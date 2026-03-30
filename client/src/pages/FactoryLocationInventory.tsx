@@ -46,6 +46,10 @@ interface FactoryBaleProduct {
   totalCost: number;
   baleCount: number;
   sellingPrice: string;
+  // Populated only in proforma mode (from /available endpoint)
+  reservedQty?: number;
+  availableQty?: number;
+  reservations?: Array<{ proformaId: number; proformaName: string; customerId: number; qty: number }>;
 }
 
 interface CategoryGroup {
@@ -186,6 +190,23 @@ export default function FactoryLocationInventory() {
     enabled: !!selectedLocation,
   });
 
+  const { data: availableInventoryData = [], isLoading: availableLoading } = useQuery<FactoryBaleProduct[]>({
+    queryKey: selectedLocation
+      ? [`/api/factory/location-inventory/${selectedLocation.id}/available`]
+      : [],
+    queryFn: async () => {
+      const response = await fetch(`/api/factory/location-inventory/${selectedLocation!.id}/available`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch available inventory");
+      return response.json();
+    },
+    enabled: !!selectedLocation && proformaMode,
+  });
+
+  // In proforma mode use the reservations-aware data; otherwise use the plain inventory
+  const activeInventoryData: FactoryBaleProduct[] = proformaMode && availableInventoryData.length > 0
+    ? availableInventoryData
+    : inventoryData;
+
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/factory/customers"],
     enabled: finalizeOpen,
@@ -217,6 +238,7 @@ export default function FactoryLocationInventory() {
     onSuccess: (result: any) => {
       setSavedProformaId(result.id);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-proformas"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/location-inventory"] });
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
@@ -232,6 +254,7 @@ export default function FactoryLocationInventory() {
     onSuccess: (result: any) => {
       toast({ title: "Proforma updated", description: "Lines saved successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-proformas"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/location-inventory"] });
       setSavedProformaId(result.id);
       setTimeout(() => navigate("/factory/sales/proformas"), 800);
     },
@@ -328,13 +351,14 @@ export default function FactoryLocationInventory() {
     (inventoryData as any[]).forEach((prod: any) => {
       const line = lineMap.get(prod.articleCode);
       if (line) {
+        const available = prod.availableQty ?? prod.baleCount;
         newSelections.set(prod.productId, {
           productId: prod.productId,
           articleCode: prod.articleCode,
           productName: prod.productName,
-          availableBales: prod.baleCount,
+          availableBales: available,
           totalWeight: prod.totalWeight,
-          selectedQty: Math.min(line.quantity, prod.baleCount),
+          selectedQty: line.quantity,
           pricePerBale: line.pricePerBale,
         });
       }
@@ -343,7 +367,7 @@ export default function FactoryLocationInventory() {
     setEditModeInitialized(true);
   }, [editingProformaId, editProformaLines, inventoryData, editModeInitialized]);
 
-  const categoryGroups: CategoryGroup[] = inventoryData.reduce((groups, item) => {
+  const categoryGroups: CategoryGroup[] = activeInventoryData.reduce((groups, item) => {
     const catId = item.categoryId || 0;
     let group = groups.find((g) => (g.categoryId || 0) === catId);
     if (!group) {
@@ -374,14 +398,14 @@ export default function FactoryLocationInventory() {
   );
 
   const globalSearchResults = useMemo(() => {
-    if (!categorySearch.trim() || !inventoryData.length) return null;
+    if (!categorySearch.trim() || !activeInventoryData.length) return null;
     const q = categorySearch.toLowerCase();
-    const matched = inventoryData.filter(
+    const matched = activeInventoryData.filter(
       (p) => p.productName.toLowerCase().includes(q) || p.articleCode.toLowerCase().includes(q)
     );
     if (matched.length === 0) return null;
     return matched;
-  }, [categorySearch, inventoryData]);
+  }, [categorySearch, activeInventoryData]);
 
   const filteredCategories = applySortCategories(
     categoryGroups.filter((c) =>
@@ -425,7 +449,7 @@ export default function FactoryLocationInventory() {
   };
 
   const handleViewAll = () => {
-    const allProducts = inventoryData.slice().sort((a, b) => a.productName.localeCompare(b.productName));
+    const allProducts = activeInventoryData.slice().sort((a, b) => a.productName.localeCompare(b.productName));
     const totalBales = allProducts.reduce((s, p) => s + p.baleCount, 0);
     const totalWeight = allProducts.reduce((s, p) => s + p.totalWeight, 0);
     const totalCost = allProducts.reduce((s, p) => s + p.totalCost, 0);
@@ -479,13 +503,14 @@ export default function FactoryLocationInventory() {
       const next = new Map(prev);
       filteredProducts.forEach((prod) => {
         if (!next.has(prod.productId)) {
+          const available = prod.availableQty ?? prod.baleCount;
           next.set(prod.productId, {
             productId: prod.productId,
             articleCode: prod.articleCode,
             productName: prod.productName,
-            availableBales: prod.baleCount,
+            availableBales: available,
             totalWeight: prod.totalWeight,
-            selectedQty: prod.baleCount,
+            selectedQty: available,
             pricePerBale: prod.sellingPrice || "0",
           });
         }
@@ -509,13 +534,14 @@ export default function FactoryLocationInventory() {
       if (next.has(prod.productId)) {
         next.delete(prod.productId);
       } else {
+        const available = prod.availableQty ?? prod.baleCount;
         next.set(prod.productId, {
           productId: prod.productId,
           articleCode: prod.articleCode,
           productName: prod.productName,
-          availableBales: prod.baleCount,
+          availableBales: available,
           totalWeight: prod.totalWeight,
-          selectedQty: prod.baleCount,
+          selectedQty: available,
           pricePerBale: prod.sellingPrice || "0",
         });
       }
@@ -1061,7 +1087,7 @@ export default function FactoryLocationInventory() {
             </div>
           </div>
 
-          {inventoryLoading ? (
+          {(inventoryLoading || (proformaMode && availableLoading)) ? (
             <div className="space-y-2">
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
@@ -1550,7 +1576,13 @@ export default function FactoryLocationInventory() {
                       )}
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div><span className="text-muted-foreground">Bales: </span><span className="font-mono">{prod.baleCount.toLocaleString()}</span></div>
+                      <div>
+                        <span className="text-muted-foreground">Bales: </span>
+                        <span className="font-mono">{proformaMode ? (prod.availableQty ?? prod.baleCount) : prod.baleCount}</span>
+                        {proformaMode && (prod.reservedQty ?? 0) > 0 && (
+                          <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">({prod.reservedQty} reserved)</span>
+                        )}
+                      </div>
                       <div className="text-right"><span className="text-muted-foreground">Wt/Bale: </span><span className="font-mono">{fmt(weightPerBale)} KG</span></div>
                       <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
                       {!hideAvgRate && <div><span className="text-muted-foreground">Cost/Bale: </span><span className="font-mono">{formatAmount(avgRate)}</span></div>}
@@ -1569,7 +1601,7 @@ export default function FactoryLocationInventory() {
                           min={1}
                           data-testid={`input-qty-mobile-${prod.productId}`}
                         />
-                        <span className="text-xs text-muted-foreground">/ {prod.baleCount}</span>
+                        <span className="text-xs text-muted-foreground">/ {prod.availableQty ?? prod.baleCount}</span>
                         <span className="text-xs text-muted-foreground ml-2">Price:</span>
                         <Input
                           type="number"
@@ -1637,7 +1669,13 @@ export default function FactoryLocationInventory() {
                           <span className="text-xs text-muted-foreground">| {prod.category}</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div><span className="text-muted-foreground">Bales: </span><span className="font-mono">{prod.baleCount.toLocaleString()}</span></div>
+                          <div>
+                            <span className="text-muted-foreground">Bales: </span>
+                            <span className="font-mono">{proformaMode ? (prod.availableQty ?? prod.baleCount) : prod.baleCount}</span>
+                            {proformaMode && (prod.reservedQty ?? 0) > 0 && (
+                              <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">({prod.reservedQty} reserved)</span>
+                            )}
+                          </div>
                           <div className="text-right"><span className="text-muted-foreground">Wt/Bale: </span><span className="font-mono">{fmt(weightPerBale)} KG</span></div>
                           <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
                           {!hideAvgRate && <div><span className="text-muted-foreground">Cost/Bale: </span><span className="font-mono">{formatAmount(avgRate)}</span></div>}
@@ -1649,7 +1687,7 @@ export default function FactoryLocationInventory() {
                           <div className="mt-2 pt-2 border-t flex items-center gap-2 flex-wrap">
                             <span className="text-xs text-muted-foreground">Qty:</span>
                             <Input type="number" value={selection.selectedQty} onChange={(e) => updateSelectionQty(prod.productId, e.target.value)} className="w-20 text-right" min={1} data-testid={`input-qty-mobile-sp-${prod.productId}`} />
-                            <span className="text-xs text-muted-foreground">/ {prod.baleCount}</span>
+                            <span className="text-xs text-muted-foreground">/ {prod.availableQty ?? prod.baleCount}</span>
                             <span className="text-xs text-muted-foreground ml-2">Price:</span>
                             <Input type="number" value={selection.pricePerBale} onChange={(e) => updateSelectionPrice(prod.productId, e.target.value)} className="w-24 text-right" step="0.01" data-testid={`input-price-mobile-sp-${prod.productId}`} />
                           </div>
@@ -1696,7 +1734,7 @@ export default function FactoryLocationInventory() {
                   {isAllItems && <th className="text-left px-3 font-medium">Category</th>}
                   <th className="text-left px-3 font-medium">Article Code</th>
                   <th className="text-left px-3 font-medium whitespace-nowrap">Bale Name</th>
-                  <th className="text-right px-3 font-medium whitespace-nowrap">Bales</th>
+                  <th className="text-right px-3 font-medium whitespace-nowrap">{proformaMode ? "Available" : "Bales"}</th>
                   {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
                   {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
                   <th className="text-right px-3 font-medium">Wt/Bale (KG)</th>
@@ -1736,7 +1774,12 @@ export default function FactoryLocationInventory() {
                               {prod.productName}
                             </button>
                           </td>
-                          <td className="text-right px-3 font-mono whitespace-nowrap">{prod.baleCount.toLocaleString()}</td>
+                          <td className="text-right px-3 font-mono whitespace-nowrap">
+                            {proformaMode ? (prod.availableQty ?? prod.baleCount) : prod.baleCount}
+                            {proformaMode && (prod.reservedQty ?? 0) > 0 && (
+                              <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">({prod.reservedQty}R)</span>
+                            )}
+                          </td>
                           {proformaMode && (
                             <td className="text-right px-3">
                               {isSelected && selection ? (
@@ -1821,7 +1864,7 @@ export default function FactoryLocationInventory() {
                       <th className="text-left px-3 font-medium">Category</th>
                       <th className="text-left px-3 font-medium">Article Code</th>
                       <th className="text-left px-3 font-medium whitespace-nowrap">Bale Name</th>
-                      <th className="text-right px-3 font-medium whitespace-nowrap">Bales</th>
+                      <th className="text-right px-3 font-medium whitespace-nowrap">{proformaMode ? "Available" : "Bales"}</th>
                       {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
                       {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
                       <th className="text-right px-3 font-medium">Wt/Bale (KG)</th>
@@ -1853,7 +1896,12 @@ export default function FactoryLocationInventory() {
                               {prod.productName}
                             </button>
                           </td>
-                          <td className="text-right px-3 font-mono whitespace-nowrap">{prod.baleCount.toLocaleString()}</td>
+                          <td className="text-right px-3 font-mono whitespace-nowrap">
+                            {proformaMode ? (prod.availableQty ?? prod.baleCount) : prod.baleCount}
+                            {proformaMode && (prod.reservedQty ?? 0) > 0 && (
+                              <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">({prod.reservedQty}R)</span>
+                            )}
+                          </td>
                           {proformaMode && (
                             <td className="text-right px-3">
                               {isSelected && selection ? (

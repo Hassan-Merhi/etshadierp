@@ -1032,6 +1032,106 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // Returns inventory with pending proforma reservations subtracted
+  app.get("/api/factory/location-inventory/:locationId/available", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const locationId = parseInt(req.params.locationId);
+      if (isNaN(locationId)) return res.status(400).json({ message: "Invalid location ID" });
+
+      // --- stock (same logic as base endpoint) ---
+      const bales = await db
+        .select()
+        .from(factoryBales)
+        .where(
+          and(
+            eq(factoryBales.companyId, companyId),
+            eq(factoryBales.erpLocationId, locationId),
+            or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+          )
+        );
+
+      const allProducts = await db.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId));
+      const categoryIds = [...new Set(allProducts.map(p => p.categoryId).filter((id): id is number => id != null))];
+      const categories = categoryIds.length > 0
+        ? await db.select().from(factoryCategories).where(and(eq(factoryCategories.companyId, companyId), inArray(factoryCategories.id, categoryIds)))
+        : [];
+      const categoryMap = new Map(categories.map(c => [c.id, c.name]));
+      const productById = new Map(allProducts.map(p => [p.id, p]));
+      const productByArticleCode = new Map(allProducts.filter(p => p.articleCode).map(p => [p.articleCode!.toLowerCase(), p]));
+      const getProduct = (bale: typeof bales[number]) => {
+        const byId = bale.productId ? productById.get(bale.productId) : undefined;
+        if (byId) return byId;
+        return bale.articleCode ? productByArticleCode.get(bale.articleCode.toLowerCase()) : undefined;
+      };
+
+      const grouped = new Map<string, {
+        productId: number; articleCode: string; productName: string;
+        category: string | null; categoryId: number | null;
+        quantity: number; totalWeight: number; totalCost: number;
+        baleCount: number; sellingPrice: string; productionPrice: number;
+      }>();
+
+      for (const b of bales) {
+        const product = getProduct(b);
+        const groupKey = product ? `p:${product.id}` : `a:${b.articleCode || b.baleCode || "unknown"}`;
+        const existing = grouped.get(groupKey);
+        const qty = parseFloat(String(b.quantity || "1"));
+        const weight = parseFloat(String(b.weightKg || "0"));
+        const productionPrice = parseFloat(String((product as any)?.productionPrice || "0"));
+        const sellingPrice = String(product?.sellingPrice || "0");
+        const categoryName = product?.categoryId ? (categoryMap.get(product.categoryId) || b.category || null) : (b.category || null);
+        const categoryId = product?.categoryId || null;
+        if (existing) {
+          existing.quantity += qty; existing.totalWeight += weight;
+          existing.totalCost += productionPrice; existing.baleCount += 1;
+        } else {
+          grouped.set(groupKey, { productId: product?.id || b.productId || 0, articleCode: product?.articleCode || b.articleCode || b.baleCode || "", productName: product?.name || b.productName || "Unknown", category: categoryName, categoryId, quantity: qty, totalWeight: weight, totalCost: productionPrice, baleCount: 1, sellingPrice, productionPrice });
+        }
+      }
+
+      // --- pending proforma reservations ---
+      const proformas = await db.select().from(customerProformas).where(eq(customerProformas.companyId, companyId));
+      const proformaIds = proformas.map(p => p.id);
+
+      // reservedByArticle: articleCode (lowercase) → { qty, details }
+      const reservedByArticle = new Map<string, { qty: number; details: Array<{ proformaId: number; proformaName: string; customerId: number; qty: number }> }>();
+
+      if (proformaIds.length > 0) {
+        const lines = await db.select().from(customerProformaLines).where(inArray(customerProformaLines.proformaId, proformaIds));
+        const proformaMap = new Map(proformas.map(p => [p.id, p]));
+        for (const line of lines) {
+          const key = (line.articleCode || "").toLowerCase();
+          const proforma = proformaMap.get(line.proformaId);
+          const existing = reservedByArticle.get(key);
+          const detail = { proformaId: line.proformaId, proformaName: proforma?.name || `#${line.proformaId}`, customerId: proforma?.customerId || 0, qty: line.quantity };
+          if (existing) {
+            existing.qty += line.quantity;
+            existing.details.push(detail);
+          } else {
+            reservedByArticle.set(key, { qty: line.quantity, details: [detail] });
+          }
+        }
+      }
+
+      // merge reservations into grouped stock
+      const result = Array.from(grouped.values()).map(item => {
+        const key = (item.articleCode || "").toLowerCase();
+        const reservation = reservedByArticle.get(key);
+        const reservedQty = reservation?.qty ?? 0;
+        const availableQty = Math.max(0, item.baleCount - reservedQty);
+        return { ...item, reservedQty, availableQty, reservations: reservation?.details ?? [] };
+      }).sort((a, b) => a.productName.localeCompare(b.productName));
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching available factory location inventory:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/factory/location-inventory/:locationId/export/excel", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
