@@ -326,8 +326,8 @@ export default function StockEntryHistory() {
     const matrix = buildWorkerMatrix(filteredGroups);
     const { workers: cols, rows, workerTotals, grandTotal } = matrix;
 
-    const numCols = cols.length + 2;
-    const fontSize = numCols > 14 ? 6.5 : numCols > 10 ? 7.5 : numCols > 7 ? 8.5 : 9.5;
+    // Readable font — minimum 8.5 px regardless of column count
+    const fontSize = cols.length > 20 ? 8.5 : cols.length > 14 ? 9.5 : cols.length > 10 ? 10.5 : 11.5;
 
     // Palette of vivid accent colors for worker columns (cycles if more workers than colors)
     const palette = [
@@ -336,11 +336,22 @@ export default function StockEntryHistory() {
     ];
     const colColor = (i: number) => palette[i % palette.length];
 
-    // Create subtle background per column header
+    // Worker header — split on the last space so two short lines fit the narrow column
     const headerCells = cols.map((w, i) => {
       const c = colColor(i);
-      return `<th class="wc" style="background:${c};">${w.replace(" ", "<br/>")}</th>`;
+      const lastSpace = w.lastIndexOf(" ");
+      const label = lastSpace > 0
+        ? `${w.slice(0, lastSpace)}<br/>${w.slice(lastSpace + 1)}`
+        : w;
+      return `<th class="wc" style="background:${c};">${label}</th>`;
     }).join("");
+
+    // Split "Product Name (CODE)" into two stacked lines to keep the cell narrow
+    const prodHtml = (label: string) => {
+      const m = label.match(/^(.*)\s\(([^)]+)\)$/);
+      if (m) return `${m[1]}<br/><span class="code">${m[2]}</span>`;
+      return label;
+    };
 
     const dataRows = rows.map((row, idx) => {
       const rowBg = idx % 2 === 0 ? "#ffffff" : "#f1f5f9";
@@ -350,10 +361,10 @@ export default function StockEntryHistory() {
         const style = v > 0
           ? `style="color:${accent};font-weight:700;background:${rowBg};"`
           : `style="background:${rowBg};color:#cbd5e1;"`;
-        return `<td class="num" ${style}>${v > 0 ? v : "·"}</td>`;
+        return `<td class="num" ${style}>${v > 0 ? v : "&middot;"}</td>`;
       }).join("");
       return `<tr>
-        <td class="prod" style="background:${rowBg};">${row.productLabel}</td>
+        <td class="prod" style="background:${rowBg};">${prodHtml(row.productLabel)}</td>
         ${cells}
         <td class="num total-col" style="background:${idx % 2 === 0 ? "#e0f2fe" : "#bae6fd"};">${row.total}</td>
       </tr>`;
@@ -364,36 +375,40 @@ export default function StockEntryHistory() {
       return `<td class="num" style="background:${c};color:#fff;">${workerTotals[w] || 0}</td>`;
     }).join("");
 
+    // Column widths: product = 12%, total = 7%, workers share the remaining 81%
+    const workerColPct = Math.max(2, Math.floor(81 / Math.max(cols.length, 1)));
+
     const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8"/>
   <title>Worker Matrix — ${fromDate} to ${toDate}</title>
   <style>
-    @page { size: landscape; margin: 10mm 8mm; }
+    @page { size: landscape; margin: 8mm 7mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', Arial, sans-serif; font-size: ${fontSize}px; color: #1e293b; background: #fff; }
 
-    .header { margin-bottom: 6px; display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 2px solid #2563eb; padding-bottom: 4px; }
-    .header-left h1 { font-size: ${fontSize + 3}px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.3px; }
+    .header { margin-bottom: 5px; display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 2px solid #2563eb; padding-bottom: 3px; }
+    .header-left h1 { font-size: ${fontSize + 2.5}px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.3px; }
     .header-left .sub { font-size: ${fontSize - 0.5}px; color: #475569; margin-top: 1px; }
-    .header-right { text-align: right; font-size: ${fontSize - 1}px; color: #64748b; line-height: 1.5; }
+    .header-right { text-align: right; font-size: ${fontSize - 0.5}px; color: #64748b; line-height: 1.5; }
     .header-right strong { color: #1e3a8a; }
 
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     thead { display: table-header-group; }
     th, td { border: 1px solid #e2e8f0; padding: 2px 3px; overflow: hidden; }
-    th { color: #fff; font-weight: 700; text-align: center; font-size: ${fontSize - 0.5}px; line-height: 1.2; }
-    th.prod-h { background: #1e3a8a; text-align: left; width: 22%; font-size: ${fontSize - 0.5}px; }
-    th.wc { width: ${Math.floor(68 / Math.max(cols.length, 1))}%; }
-    th.total-h { background: #0369a1; width: 6%; }
+    th { color: #fff; font-weight: 700; text-align: center; font-size: ${fontSize}px; line-height: 1.3; }
+    th.prod-h { background: #1e3a8a; text-align: left; width: 12%; }
+    th.wc { width: ${workerColPct}%; }
+    th.total-h { background: #0369a1; width: 7%; }
 
-    td.prod { text-align: left; font-weight: 500; word-break: break-word; color: #1e293b; font-size: ${fontSize - 0.5}px; }
+    td.prod { text-align: left; font-weight: 500; word-break: break-word; color: #1e293b; font-size: ${fontSize}px; line-height: 1.3; }
+    .code { color: #64748b; font-size: ${Math.max(6.5, fontSize - 1.5)}px; font-weight: 400; }
     td.num { text-align: center; font-size: ${fontSize}px; }
     td.total-col { font-weight: 800; text-align: center; }
 
     tr.totals-row td { font-weight: 800; border-color: #1e3a8a; }
-    tr.totals-row td.prod-total { background: #1e3a8a; color: #fff; text-align: left; font-size: ${fontSize - 0.5}px; }
+    tr.totals-row td.prod-total { background: #1e3a8a; color: #fff; text-align: left; }
     tr.totals-row td.grand { background: #0369a1; color: #fff; text-align: center; font-weight: 800; }
   </style>
 </head>
@@ -401,7 +416,7 @@ export default function StockEntryHistory() {
   <div class="header">
     <div class="header-left">
       <h1>Worker Bale Matrix</h1>
-      <div class="sub">Stock Entry History &nbsp;·&nbsp; ${fromDate} &rarr; ${toDate}</div>
+      <div class="sub">Stock Entry History &nbsp;&middot;&nbsp; ${fromDate} &rarr; ${toDate}</div>
     </div>
     <div class="header-right">
       <strong>${cols.length}</strong> worker${cols.length !== 1 ? "s" : ""} &nbsp;|&nbsp;
