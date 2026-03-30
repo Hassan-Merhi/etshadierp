@@ -229,7 +229,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/stock-entry", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { items, erpLocationId, mixBatchId, entryDate } = req.body;
@@ -491,7 +491,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/bales/import", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { erpLocationId, bales } = req.body;
@@ -666,7 +666,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/stock-entry/remove", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { baleIds, supervisorUsername, supervisorPassword, reason } = req.body;
@@ -795,7 +795,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // Remove N bales of a specific product from a specific location
   app.post("/api/factory/stock-entry/remove-by-product", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { productId, locationId, qty, supervisorUsername, supervisorPassword, reason } = req.body;
@@ -895,7 +895,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/location-inventory/:locationId", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const locationId = parseInt(req.params.locationId);
@@ -991,7 +991,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/location-inventory/:locationId/export/excel", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const locationId = parseInt(req.params.locationId);
@@ -1164,7 +1164,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // Export ALL locations inventory to Excel — summary + full bale detail with ref numbers
   app.get("/api/factory/location-inventory/export/all", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const includeCost = req.query.includeCost !== "0";
@@ -1354,7 +1354,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/stock-entry/in-stock", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { locationId } = req.query;
@@ -1387,7 +1387,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/suppliers", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const results = await db
@@ -1405,7 +1405,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/suppliers", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = insertFactorySupplierSchema.parse({ ...req.body, companyId });
@@ -1419,7 +1419,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.patch("/api/factory/suppliers/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -1439,7 +1439,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.delete("/api/factory/suppliers/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -1460,7 +1460,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // Overwrite a factory supplier's opening balance
   app.patch("/api/factory/suppliers/:id/opening-balance", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -1499,7 +1499,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // Hard-delete a factory supplier — cascades through all related records
   app.delete("/api/factory/suppliers/:id/permanent", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -1559,7 +1559,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/supplier-payments", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const supplierId = req.query.supplierId ? parseInt(req.query.supplierId as string) : null;
 
@@ -1596,7 +1596,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/supplier-payments", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = insertFactorySupplierPaymentSchema.parse({ ...req.body, companyId });
@@ -1667,7 +1667,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.delete("/api/factory/supplier-payments/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       const [payment] = await db.select().from(factorySupplierPayments)
@@ -1713,7 +1713,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/supplier-fx-transfers", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const transfers = await db
         .select()
@@ -1729,7 +1729,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/supplier-fx-transfers", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = insertFactorySupplierFxTransferSchema.parse({ ...req.body, companyId });
@@ -1933,7 +1933,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.delete("/api/factory/supplier-fx-transfers/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       const [transfer] = await db.select().from(factorySupplierFxTransfers)
@@ -1967,7 +1967,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // client can run the greedy allocation algorithm offline.
   app.get("/api/factory/suppliers/:brokerId/bulk-fx-prefetch", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const brokerId = parseInt(req.params.brokerId);
       if (isNaN(brokerId)) return res.status(400).json({ message: "Invalid broker ID" });
@@ -2040,7 +2040,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // supplier's outstanding balance.
   app.post("/api/factory/suppliers/:brokerId/bulk-fx-settlement", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const brokerId = parseInt(req.params.brokerId);
       if (isNaN(brokerId)) return res.status(400).json({ message: "Invalid broker ID" });
@@ -2300,7 +2300,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // voucher-based payments, and broker aggregation across linked suppliers).
   app.get("/api/factory/suppliers/:id/balance", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const supplierId = parseInt(req.params.id);
       if (isNaN(supplierId)) return res.status(400).json({ message: "Invalid supplier ID" });
@@ -2419,7 +2419,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/suppliers/with-balances", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const suppliersList = await db
@@ -3957,7 +3957,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/categories", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const results = await db
@@ -3975,7 +3975,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/categories", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = insertFactoryCategorySchema.parse({ ...req.body, companyId });
@@ -3989,7 +3989,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.patch("/api/factory/categories/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -4009,7 +4009,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.delete("/api/factory/categories/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -4033,7 +4033,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/bale-products", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const results = await db
@@ -4051,7 +4051,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/bale-products/generate-code", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const grade = req.query.grade as string;
@@ -4107,7 +4107,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/bale-products/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -4126,7 +4126,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/bale-product-detail/:productId", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const productId = parseInt(req.params.productId);
       if (!productId) return res.status(400).json({ message: "Invalid product ID" });
@@ -4270,7 +4270,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/bale-products", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       let code = req.body.code;
@@ -4419,7 +4419,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.patch("/api/factory/bale-products/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -4439,7 +4439,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/bale-products/:id/cascade-update", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -4506,7 +4506,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/bale-product-history/:productId/:locationId", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const productId = parseInt(req.params.productId);
@@ -4581,7 +4581,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/bale-product-history/:productId/:locationId/:year/:month", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const productId = parseInt(req.params.productId);
@@ -4622,7 +4622,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.delete("/api/factory/bale-products/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -4642,7 +4642,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/bale-products/bulk-rename-preview", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { codePrefix, find, replace } = req.body;
@@ -4680,7 +4680,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/bale-products/bulk-rename-apply", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { items } = req.body;
@@ -4714,7 +4714,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         try {
           if (err) return res.status(400).json({ message: err.message });
 
-          const companyId = (req.session as any).currentCompanyId;
+          const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
           if (!companyId) return res.status(400).json({ message: "No company selected" });
 
           if (!req.file) return res.status(400).json({ message: "No file uploaded" });
@@ -4860,7 +4860,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         try {
           if (err) return res.status(400).json({ message: err.message });
 
-          const companyId = (req.session as any).currentCompanyId;
+          const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
           if (!companyId) return res.status(400).json({ message: "No company selected" });
 
           if (!req.file) return res.status(400).json({ message: "No file uploaded" });
@@ -4968,7 +4968,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         try {
           if (err) return res.status(400).json({ message: err.message });
 
-          const companyId = (req.session as any).currentCompanyId;
+          const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
           if (!companyId) return res.status(400).json({ message: "No company selected" });
 
           if (!req.file) return res.status(400).json({ message: "No file uploaded" });
@@ -5221,7 +5221,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/containers", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = insertFactoryContainerSchema.parse({ ...req.body, companyId });
@@ -5409,7 +5409,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.patch("/api/factory/containers/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -5583,7 +5583,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.delete("/api/factory/containers/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -5603,7 +5603,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // ── Backfill: create missing goods-import credits for existing containers ────
   app.post("/api/factory/containers/backfill-import-credits", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const allContainers = await db
@@ -5671,7 +5671,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/containers/:id/other-charges", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const containerId = parseInt(req.params.id);
       const charges = await db
@@ -5690,7 +5690,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/containers/:id/other-charges/sync", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const containerId = parseInt(req.params.id);
       const { charges, isCreate } = req.body as { charges: { description: string; amount: string; currencyCode?: string; ledgerAccountId?: number | null }[]; isCreate?: boolean };
@@ -5806,7 +5806,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // Preview: list containers that have other charges NOT in USD
   app.get("/api/factory/admin/other-charges-currency-preview", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Find containers where:
@@ -5888,7 +5888,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // Apply: fix other charges to USD — updates container otherChargesCurrencyCode and daybook entries
   app.post("/api/factory/admin/fix-other-charges-currency", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { containerIds } = req.body as { containerIds: number[] };
@@ -5993,7 +5993,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/containers/import-excel", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { rows } = req.body;
@@ -6141,7 +6141,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/raw-stock", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const results = await db
@@ -6322,7 +6322,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // GET all adjustments for display/audit
   app.get("/api/factory/raw-stock/adjustments", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const rows = await db.select({
         id: factoryRawMaterialAdjustments.id,
@@ -6354,7 +6354,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // POST create a new adjustment (ADD or REMOVE), or create a new standalone manual material
   app.post("/api/factory/raw-stock/adjustment", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { type, kg, costPerKg, currencyCode, supplierId, materialLabel, notes, date } = req.body;
       if (!type || !["ADD", "REMOVE"].includes(type)) return res.status(400).json({ message: "type must be ADD or REMOVE" });
@@ -6381,7 +6381,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // DELETE a specific adjustment
   app.delete("/api/factory/raw-stock/adjustments/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       await db.delete(factoryRawMaterialAdjustments)
@@ -6394,7 +6394,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/raw-stock/by-container", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const results = await db
@@ -6436,7 +6436,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/raw-stock/available-containers", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const offloaded = await db
@@ -6471,7 +6471,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/raw-stock/offload", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const {
@@ -6985,7 +6985,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // ── Reverse Offload ──────────────────────────────────────────────────────────
   app.post("/api/factory/containers/:id/reverse-offload", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const containerId = parseInt(req.params.id);
@@ -7211,7 +7211,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.patch("/api/factory/containers/:id/confirm-duty", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const containerId = parseInt(req.params.id);
@@ -7354,7 +7354,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/containers/:id/duty-audit-log", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const containerId = parseInt(req.params.id);
@@ -7373,7 +7373,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/container-commissions/:containerId", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const containerId = parseInt(req.params.containerId);
@@ -7391,7 +7391,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/raw-stock/opening-balance", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { supplierName, supplierId: reqSupplierId, receivedKg, costPerKg, currencyCode: reqCurrency, fxRateToUsd: reqFxRate, notes,
@@ -7551,7 +7551,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // GET a single opening-balance raw stock record
   app.get("/api/factory/raw-stock/opening-balance/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -7598,7 +7598,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // PATCH a single opening-balance raw stock record
   app.patch("/api/factory/raw-stock/opening-balance/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -7729,7 +7729,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // DELETE a single opening-balance raw stock record (bale-safe)
   app.delete("/api/factory/raw-stock/opening-balance/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -7774,7 +7774,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // Get all bales with no mix batch link (unlinked / not yet sourced from raw stock)
   app.get("/api/factory/bales/unlinked", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const bales = await db
@@ -7807,7 +7807,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // Assign opening balance raw stock to already-pressed bales
   app.post("/api/factory/raw-stock/:rawStockId/assign-to-bales", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const rawStockId = parseInt(req.params.rawStockId);
@@ -7905,7 +7905,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // Recalculate usedKg for all factory_raw_stock records based on active mix batch sources
   app.post("/api/factory/raw-stock/recalculate-used", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const allRawStock = await db
@@ -7956,7 +7956,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/mix-batches", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const results = await db
@@ -7980,7 +7980,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/mix-batches/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -8002,7 +8002,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.patch("/api/factory/mix-batches/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -8229,7 +8229,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.delete("/api/factory/mix-batches/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -8341,7 +8341,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/mix-batches", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { supplierSources = [], openingBatchId, name, notes,
@@ -8603,7 +8603,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // Assign existing (unlinked) bales to a mix batch
   app.post("/api/factory/mix-batches/:id/assign-bales", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const mixBatchId = parseInt(req.params.id);
@@ -8664,7 +8664,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/mix-batches/:id/sources", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -8703,7 +8703,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/mix-batches/consume", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { usages, operatorUser, usedDate } = req.body as {
@@ -8811,7 +8811,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/daily-report", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
@@ -8844,7 +8844,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/daily-report/export", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
@@ -8980,7 +8980,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/pressing/create-and-print", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { productId, quantity, weightPerBale } = req.body;
@@ -9068,7 +9068,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/pressing/create-multi", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { items } = req.body;
@@ -9166,7 +9166,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/bales/create-batch", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { productId, quantity, weightPerBale } = req.body;
@@ -9249,7 +9249,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/pressing-batches", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const batches = await db
@@ -9298,7 +9298,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/pressing-batches/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -9329,7 +9329,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/finalize", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { pressingBatchId, scannedBaleIds, erpLocationId, mixBatchId } = req.body;
@@ -9591,7 +9591,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // Backfill historical bale costs from raw stock source prices
   app.post("/api/factory/bales/backfill-costs", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const balesWithMix = await db
@@ -9678,7 +9678,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/bales/export-full.xlsx", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { date } = req.query;
@@ -9770,7 +9770,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
       try {
-        const companyId = (req.session as any).currentCompanyId;
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const ExcelJS = (await import("exceljs")).default;
@@ -10020,7 +10020,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // GET /api/factory/bales/export-names.xlsx — Export all bales for bulk product-name editing
   app.get("/api/factory/bales/export-names.xlsx", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const bales = await db
@@ -10085,7 +10085,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
       try {
-        const companyId = (req.session as any).currentCompanyId;
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const { read: readXlsx, utils } = await import("xlsx");
@@ -10136,7 +10136,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/bales", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { status, mixBatchId, pressingBatchId } = req.query;
@@ -10198,7 +10198,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.patch("/api/factory/bales/bulk-status", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { ids, status } = req.body;
@@ -10222,7 +10222,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.patch("/api/factory/bales/:id/status", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -10249,7 +10249,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.delete("/api/factory/bales/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -10270,7 +10270,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.patch("/api/factory/bales/:id/product-name", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -10307,7 +10307,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.patch("/api/factory/bales/:id/assign-worker", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       const { workerId } = req.body;
@@ -10345,7 +10345,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/bales/:id/repack", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -10675,7 +10675,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/bales/lookup/:barcode", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const barcode = req.params.barcode;
@@ -10743,7 +10743,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/production-summary", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const allBales = await db
@@ -10900,7 +10900,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/import/suppliers", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { suppliers: supplierList } = req.body;
@@ -10962,7 +10962,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/import/raw-stock", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { items } = req.body;
@@ -11041,7 +11041,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/import/bales", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { bales } = req.body;
@@ -11209,7 +11209,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/raw-stock/recalc-opening", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const stats = await recalcOpeningStockUsage(companyId);
       res.json(stats);
@@ -11221,7 +11221,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/import/opening-raw-stock", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { items } = req.body;
@@ -11408,7 +11408,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/fx-rates", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { currencyCode } = req.query;
       const conditions: any[] = [eq(factoryFxRates.companyId, companyId)];
@@ -11422,7 +11422,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/fx-rates/latest/:currencyCode", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const currency = req.params.currencyCode.toUpperCase();
       const today = new Date().toISOString().split("T")[0];
@@ -11447,7 +11447,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/fx-rates/:currencyCode/:date", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const currency = req.params.currencyCode.toUpperCase();
       const dateISO = req.params.date;
@@ -11463,7 +11463,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/fx-rates", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const parsed = insertFactoryFxRateSchema.parse({ ...req.body, companyId });
       const [rate] = await db.insert(factoryFxRates).values(parsed).returning();
@@ -11475,7 +11475,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.delete("/api/factory/fx-rates/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const [deleted] = await db.delete(factoryFxRates)
         .where(and(eq(factoryFxRates.id, parseInt(req.params.id)), eq(factoryFxRates.companyId, companyId)))
@@ -11738,7 +11738,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/customers", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const allCustomers = await db.select().from(customers)
@@ -11783,7 +11783,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/customers", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const dataWithCompany = { ...req.body, companyId };
@@ -11850,7 +11850,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
 
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const [existing] = await db.select().from(customers).where(eq(customers.id, customerId));
@@ -11879,7 +11879,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
 
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const [existing] = await db.select().from(customers).where(eq(customers.id, customerId));
@@ -11903,7 +11903,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/customers/:id/statement", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const customerId = parseInt(req.params.id);
@@ -12006,7 +12006,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // ── Customer Statement: PDF Export ──────────────────────────────────────
   app.get("/api/factory/customers/:id/statement/export-pdf", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
@@ -12184,7 +12184,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // ── Customer Statement: Excel Export ────────────────────────────────────
   app.get("/api/factory/customers/:id/statement/export-excel", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
@@ -12343,7 +12343,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/customer-proformas", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const customerId = req.query.customerId ? parseInt(req.query.customerId) : null;
@@ -12387,7 +12387,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/customer-proformas", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = insertCustomerProformaSchema.parse({ ...req.body, companyId });
@@ -12417,7 +12417,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.put("/api/factory/customer-proformas/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -12456,7 +12456,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.delete("/api/factory/customer-proformas/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -12476,7 +12476,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // Create a pending loading from a proforma — auto-adds matching bales from stock
   app.post("/api/factory/customer-proformas/:id/create-loading", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const proformaId = parseInt(req.params.id);
@@ -12607,7 +12607,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/customer-proformas/bulk", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { customerId, name, isActive, lines } = req.body;
@@ -12652,7 +12652,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.put("/api/factory/customer-proformas/:id/replace-lines", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -12692,7 +12692,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/customer-proformas/:id/apply-catalog-prices", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -12734,7 +12734,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // Toggle price_fixed flag on a proforma line
   app.patch("/api/factory/customer-proforma-lines/:lineId/toggle-fixed", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const lineId = parseInt(req.params.lineId);
       const [line] = await db.select().from(customerProformaLines).where(eq(customerProformaLines.id, lineId)).limit(1);
@@ -12751,7 +12751,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/customer-proformas/:id/export/excel", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -12871,7 +12871,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/customer-proformas/:id/export/pdf", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -13024,7 +13024,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/customer-orders", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const conditions: any[] = [eq(customerOrders.companyId, companyId)];
@@ -13072,7 +13072,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/customer-orders/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -13122,7 +13122,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/customer-orders/:id/profitability", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -13211,7 +13211,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/customer-orders", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = insertCustomerOrderSchema.parse({ ...req.body, companyId, status: "DRAFT" });
@@ -13225,7 +13225,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/customer-orders/:id/bales", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -13380,7 +13380,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/customer-orders/:id/bales/bulk-import", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -13573,7 +13573,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.delete("/api/factory/customer-orders/:id/bales/:baleId", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -13610,7 +13610,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/customer-orders/:id/charges", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -13660,7 +13660,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.delete("/api/factory/customer-orders/:id/charges/:chargeId", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -13704,7 +13704,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.delete("/api/factory/customer-orders/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -13738,7 +13738,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/customer-orders/:id/finalize", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -13890,7 +13890,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/customer-orders/:id/finalize-preview", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -13941,7 +13941,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/customer-orders/:id/reprice", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -14034,7 +14034,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   app.post("/api/factory/customer-orders/:id/force-sync-bale-status", requireAuth, async (req: any, res: any) => {
     try {
       const session = req.session as any;
-      const companyId = session.currentCompanyId;
+      const companyId = session.factoryCompanyId || session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const role = (session.currentRole || session.role || "").toLowerCase();
@@ -14075,7 +14075,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // Export a single customer order to Excel with full bale detail
   app.get("/api/factory/customer-orders/:id/export/excel", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -14207,7 +14207,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/customer-orders/:id/unfinalize", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -14291,7 +14291,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/customer-orders/:id/cancel", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -14334,7 +14334,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/customer-orders-loading", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { customerId, proformaIdUsed, locationId, orderDate } = req.body;
@@ -14370,7 +14370,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/customer-orders/:id/finalize-loading", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -14410,7 +14410,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/customer-orders/:id/verification-summary", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -14500,7 +14500,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/customer-orders/:id/verify", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -14547,7 +14547,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/customer-orders/:id/return-to-loading", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -14571,7 +14571,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.post("/api/factory/customer-orders/:id/assign-container", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -14608,7 +14608,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/bale-lookup", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const code = req.query.code as string;
@@ -14646,7 +14646,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/customer-orders/:id/export-excel", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -14722,7 +14722,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/customer-orders/:id/pending-export", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -14806,7 +14806,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/customer-orders/:id/export-pdf", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
@@ -14978,7 +14978,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
           const containerId = Number(req.params.containerId);
-          const companyId = (req.session as any).currentCompanyId;
+          const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
           const docTypeId = Number(req.body.docTypeId);
           if (!companyId || !docTypeId) return res.status(400).json({ message: "Missing companyId or docTypeId" });
 
@@ -15029,7 +15029,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
     try {
       const containerId = Number(req.params.containerId);
       const docId = Number(req.params.docId);
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
 
       const [deleted] = await db.delete(containerDocuments)
         .where(and(eq(containerDocuments.id, docId), eq(containerDocuments.containerId, containerId)))
@@ -15100,7 +15100,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   app.post("/api/factory/containers/:containerId/freight", requireAuth, async (req: any, res: any) => {
     try {
       const containerId = Number(req.params.containerId);
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const [row] = await db.insert(containerFreight).values({
@@ -15138,7 +15138,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
     try {
       const freightId = Number(req.params.freightId);
       const containerId = Number(req.params.containerId);
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
 
       await db.delete(containerFreightPayments).where(eq(containerFreightPayments.containerFreightId, freightId));
       const [deleted] = await db.delete(containerFreight)
@@ -15169,7 +15169,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   app.post("/api/factory/freight/:freightId/payments", requireAuth, async (req: any, res: any) => {
     try {
       const freightId = Number(req.params.freightId);
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const [payment] = await db.insert(containerFreightPayments).values({
@@ -15212,7 +15212,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
     try {
       const freightId = Number(req.params.freightId);
       const paymentId = Number(req.params.paymentId);
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
 
       const [deleted] = await db.delete(containerFreightPayments)
         .where(and(eq(containerFreightPayments.id, paymentId), eq(containerFreightPayments.containerFreightId, freightId)))
@@ -15249,7 +15249,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.get("/api/factory/containers/freight-status", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.json({});
       const allFreight = await db.select().from(containerFreight).where(eq(containerFreight.companyId, companyId));
       const freightIds = allFreight.map((f: any) => f.id);
@@ -15285,7 +15285,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
     try {
       const rawEntryId = Number(req.params.entryId);
       const session = req.session as any;
-      const companyId = session.currentCompanyId;
+      const companyId = session.factoryCompanyId || session.currentCompanyId;
       const userId = session.userId ? Number(session.userId) : null;
       const { reason, description, amountCurrency, amountUsd, currencyCode, fxRateToUsd, txDate } = req.body;
 
@@ -15542,7 +15542,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.get("/api/factory/users", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       const currentRole = (req.session as any).currentRole;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
@@ -15604,7 +15604,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.post("/api/factory/users", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       const currentRole = (req.session as any).currentRole;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (currentRole !== "Admin" && currentRole !== "Owner") {
@@ -15674,7 +15674,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.put("/api/factory/users/:userId", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       const currentRole = (req.session as any).currentRole;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (currentRole !== "Admin" && currentRole !== "Owner") {
@@ -15750,7 +15750,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.delete("/api/factory/users/:userId", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       const currentRole = (req.session as any).currentRole;
       const sessionUserId = (req.session as any).userId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -15777,7 +15777,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.get("/api/factory/my-access", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       const userId = (req.session as any).userId;
       if (!companyId || !userId) return res.status(400).json({ message: "No company or user" });
 
@@ -16041,7 +16041,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.get("/api/factory/export-company-data", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const byCompany = (table: any) => eq(table.companyId, companyId);
@@ -16654,7 +16654,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   // ── Factory Analytics: Sales by Customer ─────────────────────────────────
   app.get("/api/factory/analytics/sales-by-customer", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const rows = await db
@@ -16680,7 +16680,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   // ── Factory Analytics: Container Sales Report (loaded containers by customer) ──
   app.get("/api/factory/analytics/container-sales-report", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { startDate, endDate, customerId, paymentStatus } = req.query as Record<string, string>;
@@ -16722,7 +16722,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   // ── Factory Analytics: Stock Summary (opening + closing stock) ───────────
   app.get("/api/factory/analytics/stock-summary", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Opening stock = total raw material received (cost basis)
@@ -16787,7 +16787,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
    */
   app.post("/api/factory/bales/relabel/validate", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { rows } = req.body;
@@ -16849,7 +16849,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
    */
   app.post("/api/factory/bales/relabel/apply", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const userId: string | null = (req.session as any).userId || null;
 
@@ -16981,7 +16981,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
    */
   app.get("/api/factory/bales/relabel/sessions", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const sessions = await db
@@ -17021,7 +17021,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   // GET /api/factory/employees - list employees (employeeType = "Employee") for current company
   app.get("/api/factory/employees", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const rows = await db
@@ -17045,7 +17045,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   // GET /api/factory/employees/:id - single employee
   app.get("/api/factory/employees/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -17066,7 +17066,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   // POST /api/factory/employees - create employee with employeeType = "Employee"
   app.post("/api/factory/employees", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { firstName, lastName, code, department, phone, monthlySalary, joinDate, active } = req.body;
@@ -17114,7 +17114,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   // PATCH /api/factory/employees/:id - update employee
   app.patch("/api/factory/employees/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -17143,7 +17143,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   // DELETE /api/factory/employees/:id - soft-delete employee
   app.delete("/api/factory/employees/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -17164,7 +17164,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   // GET /api/factory/employees/:id/statement - running ledger from voucher entries
   app.get("/api/factory/employees/:id/statement", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -17222,7 +17222,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   // DR: PAYROLL_DEPOSIT_EXPENSE, CR: Employee (via employeeId)
   app.post("/api/factory/employees/:id/deposit", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -17303,7 +17303,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   // DR: Employee (via employeeId), CR: Cash ledger account
   app.post("/api/factory/employees/:id/withdraw", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -17375,7 +17375,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   // POST /api/factory/employees/bulk-payroll - bulk payroll deposit for multiple employees
   app.post("/api/factory/employees/bulk-payroll", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { deposits, date, notes } = req.body;
@@ -17471,7 +17471,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.get("/api/factory/employee-attendance", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { date } = req.query as { date?: string };
       if (!date) return res.status(400).json({ message: "date is required" });
@@ -17495,7 +17495,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.post("/api/factory/employee-attendance/bulk", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { records } = req.body as { records: Array<{ employeeId: number; attendanceDate: string; status: string; notes?: string }> };
       if (!Array.isArray(records) || records.length === 0) return res.status(400).json({ message: "records array is required" });
@@ -17515,7 +17515,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.get("/api/factory/employee-advances", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { employeeId, status } = req.query as { employeeId?: string; status?: string };
 
@@ -17537,7 +17537,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.post("/api/factory/employee-advances", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { employeeId, advanceDate, amount, cashAccountId, notes } = req.body;
       if (!employeeId || !advanceDate || !amount) return res.status(400).json({ message: "employeeId, advanceDate, amount required" });
@@ -17558,7 +17558,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.post("/api/factory/employee-advances/:id/repay", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const advId = parseInt(req.params.id);
       const { repaymentDate, amount, cashAccountId, notes } = req.body;
@@ -17585,7 +17585,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.get("/api/factory/employee-advance-repayments", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { advanceId } = req.query as { advanceId?: string };
       let query = `SELECT r.*, e.first_name, e.last_name, ea.amount as advance_amount, ea.advance_date
@@ -17602,7 +17602,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.delete("/api/factory/employee-advances/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       await db.execute(sql`DELETE FROM employee_advance_repayments WHERE advance_id = ${parseInt(req.params.id)} AND company_id = ${companyId}`);
       await db.execute(sql`DELETE FROM employee_advances WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId}`);
@@ -17614,7 +17614,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.get("/api/factory/employee-bonuses", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { employeeId } = req.query as { employeeId?: string };
       let query = `SELECT eb.*, e.first_name, e.last_name, e.code as employee_code
@@ -17630,7 +17630,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.post("/api/factory/employee-bonuses", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { employeeId, bonusDate, amount, notes } = req.body;
       if (!employeeId || !bonusDate || !amount) return res.status(400).json({ message: "employeeId, bonusDate, amount required" });
@@ -17676,7 +17676,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.delete("/api/factory/employee-bonuses/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const bonusResult = await db.execute(sql`SELECT * FROM employee_bonuses WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId}`);
       const bonus = bonusResult.rows[0] as any;
@@ -17765,7 +17765,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.get("/api/factory/bale-ledger", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Load all relevant data
@@ -17913,7 +17913,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.get("/api/factory/waste-dispatch/bales", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const search = (req.query.search as string) || "";
@@ -18002,7 +18002,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.get("/api/factory/waste-dispatch/history", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const dispatches = await db
@@ -18049,7 +18049,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.post("/api/factory/waste-dispatch/submit", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { baleIds, dispatchDate, notes } = req.body;
@@ -18177,7 +18177,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   // GET /api/factory/pos/sales — list factory POS sales
   app.get("/api/factory/pos/sales", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const sales = await db
         .select()
@@ -18193,7 +18193,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   // GET /api/factory/pos/sales/:id — single sale with items
   app.get("/api/factory/pos/sales/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const saleId = parseInt(req.params.id);
       const [sale] = await db.select().from(factoryPosSales).where(and(eq(factoryPosSales.id, saleId), eq(factoryPosSales.companyId, companyId)));
@@ -18208,7 +18208,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   // POST /api/factory/pos/sale — create a factory POS sale
   app.post("/api/factory/pos/sale", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       const userId = (req.session as any).userId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
@@ -18369,7 +18369,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   // DELETE /api/factory/pos/sales/:id — void a factory POS sale
   app.delete("/api/factory/pos/sales/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const saleId = parseInt(req.params.id);
       const [sale] = await db.select().from(factoryPosSales).where(and(eq(factoryPosSales.id, saleId), eq(factoryPosSales.companyId, companyId)));
