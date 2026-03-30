@@ -102,9 +102,12 @@ export default function FactoryPayrollTab() {
   const [paidPayrollIds, setPaidPayrollIds] = useState<number[]>([]);
   const [printSummaryOpen, setPrintSummaryOpen] = useState(false);
 
+  const _now = new Date();
+  const _lastDayOfMonth = new Date(_now.getFullYear(), _now.getMonth() + 1, 0).toISOString().split("T")[0];
+
   const [runForm, setRunForm] = useState({
-    periodStart: new Date().toISOString().slice(0, 7) + "-01",
-    periodEnd: new Date().toISOString().split("T")[0],
+    periodStart: _now.toISOString().slice(0, 7) + "-01",
+    periodEnd: _lastDayOfMonth,
     frequency: "Monthly",
     daysCount: "",
     bonusPerWorker: "",
