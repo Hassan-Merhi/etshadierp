@@ -18354,7 +18354,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       const userId: number | null = rawUserId && !isNaN(Number(rawUserId)) ? Number(rawUserId) : null;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { locationId, customerName, notes, txDate, currencyCode, cashAccountId, items, expenses } = req.body;
+      const { locationId, customerName, customerId, notes, txDate, currencyCode, cashAccountId, paymentType, depositAmount, items, expenses } = req.body;
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
       }
@@ -18364,6 +18364,10 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         if (!item.productId && !item.productName) return res.status(400).json({ message: "Each item needs a product" });
         if (!item.quantity || item.quantity <= 0) return res.status(400).json({ message: "Quantity must be positive" });
       }
+
+      const isCredit = (paymentType || "CASH") === "CREDIT";
+      const parsedCustomerId = customerId ? parseInt(customerId) : null;
+      const depositAmt = isCredit ? Math.max(0, parseFloat(depositAmount || "0")) : 0;
 
       const totalAmount = items.reduce((s: number, it: any) => s + parseFloat(it.unitPrice || "0") * parseInt(it.quantity || "1"), 0);
 
@@ -18378,7 +18382,8 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         }
       }
       const totalExpenses = expenseRows.reduce((s, e) => s + e.amount, 0);
-      const netCash = totalAmount - totalExpenses;
+      // For cash: netCash = total - expenses. For credit: deposit may come in as cash.
+      const netCash = isCredit ? depositAmt - totalExpenses : totalAmount - totalExpenses;
 
       // Generate sale number
       const [seqRow] = await db.select({ count: sql<number>`count(*)` }).from(factoryPosSales).where(eq(factoryPosSales.companyId, companyId));
@@ -18393,10 +18398,13 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           txDate: txDate || new Date().toISOString().split("T")[0],
           locationId: locationId || null,
           customerName: customerName || null,
+          customerId: parsedCustomerId,
           notes: notes || null,
           totalAmount: totalAmount.toFixed(2),
           currencyCode: currencyCode || "USD",
           cashAccountId: cashAccountId || null,
+          paymentType: isCredit ? "CREDIT" : "CASH",
+          depositAmount: isCredit ? depositAmt.toFixed(2) : "0",
           status: "COMPLETED",
           createdBy: userId,
           expensesJson: expenseRows.length > 0 ? JSON.stringify(expenseRows) : null,
@@ -18447,7 +18455,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           txType: "BALE_SALE",
           referenceId: sale.id,
           referenceTable: "factory_pos_sales",
-          description: `Factory POS Sale ${saleNumber}${customerName ? ` – ${customerName}` : ""}`,
+          description: `Factory POS Sale ${saleNumber}${customerName ? ` – ${customerName}` : ""}${isCredit ? " [CREDIT]" : ""}`,
           currencyCode: currencyCode || "USD",
           amountCurrency: totalAmount.toFixed(2),
           fxRateToUsd: "1",
@@ -18455,8 +18463,54 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           createdBy: userId,
         });
 
-        // 5. Create ERP voucher for cash account (DR Cash / DR Expenses / CR Factory Sales Income)
-        if (cashAccountId) {
+        // 5a. CREDIT sale — update customer balance
+        if (isCredit && parsedCustomerId) {
+          // Compute current running balance for this customer
+          const [balRow] = await tx
+            .select({ net: sql<string>`COALESCE(SUM(debit_amount::numeric - credit_amount::numeric), 0)` })
+            .from(customerBalances)
+            .where(and(eq(customerBalances.customerId, parsedCustomerId), eq(customerBalances.companyId, companyId)));
+          const runningBefore = parseFloat(balRow?.net || "0");
+
+          // DR customer for full sale amount
+          const balAfterSale = runningBefore + totalAmount;
+          await tx.insert(customerBalances).values({
+            companyId,
+            customerId: parsedCustomerId,
+            transactionDate: txDate || new Date().toISOString().split("T")[0],
+            transactionType: "SALE",
+            referenceId: sale.id,
+            referenceType: "FACTORY_POS_SALE",
+            debitAmount: totalAmount.toFixed(2),
+            creditAmount: "0",
+            balance: balAfterSale.toFixed(2),
+            currency: currencyCode || "USD",
+            description: `POS Sale ${saleNumber}`,
+          });
+
+          // CR customer for any deposit received
+          if (depositAmt > 0) {
+            const balAfterDeposit = balAfterSale - depositAmt;
+            await tx.insert(customerBalances).values({
+              companyId,
+              customerId: parsedCustomerId,
+              transactionDate: txDate || new Date().toISOString().split("T")[0],
+              transactionType: "PAYMENT",
+              referenceId: sale.id,
+              referenceType: "FACTORY_POS_DEPOSIT",
+              debitAmount: "0",
+              creditAmount: depositAmt.toFixed(2),
+              balance: balAfterDeposit.toFixed(2),
+              currency: currencyCode || "USD",
+              description: `Deposit on POS Sale ${saleNumber}`,
+            });
+          }
+        }
+
+        // 5b. Cash receipt ERP voucher
+        // For cash sales: full amount. For credit sales with deposit: deposit only.
+        const voucherCashAmt = isCredit ? depositAmt : totalAmount;
+        if (cashAccountId && voucherCashAmt > 0) {
           const voucherNum = `FPOS-${sale.id}-${Date.now()}`;
           const [vch] = await tx.insert(vouchers).values({
             companyId,
@@ -18464,19 +18518,22 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
             voucherNumber: voucherNum,
             voucherDate: txDate || new Date().toISOString().split("T")[0],
             description: `Factory POS Sale ${saleNumber}${customerName ? ` – ${customerName}` : ""}`,
-            totalAmount: totalAmount.toFixed(2),
+            totalAmount: voucherCashAmt.toFixed(2),
             currency: currencyCode || "USD",
             exchangeRate: "1",
             sourceModule: "FACTORY_POS",
           }).returning();
-          // DR Cash (net after expense deductions)
-          await tx.insert(voucherEntries).values({
-            voucherId: vch.id,
-            ledgerAccountId: cashAccountId,
-            debitAmount: netCash.toFixed(2),
-            creditAmount: "0",
-            narration: `Factory POS cash receipt – ${saleNumber}`,
-          });
+          // DR Cash (net of deposit after expense deductions)
+          const netDeposit = Math.max(0, netCash);
+          if (netDeposit > 0) {
+            await tx.insert(voucherEntries).values({
+              voucherId: vch.id,
+              ledgerAccountId: cashAccountId,
+              debitAmount: netDeposit.toFixed(2),
+              creditAmount: "0",
+              narration: isCredit ? `Deposit on credit sale – ${saleNumber}` : `Factory POS cash receipt – ${saleNumber}`,
+            });
+          }
           // DR each expense account
           for (const exp of expenseRows) {
             await tx.insert(voucherEntries).values({
@@ -18487,13 +18544,13 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
               narration: exp.description || `POS deduction – ${saleNumber}`,
             });
           }
-          // CR Factory Sales Income (gross sales amount)
+          // CR Factory Sales Income (gross amount entering cash)
           const salesIncomeAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_BALE_SALES_INCOME", "Factory Bale Sales Income", "Revenue");
           await tx.insert(voucherEntries).values({
             voucherId: vch.id,
             ledgerAccountId: salesIncomeAccId,
             debitAmount: "0",
-            creditAmount: totalAmount.toFixed(2),
+            creditAmount: voucherCashAmt.toFixed(2),
             narration: `Factory POS sales income – ${saleNumber}`,
           });
         }

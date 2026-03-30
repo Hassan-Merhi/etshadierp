@@ -720,6 +720,9 @@ let migrationsDone = false;
       currency_code varchar(10) NOT NULL DEFAULT 'USD'
     )`,
     `ALTER TABLE factory_pos_sales ADD COLUMN IF NOT EXISTS expenses_json text`,
+    `ALTER TABLE factory_pos_sales ADD COLUMN IF NOT EXISTS payment_type text NOT NULL DEFAULT 'CASH'`,
+    `ALTER TABLE factory_pos_sales ADD COLUMN IF NOT EXISTS customer_id integer`,
+    `ALTER TABLE factory_pos_sales ADD COLUMN IF NOT EXISTS deposit_amount decimal(20,2) DEFAULT 0`,
     `CREATE TABLE IF NOT EXISTS factory_worker_categories (
       id serial PRIMARY KEY,
       company_id integer NOT NULL,
