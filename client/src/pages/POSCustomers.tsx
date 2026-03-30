@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Search, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { drCrClass } from "@/lib/formatNumber";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -334,7 +335,8 @@ export default function POSCustomers() {
                       </TableCell>
                       <TableCell>
                         <Badge 
-                          variant={customer.balanceSide === "Dr" ? "default" : "secondary"}
+                          variant="secondary"
+                          className={drCrClass(customer.balanceSide || "Dr")}
                           data-testid={`badge-balance-side-${customer.id}`}
                         >
                           {customer.balanceSide || "Dr"}

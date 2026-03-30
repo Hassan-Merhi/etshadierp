@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, FileText, User, Download, FileSpreadsheet } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { drCrClass } from "@/lib/formatNumber";
 import { useState } from "react";
 
 interface CustomerInfo {
@@ -302,7 +303,7 @@ export default function FactoryCustomerStatement() {
                       {fmtMoney(Math.abs(entry.runningBalance))}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="text-xs">{entry.runningBalanceSide}</Badge>
+                      <Badge variant="outline" className={`text-xs font-semibold ${drCrClass(entry.runningBalanceSide)}`}>{entry.runningBalanceSide}</Badge>
                     </TableCell>
                   </TableRow>
                 ))

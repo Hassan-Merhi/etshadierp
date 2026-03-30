@@ -3,7 +3,7 @@ import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { formatNumber } from "@/lib/formatNumber";
+import { formatNumber, drCrClass } from "@/lib/formatNumber";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { format, parseISO } from "date-fns";
@@ -215,7 +215,7 @@ export default function LedgerMonthlySummary() {
                       data-testid="text-closing-balance"
                     >
                       {formatAmount(Math.abs(data.grandTotal.closingBalance))}{" "}
-                      {data.grandTotal.closingBalance >= 0 ? "Dr" : "Cr"}
+                      <span className={drCrClass(data.grandTotal.closingBalance >= 0 ? "Dr" : "Cr")}>{data.grandTotal.closingBalance >= 0 ? "Dr" : "Cr"}</span>
                     </p>
                   </div>
                 </div>
@@ -273,15 +273,9 @@ export default function LedgerMonthlySummary() {
                             <TableCell className="text-right font-mono">
                               {month.credit > 0 ? formatAmount(month.credit) : ""}
                             </TableCell>
-                            <TableCell
-                              className={`text-right font-mono ${
-                                month.closingBalance >= 0
-                                  ? ""
-                                  : "text-red-600"
-                              }`}
-                            >
+                            <TableCell className="text-right font-mono">
                               {formatAmount(Math.abs(month.closingBalance))}{" "}
-                              {month.closingBalance >= 0 ? "Dr" : "Cr"}
+                              <span className={`font-semibold ${drCrClass(month.closingBalance >= 0 ? "Dr" : "Cr")}`}>{month.closingBalance >= 0 ? "Dr" : "Cr"}</span>
                             </TableCell>
                             <TableCell>
                               <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -299,15 +293,9 @@ export default function LedgerMonthlySummary() {
                         <TableCell className="text-right font-mono">
                           {formatAmount(data.grandTotal.credit)}
                         </TableCell>
-                        <TableCell
-                          className={`text-right font-mono ${
-                            data.grandTotal.closingBalance >= 0
-                              ? "text-green-600"
-                              : "text-red-600"
-                          }`}
-                        >
+                        <TableCell className="text-right font-mono">
                           {formatAmount(Math.abs(data.grandTotal.closingBalance))}{" "}
-                          {data.grandTotal.closingBalance >= 0 ? "Dr" : "Cr"}
+                          <span className={`font-semibold ${drCrClass(data.grandTotal.closingBalance >= 0 ? "Dr" : "Cr")}`}>{data.grandTotal.closingBalance >= 0 ? "Dr" : "Cr"}</span>
                         </TableCell>
                         <TableCell></TableCell>
                       </TableRow>

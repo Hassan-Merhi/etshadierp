@@ -1,6 +1,18 @@
 export type CurrencyCode = "USD" | "CFA";
 
 /**
+ * Returns tailwind text-color classes for a Dr/Cr balance side.
+ * Dr (Debit)  = green
+ * Cr (Credit) = red
+ */
+export function drCrClass(side: string | null | undefined): string {
+  if (!side) return "";
+  return side.toUpperCase() === "CR"
+    ? "text-red-500 dark:text-red-400"
+    : "text-green-600 dark:text-green-400";
+}
+
+/**
  * Format a number to remove unnecessary .00 decimals and add comma separators
  * @param num - The number to format
  * @param maxDecimals - Maximum decimal places to show (default 2)

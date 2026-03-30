@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
+import { drCrClass } from "@/lib/formatNumber";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -356,7 +357,7 @@ export default function Agents() {
                   {account.balance !== 0 && (
                     <div className="mt-0.5 text-xs tabular-nums text-muted-foreground">
                       {formatAmount(Math.abs(account.balance))}{" "}
-                      <span className={account.balanceSide?.toLowerCase() === "dr" ? "text-red-500 dark:text-red-400" : "text-green-600 dark:text-green-400"}>
+                      <span className={drCrClass(account.balanceSide)}>
                         {account.balanceSide ?? ""}
                       </span>
                     </div>
@@ -403,7 +404,8 @@ export default function Agents() {
                         ? <TrendingDown className="w-4 h-4 text-red-600" />
                         : <TrendingUp className="w-4 h-4 text-green-600" />}
                       <span className="font-mono font-semibold" data-testid="text-agent-balance">
-                        {formatAmount(Math.abs(selectedAccount.balance))} {selectedAccount.balanceSide ?? ""}
+                        {formatAmount(Math.abs(selectedAccount.balance))}{" "}
+                        <span className={drCrClass(selectedAccount.balanceSide)}>{selectedAccount.balanceSide ?? ""}</span>
                       </span>
                     </div>
                   </div>
@@ -599,7 +601,8 @@ export default function Agents() {
                     <span className="text-sm flex-1">{account.name}</span>
                     {account.balance !== 0 && (
                       <span className="text-xs tabular-nums text-muted-foreground shrink-0">
-                        {formatAmount(Math.abs(account.balance))} {account.balanceSide ?? ""}
+                        {formatAmount(Math.abs(account.balance))}{" "}
+                        <span className={drCrClass(account.balanceSide)}>{account.balanceSide ?? ""}</span>
                       </span>
                     )}
                   </button>

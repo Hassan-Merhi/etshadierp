@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { formatNumber } from "@/lib/formatNumber";
+import { formatNumber, drCrClass } from "@/lib/formatNumber";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Plus, Search, Building2, Pencil } from "lucide-react";
@@ -341,7 +341,7 @@ export default function Customers() {
                   <TableCell className="text-right font-mono">
                     {formatAmount(customer.balance || 0)}
                   </TableCell>
-                  <TableCell>{customer.balanceSide || "Dr"}</TableCell>
+                  <TableCell className={`font-semibold text-sm ${drCrClass(customer.balanceSide || "Dr")}`}>{customer.balanceSide || "Dr"}</TableCell>
                   <TableCell>
                     <Button
                       variant="ghost"
@@ -386,7 +386,7 @@ export default function Customers() {
                   </Button>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <Badge variant="secondary">{customer.balanceSide || "Dr"}</Badge>
+                  <Badge variant="secondary" className={drCrClass(customer.balanceSide || "Dr")}>{customer.balanceSide || "Dr"}</Badge>
                   <span className="font-mono font-semibold">{formatAmount(customer.balance || 0)}</span>
                 </div>
               </div>
@@ -513,7 +513,7 @@ export default function Customers() {
             </DialogTitle>
             <div className="flex items-center gap-3 pt-1 text-sm text-muted-foreground">
               <span>Balance: <span className="font-mono font-semibold text-foreground">{formatAmount(statementCustomer?.balance || 0)}</span></span>
-              <Badge variant={statementCustomer?.balanceSide === "Cr" ? "default" : "secondary"}>
+              <Badge variant="secondary" className={drCrClass(statementCustomer?.balanceSide || "Dr")}>
                 {statementCustomer?.balanceSide || "Dr"}
               </Badge>
             </div>
@@ -582,7 +582,7 @@ export default function Customers() {
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm font-medium">
                             {formatAmount(Math.abs(running))}
-                            <span className="text-xs text-muted-foreground ml-1">{running >= 0 ? "Dr" : "Cr"}</span>
+                            <span className={`text-xs font-semibold ml-1 ${drCrClass(running >= 0 ? "Dr" : "Cr")}`}>{running >= 0 ? "Dr" : "Cr"}</span>
                           </TableCell>
                         </TableRow>
                       );
@@ -595,7 +595,7 @@ export default function Customers() {
                       <TableHead className="text-right font-mono text-foreground">{formatAmount(totalCr)}</TableHead>
                       <TableHead className="text-right font-mono text-foreground">
                         {formatAmount(Math.abs(closingBalance))}
-                        <span className="text-xs font-normal text-muted-foreground ml-1">{(statementCustomer?.balanceSide || "Dr")}</span>
+                        <span className={`text-xs font-semibold ml-1 ${drCrClass(statementCustomer?.balanceSide || "Dr")}`}>{(statementCustomer?.balanceSide || "Dr")}</span>
                       </TableHead>
                     </TableRow>
                   </TableHeader>

@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { utils, writeFile, readFile, ExcelJS } from "@/lib/excelHelper";
-import { formatNumber } from "@/lib/formatNumber";
+import { formatNumber, drCrClass } from "@/lib/formatNumber";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 
@@ -864,7 +864,7 @@ export default function Analytics() {
                   {formatSmartCurrency(displayBalance)}
                 </TableCell>
                 {showSide && (
-                  <TableCell className="text-right text-sm text-muted-foreground">
+                  <TableCell className={`text-right text-sm font-semibold ${drCrClass(parent.balanceSide || "Dr")}`}>
                     {parent.balanceSide || "Dr"}
                   </TableCell>
                 )}
@@ -883,7 +883,7 @@ export default function Analytics() {
                     {formatSmartCurrency(parseBalance(child.balance))}
                   </TableCell>
                   {showSide && (
-                    <TableCell className="text-right text-sm text-muted-foreground">
+                    <TableCell className={`text-right text-sm font-semibold ${drCrClass(child.balanceSide || "Dr")}`}>
                       {child.balanceSide || "Dr"}
                     </TableCell>
                   )}

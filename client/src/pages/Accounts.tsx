@@ -84,6 +84,7 @@ import {
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { drCrClass } from "@/lib/formatNumber";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -1696,7 +1697,7 @@ export default function Accounts() {
                                     {!hideBalances && account.balance !== 0 && (
                                       <span className="ml-auto text-xs tabular-nums text-muted-foreground shrink-0">
                                         {formatAmount(Math.abs(account.balance))}{" "}
-                                        <span className={account.balanceSide?.toLowerCase() === "dr" ? "text-red-500 dark:text-red-400" : "text-green-600 dark:text-green-400"}>
+                                        <span className={drCrClass(account.balanceSide)}>
                                           {account.balanceSide ?? ""}
                                         </span>
                                       </span>
@@ -1733,7 +1734,7 @@ export default function Accounts() {
                                         {!hideBalances && child.balance !== 0 && (
                                           <span className="ml-auto text-xs tabular-nums text-muted-foreground shrink-0">
                                             {formatAmount(Math.abs(child.balance))}{" "}
-                                            <span className={child.balanceSide?.toLowerCase() === "dr" ? "text-red-500 dark:text-red-400" : "text-green-600 dark:text-green-400"}>
+                                            <span className={drCrClass(child.balanceSide)}>
                                               {child.balanceSide ?? ""}
                                             </span>
                                           </span>

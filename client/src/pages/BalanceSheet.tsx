@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DollarSign, Landmark, CreditCard, PiggyBank, type LucideIcon } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { drCrClass } from "@/lib/formatNumber";
 
 interface Account {
   id: string;
@@ -117,7 +118,7 @@ export default function BalanceSheet() {
               <TableRow key={account.id} data-testid={`row-account-${account.id}`}>
                 <TableCell>{account.name}</TableCell>
                 <TableCell className="text-right font-mono">
-                  {formatAmount(account.balance)} {account.balanceSide || ""}
+                  {formatAmount(account.balance)}{account.balanceSide ? <span className={`ml-1 ${drCrClass(account.balanceSide)}`}>{account.balanceSide}</span> : ""}
                 </TableCell>
               </TableRow>
             ))}

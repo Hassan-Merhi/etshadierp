@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { drCrClass } from "@/lib/formatNumber";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -226,7 +227,7 @@ export default function FactoryCustomers() {
                             {customer.balance % 1 === 0
                               ? `$${Math.round(customer.balance).toLocaleString()}`
                               : `$${customer.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}{" "}
-                            <span className="text-xs text-muted-foreground">{customer.balanceSide}</span>
+                            <span className={`text-xs font-semibold ${drCrClass(customer.balanceSide)}`}>{customer.balanceSide}</span>
                           </span>
                         ) : (
                           "-"
