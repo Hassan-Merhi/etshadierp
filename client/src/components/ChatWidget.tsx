@@ -141,14 +141,19 @@ export function ChatWidget() {
   return (
     <div className="fixed bottom-4 right-4 z-50" data-testid="chat-widget-container">
       {!isOpen ? (
-        <Button
-          size="lg"
-          className="rounded-full h-14 w-14 shadow-lg hover-elevate"
+        <button
           onClick={() => setIsOpen(true)}
           data-testid="button-open-chat"
+          className="group flex items-center gap-2 rounded-full bg-primary text-primary-foreground shadow-md
+            px-3 py-2 opacity-30 hover:opacity-100
+            transition-all duration-300 ease-in-out
+            overflow-hidden max-w-[2.25rem] hover:max-w-[160px]"
         >
-          <MessageCircle className="h-6 w-6" />
-        </Button>
+          <MessageCircle className="h-4 w-4 flex-shrink-0" />
+          <span className="text-sm font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 delay-100">
+            AI Assistant
+          </span>
+        </button>
       ) : (
         <Card className={cn(
           "w-[360px] sm:w-[420px] shadow-2xl transition-all duration-200 flex flex-col",
