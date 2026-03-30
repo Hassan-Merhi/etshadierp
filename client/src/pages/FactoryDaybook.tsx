@@ -1150,10 +1150,10 @@ export default function FactoryDaybook() {
                   <Table>
                     <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        {hasNonUsdC && <TableHead className="text-right">FX Rate</TableHead>}
-                        <TableHead></TableHead>
+                        <TableHead className="w-full">Date</TableHead>
+                        <TableHead className="text-right whitespace-nowrap">Amount</TableHead>
+                        {hasNonUsdC && <TableHead className="text-right whitespace-nowrap">FX Rate</TableHead>}
+                        <TableHead className="w-0 p-0"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1191,7 +1191,7 @@ export default function FactoryDaybook() {
                                   {row.currencyCode === "USD" ? "—" : row.fxRateToUsd ? parseFloat(row.fxRateToUsd).toFixed(4) : "mixed"}
                                 </TableCell>
                               )}
-                              <TableCell />
+                              <TableCell className="w-0 p-0" />
                             </TableRow>
                             {isExpanded && expandedEntries.map((entry) => {
                               const isBaleTransfer = entry.txType === "BALE_TRANSFER";
