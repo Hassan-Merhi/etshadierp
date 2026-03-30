@@ -673,6 +673,10 @@ export default function Analytics() {
     return children.reduce((sum, acc) => sum + parseBalance(acc.balance), 0);
   };
 
+  // Returns a signed balance: Cr = positive, Dr = negative
+  const signedBalance = (acc: Account) =>
+    acc.balanceSide === "Cr" ? parseBalance(acc.balance) : -parseBalance(acc.balance);
+
   const calculateTotal = (accountList: Account[]) => {
     // Get all account IDs that are present in this list
     const accountIds = new Set(accountList.map(acc => acc.accountId));
@@ -694,10 +698,10 @@ export default function Analytics() {
       if (hasChildrenInList) {
         // This is a parent with children - count the children's total (not the parent's balance)
         const children = accountList.filter(child => child.parentId === acc.accountId);
-        total += children.reduce((sum, child) => sum + parseBalance(child.balance), 0);
+        total += children.reduce((sum, child) => sum + signedBalance(child), 0);
       } else if (!isChildOfParentInList) {
         // This is a standalone account (not a child of something in the list) - count its balance
-        total += parseBalance(acc.balance);
+        total += signedBalance(acc);
       }
       // If it's a child of a parent in the list, don't count it separately (already counted via parent)
     });
