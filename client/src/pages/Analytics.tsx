@@ -68,6 +68,7 @@ interface POSTransaction {
   voucherDate: string;
   createdAt: string;
   description: string | null;
+  customerName: string | null;
   totalAmount: number;
   totalQuantity: number;
   itemCount: number;
@@ -1544,6 +1545,7 @@ export default function Analytics() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Date</TableHead>
+                          {selectedLocationForDetails === -1 && <TableHead>Customer</TableHead>}
                           <TableHead className="text-right">Items</TableHead>
                           <TableHead className="text-right">Quantity</TableHead>
                           <TableHead className="text-right">Amount</TableHead>
@@ -1553,8 +1555,29 @@ export default function Analytics() {
                         {transactions.map((transaction) => (
                           <TableRow key={transaction.id}>
                             <TableCell>
-                              {formatDisplayDate(transaction.voucherDate)}
+                              <button
+                                className="text-left hover:underline text-primary cursor-pointer"
+                                onClick={() => {
+                                  const params = new URLSearchParams();
+                                  params.set("displayDate", formatDisplayDate(transaction.voucherDate));
+                                  params.set("grouping", "daily");
+                                  params.set("startDate", transaction.voucherDate);
+                                  params.set("endDate", transaction.voucherDate);
+                                  if (selectedLocationForDetails !== null && selectedLocationForDetails !== -1) {
+                                    params.set("locationId", String(selectedLocationForDetails));
+                                  }
+                                  setSelectedLocationForDetails(null);
+                                  navigate(`/sales-report/detail?${params.toString()}`);
+                                }}
+                              >
+                                {formatDisplayDate(transaction.voucherDate)}
+                              </button>
                             </TableCell>
+                            {selectedLocationForDetails === -1 && (
+                              <TableCell className="text-muted-foreground">
+                                {transaction.customerName || "—"}
+                              </TableCell>
+                            )}
                             <TableCell className="text-right">
                               {transaction.itemCount}
                             </TableCell>
@@ -1571,12 +1594,30 @@ export default function Analytics() {
                     </div>
                     <div className="md:hidden space-y-3">
                       {transactions.map((transaction) => (
-                        <Card key={transaction.id}>
+                        <Card
+                          key={transaction.id}
+                          className="hover-elevate cursor-pointer"
+                          onClick={() => {
+                            const params = new URLSearchParams();
+                            params.set("displayDate", formatDisplayDate(transaction.voucherDate));
+                            params.set("grouping", "daily");
+                            params.set("startDate", transaction.voucherDate);
+                            params.set("endDate", transaction.voucherDate);
+                            if (selectedLocationForDetails !== null && selectedLocationForDetails !== -1) {
+                              params.set("locationId", String(selectedLocationForDetails));
+                            }
+                            setSelectedLocationForDetails(null);
+                            navigate(`/sales-report/detail?${params.toString()}`);
+                          }}
+                        >
                           <CardContent className="p-3 space-y-1">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-sm text-muted-foreground">{formatDisplayDate(transaction.voucherDate)}</span>
+                              <span className="text-sm font-medium text-primary">{formatDisplayDate(transaction.voucherDate)}</span>
                               <span className="font-mono font-medium">{formatAmount(transaction.totalAmount)}</span>
                             </div>
+                            {selectedLocationForDetails === -1 && transaction.customerName && (
+                              <div className="text-sm text-muted-foreground">{transaction.customerName}</div>
+                            )}
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-muted-foreground">Items: {transaction.itemCount} | Qty: {transaction.totalQuantity}</span>
                             </div>

@@ -19873,6 +19873,7 @@ if (asOfDate) {
               voucherDate: voucher.voucherDate,
               createdAt: voucher.createdAt,
               description: voucher.description,
+              customerName: voucher.customerName ?? null,
               totalAmount: totalAmt,
               totalQuantity: totalQty,
               itemCount: items.length,
