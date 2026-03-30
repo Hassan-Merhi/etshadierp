@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { eq, and, sql, gte, lte, desc, inArray, isNull } from "drizzle-orm";
+import { eq, and, sql, asc, gte, lte, desc, inArray, isNull } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import ExcelJS from "exceljs";
 import {
@@ -292,7 +292,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         .from(factoryPayrolls)
         .leftJoin(factoryWorkers, eq(factoryPayrolls.workerId, factoryWorkers.id))
         .where(and(...conditions))
-        .orderBy(desc(factoryPayrolls.createdAt));
+        .orderBy(asc(factoryWorkers.fullName), desc(factoryPayrolls.periodStart));
 
       const formatted = results.map((r: any) => ({
         ...r.payroll,

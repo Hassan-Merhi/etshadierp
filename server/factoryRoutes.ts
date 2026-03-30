@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { eq, and, or, desc, sql, inArray, ilike, ne } from "drizzle-orm";
+import { eq, and, or, asc, desc, sql, inArray, ilike, ne } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import CryptoJS from "crypto-js";
 import multer from "multer";
@@ -11819,7 +11819,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const allCustomers = await db.select().from(customers)
-        .where(and(eq(customers.companyId, companyId), sql`${customers.deletedAt} IS NULL`));
+        .where(and(eq(customers.companyId, companyId), sql`${customers.deletedAt} IS NULL`))
+        .orderBy(asc(customers.legalName));
 
       if (allCustomers.length === 0) {
         return res.json([]);
