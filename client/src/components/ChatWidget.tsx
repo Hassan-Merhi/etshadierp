@@ -125,28 +125,8 @@ export function ChatWidget() {
     queryClient.removeQueries({ queryKey: [`/api/chatbot/history/${sessionId}`] });
   };
 
-  if (!status?.enabled || !status?.hasApiKey) {
-    const reason = !status?.enabled
-      ? "AI Assistant is disabled by your administrator."
-      : "No API key configured. Ask an admin to set one up in Settings.";
-    return (
-      <div className="fixed bottom-4 right-4 z-50" data-testid="chat-widget-disabled">
-        <div className="relative group">
-          <Button
-            size="lg"
-            variant="outline"
-            className="rounded-full h-14 w-14 shadow-lg opacity-50 cursor-default"
-            disabled
-            data-testid="button-chat-disabled"
-          >
-            <MessageCircle className="h-6 w-6" />
-          </Button>
-          <div className="invisible group-hover:visible absolute bottom-full right-0 mb-2 w-56 p-3 rounded-md bg-popover text-popover-foreground text-xs shadow-md border">
-            {reason}
-          </div>
-        </div>
-      </div>
-    );
+  if (!status || !status.enabled || !status.hasApiKey) {
+    return null;
   }
 
   const defaultSuggestions = [
