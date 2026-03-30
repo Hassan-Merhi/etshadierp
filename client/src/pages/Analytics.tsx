@@ -810,6 +810,11 @@ export default function Analytics() {
   const totalExpenses = totalDirectExpense + totalIndirectExpense;
   const netProfit = totalIncome - totalExpenses;
 
+  const goToStatement = (accountId: number) => {
+    const basePath = appMode === "factory" ? "/factory" : "";
+    navigate(`${basePath}/ledger-monthly/${accountId}`);
+  };
+
   // Render hierarchical accounts (filters out zero-balance accounts)
   const renderHierarchicalAccounts = (accountList: Account[], showSide: boolean = false) => {
     const { parentAccounts, accountMap } = groupAccountsByParent(accountList);
@@ -834,8 +839,8 @@ export default function Analytics() {
             <Fragment key={parent.id}>
               <TableRow 
                 data-testid={`row-account-${parent.id}`}
-                className={hasChildren ? "hover-elevate cursor-pointer font-medium" : ""}
-                onClick={() => hasChildren && toggleAccount(parent.accountId)}
+                className={`hover-elevate cursor-pointer font-medium`}
+                onClick={() => hasChildren ? toggleAccount(parent.accountId) : goToStatement(parent.accountId)}
               >
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-2">
@@ -844,7 +849,10 @@ export default function Analytics() {
                         <ChevronDown className="h-4 w-4" /> : 
                         <ChevronRight className="h-4 w-4" />
                     )}
-                    <span>{parent.name}</span>
+                    <span
+                      className="hover:underline"
+                      onClick={(e) => { e.stopPropagation(); goToStatement(parent.accountId); }}
+                    >{parent.name}</span>
                   </div>
                 </TableCell>
                 <TableCell className="text-right font-mono font-medium">
@@ -857,8 +865,13 @@ export default function Analytics() {
                 )}
               </TableRow>
               {hasChildren && isExpanded && nonZeroChildren.map((child) => (
-                <TableRow key={child.id} data-testid={`row-account-${child.id}`}>
-                  <TableCell className="pl-8 text-muted-foreground">
+                <TableRow
+                  key={child.id}
+                  data-testid={`row-account-${child.id}`}
+                  className="hover-elevate cursor-pointer"
+                  onClick={() => goToStatement(child.accountId)}
+                >
+                  <TableCell className="pl-8 text-muted-foreground hover:underline">
                     {child.name}
                   </TableCell>
                   <TableCell className="text-right font-mono">
@@ -910,8 +923,12 @@ export default function Analytics() {
           </TableHeader>
           <TableBody>
             {accountList.map((account) => (
-              <TableRow key={account.id}>
-                <TableCell>{account.name}</TableCell>
+              <TableRow
+                key={account.id}
+                className="hover-elevate cursor-pointer"
+                onClick={() => goToStatement(account.accountId)}
+              >
+                <TableCell className="hover:underline">{account.name}</TableCell>
                 <TableCell className="text-right font-mono">
                   {formatCurrency(account.balance)}
                 </TableCell>

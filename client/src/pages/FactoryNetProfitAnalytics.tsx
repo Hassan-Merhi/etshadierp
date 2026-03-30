@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,7 @@ import {
   ArrowDownRight,
   Equal,
 } from "lucide-react";
+import { useLocation } from "wouter";
 
 type Period = "today" | "this_week" | "this_month" | "this_year" | "all_time" | "specific_month";
 
@@ -96,6 +97,7 @@ function AccountBreakdown({
   badgeClass: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [, navigate] = useLocation();
   const active = (accounts || []).filter((a: any) => a.debit !== 0 || a.credit !== 0);
 
   return (
@@ -128,8 +130,8 @@ function AccountBreakdown({
               </thead>
               <tbody>
                 {active.map((acc: any, i: number) => (
-                  <tr key={i} className="border-t">
-                    <td className="px-3 py-2 text-foreground">{acc.name}</td>
+                  <tr key={i} className="border-t hover-elevate cursor-pointer" onClick={() => acc.id && navigate(`/factory/ledger-monthly/${acc.id}`)}>
+                    <td className="px-3 py-2 text-foreground hover:underline">{acc.name}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground font-mono">{fmt(acc.debit)}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground font-mono">{fmt(acc.credit)}</td>
                     <td className={`px-3 py-2 text-right font-mono font-medium ${type === "income" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>

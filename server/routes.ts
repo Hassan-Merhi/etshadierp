@@ -38071,7 +38071,7 @@ if (asOfDate) {
         const directIncDetails = directIncAccounts.map((acc: any) => {
           const b = balances.get(acc.id) || { debit: 0, credit: 0 };
           const net = b.credit - b.debit; directIncTotal += net;
-          return { name: acc.name, debit: b.debit, credit: b.credit, balance: net };
+          return { id: acc.id, name: acc.name, debit: b.debit, credit: b.credit, balance: net };
         }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
 
         const totalIncome = salesTotal + directIncTotal;
@@ -38082,7 +38082,7 @@ if (asOfDate) {
         const purchaseDetails = purchaseAccounts.map((acc: any) => {
           const b = balances.get(acc.id) || { debit: 0, credit: 0 };
           const net = b.debit - b.credit; purchaseTotal += net;
-          return { name: acc.name, debit: b.debit, credit: b.credit, balance: net };
+          return { id: acc.id, name: acc.name, debit: b.debit, credit: b.credit, balance: net };
         }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
 
         // Direct Expenses
@@ -38093,7 +38093,7 @@ if (asOfDate) {
         const directExpDetails = directExpAccounts.map((acc: any) => {
           const b = balances.get(acc.id) || { debit: 0, credit: 0 };
           const net = b.debit - b.credit; directExpTotal += net;
-          return { name: acc.name, debit: b.debit, credit: b.credit, balance: net };
+          return { id: acc.id, name: acc.name, debit: b.debit, credit: b.credit, balance: net };
         }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
 
         // Indirect Expenses
@@ -38104,7 +38104,7 @@ if (asOfDate) {
         const indirectExpDetails = indirectExpAccounts.map((acc: any) => {
           const b = balances.get(acc.id) || { debit: 0, credit: 0 };
           const net = b.debit - b.credit; indirectExpTotal += net;
-          return { name: acc.name, debit: b.debit, credit: b.credit, balance: net };
+          return { id: acc.id, name: acc.name, debit: b.debit, credit: b.credit, balance: net };
         }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
 
         // COGS: Opening + Purchases + Direct + Indirect - Closing (monthlyMode: no opening/closing)

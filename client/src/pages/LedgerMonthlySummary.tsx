@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
@@ -88,11 +88,22 @@ export default function LedgerMonthlySummary() {
   const modeApiRequest = getApiRequest(appMode);
   const [, navigate] = useLocation();
   const [, params] = useRoute("/ledger-monthly/:accountId");
-  const accountId = params?.accountId ? parseInt(params.accountId) : null;
+  const [, factoryParams] = useRoute("/factory/ledger-monthly/:accountId");
+  const accountId = (params?.accountId || factoryParams?.accountId)
+    ? parseInt((params?.accountId || factoryParams?.accountId) as string)
+    : null;
 
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(
     getDefaultPeriodValue("this_year")
   );
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") window.history.back();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const startDate = periodFilter.fromDate;
   const endDate = periodFilter.toDate;
