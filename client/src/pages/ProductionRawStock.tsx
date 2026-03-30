@@ -359,6 +359,7 @@ export default function ProductionRawStock() {
   const [adjDate, setAdjDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [adjMaterialLabel, setAdjMaterialLabel] = useState("");
   const [adjIsNewMaterial, setAdjIsNewMaterial] = useState(false);
+  const [adjSupplierId, setAdjSupplierId] = useState<string>("");
   // Mix batch section state
   const [createMixBatchOpen, setCreateMixBatchOpen] = useState(false);
   const [mixBatchStatusFilter, setMixBatchStatusFilter] = useState<string>("OPEN");
@@ -400,9 +401,9 @@ export default function ProductionRawStock() {
     enabled: offloadDialogOpen || obDialogOpen,
   });
 
-  const { data: factorySuppliers } = useQuery<{ id: number; name: string }[]>({
+  const { data: factorySuppliers = [] } = useQuery<{ id: number; name: string }[]>({
     queryKey: ["/api/factory/suppliers"],
-    enabled: offloadDialogOpen || obDialogOpen,
+    enabled: offloadDialogOpen || obDialogOpen || adjustDialogOpen,
   });
 
   // Raw stock by individual container (always fetched so it's available when "Assign to Bales" is clicked)
@@ -538,6 +539,7 @@ export default function ProductionRawStock() {
       materialLabel?: string;
       notes?: string;
       date: string;
+      createVoucher?: boolean;
     }) => {
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/adjustment", payload);
       if (!res.ok) {
@@ -549,11 +551,13 @@ export default function ProductionRawStock() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/adjustments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
       setAdjustDialogOpen(false);
       setAdjKg("");
       setAdjCostPerKg("");
       setAdjNotes("");
       setAdjMaterialLabel("");
+      setAdjSupplierId("");
       toast({ title: "Saved", description: "Stock adjustment recorded successfully." });
     },
     onError: (err: any) => {
@@ -1097,6 +1101,7 @@ export default function ProductionRawStock() {
                 setAdjCurrency("USD");
                 setAdjNotes("");
                 setAdjMaterialLabel("");
+                setAdjSupplierId("");
                 setAdjDate(new Date().toISOString().split("T")[0]);
                 setAdjustDialogOpen(true);
               }}
@@ -2768,22 +2773,43 @@ export default function ProductionRawStock() {
             </DialogTitle>
             <DialogDescription>
               {adjIsNewMaterial
-                ? "Create a standalone raw material entry not linked to any container or supplier. This will not affect any supplier or broker balance."
-                : "Add or remove kg from this supplier's stock total. This will not affect any supplier or broker balance."}
+                ? "Add raw material stock. Choose an existing supplier to record a payable and create accounting entries, or leave blank for a standalone (no-accounting) entry."
+                : "Add or remove kg from this supplier's stock total."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             {adjIsNewMaterial && (
-              <div className="space-y-1">
-                <Label>Material Name</Label>
-                <Input
-                  value={adjMaterialLabel}
-                  onChange={(e) => setAdjMaterialLabel(e.target.value)}
-                  placeholder="e.g. Waste Regrind, Local Purchase..."
-                  data-testid="input-adj-material-label"
-                />
-              </div>
+              <>
+                <div className="space-y-1">
+                  <Label>Supplier <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                  <Select value={adjSupplierId} onValueChange={setAdjSupplierId} data-testid="select-adj-supplier">
+                    <SelectTrigger data-testid="select-adj-supplier-trigger">
+                      <SelectValue placeholder="Select existing supplier…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No Supplier (standalone entry)</SelectItem>
+                      {factorySuppliers.map((s) => (
+                        <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {adjSupplierId && (
+                    <p className="text-xs text-muted-foreground">A journal voucher (Dr Raw Material / Cr Supplier) will be created when cost &gt; 0.</p>
+                  )}
+                </div>
+                {!adjSupplierId && (
+                  <div className="space-y-1">
+                    <Label>Material Name <span className="text-muted-foreground text-xs">(required when no supplier)</span></Label>
+                    <Input
+                      value={adjMaterialLabel}
+                      onChange={(e) => setAdjMaterialLabel(e.target.value)}
+                      placeholder="e.g. Waste Regrind, Local Purchase..."
+                      data-testid="input-adj-material-label"
+                    />
+                  </div>
+                )}
+              </>
             )}
 
             <div className="space-y-1">
@@ -2878,23 +2904,27 @@ export default function ProductionRawStock() {
                   toast({ title: "Error", description: "Please enter a valid kg amount.", variant: "destructive" });
                   return;
                 }
-                if (adjIsNewMaterial && !adjMaterialLabel.trim()) {
-                  toast({ title: "Error", description: "Please enter a material name.", variant: "destructive" });
+                if (adjIsNewMaterial && !adjSupplierId && !adjMaterialLabel.trim()) {
+                  toast({ title: "Error", description: "Please choose a supplier or enter a material name.", variant: "destructive" });
                   return;
                 }
                 if (!adjDate) {
                   toast({ title: "Error", description: "Please select a date.", variant: "destructive" });
                   return;
                 }
+                const resolvedSupplierId = adjIsNewMaterial
+                  ? (adjSupplierId ? parseInt(adjSupplierId) : null)
+                  : (adjustingRow?.supplierId ?? null);
                 createAdjustmentMutation.mutate({
                   type: adjType,
                   kg: adjKg,
                   costPerKg: adjCostPerKg || "0",
                   currencyCode: adjCurrency,
-                  supplierId: adjIsNewMaterial ? null : (adjustingRow?.supplierId ?? null),
-                  materialLabel: adjIsNewMaterial ? adjMaterialLabel.trim() : undefined,
+                  supplierId: resolvedSupplierId,
+                  materialLabel: (!adjSupplierId && adjIsNewMaterial) ? adjMaterialLabel.trim() : undefined,
                   notes: adjNotes || undefined,
                   date: adjDate,
+                  createVoucher: adjIsNewMaterial && !!adjSupplierId && adjType === "ADD" && parseFloat(adjCostPerKg || "0") > 0,
                 });
               }}
               disabled={createAdjustmentMutation.isPending}

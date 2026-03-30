@@ -6533,21 +6533,95 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const { type, kg, costPerKg, currencyCode, supplierId, materialLabel, notes, date } = req.body;
+      const { type, kg, costPerKg, currencyCode, supplierId, materialLabel, notes, date, createVoucher } = req.body;
       if (!type || !["ADD", "REMOVE"].includes(type)) return res.status(400).json({ message: "type must be ADD or REMOVE" });
       if (!kg || parseFloat(kg) <= 0) return res.status(400).json({ message: "kg must be > 0" });
       if (!date) return res.status(400).json({ message: "date is required" });
-      const [inserted] = await db.insert(factoryRawMaterialAdjustments).values({
-        companyId,
-        date,
-        type,
-        kg: String(parseFloat(kg)),
-        costPerKg: costPerKg ? String(parseFloat(costPerKg)) : "0",
-        currencyCode: currencyCode || "USD",
-        supplierId: supplierId ? Number(supplierId) : null,
-        materialLabel: materialLabel || null,
-        notes: notes || null,
-      }).returning();
+
+      const kgNum = parseFloat(kg);
+      const costNum = costPerKg ? parseFloat(costPerKg) : 0;
+      const ccy = currencyCode || "USD";
+      const resolvedSupplierId = supplierId ? Number(supplierId) : null;
+      const totalAmount = kgNum * costNum;
+
+      // Pre-fetch ledger account IDs before transaction (getOrCreateLedgerAccount must run outside tx)
+      let rawMaterialAcctId: number | null = null;
+      if (createVoucher && resolvedSupplierId && type === "ADD" && costNum > 0) {
+        rawMaterialAcctId = await getOrCreateLedgerAccount(companyId, "FACTORY_RAW_MATERIAL_STOCK", "Factory Raw Material Stock", "ASSET");
+      }
+
+      let fxRate = 1;
+      if (ccy !== "USD") {
+        try { fxRate = parseFloat(await getOrFetchFxRateToUsd(companyId, ccy, date)); } catch { fxRate = 1; }
+      }
+
+      let inserted: any;
+      await db.transaction(async (tx) => {
+        [inserted] = await tx.insert(factoryRawMaterialAdjustments).values({
+          companyId,
+          date,
+          type,
+          kg: String(kgNum),
+          costPerKg: costNum > 0 ? String(costNum) : "0",
+          currencyCode: ccy,
+          supplierId: resolvedSupplierId,
+          materialLabel: materialLabel || null,
+          notes: notes || null,
+        }).returning();
+
+        // Accounting voucher: Dr Raw Material Stock / Cr Supplier Account
+        if (createVoucher && resolvedSupplierId && rawMaterialAcctId && totalAmount > 0) {
+          // Look up supplier name for description
+          const [sup] = await tx.select({ name: factorySuppliers.name })
+            .from(factorySuppliers)
+            .where(and(eq(factorySuppliers.id, resolvedSupplierId), eq(factorySuppliers.companyId, companyId)))
+            .limit(1);
+          const supplierName = sup?.name || `Supplier #${resolvedSupplierId}`;
+
+          const voucherNum = `FACTORY-MANUAL-${inserted.id}-${Date.now()}`;
+          const [voucher] = await tx.insert(vouchers).values({
+            companyId,
+            voucherType: "Journal",
+            voucherNumber: voucherNum,
+            voucherDate: date,
+            description: `Manual raw material purchase: ${kgNum} kg @ ${costNum}/${ccy} — ${supplierName}`,
+            totalAmount: String(totalAmount),
+            currency: ccy,
+            exchangeRate: String(fxRate),
+            sourceModule: "FACTORY",
+          }).returning();
+
+          // Dr Raw Material Stock
+          await tx.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: rawMaterialAcctId,
+            debitAmount: String(totalAmount),
+            creditAmount: "0",
+            narration: `Raw material stock — ${kgNum} kg from ${supplierName}`,
+          });
+
+          // Cr Supplier
+          await tx.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            factorySupplierId: resolvedSupplierId,
+            debitAmount: "0",
+            creditAmount: String(totalAmount),
+            narration: `Payable to ${supplierName} for raw material`,
+          });
+
+          await writeDaybookEntry(tx, {
+            companyId,
+            txDate: date,
+            txType: "OFFLOAD_RAW_STOCK",
+            referenceId: inserted.id,
+            description: `Manual purchase: ${kgNum} kg @ ${costNum} ${ccy} from ${supplierName}`,
+            currencyCode: ccy,
+            amountCurrency: totalAmount,
+            fxRateToUsd: fxRate,
+          });
+        }
+      });
+
       res.json(inserted);
     } catch (error: any) {
       console.error("Error creating raw stock adjustment:", error);
