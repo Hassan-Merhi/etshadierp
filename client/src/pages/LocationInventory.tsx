@@ -7,7 +7,7 @@ import { useLocation as useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
-import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown, Globe, Eye, Pencil } from "lucide-react";
+import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown, Globe, Eye, Pencil, FileSpreadsheet } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { format } from "date-fns";
@@ -2042,15 +2042,26 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             <h1 className="text-xl md:text-3xl font-bold">
               {selectedLocationLocal.name} - All Stock Items
             </h1>
-            <Button
-              onClick={handlePrint}
-              data-testid="button-print-inventory"
-              variant="default"
-              className="gap-2 w-full sm:w-auto"
-            >
-              <Printer className="w-4 h-4" />
-              Print Inventory
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+              <Button
+                onClick={handleExportInventory}
+                data-testid="button-export-all-stock-excel"
+                variant="outline"
+                className="gap-2 flex-1 sm:flex-none"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                Export Excel
+              </Button>
+              <Button
+                onClick={handlePrint}
+                data-testid="button-print-inventory"
+                variant="default"
+                className="gap-2 flex-1 sm:flex-none"
+              >
+                <Printer className="w-4 h-4" />
+                Print Inventory
+              </Button>
+            </div>
           </div>
 
           {/* Printable area */}
