@@ -6635,10 +6635,45 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
-      await db.delete(factoryRawMaterialAdjustments)
-        .where(and(eq(factoryRawMaterialAdjustments.id, id), eq(factoryRawMaterialAdjustments.companyId, companyId)));
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+
+      // Fetch the adjustment to know whether it has linked accounting
+      const [adj] = await db.select().from(factoryRawMaterialAdjustments)
+        .where(and(eq(factoryRawMaterialAdjustments.id, id), eq(factoryRawMaterialAdjustments.companyId, companyId)))
+        .limit(1);
+      if (!adj) return res.status(404).json({ message: "Adjustment not found" });
+
+      await db.transaction(async (tx) => {
+        // Delete the raw stock adjustment record
+        await tx.delete(factoryRawMaterialAdjustments)
+          .where(and(eq(factoryRawMaterialAdjustments.id, id), eq(factoryRawMaterialAdjustments.companyId, companyId)));
+
+        // Reverse any linked journal vouchers created for this adjustment
+        // Voucher numbers were created as: FACTORY-MANUAL-{id}-{timestamp}
+        const linkedVouchers = await tx.select({ id: vouchers.id })
+          .from(vouchers)
+          .where(and(
+            eq(vouchers.companyId, companyId),
+            sql`${vouchers.voucherNumber} LIKE ${'FACTORY-MANUAL-' + id + '-%'}`,
+          ));
+
+        for (const v of linkedVouchers) {
+          // Delete voucher entries first (FK constraint)
+          await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
+          await tx.delete(vouchers).where(eq(vouchers.id, v.id));
+        }
+
+        // Delete linked daybook entries (referenceId = adj.id, txType = 'OFFLOAD_RAW_STOCK')
+        await tx.delete(factoryDaybookEntries).where(and(
+          eq(factoryDaybookEntries.companyId, companyId),
+          eq(factoryDaybookEntries.referenceId, id),
+          sql`${factoryDaybookEntries.txType} = 'OFFLOAD_RAW_STOCK'`,
+        ));
+      });
+
       res.json({ success: true });
     } catch (error: any) {
+      console.error("Error deleting raw stock adjustment:", error);
       res.status(500).json({ message: error.message });
     }
   });

@@ -200,8 +200,8 @@ interface ContainerOption {
   commissionSupplierId?: number | null;
 }
 
-function AdjustmentsHistoryCard({ deleteAdjustmentMutation }: {
-  deleteAdjustmentMutation: any;
+function AdjustmentsHistoryCard({ onDeleteRequest }: {
+  onDeleteRequest: (id: number) => void;
 }) {
   const { formatDisplayDate } = useDateFormat();
   const [open, setOpen] = useState(false);
@@ -273,8 +273,7 @@ function AdjustmentsHistoryCard({ deleteAdjustmentMutation }: {
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={() => deleteAdjustmentMutation.mutate(adj.id)}
-                      disabled={deleteAdjustmentMutation.isPending}
+                      onClick={() => onDeleteRequest(adj.id)}
                       data-testid={`button-delete-adjustment-${adj.id}`}
                     >
                       <Trash2 className="h-3.5 w-3.5 text-destructive" />
@@ -566,6 +565,8 @@ export default function ProductionRawStock() {
     },
   });
 
+  const [confirmDeleteAdjId, setConfirmDeleteAdjId] = useState<number | null>(null);
+
   const deleteAdjustmentMutation = useMutation({
     mutationFn: async (id: number) => {
       const res = await modeApiRequest("DELETE", `/api/factory/raw-stock/adjustments/${id}`);
@@ -578,7 +579,9 @@ export default function ProductionRawStock() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/adjustments"] });
-      toast({ title: "Deleted", description: "Adjustment removed." });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
+      setConfirmDeleteAdjId(null);
+      toast({ title: "Deleted", description: "Adjustment and any linked accounting entries removed." });
     },
     onError: (err: any) => {
       if (err?._handledGlobally) return;
@@ -1323,7 +1326,7 @@ export default function ProductionRawStock() {
       </Card>
 
       {/* ── Manual Stock Adjustments History ── */}
-      <AdjustmentsHistoryCard deleteAdjustmentMutation={deleteAdjustmentMutation} />
+      <AdjustmentsHistoryCard onDeleteRequest={setConfirmDeleteAdjId} />
 
       {/* ── Mix Batches Section ── */}
       <Card>
@@ -2722,6 +2725,40 @@ export default function ProductionRawStock() {
               })()}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Manual Adjustment Confirmation ── */}
+      <Dialog open={confirmDeleteAdjId !== null} onOpenChange={(open) => { if (!open) setConfirmDeleteAdjId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Delete Manual Adjustment?
+            </DialogTitle>
+            <DialogDescription>
+              This will permanently remove the adjustment record.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md bg-muted p-3 text-sm space-y-1">
+            <p className="font-medium">What happens:</p>
+            <p>The stock adjustment entry will be deleted and stock totals will be recalculated.</p>
+            <p>If a journal voucher was created (Dr Raw Material / Cr Supplier), it will be reversed and removed.</p>
+            <p>Any linked daybook entries will also be removed.</p>
+          </div>
+          <div className="flex justify-end gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => setConfirmDeleteAdjId(null)} data-testid="button-delete-adj-cancel">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => confirmDeleteAdjId !== null && deleteAdjustmentMutation.mutate(confirmDeleteAdjId)}
+              disabled={deleteAdjustmentMutation.isPending}
+              data-testid="button-delete-adj-confirm"
+            >
+              {deleteAdjustmentMutation.isPending ? "Deleting..." : "Yes, Delete"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
