@@ -662,6 +662,7 @@ let migrationsDone = false;
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS freight_account_id integer`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS freight_supplier_id integer`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS other_charges decimal(20,2) DEFAULT 0`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS other_charges_currency_code varchar(10)`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS other_charges_account_id integer`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS other_charges_supplier_id integer`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS commission_amount decimal(20,2) DEFAULT 0`,
