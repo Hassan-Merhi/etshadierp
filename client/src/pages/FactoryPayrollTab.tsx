@@ -103,10 +103,14 @@ export default function FactoryPayrollTab() {
   const [printSummaryOpen, setPrintSummaryOpen] = useState(false);
 
   const _now = new Date();
-  const _lastDayOfMonth = new Date(_now.getFullYear(), _now.getMonth() + 1, 0).toISOString().split("T")[0];
+  // Use local date parts to avoid UTC-offset stripping a day (e.g. UTC+3 midnight → previous UTC day)
+  const _pad = (n: number) => String(n).padStart(2, "0");
+  const _lastDayLocal = new Date(_now.getFullYear(), _now.getMonth() + 1, 0);
+  const _lastDayOfMonth = `${_lastDayLocal.getFullYear()}-${_pad(_lastDayLocal.getMonth() + 1)}-${_pad(_lastDayLocal.getDate())}`;
+  const _periodStartLocal = `${_now.getFullYear()}-${_pad(_now.getMonth() + 1)}-01`;
 
   const [runForm, setRunForm] = useState({
-    periodStart: _now.toISOString().slice(0, 7) + "-01",
+    periodStart: _periodStartLocal,
     periodEnd: _lastDayOfMonth,
     frequency: "Monthly",
     daysCount: "",
