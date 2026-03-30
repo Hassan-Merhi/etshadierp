@@ -1,4 +1,4 @@
-  import { useState, useEffect, Fragment, useRef } from "react";
+  import { useState, useEffect, useRef } from "react";
   import { useConnectivity } from "@/contexts/ConnectivityContext";
   import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
   import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
@@ -55,6 +55,7 @@
     TableRow,
   } from "@/components/ui/table";
   import { Badge } from "@/components/ui/badge";
+  import { Skeleton } from "@/components/ui/skeleton";
   import { Switch } from "@/components/ui/switch";
   
   import { useToast } from "@/hooks/use-toast";
@@ -3100,6 +3101,7 @@ function OfflineSyncPanel() {
 
     const openFactoryUserEdit = async (user: any) => {
       setFactoryEditingUser(user);
+      setExpandedUserId(user.id);
       setFactoryUserFormData({ username: user.username, password: "", displayName: user.displayName || "", hasErpAccess: user.hasErpAccess ?? true, hasFactoryAccess: user.hasFactoryAccess ?? true });
       setFactoryUserPages(new Set(user.pageAccess));
       setFactoryUserHiddenCostFields(user.hiddenCostFields ?? []);
@@ -4336,7 +4338,7 @@ function OfflineSyncPanel() {
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
                   <h2 className="text-2xl font-semibold" data-testid="text-factory-users-title">User Management</h2>
-                  <p className="text-muted-foreground mt-1">Create users and control which pages they can access</p>
+                  <p className="text-muted-foreground mt-1">Create users and control their access</p>
                 </div>
                 <Button onClick={() => { resetFactoryUserForm(); setFactoryCreateOpen(true); }} data-testid="button-add-factory-user">
                   <Plus className="h-4 w-4 mr-2" />Add User
@@ -4344,255 +4346,217 @@ function OfflineSyncPanel() {
               </div>
 
               <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-muted-foreground" />
-                    <CardTitle className="text-lg">Users ({factoryUsersData.length})</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="overflow-x-auto">
+                <CardContent className="pt-4 overflow-x-auto">
                   {isLoadingFactoryUsers ? (
-                    <p className="text-center text-muted-foreground py-8">Loading users...</p>
+                    <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
                   ) : factoryUsersData.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-8"></TableHead>
                           <TableHead>Username</TableHead>
-                          <TableHead>Display Name</TableHead>
-                          <TableHead>ERP Access</TableHead>
-                          <TableHead>Factory Access</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Access</TableHead>
                           <TableHead>Pages</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="w-24">Actions</TableHead>
+                          <TableHead className="w-20">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {factoryUsersData.map((user: any) => (
-                          <Fragment key={user.id}>
-                          <TableRow data-testid={`row-factory-user-${user.id}`}>
-                            <TableCell className="p-1">
-                              <Button variant="ghost" size="icon" onClick={() => toggleUserExpansion(user.id)} data-testid={`button-expand-user-${user.id}`}>
-                                {expandedUserId === user.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                              </Button>
-                            </TableCell>
-                            <TableCell className="font-medium font-mono">{user.username}</TableCell>
-                            <TableCell className="text-muted-foreground">{user.displayName || "-"}</TableCell>
-                            <TableCell>
-                              <Switch
-                                checked={isFactoryAdminOrOwner(user) ? true : (user.hasErpAccess ?? true)}
-                                disabled={isFactoryAdminOrOwner(user) || toggleFactoryAccessMutation.isPending}
-                                onCheckedChange={(checked) => toggleFactoryAccessMutation.mutate({ userId: user.id, data: { hasErpAccess: checked } })}
-                                data-testid={`switch-erp-access-${user.id}`}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Switch
-                                checked={isFactoryAdminOrOwner(user) ? true : (user.hasFactoryAccess ?? true)}
-                                disabled={isFactoryAdminOrOwner(user) || toggleFactoryAccessMutation.isPending}
-                                onCheckedChange={(checked) => toggleFactoryAccessMutation.mutate({ userId: user.id, data: { hasFactoryAccess: checked } })}
-                                data-testid={`switch-factory-access-${user.id}`}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {user.pageAccess.length > 0 ? (
-                                <Badge variant="secondary">{user.pageAccess.length} pages</Badge>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">Full access</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={user.active ? "default" : "secondary"}>{user.active ? "Active" : "Inactive"}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                <Button variant="ghost" size="icon" onClick={() => openFactoryUserEdit(user)} data-testid={`button-edit-user-${user.id}`}>
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                {!isFactoryAdminOrOwner(user) && (
-                                  <Button variant="ghost" size="icon" onClick={() => setFactoryDeletingUser(user)} data-testid={`button-delete-user-${user.id}`} className="text-destructive">
-                                    <Trash2 className="h-4 w-4" />
+                        {factoryUsersData.map((user: any) => {
+                          const privileged = isFactoryAdminOrOwner(user);
+                          const hasERP = privileged || (user.hasErpAccess ?? true);
+                          const hasFactory = privileged || (user.hasFactoryAccess ?? true);
+                          const factoryPageKeys = new Set(ALL_FACTORY_PAGES_SETTINGS.map((p: any) => p.key));
+                          const erpPageKeys = new Set(ALL_ERP_PAGES.map((p: any) => p.key));
+                          const factoryPagesCount = user.pageAccess.filter((k: string) => factoryPageKeys.has(k)).length;
+                          const erpPagesCount = user.pageAccess.filter((k: string) => erpPageKeys.has(k)).length;
+                          const accessLabel = hasERP && hasFactory ? "ERP + Factory" : hasERP ? "ERP only" : hasFactory ? "Factory only" : "No access";
+                          let pagesLabel = "All pages";
+                          if (!privileged && user.pageAccess.length > 0) {
+                            const parts: string[] = [];
+                            if (hasFactory && factoryPagesCount > 0) parts.push(`Factory: ${factoryPagesCount}`);
+                            if (hasERP && erpPagesCount > 0) parts.push(`ERP: ${erpPagesCount}`);
+                            if (parts.length > 0) pagesLabel = parts.join(" · ");
+                          }
+                          const roleLabel = user.role || "User";
+                          return (
+                            <TableRow key={user.id} data-testid={`row-factory-user-${user.id}`}>
+                              <TableCell className="font-mono font-medium">{user.username}</TableCell>
+                              <TableCell className="text-muted-foreground">{user.displayName || "—"}</TableCell>
+                              <TableCell>
+                                <Badge variant={privileged ? "default" : "secondary"} className="capitalize">
+                                  {roleLabel}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{accessLabel}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{pagesLabel}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <Button variant="ghost" size="icon" onClick={() => openFactoryUserEdit(user)} data-testid={`button-edit-user-${user.id}`}>
+                                    <Edit className="h-4 w-4" />
                                   </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                          {expandedUserId === user.id && (
-                            <TableRow key={`${user.id}-roles`} className="bg-muted/30">
-                              <TableCell colSpan={8} className="py-3 px-6">
-                                <div className="space-y-2">
-                                  <div className="flex items-center justify-between flex-wrap gap-2">
-                                    <span className="text-sm font-semibold flex items-center gap-2"><Shield className="h-4 w-4 text-muted-foreground" />ERP Company Roles</span>
-                                    <Button size="sm" variant="outline" onClick={() => handleAddRole(user.id)} data-testid={`button-add-role-${user.id}`}>
-                                      <Plus className="h-3 w-3 mr-1" />Add Role
+                                  {!privileged && (
+                                    <Button variant="ghost" size="icon" onClick={() => setFactoryDeletingUser(user)} data-testid={`button-delete-user-${user.id}`} className="text-destructive">
+                                      <Trash2 className="h-4 w-4" />
                                     </Button>
-                                  </div>
-                                  {userCompanyRoles.length === 0 ? (
-                                    <p className="text-xs text-muted-foreground">No ERP roles assigned. Click "Add Role" to assign a role to a company.</p>
-                                  ) : (
-                                    <div className="flex flex-wrap gap-2">
-                                      {userCompanyRoles.map((role: any) => (
-                                        <div key={role.id} className="flex items-center gap-1.5 border rounded-md px-2 py-1 bg-background text-sm" data-testid={`role-item-${role.id}`}>
-                                          <span className="font-medium">{companies.find((c: any) => c.id === role.companyId)?.name || `Company ${role.companyId}`}</span>
-                                          <span className="text-muted-foreground">—</span>
-                                          <Badge variant={role.role === "Admin" ? "default" : role.role === "Owner" ? "default" : "secondary"} className="text-xs">{role.role}</Badge>
-                                          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleEditRole(role)} data-testid={`button-edit-role-${role.id}`}>
-                                            <Edit className="h-3 w-3" />
-                                          </Button>
-                                          <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => handleDeleteRole(role.id, user.id)} data-testid={`button-delete-role-${role.id}`}>
-                                            <Trash2 className="h-3 w-3" />
-                                          </Button>
-                                        </div>
-                                      ))}
-                                    </div>
                                   )}
                                 </div>
                               </TableCell>
                             </TableRow>
-                          )}
-                          </Fragment>
-                        ))}
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                      <p className="text-lg font-medium">No users configured</p>
-                      <p className="text-sm mt-1">Add users and assign them specific page access</p>
+                    <div className="text-center py-10 text-muted-foreground">
+                      <Users className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                      <p className="font-medium">No users yet</p>
+                      <p className="text-sm mt-1">Click "Add User" to create the first one</p>
                     </div>
                   )}
                 </CardContent>
               </Card>
 
-              {/* Factory user create/edit dialog */}
-              <Dialog open={factoryCreateOpen || !!factoryEditingUser} onOpenChange={(open) => { if (!open) { setFactoryCreateOpen(false); setFactoryEditingUser(null); resetFactoryUserForm(); } }}>
+              {/* Create / Edit Dialog */}
+              <Dialog open={factoryCreateOpen || !!factoryEditingUser} onOpenChange={(open) => { if (!open) { setFactoryCreateOpen(false); setFactoryEditingUser(null); setExpandedUserId(null); resetFactoryUserForm(); } }}>
                 <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                       <Shield className="h-5 w-5" />
-                      {factoryEditingUser ? `Edit User: ${factoryEditingUser.username}` : "Add New User"}
+                      {factoryEditingUser ? `Edit: ${factoryEditingUser.username}` : "Add New User"}
                     </DialogTitle>
                     <DialogDescription>
-                      {factoryEditingUser ? "Update display name, password, or page access" : "Create a new user and choose which factory pages they can see"}
+                      {factoryEditingUser ? "Update credentials, access modes, and page permissions" : "Set up login credentials and choose what this user can access"}
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="space-y-5">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label>Username *</Label>
-                        <Input value={factoryUserFormData.username} onChange={(e) => setFactoryUserFormData({ ...factoryUserFormData, username: e.target.value })} placeholder="Enter username" data-testid="input-factory-username" />
-                        {factoryEditingUser && factoryUserFormData.username !== factoryEditingUser.username && (
-                          <p className="text-xs text-muted-foreground mt-1">Username will be changed on save</p>
-                        )}
+
+                  <div className="space-y-6 py-1">
+                    {/* Credentials */}
+                    <div className="space-y-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Credentials</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label>Username *</Label>
+                          <Input value={factoryUserFormData.username} onChange={(e) => setFactoryUserFormData({ ...factoryUserFormData, username: e.target.value })} placeholder="Enter username" data-testid="input-factory-username" />
+                          {factoryEditingUser && factoryUserFormData.username !== factoryEditingUser.username && (
+                            <p className="text-xs text-muted-foreground mt-1">Username will change on save</p>
+                          )}
+                        </div>
+                        <div>
+                          <Label>{factoryEditingUser ? "New Password" : "Password *"}</Label>
+                          <Input type="password" value={factoryUserFormData.password} onChange={(e) => setFactoryUserFormData({ ...factoryUserFormData, password: e.target.value })} placeholder={factoryEditingUser ? "Leave blank to keep" : "Min 4 characters"} data-testid="input-factory-password" />
+                        </div>
                       </div>
                       <div>
-                        <Label>{factoryEditingUser ? "New Password (leave blank to keep)" : "Password *"}</Label>
-                        <Input type="password" value={factoryUserFormData.password} onChange={(e) => setFactoryUserFormData({ ...factoryUserFormData, password: e.target.value })} placeholder={factoryEditingUser ? "Leave blank to keep" : "Min 4 characters"} data-testid="input-factory-password" />
+                        <Label>Display Name</Label>
+                        <Input value={factoryUserFormData.displayName} onChange={(e) => setFactoryUserFormData({ ...factoryUserFormData, displayName: e.target.value })} placeholder="Name shown in the system (e.g. John, Warehouse Manager)" data-testid="input-factory-display-name" />
                       </div>
                     </div>
-                    <div>
-                      <Label>Display Name</Label>
-                      <Input value={factoryUserFormData.displayName} onChange={(e) => setFactoryUserFormData({ ...factoryUserFormData, displayName: e.target.value })} placeholder="Name shown in the system" data-testid="input-factory-display-name" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex items-center justify-between rounded-md border p-3">
-                        <Label className="cursor-pointer">ERP Access</Label>
-                        <Switch checked={factoryEditingUser && isFactoryAdminOrOwner(factoryEditingUser) ? true : factoryUserFormData.hasErpAccess} disabled={!!factoryEditingUser && isFactoryAdminOrOwner(factoryEditingUser)} onCheckedChange={(v) => setFactoryUserFormData({ ...factoryUserFormData, hasErpAccess: v })} data-testid="switch-form-erp-access" />
+
+                    {/* App Access */}
+                    <div className="space-y-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">App Access</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex items-center justify-between rounded-md border p-3">
+                          <div>
+                            <p className="text-sm font-medium">ERP</p>
+                            <p className="text-xs text-muted-foreground">Accounting, sales, analytics</p>
+                          </div>
+                          <Switch checked={factoryEditingUser && isFactoryAdminOrOwner(factoryEditingUser) ? true : factoryUserFormData.hasErpAccess} disabled={!!factoryEditingUser && isFactoryAdminOrOwner(factoryEditingUser)} onCheckedChange={(v) => setFactoryUserFormData({ ...factoryUserFormData, hasErpAccess: v })} data-testid="switch-form-erp-access" />
+                        </div>
+                        <div className="flex items-center justify-between rounded-md border p-3">
+                          <div>
+                            <p className="text-sm font-medium">Factory</p>
+                            <p className="text-xs text-muted-foreground">Production, bales, workers</p>
+                          </div>
+                          <Switch checked={factoryEditingUser && isFactoryAdminOrOwner(factoryEditingUser) ? true : factoryUserFormData.hasFactoryAccess} disabled={!!factoryEditingUser && isFactoryAdminOrOwner(factoryEditingUser)} onCheckedChange={(v) => setFactoryUserFormData({ ...factoryUserFormData, hasFactoryAccess: v })} data-testid="switch-form-factory-access" />
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between rounded-md border p-3">
-                        <Label className="cursor-pointer">Factory Access</Label>
-                        <Switch checked={factoryEditingUser && isFactoryAdminOrOwner(factoryEditingUser) ? true : factoryUserFormData.hasFactoryAccess} disabled={!!factoryEditingUser && isFactoryAdminOrOwner(factoryEditingUser)} onCheckedChange={(v) => setFactoryUserFormData({ ...factoryUserFormData, hasFactoryAccess: v })} data-testid="switch-form-factory-access" />
-                      </div>
                     </div>
+
+                    {/* Factory Pages */}
                     {factoryUserFormData.hasFactoryAccess && !(factoryEditingUser && isFactoryAdminOrOwner(factoryEditingUser)) && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <Label className="text-base font-semibold">Factory Page Access</Label>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => setFactoryUserPages(prev => new Set([...prev, ...ALL_FACTORY_PAGES_SETTINGS.map(p => p.key)]))} data-testid="button-select-all-pages"><Check className="h-3 w-3 mr-1" />All</Button>
-                          <Button variant="outline" size="sm" onClick={() => setFactoryUserPages(prev => { const next = new Set(prev); ALL_FACTORY_PAGES_SETTINGS.forEach(p => next.delete(p.key)); return next; })} data-testid="button-select-none-pages"><X className="h-3 w-3 mr-1" />None</Button>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Factory Pages</p>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setFactoryUserPages(prev => new Set([...prev, ...ALL_FACTORY_PAGES_SETTINGS.map((p: any) => p.key)]))} data-testid="button-select-all-pages"><Check className="h-3 w-3 mr-1" />All</Button>
+                            <Button variant="outline" size="sm" onClick={() => setFactoryUserPages(prev => { const next = new Set(prev); ALL_FACTORY_PAGES_SETTINGS.forEach((p: any) => next.delete(p.key)); return next; })} data-testid="button-select-none-pages"><X className="h-3 w-3 mr-1" />None</Button>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground">Leave all unchecked to grant full factory access.</p>
+                        <div className="space-y-4 border rounded-md p-4 max-h-56 overflow-y-auto">
+                          {FACTORY_PAGE_GROUPS_SETTINGS.map((group: string) => {
+                            const groupPages = ALL_FACTORY_PAGES_SETTINGS.filter((p: any) => p.group === group);
+                            const allSelected = groupPages.every((p: any) => factoryUserPages.has(p.key));
+                            const someSelected = groupPages.some((p: any) => factoryUserPages.has(p.key));
+                            return (
+                              <div key={group} className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <Checkbox checked={allSelected} onCheckedChange={() => toggleFactoryUserGroup(group)} data-testid={`checkbox-group-${group.toLowerCase().replace(/\s+/g, '-')}`} />
+                                  <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{group}</span>
+                                  {someSelected && !allSelected && <Badge variant="secondary" className="text-xs">partial</Badge>}
+                                </div>
+                                <div className="ml-6 grid grid-cols-2 gap-1">
+                                  {groupPages.map((page: any) => (
+                                    <div key={page.key} className="flex items-center gap-2">
+                                      <Checkbox checked={factoryUserPages.has(page.key)} onCheckedChange={() => toggleFactoryUserPage(page.key)} data-testid={`checkbox-page-${page.key.replace(/\//g, '-')}`} />
+                                      <span className="text-sm">{page.label}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                      <p className="text-sm text-muted-foreground">Restrict which factory pages this user can see. If none selected, user gets full factory access.</p>
-                      <div className="space-y-4 border rounded-md p-4 max-h-60 overflow-y-auto">
-                        {FACTORY_PAGE_GROUPS_SETTINGS.map(group => {
-                          const groupPages = ALL_FACTORY_PAGES_SETTINGS.filter(p => p.group === group);
-                          const allSelected = groupPages.every(p => factoryUserPages.has(p.key));
-                          const someSelected = groupPages.some(p => factoryUserPages.has(p.key));
-                          return (
-                            <div key={group} className="space-y-2">
-                              <div className="flex items-center gap-2">
-                                <Checkbox checked={allSelected} onCheckedChange={() => toggleFactoryUserGroup(group)} data-testid={`checkbox-group-${group.toLowerCase().replace(/\s+/g, '-')}`} />
-                                <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{group}</span>
-                                {someSelected && !allSelected && <Badge variant="secondary" className="text-xs">partial</Badge>}
-                              </div>
-                              <div className="ml-6 grid grid-cols-2 gap-1">
-                                {groupPages.map(page => (
-                                  <div key={page.key} className="flex items-center gap-2">
-                                    <Checkbox checked={factoryUserPages.has(page.key)} onCheckedChange={() => toggleFactoryUserPage(page.key)} data-testid={`checkbox-page-${page.key.replace(/\//g, '-')}`} />
-                                    <span className="text-sm">{page.label}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
                     )}
+
+                    {/* ERP Pages */}
                     {factoryUserFormData.hasErpAccess && !(factoryEditingUser && isFactoryAdminOrOwner(factoryEditingUser)) && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <Label className="text-base font-semibold">ERP Page Access</Label>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => setFactoryUserPages(prev => new Set([...prev, ...ALL_ERP_PAGES.map(p => p.key)]))} data-testid="button-select-all-erp-pages"><Check className="h-3 w-3 mr-1" />All</Button>
-                          <Button variant="outline" size="sm" onClick={() => setFactoryUserPages(prev => { const next = new Set(prev); ALL_ERP_PAGES.forEach(p => next.delete(p.key)); return next; })} data-testid="button-select-none-erp-pages"><X className="h-3 w-3 mr-1" />None</Button>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">ERP Pages</p>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setFactoryUserPages(prev => new Set([...prev, ...ALL_ERP_PAGES.map((p: any) => p.key)]))} data-testid="button-select-all-erp-pages"><Check className="h-3 w-3 mr-1" />All</Button>
+                            <Button variant="outline" size="sm" onClick={() => setFactoryUserPages(prev => { const next = new Set(prev); ALL_ERP_PAGES.forEach((p: any) => next.delete(p.key)); return next; })} data-testid="button-select-none-erp-pages"><X className="h-3 w-3 mr-1" />None</Button>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground">Leave all unchecked to grant full ERP access.</p>
+                        <div className="space-y-4 border rounded-md p-4 max-h-56 overflow-y-auto">
+                          {ERP_PAGE_GROUPS.map((group: string) => {
+                            const groupPages = ALL_ERP_PAGES.filter((p: any) => p.group === group);
+                            const allSelected = groupPages.every((p: any) => factoryUserPages.has(p.key));
+                            const someSelected = groupPages.some((p: any) => factoryUserPages.has(p.key));
+                            return (
+                              <div key={`erp-${group}`} className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <Checkbox checked={allSelected} onCheckedChange={() => { setFactoryUserPages(prev => { const next = new Set(prev); if (allSelected) { groupPages.forEach((p: any) => next.delete(p.key)); } else { groupPages.forEach((p: any) => next.add(p.key)); } return next; }); }} data-testid={`checkbox-erp-group-${group.toLowerCase().replace(/\s+/g, '-')}`} />
+                                  <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{group}</span>
+                                  {someSelected && !allSelected && <Badge variant="secondary" className="text-xs">partial</Badge>}
+                                </div>
+                                <div className="ml-6 grid grid-cols-2 gap-1">
+                                  {groupPages.map((page: any) => (
+                                    <div key={page.key} className="flex items-center gap-2">
+                                      <Checkbox checked={factoryUserPages.has(page.key)} onCheckedChange={() => toggleFactoryUserPage(page.key)} data-testid={`checkbox-erp-page-${page.key}`} />
+                                      <span className="text-sm">{page.label}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                      <p className="text-sm text-muted-foreground">Restrict which ERP pages this user can see. If none selected, user gets full ERP access.</p>
-                      <div className="space-y-4 border rounded-md p-4 max-h-60 overflow-y-auto">
-                        {ERP_PAGE_GROUPS.map(group => {
-                          const groupPages = ALL_ERP_PAGES.filter(p => p.group === group);
-                          const allSelected = groupPages.every(p => factoryUserPages.has(p.key));
-                          const someSelected = groupPages.some(p => factoryUserPages.has(p.key));
-                          return (
-                            <div key={`erp-${group}`} className="space-y-2">
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  checked={allSelected}
-                                  onCheckedChange={() => {
-                                    setFactoryUserPages(prev => {
-                                      const next = new Set(prev);
-                                      if (allSelected) { groupPages.forEach(p => next.delete(p.key)); }
-                                      else { groupPages.forEach(p => next.add(p.key)); }
-                                      return next;
-                                    });
-                                  }}
-                                  data-testid={`checkbox-erp-group-${group.toLowerCase().replace(/\s+/g, '-')}`}
-                                />
-                                <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{group}</span>
-                                {someSelected && !allSelected && <Badge variant="secondary" className="text-xs">partial</Badge>}
-                              </div>
-                              <div className="ml-6 grid grid-cols-2 gap-1">
-                                {groupPages.map(page => (
-                                  <div key={page.key} className="flex items-center gap-2">
-                                    <Checkbox checked={factoryUserPages.has(page.key)} onCheckedChange={() => toggleFactoryUserPage(page.key)} data-testid={`checkbox-erp-page-${page.key}`} />
-                                    <span className="text-sm">{page.label}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
                     )}
+
+                    {/* Cost Visibility */}
                     {!(factoryEditingUser && isFactoryAdminOrOwner(factoryEditingUser)) && (
                       <div className="space-y-3">
-                        <Label className="text-base font-semibold">Hidden Cost Fields</Label>
-                        <p className="text-sm text-muted-foreground">Select which cost/price fields to hide from this user.</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cost & Pricing Visibility</p>
+                        <p className="text-xs text-muted-foreground">Check to hide these fields from this user.</p>
                         <div className="space-y-2 border rounded-md p-4">
-                          {FACTORY_COST_FIELDS.map(field => (
+                          {FACTORY_COST_FIELDS.map((field: any) => (
                             <div key={field.key} className="flex items-center gap-2">
                               <Checkbox checked={factoryUserHiddenCostFields.includes(field.key)} onCheckedChange={() => setFactoryUserHiddenCostFields(prev => prev.includes(field.key) ? prev.filter(k => k !== field.key) : [...prev, field.key])} data-testid={`checkbox-cost-${field.key}`} />
                               <span className="text-sm">{field.label}</span>
@@ -4601,9 +4565,37 @@ function OfflineSyncPanel() {
                         </div>
                       </div>
                     )}
+
+                    {/* Company Roles — edit mode only */}
+                    {factoryEditingUser && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">ERP Company Roles</p>
+                          <Button size="sm" variant="outline" onClick={() => handleAddRole(factoryEditingUser.id)} data-testid={`button-add-role-${factoryEditingUser.id}`}>
+                            <Plus className="h-3 w-3 mr-1" />Add Role
+                          </Button>
+                        </div>
+                        {userCompanyRoles.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No company roles assigned yet.</p>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {userCompanyRoles.map((role: any) => (
+                              <div key={role.id} className="flex items-center gap-1.5 border rounded-md px-2 py-1 bg-background text-sm" data-testid={`role-item-${role.id}`}>
+                                <span className="font-medium">{companies.find((c: any) => c.id === role.companyId)?.name || `Company ${role.companyId}`}</span>
+                                <span className="text-muted-foreground">—</span>
+                                <Badge variant={role.role === "Admin" || role.role === "Owner" ? "default" : "secondary"} className="text-xs">{role.role}</Badge>
+                                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleEditRole(role)} data-testid={`button-edit-role-${role.id}`}><Edit className="h-3 w-3" /></Button>
+                                <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => handleDeleteRole(role.id, factoryEditingUser.id)} data-testid={`button-delete-role-${role.id}`}><Trash2 className="h-3 w-3" /></Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <DialogFooter className="mt-6">
-                    <Button variant="outline" onClick={() => { setFactoryCreateOpen(false); setFactoryEditingUser(null); resetFactoryUserForm(); }} disabled={createFactoryUserMutation.isPending || updateFactoryUserMutation.isPending}>Cancel</Button>
+
+                  <DialogFooter className="mt-4">
+                    <Button variant="outline" onClick={() => { setFactoryCreateOpen(false); setFactoryEditingUser(null); setExpandedUserId(null); resetFactoryUserForm(); }} disabled={createFactoryUserMutation.isPending || updateFactoryUserMutation.isPending}>Cancel</Button>
                     <Button onClick={handleFactoryUserSubmit} disabled={createFactoryUserMutation.isPending || updateFactoryUserMutation.isPending} data-testid="button-save-factory-user">
                       {(createFactoryUserMutation.isPending || updateFactoryUserMutation.isPending) ? "Saving..." : factoryEditingUser ? "Save Changes" : "Create User"}
                     </Button>
@@ -4611,7 +4603,7 @@ function OfflineSyncPanel() {
                 </DialogContent>
               </Dialog>
 
-              {/* Factory user delete confirm */}
+              {/* Delete confirm */}
               <Dialog open={!!factoryDeletingUser} onOpenChange={(open) => { if (!open) setFactoryDeletingUser(null); }}>
                 <DialogContent>
                   <DialogHeader>
