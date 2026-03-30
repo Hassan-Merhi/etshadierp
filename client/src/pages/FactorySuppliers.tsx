@@ -1520,19 +1520,26 @@ export default function FactorySuppliers() {
                           const netPay = parseFloat(group.netPayable);
                           const isOverpaid = netPay < -0.005;
                           const ccPrefix = group.currencyCode !== "USD" ? `${group.currencyCode} ` : "$";
+                          // Auto-settled: cross-currency freight already reflected in parent broker's pool
+                          const autoSettledFreight = parseFloat((group as any).autoSettledFreight || "0");
+                          const isAutoSettled = autoSettledFreight > 0.005 && Math.abs(netPay) <= 0.005;
                           return (
                           <TableRow key={group.currencyCode}>
                             <TableCell className="font-semibold">
                               <Badge variant="outline">{group.currencyCode}</Badge>
                               {isCommissionOnly && <span className="ml-2 text-xs text-muted-foreground">Commission</span>}
-                              {isFreightOnly && <span className="ml-2 text-xs text-muted-foreground">Freight</span>}
-                              {isCrossFreightPool && hasCommission && <span className="ml-2 text-xs text-muted-foreground">Freight + Commission</span>}
+                              {isFreightOnly && !isAutoSettled && <span className="ml-2 text-xs text-muted-foreground">Freight</span>}
+                              {isCrossFreightPool && hasCommission && !isAutoSettled && <span className="ml-2 text-xs text-muted-foreground">Freight + Commission</span>}
+                              {isAutoSettled && <span className="ml-2 text-xs text-muted-foreground">Freight · In broker pool</span>}
                             </TableCell>
                             <TableCell className="text-right text-sm tabular-nums">{isCrossFreightPool ? "—" : group.containers.length}</TableCell>
                             <TableCell className="text-right text-sm tabular-nums">{isCrossFreightPool ? "—" : formatKg(group.totalKg)}</TableCell>
                             <TableCell className="text-right text-sm tabular-nums font-medium">
                               {isCrossFreightPool ? (() => {
                                 const totalFreight = parseFloat(group.totalFreight || "0");
+                                if (isAutoSettled) {
+                                  return <span className="text-muted-foreground">{ccPrefix}{formatNum(String(totalFreight.toFixed(2)))}</span>;
+                                }
                                 const remComm = parseFloat(group.remainingCommission || group.totalCommission || "0");
                                 const remainingFreight = Math.max(0, netPay - remComm);
                                 const freightSettled = remainingFreight < totalFreight - 0.005;
@@ -1565,12 +1572,14 @@ export default function FactorySuppliers() {
                               ) : "—"}
                             </TableCell>
                             <TableCell className="text-right text-sm tabular-nums font-bold">
-                              {isOverpaid ? (
+                              {isAutoSettled ? (
+                                <span className="text-muted-foreground text-sm font-normal">In broker pool</span>
+                              ) : isOverpaid ? (
                                 <span className="text-green-600 dark:text-green-400">{ccPrefix}{formatNum(String(Math.abs(netPay)))} CR</span>
                               ) : (
                                 <>{ccPrefix}{formatNum(group.netPayable)}</>
                               )}
-                              {(group.currencyCode !== "USD" || isCommissionOnly || isCrossFreightPool) && (netPay > 0 || hasCommission) && statementData.supplier.parentId && (
+                              {!isAutoSettled && (group.currencyCode !== "USD" || isCommissionOnly || isCrossFreightPool) && (netPay > 0 || hasCommission) && statementData.supplier.parentId && (
                                 <Button
                                   variant="ghost"
                                   size="sm"

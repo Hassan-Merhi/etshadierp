@@ -3182,6 +3182,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
       }
 
+      // Is this a linked (child) supplier? Cross-currency freight from linked suppliers flows
+      // automatically into the parent broker's statement from container data — no explicit FX
+      // transfer is needed. Treat such freight as already settled to avoid double-counting.
+      const isLinkedSupplier = !!(supplier as any).parentId;
+
       const currencyGroups = Object.entries(byCurrency).map(([cc, data]) => {
         const paid = paidByCurrency[cc] || 0;
         // effectiveCommission: before offload only commissionAmount (directCommission) exists;
@@ -3195,15 +3200,19 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const isCommissionOnly = data.containers.length === 0 && effectiveCommission > 0 && data.totalFreight <= 0.005 && data.totalOtherCharges <= 0.005;
         // Freight pool (cross-currency): no containers, has freight, may also have commission earned by supplier
         const isCrossFreightPool = data.containers.length === 0 && data.totalFreight > 0.005;
+        // For linked suppliers, cross-currency freight is already reflected in the parent broker's
+        // statement automatically — offset it from the paid amount so netPayable = 0 (auto-settled).
+        const autoSettledFreight = isLinkedSupplier && isCrossFreightPool ? data.totalFreight : 0;
+        const effectivePaid = paid + autoSettledFreight;
         // netPayable semantics:
         //  - Commission-only:  commission is EARNED by supplier → effectiveCommission - paid
         //  - Cross-freight:    totalValue (=freight+otherCharges) is owed, commission also EARNED → totalValue + commission - paid
         //  - Normal container: commission is DEDUCTED (goes to broker); totalValue includes goods+freight+otherCharges → totalValue - commission - paid
         const netPayable = isCommissionOnly
-          ? effectiveCommission - paid
+          ? effectiveCommission - effectivePaid
           : isCrossFreightPool
-          ? data.totalValue + effectiveCommission - paid
-          : data.totalValue - effectiveCommission - paid;
+          ? data.totalValue + effectiveCommission - effectivePaid
+          : data.totalValue - effectiveCommission - effectivePaid;
         // Phase 2: commission remaining = effectiveCommission minus what was settled via FX
         // "both" is treated as commission-first (capped at effectiveCommission), then supplier
         const commFxReduction = Math.min(effectiveCommission, (fxCommOut[cc] || 0) + (fxBothOut[cc] || 0));
@@ -3221,8 +3230,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           totalOwed: (data.totalValue + effectiveCommission).toFixed(2),
           totalFreight: data.totalFreight.toFixed(2),
           totalOtherCharges: data.totalOtherCharges.toFixed(2),
+          autoSettledFreight: autoSettledFreight.toFixed(2),
         };
-      }).filter(g => Math.abs(parseFloat(g.netPayable)) > 0.005 || (g.containers.length > 0 && g.currencyCode !== "USD") || parseFloat(g.totalCommission) > 0.005 || parseFloat(g.totalOtherCharges) > 0.005);
+      }).filter(g => Math.abs(parseFloat(g.netPayable)) > 0.005 || (g.containers.length > 0 && g.currencyCode !== "USD") || parseFloat(g.totalCommission) > 0.005 || parseFloat(g.totalOtherCharges) > 0.005 || parseFloat(g.autoSettledFreight || "0") > 0.005);
 
       // Compute the combined USD-equivalent net payable across all currency groups.
       // Correctly accounts for FX transfers (already deducted in paidByCurrency) and
