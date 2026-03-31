@@ -29209,12 +29209,12 @@ if (asOfDate) {
               totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
             })
             .from(voucherEntries)
-            .innerJoin(vouchersTable, eq(voucherEntries.voucherId, vouchersTable.id))
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
             .where(and(
               inArray(voucherEntries.ledgerAccountId, ledgerIds),
-              eq(vouchersTable.companyId, companyId),
-              isNull(vouchersTable.deletedAt),
-              eq(vouchersTable.optional, false)
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt),
+              eq(vouchers.optional, false)
             ))
             .groupBy(voucherEntries.ledgerAccountId)
             .execute()
@@ -29226,12 +29226,12 @@ if (asOfDate) {
               totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
             })
             .from(voucherEntries)
-            .innerJoin(vouchersTable, eq(voucherEntries.voucherId, vouchersTable.id))
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
             .where(and(
               inArray(voucherEntries.bankAccountId, bankIds),
-              eq(vouchersTable.companyId, companyId),
-              isNull(vouchersTable.deletedAt),
-              eq(vouchersTable.optional, false)
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt),
+              eq(vouchers.optional, false)
             ))
             .groupBy(voucherEntries.bankAccountId)
             .execute()
@@ -29382,12 +29382,12 @@ if (asOfDate) {
             totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
           })
           .from(voucherEntries)
-          .innerJoin(vouchersTable, eq(voucherEntries.voucherId, vouchersTable.id))
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
           .where(and(
             inArray(voucherEntries.ledgerAccountId, ledgerIds),
-            eq(vouchersTable.companyId, companyId),
-            isNull(vouchersTable.deletedAt),
-            eq(vouchersTable.optional, false)
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false)
           ))
           .groupBy(voucherEntries.ledgerAccountId)
           .execute(),
