@@ -3007,7 +3007,7 @@ export const factoryDaybookEntries = pgTable("factory_daybook_entries", {
   fxRateToUsd: decimal("fx_rate_to_usd", { precision: 20, scale: 8 }).notNull().default("1"),
   amountUsd: decimal("amount_usd", { precision: 20, scale: 2 }).notNull().default("0"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  createdBy: integer("created_by"),
+  createdBy: varchar("created_by"),
 }, (t) => ({
   companyDateIdx: index("factory_daybook_company_date_idx").on(t.companyId, t.txDate),
   txTypeIdx: index("factory_daybook_tx_type_idx").on(t.txType),

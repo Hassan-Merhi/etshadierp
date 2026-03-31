@@ -4566,6 +4566,28 @@ function OfflineSyncPanel() {
                       </div>
                     )}
 
+                    {/* Daybook Restrictions */}
+                    {!(factoryEditingUser && isFactoryAdminOrOwner(factoryEditingUser)) && (
+                      <div className="space-y-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Daybook Restrictions</p>
+                        <p className="text-xs text-muted-foreground">Restrict what this user sees in the factory daybook.</p>
+                        <div className="space-y-2 border rounded-md p-4">
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              checked={factoryUserHiddenCostFields.includes("daybook_own_only")}
+                              onCheckedChange={() => setFactoryUserHiddenCostFields(prev =>
+                                prev.includes("daybook_own_only")
+                                  ? prev.filter(k => k !== "daybook_own_only")
+                                  : [...prev, "daybook_own_only"]
+                              )}
+                              data-testid="checkbox-daybook-own-only"
+                            />
+                            <span className="text-sm">Show only entries they created</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Company Roles — edit mode only */}
                     {factoryEditingUser && (
                       <div className="space-y-3">

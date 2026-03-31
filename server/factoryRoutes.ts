@@ -120,7 +120,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     amountCurrency?: number;
     fxRateToUsd?: number;
     amountUsd?: number;
-    createdBy?: number;
+    createdBy?: string | null;
   }) {
     const currency = opts.currencyCode || "USD";
     const fxRate = opts.fxRateToUsd || 1;
@@ -11821,7 +11821,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const currentUserId = (req.session as any).userId as string | undefined;
       const { startDate, endDate, txType, currencyCode } = req.query;
+
+      // ── Check if this user has "daybook_own_only" restriction ─────────────
+      let ownOnly = false;
+      if (currentUserId) {
+        const [profile] = await db.select({ hiddenCostFields: factoryUserProfiles.hiddenCostFields })
+          .from(factoryUserProfiles)
+          .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, currentUserId)));
+        if (profile?.hiddenCostFields?.includes("daybook_own_only")) ownOnly = true;
+      }
 
       // ── 1. Query existing factory_daybook_entries ──────────────────────────
       const conditions: any[] = [
@@ -11830,6 +11840,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         sql`${factoryDaybookEntries.txType} NOT LIKE '%_VOIDED'`,
         sql`${factoryDaybookEntries.txType} NOT LIKE '%_DELETED'`,
       ];
+      // If user is restricted to own entries only, filter by their userId
+      if (ownOnly && currentUserId) conditions.push(eq(factoryDaybookEntries.createdBy, currentUserId));
       if (startDate) conditions.push(sql`${factoryDaybookEntries.txDate} >= ${startDate}`);
       if (endDate) conditions.push(sql`${factoryDaybookEntries.txDate} <= ${endDate}`);
       if (txType) conditions.push(eq(factoryDaybookEntries.txType, txType as string));
@@ -12046,7 +12058,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       }
 
       // ── 3. Merge + sort ────────────────────────────────────────────────────
-      const merged = [...filteredDaybookRows, ...syntheticRows].sort((a: any, b: any) => {
+      // If ownOnly, exclude synthetic rows (voucher-derived rows with no createdBy)
+      const effectiveSyntheticRows = ownOnly ? [] : syntheticRows;
+      const merged = [...filteredDaybookRows, ...effectiveSyntheticRows].sort((a: any, b: any) => {
         if (b.txDate > a.txDate) return 1;
         if (b.txDate < a.txDate) return -1;
         return Math.abs(b.id) - Math.abs(a.id);
@@ -15531,7 +15545,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
             fileName: req.file.originalname,
             storageKey,
             mimeType: req.file.mimetype,
-            uploadedBy: (req.session as any).userId ? Number((req.session as any).userId) : null,
+            uploadedBy: (req.session as any).userId || null,
           }).returning();
 
           const docType = await db.select().from(containerDocumentTypes).where(eq(containerDocumentTypes.id, docTypeId));
@@ -15545,7 +15559,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
             referenceTable: "containers",
             description: `Uploaded ${docTypeName}: ${req.file.originalname} for container #${containerId}`,
             metaJson: JSON.stringify({ docId: doc.id, docTypeId, fileName: req.file.originalname }),
-            createdBy: (req.session as any).userId ? Number((req.session as any).userId) : undefined,
+            createdBy: (req.session as any).userId || undefined,
           });
 
           const allDocs = await db.select().from(containerDocuments).where(eq(containerDocuments.containerId, containerId));
@@ -15590,7 +15604,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         referenceTable: "containers",
         description: `Deleted document: ${deleted.fileName} from container #${containerId}`,
         metaJson: JSON.stringify({ docId: deleted.id, fileName: deleted.fileName }),
-        createdBy: (req.session as any).userId ? Number((req.session as any).userId) : undefined,
+        createdBy: (req.session as any).userId || undefined,
       });
 
       const allDocs = await db.select().from(containerDocuments).where(eq(containerDocuments.containerId, containerId));
@@ -15666,7 +15680,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         currencyCode: row.currency,
         amountCurrency: Number(row.freightAmount),
         metaJson: JSON.stringify({ freightId: row.id, vendorName: row.vendorName }),
-        createdBy: (req.session as any).userId ? Number((req.session as any).userId) : undefined,
+        createdBy: (req.session as any).userId || undefined,
       });
 
       res.json(row);
@@ -15696,7 +15710,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         description: `Deleted freight charge ${deleted.currency} ${deleted.freightAmount} from container #${containerId}`,
         currencyCode: deleted.currency,
         amountCurrency: Number(deleted.freightAmount),
-        createdBy: (req.session as any).userId ? Number((req.session as any).userId) : undefined,
+        createdBy: (req.session as any).userId || undefined,
       });
 
       res.json({ success: true });
@@ -15720,7 +15734,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         amount: String(req.body.amount),
         method: req.body.method || null,
         reference: req.body.reference || null,
-        createdBy: (req.session as any).userId ? Number((req.session as any).userId) : null,
+        createdBy: (req.session as any).userId || null,
       }).returning();
 
       const [fr] = await db.select().from(containerFreight).where(eq(containerFreight.id, freightId));
@@ -15740,7 +15754,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         currencyCode: fr.currency,
         amountCurrency: Number(req.body.amount),
         metaJson: JSON.stringify({ freightId, paymentId: payment.id }),
-        createdBy: (req.session as any).userId ? Number((req.session as any).userId) : undefined,
+        createdBy: (req.session as any).userId || undefined,
       });
 
       res.json(payment);
@@ -15777,7 +15791,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         referenceTable: "containers",
         description: `Deleted freight payment of ${deleted.amount} for freight #${freightId}`,
         amountCurrency: Number(deleted.amount),
-        createdBy: (req.session as any).userId ? Number((req.session as any).userId) : undefined,
+        createdBy: (req.session as any).userId || undefined,
       });
 
       res.json({ success: true });
@@ -15827,7 +15841,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       const rawEntryId = Number(req.params.entryId);
       const session = req.session as any;
       const companyId = session.factoryCompanyId || session.currentCompanyId;
-      const userId = session.userId ? Number(session.userId) : null;
+      const userId = session.userId || null;
       const { reason, description, amountCurrency, amountUsd, currencyCode, fxRateToUsd, txDate } = req.body;
 
       if (!reason || typeof reason !== "string" || reason.trim().length === 0) {
@@ -16066,7 +16080,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           amountCurrency: amt,
           fxRateToUsd: fxRate,
           amountUsd: amtUsd,
-          createdBy: session.userId ? Number(session.userId) : undefined,
+          createdBy: session.userId || undefined,
         });
       });
 
