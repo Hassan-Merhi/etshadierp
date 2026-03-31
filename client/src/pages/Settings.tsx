@@ -580,9 +580,9 @@ function DataToolsTab() {
   const [isSilentApplying, setIsSilentApplying] = useState(false);
   const [silentAppliedCount, setSilentAppliedCount] = useState(0);
 
-  // Fetch locations (filtered by company context - locations are already company-scoped by the API)
+  // Fetch locations for the current company
   const { data: locations = [] } = useQuery<any[]>({
-    queryKey: ["/api/locations"],
+    queryKey: ["/api/locations", selectedCompany?.id],
     enabled: !!selectedCompany,
   });
 
@@ -2485,7 +2485,7 @@ function IntercompanyPosTab() {
 
   // Current config
   const { data: config, isLoading: configLoading } = useQuery<any>({
-    queryKey: ["/api/intercompany-pos-config"],
+    queryKey: ["/api/intercompany-pos-config", selectedCompany?.id],
   });
 
   // All companies (for dest company dropdown)
@@ -2495,7 +2495,7 @@ function IntercompanyPosTab() {
 
   // Current company accounts (source interco account)
   const { data: srcAccounts = [] } = useQuery<any[]>({
-    queryKey: ["/api/ledger-accounts"],
+    queryKey: ["/api/ledger-accounts", selectedCompany?.id],
   });
 
   const [destCompanyId, setDestCompanyId] = useState<string>("");
