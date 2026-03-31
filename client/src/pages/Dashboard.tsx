@@ -208,7 +208,7 @@ export default function Dashboard() {
   });
 
   // Fetch dashboard cash accounts
-  const { data: dashboardCashAccounts = [] } = useQuery<DashboardCashAccount[]>(
+  const { data: dashboardCashAccounts = [], error: cashAccountsError } = useQuery<DashboardCashAccount[]>(
     {
       queryKey: ["/api/dashboard-cash-accounts", selectedCompany?.id],
       enabled: !!selectedCompany,
@@ -238,7 +238,7 @@ export default function Dashboard() {
   });
 
   // Fetch dashboard payable accounts (auto-refresh every 30 seconds)
-  const { data: dashboardPayableAccounts = [] } = useQuery<PayableAccount[]>({
+  const { data: dashboardPayableAccounts = [], error: payableAccountsError } = useQuery<PayableAccount[]>({
     queryKey: ["/api/dashboard-payable-accounts", selectedCompany?.id],
     enabled: !!selectedCompany,
     staleTime: 0,
@@ -735,7 +735,9 @@ export default function Dashboard() {
                 </Dialog>
               </div>
 
-              {displayedCashAccounts.length === 0 ? (
+              {cashAccountsError ? (
+                <p className="text-sm text-destructive text-center py-4">Error loading accounts: {(cashAccountsError as any)?.message || "Unknown error"}</p>
+              ) : displayedCashAccounts.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">No accounts added yet</p>
               ) : (
                 <div className="space-y-1">
@@ -824,7 +826,9 @@ export default function Dashboard() {
                 </Dialog>
               </div>
 
-              {dashboardPayableAccounts.length === 0 ? (
+              {payableAccountsError ? (
+                <p className="text-sm text-destructive text-center py-4">Error loading accounts: {(payableAccountsError as any)?.message || "Unknown error"}</p>
+              ) : dashboardPayableAccounts.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">No accounts added yet</p>
               ) : (
                 <div className="space-y-1">
