@@ -1161,10 +1161,10 @@ export default function ProductionRawStock() {
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant={isOB ? "secondary" : row.sourceType === "MANUAL" ? "secondary" : "outline"}
+                          variant={row.sourceType === "MANUAL" ? "secondary" : "outline"}
                           data-testid={`badge-source-${row.supplierId || idx}${isOB ? "-ob" : "-ct"}`}
                         >
-                          {isOB ? "Opening" : row.sourceType === "MANUAL" ? "Manual" : "Container"}
+                          {row.sourceType === "MANUAL" ? "Manual" : "Container"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono">
