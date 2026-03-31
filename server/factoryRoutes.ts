@@ -13233,27 +13233,27 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           inArray(customerOrders.status, ["LOADING", "PENDING_VERIFICATION", "VERIFIED"]),
         ));
 
-      // For active orders, get the bale article code counts from customer_order_bales → factory_bales
+      // For active orders, get the bale article code counts from customer_order_bales directly
+      // (customerOrderBales already stores articleCode; no need to join factoryBales)
       let activeOrderBales: any[] = [];
       if (activeOrders.length > 0) {
         const orderIds = activeOrders.map((o: any) => o.id);
         activeOrderBales = await db.select({
           orderId: customerOrderBales.orderId,
-          articleCode: factoryBales.articleCode,
+          articleCode: customerOrderBales.articleCode,
           count: sql<number>`COUNT(*)`,
         }).from(customerOrderBales)
-          .innerJoin(factoryBales, eq(customerOrderBales.baleId, factoryBales.id))
           .where(inArray(customerOrderBales.orderId, orderIds))
-          .groupBy(customerOrderBales.orderId, factoryBales.articleCode);
+          .groupBy(customerOrderBales.orderId, customerOrderBales.articleCode);
       }
 
       // 5. Customers lookup for proforma names
-      const allCustomerIds = [...new Set(allProformas.map((p: any) => p.customerId))];
+      const allCustomerIds = [...new Set(allProformas.map((p: any) => p.customerId))].filter((id): id is number => id != null);
       let customerRows: any[] = [];
       if (allCustomerIds.length > 0) {
         customerRows = await db.select({ id: customers.id, name: customers.name })
           .from(customers)
-          .where(inArray(customers.id, allCustomerIds as number[]));
+          .where(inArray(customers.id, allCustomerIds));
       }
       const customerMap = new Map(customerRows.map((c: any) => [c.id, c.name]));
 
