@@ -10469,13 +10469,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { status, mixBatchId, pressingBatchId } = req.query;
+      const { status, mixBatchId, pressingBatchId, locationId, productId } = req.query;
 
       const conditions: any[] = [eq(factoryBales.companyId, companyId)];
 
       if (status) conditions.push(eq(factoryBales.status, status as string));
       if (mixBatchId) conditions.push(eq(factoryBales.mixBatchId, parseInt(mixBatchId as string)));
       if (pressingBatchId) conditions.push(eq(factoryBales.pressingBatchId, parseInt(pressingBatchId as string)));
+      if (locationId) conditions.push(eq(factoryBales.erpLocationId, parseInt(locationId as string)));
+      if (productId) conditions.push(eq(factoryBales.productId, parseInt(productId as string)));
 
       const bales = await db
         .select()

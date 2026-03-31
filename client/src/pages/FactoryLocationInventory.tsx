@@ -18,10 +18,14 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft, MapPin, Layers, Package, Search, Printer, ArrowUpDown,
-  FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2, Pencil
+  FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2, Pencil, Tag
 } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { useEscapeBack } from "@/hooks/use-escape-back";
+import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
+import { buildZplBatch } from "@/lib/zplBuilder";
+import { LabelPrintSettings, getPaperFormat } from "@/components/LabelPrintSettings";
+import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, A4_DESIGN_OPTIONS, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
 
 type SortField = "name" | "bales" | "kg" | "value";
 type SortDir = "asc" | "desc";
@@ -153,6 +157,14 @@ export default function FactoryLocationInventory() {
   const [deleteSupervisorPass, setDeleteSupervisorPass] = useState("");
   const [deleteReason, setDeleteReason] = useState("");
 
+  // Barcode reprint state
+  const [reprintDialogOpen, setReprintDialogOpen] = useState(false);
+  const [reprintProduct, setReprintProduct] = useState<FactoryBaleProduct | null>(null);
+  const [reprintBales, setReprintBales] = useState<any[]>([]);
+  const [reprintLoading, setReprintLoading] = useState(false);
+  const [reprintDesignPickerOpen, setReprintDesignPickerOpen] = useState(false);
+  const [reprintPendingLabels, setReprintPendingLabels] = useState<LabelData[]>([]);
+
   // Edit-mode state (deep-link from CustomerProformas "Edit in Inventory")
   const [editingProformaId, setEditingProformaId] = useState<number | null>(null);
   const [editProformaLines, setEditProformaLines] = useState<Array<{ articleCode: string; quantity: number; pricePerBale: string }>>([]);
@@ -166,6 +178,96 @@ export default function FactoryLocationInventory() {
   }>({ open: false, items: [], pendingFn: null });
 
   const handlePrint = useReactToPrint({ contentRef: printRef });
+
+  const openBrowserReprintLabels = (labels: LabelData[], designColor?: A4DesignColor) => {
+    const fmt = getPaperFormat();
+    if (fmt === "A4" && !designColor) {
+      setReprintPendingLabels(labels);
+      setReprintDesignPickerOpen(true);
+      return;
+    }
+    const paperHtml = fmt === "A5"
+      ? generateA5LabelsHtml(labels)
+      : generateCombinedLabelsHtml(labels, designColor);
+    const stickerHtml = generateStickerLabelsHtml(labels);
+
+    const w1 = window.open("", "_blank", "width=800,height=900");
+    if (w1) {
+      w1.document.write(paperHtml);
+      w1.document.close();
+      w1.focus();
+      setTimeout(() => w1.print(), 500);
+    }
+    const w2 = window.open("", "_blank", "width=400,height=600");
+    if (w2) {
+      w2.document.write(stickerHtml);
+      w2.document.close();
+      w2.focus();
+      const imgs = w2.document.images;
+      let loaded = 0;
+      const total = imgs.length;
+      const tryPrint = () => { loaded++; if (loaded >= total) setTimeout(() => w2.print(), 300); };
+      if (total === 0) { setTimeout(() => w2.print(), 300); }
+      else { for (let i = 0; i < total; i++) { if (imgs[i].complete) tryPrint(); else imgs[i].onload = imgs[i].onerror = tryPrint; } }
+    }
+    if (!w1 && !w2) {
+      toast({ title: "Warning", description: "Please allow pop-ups to print labels", variant: "destructive" });
+    }
+  };
+
+  const handleReprintProduct = async (prod: FactoryBaleProduct) => {
+    if (!selectedLocation) return;
+    setReprintProduct(prod);
+    setReprintBales([]);
+    setReprintLoading(true);
+    setReprintDialogOpen(true);
+    try {
+      const res = await fetch(
+        `/api/factory/bales?locationId=${selectedLocation.id}&productId=${prod.productId}&status=IN_STOCK`,
+        { credentials: "include" }
+      );
+      if (!res.ok) throw new Error("Failed to fetch bales");
+      const data = await res.json();
+      setReprintBales(data);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      setReprintDialogOpen(false);
+    } finally {
+      setReprintLoading(false);
+    }
+  };
+
+  const handleDoPrint = async () => {
+    if (reprintBales.length === 0) return;
+    const labels: LabelData[] = reprintBales.map((row: any) => ({
+      referenceNumber: row.bale.referenceNumber || row.bale.baleCode,
+      articleCode: row.product?.articleCode || row.bale.articleCode || row.bale.category || "",
+      pieces: row.bale.quantity || 1,
+      approxWeightKg: row.bale.weightKg || "0",
+      productName: row.bale.productName || row.product?.name || row.bale.category || "",
+    }));
+
+    for (const row of reprintBales) {
+      try {
+        await modeApiRequest("POST", "/api/bale-label-prints/reprint", { baleId: row.bale.id });
+      } catch {}
+    }
+
+    setReprintDialogOpen(false);
+
+    if (isZebraMode()) {
+      try {
+        const zpl = buildZplBatch(labels, true);
+        await printRawZpl(zpl);
+        toast({ title: `${labels.length} label(s) sent to Zebra printer` });
+      } catch (err: any) {
+        toast({ title: "Zebra print failed — falling back to browser", description: err.message, variant: "destructive" });
+        openBrowserReprintLabels(labels);
+      }
+    } else {
+      openBrowserReprintLabels(labels);
+    }
+  };
 
   const { data: locations = [], isLoading: locationsLoading } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
@@ -1558,15 +1660,26 @@ export default function FactoryLocationInventory() {
                         {prod.productName}
                       </button>
                       {!proformaMode && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-destructive ml-auto"
-                          onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }}
-                          data-testid={`button-delete-product-mobile-${prod.productId}`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex items-center gap-0.5 ml-auto">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={() => handleReprintProduct(prod)}
+                            data-testid={`button-print-barcodes-mobile-${prod.productId}`}
+                          >
+                            <Tag className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-destructive"
+                            onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }}
+                            data-testid={`button-delete-product-mobile-${prod.productId}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
@@ -1653,15 +1766,26 @@ export default function FactoryLocationInventory() {
                             {prod.productName}
                           </button>
                           {!proformaMode && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7 text-destructive ml-auto"
-                              onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }}
-                              data-testid={`button-delete-product-mobile-sp-${prod.productId}`}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                            <div className="flex items-center gap-0.5 ml-auto">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                onClick={() => handleReprintProduct(prod)}
+                                data-testid={`button-print-barcodes-mobile-sp-${prod.productId}`}
+                              >
+                                <Tag className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-destructive"
+                                onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }}
+                                data-testid={`button-delete-product-mobile-sp-${prod.productId}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
@@ -1726,7 +1850,7 @@ export default function FactoryLocationInventory() {
                 {!hideTotalValue && !proformaMode && <col style={{ width: "130px" }} />}
                 {(!hideTotalValue || proformaMode) && <col style={{ width: "130px" }} />}
                 <col style={{ width: "100px" }} />
-                {!proformaMode && <col style={{ width: "44px" }} />}
+                {!proformaMode && <col style={{ width: "80px" }} />}
               </colgroup>
               <thead className="bg-muted/50 sticky top-0 z-10">
                 <tr className="h-12">
@@ -1802,16 +1926,28 @@ export default function FactoryLocationInventory() {
                           <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
                           {!proformaMode && (
                             <td className="px-1 text-center">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 text-destructive"
-                                title="Remove bales"
-                                onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }}
-                                data-testid={`button-delete-product-${prod.productId}`}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                              <div className="flex items-center justify-center gap-0.5">
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7"
+                                  title="Print barcodes"
+                                  onClick={() => handleReprintProduct(prod)}
+                                  data-testid={`button-print-barcodes-${prod.productId}`}
+                                >
+                                  <Tag className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-destructive"
+                                  title="Remove bales"
+                                  onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }}
+                                  data-testid={`button-delete-product-${prod.productId}`}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
                             </td>
                           )}
                         </tr>
@@ -1856,7 +1992,7 @@ export default function FactoryLocationInventory() {
                     {!hideTotalValue && !proformaMode && <col style={{ width: "130px" }} />}
                     {(!hideTotalValue || proformaMode) && <col style={{ width: "130px" }} />}
                     <col style={{ width: "100px" }} />
-                    {!proformaMode && <col style={{ width: "44px" }} />}
+                    {!proformaMode && <col style={{ width: "80px" }} />}
                   </colgroup>
                   <thead className="bg-muted/50 sticky top-0 z-10">
                     <tr className="h-12">
@@ -1924,16 +2060,28 @@ export default function FactoryLocationInventory() {
                           <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
                           {!proformaMode && (
                             <td className="px-1 text-center">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 text-destructive"
-                                title="Remove bales"
-                                onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }}
-                                data-testid={`button-delete-product-sp-${prod.productId}`}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                              <div className="flex items-center justify-center gap-0.5">
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7"
+                                  title="Print barcodes"
+                                  onClick={() => handleReprintProduct(prod)}
+                                  data-testid={`button-print-barcodes-sp-${prod.productId}`}
+                                >
+                                  <Tag className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-destructive"
+                                  title="Remove bales"
+                                  onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }}
+                                  data-testid={`button-delete-product-sp-${prod.productId}`}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
                             </td>
                           )}
                         </tr>
