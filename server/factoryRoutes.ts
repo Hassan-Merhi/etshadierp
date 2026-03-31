@@ -4375,7 +4375,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             const total = balesInOrder.reduce((s: number, b: any) => s + parseFloat(b.priceUsed || '0'), 0);
             const pricePerBale = qty > 0 ? total / qty : 0;
 
-            const [customer] = await db.select({ name: customers.name }).from(customers)
+            const [customer] = await db.select({ legalName: customers.legalName }).from(customers)
               .where(eq(customers.id, order.customerId));
 
             const entry = {
@@ -4383,7 +4383,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
               invoiceNumber: order.invoiceNumber || `Order #${order.id}`,
               orderDate: order.orderDate,
               containerNumber: order.containerNumber,
-              customerName: customer?.name || 'Unknown',
+              customerName: customer?.legalName || 'Unknown',
               qty,
               pricePerBale: pricePerBale.toFixed(2),
               total: total.toFixed(2),
