@@ -99,6 +99,7 @@ const FactoryBaleProductHistory = lazy(() => import("@/pages/FactoryBaleProductH
 const FactoryBaleProductMonthDetail = lazy(() => import("@/pages/FactoryBaleProductHistory").then(m => ({ default: m.FactoryBaleProductMonthDetail })));
 const BarcodeLookup = lazy(() => import("@/pages/BarcodeLookup"));
 const FactoryBalesHub = lazy(() => import("@/pages/FactoryBalesHub"));
+const FactoryReprintLabels = lazy(() => import("@/pages/FactoryReprintLabels"));
 const FactoryRawMaterialsHub = lazy(() => import("@/pages/FactoryRawMaterialsHub"));
 const FactoryLoadingsHub = lazy(() => import("@/pages/FactoryLoadingsHub"));
 const ProductionSummary = lazy(() => import("@/pages/ProductionSummary"));
@@ -670,6 +671,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/stock-entry" component={BaleStockEntry} />
                     <Route path="/factory/bales-history" component={BalesHistory} />
                     <Route path="/factory/bales-hub" component={FactoryBalesHub} />
+                    <Route path="/factory/reprint-labels" component={FactoryReprintLabels} />
                     <Route path="/factory/location-inventory" component={FactoryLocationInventory} />
                     <Route path="/factory/bale-product-history/:productId/:locationId/:year/:month" component={FactoryBaleProductMonthDetail} />
                     <Route path="/factory/bale-product-history/:productId/:locationId" component={FactoryBaleProductHistory} />

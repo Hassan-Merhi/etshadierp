@@ -2288,6 +2288,91 @@ export default function FactoryLocationInventory() {
         </DialogContent>
       </Dialog>
 
+      {/* Barcode Reprint Dialog */}
+      <Dialog open={reprintDialogOpen} onOpenChange={(open) => { if (!open) { setReprintDialogOpen(false); setReprintBales([]); setReprintProduct(null); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle data-testid="text-reprint-dialog-title">
+              Print Barcodes{reprintProduct ? ` — ${reprintProduct.productName}` : ""}
+            </DialogTitle>
+            <DialogDescription>
+              {reprintLoading
+                ? "Loading bales…"
+                : `${reprintBales.length} bale(s) in stock at ${selectedLocation?.name}. Click Print to generate labels for all of them.`}
+            </DialogDescription>
+          </DialogHeader>
+          {reprintLoading ? (
+            <div className="space-y-2 py-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          ) : reprintBales.length > 0 ? (
+            <div className="overflow-auto max-h-[260px] rounded-md border">
+              <table className="text-sm w-full">
+                <thead className="bg-muted/50">
+                  <tr className="h-9">
+                    <th className="text-left px-3 font-medium">Reference No.</th>
+                    <th className="text-right px-3 font-medium">KG</th>
+                    <th className="text-right px-3 font-medium">Pcs</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reprintBales.map((row: any) => (
+                    <tr key={row.bale.id} className="border-t h-9" data-testid={`row-reprint-bale-${row.bale.id}`}>
+                      <td className="px-3 font-mono text-xs text-muted-foreground">{row.bale.referenceNumber || row.bale.baleCode}</td>
+                      <td className="px-3 text-right font-mono text-xs">{parseFloat(row.bale.weightKg).toFixed(1)}</td>
+                      <td className="px-3 text-right font-mono text-xs">{row.bale.quantity}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-2">No IN_STOCK bales found for this product at this location.</p>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setReprintDialogOpen(false); setReprintBales([]); setReprintProduct(null); }} data-testid="button-reprint-cancel">
+              Cancel
+            </Button>
+            <Button onClick={handleDoPrint} disabled={reprintLoading || reprintBales.length === 0} data-testid="button-reprint-confirm">
+              <Printer className="h-4 w-4 mr-1.5" />
+              Print {reprintBales.length > 0 ? `${reprintBales.length} Label(s)` : ""}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* A4 Design Picker for reprint from inventory */}
+      <Dialog open={reprintDesignPickerOpen} onOpenChange={setReprintDesignPickerOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Choose A4 Label Design</DialogTitle>
+            <DialogDescription>Pick a color design for the A4 label sheet.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-2 py-2">
+            {A4_DESIGN_OPTIONS.map((opt) => (
+              <Button
+                key={opt.value}
+                variant="outline"
+                onClick={() => {
+                  setReprintDesignPickerOpen(false);
+                  openBrowserReprintLabels(reprintPendingLabels, opt.value as A4DesignColor);
+                }}
+                data-testid={`button-inv-design-${opt.value}`}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setReprintDesignPickerOpen(false)} data-testid="button-inv-design-cancel">
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Rename Location Dialog */}
       <Dialog open={renameDialogOpen} onOpenChange={(open) => { if (!open) setRenameDialogOpen(false); }}>
         <DialogContent>
