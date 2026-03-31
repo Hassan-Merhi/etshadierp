@@ -24178,18 +24178,6 @@ if (asOfDate) {
         const costProfitPercentage = totalSales > 0 ? (costProfit / totalSales) * 100 : 0;
         const configuredProfitPercentage = totalConfiguredCost > 0 ? (configuredProfit / totalConfiguredCost) * 100 : 0;
         
-        // Debug logging
-        if (item.stockItemName.includes("Men T Shirt")) {
-          console.log(`DEBUG: ${item.stockItemName}`, {
-            quantity,
-            actualPrice,
-            configuredPrice,
-            rawConfiguredPrice: item.configuredSellingPrice,
-            configuredProfit,
-            totalConfiguredCost,
-          });
-        }
-        
         return {
           ...item,
           configuredSellingPrice: configuredPrice.toString(),
@@ -27590,18 +27578,15 @@ if (asOfDate) {
   app.get("/api/reports/closing-stock-summary", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      console.log("[closing-stock-summary] Company ID:", companyId);
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
 
       // Get all stock groups for the company
       const allStockGroups = await storage.getAllStockGroups(companyId);
-      console.log("[closing-stock-summary] Stock groups found:", allStockGroups.length, allStockGroups.map(g => ({ id: g.id, name: g.name })));
       
       // Get all stock items for the company
       const allStockItems = await storage.getAllStockItems(companyId);
-      console.log("[closing-stock-summary] Stock items found:", allStockItems.length, allStockItems.map(i => ({ id: i.id, name: i.name, stockGroupId: i.stockGroupId })));
       
       // Get inventory data from active locations only
       const inventoryData = await db
@@ -27621,9 +27606,6 @@ if (asOfDate) {
         )
         .execute();
       
-      console.log("[closing-stock-summary] Inventory data rows:", inventoryData.length);
-      console.log("[closing-stock-summary] Inventory sample:", inventoryData.slice(0, 5));
-
       // Aggregate inventory by stock item - calculate value dynamically as qty * rate
       const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
       for (const inv of inventoryData) {
@@ -27643,20 +27625,15 @@ if (asOfDate) {
         }
       }
       
-      console.log("[closing-stock-summary] Inventory by item map size:", inventoryByItem.size);
-      console.log("[closing-stock-summary] Inventory by item entries:", Array.from(inventoryByItem.entries()));
-
       // Build stock groups summary
       const stockGroupSummary = allStockGroups.map((group) => {
         const groupItems = allStockItems.filter((item) => item.stockGroupId === group.id);
-        console.log(`[closing-stock-summary] Group ${group.id} (${group.name}): ${groupItems.length} items`, groupItems.map(i => ({ id: i.id, name: i.name })));
         
         let closingQuantity = 0;
         let closingValue = 0;
         
         for (const item of groupItems) {
           const invData = inventoryByItem.get(item.id);
-          console.log(`[closing-stock-summary] Item ${item.id} (${item.name}) inventory:`, invData);
           if (invData) {
             closingQuantity += invData.quantity;
             closingValue += invData.totalValue;
@@ -27664,7 +27641,6 @@ if (asOfDate) {
         }
         
         const closingRate = closingQuantity > 0 ? closingValue / closingQuantity : 0;
-        console.log(`[closing-stock-summary] Group ${group.name} totals: qty=${closingQuantity}, value=${closingValue}`);
         
         return {
           id: group.id,
@@ -27679,8 +27655,6 @@ if (asOfDate) {
         };
       }).filter((g) => g.closing.quantity > 0 || g.closing.value > 0);
       
-      console.log("[closing-stock-summary] Final summary (after filter):", stockGroupSummary);
-
       // Calculate grand totals
       const grandTotal = {
         quantity: stockGroupSummary.reduce((sum, g) => sum + g.closing.quantity, 0),

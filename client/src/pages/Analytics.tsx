@@ -286,8 +286,8 @@ export default function Analytics() {
   const { formatAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
-  const [selectedPeriod, setSelectedPeriod] = useState("month");
-  const [detailsPeriod, setDetailsPeriod] = useState("month");
+  const [selectedPeriod, setSelectedPeriod] = useState("all");
+  const [detailsPeriod, setDetailsPeriod] = useState("all");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
   const [selectedLocationForDetails, setSelectedLocationForDetails] = useState<number | null>(null);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set());
