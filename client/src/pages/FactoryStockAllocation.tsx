@@ -73,13 +73,14 @@ export default function FactoryStockAllocation() {
   const { toast } = useToast();
   const [toggling, setToggling] = useState<string | null>(null);
 
-  const { data, isLoading, refetch } = useQuery<AllocationData>({
+  const { data, isLoading, isError, error, refetch } = useQuery<AllocationData>({
     queryKey: ["/api/factory/stock-allocation"],
     queryFn: async () => {
       const res = await fetch("/api/factory/stock-allocation", { credentials: "include" });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Failed"); }
       return res.json();
     },
+    retry: 1,
   });
 
   const toggleMutation = useMutation({
@@ -179,7 +180,18 @@ export default function FactoryStockAllocation() {
     );
   }
 
-  if (!data) return null;
+  if (isError || !data) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center h-64 gap-4">
+        <p className="text-muted-foreground text-sm">
+          {(error as Error)?.message || "Failed to load stock allocation data."}
+        </p>
+        <Button variant="outline" onClick={() => refetch()}>
+          <RefreshCw className="h-4 w-4 mr-2" />Try Again
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 flex flex-col gap-4 h-full">

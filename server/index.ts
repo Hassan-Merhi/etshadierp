@@ -753,6 +753,14 @@ let migrationsDone = false;
       created_at timestamp NOT NULL DEFAULT now(),
       UNIQUE(company_id, account_id)
     )`,
+    `CREATE TABLE IF NOT EXISTS proforma_stock_reservations (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      proforma_id integer NOT NULL,
+      article_code varchar(50) NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now(),
+      UNIQUE(company_id, proforma_id, article_code)
+    )`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's
