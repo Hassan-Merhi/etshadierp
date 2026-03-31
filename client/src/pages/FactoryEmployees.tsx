@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Search, Pencil, Users, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Users, UserX, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -61,7 +61,7 @@ export default function FactoryEmployees() {
   const [statusFilter, setStatusFilter] = useState("Active");
   const [createOpen, setCreateOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [deletingEmployee, setDeletingEmployee] = useState<Employee | null>(null);
+  const [endingContractEmployee, setEndingContractEmployee] = useState<Employee | null>(null);
   const [formData, setFormData] = useState({ ...emptyForm });
 
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
@@ -109,18 +109,35 @@ export default function FactoryEmployees() {
     onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
   });
 
-  const deleteMutation = useMutation({
+  const deactivateMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await factoryApiRequest("DELETE", `/api/factory/employees/${id}`);
+      const res = await factoryApiRequest("PATCH", `/api/factory/employees/${id}`, { active: false });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "Failed to delete employee");
+        throw new Error(err.message || "Failed to end contract");
       }
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
-      toast({ title: "Employee deleted" });
-      setDeletingEmployee(null);
+      toast({ title: "Contract ended", description: "Employee has been deactivated" });
+      setEndingContractEmployee(null);
+    },
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
+  });
+
+  const reactivateMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await factoryApiRequest("PATCH", `/api/factory/employees/${id}`, { active: true });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to reactivate employee");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
+      toast({ title: "Employee reactivated" });
     },
     onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
   });
@@ -281,14 +298,28 @@ export default function FactoryEmployees() {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setDeletingEmployee(emp)}
-                        data-testid={`button-delete-employee-${emp.id}`}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {emp.active ? (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setEndingContractEmployee(emp)}
+                          data-testid={`button-end-contract-${emp.id}`}
+                          title="End Contract"
+                        >
+                          <UserX className="h-4 w-4 text-destructive" />
+                        </Button>
+                      ) : (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => reactivateMutation.mutate(emp.id)}
+                          disabled={reactivateMutation.isPending}
+                          data-testid={`button-reactivate-${emp.id}`}
+                          title="Reactivate"
+                        >
+                          <UserCheck className="h-4 w-4 text-green-600" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -405,26 +436,26 @@ export default function FactoryEmployees() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={!!deletingEmployee} onOpenChange={(open) => { if (!open) setDeletingEmployee(null); }}>
+      {/* End Contract Confirmation Dialog */}
+      <Dialog open={!!endingContractEmployee} onOpenChange={(open) => { if (!open) setEndingContractEmployee(null); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete Employee</DialogTitle>
+            <DialogTitle>End Contract</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete <span className="font-semibold text-foreground">{deletingEmployee?.firstName} {deletingEmployee?.lastName}</span>? This cannot be undone.
+            End contract for <span className="font-semibold text-foreground">{endingContractEmployee?.firstName} {endingContractEmployee?.lastName}</span>? They will be marked inactive but can be reactivated later.
           </p>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDeletingEmployee(null)} disabled={deleteMutation.isPending}>
+            <Button variant="outline" onClick={() => setEndingContractEmployee(null)} disabled={deactivateMutation.isPending}>
               Cancel
             </Button>
             <Button
               variant="destructive"
-              onClick={() => deletingEmployee && deleteMutation.mutate(deletingEmployee.id)}
-              disabled={deleteMutation.isPending}
-              data-testid="button-confirm-delete-employee"
+              onClick={() => endingContractEmployee && deactivateMutation.mutate(endingContractEmployee.id)}
+              disabled={deactivateMutation.isPending}
+              data-testid="button-confirm-end-contract"
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              {deactivateMutation.isPending ? "Ending..." : "End Contract"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -223,7 +223,7 @@ export default function Dashboard() {
 
   // Fetch all payable accounts (ledger accounts with liability/payable type)
   const { data: allPayableAccounts = [] } = useQuery<PayableAccount[]>({
-    queryKey: ["/api/accounts/all", selectedCompany?.id],
+    queryKey: ["/api/accounts/all-ledger", selectedCompany?.id],
     queryFn: async () => {
       const response = await modeApiRequest("GET", "/api/accounts/all");
       if (!response.ok) throw new Error("Failed to fetch accounts");
