@@ -13196,80 +13196,104 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      // 1. All proformas (with lines) for this company — no customer filter, all proformas
-      const allProformas = await db.select().from(customerProformas)
+      // 1. All proformas for this company
+      const allProformas = await db.select({
+        id: customerProformas.id,
+        companyId: customerProformas.companyId,
+        customerId: customerProformas.customerId,
+        name: customerProformas.name,
+        isActive: customerProformas.isActive,
+        createdAt: customerProformas.createdAt,
+      }).from(customerProformas)
         .where(eq(customerProformas.companyId, companyId))
         .orderBy(customerProformas.createdAt);
+
       const proformaIds = allProformas.map((p: any) => p.id);
       let allLines: any[] = [];
       if (proformaIds.length > 0) {
-        allLines = await db.select().from(customerProformaLines)
+        allLines = await db.select({
+          id: customerProformaLines.id,
+          proformaId: customerProformaLines.proformaId,
+          articleCode: customerProformaLines.articleCode,
+          productName: customerProformaLines.productName,
+          quantity: customerProformaLines.quantity,
+          pricePerBale: customerProformaLines.pricePerBale,
+        }).from(customerProformaLines)
           .where(inArray(customerProformaLines.proformaId, proformaIds));
       }
 
       // 2. IN_STOCK bale counts grouped by articleCode
-      const inStockCounts = await db.select({
-        articleCode: factoryBales.articleCode,
-        count: sql<number>`COUNT(*)`,
-      }).from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          eq(factoryBales.status, "IN_STOCK"),
-        ))
-        .groupBy(factoryBales.articleCode);
+      const inStockCountsRaw = await db.execute(
+        sql`SELECT article_code as "articleCode", COUNT(*)::int as count FROM factory_bales WHERE company_id = ${companyId} AND status = 'IN_STOCK' GROUP BY article_code`
+      );
+      const inStockCounts = (inStockCountsRaw.rows || inStockCountsRaw as any[]).map((r: any) => ({
+        articleCode: r.articleCode,
+        count: Number(r.count),
+      }));
 
       // 3. Existing reservations for this company
-      const reservations = await db.select().from(proformaStockReservations)
+      const reservations = await db.select({
+        id: proformaStockReservations.id,
+        companyId: proformaStockReservations.companyId,
+        proformaId: proformaStockReservations.proformaId,
+        articleCode: proformaStockReservations.articleCode,
+      }).from(proformaStockReservations)
         .where(eq(proformaStockReservations.companyId, companyId));
 
-      // 4. Active orders (LOADING, PENDING_VERIFICATION, VERIFIED) with their proformaIdUsed and bale counts
-      const activeOrders = await db.select({
-        id: customerOrders.id,
-        proformaIdUsed: customerOrders.proformaIdUsed,
-        status: customerOrders.status,
-      }).from(customerOrders)
-        .where(and(
-          eq(customerOrders.companyId, companyId),
-          inArray(customerOrders.status, ["LOADING", "PENDING_VERIFICATION", "VERIFIED"]),
-        ));
+      // 4. Active orders (LOADING, PENDING_VERIFICATION, VERIFIED)
+      const activeOrdersRaw = await db.execute(
+        sql`SELECT id, proforma_id_used as "proformaIdUsed", status FROM customer_orders WHERE company_id = ${companyId} AND status IN ('LOADING','PENDING_VERIFICATION','VERIFIED')`
+      );
+      const activeOrders = (activeOrdersRaw.rows || activeOrdersRaw as any[]).map((o: any) => ({
+        id: o.id,
+        proformaIdUsed: o.proformaIdUsed,
+        status: o.status,
+      }));
 
-      // For active orders, get the bale article code counts from customer_order_bales directly
-      // (customerOrderBales already stores articleCode; no need to join factoryBales)
+      // For active orders, get bale article code counts from customer_order_bales
       let activeOrderBales: any[] = [];
       if (activeOrders.length > 0) {
         const orderIds = activeOrders.map((o: any) => o.id);
-        activeOrderBales = await db.select({
-          orderId: customerOrderBales.orderId,
-          articleCode: customerOrderBales.articleCode,
-          count: sql<number>`COUNT(*)`,
-        }).from(customerOrderBales)
-          .where(inArray(customerOrderBales.orderId, orderIds))
-          .groupBy(customerOrderBales.orderId, customerOrderBales.articleCode);
+        const activeOrderBalesRaw = await db.execute(
+          sql`SELECT order_id as "orderId", article_code as "articleCode", COUNT(*)::int as count FROM customer_order_bales WHERE order_id = ANY(${sql.raw(`ARRAY[${orderIds.join(',')}]`)}) GROUP BY order_id, article_code`
+        );
+        activeOrderBales = (activeOrderBalesRaw.rows || activeOrderBalesRaw as any[]).map((b: any) => ({
+          orderId: b.orderId,
+          articleCode: b.articleCode,
+          count: Number(b.count),
+        }));
       }
 
-      // 5. Customers lookup for proforma names
-      const allCustomerIds = [...new Set(allProformas.map((p: any) => p.customerId))].filter((id): id is number => id != null);
+      // 5. Customers lookup — use legalName (the customers table has no "name" column)
+      const allCustomerIds = [...new Set(allProformas.map((p: any) => p.customerId))].filter((id): id is number => id != null && !isNaN(Number(id)));
       let customerRows: any[] = [];
       if (allCustomerIds.length > 0) {
-        customerRows = await db.select({ id: customers.id, name: customers.name })
+        customerRows = await db.select({ id: customers.id, legalName: customers.legalName })
           .from(customers)
           .where(inArray(customers.id, allCustomerIds));
       }
-      const customerMap = new Map(customerRows.map((c: any) => [c.id, c.name]));
+      const customerMap = new Map(customerRows.map((c: any) => [c.id, c.legalName]));
 
       res.json({
         proformas: allProformas.map((p: any) => ({
-          ...p,
+          id: p.id,
+          companyId: p.companyId,
+          customerId: p.customerId,
+          name: p.name,
+          isActive: p.isActive,
+          createdAt: p.createdAt,
           customerName: customerMap.get(p.customerId) || `Customer #${p.customerId}`,
           lines: allLines.filter((l: any) => l.proformaId === p.id),
         })),
-        inStockCounts: inStockCounts.map((r: any) => ({ articleCode: r.articleCode, count: Number(r.count) })),
+        inStockCounts,
         reservations,
         activeOrders: activeOrders.map((o: any) => ({
-          ...o,
+          id: o.id,
+          proformaIdUsed: o.proformaIdUsed,
+          status: o.status,
           balesByArticle: activeOrderBales
             .filter((b: any) => b.orderId === o.id)
-            .map((b: any) => ({ articleCode: b.articleCode, count: Number(b.count) })),
+            .map((b: any) => ({ articleCode: b.articleCode, count: b.count })),
         })),
       });
     } catch (error: any) {
