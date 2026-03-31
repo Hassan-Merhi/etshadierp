@@ -4,7 +4,7 @@ import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, RefreshCw, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -198,13 +198,18 @@ export default function FactoryStockAllocation() {
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold">Stock Allocation</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Toggle proforma columns to reserve stock. Pending loadings are automatically highlighted.
-          </p>
         </div>
-        <Button variant="outline" size="default" onClick={() => refetch()} data-testid="button-refresh-allocation">
-          <RefreshCw className="h-4 w-4 mr-2" />Refresh
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-xs text-muted-foreground">Reserved</p>
+            <p className="text-2xl font-bold tabular-nums leading-none">
+              {articleRows.reduce((s, r) => s + r.reserved, 0)}
+            </p>
+          </div>
+          <Button variant="outline" size="default" onClick={() => refetch()} data-testid="button-refresh-allocation">
+            <RefreshCw className="h-4 w-4 mr-2" />Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Legend */}
@@ -394,55 +399,6 @@ export default function FactoryStockAllocation() {
         </div>
       )}
 
-      {/* Summary cards */}
-      {articleRows.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Card>
-            <CardHeader className="pb-1 pt-3 px-4">
-              <CardTitle className="text-xs font-medium text-muted-foreground">Total In Stock</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-3">
-              <p className="text-2xl font-bold tabular-nums">
-                {articleRows.reduce((s, r) => s + r.inStock, 0)}
-              </p>
-              <p className="text-xs text-muted-foreground">bales across {articleRows.filter(r => r.inStock > 0).length} articles</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-1 pt-3 px-4">
-              <CardTitle className="text-xs font-medium text-muted-foreground">Reserved</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-3">
-              <p className="text-2xl font-bold tabular-nums">
-                {articleRows.reduce((s, r) => s + r.reserved, 0)}
-              </p>
-              <p className="text-xs text-muted-foreground">allocated to proformas</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-1 pt-3 px-4">
-              <CardTitle className="text-xs font-medium text-amber-700 dark:text-amber-400">Pending Loading</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-3">
-              <p className="text-2xl font-bold tabular-nums text-amber-700 dark:text-amber-400">
-                {articleRows.reduce((s, r) => s + r.pendingLoading, 0)}
-              </p>
-              <p className="text-xs text-muted-foreground">in active loadings</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-1 pt-3 px-4">
-              <CardTitle className="text-xs font-medium text-green-700 dark:text-green-400">Available</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-3">
-              <p className="text-2xl font-bold tabular-nums text-green-700 dark:text-green-400">
-                {articleRows.reduce((s, r) => s + r.available, 0)}
-              </p>
-              <p className="text-xs text-muted-foreground">free to allocate</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }
