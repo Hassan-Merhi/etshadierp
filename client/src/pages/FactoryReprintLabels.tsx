@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Tag, Search, Printer, CheckSquare, Square, MapPin, Package, X, ChevronDown
+  Tag, Search, Printer, CheckSquare, Square, MapPin, Package, X, ChevronDown, Filter
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -64,7 +65,9 @@ export default function FactoryReprintLabels() {
 
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [search, setSearch] = useState("");
-  const [articleCodeFilter, setArticleCodeFilter] = useState<string>("__all__");
+  const [articleCodeFilters, setArticleCodeFilters] = useState<Set<string>>(new Set());
+  const [articleCodeSearch, setArticleCodeSearch] = useState("");
+  const [articlePickerOpen, setArticlePickerOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const [designPickerOpen, setDesignPickerOpen] = useState(false);
@@ -100,7 +103,7 @@ export default function FactoryReprintLabels() {
   const filteredBales = useMemo(() => {
     return balesData.filter((row) => {
       const artCode = row.product?.articleCode || row.bale.articleCode || "";
-      if (articleCodeFilter !== "__all__" && artCode !== articleCodeFilter) return false;
+      if (articleCodeFilters.size > 0 && !articleCodeFilters.has(artCode)) return false;
       if (!search.trim()) return true;
       const term = search.toLowerCase();
       const refNum = (row.bale.referenceNumber || "").toLowerCase();
@@ -108,7 +111,7 @@ export default function FactoryReprintLabels() {
       const prodName = (row.bale.productName || row.product?.name || "").toLowerCase();
       return refNum.includes(term) || baleCode.includes(term) || prodName.includes(term) || artCode.toLowerCase().includes(term);
     });
-  }, [balesData, search, articleCodeFilter]);
+  }, [balesData, search, articleCodeFilters]);
 
   const selectedLocation = locations.find((l) => String(l.id) === selectedLocationId);
 
@@ -229,7 +232,8 @@ export default function FactoryReprintLabels() {
               setSelectedLocationId(val);
               setSelectedIds(new Set());
               setSearch("");
-              setArticleCodeFilter("__all__");
+              setArticleCodeFilters(new Set());
+              setArticleCodeSearch("");
             }}
             data-testid="select-location"
           >
@@ -281,17 +285,81 @@ export default function FactoryReprintLabels() {
               )}
             </div>
 
-            <Select value={articleCodeFilter} onValueChange={setArticleCodeFilter} data-testid="select-article-code">
-              <SelectTrigger className="w-[160px]" data-testid="select-article-code-trigger">
-                <SelectValue placeholder="Article code" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All articles</SelectItem>
-                {uniqueArticleCodes.map((code) => (
-                  <SelectItem key={code} value={code} data-testid={`option-article-${code}`}>{code}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={articlePickerOpen} onOpenChange={setArticlePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="default"
+                  className="gap-2"
+                  data-testid="button-article-code-filter"
+                >
+                  <Filter className="h-4 w-4" />
+                  {articleCodeFilters.size === 0
+                    ? "Article code"
+                    : `${articleCodeFilters.size} selected`}
+                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-2" align="start">
+                <div className="relative mb-2">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <Input
+                    placeholder="Search article codes…"
+                    value={articleCodeSearch}
+                    onChange={(e) => setArticleCodeSearch(e.target.value)}
+                    className="pl-7 h-8 text-sm"
+                    data-testid="input-article-code-search"
+                  />
+                  {articleCodeSearch && (
+                    <button
+                      onClick={() => setArticleCodeSearch("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {articleCodeFilters.size > 0 && (
+                  <button
+                    onClick={() => setArticleCodeFilters(new Set())}
+                    className="text-xs text-muted-foreground hover:text-foreground mb-2 w-full text-left"
+                    data-testid="button-clear-article-filters"
+                  >
+                    Clear all ({articleCodeFilters.size})
+                  </button>
+                )}
+
+                <div className="max-h-52 overflow-y-auto space-y-0.5">
+                  {uniqueArticleCodes
+                    .filter((c) => !articleCodeSearch.trim() || c.toLowerCase().includes(articleCodeSearch.toLowerCase()))
+                    .map((code) => (
+                      <label
+                        key={code}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-sm cursor-pointer hover-elevate text-sm"
+                        data-testid={`option-article-${code}`}
+                      >
+                        <Checkbox
+                          checked={articleCodeFilters.has(code)}
+                          onCheckedChange={(checked) => {
+                            setArticleCodeFilters((prev) => {
+                              const next = new Set(prev);
+                              if (checked) next.add(code);
+                              else next.delete(code);
+                              return next;
+                            });
+                          }}
+                          data-testid={`checkbox-article-${code}`}
+                        />
+                        <span>{code}</span>
+                      </label>
+                    ))}
+                  {uniqueArticleCodes.filter((c) => !articleCodeSearch.trim() || c.toLowerCase().includes(articleCodeSearch.toLowerCase())).length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-2">No article codes found</p>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
 
             <Button
               variant="outline"
@@ -317,6 +385,38 @@ export default function FactoryReprintLabels() {
               Print {selectedIds.size > 0 ? `${selectedIds.size} Label(s)` : "Selected"}
             </Button>
           </div>
+
+          {/* Active article code filter chips */}
+          {articleCodeFilters.size > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs text-muted-foreground">Filtering by:</span>
+              {Array.from(articleCodeFilters).map((code) => (
+                <Badge
+                  key={code}
+                  variant="secondary"
+                  className="gap-1 cursor-pointer"
+                  onClick={() =>
+                    setArticleCodeFilters((prev) => {
+                      const next = new Set(prev);
+                      next.delete(code);
+                      return next;
+                    })
+                  }
+                  data-testid={`chip-article-${code}`}
+                >
+                  {code}
+                  <X className="h-3 w-3" />
+                </Badge>
+              ))}
+              <button
+                onClick={() => setArticleCodeFilters(new Set())}
+                className="text-xs text-muted-foreground hover:text-foreground"
+                data-testid="button-clear-all-chips"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
 
           {/* Bale list */}
           {balesLoading ? (
