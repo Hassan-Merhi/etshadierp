@@ -29283,6 +29283,22 @@ if (asOfDate) {
         companyId,
       });
 
+      // Check for existing entry to prevent duplicates
+      const existing = await db
+        .select()
+        .from(dashboardCashAccounts)
+        .where(and(
+          eq(dashboardCashAccounts.companyId, companyId),
+          eq(dashboardCashAccounts.accountType, data.accountType),
+          eq(dashboardCashAccounts.accountId, data.accountId),
+        ))
+        .limit(1)
+        .execute();
+
+      if (existing.length > 0) {
+        return res.json(existing[0]);
+      }
+
       const [account] = await db
         .insert(dashboardCashAccounts)
         .values(data)
@@ -29414,6 +29430,21 @@ if (asOfDate) {
         ...req.body,
         companyId,
       });
+
+      // Check for existing entry to prevent duplicates
+      const existing = await db
+        .select()
+        .from(dashboardPayableAccounts)
+        .where(and(
+          eq(dashboardPayableAccounts.companyId, companyId),
+          eq(dashboardPayableAccounts.accountId, data.accountId),
+        ))
+        .limit(1)
+        .execute();
+
+      if (existing.length > 0) {
+        return res.json(existing[0]);
+      }
 
       const [account] = await db
         .insert(dashboardPayableAccounts)

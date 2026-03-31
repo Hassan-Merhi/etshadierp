@@ -212,6 +212,7 @@ export default function Dashboard() {
     {
       queryKey: ["/api/dashboard-cash-accounts", selectedCompany?.id],
       enabled: !!selectedCompany,
+      staleTime: 0,
     },
   );
 
@@ -240,6 +241,7 @@ export default function Dashboard() {
   const { data: dashboardPayableAccounts = [] } = useQuery<PayableAccount[]>({
     queryKey: ["/api/dashboard-payable-accounts", selectedCompany?.id],
     enabled: !!selectedCompany,
+    staleTime: 0,
     refetchInterval: 5 * 60 * 1000,
   });
 
@@ -249,7 +251,7 @@ export default function Dashboard() {
       return await modeApiRequest("POST", "/api/dashboard-cash-accounts", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
+      queryClient.refetchQueries({
         queryKey: ["/api/dashboard-cash-accounts", selectedCompany?.id],
       });
       setIsAddDialogOpen(false);
@@ -275,7 +277,7 @@ export default function Dashboard() {
       return await modeApiRequest("DELETE", `/api/dashboard-cash-accounts/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
+      queryClient.refetchQueries({
         queryKey: ["/api/dashboard-cash-accounts", selectedCompany?.id],
       });
       toast({
@@ -299,7 +301,7 @@ export default function Dashboard() {
       return await modeApiRequest("POST", "/api/dashboard-payable-accounts", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
+      queryClient.refetchQueries({
         queryKey: ["/api/dashboard-payable-accounts", selectedCompany?.id],
       });
       setIsAddPayableDialogOpen(false);
@@ -328,7 +330,7 @@ export default function Dashboard() {
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
+      queryClient.refetchQueries({
         queryKey: ["/api/dashboard-payable-accounts", selectedCompany?.id],
       });
       toast({
