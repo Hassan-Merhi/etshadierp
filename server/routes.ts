@@ -5748,6 +5748,42 @@ if (asOfDate) {
         const [updated] = await db.update(erpPayrollRuns)
           .set({ status: "PAID", paymentAccountId: parseInt(paymentAccountId), paidAt: new Date().toISOString() })
           .where(eq(erpPayrollRuns.id, runId)).returning();
+
+        // Deduct advance balances FIFO for each employee who has a deduction in this payroll
+        const payMonth = payDate.substring(0, 7);
+        for (const item of runItems) {
+          const deductAmt = parseFloat(item.deduction || "0");
+          if (deductAmt <= 0 || !item.employeeId) continue;
+
+          const outstanding = await db.select().from(salaryAdvances)
+            .where(and(
+              eq(salaryAdvances.employeeId, item.employeeId),
+              eq(salaryAdvances.companyId, companyId),
+              eq(salaryAdvances.fullyPaid, false),
+            ))
+            .orderBy(salaryAdvances.advanceDate);
+
+          let remaining = deductAmt;
+          for (const adv of outstanding) {
+            if (remaining <= 0.001) break;
+            const bal = parseFloat(adv.remainingBalance || "0");
+            if (bal <= 0) continue;
+            const toDeduct = Math.min(remaining, bal);
+            const newBal = Math.max(0, bal - toDeduct);
+            const fullyPaid = newBal <= 0.01;
+
+            await db.insert(salaryAdvanceDeductions).values({
+              salaryAdvanceId: adv.id,
+              payrollMonth: payMonth,
+              deductionAmount: toDeduct.toFixed(2),
+            });
+            await db.update(salaryAdvances)
+              .set({ remainingBalance: newBal.toFixed(2), fullyPaid })
+              .where(eq(salaryAdvances.id, adv.id));
+            remaining -= toDeduct;
+          }
+        }
+
         return res.json({ ...updated, voucher });
       }
 
@@ -7210,50 +7246,99 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
+      // 1. Load all advances (oldest first per employee)
       const allAdvances = await db
         .select()
         .from(salaryAdvances)
-        .where(eq(salaryAdvances.companyId, companyId));
+        .where(eq(salaryAdvances.companyId, companyId))
+        .orderBy(salaryAdvances.employeeId, salaryAdvances.advanceDate);
 
-      const allDeductions = await db
+      // 2. Load all manual deduction records (linked to specific advance IDs)
+      const allManualDeductions = await db
         .select()
         .from(salaryAdvanceDeductions)
         .where(
-          inArray(
-            salaryAdvanceDeductions.salaryAdvanceId,
-            allAdvances.map((a) => a.id)
-          )
+          allAdvances.length > 0
+            ? inArray(salaryAdvanceDeductions.salaryAdvanceId, allAdvances.map((a) => a.id))
+            : sql`false`
         );
 
-      const deductionsByAdvance: Record<number, number> = {};
-      for (const d of allDeductions) {
-        const id = d.salaryAdvanceId;
-        deductionsByAdvance[id] = (deductionsByAdvance[id] || 0) + parseFloat(d.deductionAmount || "0");
+      const manualDeductionByAdvance = new Map<number, number>();
+      for (const d of allManualDeductions) {
+        manualDeductionByAdvance.set(
+          d.salaryAdvanceId,
+          (manualDeductionByAdvance.get(d.salaryAdvanceId) || 0) + parseFloat(d.deductionAmount || "0")
+        );
       }
 
-      let fixed = 0;
-      for (const advance of allAdvances) {
-        const originalAmount = parseFloat(advance.amount || "0");
-        const totalDeducted = deductionsByAdvance[advance.id] || 0;
-        const correctRemaining = Math.max(0, originalAmount - totalDeducted);
-        const correctlyPaid = correctRemaining <= 0.01;
+      // 3. Load all PAID payroll run items with deductions
+      const paidRuns = await db
+        .select({ id: erpPayrollRuns.id })
+        .from(erpPayrollRuns)
+        .where(and(eq(erpPayrollRuns.companyId, companyId), eq(erpPayrollRuns.status, "PAID")));
 
-        const currentRemaining = parseFloat(advance.remainingBalance || "0");
-        const changed =
-          Math.abs(currentRemaining - correctRemaining) > 0.01 ||
-          advance.fullyPaid !== correctlyPaid;
+      const payrollDeductionByEmployee = new Map<number, number>();
+      if (paidRuns.length > 0) {
+        const paidItems = await db
+          .select({ employeeId: erpPayrollRunItems.employeeId, deduction: erpPayrollRunItems.deduction })
+          .from(erpPayrollRunItems)
+          .where(inArray(erpPayrollRunItems.runId, paidRuns.map((r) => r.id)));
 
-        if (changed) {
-          await db
-            .update(salaryAdvances)
-            .set({
-              remainingBalance: correctRemaining.toFixed(2),
-              fullyPaid: correctlyPaid,
-            })
-            .where(eq(salaryAdvances.id, advance.id));
-          fixed++;
+        for (const item of paidItems) {
+          const amt = parseFloat(item.deduction || "0");
+          if (amt > 0 && item.employeeId) {
+            payrollDeductionByEmployee.set(
+              item.employeeId,
+              (payrollDeductionByEmployee.get(item.employeeId) || 0) + amt
+            );
+          }
         }
       }
+
+      // 4. Group advances by employee
+      const advancesByEmployee = new Map<number, typeof allAdvances>();
+      for (const adv of allAdvances) {
+        const list = advancesByEmployee.get(adv.employeeId) || [];
+        list.push(adv);
+        advancesByEmployee.set(adv.employeeId, list);
+      }
+
+      // 5. Recompute each employee's advance balances
+      let fixed = 0;
+      await db.transaction(async (tx: any) => {
+        for (const [employeeId, advances] of advancesByEmployee) {
+          // Step A: Start with original amount minus manual deductions (per advance)
+          const balances: { id: number; bal: number }[] = [];
+          for (const adv of advances) {
+            const original = parseFloat(adv.amount || "0");
+            const manualPaid = manualDeductionByAdvance.get(adv.id) || 0;
+            balances.push({ id: adv.id, bal: Math.max(0, original - manualPaid) });
+          }
+
+          // Step B: Apply total payroll deductions FIFO (oldest advance first)
+          let remaining = payrollDeductionByEmployee.get(employeeId) || 0;
+          for (const entry of balances) {
+            if (remaining <= 0) break;
+            const deduct = Math.min(entry.bal, remaining);
+            entry.bal = entry.bal - deduct;
+            remaining -= deduct;
+          }
+
+          // Step C: Persist updated balances
+          for (let i = 0; i < advances.length; i++) {
+            const newBal = parseFloat(Math.max(0, balances[i].bal).toFixed(2));
+            const fullyPaid = newBal <= 0.01;
+            const adv = advances[i];
+            const currentBal = parseFloat(adv.remainingBalance || "0");
+            if (Math.abs(currentBal - newBal) > 0.01 || adv.fullyPaid !== fullyPaid) {
+              await tx.update(salaryAdvances)
+                .set({ remainingBalance: newBal.toFixed(2), fullyPaid })
+                .where(eq(salaryAdvances.id, adv.id));
+              fixed++;
+            }
+          }
+        }
+      });
 
       res.json({ message: `Reconciliation complete. ${fixed} advance(s) corrected.`, fixed });
     } catch (error: any) {
