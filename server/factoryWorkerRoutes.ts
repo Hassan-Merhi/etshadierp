@@ -1880,6 +1880,101 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     }
   });
 
+  // POST /api/factory/advances/reconcile - Recalculate all advance remaining balances from historical payrolls
+  app.post("/api/factory/advances/reconcile", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // Load all salary-deduction advances for company (oldest first)
+      const allAdvances = await db.select().from(factoryWorkerAdvances)
+        .where(and(
+          eq(factoryWorkerAdvances.companyId, companyId),
+          eq(factoryWorkerAdvances.repaymentType, "salary_deduction"),
+        ))
+        .orderBy(factoryWorkerAdvances.workerId, factoryWorkerAdvances.advanceDate);
+
+      // Load all payrolls that have advance deductions
+      const allPayrolls = await db.select({
+        workerId: factoryPayrolls.workerId,
+        advances: factoryPayrolls.advances,
+        periodStart: factoryPayrolls.periodStart,
+      }).from(factoryPayrolls)
+        .where(and(
+          eq(factoryPayrolls.companyId, companyId),
+        ))
+        .orderBy(factoryPayrolls.workerId, factoryPayrolls.periodStart);
+
+      // Load all manual repayments (linked to specific advance IDs)
+      const allRepayments = await db.select().from(factoryAdvanceRepayments)
+        .where(eq(factoryAdvanceRepayments.companyId, companyId))
+        .orderBy(factoryAdvanceRepayments.advanceId, factoryAdvanceRepayments.repaymentDate);
+
+      // Group by worker
+      const advancesByWorker = new Map<number, typeof allAdvances>();
+      for (const adv of allAdvances) {
+        const list = advancesByWorker.get(adv.workerId) || [];
+        list.push(adv);
+        advancesByWorker.set(adv.workerId, list);
+      }
+
+      const payrollDeductionByWorker = new Map<number, number>();
+      for (const pr of allPayrolls) {
+        const amt = parseFloat(pr.advances || "0");
+        if (amt > 0) {
+          payrollDeductionByWorker.set(pr.workerId, (payrollDeductionByWorker.get(pr.workerId) || 0) + amt);
+        }
+      }
+
+      // Manual repayments keyed by advanceId
+      const manualRepaymentByAdvance = new Map<number, number>();
+      for (const rep of allRepayments) {
+        manualRepaymentByAdvance.set(rep.advanceId, (manualRepaymentByAdvance.get(rep.advanceId) || 0) + parseFloat(rep.amount || "0"));
+      }
+
+      let updatedCount = 0;
+      await db.transaction(async (tx: any) => {
+        for (const [workerId, advances] of advancesByWorker) {
+          // Step 1: Reset each advance to its original amount minus manual repayments
+          const balances: { id: number; bal: number }[] = [];
+          for (const adv of advances) {
+            const original = parseFloat(adv.amount || "0");
+            const manualPaid = manualRepaymentByAdvance.get(adv.id) || 0;
+            balances.push({ id: adv.id, bal: Math.max(0, original - manualPaid) });
+          }
+
+          // Step 2: Apply total payroll deductions oldest-first
+          let remaining = payrollDeductionByWorker.get(workerId) || 0;
+          for (const entry of balances) {
+            if (remaining <= 0) break;
+            const deduct = Math.min(entry.bal, remaining);
+            entry.bal = entry.bal - deduct;
+            remaining -= deduct;
+          }
+
+          // Step 3: Persist updated balances
+          for (let i = 0; i < advances.length; i++) {
+            const newBal = Math.max(0, balances[i].bal);
+            const newBal2dp = newBal.toFixed(2);
+            const fullyPaid = newBal <= 0.001;
+            const adv = advances[i];
+            if (adv.remainingBalance !== newBal2dp || adv.fullyPaid !== fullyPaid) {
+              await tx.update(factoryWorkerAdvances)
+                .set({ remainingBalance: newBal2dp, fullyPaid })
+                .where(eq(factoryWorkerAdvances.id, adv.id));
+              updatedCount++;
+            }
+          }
+        }
+      });
+
+      res.json({ message: `Reconciliation complete — ${updatedCount} advance record(s) updated` });
+    } catch (e: any) {
+      console.error("Advance reconcile error:", e);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // DELETE /api/factory/advances/:id - Delete advance (admin/owner only)
   app.delete("/api/factory/advances/:id", requireAuth, async (req: any, res: any) => {
     try {

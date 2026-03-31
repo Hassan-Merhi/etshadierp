@@ -168,6 +168,26 @@ function AdvancesView() {
     },
   });
 
+  const [reconcileOpen, setReconcileOpen] = useState(false);
+  const reconcileMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/factory/advances/reconcile", {});
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Reconciliation failed");
+      return json;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances/unvouchered"] });
+      toast({ title: "Reconciliation complete", description: data.message });
+      setReconcileOpen(false);
+    },
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const createMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/factory/workers/${form.workerId}/advances`, {
@@ -336,6 +356,9 @@ function AdvancesView() {
         </Select>
 
         <div className="ml-auto flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setReconcileOpen(true)} data-testid="button-reconcile-advances">
+            <RotateCcw className="h-4 w-4 mr-2" />Reconcile Balances
+          </Button>
           <Button variant="outline" onClick={() => { setPostAccountingOpen(true); refetchUnvouchered(); }} data-testid="button-post-accounting">
             <BookOpen className="h-4 w-4 mr-2" />Post Accounting
           </Button>
@@ -820,6 +843,34 @@ function AdvancesView() {
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Posting...</>
               ) : (
                 <>Post {unvouchered?.length || 0} Entries</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reconcile confirmation dialog */}
+      <Dialog open={reconcileOpen} onOpenChange={setReconcileOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reconcile Advance Balances</DialogTitle>
+            <DialogDescription>
+              This will recalculate every worker's outstanding advance balances from scratch — replaying all historical payroll deductions and manual repayments in order. Use this to correct balances from payrolls that ran before automatic reconciliation was in place.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReconcileOpen(false)} data-testid="button-cancel-reconcile">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => reconcileMutation.mutate()}
+              disabled={reconcileMutation.isPending}
+              data-testid="button-confirm-reconcile"
+            >
+              {reconcileMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Reconciling...</>
+              ) : (
+                <>Reconcile Now</>
               )}
             </Button>
           </DialogFooter>
