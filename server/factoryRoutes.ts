@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { eq, and, or, asc, desc, sql, inArray, ilike, ne } from "drizzle-orm";
+import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import CryptoJS from "crypto-js";
 import multer from "multer";
@@ -11821,7 +11821,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const currentUserId = (req.session as any).userId as string | undefined;
+      const currentUserId = (req.session as any).userId != null ? String((req.session as any).userId) : undefined;
       const { startDate, endDate, txType, currencyCode } = req.query;
 
       // ── Check if this user has "daybook_own_only" restriction ─────────────
@@ -11840,8 +11840,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         sql`${factoryDaybookEntries.txType} NOT LIKE '%_VOIDED'`,
         sql`${factoryDaybookEntries.txType} NOT LIKE '%_DELETED'`,
       ];
-      // If user is restricted to own entries only, filter by their userId
-      if (ownOnly && currentUserId) conditions.push(eq(factoryDaybookEntries.createdBy, currentUserId));
+      // If user is restricted to own entries only, show their entries + unattributed ones (NULL createdBy)
+      if (ownOnly && currentUserId) {
+        conditions.push(
+          or(
+            eq(factoryDaybookEntries.createdBy, currentUserId),
+            isNull(factoryDaybookEntries.createdBy)
+          )!
+        );
+      }
       if (startDate) conditions.push(sql`${factoryDaybookEntries.txDate} >= ${startDate}`);
       if (endDate) conditions.push(sql`${factoryDaybookEntries.txDate} <= ${endDate}`);
       if (txType) conditions.push(eq(factoryDaybookEntries.txType, txType as string));
