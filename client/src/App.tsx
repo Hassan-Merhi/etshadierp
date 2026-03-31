@@ -308,7 +308,8 @@ function AuthenticatedApp() {
     queryKey: ["/api/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
     retry: false,
-    staleTime: Infinity,
+    staleTime: 30 * 60 * 1000,
+    refetchOnMount: "always",
   });
 
   const handleGoBack = useCallback(() => {
