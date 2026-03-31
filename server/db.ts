@@ -34,11 +34,11 @@ if (isLocalReplitDB) {
 
 // Single shared Pool for the entire application.
 // Session store uses its own separate pool (server/index.ts, max 4).
-// Total = 11 connections, well within Render's 25-connection basic plan limit.
+// Total = 19 connections, well within Render's 25-connection basic plan limit.
 export const pool = new Pool({
   connectionString,
   ssl: requiresSSL ? { rejectUnauthorized: false } : false,
-  max: 7,
+  max: 15,
   // Give connections 10 seconds to become available before throwing.
   // Routes that are non-critical (presence heartbeat, leave) handle this gracefully.
   connectionTimeoutMillis: 10000,

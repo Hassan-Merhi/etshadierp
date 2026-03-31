@@ -27341,17 +27341,6 @@ if (asOfDate) {
           else stmtAccountsOnUs.push(entry);
         }
       }
-      console.log('[NET POSITION BREAKDOWN]', {
-        openingStock: openingStockValue,
-        closingStock: closingStockValue,
-        supplierNetBalance: stmtSupplierTotal,
-        accountsForUs: stmtAccountsForUs,
-        accountsOnUs: stmtAccountsOnUs,
-        stmtNpForUs,
-        stmtNpOnUs,
-        netPositionBeforeRound: stmtNpForUs - stmtNpOnUs,
-      });
-
       const netPositionValue = npRound2Stmt(stmtNpForUs - stmtNpOnUs);
 
       // Opening Balances Net — the net worth of the business before any voucher transactions.
