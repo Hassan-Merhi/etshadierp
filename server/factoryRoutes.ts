@@ -6347,7 +6347,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const supplierMap = new Map<string, any>();
       for (const r of results) {
         const isOB = r.containerStatus === "OPENING_BALANCE";
-        const key = (r.supplierName || `unknown-${r.containerId}`) + (isOB ? "__OB" : "__CT");
+        // Always merge by supplier — one row per supplier regardless of OB vs Container
+        const key = r.supplierId ? `supplier-${r.supplierId}` : (r.supplierName || `unknown-${r.containerId}`);
         const received = parseFloat(r.receivedKg as string) || 0;
         const used = parseFloat(r.usedKg as string) || 0;
         const costPerKg = parseFloat(r.costPerKg as string) || 0;
@@ -6370,6 +6371,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (new Date(r.offloadedAt) > new Date(existing.lastOffloaded)) {
             existing.lastOffloaded = r.offloadedAt;
           }
+          // If any container for this supplier is not OB, show as Container
+          if (!isOB) existing.sourceType = "CONTAINER";
         } else {
           supplierMap.set(key, {
             supplierName: r.supplierName || "Unknown",
@@ -6398,27 +6401,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         let supplierId: number | null = null;
         if (adj.supplierId) {
           supplierId = adj.supplierId;
-          const allEntries = Array.from(supplierMap.entries()).filter(([, v]) => v.supplierId === adj.supplierId);
-          // Prefer merging into an existing non-OB row (container stock).
-          // If the only row is OPENING_BALANCE, keep adjustments as a separate MANUAL row
-          // so manual additions are never silently absorbed into the opening balance.
-          const nonOBEntry = allEntries.find(([, v]) => v.sourceType !== "OPENING_BALANCE");
-          if (nonOBEntry) {
-            key = nonOBEntry[0];
-            supplierName = nonOBEntry[1].supplierName;
+          // Use the same unified supplier key (matches container key generation above)
+          key = `supplier-${adj.supplierId}`;
+          const anyEntry = supplierMap.get(key);
+          if (anyEntry) {
+            supplierName = anyEntry.supplierName;
           } else {
-            // No non-OB entry: create (or reuse) a dedicated MANUAL row for this supplier
-            const anyEntry = allEntries[0];
-            if (anyEntry) {
-              supplierName = anyEntry[1].supplierName;
-            } else {
-              const [sup] = await db.select({ name: factorySuppliers.name })
-                .from(factorySuppliers)
-                .where(and(eq(factorySuppliers.id, adj.supplierId), eq(factorySuppliers.companyId, companyId)))
-                .limit(1);
-              supplierName = sup?.name || `Supplier #${adj.supplierId}`;
-            }
-            key = `${supplierName}__ADJ_${adj.supplierId}`;
+            const [sup] = await db.select({ name: factorySuppliers.name })
+              .from(factorySuppliers)
+              .where(and(eq(factorySuppliers.id, adj.supplierId), eq(factorySuppliers.companyId, companyId)))
+              .limit(1);
+            supplierName = sup?.name || `Supplier #${adj.supplierId}`;
           }
         } else {
           // Standalone manual material (no supplier)
