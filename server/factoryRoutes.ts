@@ -12878,12 +12878,30 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
+
+      // Fetch proforma before deleting so we can log which customer it belongs to
+      const [proformaBefore] = await db.select().from(customerProformas)
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
+      if (proformaBefore) {
+        const [custBefore] = await db.select({ id: customers.id, legalName: customers.legalName, deletedAt: customers.deletedAt })
+          .from(customers).where(eq(customers.id, proformaBefore.customerId));
+        console.log(`[PROFORMA DELETE] Deleting proforma id=${id} name="${proformaBefore.name}" customerId=${proformaBefore.customerId} customerName="${custBefore?.legalName}" customerDeletedAt=${custBefore?.deletedAt}`);
+      }
+
       await db.delete(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
       const [deleted] = await db.delete(customerProformas)
         .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)))
         .returning();
 
       if (!deleted) return res.status(404).json({ message: "Proforma not found" });
+
+      // Verify customer still exists after proforma deletion
+      if (proformaBefore) {
+        const [custAfter] = await db.select({ id: customers.id, legalName: customers.legalName, deletedAt: customers.deletedAt })
+          .from(customers).where(eq(customers.id, proformaBefore.customerId));
+        console.log(`[PROFORMA DELETE] After deletion: customerId=${proformaBefore.customerId} customerName="${custAfter?.legalName}" customerDeletedAt=${custAfter?.deletedAt}`);
+      }
+
       res.json({ message: "Proforma deleted" });
     } catch (error: any) {
       console.error("Error deleting customer proforma:", error);
