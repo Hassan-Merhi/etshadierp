@@ -12823,11 +12823,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         return res.status(409).json({ message: `A proforma named "${parsed.name}" already exists for this customer. Please choose a different name.` });
       }
 
-      if (parsed.isActive) {
-        await db.update(customerProformas).set({ isActive: false, updatedAt: new Date() })
-          .where(and(eq(customerProformas.companyId, companyId), eq(customerProformas.customerId, parsed.customerId)));
-      }
-
       const [proforma] = await db.insert(customerProformas).values(parsed).returning();
       res.json(proforma);
     } catch (error: any) {
@@ -12856,11 +12851,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         if (duplicate) {
           return res.status(409).json({ message: `A proforma named "${req.body.name}" already exists for this customer. Please choose a different name.` });
         }
-      }
-
-      if (req.body.isActive === true) {
-        await db.update(customerProformas).set({ isActive: false, updatedAt: new Date() })
-          .where(and(eq(customerProformas.companyId, companyId), eq(customerProformas.customerId, existing.customerId)));
       }
 
       const [updated] = await db.update(customerProformas)
@@ -13062,11 +13052,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const parsed = insertCustomerProformaSchema.parse({ companyId, customerId, name, isActive: isActive || false });
 
       const result = await db.transaction(async (tx: any) => {
-        if (parsed.isActive) {
-          await tx.update(customerProformas).set({ isActive: false, updatedAt: new Date() })
-            .where(and(eq(customerProformas.companyId, companyId), eq(customerProformas.customerId, parsed.customerId)));
-        }
-
         const [proforma] = await tx.insert(customerProformas).values(parsed).returning();
 
         const lineValues = validLines.map((l: any) => ({

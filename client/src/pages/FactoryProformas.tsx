@@ -134,12 +134,12 @@ export default function FactoryProformas() {
     },
   });
 
-  const activateProformaMutation = useMutation({
-    mutationFn: async (id: number) => {
-      return await modeApiRequest("PUT", `/api/factory/customer-proformas/${id}`, { isActive: true });
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: number; isActive: boolean }) => {
+      return await modeApiRequest("PUT", `/api/factory/customer-proformas/${id}`, { isActive });
     },
-    onSuccess: () => {
-      toast({ title: "Success", description: "Proforma set as active" });
+    onSuccess: (_, vars) => {
+      toast({ title: vars.isActive ? "Proforma activated" : "Proforma deactivated" });
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
     },
     onError: (error: Error) => {
@@ -402,18 +402,16 @@ export default function FactoryProformas() {
                         <Truck className="h-4 w-4 mr-1" />
                         Create Loading
                       </Button>
-                      {!proforma.isActive && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => activateProformaMutation.mutate(proforma.id)}
-                          disabled={activateProformaMutation.isPending}
-                          data-testid={`button-activate-proforma-${proforma.id}`}
-                          title="Set as active"
-                        >
-                          <Star className="h-4 w-4" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => toggleActiveMutation.mutate({ id: proforma.id, isActive: !proforma.isActive })}
+                        disabled={toggleActiveMutation.isPending}
+                        data-testid={`button-toggle-active-proforma-${proforma.id}`}
+                        title={proforma.isActive ? "Deactivate proforma" : "Set as active"}
+                      >
+                        <Star className={proforma.isActive ? "h-4 w-4 fill-yellow-400 text-yellow-500" : "h-4 w-4"} />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
