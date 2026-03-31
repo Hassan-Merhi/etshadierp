@@ -73,7 +73,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import type { Employee } from "@shared/schema";
 import { insertEmployeeSchema } from "@shared/schema";
-import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown, ExternalLink, User, HardHat, Banknote, ArrowDownCircle, ArrowUpCircle, Gift, Receipt, PlayCircle, X, Loader2, RefreshCw, Percent, Package, Save, ChevronRight } from "lucide-react";
+import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown, ExternalLink, User, HardHat, Banknote, ArrowDownCircle, ArrowUpCircle, Gift, Receipt, PlayCircle, X, Loader2, RefreshCw, Percent, Package, Save, ChevronRight, Printer } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -1066,6 +1066,44 @@ export default function Payroll() {
       });
     },
   });
+
+  const handlePrintBulkBonus = () => {
+    const rows = employeeStaff
+      .filter(emp => parseFloat(bulkBonusAmounts[emp.id] || "0") > 0)
+      .map(emp => {
+        const pending = pendingBonuses[emp.id];
+        const desc = pending?.description || (bulkBonusNotes || "Bonus");
+        const amt = parseFloat(bulkBonusAmounts[emp.id] || "0");
+        return `<tr><td>${emp.firstName} ${emp.lastName}</td><td>${desc}</td><td style="text-align:right;font-family:monospace">${amt.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`;
+      }).join("");
+    const total = Object.values(bulkBonusAmounts).reduce((s, a) => s + (parseFloat(a) || 0), 0);
+    const empCount = Object.values(bulkBonusAmounts).filter(a => parseFloat(a) > 0).length;
+    const html = `<!DOCTYPE html><html><head><title>Bulk Bonus — ${bulkBonusDate}</title>
+    <style>
+      body { font-family: Arial, sans-serif; font-size: 13px; margin: 32px; color: #111; }
+      h2 { margin: 0 0 4px; } p { margin: 2px 0; color: #555; font-size: 12px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+      th { border-bottom: 2px solid #111; padding: 6px 8px; text-align: left; font-size: 12px; }
+      td { border-bottom: 1px solid #ddd; padding: 6px 8px; }
+      tfoot td { border-top: 2px solid #111; font-weight: bold; }
+      .right { text-align: right; font-family: monospace; }
+    </style></head><body>
+    <h2>Bulk Bonus Deposit</h2>
+    <p>Date: ${bulkBonusDate}</p>
+    ${bulkBonusNotes ? `<p>Notes: ${bulkBonusNotes}</p>` : ""}
+    <table>
+      <thead><tr><th>Employee</th><th>Description</th><th style="text-align:right">Amount</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr><td colspan="2">${empCount} employee${empCount !== 1 ? "s" : ""}</td><td class="right">${total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr></tfoot>
+    </table>
+    </body></html>`;
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
 
   const bulkWithdrawalMutation = useMutation({
     mutationFn: async () => {
@@ -4855,6 +4893,14 @@ export default function Payroll() {
                     data-testid="button-back-bulk-bonus"
                   >
                     Back
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handlePrintBulkBonus}
+                    data-testid="button-print-bulk-bonus"
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print
                   </Button>
                   <Button
                     onClick={() => bulkBonusMutation.mutate()}
