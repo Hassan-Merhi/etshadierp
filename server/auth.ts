@@ -25,6 +25,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   // Build req.user from session cache — no DB round-trip needed
   req.user = {
     id: req.session.userId,
+    username: req.session.username,
     role,
     assignedLocationId: req.session.currentLocationId ?? null,
     posStation: req.session.currentPOSStation ?? null,

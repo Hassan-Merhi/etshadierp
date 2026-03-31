@@ -1112,6 +1112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       req.session.userId = user.id;
+      req.session.username = user.username;
 
       // Auto-select first company
       const userCompanies = await storage.getUserCompaniesWithRoles(user.id);
@@ -1398,8 +1399,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-    const { password: _, ...userWithoutPassword } = req.user;
-    res.json(userWithoutPassword);
+    // If username not in session (legacy session), fetch it from DB and cache it
+    let username = (req.user as any).username || req.session.username;
+    if (!username && (req.session as any).userId) {
+      try {
+        const dbUser = await storage.getUser((req.session as any).userId);
+        if (dbUser?.username) {
+          username = dbUser.username;
+          req.session.username = username;
+        }
+      } catch (_) {}
+    }
+    const { password: _, ...userWithoutPassword } = req.user as any;
+    res.json({ ...userWithoutPassword, username });
   });
   // User management routes (Admin only)
   app.get(
