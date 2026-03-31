@@ -7205,6 +7205,62 @@ if (asOfDate) {
     }
   });
 
+  app.post("/api/salary-advances/reconcile", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const allAdvances = await db
+        .select()
+        .from(salaryAdvances)
+        .where(eq(salaryAdvances.companyId, companyId));
+
+      const allDeductions = await db
+        .select()
+        .from(salaryAdvanceDeductions)
+        .where(
+          inArray(
+            salaryAdvanceDeductions.salaryAdvanceId,
+            allAdvances.map((a) => a.id)
+          )
+        );
+
+      const deductionsByAdvance: Record<number, number> = {};
+      for (const d of allDeductions) {
+        const id = d.salaryAdvanceId;
+        deductionsByAdvance[id] = (deductionsByAdvance[id] || 0) + parseFloat(d.deductionAmount || "0");
+      }
+
+      let fixed = 0;
+      for (const advance of allAdvances) {
+        const originalAmount = parseFloat(advance.amount || "0");
+        const totalDeducted = deductionsByAdvance[advance.id] || 0;
+        const correctRemaining = Math.max(0, originalAmount - totalDeducted);
+        const correctlyPaid = correctRemaining <= 0.01;
+
+        const currentRemaining = parseFloat(advance.remainingBalance || "0");
+        const changed =
+          Math.abs(currentRemaining - correctRemaining) > 0.01 ||
+          advance.fullyPaid !== correctlyPaid;
+
+        if (changed) {
+          await db
+            .update(salaryAdvances)
+            .set({
+              remainingBalance: correctRemaining.toFixed(2),
+              fullyPaid: correctlyPaid,
+            })
+            .where(eq(salaryAdvances.id, advance.id));
+          fixed++;
+        }
+      }
+
+      res.json({ message: `Reconciliation complete. ${fixed} advance(s) corrected.`, fixed });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/salary-advance-deductions", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;

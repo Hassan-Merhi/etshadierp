@@ -101,6 +101,7 @@ function AdvancesView() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [deleteTarget, setDeleteTarget] = useState<AdvanceRecord | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [reconcileOpen, setReconcileOpen] = useState(false);
   const [bulkAmounts, setBulkAmounts] = useState<Record<number, string>>({});
   const [bulkSelected, setBulkSelected] = useState<Set<number>>(new Set());
   const [bulkForm, setBulkForm] = useState({
@@ -236,6 +237,21 @@ function AdvancesView() {
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
+  const reconcileMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/salary-advances/reconcile", {});
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Reconciliation failed");
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/salary-advances"] });
+      toast({ title: "Reconciliation complete", description: data.message });
+      setReconcileOpen(false);
+    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -318,6 +334,9 @@ function AdvancesView() {
         </Select>
 
         <div className="ml-auto flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setReconcileOpen(true)} data-testid="button-erp-reconcile-advances">
+            <RotateCcw className="h-4 w-4 mr-2" />Reconcile Balances
+          </Button>
           <Button variant="outline" onClick={() => setBulkOpen(true)} data-testid="button-erp-bulk-advance">
             <Users className="h-4 w-4 mr-2" />Bulk Advance
           </Button>
@@ -612,6 +631,30 @@ function AdvancesView() {
                 ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>
                 : `Record ${Array.from(bulkSelected).filter((wid) => parseFloat(bulkAmounts[wid] || "0") > 0).length || ""} Advance(s)`
               }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reconcile confirmation */}
+      <Dialog open={reconcileOpen} onOpenChange={setReconcileOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reconcile Advance Balances</DialogTitle>
+            <DialogDescription>
+              This will recalculate every worker's advance remaining balance from scratch based on all recorded payroll deductions. Use this if balances look incorrect after running a payroll. No data will be deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setReconcileOpen(false)} data-testid="button-cancel-reconcile-erp">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => reconcileMutation.mutate()}
+              disabled={reconcileMutation.isPending}
+              data-testid="button-confirm-reconcile-erp"
+            >
+              {reconcileMutation.isPending ? "Reconciling..." : "Reconcile Now"}
             </Button>
           </DialogFooter>
         </DialogContent>
