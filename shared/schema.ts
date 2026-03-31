@@ -4097,3 +4097,18 @@ export const agentAccounts = pgTable("agent_accounts", {
 export const insertAgentAccountSchema = createInsertSchema(agentAccounts).omit({ id: true, createdAt: true });
 export type InsertAgentAccount = z.infer<typeof insertAgentAccountSchema>;
 export type AgentAccount = typeof agentAccounts.$inferSelect;
+
+// Proforma Stock Reservations — tracks which proforma+articleCode combos are toggled as "reserved"
+export const proformaStockReservations = pgTable("proforma_stock_reservations", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  proformaId: integer("proforma_id").notNull(),
+  articleCode: varchar("article_code", { length: 50 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniq: uniqueIndex("proforma_stock_reservations_unique").on(t.companyId, t.proformaId, t.articleCode),
+}));
+
+export const insertProformaStockReservationSchema = createInsertSchema(proformaStockReservations).omit({ id: true, createdAt: true });
+export type InsertProformaStockReservation = z.infer<typeof insertProformaStockReservationSchema>;
+export type ProformaStockReservation = typeof proformaStockReservations.$inferSelect;

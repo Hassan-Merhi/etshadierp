@@ -102,6 +102,7 @@ import {
   factoryBaleWasteDispatches,
   factoryPosSales,
   factoryPosSaleItems,
+  proformaStockReservations,
 } from "@shared/schema";
 import { adjustInventory } from "./inventoryHelper";
 
@@ -13186,6 +13187,130 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // ─── Stock Allocation endpoints ─────────────────────────────────────────────
+
+  // GET /api/factory/stock-allocation — returns all article codes with IN_STOCK bale counts,
+  // all proformas with their lines, existing reservations, and LOADING/PENDING_VERIFICATION/VERIFIED order quantities
+  app.get("/api/factory/stock-allocation", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // 1. All proformas (with lines) for this company — no customer filter, all proformas
+      const allProformas = await db.select().from(customerProformas)
+        .where(eq(customerProformas.companyId, companyId))
+        .orderBy(customerProformas.createdAt);
+      const proformaIds = allProformas.map((p: any) => p.id);
+      let allLines: any[] = [];
+      if (proformaIds.length > 0) {
+        allLines = await db.select().from(customerProformaLines)
+          .where(inArray(customerProformaLines.proformaId, proformaIds));
+      }
+
+      // 2. IN_STOCK bale counts grouped by articleCode
+      const inStockCounts = await db.select({
+        articleCode: factoryBales.articleCode,
+        count: sql<number>`COUNT(*)`,
+      }).from(factoryBales)
+        .where(and(
+          eq(factoryBales.companyId, companyId),
+          eq(factoryBales.status, "IN_STOCK"),
+        ))
+        .groupBy(factoryBales.articleCode);
+
+      // 3. Existing reservations for this company
+      const reservations = await db.select().from(proformaStockReservations)
+        .where(eq(proformaStockReservations.companyId, companyId));
+
+      // 4. Active orders (LOADING, PENDING_VERIFICATION, VERIFIED) with their proformaIdUsed and bale counts
+      const activeOrders = await db.select({
+        id: customerOrders.id,
+        proformaIdUsed: customerOrders.proformaIdUsed,
+        status: customerOrders.status,
+      }).from(customerOrders)
+        .where(and(
+          eq(customerOrders.companyId, companyId),
+          inArray(customerOrders.status, ["LOADING", "PENDING_VERIFICATION", "VERIFIED"]),
+        ));
+
+      // For active orders, get the bale article code counts from customer_order_bales → factory_bales
+      let activeOrderBales: any[] = [];
+      if (activeOrders.length > 0) {
+        const orderIds = activeOrders.map((o: any) => o.id);
+        activeOrderBales = await db.select({
+          orderId: customerOrderBales.orderId,
+          articleCode: factoryBales.articleCode,
+          count: sql<number>`COUNT(*)`,
+        }).from(customerOrderBales)
+          .innerJoin(factoryBales, eq(customerOrderBales.baleId, factoryBales.id))
+          .where(inArray(customerOrderBales.orderId, orderIds))
+          .groupBy(customerOrderBales.orderId, factoryBales.articleCode);
+      }
+
+      // 5. Customers lookup for proforma names
+      const allCustomerIds = [...new Set(allProformas.map((p: any) => p.customerId))];
+      let customerRows: any[] = [];
+      if (allCustomerIds.length > 0) {
+        customerRows = await db.select({ id: customers.id, name: customers.name })
+          .from(customers)
+          .where(inArray(customers.id, allCustomerIds as number[]));
+      }
+      const customerMap = new Map(customerRows.map((c: any) => [c.id, c.name]));
+
+      res.json({
+        proformas: allProformas.map((p: any) => ({
+          ...p,
+          customerName: customerMap.get(p.customerId) || `Customer #${p.customerId}`,
+          lines: allLines.filter((l: any) => l.proformaId === p.id),
+        })),
+        inStockCounts: inStockCounts.map((r: any) => ({ articleCode: r.articleCode, count: Number(r.count) })),
+        reservations,
+        activeOrders: activeOrders.map((o: any) => ({
+          ...o,
+          balesByArticle: activeOrderBales
+            .filter((b: any) => b.orderId === o.id)
+            .map((b: any) => ({ articleCode: b.articleCode, count: Number(b.count) })),
+        })),
+      });
+    } catch (error: any) {
+      console.error("Error fetching stock allocation:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/stock-allocation/reservations/toggle — toggle a reservation on/off
+  app.post("/api/factory/stock-allocation/reservations/toggle", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { proformaId, articleCode } = req.body;
+      if (!proformaId || !articleCode) return res.status(400).json({ message: "proformaId and articleCode required" });
+
+      // Check if reservation exists
+      const [existing] = await db.select().from(proformaStockReservations)
+        .where(and(
+          eq(proformaStockReservations.companyId, companyId),
+          eq(proformaStockReservations.proformaId, proformaId),
+          eq(proformaStockReservations.articleCode, articleCode),
+        )).limit(1);
+
+      if (existing) {
+        await db.delete(proformaStockReservations)
+          .where(eq(proformaStockReservations.id, existing.id));
+        res.json({ reserved: false });
+      } else {
+        await db.insert(proformaStockReservations).values({ companyId, proformaId, articleCode });
+        res.json({ reserved: true });
+      }
+    } catch (error: any) {
+      console.error("Error toggling reservation:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─── End Stock Allocation ─────────────────────────────────────────────────────
 
   app.get("/api/factory/customer-proformas/:id/export/excel", requireAuth, async (req: any, res: any) => {
     try {
