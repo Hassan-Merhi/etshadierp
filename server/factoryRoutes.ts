@@ -18919,7 +18919,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           }
         }
 
-        // 4. Create daybook entry
+        // 4. Create daybook entry for the sale
         await tx.insert(factoryDaybookEntries).values({
           companyId,
           txDate: txDate || new Date().toISOString().split("T")[0],
@@ -18933,6 +18933,23 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           amountUsd: totalAmount.toFixed(2),
           createdBy: userId,
         });
+
+        // 4b. Create daybook entries for each expense/deduction
+        for (const exp of expenseRows) {
+          await tx.insert(factoryDaybookEntries).values({
+            companyId,
+            txDate: txDate || new Date().toISOString().split("T")[0],
+            txType: "POS_EXPENSE",
+            referenceId: sale.id,
+            referenceTable: "factory_pos_sales",
+            description: `${exp.description || "Deduction"} – POS ${saleNumber}${customerName ? ` (${customerName})` : ""}`,
+            currencyCode: currencyCode || "USD",
+            amountCurrency: exp.amount.toFixed(2),
+            fxRateToUsd: "1",
+            amountUsd: exp.amount.toFixed(2),
+            createdBy: userId,
+          });
+        }
 
         // 5a. CREDIT sale — update customer balance
         if (isCredit && parsedCustomerId) {
@@ -19152,7 +19169,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           }
         }
 
-        // Step 5: Update factory daybook entry amount and date
+        // Step 5: Update factory daybook BALE_SALE entry and rebuild POS_EXPENSE entries
         await tx.update(factoryDaybookEntries)
           .set({
             amountCurrency: totalAmount.toFixed(2),
@@ -19163,7 +19180,30 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           .where(and(
             eq(factoryDaybookEntries.referenceTable, "factory_pos_sales"),
             eq(factoryDaybookEntries.referenceId, saleId),
+            eq(factoryDaybookEntries.txType, "BALE_SALE"),
           ));
+
+        // Delete old expense daybook rows, then re-insert fresh ones
+        await tx.delete(factoryDaybookEntries)
+          .where(and(
+            eq(factoryDaybookEntries.referenceTable, "factory_pos_sales"),
+            eq(factoryDaybookEntries.referenceId, saleId),
+            eq(factoryDaybookEntries.txType, "POS_EXPENSE"),
+          ));
+        for (const exp of expenseRows) {
+          await tx.insert(factoryDaybookEntries).values({
+            companyId,
+            txDate: txDate || existingSale.txDate,
+            txType: "POS_EXPENSE",
+            referenceId: saleId,
+            referenceTable: "factory_pos_sales",
+            description: `${exp.description || "Deduction"} – POS ${existingSale.saleNumber}${customerName ? ` (${customerName})` : ""}`,
+            currencyCode: currencyCode || "USD",
+            amountCurrency: exp.amount.toFixed(2),
+            fxRateToUsd: "1",
+            amountUsd: exp.amount.toFixed(2),
+          });
+        }
 
         // Step 6: Update customer balance entries if applicable
         if (isCredit && parsedCustomerId) {

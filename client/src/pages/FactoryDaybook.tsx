@@ -141,6 +141,8 @@ const TX_TYPE_LABELS: Record<string, string> = {
   PAYROLL_GENERATED: "Payroll Generated",
   PAYROLL_PAYMENT: "Payroll Payment",
   PAYROLL_STATUS_CHANGE: "Payroll Status",
+  BALE_SALE: "POS Sale",
+  POS_EXPENSE: "POS Deduction",
   SUPPLIER_PAYMENT: "Supplier Payment",
   SUPPLIER_PAYMENT_DELETE: "Supplier Pmt. Deleted",
   ORDER_CANCELLED: "Order Cancelled",
@@ -181,6 +183,10 @@ function getFactoryTxTypeBadge(type: string): { variant: "default" | "secondary"
     case "BALE_REIMPORT":
     case "OPENING_BALANCE_RAW":
       return { variant: "outline", className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40" };
+    case "BALE_SALE":
+      return { variant: "outline", className: "bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/40" };
+    case "POS_EXPENSE":
+      return { variant: "outline", className: "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/40" };
     case "BALE_REMOVAL":
     case "BALE_TRANSFER":
       return { variant: "outline", className: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/40" };
@@ -211,6 +217,7 @@ const VOUCHER_TX_TYPES: Record<string, string> = {
   INVOICE: "receipt",
   FREIGHT_PAYMENT: "payment",
   BALE_SALE: "factory_pos",
+  POS_EXPENSE: "factory_pos",
 };
 
 // ─── Factory Daybook sessionStorage persistence ───────────────────────────────
