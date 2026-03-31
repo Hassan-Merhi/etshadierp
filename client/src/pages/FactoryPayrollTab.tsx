@@ -233,6 +233,9 @@ export default function FactoryPayrollTab() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances/unvouchered"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
       toast({ title: "Payroll generated", description: `${data.created} records created` });
       setRunOpen(false); setPreviewOpen(false);
       // Auto-expand the new group
@@ -301,6 +304,9 @@ export default function FactoryPayrollTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances/unvouchered"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
       toast({ title: "Draft payroll deleted" });
       setDeleteTargetId(null);
     },
