@@ -872,6 +872,44 @@ let migrationsDone = false;
       }
       console.log("✓ Database tables and columns verified/migrated");
 
+      // Backfill POS_EXPENSE daybook entries for any factory POS sales
+      // that have expenses_json stored but no corresponding daybook rows yet
+      try {
+        await migrationClient.query(`
+          INSERT INTO factory_daybook_entries
+            (company_id, tx_date, tx_type, reference_id, reference_table,
+             description, currency_code, amount_currency, fx_rate_to_usd, amount_usd)
+          SELECT
+            s.company_id,
+            s.tx_date,
+            'POS_EXPENSE',
+            s.id,
+            'factory_pos_sales',
+            CONCAT(
+              COALESCE(NULLIF(exp->>'description',''), 'Deduction'),
+              ' – POS ', s.sale_number,
+              CASE WHEN s.customer_name IS NOT NULL
+                   THEN CONCAT(' (', s.customer_name, ')')
+                   ELSE '' END
+            ),
+            COALESCE(s.currency_code, 'USD'),
+            ROUND((exp->>'amount')::numeric, 2),
+            1,
+            ROUND((exp->>'amount')::numeric, 2)
+          FROM factory_pos_sales s,
+               jsonb_array_elements(s.expenses_json::jsonb) AS exp
+          WHERE s.expenses_json IS NOT NULL
+            AND s.expenses_json <> 'null'
+            AND (exp->>'amount')::numeric > 0
+            AND NOT EXISTS (
+              SELECT 1 FROM factory_daybook_entries d
+              WHERE d.reference_table = 'factory_pos_sales'
+                AND d.reference_id = s.id
+                AND d.tx_type = 'POS_EXPENSE'
+            )
+        `);
+      } catch { /* table may not exist yet — skip */ }
+
       // Auto-fix sequence desyncs (can happen after data restores / bulk imports with explicit IDs)
       const seqFixes: Array<[string, string]> = [
         ["ledger_accounts", "ledger_accounts_id_seq"],
