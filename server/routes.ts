@@ -476,8 +476,6 @@ async function calculateHistoricalLocationInventory(
   const cutoffDateStr = asOfDate; // For vouchers.voucherDate (DATE type)
   const cutoffTimestamp = new Date(asOfDate + 'T23:59:59.999'); // For containerOffloads.offloadedAt (TIMESTAMP type)
   
-  console.log(`[HIST-INV] Starting for locationId=${locationId}, companyId=${companyId}, asOfDate=${asOfDate}`);
-  
   // STEP 1: Build seed set of ALL stockItemIds that ever existed at this location
   const seedStockItemIds = new Set<number>();
 
@@ -500,7 +498,6 @@ async function calculateHistoricalLocationInventory(
   for (const inv of currentInventory) {
     seedStockItemIds.add(inv.stockItemId);
   }
-  console.log(`[HIST-INV] Seed currentInventory: ${currentInventory.length}`);
 
   // 1b. From sales at this location (any time)
   const salesStockItems = await db
@@ -518,7 +515,6 @@ async function calculateHistoricalLocationInventory(
   for (const item of salesStockItems) {
     seedStockItemIds.add(item.stockItemId);
   }
-  console.log(`[HIST-INV] Seed sales: ${salesStockItems.length}`);
 
   // 1c. From container offloads at this location (any time) - WITH company filter
   const offloadStockItems = await db
@@ -537,7 +533,6 @@ async function calculateHistoricalLocationInventory(
   for (const item of offloadStockItems) {
     seedStockItemIds.add(item.stockItemId);
   }
-  console.log(`[HIST-INV] Seed offloads: ${offloadStockItems.length}`);
 
   // 1d. From stock adjustments at this location (any time)
   const adjustmentStockItems = await db
@@ -556,7 +551,6 @@ async function calculateHistoricalLocationInventory(
   for (const item of adjustmentStockItems) {
     seedStockItemIds.add(item.stockItemId);
   }
-  console.log(`[HIST-INV] Seed adjustments: ${adjustmentStockItems.length}`);
 
   // 1e. From transfers INTO this location (destination on voucher level)
   const transfersInStockItems = await db
@@ -575,7 +569,6 @@ async function calculateHistoricalLocationInventory(
   for (const item of transfersInStockItems) {
     seedStockItemIds.add(item.stockItemId);
   }
-  console.log(`[HIST-INV] Seed transfers-in: ${transfersInStockItems.length}`);
 
   // 1f. From transfers OUT of this location (source on item level)
   const transfersOutStockItems = await db
@@ -594,13 +587,10 @@ async function calculateHistoricalLocationInventory(
   for (const item of transfersOutStockItems) {
     seedStockItemIds.add(item.stockItemId);
   }
-  console.log(`[HIST-INV] Seed transfers-out: ${transfersOutStockItems.length}`);
 
   const finalSeedCount = seedStockItemIds.size;
-  console.log(`[HIST-INV] Final seed count: ${finalSeedCount}`);
 
   if (finalSeedCount === 0) {
-    console.log(`[HIST-INV] WARNING: No seed items found!`);
     return [];
   }
 
@@ -637,8 +627,6 @@ async function calculateHistoricalLocationInventory(
     )
     .execute();
 
-  console.log(`[HIST-INV] Sales after cutoff: ${salesAfterDate.length}`);
-
   for (const sale of salesAfterDate) {
     const qty = parseFloat(sale.quantity) || 0;
     const cost = parseFloat(sale.costPrice) || 0;
@@ -669,8 +657,6 @@ async function calculateHistoricalLocationInventory(
       )
     )
     .execute();
-
-  console.log(`[HIST-INV] Adjustments after cutoff: ${adjustmentsAfterDate.length}`);
 
   for (const adj of adjustmentsAfterDate) {
     const qty = parseFloat(adj.quantity) || 0;
@@ -710,8 +696,6 @@ async function calculateHistoricalLocationInventory(
     )
     .execute();
 
-  console.log(`[HIST-INV] Transfers-in after cutoff: ${transfersInAfterDate.length}`);
-
   for (const transfer of transfersInAfterDate) {
     const qty = parseFloat(transfer.quantity) || 0;
     const rate = parseFloat(transfer.rate) || 0;
@@ -742,8 +726,6 @@ async function calculateHistoricalLocationInventory(
     )
     .execute();
 
-  console.log(`[HIST-INV] Transfers-out after cutoff: ${transfersOutAfterDate.length}`);
-
   for (const transfer of transfersOutAfterDate) {
     const qty = parseFloat(transfer.quantity) || 0;
     const rate = parseFloat(transfer.rate) || 0;
@@ -773,8 +755,6 @@ async function calculateHistoricalLocationInventory(
     )
     .execute();
 
-  console.log(`[HIST-INV] Offloads after cutoff: ${offloadsAfterDate.length}`);
-
   for (const offload of offloadsAfterDate) {
     const qty = parseFloat(offload.quantity) || 0;
     const cost = parseFloat(offload.rate) || 0;
@@ -790,7 +770,6 @@ async function calculateHistoricalLocationInventory(
   for (const [, data] of Array.from(inventoryMap)) {
     if (data.quantity !== 0) nonzeroCount++;
   }
-  console.log(`[HIST-INV] Items with qty != 0: ${nonzeroCount}`);
 
   // STEP 8: Build the result array
   const stockItemDetails = await db
@@ -830,8 +809,6 @@ async function calculateHistoricalLocationInventory(
       });
     }
   }
-
-  console.log(`[HIST-INV] Final result: ${result.length} items`);
 
   return result;
 }
@@ -1005,8 +982,6 @@ async function syncEmployeeBalancesFromEntries(
     };
     
     await db.update(employees).set(updateData).where(eq(employees.id, employee.id));
-    
-    console.log(`[Payroll Sync] Employee ID ${employeeId} (${employee.code}): balance ${changes.balanceChange >= 0 ? '+' : ''}${changes.balanceChange.toFixed(2)} (new: ${newBalance.toFixed(2)}), deposits ${changes.deposits >= 0 ? '+' : ''}${changes.deposits.toFixed(2)}, withdrawals ${changes.withdrawals >= 0 ? '+' : ''}${changes.withdrawals.toFixed(2)}`);
   }
   
   // Apply balance changes for ledger account entries (by code)
@@ -1033,8 +1008,6 @@ async function syncEmployeeBalancesFromEntries(
     };
     
     await db.update(employees).set(updateData).where(eq(employees.id, employee.id));
-    
-    console.log(`[Payroll Sync] Employee ${employeeCode}: balance ${changes.balanceChange >= 0 ? '+' : ''}${changes.balanceChange.toFixed(2)} (new: ${newBalance.toFixed(2)}), deposits ${changes.deposits >= 0 ? '+' : ''}${changes.deposits.toFixed(2)}, withdrawals ${changes.withdrawals >= 0 ? '+' : ''}${changes.withdrawals.toFixed(2)}`);
   }
 }
 
@@ -1078,7 +1051,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
   app.post("/api/auth/login", async (req, res) => {
     try {
-      console.log("Login attempt started for username:", req.body.username);
       const { username, password } = req.body;
 
       if (!username || !password) {
@@ -1086,10 +1058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .status(400)
           .json({ message: "Username and password are required" });
       }
-
-      console.log("Fetching user from database...");
       const user = await storage.getUserByUsername(username);
-      console.log("User fetch complete:", user ? "Found" : "Not found");
       if (!user) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
@@ -1318,7 +1287,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-
   // Audit Log endpoints
   // GET: Fetch audit logs (Admin/Owner only)
   app.get(
@@ -1393,7 +1361,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Logged out successfully" });
     });
   });
-
 
   app.get("/api/auth/me", requireAuth, async (req, res) => {
     if (!req.user) {
@@ -1491,7 +1458,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error.message });
     }
   });
-
 
   app.delete(
     "/api/users/:id",
@@ -1679,7 +1645,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-
   // User Locations routes - multi-location assignment for POS users
   app.get(
     "/api/user-locations/:userId/:companyId",
@@ -1717,8 +1682,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!Array.isArray(locationIds)) {
           return res.status(400).json({ message: "locationIds must be an array" });
         }
-
-
 
         await db
           .delete(userLocations)
@@ -1870,7 +1833,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-
   // Company management routes
   app.get("/api/companies", requireAuth, async (req, res) => {
     try {
@@ -1993,7 +1955,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     },
   );
-
 
   // Check if today's exchange rate exists
   app.get("/api/exchange-rates/check-today", requireAuth, async (req, res) => {
@@ -2162,17 +2123,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? parseInt(req.query.companyId as string)
         : req.session.currentCompanyId;
 
-      console.log("[/api/locations] Request from user:", req.user?.username);
-      console.log(
-        "[/api/locations] Company ID from query:",
-        req.query.companyId,
-      );
-      console.log(
-        "[/api/locations] Company ID from session:",
-        req.session.currentCompanyId,
-      );
-      console.log("[/api/locations] Final companyId to query:", companyId);
-
       if (!companyId) {
         return res
           .status(400)
@@ -2180,12 +2130,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const locations = await storage.getAllLocations(companyId);
-      console.log(
-        "[/api/locations] Found locations:",
-        locations.length,
-        "for company",
-        companyId,
-      );
       res.json(locations);
     } catch (error: any) {
       console.error("[/api/locations] Error:", error);
@@ -2905,7 +2849,6 @@ if (asOfDate) {
         const allStockGroups = await storage.getAllStockGroups(
           req.session.currentCompanyId,
         );
-
 
         const results = {
           created: [] as any[],
@@ -4050,8 +3993,6 @@ if (asOfDate) {
         // The syncEmployeePayrollBalance function updates currentBalance when vouchers are created/edited/deleted
         const currentBalance = parseFloat((emp as any).currentBalance || "0");
         
-        console.log(`Employee ${emp.firstName} ${emp.lastName}: currentBalance=${currentBalance}`);
-        
         return {
           ...emp,
           firstName: emp.firstName || (emp as any).first_name,
@@ -4422,19 +4363,15 @@ if (asOfDate) {
       }
       const companyId = req.session.currentCompanyId;
       const allGroups = await storage.getAllEmployeeGroups(companyId);
-      console.log("DEBUG: allGroups from storage:", JSON.stringify(allGroups, null, 2));
       const workerGroups = allGroups.filter((g: any) => {
         const type = g.groupType || g.group_type;
-        console.log(`DEBUG: Checking group ${g.id} (${g.name}): groupType=${g.groupType}, group_type=${g.group_type}, final type=${type}`);
         return type === "Worker";
       });
-      console.log(`DEBUG: Found ${workerGroups.length} worker groups out of ${allGroups.length} total groups`);
       
       // Get members for each group, filtering by company for security
       const groupsWithMembers = await Promise.all(
         workerGroups.map(async (group: any) => {
           const memberRecords = await storage.getEmployeeGroupMembers(group.id);
-          console.log(`DEBUG: Group ${group.id} (${group.name}) memberRecords:`, JSON.stringify(memberRecords, null, 2));
           // Get full worker details for each member, ensuring they belong to the same company
           const members = await Promise.all(
             memberRecords.map(async (m: any) => {
@@ -4447,7 +4384,6 @@ if (asOfDate) {
                     eq(employees.companyId, companyId)
                   )
                 );
-              console.log(`DEBUG: Looking for employee ${m.employeeId} in company ${companyId}, found:`, worker ? worker.id : "NOT FOUND");
               return worker;
             })
           );
@@ -4455,12 +4391,9 @@ if (asOfDate) {
             ...group,
             members: members.filter(Boolean),
           };
-          console.log(`DEBUG: Final group response - id=${group.id}, members count=${finalResult.members.length}`);
           return finalResult;
         })
       );
-      
-      console.log(`DEBUG: Final response has ${groupsWithMembers.length} groups with members`);
       res.json(groupsWithMembers);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -7941,7 +7874,6 @@ if (asOfDate) {
     }
   });
 
-
   // Get location prices for a stock item
   app.get("/api/stock-items/:id/location-prices", requireAuth, async (req, res) => {
     try {
@@ -8086,7 +8018,6 @@ if (asOfDate) {
         if (!Array.isArray(items)) {
           return res.status(400).json({ message: "Items must be an array" });
         }
-
 
         // Fetch all valid stock groups for this company for validation
         const validStockGroups = await storage.getAllStockGroups(
@@ -12132,7 +12063,6 @@ if (asOfDate) {
     }
   });
 
-
   // Get POs for a container (for viewing details from dashboard)
   app.get("/api/containers/:id/purchase-orders", requireAuth, async (req, res) => {
     try {
@@ -13272,9 +13202,6 @@ if (asOfDate) {
         const existingLineItems = await storage.getLineItemsByPO(id);
         const existingItemsMap = new Map(existingLineItems.map(item => [item.id, item]));
         
-        console.log('[PO PATCH] Existing line items:', existingLineItems.map(i => ({ id: i.id, qty: i.quantity, rate: i.rate })));
-        console.log('[PO PATCH] Request items:', req.body.items.map((i: any) => ({ id: i.id, qty: i.quantity, rate: i.rate })));
-        
         // Calculate new items total, preserving existing quantity/rate if not provided
         let itemsTotal = 0;
         const newItems = req.body.items.map((item: any) => {
@@ -13283,16 +13210,12 @@ if (asOfDate) {
           const itemIdNum = item.id ? Number(item.id) : null;
           const existingItem = itemIdNum ? existingItemsMap.get(itemIdNum) : null;
           
-          console.log(`[PO PATCH] Item id=${item.id}, itemIdNum=${itemIdNum}, foundExisting=${!!existingItem}`);
-          
           // Use provided values, or fall back to existing values, or default to "0"
           // Also handle empty string as missing value
           const hasQuantity = item.quantity !== undefined && item.quantity !== null && item.quantity !== "";
           const hasRate = item.rate !== undefined && item.rate !== null && item.rate !== "";
           const quantity = hasQuantity ? item.quantity.toString() : (existingItem?.quantity ?? "0");
           const rate = hasRate ? item.rate.toString() : (existingItem?.rate ?? "0");
-          
-          console.log(`[PO PATCH] Item result: qty=${quantity}, rate=${rate}`);
           const lineTotal = parseFloat(quantity) * parseFloat(rate);
           itemsTotal += lineTotal;
           
@@ -15709,7 +15632,6 @@ if (asOfDate) {
       res.status(500).json({ message: error.message });
     }
   });
-
 
   // Create a voucher with entries in one transaction
   app.post(
@@ -21105,7 +21027,6 @@ if (asOfDate) {
     }
   });
 
-
   // Draft POS Sales Routes
   // Get all drafts for current user
   app.get("/api/pos/drafts", requireAuth, async (req, res) => {
@@ -22535,16 +22456,6 @@ if (asOfDate) {
       // This is a simplified calculation: Assets - Liabilities only
       const netPosition = round2(forUsTotal - onUsTotal);
       
-      // Debug logging for Net Position calculation
-      console.log("Net Position Debug:", {
-        companyId,
-        shouldIncludeSuppliers,
-        forUsTotal,
-        onUsTotal,
-        netPosition,
-        stockOnFloor,
-        categoryTotals
-      });
       const netPositionLabel = netPosition >= 0 
         ? "We have more than we owe" 
         : "We owe more than we have";
@@ -23631,39 +23542,6 @@ if (asOfDate) {
         payrollLiabilitiesBalance - // Payroll Liabilities (what we owe employees)
         openingBalanceEquity);      // Opening Balance Equity (implicit capital from opening balances)
 
-      // Log components for debugging
-      console.log("Import Cycle Balance Components:", JSON.stringify({
-        assets: {
-          stockOtwValue,
-          cashBalance,
-          bankBalance,
-          stockOnFloorValue,
-          assetBalance,
-          salaryAdvancesBalance,
-        },
-        expenses: {
-          directExpenseBalance,
-          indirectExpenseBalance,
-          governmentTaxesBalance,
-          cogsBalance,
-          consumptionBalance,
-          productionBalance,
-        },
-        liabilities: {
-          supplierBalance,
-          dutyAgentBalance,
-          transporterAgentBalance,
-          loansBalance,
-          liabilityBalance,
-          profitBalance,
-          incomeBalance,
-          payrollLiabilitiesBalance,
-          openingBalanceEquity,
-          openingStockValue,
-        },
-        netImportCycleBalance,
-      }, null, 2));
-
       // Get stored equity adjustment for this company (if any)
       const equityAdjustmentSetting = await db
         .select()
@@ -24322,7 +24200,6 @@ if (asOfDate) {
       res.status(500).json({ message: error.message, details: error.toString() });
     }
   });
-
 
   // Recalculate cost prices for sales items using current inventory rates
   app.post(
@@ -26175,7 +26052,6 @@ if (asOfDate) {
          profitBalance + equityTransactionBalance + apTransactionBalance + incomeBalance + payrollLiabilitiesBalance -
          openingBalanceEquity)
       ) * 100) / 100;
-
 
       // === RECONCILIATION SECTION ===
       // Re-compute buckets from account-level data to identify the source of any discrepancy
@@ -28057,17 +27933,14 @@ if (asOfDate) {
   });
 
   // Closing Stock Detail - Items in a stock group
-  // Closing Stock Detail - Items in a stock group
   app.get("/api/reports/closing-stock-summary/:stockGroupId/items", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      console.log("[closing-stock-detail] Company ID:", companyId);
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
 
       const { stockGroupId } = req.params;
-      console.log("[closing-stock-detail] Stock Group ID param:", stockGroupId, "parsed:", parseInt(stockGroupId));
 
       // Get stock items in this group
       const groupItems = await db
@@ -28081,8 +27954,6 @@ if (asOfDate) {
           )
         )
         .execute();
-      
-      console.log("[closing-stock-detail] Group items found:", groupItems.length, groupItems.map(i => ({ id: i.id, name: i.name, stockGroupId: i.stockGroupId })));
 
       // Get inventory for these items from active locations
       const itemIds = groupItems.map((i) => i.id);
@@ -28126,15 +27997,10 @@ if (asOfDate) {
         }
       }
 
-      console.log("[closing-stock-detail] Inventory data rows:", inventoryData.length);
-      console.log("[closing-stock-detail] Inventory by item entries:", Array.from(inventoryByItem.entries()));
-
       // Build items list
       const items = groupItems.map((item) => {
         const invData = inventoryByItem.get(item.id) || { quantity: 0, totalValue: 0 };
         const rate = invData.quantity > 0 ? invData.totalValue / invData.quantity : 0;
-        console.log(`[closing-stock-detail] Item ${item.id} (${item.name}):`, invData);
-        
         return {
           id: item.id,
           code: item.code,
@@ -28146,8 +28012,6 @@ if (asOfDate) {
           },
         };
       }).filter((i) => i.closing.quantity > 0 || i.closing.value > 0);
-      
-      console.log("[closing-stock-detail] Final items (after filter):", items.length, items);
 
       // Calculate totals
       const totals = {
@@ -28943,7 +28807,6 @@ if (asOfDate) {
       res.status(500).json({ message: error.message });
     }
   });
-
 
   // Dashboard Container Tracking - cross-company OTW container view
   app.get("/api/dashboard/container-tracking", requireAuth, async (req, res) => {
@@ -29775,7 +29638,6 @@ if (asOfDate) {
     }
   });
 
-
   // Pending Barcodes API Routes - for pre-printing barcode labels
   app.get("/api/pending-barcodes", requireAuth, async (req, res) => {
     try {
@@ -30167,7 +30029,6 @@ if (asOfDate) {
   // existing factory_bales ref for this company, by taking the max across both
   // sequence tables and the actual data.
   async function generateSafeRef(tx: any, companyId: number): Promise<string> {
-
 
     // Find the true max numeric ref already in use for this company
     const [maxRow] = await tx
@@ -31426,7 +31287,6 @@ if (asOfDate) {
     }
   });
 
-
   // GET endpoint to return barcode as PNG image (for print labels)
   app.get("/api/barcode/:code", async (req, res) => {
     try {
@@ -31627,7 +31487,6 @@ if (asOfDate) {
       res.status(500).json({ message: error.message });
     }
   });
-
 
   app.get("/api/inventory-by-location/:locationId", requireAuth, async (req, res) => {
     try {
@@ -34611,37 +34470,26 @@ if (asOfDate) {
       const userId = req.session.userId;
       const companyId = req.session.currentCompanyId;
       
-      console.log("[Chatbot] Message request - userId:", userId, "companyId:", companyId);
-      
       if (!userId || !companyId) {
-        console.log("[Chatbot] Error: No company selected");
         return res.status(400).json({ message: "No company selected" });
       }
 
       const { message, sessionId } = req.body;
       if (!message || !sessionId) {
-        console.log("[Chatbot] Error: Missing message or sessionId");
         return res.status(400).json({ message: "Message and sessionId are required" });
       }
 
-      console.log("[Chatbot] Processing message for session:", sessionId);
-
       // Save user message
       await saveMessage(companyId, userId, "user", message, sessionId);
-      console.log("[Chatbot] User message saved");
 
       // Get conversation history for AI context (excluding current message)
       const history = await getConversationHistoryForAI(sessionId, 10);
-      console.log("[Chatbot] Got history, length:", history.length);
 
       // Get AI response (excluding current message from history context)
-      console.log("[Chatbot] Calling AI...");
       const result = await chat(message, companyId, history.slice(0, -1));
-      console.log("[Chatbot] AI response received");
 
       // Save assistant response
       await saveMessage(companyId, userId, "assistant", result.response, sessionId);
-      console.log("[Chatbot] Assistant message saved");
 
       res.json({ response: result.response, suggestions: result.suggestions });
     } catch (error: any) {
@@ -34655,17 +34503,13 @@ if (asOfDate) {
   app.get("/api/chatbot/history/:sessionId", requireAuth, async (req, res) => {
     try {
       const userId = req.session.userId;
-      console.log("[Chatbot] History request - userId:", userId, "sessionId:", req.params.sessionId);
-      
       if (!userId) {
-        console.log("[Chatbot] History error: Not authenticated");
         return res.status(401).json({ message: "Not authenticated" });
       }
 
       const { sessionId } = req.params;
       // Pass userId to ensure users can only access their own chat history
       const history = await getConversationHistory(sessionId, userId, 50);
-      console.log("[Chatbot] History retrieved, count:", history.length);
       res.json(history);
     } catch (error: any) {
       console.error("[Chatbot] History ERROR:", error.message);
@@ -36577,7 +36421,6 @@ if (asOfDate) {
     }
   });
 
-
   app.post("/api/admin/rebuild-inventory", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -37742,7 +37585,6 @@ if (asOfDate) {
     }
   });
 
-
   // ==========================================
   // ERP User Page Access
   // ==========================================
@@ -38630,7 +38472,6 @@ if (asOfDate) {
         nmRow.getCell(2).font = { bold: false }; nmRow.getCell(5).font = { bold: true };
         ws.mergeCells(`B${nmRow.number}:D${nmRow.number}`);
 
-
         ws.getColumn(1).width = 28;
         ws.getColumn(2).width = 38;
         ws.getColumn(3).width = 16;
@@ -38750,7 +38591,6 @@ if (asOfDate) {
         writeRow('Gross Margin %', monthStatsList.map(s => s.grossMarginPct), totalStats.grossMarginPct, { pct: true });
         writeRow('Net Margin %', monthStatsList.map(s => s.netMarginPct), totalStats.netMarginPct, { pct: true });
         blankRow();
-
 
         // Column widths
         ws.getColumn(1).width = 36;
