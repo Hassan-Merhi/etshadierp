@@ -13,7 +13,7 @@ import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Search, Phone, User, Trash2, FileText } from "lucide-react";
+import { Plus, Pencil, Search, Phone, User, Trash2, FileText, RotateCcw, History } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface Customer {
@@ -35,6 +35,7 @@ export default function FactoryCustomers() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [formData, setFormData] = useState({
     legalName: "",
     phone: "",
@@ -84,10 +85,32 @@ export default function FactoryCustomers() {
       return await factoryApiRequest("DELETE", `/api/factory/customers/${id}`, {});
     },
     onSuccess: () => {
-      toast({ title: "Success", description: "Customer deleted" });
+      toast({ title: "Customer deleted", description: "You can restore them from the deleted customers list." });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers/deleted"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       setDeletingCustomer(null);
+    },
+    onError: (error: Error) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const { data: deletedCustomers = [] } = useQuery<Customer[]>({
+    queryKey: ["/api/factory/customers/deleted"],
+    enabled: showDeleted,
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await factoryApiRequest("POST", `/api/factory/customers/${id}/restore`, {});
+    },
+    onSuccess: () => {
+      toast({ title: "Customer restored", description: "The customer is now active again." });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers/deleted"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
@@ -164,15 +187,25 @@ export default function FactoryCustomers() {
 
   return (
     <div className="flex flex-col h-full p-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Customers</h1>
           <p className="text-sm text-muted-foreground">{customers.length} total customers</p>
         </div>
-        <Button onClick={openCreate} data-testid="button-add-customer">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Customer
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={() => setShowDeleted(!showDeleted)}
+            data-testid="button-toggle-deleted"
+          >
+            <History className="h-4 w-4 mr-2" />
+            {showDeleted ? "Hide Deleted" : "Deleted Customers"}
+          </Button>
+          <Button onClick={openCreate} data-testid="button-add-customer">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Customer
+          </Button>
+        </div>
       </div>
 
       <div className="relative mb-4">
@@ -253,14 +286,18 @@ export default function FactoryCustomers() {
                             variant="ghost"
                             size="icon"
                             onClick={() => openEdit(customer)}
+                            title="Edit Customer"
                             data-testid={`button-edit-customer-${customer.id}`}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
+                          <div className="w-px h-5 bg-border mx-0.5" />
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => setDeletingCustomer(customer)}
+                            title="Delete Customer"
+                            className="text-destructive"
                             data-testid={`button-delete-customer-${customer.id}`}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -275,6 +312,59 @@ export default function FactoryCustomers() {
           </div>
         </CardContent>
       </Card>
+
+      {showDeleted && (
+        <Card className="mt-6">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <History className="h-4 w-4 text-muted-foreground" />
+              Deleted Customers
+              {deletedCustomers.length > 0 && (
+                <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate">{deletedCustomers.length}</Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {deletedCustomers.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8 px-4">No deleted customers found</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Code</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead className="w-[80px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {deletedCustomers.map((customer) => (
+                      <TableRow key={customer.id} data-testid={`row-deleted-customer-${customer.id}`}>
+                        <TableCell className="font-medium text-muted-foreground">{customer.legalName}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground font-mono">{customer.code}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{customer.phone || "-"}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => restoreMutation.mutate(customer.id)}
+                            disabled={restoreMutation.isPending}
+                            data-testid={`button-restore-customer-${customer.id}`}
+                          >
+                            <RotateCcw className="h-3 w-3 mr-1" />
+                            Restore
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog open={isCreateOpen} onOpenChange={(open) => { if (!open) { setIsCreateOpen(false); resetForm(); } }}>
         <DialogContent>
@@ -401,7 +491,7 @@ export default function FactoryCustomers() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Customer</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete <strong>{deletingCustomer?.legalName}</strong>? This action cannot be undone.
+              Are you sure you want to delete <strong>{deletingCustomer?.legalName}</strong>? They will be hidden from the customers list. You can restore them later from the "Deleted Customers" section.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -12275,6 +12275,47 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // RESTORE DELETED CUSTOMER
+  app.post("/api/factory/customers/:id/restore", requireAuth, async (req: any, res: any) => {
+    try {
+      const customerId = parseInt(req.params.id);
+      if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const [existing] = await db.select().from(customers).where(eq(customers.id, customerId));
+      if (!existing) return res.status(404).json({ message: "Customer not found" });
+      if (existing.companyId !== companyId) return res.status(403).json({ message: "Access denied" });
+
+      const [restored] = await db.update(customers)
+        .set({ deletedAt: null })
+        .where(eq(customers.id, customerId))
+        .returning();
+
+      res.json(restored);
+    } catch (error: any) {
+      console.error("Error restoring factory customer:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // LIST DELETED CUSTOMERS
+  app.get("/api/factory/customers/deleted", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const deletedCustomers = await db.select().from(customers)
+        .where(and(eq(customers.companyId, companyId), sql`${customers.deletedAt} IS NOT NULL`))
+        .orderBy(desc(customers.deletedAt));
+
+      res.json(deletedCustomers);
+    } catch (error: any) {
+      console.error("Error fetching deleted factory customers:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // CUSTOMER STATEMENT
   // ───────────────────────────────────────────────
 
