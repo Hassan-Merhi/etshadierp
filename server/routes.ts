@@ -5830,6 +5830,64 @@ if (asOfDate) {
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
+  // ── Undo a PAID payroll run ───────────────────────────────────────────────
+  app.post("/api/payroll/runs/:id/undo", requireAuth, requireNonPOS, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const runId = parseInt(req.params.id);
+      const [run] = await db.select().from(erpPayrollRuns).where(and(eq(erpPayrollRuns.id, runId), eq(erpPayrollRuns.companyId, companyId)));
+      if (!run) return res.status(404).json({ message: "Payroll run not found" });
+      if (run.status !== "PAID") return res.status(400).json({ message: "Only PAID runs can be undone" });
+
+      await db.transaction(async (tx) => {
+        // 1. Find and soft-delete the SAL- voucher tied to this run
+        const salVouchers = await tx.select().from(vouchers)
+          .where(and(eq(vouchers.companyId, companyId), sql`${vouchers.voucherNumber} LIKE ${"SAL-" + runId + "-%"}`, isNull(vouchers.deletedAt)));
+        for (const v of salVouchers) {
+          await tx.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, v.id));
+        }
+
+        // 2. Reverse advance deductions for each run item
+        const runItems = await tx.select().from(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, runId));
+        const payMonth = run.date.substring(0, 7);
+
+        for (const item of runItems) {
+          const deductAmt = parseFloat(item.deduction || "0");
+          if (deductAmt <= 0 || !item.employeeId) continue;
+
+          // Find advance deductions recorded for this payroll month for this employee's advances
+          const empAdvances = await tx.select({ id: salaryAdvances.id })
+            .from(salaryAdvances)
+            .where(and(eq(salaryAdvances.employeeId, item.employeeId), eq(salaryAdvances.companyId, companyId)));
+          const advanceIds = empAdvances.map(a => a.id);
+          if (advanceIds.length === 0) continue;
+
+          const deductions = await tx.select().from(salaryAdvanceDeductions)
+            .where(and(inArray(salaryAdvanceDeductions.salaryAdvanceId, advanceIds), eq(salaryAdvanceDeductions.payrollMonth, payMonth)));
+
+          for (const ded of deductions) {
+            const dedAmt = parseFloat(ded.deductionAmount || "0");
+            const [adv] = await tx.select().from(salaryAdvances).where(eq(salaryAdvances.id, ded.salaryAdvanceId));
+            if (!adv) continue;
+            const restoredBal = parseFloat(adv.remainingBalance || "0") + dedAmt;
+            const originalAmt = parseFloat(adv.amount || "0");
+            const newBal = Math.min(restoredBal, originalAmt);
+            await tx.update(salaryAdvances).set({ remainingBalance: newBal.toFixed(2), fullyPaid: false }).where(eq(salaryAdvances.id, adv.id));
+            await tx.delete(salaryAdvanceDeductions).where(eq(salaryAdvanceDeductions.id, ded.id));
+          }
+        }
+
+        // 3. Reset run to DRAFT
+        await tx.update(erpPayrollRuns)
+          .set({ status: "DRAFT", paymentAccountId: null, paidAt: null })
+          .where(eq(erpPayrollRuns.id, runId));
+      });
+
+      res.json({ message: "Payroll run reversed to draft" });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
   // ── End ERP Payroll Runs ──────────────────────────────────────────────────
 
   // Get employees with calculated balances from transactions
@@ -19615,6 +19673,38 @@ if (asOfDate) {
 
             // Cascade: remove factory daybook entries linked to this voucher
             await tx.execute(sql`DELETE FROM factory_daybook_entries WHERE reference_table = 'vouchers' AND reference_id = ${id}`);
+
+            // If this is a SAL- payroll voucher, also reverse the payroll run
+            if (voucher.voucherNumber && /^SAL-\d+-/.test(voucher.voucherNumber)) {
+              const runIdMatch = voucher.voucherNumber.match(/^SAL-(\d+)-/);
+              if (runIdMatch) {
+                const payRunId = parseInt(runIdMatch[1]);
+                const [payRun] = await tx.select().from(erpPayrollRuns)
+                  .where(and(eq(erpPayrollRuns.id, payRunId), eq(erpPayrollRuns.companyId, currentCompanyId), eq(erpPayrollRuns.status, "PAID")));
+                if (payRun) {
+                  const runItems = await tx.select().from(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, payRunId));
+                  const payMonth = payRun.date.substring(0, 7);
+                  for (const item of runItems) {
+                    if (parseFloat(item.deduction || "0") <= 0 || !item.employeeId) continue;
+                    const empAdvances = await tx.select({ id: salaryAdvances.id })
+                      .from(salaryAdvances).where(and(eq(salaryAdvances.employeeId, item.employeeId), eq(salaryAdvances.companyId, currentCompanyId)));
+                    const advIds = empAdvances.map(a => a.id);
+                    if (advIds.length === 0) continue;
+                    const deductions = await tx.select().from(salaryAdvanceDeductions)
+                      .where(and(inArray(salaryAdvanceDeductions.salaryAdvanceId, advIds), eq(salaryAdvanceDeductions.payrollMonth, payMonth)));
+                    for (const ded of deductions) {
+                      const dedAmt = parseFloat(ded.deductionAmount || "0");
+                      const [adv] = await tx.select().from(salaryAdvances).where(eq(salaryAdvances.id, ded.salaryAdvanceId));
+                      if (!adv) continue;
+                      const newBal = Math.min(parseFloat(adv.remainingBalance || "0") + dedAmt, parseFloat(adv.amount || "0"));
+                      await tx.update(salaryAdvances).set({ remainingBalance: newBal.toFixed(2), fullyPaid: false }).where(eq(salaryAdvances.id, adv.id));
+                      await tx.delete(salaryAdvanceDeductions).where(eq(salaryAdvanceDeductions.id, ded.id));
+                    }
+                  }
+                  await tx.update(erpPayrollRuns).set({ status: "DRAFT", paymentAccountId: null, paidAt: null }).where(eq(erpPayrollRuns.id, payRunId));
+                }
+              }
+            }
           });
 
         // Log the deletion to audit log

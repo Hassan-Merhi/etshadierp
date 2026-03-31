@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Users, Search, ChevronDown, ChevronRight, DollarSign, Loader2,
   PlayCircle, Banknote, FileSpreadsheet, FileText, Printer,
-  CheckCircle2, History, ArrowLeft, Trash2, ClipboardList,
+  CheckCircle2, History, ArrowLeft, Trash2, ClipboardList, RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -138,6 +138,7 @@ export default function ERPRunPayroll() {
   const [payDialogRun, setPayDialogRun] = useState<PayrollRun | null>(null);
   const [payAccountId, setPayAccountId] = useState("");
   const [deleteRunId, setDeleteRunId] = useState<number | null>(null);
+  const [undoRunId, setUndoRunId] = useState<number | null>(null);
 
   // ── Queries ───────────────────────────────────────────────────────────────
   const { data: allEmployees, isLoading: empLoading } = useQuery<Employee[]>({
@@ -332,6 +333,22 @@ export default function ERPRunPayroll() {
       queryClient.invalidateQueries({ queryKey: ["/api/payroll/runs"] });
       toast({ title: "Draft deleted" });
       setDeleteRunId(null);
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const undoRunMutation = useMutation({
+    mutationFn: async (runId: number) => {
+      const res = await apiRequest("POST", `/api/payroll/runs/${runId}/undo`, {});
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed to undo"); }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/runs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/salary-advances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      toast({ title: "Payroll undone", description: "Run reversed to draft. Ledger entries and advance deductions removed." });
+      setUndoRunId(null);
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -805,6 +822,18 @@ export default function ERPRunPayroll() {
                               </Button>
                             </>
                           )}
+                          {run.status === "PAID" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setUndoRunId(run.id)}
+                              className="text-destructive"
+                              title="Undo payroll — reverses ledger entries and advance deductions"
+                              data-testid={`button-undo-run-${run.id}`}
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -922,6 +951,30 @@ export default function ERPRunPayroll() {
               data-testid="button-confirm-delete"
             >
               {deleteRunMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Undo Confirmation ───────────────────────────────────────────────── */}
+      <AlertDialog open={!!undoRunId} onOpenChange={(open) => { if (!open) setUndoRunId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Undo Payroll Run?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will reverse the payroll payment — the ledger entries (salary expense and cash) will be removed,
+              any advance deductions applied during this payroll will be restored, and the run will go back to draft status.
+              This cannot be undone automatically; you will need to re-pay the run.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => undoRunId && undoRunMutation.mutate(undoRunId)}
+              className="bg-destructive text-destructive-foreground"
+              data-testid="button-confirm-undo"
+            >
+              {undoRunMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Undo Payroll"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

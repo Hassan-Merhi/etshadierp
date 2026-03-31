@@ -1147,6 +1147,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
         refetchType: "all",
       });
       queryClient.invalidateQueries({
+        queryKey: ["/api/payroll/runs"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/salary-advances"],
+      });
+      queryClient.invalidateQueries({
         queryKey: ["/api/suppliers", selectedCompany?.id],
       });
       if (cashAccountId) {
