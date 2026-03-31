@@ -64,6 +64,7 @@ export default function FactoryReprintLabels() {
 
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [search, setSearch] = useState("");
+  const [articleCodeFilter, setArticleCodeFilter] = useState<string>("__all__");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const [designPickerOpen, setDesignPickerOpen] = useState(false);
@@ -87,17 +88,27 @@ export default function FactoryReprintLabels() {
     enabled: !!selectedLocationId,
   });
 
+  const uniqueArticleCodes = useMemo(() => {
+    const codes = new Set<string>();
+    for (const row of balesData) {
+      const code = row.product?.articleCode || row.bale.articleCode || "";
+      if (code) codes.add(code);
+    }
+    return Array.from(codes).sort();
+  }, [balesData]);
+
   const filteredBales = useMemo(() => {
-    if (!search.trim()) return balesData;
-    const term = search.toLowerCase();
     return balesData.filter((row) => {
+      const artCode = row.product?.articleCode || row.bale.articleCode || "";
+      if (articleCodeFilter !== "__all__" && artCode !== articleCodeFilter) return false;
+      if (!search.trim()) return true;
+      const term = search.toLowerCase();
       const refNum = (row.bale.referenceNumber || "").toLowerCase();
       const baleCode = (row.bale.baleCode || "").toLowerCase();
       const prodName = (row.bale.productName || row.product?.name || "").toLowerCase();
-      const artCode = (row.product?.articleCode || row.bale.articleCode || "").toLowerCase();
-      return refNum.includes(term) || baleCode.includes(term) || prodName.includes(term) || artCode.includes(term);
+      return refNum.includes(term) || baleCode.includes(term) || prodName.includes(term) || artCode.toLowerCase().includes(term);
     });
-  }, [balesData, search]);
+  }, [balesData, search, articleCodeFilter]);
 
   const selectedLocation = locations.find((l) => String(l.id) === selectedLocationId);
 
@@ -218,6 +229,7 @@ export default function FactoryReprintLabels() {
               setSelectedLocationId(val);
               setSelectedIds(new Set());
               setSearch("");
+              setArticleCodeFilter("__all__");
             }}
             data-testid="select-location"
           >
@@ -252,7 +264,7 @@ export default function FactoryReprintLabels() {
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
-                placeholder="Filter by bale name, reference or article code…"
+                placeholder="Filter by bale name or reference…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
@@ -268,6 +280,18 @@ export default function FactoryReprintLabels() {
                 </button>
               )}
             </div>
+
+            <Select value={articleCodeFilter} onValueChange={setArticleCodeFilter} data-testid="select-article-code">
+              <SelectTrigger className="w-[160px]" data-testid="select-article-code-trigger">
+                <SelectValue placeholder="Article code" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All articles</SelectItem>
+                {uniqueArticleCodes.map((code) => (
+                  <SelectItem key={code} value={code} data-testid={`option-article-${code}`}>{code}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             <Button
               variant="outline"
