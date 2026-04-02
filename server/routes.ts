@@ -14430,6 +14430,7 @@ if (asOfDate) {
       const supplierBalances = new Map<number, number>();
       const employeeBalances = new Map<number, { debits: number; credits: number }>();
       const factorySupplierBalances = new Map<number, number>();
+      const customerBalances = new Map<number, { debits: number; credits: number }>();
 
       for (const entry of allEntries) {
         const debit = parseFloat(entry.debitAmount || "0");
@@ -14486,6 +14487,15 @@ if (asOfDate) {
         if (entry.employeeId) {
           const existing = employeeBalances.get(entry.employeeId) || { debits: 0, credits: 0 };
           employeeBalances.set(entry.employeeId, {
+            debits: existing.debits + debit,
+            credits: existing.credits + credit,
+          });
+        }
+
+        if ((entry as any).customerId) {
+          const cId = (entry as any).customerId as number;
+          const existing = customerBalances.get(cId) || { debits: 0, credits: 0 };
+          customerBalances.set(cId, {
             debits: existing.debits + debit,
             credits: existing.credits + credit,
           });
@@ -14652,6 +14662,30 @@ if (asOfDate) {
             balance,
           };
         }),
+        // Customers — appear as type="customer" (their mirror ledger accounts are excluded above)
+        ...companyCustomers
+          .filter((c) => !c.deletedAt && c.active !== false)
+          .map((customer) => {
+            // Combine movements from direct customerId entries AND ledger mirror entries
+            const directMov = customerBalances.get(customer.id) || { debits: 0, credits: 0 };
+            const ledgerId = customer.ledgerAccountId;
+            const ledgerMov = ledgerId ? (ledgerBalances.get(ledgerId) || { debits: 0, credits: 0 }) : { debits: 0, credits: 0 };
+            const totalDebits = directMov.debits + ledgerMov.debits;
+            const totalCredits = directMov.credits + ledgerMov.credits;
+            const balance = calculateSignedBalance(
+              customer.openingBalance || "0",
+              customer.openingBalanceSide || "Dr",
+              totalDebits,
+              totalCredits,
+            );
+            return {
+              id: customer.id,
+              type: "customer" as const,
+              name: customer.legalName,
+              code: customer.code,
+              balance,
+            };
+          }),
         // Fixed Assets
         ...assets.map((asset) => {
           const movements = assetBalances.get(asset.id) || { debits: 0, credits: 0 };
