@@ -14517,8 +14517,9 @@ if (asOfDate) {
 
       // Build set of ledger account IDs that are auto-created mirrors of customers
       // so they can be excluded from the ledger list (customers appear as type="customer")
+      const companyCustomers = await storage.getAllCustomers(companyId);
       const customerLedgerIds = new Set(
-        (customers as any[]).filter((c) => c.ledgerAccountId).map((c) => c.ledgerAccountId as number)
+        companyCustomers.filter((c) => c.ledgerAccountId).map((c) => c.ledgerAccountId as number)
       );
 
       // Build simplified account array for sidebar
