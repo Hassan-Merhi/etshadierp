@@ -1215,13 +1215,16 @@ export default function ProductionRawStock() {
           {dailyReportOpen && (
             <div className="mt-4 border rounded-md p-4 space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
-                <span className="text-sm font-medium text-muted-foreground">All-time production consumption</span>
+                <div>
+                  <span className="text-sm font-medium">Weekly Production Report</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">Supplier × day pivot — one section per week, with opening balance, stock-in and daily consumption</p>
+                </div>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => window.open(`/api/factory/daily-report/export?format=excel`, "_blank")}
-                    data-testid="button-export-daily-excel"
+                    onClick={() => window.open(`/api/factory/weekly-report/export?format=excel`, "_blank")}
+                    data-testid="button-export-weekly-excel"
                   >
                     <FileSpreadsheet className="h-4 w-4 mr-1" />
                     Excel
@@ -1229,8 +1232,8 @@ export default function ProductionRawStock() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => window.open(`/api/factory/daily-report/export?format=pdf`, "_blank")}
-                    data-testid="button-export-daily-pdf"
+                    onClick={() => window.open(`/api/factory/weekly-report/export?format=pdf`, "_blank")}
+                    data-testid="button-export-weekly-pdf"
                   >
                     <FileText className="h-4 w-4 mr-1" />
                     PDF
