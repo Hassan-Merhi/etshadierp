@@ -1685,12 +1685,6 @@ export default function Accounts() {
                                   data-testid={`button-select-account-${account.id}`}
                                 >
                                   <div className="flex items-center gap-2 w-full">
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs shrink-0"
-                                    >
-                                      {account.type}
-                                    </Badge>
                                     <span className="text-sm flex-1">
                                       {account.name}
                                     </span>
@@ -1722,12 +1716,6 @@ export default function Accounts() {
                                       data-testid={`button-select-account-${child.id}`}
                                     >
                                       <div className="flex items-center gap-2 w-full">
-                                        <Badge
-                                          variant="outline"
-                                          className="text-xs shrink-0"
-                                        >
-                                          {child.type}
-                                        </Badge>
                                         <span className="text-sm flex-1">
                                           {child.name}
                                         </span>
@@ -2739,9 +2727,6 @@ export default function Accounts() {
                             data-testid={`button-select-account-edit-${account.id}`}
                           >
                             <div className="flex items-center gap-2 w-full">
-                              <Badge variant="outline" className="text-xs shrink-0">
-                                {account.type}
-                              </Badge>
                               <span className="text-sm flex-1 text-left">{account.name}</span>
                               {(isFactorySupplier || isFactoryWorker || isFixedAsset) && (
                                 <span

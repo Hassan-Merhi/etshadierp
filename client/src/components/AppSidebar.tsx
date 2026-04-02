@@ -24,6 +24,7 @@ import {
   Tag,
   UserRound,
   ChevronDown,
+  GripVertical,
 } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
@@ -48,12 +49,30 @@ interface NavSection {
   items: NavItem[];
 }
 
-const pinnedItems: NavItem[] = [
+const defaultPinnedItems: NavItem[] = [
   { title: "Tracking",  url: "/",                  icon: Ship            },
   { title: "Dashboard", url: "/financial-overview", icon: LayoutDashboard },
+  { title: "Agents",    url: "/agents",             icon: UserRound       },
   { title: "Daybook",   url: "/daybook",            icon: Book            },
   { title: "Vouchers",  url: "/vouchers",           icon: Receipt         },
 ];
+
+const PINNED_ORDER_KEY = "erp-pinned-order";
+
+function loadPinnedOrder(): string[] | null {
+  try {
+    const raw = localStorage.getItem(PINNED_ORDER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function savePinnedOrder(urls: string[]) {
+  try {
+    localStorage.setItem(PINNED_ORDER_KEY, JSON.stringify(urls));
+  } catch {}
+}
 
 const navSections: NavSection[] = [
   {
@@ -82,7 +101,6 @@ const navSections: NavSection[] = [
     color: "#f59e0b",
     items: [
       { title: "Accounts",  url: "/accounts",  icon: Wallet    },
-      { title: "Agents",    url: "/agents",    icon: UserRound },
       { title: "Suppliers", url: "/suppliers", icon: Users     },
       { title: "Customers", url: "/customers", icon: Users     },
       { title: "Payroll",   url: "/payroll",   icon: UserCheck },
@@ -111,6 +129,45 @@ export function AppSidebar({ user }: { user?: any }) {
   const { toast } = useToast();
   const { conflictCount } = useConnectivity();
   const prevUnreadRef = useRef<number>(-1);
+
+  // Pinned items drag-and-drop order (persisted to localStorage)
+  const [pinnedOrder, setPinnedOrder] = useState<string[]>(() => {
+    const saved = loadPinnedOrder();
+    if (saved) {
+      // Merge: any new items in defaultPinnedItems that aren't in saved get appended
+      const newUrls = defaultPinnedItems.map(i => i.url).filter(u => !saved.includes(u));
+      return [...saved, ...newUrls];
+    }
+    return defaultPinnedItems.map(i => i.url);
+  });
+  const dragPinnedRef = useRef<string | null>(null);
+  const dragOverPinnedRef = useRef<string | null>(null);
+
+  const pinnedItems = pinnedOrder
+    .map(url => defaultPinnedItems.find(i => i.url === url))
+    .filter(Boolean) as NavItem[];
+
+  const handlePinnedDragStart = (url: string) => {
+    dragPinnedRef.current = url;
+  };
+  const handlePinnedDragOver = (e: React.DragEvent, url: string) => {
+    e.preventDefault();
+    dragOverPinnedRef.current = url;
+  };
+  const handlePinnedDrop = (targetUrl: string) => {
+    const fromUrl = dragPinnedRef.current;
+    if (!fromUrl || fromUrl === targetUrl) return;
+    const fromIdx = pinnedOrder.indexOf(fromUrl);
+    const toIdx = pinnedOrder.indexOf(targetUrl);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const next = [...pinnedOrder];
+    next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, fromUrl);
+    setPinnedOrder(next);
+    savePinnedOrder(next);
+    dragPinnedRef.current = null;
+    dragOverPinnedRef.current = null;
+  };
 
   const { data: chatUnread } = useQuery<{ count: number }>({
     queryKey: ["/api/chat/unread-count"],
@@ -263,11 +320,45 @@ export function AppSidebar({ user }: { user?: any }) {
       </SidebarHeader>
 
       <SidebarContent className="px-3 py-2 overflow-y-auto">
-        {/* Pinned top items */}
+        {/* Pinned top items — draggable to reorder */}
         <div className="space-y-0.5 mb-2">
-          {pinnedItems.filter(isItemVisible).map(item => (
-            <FlatLink key={item.url} href={item.url} icon={item.icon} label={item.title} color="#3b82f6" testId={`link-${item.url}`} />
-          ))}
+          {pinnedItems.filter(isItemVisible).map(item => {
+            const isActive = location === item.url;
+            const unread = item.url === "/chat" ? (chatUnread?.count || 0) : 0;
+            return (
+              <div
+                key={item.url}
+                draggable
+                onDragStart={() => handlePinnedDragStart(item.url)}
+                onDragOver={(e) => handlePinnedDragOver(e, item.url)}
+                onDrop={() => handlePinnedDrop(item.url)}
+                className="flex items-center group"
+              >
+                <span
+                  className="flex items-center justify-center w-5 h-full cursor-grab opacity-0 group-hover:opacity-40 shrink-0"
+                  title="Drag to reorder"
+                >
+                  <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+                </span>
+                <a
+                  href={item.url}
+                  data-testid={`link-${item.url}`}
+                  className={`flex flex-1 items-center gap-2.5 rounded-md py-1.5 text-sm transition-colors ${
+                    isActive
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+                  }`}
+                  style={{ borderLeft: `2px solid ${isActive ? "#3b82f6" : "transparent"}`, paddingLeft: "8px", paddingRight: "10px" }}
+                >
+                  <item.icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color: "#3b82f6" } : {}} />
+                  <span className="flex-1 leading-tight">{item.title}</span>
+                  {unread > 0 && (
+                    <Badge variant="default" className="text-xs min-w-5 justify-center">{unread}</Badge>
+                  )}
+                </a>
+              </div>
+            );
+          })}
         </div>
 
         {/* Collapsible sections */}
