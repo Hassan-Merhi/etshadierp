@@ -533,15 +533,6 @@ export default function Analytics() {
     enabled: appMode === "factory" && false, // Manual trigger
   });
 
-  const { data: factoryStockSummary } = useQuery<any>({
-    queryKey: ["/api/factory/analytics/stock-summary", selectedCompany?.id],
-    queryFn: async () => {
-      const res = await fetch("/api/factory/analytics/stock-summary", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch factory stock summary");
-      return res.json();
-    },
-    enabled: !!selectedCompany && appMode === "factory",
-  });
 
   // Fetch Opening Stock Summary
   const buildOpeningStockUrl = () => {
@@ -2069,9 +2060,7 @@ export default function Analytics() {
                         Opening Stock
                       </span>
                       <span className="font-mono">
-                        {appMode === "factory"
-                          ? formatAmount(factoryStockSummary?.openingStock ?? 0)
-                          : formatAmount(netProfitData.leftPane.openingStock.value)}
+                        {formatAmount(netProfitData.leftPane.openingStock.value)}
                       </span>
                     </div>
 
@@ -2276,9 +2265,7 @@ export default function Analytics() {
                         Closing Stock
                       </span>
                       <span className="font-mono">
-                        {appMode === "factory"
-                          ? formatAmount(factoryStockSummary?.closingStock ?? 0)
-                          : formatAmount(netProfitData.rightPane?.closingStock?.value || 0)}
+                        {formatAmount(netProfitData.rightPane?.closingStock?.value || 0)}
                       </span>
                     </div>
 

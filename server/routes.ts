@@ -27465,7 +27465,7 @@ if (asOfDate) {
           purchaseAccounts: {
             total: purchaseAccountsTotal,
             accounts: purchaseAccountsDetails,
-            count: purchaseAccounts.length,
+            count: purchaseAccountsDetails.length,
           },
           directExpenses: {
             total: directExpensesTotal,
