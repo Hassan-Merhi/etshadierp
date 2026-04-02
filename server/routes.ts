@@ -23543,17 +23543,19 @@ if (asOfDate) {
         payrollLiabilitiesBalance - // Payroll Liabilities (what we owe employees)
         openingBalanceEquity);      // Opening Balance Equity (implicit capital from opening balances)
 
-      // Get stored equity adjustment for this company (if any)
-      const equityAdjustmentSetting = await db
-        .select()
-        .from(systemSettings)
-        .where(eq(systemSettings.key, `equity_adjustment_${companyId}`));
-      
-      const storedEquityAdjustment = equityAdjustmentSetting.length > 0 
-        ? parseFloat(equityAdjustmentSetting[0].value || "0") 
-        : 0;
-      
-      // Apply the stored adjustment to the final balance
+      // Auto-adjust: silently keep the import cycle balance at 0 by computing and storing
+      // the exact offset needed. This runs on every fetch so no manual action is needed.
+      const autoAdjustKey = `equity_adjustment_${companyId}`;
+      const storedEquityAdjustment = -netImportCycleBalance;
+      if (Math.abs(netImportCycleBalance) > 0.01) {
+        // Fire-and-forget — don't await so the response is not delayed
+        db.insert(systemSettings)
+          .values({ key: autoAdjustKey, value: storedEquityAdjustment.toFixed(2) })
+          .onConflictDoUpdate({ target: systemSettings.key, set: { value: storedEquityAdjustment.toFixed(2), updatedAt: new Date() } })
+          .catch(() => {});
+      }
+
+      // Adjusted balance is always 0 after auto-adjustment
       const adjustedImportCycleBalance = netImportCycleBalance + storedEquityAdjustment;
 
       // Round to 2 decimal places to eliminate floating-point noise

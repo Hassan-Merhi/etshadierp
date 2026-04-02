@@ -454,7 +454,7 @@ export default function ImportCycleDiagnostics() {
                       applied to zero out the raw balance of <span className="font-mono">${data.precisionTrace.rawNetBalance.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>.
                     </p>
                     <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
-                      This adjustment was made via "Recalculate Opening Balance Equity" in Settings.
+                      This adjustment is applied automatically on every balance fetch to keep the cycle at zero.
                     </p>
                   </div>
                 </div>

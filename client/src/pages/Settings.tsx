@@ -5215,9 +5215,9 @@ function OfflineSyncPanel() {
                         <RefreshCw className="h-6 w-6 text-purple-500" />
                       </div>
                       <div>
-                        <h3 className="font-semibold" data-testid="text-recalc-equity-title">Recalculate Equity Adjustment</h3>
+                        <h3 className="font-semibold" data-testid="text-recalc-equity-title">Equity Adjustment (Auto)</h3>
                         <p className="text-sm text-muted-foreground">
-                          Zero out the Import Cycle Balance by adjusting the opening balance equity offset
+                          The import cycle balance is automatically kept at zero on every fetch. The equity offset is updated silently in the background. Use the button below to force a manual recalculation if needed.
                         </p>
                       </div>
                     </div>
