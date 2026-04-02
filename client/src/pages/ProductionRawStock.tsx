@@ -361,7 +361,6 @@ export default function ProductionRawStock() {
   const [adjSupplierId, setAdjSupplierId] = useState<string>("");
   // Mix batch section state
   const [createMixBatchOpen, setCreateMixBatchOpen] = useState(false);
-  const [mixBatchStatusFilter, setMixBatchStatusFilter] = useState<string>("OPEN");
   const [dailyReportOpen, setDailyReportOpen] = useState(false);
   const [dailyReportDate, setDailyReportDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [deleteBatchId, setDeleteBatchId] = useState<number | null>(null);
@@ -985,14 +984,7 @@ export default function ProductionRawStock() {
   const totalReserved = rawStock?.reduce((sum, r) => sum + parseFloat(r.reservedKg || "0"), 0) || 0;
   const totalFree = rawStock?.reduce((sum, r) => sum + parseFloat(r.freeKg || "0"), 0) || 0;
 
-  const filteredMixBatches = useMemo(() => {
-    if (!mixBatches) return [];
-    if (mixBatchStatusFilter === "ALL") return mixBatches;
-    if (mixBatchStatusFilter === "OPEN") {
-      return mixBatches.filter((b) => b.status === "OPEN" || b.status === "ACTIVE" || b.status === "CARRY_FORWARD");
-    }
-    return mixBatches.filter((b) => b.status === mixBatchStatusFilter);
-  }, [mixBatches, mixBatchStatusFilter]);
+  const filteredMixBatches = useMemo(() => mixBatches || [], [mixBatches]);
 
   const mixBatchKpis = useMemo(() => {
     const active = (mixBatches || []).filter((b) => b.status === "OPEN" || b.status === "ACTIVE" || b.status === "CARRY_FORWARD");
@@ -1240,25 +1232,6 @@ export default function ProductionRawStock() {
               </Button>
             </div>
           </div>
-          {/* Status filter */}
-          <div className="flex gap-2 flex-wrap mt-2">
-            {[
-              { key: "OPEN", label: "Open / Active" },
-              { key: "CARRY_FORWARD", label: "Carry Forward" },
-              { key: "CLOSED", label: "Closed" },
-              { key: "ALL", label: "All" },
-            ].map(({ key, label }) => (
-              <Button
-                key={key}
-                size="sm"
-                variant={mixBatchStatusFilter === key ? "default" : "outline"}
-                onClick={() => setMixBatchStatusFilter(key)}
-                data-testid={`button-mix-filter-${key.toLowerCase()}`}
-              >
-                {label}
-              </Button>
-            ))}
-          </div>
 
           {/* Daily report panel */}
           {dailyReportOpen && (
@@ -1469,15 +1442,11 @@ export default function ProductionRawStock() {
             <div className="text-center py-10">
               <Layers className="mx-auto h-10 w-10 text-muted-foreground" />
               <h3 className="mt-3 text-base font-semibold">No mix batches</h3>
-              <p className="text-muted-foreground text-sm mt-1">
-                {mixBatchStatusFilter === "OPEN" ? "No open batches. Create one to get started." : "No batches match the current filter."}
-              </p>
-              {mixBatchStatusFilter === "OPEN" && (
-                <Button className="mt-3" size="sm" onClick={() => setCreateMixBatchOpen(true)}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Create First Batch
-                </Button>
-              )}
+              <p className="text-muted-foreground text-sm mt-1">No mix batches yet. Create one to get started.</p>
+              <Button className="mt-3" size="sm" onClick={() => setCreateMixBatchOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" />
+                Create First Batch
+              </Button>
             </div>
           )}
         </CardContent>
