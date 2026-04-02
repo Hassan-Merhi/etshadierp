@@ -18071,6 +18071,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
+      const { startDate, endDate } = req.query as Record<string, string>;
+      const conditions: any[] = [eq(containerSales.companyId, companyId)];
+      if (startDate) conditions.push(sql`${containerSales.saleDate} >= ${startDate}`);
+      if (endDate) conditions.push(sql`${containerSales.saleDate} <= ${endDate}`);
+
       const rows = await db
         .select({
           customerId: containerSales.customerId,
@@ -18081,11 +18086,60 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         })
         .from(containerSales)
         .leftJoin(customers, eq(containerSales.customerId, customers.id))
-        .where(eq(containerSales.companyId, companyId))
+        .where(and(...conditions))
         .groupBy(containerSales.customerId, customers.legalName)
         .orderBy(sql`SUM(${containerSales.totalAmount}) DESC`);
 
       res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Factory Analytics: POS Sales Summary (by customer + grand total) ─────
+  app.get("/api/factory/analytics/pos-summary", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { startDate, endDate } = req.query as Record<string, string>;
+      const conditions: any[] = [
+        eq(factoryPosSales.companyId, companyId),
+        ne(factoryPosSales.status, "VOID"),
+      ];
+      if (startDate) conditions.push(sql`${factoryPosSales.txDate} >= ${startDate}`);
+      if (endDate) conditions.push(sql`${factoryPosSales.txDate} <= ${endDate}`);
+
+      // Aggregate POS sales by customer (customerId may be null = walk-in)
+      const byCustomer = await db
+        .select({
+          customerId: factoryPosSales.customerId,
+          customerName: sql<string>`COALESCE(${customers.legalName}, ${factoryPosSales.customerName}, 'Walk-in / Cash')`,
+          sales: sql<number>`COUNT(${factoryPosSales.id})`,
+          totalAmount: sql<string>`COALESCE(SUM(${factoryPosSales.totalAmount}), '0')`,
+          depositAmount: sql<string>`COALESCE(SUM(${factoryPosSales.depositAmount}), '0')`,
+          cashSales: sql<string>`COALESCE(SUM(CASE WHEN ${factoryPosSales.paymentType} = 'CASH' THEN ${factoryPosSales.totalAmount} ELSE 0 END), '0')`,
+          creditSales: sql<string>`COALESCE(SUM(CASE WHEN ${factoryPosSales.paymentType} = 'CREDIT' THEN ${factoryPosSales.totalAmount} ELSE 0 END), '0')`,
+        })
+        .from(factoryPosSales)
+        .leftJoin(customers, eq(factoryPosSales.customerId, customers.id))
+        .where(and(...conditions))
+        .groupBy(factoryPosSales.customerId, customers.legalName, factoryPosSales.customerName)
+        .orderBy(sql`SUM(${factoryPosSales.totalAmount}) DESC`);
+
+      // Grand total
+      const [grand] = await db
+        .select({
+          sales: sql<number>`COUNT(${factoryPosSales.id})`,
+          totalAmount: sql<string>`COALESCE(SUM(${factoryPosSales.totalAmount}), '0')`,
+          depositAmount: sql<string>`COALESCE(SUM(${factoryPosSales.depositAmount}), '0')`,
+          cashSales: sql<string>`COALESCE(SUM(CASE WHEN ${factoryPosSales.paymentType} = 'CASH' THEN ${factoryPosSales.totalAmount} ELSE 0 END), '0')`,
+          creditSales: sql<string>`COALESCE(SUM(CASE WHEN ${factoryPosSales.paymentType} = 'CREDIT' THEN ${factoryPosSales.totalAmount} ELSE 0 END), '0')`,
+        })
+        .from(factoryPosSales)
+        .where(and(...conditions));
+
+      res.json({ byCustomer, grand: grand ?? { sales: 0, totalAmount: "0", depositAmount: "0", cashSales: "0", creditSales: "0" } });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

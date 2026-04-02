@@ -504,11 +504,32 @@ export default function Analytics() {
   });
 
   // ── Factory Analytics Queries ───────────────────────────────────────────
+  const [factorySalesStartDate, setFactorySalesStartDate] = useState("");
+  const [factorySalesEndDate, setFactorySalesEndDate] = useState("");
+
+  const buildFactorySalesUrl = (base: string) => {
+    const params = new URLSearchParams();
+    if (factorySalesStartDate) params.append("startDate", factorySalesStartDate);
+    if (factorySalesEndDate) params.append("endDate", factorySalesEndDate);
+    const qs = params.toString();
+    return qs ? `${base}?${qs}` : base;
+  };
+
   const { data: factorySalesByCustomer = [], isLoading: loadingFactorySales } = useQuery<any[]>({
-    queryKey: ["/api/factory/analytics/sales-by-customer", selectedCompany?.id],
+    queryKey: ["/api/factory/analytics/sales-by-customer", selectedCompany?.id, factorySalesStartDate, factorySalesEndDate],
     queryFn: async () => {
-      const res = await fetch("/api/factory/analytics/sales-by-customer", { credentials: "include" });
+      const res = await fetch(buildFactorySalesUrl("/api/factory/analytics/sales-by-customer"), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch factory sales");
+      return res.json();
+    },
+    enabled: !!selectedCompany && appMode === "factory",
+  });
+
+  const { data: factoryPosSummary, isLoading: loadingFactoryPos } = useQuery<any>({
+    queryKey: ["/api/factory/analytics/pos-summary", selectedCompany?.id, factorySalesStartDate, factorySalesEndDate],
+    queryFn: async () => {
+      const res = await fetch(buildFactorySalesUrl("/api/factory/analytics/pos-summary"), { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch factory POS summary");
       return res.json();
     },
     enabled: !!selectedCompany && appMode === "factory",
@@ -1312,72 +1333,121 @@ export default function Analytics() {
         )}
 
         {activeSection === "sales" && (<>
-          {appMode === "factory" ? (
+          {appMode === "factory" ? (<>
+            {/* ── Date filter row ─────────────────────────────── */}
+            <div className="flex flex-wrap items-center gap-3 mb-2">
+              <Label className="text-sm text-muted-foreground shrink-0">Date range:</Label>
+              <DatePickerInput value={factorySalesStartDate} onChange={setFactorySalesStartDate} placeholder="Start date" />
+              <span className="text-muted-foreground text-sm">—</span>
+              <DatePickerInput value={factorySalesEndDate} onChange={setFactorySalesEndDate} placeholder="End date" />
+              {(factorySalesStartDate || factorySalesEndDate) && (
+                <Button variant="ghost" size="sm" onClick={() => { setFactorySalesStartDate(""); setFactorySalesEndDate(""); }}>
+                  Clear
+                </Button>
+              )}
+            </div>
+
+            {/* ── Factory OS – By Customer ─────────────────────── */}
             <Card className="p-6">
               <div className="mb-4">
-                <h3 className="text-lg font-medium">Sales by Customer</h3>
-                <p className="text-sm text-muted-foreground mt-1">Container sales grouped by customer</p>
+                <h3 className="text-lg font-medium">Factory OS — By Customer</h3>
+                <p className="text-sm text-muted-foreground mt-1">Container sales from the factory system, grouped by customer</p>
               </div>
               {loadingFactorySales ? (
-                <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
+                <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
               ) : factorySalesByCustomer.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">No factory sales data available</p>
+                <p className="text-sm text-muted-foreground text-center py-8">No factory OS sales data available</p>
               ) : (
-                <>
-                  <div className="hidden md:block">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Customer</TableHead>
-                          <TableHead className="text-right">Containers</TableHead>
-                          <TableHead className="text-right">Total Value</TableHead>
-                          <TableHead className="text-right">Paid</TableHead>
-                          <TableHead className="text-right">Outstanding</TableHead>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Customer</TableHead>
+                        <TableHead className="text-right">Containers</TableHead>
+                        <TableHead className="text-right">Total Value</TableHead>
+                        <TableHead className="text-right">Paid</TableHead>
+                        <TableHead className="text-right">Outstanding</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {factorySalesByCustomer.map((row: any) => (
+                        <TableRow key={row.customerId ?? "null"}>
+                          <TableCell className="font-medium">{row.customerName || `Customer #${row.customerId}`}</TableCell>
+                          <TableCell className="text-right">{row.containers}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(parseFloat(row.totalAmount))}</TableCell>
+                          <TableCell className="text-right font-mono text-green-600 dark:text-green-400">{formatAmount(parseFloat(row.paidAmount))}</TableCell>
+                          <TableCell className="text-right font-mono text-amber-600 dark:text-amber-400">
+                            {formatAmount(parseFloat(row.totalAmount) - parseFloat(row.paidAmount))}
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {factorySalesByCustomer.map((row: any) => (
-                          <TableRow key={row.customerId}>
-                            <TableCell className="font-medium">{row.customerName || `Customer #${row.customerId}`}</TableCell>
-                            <TableCell className="text-right">{row.containers}</TableCell>
-                            <TableCell className="text-right font-mono">{formatAmount(parseFloat(row.totalAmount))}</TableCell>
-                            <TableCell className="text-right font-mono text-green-600 dark:text-green-400">{formatAmount(parseFloat(row.paidAmount))}</TableCell>
-                            <TableCell className="text-right font-mono text-amber-600 dark:text-amber-400">
-                              {formatAmount(parseFloat(row.totalAmount) - parseFloat(row.paidAmount))}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
+                      ))}
+                    </TableBody>
+                    <TableBody className="font-semibold border-t-2">
+                      <TableRow>
+                        <TableCell>Total</TableCell>
+                        <TableCell className="text-right">{factorySalesByCustomer.reduce((s: number, r: any) => s + Number(r.containers), 0)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.totalAmount), 0))}</TableCell>
+                        <TableCell className="text-right font-mono">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.paidAmount), 0))}</TableCell>
+                        <TableCell className="text-right font-mono">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.totalAmount) - parseFloat(r.paidAmount), 0))}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </Card>
+
+            {/* ── Factory POS ──────────────────────────────────── */}
+            <Card className="p-6">
+              <div className="mb-4">
+                <h3 className="text-lg font-medium">Factory POS</h3>
+                <p className="text-sm text-muted-foreground mt-1">Point-of-sale transactions, by customer</p>
+              </div>
+              {loadingFactoryPos ? (
+                <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+              ) : !factoryPosSummary || (factoryPosSummary.byCustomer ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No factory POS sales data available</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Customer</TableHead>
+                        <TableHead className="text-right">Transactions</TableHead>
+                        <TableHead className="text-right">Total Sales</TableHead>
+                        <TableHead className="text-right">Cash Sales</TableHead>
+                        <TableHead className="text-right">Credit Sales</TableHead>
+                        <TableHead className="text-right">Deposit Collected</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(factoryPosSummary.byCustomer ?? []).map((row: any, idx: number) => (
+                        <TableRow key={row.customerId ?? idx}>
+                          <TableCell className="font-medium">{row.customerName}</TableCell>
+                          <TableCell className="text-right">{row.sales}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(parseFloat(row.totalAmount))}</TableCell>
+                          <TableCell className="text-right font-mono text-green-600 dark:text-green-400">{formatAmount(parseFloat(row.cashSales))}</TableCell>
+                          <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400">{formatAmount(parseFloat(row.creditSales))}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(parseFloat(row.depositAmount))}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                    {factoryPosSummary.grand && (
                       <TableBody className="font-semibold border-t-2">
                         <TableRow>
                           <TableCell>Total</TableCell>
-                          <TableCell className="text-right">{factorySalesByCustomer.reduce((s: number, r: any) => s + Number(r.containers), 0)}</TableCell>
-                          <TableCell className="text-right font-mono">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.totalAmount), 0))}</TableCell>
-                          <TableCell className="text-right font-mono">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.paidAmount), 0))}</TableCell>
-                          <TableCell className="text-right font-mono">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.totalAmount) - parseFloat(r.paidAmount), 0))}</TableCell>
+                          <TableCell className="text-right">{factoryPosSummary.grand.sales}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(parseFloat(factoryPosSummary.grand.totalAmount))}</TableCell>
+                          <TableCell className="text-right font-mono text-green-600 dark:text-green-400">{formatAmount(parseFloat(factoryPosSummary.grand.cashSales))}</TableCell>
+                          <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400">{formatAmount(parseFloat(factoryPosSummary.grand.creditSales))}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(parseFloat(factoryPosSummary.grand.depositAmount))}</TableCell>
                         </TableRow>
                       </TableBody>
-                    </Table>
-                  </div>
-                  <div className="md:hidden space-y-3">
-                    {factorySalesByCustomer.map((row: any) => (
-                      <Card key={row.customerId}>
-                        <CardContent className="p-4 space-y-2">
-                          <div className="font-medium">{row.customerName || `Customer #${row.customerId}`}</div>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div><span className="text-muted-foreground">Containers: </span>{row.containers}</div>
-                            <div className="text-right"><span className="text-muted-foreground">Total: </span><span className="font-mono">{formatAmount(parseFloat(row.totalAmount))}</span></div>
-                            <div><span className="text-muted-foreground">Paid: </span><span className="font-mono text-green-600 dark:text-green-400">{formatAmount(parseFloat(row.paidAmount))}</span></div>
-                            <div className="text-right"><span className="text-muted-foreground">Outstanding: </span><span className="font-mono text-amber-600 dark:text-amber-400">{formatAmount(parseFloat(row.totalAmount) - parseFloat(row.paidAmount))}</span></div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </>
+                    )}
+                  </Table>
+                </div>
               )}
             </Card>
-          ) : (
+          </>) : (
           <Card className="p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <h3 className="text-lg font-medium">Sales by Location</h3>
