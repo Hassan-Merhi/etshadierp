@@ -15444,6 +15444,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           otherChargesTotal: customerOrders.otherChargesTotal,
           grandTotal: customerOrders.grandTotal,
           totalQtyBales: customerOrders.totalQtyBales,
+          containerNumber: customerOrders.containerNumber,
           customerName: customers.legalName,
           customerCode: customers.code,
         })
@@ -15461,7 +15462,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const fmtNum = (val: any): string => {
         const n = parseFloat(val);
         if (isNaN(n)) return val ?? "";
-        return n % 1 === 0 ? n.toFixed(0) : n.toFixed(2).replace(/\.?0+$/, "");
+        return n % 1 === 0
+          ? n.toLocaleString("en-US")
+          : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       };
       const fmtMoney = (val: any): string => `$${fmtNum(val)}`;
 
@@ -15492,8 +15495,16 @@ h1 { margin-bottom: 5px; }
 .header-info { margin-bottom: 20px; }
 .header-info p { margin: 2px 0; }
 table { border-collapse: collapse; margin-bottom: 20px; }
-.lines-table { width: 100%; table-layout: auto; }
-th, td { border: 1px solid #ddd; padding: 6px 8px; font-size: 13px; }
+.lines-table { width: 100%; table-layout: fixed; }
+.lines-table col.col-num { width: 40px; }
+.lines-table col.col-article { width: 100px; }
+.lines-table col.col-product { width: auto; }
+.lines-table col.col-qty { width: 55px; }
+.lines-table col.col-wt-bale { width: 85px; }
+.lines-table col.col-total-wt { width: 90px; }
+.lines-table col.col-price { width: 80px; }
+.lines-table col.col-total { width: 85px; }
+th, td { border: 1px solid #ddd; padding: 5px 7px; font-size: 13px; }
 th { background-color: #f5f5f5; white-space: nowrap; }
 .totals-table { min-width: 280px; margin-left: auto; }
 .totals-table td:last-child { text-align: right; font-weight: bold; white-space: nowrap; }
@@ -15503,11 +15514,17 @@ th { background-color: #f5f5f5; white-space: nowrap; }
 <h1>${company?.name || ""}</h1>
 <div class="header-info">
 <p><strong>Invoice:</strong> ${order.invoiceNumber || "DRAFT"}</p>
-<p><strong>Customer:</strong> ${order.customerName} (${order.customerCode})</p>
+<p><strong>Customer:</strong> ${order.customerName || "-"}</p>
 <p><strong>Date:</strong> ${order.orderDate}</p>
+${order.containerNumber ? `<p><strong>Container:</strong> ${order.containerNumber}</p>` : ""}
 </div>
 <h3>Order Lines</h3>
 <table class="lines-table">
+<colgroup>
+  <col class="col-num"><col class="col-article"><col class="col-product">
+  <col class="col-qty"><col class="col-wt-bale"><col class="col-total-wt">
+  <col class="col-price"><col class="col-total">
+</colgroup>
 <thead><tr>
   <th style="text-align:center">#</th>
   <th>Article Code</th>
