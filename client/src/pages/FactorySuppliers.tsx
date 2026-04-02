@@ -209,7 +209,7 @@ export default function FactorySuppliers() {
     retry: 1,
   });
 
-  const [collapsedStmtSections, setCollapsedStmtSections] = useState<Set<string>>(new Set(["howToRead", "supplierDetails", "currencyPools", "linkedExposureDetail", "brokerActivityLedger", "activityLedger"]));
+  const [collapsedStmtSections, setCollapsedStmtSections] = useState<Set<string>>(new Set(["supplierDetails", "currencyPools", "linkedExposureDetail", "brokerActivityLedger", "activityLedger"]));
   const toggleStmtSection = (key: string) =>
     setCollapsedStmtSections(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
 
@@ -1223,66 +1223,8 @@ export default function FactorySuppliers() {
               return (
                 <>
 
-                  {/* ── Plain-English explanation (broker only) ───────────── */}
-                  {isBrokerStatement && (
-                    <div className="rounded-md border bg-muted/30 text-sm">
-                      <button
-                        className="flex items-center gap-2 w-full p-3 font-medium text-foreground hover-elevate text-left"
-                        onClick={() => toggleStmtSection("howToRead")}
-                        data-testid="button-how-to-read-toggle"
-                      >
-                        <Info className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        <span className="flex-1">How to read this statement</span>
-                        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${collapsedStmtSections.has("howToRead") ? "" : "rotate-180"}`} />
-                      </button>
-                      {!collapsedStmtSections.has("howToRead") && (
-                        <ul className="px-3 pb-3 pl-9 space-y-0.5 text-muted-foreground list-disc text-xs">
-                          <li><span className="font-medium text-foreground">Broker Net Balance</span> — amounts the broker itself owes or is owed (direct containers, commissions received, settlements made).</li>
-                          <li><span className="font-medium text-foreground">Linked Supplier Exposure</span> — balances of suppliers managed under this broker. Informational only — these are NOT broker-owned debts.</li>
-                        </ul>
-                      )}
-                    </div>
-                  )}
-
-                  {/* ── PRIMARY: Broker Net Balance ───────────────────────── */}
-                  {isBrokerStatement ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                        <h2 className="text-sm font-semibold">Broker Net Balance</h2>
-                        <span className="text-xs text-muted-foreground">— broker-owned amounts only</span>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                        {/* Container count card */}
-                        <Card>
-                          <CardContent className="p-4">
-                            <div className="text-xs text-muted-foreground">Broker Containers</div>
-                            <div className="text-xl font-bold mt-1" data-testid="text-statement-total-containers">
-                              {activeContainerCount}
-                              {statementData.summary.totalContainers > activeContainerCount && (
-                                <span className="text-sm font-normal text-muted-foreground ml-1">/ {statementData.summary.totalContainers} total</span>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                        {ownKpiEntries.length === 0 ? (
-                          <Card>
-                            <CardContent className="p-4">
-                              <div className="text-xs text-muted-foreground">Broker Balance</div>
-                              <div className="text-xl font-bold mt-1 text-muted-foreground" data-testid="text-statement-total-owed">
-                                $— <span className="text-sm font-normal">Settled</span>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ) : (
-                          ownKpiEntries.map(([cc, v]) =>
-                            renderBalCard(cc, v.own, "Broker Balance", "text-statement-balance", v.totalFreight)
-                          )
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    /* Non-broker: simple combined KPI grid */
+                  {/* Non-broker: simple KPI grid */}
+                  {!isBrokerStatement && (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                       <Card>
                         <CardContent className="p-4">
@@ -1317,23 +1259,6 @@ export default function FactorySuppliers() {
                           renderBalCard(cc, v.own, "Net Balance", "text-statement-balance", v.totalFreight)
                         )
                       )}
-                    </div>
-                  )}
-
-                  {/* ── SECONDARY: Linked Supplier Exposure ───────────────── */}
-                  {isBrokerStatement && linkedKpiEntries.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Link2 className="h-4 w-4 text-muted-foreground" />
-                        <h2 className="text-sm font-semibold">Linked Supplier Exposure</h2>
-                        <span className="text-xs text-muted-foreground">— informational, not broker-owned</span>
-                        <Badge variant="outline" className="text-xs">{linkedGroups.length} supplier{linkedGroups.length !== 1 ? "s" : ""}</Badge>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                        {linkedKpiEntries.map(([cc, bal]) =>
-                          renderBalCard(cc, bal, "Exposure", "text-linked-exposure")
-                        )}
-                      </div>
                     </div>
                   )}
 
