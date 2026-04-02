@@ -209,7 +209,7 @@ export default function FactorySuppliers() {
     retry: 1,
   });
 
-  const [collapsedStmtSections, setCollapsedStmtSections] = useState<Set<string>>(new Set(["supplierDetails", "currencyPools", "linkedExposureDetail", "brokerActivityLedger", "activityLedger"]));
+  const [collapsedStmtSections, setCollapsedStmtSections] = useState<Set<string>>(new Set(["supplierDetails", "currencyPools"]));
   const toggleStmtSection = (key: string) =>
     setCollapsedStmtSections(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
 
@@ -1324,7 +1324,7 @@ export default function FactorySuppliers() {
               );
             })()}
 
-            {statementData.supplier && (
+            {statementData.supplier && !isBrokerStatement && (
               <Card>
                 <CardHeader className="pb-2 cursor-pointer hover-elevate rounded-t-md" onClick={() => toggleStmtSection("supplierDetails")}>
                   <CardTitle className="text-base flex items-center justify-between gap-2">
@@ -1829,7 +1829,7 @@ export default function FactorySuppliers() {
             )}
 
             {/* Unified Activity Ledger — Phase 4: merges Containers, Payments, FX Settlements, Commissions */}
-            <Card>
+            {!isBrokerStatement && <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center justify-between gap-2">
                   <span
@@ -2143,7 +2143,7 @@ export default function FactorySuppliers() {
                   );
                 })()}
               </CardContent>}
-            </Card>
+            </Card>}
 
           </>
         ) : null}
