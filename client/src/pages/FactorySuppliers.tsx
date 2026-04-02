@@ -209,10 +209,7 @@ export default function FactorySuppliers() {
     retry: 1,
   });
 
-  // Broker statement view toggle: "broker-only" shows only the broker's own balance;
-  // "combined" adds linked supplier exposure to each KPI card.
-  const [brokerView, setBrokerView] = useState<"broker-only" | "combined">("broker-only");
-  const [collapsedStmtSections, setCollapsedStmtSections] = useState<Set<string>>(new Set(["howToRead"]));
+  const [collapsedStmtSections, setCollapsedStmtSections] = useState<Set<string>>(new Set(["howToRead", "supplierDetails", "currencyPools", "linkedExposureDetail", "brokerActivityLedger", "activityLedger"]));
   const toggleStmtSection = (key: string) =>
     setCollapsedStmtSections(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
 
@@ -1170,11 +1167,6 @@ export default function FactorySuppliers() {
               const ownKpiEntries = Object.entries(ownMap).filter(([, v]) => Math.abs(v.own) > 0.005);
               // KPI entries for "Linked Exposure" secondary section
               const linkedKpiEntries = Object.entries(linkedBalMap).filter(([, v]) => Math.abs(v) > 0.005);
-              // Combined total map
-              const combinedMap: Record<string, number> = {};
-              for (const [cc, v] of Object.entries(ownMap)) combinedMap[cc] = (combinedMap[cc] || 0) + v.own;
-              for (const [cc, v] of Object.entries(linkedBalMap)) combinedMap[cc] = (combinedMap[cc] || 0) + v;
-              const combinedKpiEntries = Object.entries(combinedMap).filter(([, v]) => Math.abs(v) > 0.005);
 
               // Issues
               const issues: Array<{ kind: "warn" | "info"; msg: string }> = [];
@@ -1230,31 +1222,6 @@ export default function FactorySuppliers() {
 
               return (
                 <>
-                  {/* ── View toggle (broker only) ──────────────────────────── */}
-                  {isBrokerStatement && (
-                    <div className="flex items-center justify-between flex-wrap gap-3">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Eye className="h-4 w-4" />
-                        <span>Viewing:</span>
-                        <div className="flex rounded-md border overflow-hidden">
-                          <button
-                            className={`px-3 py-1.5 text-xs font-medium transition-colors ${brokerView === "broker-only" ? "bg-primary text-primary-foreground" : "hover-elevate"}`}
-                            onClick={() => setBrokerView("broker-only")}
-                            data-testid="button-broker-view-own"
-                          >
-                            Broker Only
-                          </button>
-                          <button
-                            className={`px-3 py-1.5 text-xs font-medium border-l transition-colors ${brokerView === "combined" ? "bg-primary text-primary-foreground" : "hover-elevate"}`}
-                            onClick={() => setBrokerView("combined")}
-                            data-testid="button-broker-view-combined"
-                          >
-                            Combined Exposure
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
                   {/* ── Plain-English explanation (broker only) ───────────── */}
                   {isBrokerStatement && (
@@ -1272,7 +1239,6 @@ export default function FactorySuppliers() {
                         <ul className="px-3 pb-3 pl-9 space-y-0.5 text-muted-foreground list-disc text-xs">
                           <li><span className="font-medium text-foreground">Broker Net Balance</span> — amounts the broker itself owes or is owed (direct containers, commissions received, settlements made).</li>
                           <li><span className="font-medium text-foreground">Linked Supplier Exposure</span> — balances of suppliers managed under this broker. Informational only — these are NOT broker-owned debts.</li>
-                          <li><span className="font-medium text-foreground">Combined Exposure</span> — broker balance + all linked supplier balances (toggle above to see this view).</li>
                         </ul>
                       )}
                     </div>
@@ -1371,21 +1337,6 @@ export default function FactorySuppliers() {
                     </div>
                   )}
 
-                  {/* ── TERTIARY: Combined Exposure (only in combined view) ── */}
-                  {isBrokerStatement && brokerView === "combined" && combinedKpiEntries.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Layers className="h-4 w-4 text-muted-foreground" />
-                        <h2 className="text-sm font-semibold">Combined Exposure</h2>
-                        <span className="text-xs text-muted-foreground">— broker + all linked suppliers</span>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                        {combinedKpiEntries.map(([cc, bal]) =>
-                          renderBalCard(cc, bal, "Combined", "text-combined-exposure")
-                        )}
-                      </div>
-                    </div>
-                  )}
 
                   {/* ── Issues panel ──────────────────────────────────────── */}
                   {issues.length > 0 && (
