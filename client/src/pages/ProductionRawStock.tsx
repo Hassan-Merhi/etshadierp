@@ -1343,7 +1343,6 @@ export default function ProductionRawStock() {
                 <TableRow>
                   <TableHead>Batch Code</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Operator</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead className="text-right">Total (kg)</TableHead>
                   <TableHead className="text-right">Used (kg)</TableHead>
@@ -1382,7 +1381,6 @@ export default function ProductionRawStock() {
                       >
                         {batch.name || <span className="text-muted-foreground">—</span>}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{batch.operatorUser || "—"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{batch.batchDate ? formatDisplayDate(batch.batchDate) : formatDisplayDate(batch.createdAt)}</TableCell>
                       <TableCell className="text-right font-mono text-sm">{formatNumber(total)}</TableCell>
                       <TableCell className="text-right font-mono text-sm">{formatNumber(used)}</TableCell>
@@ -1447,7 +1445,7 @@ export default function ProductionRawStock() {
                 return (
                   <tfoot className="border-t-2 border-border bg-muted/40">
                     <tr>
-                      <td colSpan={4} className="px-4 py-3 text-sm font-semibold text-foreground">
+                      <td colSpan={3} className="px-4 py-3 text-sm font-semibold text-foreground">
                         Combined Total
                         <div className="text-xs text-muted-foreground font-normal">{filteredMixBatches.length} batch{filteredMixBatches.length !== 1 ? "es" : ""}</div>
                       </td>
