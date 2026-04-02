@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -683,31 +684,27 @@ export default function FactoryContainers() {
               Delete Selected ({selectedIds.size})
             </Button>
           )}
-          <Button
-            variant="outline"
-            onClick={() => exportContainers(containers || [])}
-            data-testid="button-export-containers"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export All
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => backfillMutation.mutate()}
-            disabled={backfillMutation.isPending}
-            data-testid="button-backfill-import-credits"
-            title="Create missing supplier credit entries for all existing containers"
-          >
-            {backfillMutation.isPending ? "Running..." : "Backfill Credits"}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => { setImportOpen(true); setImportPreview([]); setImportResult(null); }}
-            data-testid="button-import-containers"
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Import Excel
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" data-testid="button-import-export-menu">
+                <ArrowDown className="h-4 w-4 mr-2" />
+                Import / Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => exportContainers(containers || [])} data-testid="button-export-containers">
+                <Download className="h-4 w-4 mr-2" />
+                Export All
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => { setImportOpen(true); setImportPreview([]); setImportResult(null); }}
+                data-testid="button-import-containers"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Import Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             onClick={() => navigate("/factory/containers/new")}
             data-testid="button-add-factory-container"
