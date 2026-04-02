@@ -5383,6 +5383,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             WHERE fcoc.container_id = ${factoryContainers.id}
             AND fcoc.company_id = ${factoryContainers.companyId}
           ), 0)`,
+          preRegisteredChargesByCurrency: sql<string>`COALESCE(
+            (SELECT json_agg(json_build_object('currencyCode', cc, 'amount', total::text))
+             FROM (
+               SELECT COALESCE(currency_code, 'USD') AS cc, SUM(amount::numeric) AS total
+               FROM factory_container_other_charges
+               WHERE container_id = ${factoryContainers.id}
+               AND company_id = ${factoryContainers.companyId}
+               GROUP BY COALESCE(currency_code, 'USD')
+             ) t),
+            '[]'::json)`,
         })
         .from(factoryContainers)
         .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))

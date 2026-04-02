@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search, ArrowDown, AlertTriangle, RotateCcw, CheckSquare } from "lucide-react";
+import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search, ArrowDown, AlertTriangle, RotateCcw, CheckSquare, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +52,7 @@ interface ContainerWithSupplier extends FactoryContainer {
 export default function FactoryContainers() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editingContainer, setEditingContainer] = useState<ContainerWithSupplier | null>(null);
+  const [expandedSuppliers, setExpandedSuppliers] = useState<Set<string>>(new Set(["__all__"]));
   const [formData, setFormData] = useState({
     containerNumber: "",
     supplierId: "",
@@ -742,164 +743,249 @@ export default function FactoryContainers() {
           </div>
         </CardHeader>
         <CardContent>
-          {filteredContainers && filteredContainers.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox
-                      checked={filteredContainers.length > 0 && filteredContainers.every(c => selectedIds.has(c.id))}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedIds(new Set(filteredContainers.map(c => c.id)));
-                        } else {
-                          setSelectedIds(new Set());
-                        }
-                      }}
-                      data-testid="checkbox-select-all"
-                    />
-                  </TableHead>
-                  <TableHead>Container #</TableHead>
-                  <TableHead>Supplier / Broker</TableHead>
-                  <TableHead>Commission</TableHead>
-                  <TableHead>Charges</TableHead>
-                  <TableHead>Total Value</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Arrival</TableHead>
-                  <TableHead className="w-24">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredContainers.map((c) => {
-                  const commAmt = parseFloat((c as any).commissionAmount || "0");
-                  const commCcy = (c as any).commissionCurrencyCode || "USD";
-                  const brokerSupId = (c as any).commissionSupplierId;
-                  const brokerName = brokerSupId
-                    ? suppliers?.find(s => s.id === brokerSupId)?.name ?? null
-                    : null;
-                  const ccy = (c as any).currencyCode || "USD";
-                  const baseValue = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
-                  const freightAmt = parseFloat((c as any).freight || "0");
-                  const freightCcy = (c as any).freightCurrencyCode || ccy;
-                  const freightSameCcy = freightCcy === ccy;
-                  const legacyOtherAmt = parseFloat((c as any).otherCharges || "0");
-                  const preRegisteredAmt = parseFloat((c as any).preRegisteredChargesSum || "0");
-                  const additionalAmt = parseFloat((c as any).additionalChargesSum || "0");
-                  const totalOtherAmt = legacyOtherAmt + preRegisteredAmt + additionalAmt;
-                  const totalValue = baseValue + (freightSameCcy ? freightAmt : 0) + totalOtherAmt;
-                  return (
-                    <TableRow key={c.id} data-testid={`row-factory-container-${c.id}`} className={selectedIds.has(c.id) ? "bg-muted/50" : ""}>
-                      <TableCell className="w-10">
-                        <Checkbox
-                          checked={selectedIds.has(c.id)}
-                          onCheckedChange={(checked) => {
-                            setSelectedIds(prev => {
-                              const next = new Set(prev);
-                              if (checked) next.add(c.id);
-                              else next.delete(c.id);
-                              return next;
-                            });
-                          }}
-                          data-testid={`checkbox-container-${c.id}`}
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium font-mono">{c.containerNumber}</TableCell>
-                      <TableCell>
-                        <div className="space-y-0.5">
-                          <div className="font-medium">{c.supplierName || <span className="text-muted-foreground">—</span>}</div>
-                          {brokerName && (
-                            <div className="text-xs text-muted-foreground">{brokerName}</div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {commAmt > 0 ? `${commCcy} ${formatNumber(commAmt)}` : <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {(freightAmt > 0 || totalOtherAmt > 0) ? (
-                          <div className="space-y-0.5">
-                            <span>{ccy} {formatNumber((freightSameCcy ? freightAmt : 0) + totalOtherAmt)}{!freightSameCcy && freightAmt > 0 ? ` + ${freightCcy} ${formatNumber(freightAmt)}` : ""}</span>
-                            <div className="text-xs text-muted-foreground space-y-0">
-                              {freightAmt > 0 && (
-                                <div>Freight: {freightCcy} {formatNumber(freightAmt)}</div>
-                              )}
-                              {(legacyOtherAmt + preRegisteredAmt) > 0 && (
-                                <div>Other: {ccy} {formatNumber(legacyOtherAmt + preRegisteredAmt)}</div>
-                              )}
-                              {additionalAmt > 0 && (
-                                <div>Additional: {ccy} {formatNumber(additionalAmt)}</div>
-                              )}
-                            </div>
+          {filteredContainers && filteredContainers.length > 0 ? (() => {
+            // Group containers by supplier name
+            const groups: { supplierKey: string; supplierName: string; containers: typeof filteredContainers }[] = [];
+            const seenKeys = new Map<string, number>();
+            for (const c of filteredContainers) {
+              const key = c.supplierName || "__none__";
+              if (!seenKeys.has(key)) {
+                seenKeys.set(key, groups.length);
+                groups.push({ supplierKey: key, supplierName: c.supplierName || "No Supplier", containers: [] });
+              }
+              groups[seenKeys.get(key)!].containers.push(c);
+            }
+            const toggleSupplier = (key: string) => {
+              setExpandedSuppliers(prev => {
+                const next = new Set(prev);
+                if (next.has(key)) next.delete(key);
+                else next.add(key);
+                return next;
+              });
+            };
+            // Helper: render charge breakdown for a container using actual currencies
+            const renderCharges = (c: any) => {
+              const ccy = c.currencyCode || "USD";
+              const freightAmt = parseFloat(c.freight || "0");
+              const freightCcy = c.freightCurrencyCode || ccy;
+              const freightSameCcy = freightCcy === ccy;
+              const legacyOtherAmt = parseFloat(c.otherCharges || "0");
+              const additionalAmt = parseFloat(c.additionalChargesSum || "0");
+              // Parse per-currency other charges (actual currencies, not converted)
+              let chargesByCcy: { currencyCode: string; amount: number }[] = [];
+              try {
+                const raw = typeof c.preRegisteredChargesByCurrency === "string"
+                  ? JSON.parse(c.preRegisteredChargesByCurrency)
+                  : (c.preRegisteredChargesByCurrency || []);
+                chargesByCcy = Array.isArray(raw)
+                  ? raw.map((x: any) => ({ currencyCode: x.currencyCode || "USD", amount: parseFloat(x.amount || "0") }))
+                  : [];
+              } catch {}
+              const hasCharges = freightAmt > 0 || legacyOtherAmt > 0 || chargesByCcy.some(x => x.amount > 0) || additionalAmt > 0;
+              if (!hasCharges) return <span className="text-muted-foreground">—</span>;
+              // Build display lines grouped by currency
+              const ccyTotals = new Map<string, number>();
+              if (freightSameCcy && freightAmt > 0) ccyTotals.set(freightCcy, (ccyTotals.get(freightCcy) || 0) + freightAmt);
+              if (legacyOtherAmt > 0) ccyTotals.set(ccy, (ccyTotals.get(ccy) || 0) + legacyOtherAmt);
+              for (const ch of chargesByCcy) {
+                if (ch.amount > 0) ccyTotals.set(ch.currencyCode, (ccyTotals.get(ch.currencyCode) || 0) + ch.amount);
+              }
+              if (additionalAmt > 0) ccyTotals.set(ccy, (ccyTotals.get(ccy) || 0) + additionalAmt);
+              return (
+                <div className="space-y-0.5">
+                  <div className="font-mono text-sm">
+                    {Array.from(ccyTotals.entries()).map(([cc, amt]) => (
+                      <div key={cc}>{cc} {formatNumber(amt)}</div>
+                    ))}
+                    {!freightSameCcy && freightAmt > 0 && (
+                      <div>{freightCcy} {formatNumber(freightAmt)}</div>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground space-y-0">
+                    {freightAmt > 0 && <div>Freight: {freightCcy} {formatNumber(freightAmt)}</div>}
+                    {(legacyOtherAmt > 0 || chargesByCcy.some(x => x.amount > 0)) && (
+                      <div>
+                        Other:{" "}
+                        {(() => {
+                          const parts: string[] = [];
+                          if (legacyOtherAmt > 0) parts.push(`${ccy} ${formatNumber(legacyOtherAmt)}`);
+                          for (const ch of chargesByCcy) {
+                            if (ch.amount > 0) parts.push(`${ch.currencyCode} ${formatNumber(ch.amount)}`);
+                          }
+                          return parts.join(" + ");
+                        })()}
+                      </div>
+                    )}
+                    {additionalAmt > 0 && <div>Additional: {ccy} {formatNumber(additionalAmt)}</div>}
+                  </div>
+                </div>
+              );
+            };
+            return (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={filteredContainers.length > 0 && filteredContainers.every(c => selectedIds.has(c.id))}
+                        onCheckedChange={(checked) => {
+                          if (checked) setSelectedIds(new Set(filteredContainers.map(c => c.id)));
+                          else setSelectedIds(new Set());
+                        }}
+                        data-testid="checkbox-select-all"
+                      />
+                    </TableHead>
+                    <TableHead>Container #</TableHead>
+                    <TableHead>Broker</TableHead>
+                    <TableHead>Commission</TableHead>
+                    <TableHead>Charges</TableHead>
+                    <TableHead>Total Value</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Arrival</TableHead>
+                    <TableHead className="w-24">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {groups.map(({ supplierKey, supplierName, containers: groupContainers }) => {
+                    const isExpanded = expandedSuppliers.has(supplierKey);
+                    // Compute aggregate count and container count
+                    const count = groupContainers.length;
+                    // Aggregate total values by currency
+                    const groupTotals = new Map<string, number>();
+                    for (const c of groupContainers) {
+                      const ccy = (c as any).currencyCode || "USD";
+                      const baseValue = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
+                      const freightAmt = parseFloat((c as any).freight || "0");
+                      const freightCcy = (c as any).freightCurrencyCode || ccy;
+                      const freightSameCcy = freightCcy === ccy;
+                      const legacyOtherAmt = parseFloat((c as any).otherCharges || "0");
+                      const preRegisteredAmt = parseFloat((c as any).preRegisteredChargesSum || "0");
+                      const additionalAmt = parseFloat((c as any).additionalChargesSum || "0");
+                      const totalInCcy = baseValue + (freightSameCcy ? freightAmt : 0) + legacyOtherAmt + preRegisteredAmt + additionalAmt;
+                      groupTotals.set(ccy, (groupTotals.get(ccy) || 0) + totalInCcy);
+                    }
+                    return [
+                      // Supplier header row
+                      <TableRow
+                        key={`supplier-${supplierKey}`}
+                        className="bg-muted/30 hover-elevate cursor-pointer"
+                        onClick={() => toggleSupplier(supplierKey)}
+                        data-testid={`row-supplier-group-${supplierKey}`}
+                      >
+                        <TableCell className="w-10">
+                          {isExpanded
+                            ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                        </TableCell>
+                        <TableCell colSpan={3}>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">{supplierName}</span>
+                            <Badge variant="outline" className="text-xs">{count} container{count !== 1 ? "s" : ""}</Badge>
                           </div>
-                        ) : <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm font-medium">
-                        {totalValue > 0 ? `${ccy} ${formatNumber(totalValue)}` : <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={c.status === "AVAILABLE" ? "default" : "secondary"}>
-                          {c.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {c.arrivalDate || "—"}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          {c.status !== "OFFLOADED" && c.status !== "PARTIALLY_RECEIVED" && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => navigate("/factory/raw-stock")}
-                                  data-testid={`button-offload-container-${c.id}`}
-                                >
-                                  <ArrowDown className="h-4 w-4" />
+                        </TableCell>
+                        <TableCell />
+                        <TableCell className="font-mono text-sm font-medium">
+                          {Array.from(groupTotals.entries()).map(([cc, amt]) => (
+                            <div key={cc}>{cc} {formatNumber(amt)}</div>
+                          ))}
+                        </TableCell>
+                        <TableCell colSpan={3} />
+                      </TableRow>,
+                      // Container rows (only when expanded)
+                      ...(isExpanded ? groupContainers.map((c) => {
+                        const commAmt = parseFloat((c as any).commissionAmount || "0");
+                        const commCcy = (c as any).commissionCurrencyCode || "USD";
+                        const brokerSupId = (c as any).commissionSupplierId;
+                        const brokerName = brokerSupId
+                          ? suppliers?.find(s => s.id === brokerSupId)?.name ?? null
+                          : null;
+                        const ccy = (c as any).currencyCode || "USD";
+                        const baseValue = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
+                        const freightAmt = parseFloat((c as any).freight || "0");
+                        const freightCcy = (c as any).freightCurrencyCode || ccy;
+                        const freightSameCcy = freightCcy === ccy;
+                        const legacyOtherAmt = parseFloat((c as any).otherCharges || "0");
+                        const preRegisteredAmt = parseFloat((c as any).preRegisteredChargesSum || "0");
+                        const additionalAmt = parseFloat((c as any).additionalChargesSum || "0");
+                        const totalValue = baseValue + (freightSameCcy ? freightAmt : 0) + legacyOtherAmt + preRegisteredAmt + additionalAmt;
+                        return (
+                          <TableRow key={c.id} data-testid={`row-factory-container-${c.id}`} className={selectedIds.has(c.id) ? "bg-muted/50" : ""}>
+                            <TableCell className="w-10 pl-6">
+                              <Checkbox
+                                checked={selectedIds.has(c.id)}
+                                onCheckedChange={(checked) => {
+                                  setSelectedIds(prev => {
+                                    const next = new Set(prev);
+                                    if (checked) next.add(c.id);
+                                    else next.delete(c.id);
+                                    return next;
+                                  });
+                                }}
+                                data-testid={`checkbox-container-${c.id}`}
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium font-mono">{c.containerNumber}</TableCell>
+                            <TableCell>
+                              {brokerName
+                                ? <span className="text-sm text-muted-foreground">{brokerName}</span>
+                                : <span className="text-muted-foreground">—</span>}
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {commAmt > 0 ? `${commCcy} ${formatNumber(commAmt)}` : <span className="text-muted-foreground">—</span>}
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {renderCharges(c)}
+                            </TableCell>
+                            <TableCell className="font-mono text-sm font-medium">
+                              {totalValue > 0 ? `${ccy} ${formatNumber(totalValue)}` : <span className="text-muted-foreground">—</span>}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={c.status === "AVAILABLE" ? "default" : "secondary"}>
+                                {c.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {c.arrivalDate || "—"}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                {c.status !== "OFFLOADED" && c.status !== "PARTIALLY_RECEIVED" && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button variant="ghost" size="icon" onClick={() => navigate("/factory/raw-stock")} data-testid={`button-offload-container-${c.id}`}>
+                                        <ArrowDown className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Offload to Production</TooltipContent>
+                                  </Tooltip>
+                                )}
+                                {(c.status === "OFFLOADED" || c.status === "PARTIALLY_RECEIVED") && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button variant="ghost" size="icon" onClick={() => setReversingContainer(c)} data-testid={`button-reverse-offload-${c.id}`}>
+                                        <RotateCcw className="h-4 w-4 text-amber-500" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Reverse Offload</TooltipContent>
+                                  </Tooltip>
+                                )}
+                                <Button variant="ghost" size="icon" onClick={() => openEdit(c)} data-testid={`button-edit-container-${c.id}`}>
+                                  <Pencil className="h-4 w-4" />
                                 </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Offload to Production</TooltipContent>
-                            </Tooltip>
-                          )}
-                          {(c.status === "OFFLOADED" || c.status === "PARTIALLY_RECEIVED") && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setReversingContainer(c)}
-                                  data-testid={`button-reverse-offload-${c.id}`}
-                                >
-                                  <RotateCcw className="h-4 w-4 text-amber-500" />
+                                <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(c.id)} data-testid={`button-delete-container-${c.id}`}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Reverse Offload</TooltipContent>
-                            </Tooltip>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEdit(c)}
-                            data-testid={`button-edit-container-${c.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => deleteMutation.mutate(c.id)}
-                            data-testid={`button-delete-container-${c.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          ) : (
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }) : []),
+                    ];
+                  })}
+                </TableBody>
+              </Table>
+            );
+          })() : (
             <div className="text-center py-8 text-muted-foreground">
               <Container className="h-12 w-12 mx-auto mb-3 opacity-50" />
               {containers && containers.length > 0 ? (
