@@ -12955,12 +12955,75 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .where(and(eq(customerBalances.companyId, companyId), eq(customerBalances.customerId, customerId)))
         .orderBy(customerBalances.transactionDate, customerBalances.id);
 
+      // Also pull voucher entries for this customer (by ledgerAccountId or direct customerId link)
+      // to include manual accounting vouchers that don't flow through customerBalances.
+      // Exclude CHARGE-* vouchers (those are already included via invoices).
+      const voucherRows: any[] = [];
+      const ledgerAccountId = (customer as any).ledgerAccountId;
+      const voucherConditions = ledgerAccountId
+        ? sql`(${voucherEntries.ledgerAccountId} = ${ledgerAccountId} OR ${voucherEntries.customerId} = ${customerId})`
+        : sql`${voucherEntries.customerId} = ${customerId}`;
+
+      const rawVoucherRows = await db
+        .select({
+          id: voucherEntries.id,
+          voucherId: voucherEntries.voucherId,
+          voucherNumber: vouchers.voucherNumber,
+          voucherType: vouchers.voucherType,
+          voucherDate: vouchers.voucherDate,
+          description: vouchers.description,
+          debitAmount: voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
+          narration: voucherEntries.narration,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, and(
+          eq(voucherEntries.voucherId, vouchers.id),
+          eq(vouchers.companyId, companyId),
+          sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
+          sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`,
+        ))
+        .where(voucherConditions)
+        .orderBy(vouchers.voucherDate, voucherEntries.id);
+
+      // Convert to unified row format matching customerBalances shape
+      for (const ve of rawVoucherRows) {
+        voucherRows.push({
+          id: `ve-${ve.id}`,
+          customerId,
+          companyId,
+          transactionDate: ve.voucherDate,
+          transactionType: ve.voucherType || "VOUCHER",
+          referenceType: "VOUCHER",
+          referenceId: ve.voucherId,
+          referenceNumber: ve.voucherNumber,
+          description: ve.narration || ve.description || ve.voucherType,
+          debitAmount: ve.debitAmount ?? "0",
+          creditAmount: ve.creditAmount ?? "0",
+          balance: "0",
+          _fromVoucher: true,
+        });
+      }
+
+      // Merge customerBalances + voucher rows, sort by date then id
+      const allRows = [...balanceRows.map((r: any) => ({ ...r, _fromVoucher: false })), ...voucherRows]
+        .sort((a, b) => {
+          const da = (a.transactionDate || "").toString();
+          const db2 = (b.transactionDate || "").toString();
+          if (da < db2) return -1;
+          if (da > db2) return 1;
+          // same date: customerBalances rows first (they have numeric ids)
+          const ia = a._fromVoucher ? 1 : 0;
+          const ib = b._fromVoucher ? 1 : 0;
+          return ia - ib;
+        });
+
       // Build running balance
       const openingBalance = parseFloat(customer.openingBalance || "0");
       const openingSide = customer.openingBalanceSide || "Dr";
       let runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
 
-      const balanceHistory = balanceRows.map((row: any) => {
+      const balanceHistory = allRows.map((row: any) => {
         const debit = parseFloat(row.debitAmount || "0");
         const credit = parseFloat(row.creditAmount || "0");
         runningBalance += debit - credit;
@@ -13007,11 +13070,42 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .where(and(eq(customerBalances.companyId, companyId), eq(customerBalances.customerId, customerId)))
         .orderBy(customerBalances.transactionDate, customerBalances.id);
 
+      // Pull voucher entries (same logic as statement endpoint)
+      const voucherRowsPdf: any[] = [];
+      const ledgerAccountIdPdf = (customer as any).ledgerAccountId;
+      const voucherCondPdf = ledgerAccountIdPdf
+        ? sql`(${voucherEntries.ledgerAccountId} = ${ledgerAccountIdPdf} OR ${voucherEntries.customerId} = ${customerId})`
+        : sql`${voucherEntries.customerId} = ${customerId}`;
+      const rawVePdf = await db.select({
+        id: voucherEntries.id, voucherId: voucherEntries.voucherId,
+        voucherNumber: vouchers.voucherNumber, voucherType: vouchers.voucherType,
+        voucherDate: vouchers.voucherDate, description: vouchers.description,
+        debitAmount: voucherEntries.debitAmount, creditAmount: voucherEntries.creditAmount,
+        narration: voucherEntries.narration,
+      }).from(voucherEntries)
+        .innerJoin(vouchers, and(eq(voucherEntries.voucherId, vouchers.id), eq(vouchers.companyId, companyId),
+          sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`, sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`))
+        .where(voucherCondPdf).orderBy(vouchers.voucherDate, voucherEntries.id);
+      for (const ve of rawVePdf) {
+        voucherRowsPdf.push({
+          transactionDate: ve.voucherDate, transactionType: ve.voucherType || "VOUCHER",
+          referenceType: "VOUCHER", referenceNumber: ve.voucherNumber,
+          description: ve.narration || ve.description || ve.voucherType,
+          debitAmount: ve.debitAmount ?? "0", creditAmount: ve.creditAmount ?? "0", _fromVoucher: true,
+        });
+      }
+      const allRowsPdf = [...balanceRows.map((r: any) => ({ ...r, _fromVoucher: false })), ...voucherRowsPdf]
+        .sort((a, b) => {
+          const da = (a.transactionDate || "").toString(), db2 = (b.transactionDate || "").toString();
+          if (da !== db2) return da < db2 ? -1 : 1;
+          return (a._fromVoucher ? 1 : 0) - (b._fromVoucher ? 1 : 0);
+        });
+
       const openingBalance = parseFloat(customer.openingBalance || "0");
       const openingSide = customer.openingBalanceSide || "Dr";
       let runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
 
-      const rows = balanceRows.map((row: any) => {
+      const rows = allRowsPdf.map((row: any) => {
         const debit = parseFloat(row.debitAmount || "0");
         const credit = parseFloat(row.creditAmount || "0");
         runningBalance += debit - credit;
@@ -13185,11 +13279,42 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .where(and(eq(customerBalances.companyId, companyId), eq(customerBalances.customerId, customerId)))
         .orderBy(customerBalances.transactionDate, customerBalances.id);
 
+      // Pull voucher entries (same logic as statement endpoint)
+      const voucherRowsXlsx: any[] = [];
+      const ledgerAccountIdXlsx = (customer as any).ledgerAccountId;
+      const voucherCondXlsx = ledgerAccountIdXlsx
+        ? sql`(${voucherEntries.ledgerAccountId} = ${ledgerAccountIdXlsx} OR ${voucherEntries.customerId} = ${customerId})`
+        : sql`${voucherEntries.customerId} = ${customerId}`;
+      const rawVeXlsx = await db.select({
+        id: voucherEntries.id, voucherId: voucherEntries.voucherId,
+        voucherNumber: vouchers.voucherNumber, voucherType: vouchers.voucherType,
+        voucherDate: vouchers.voucherDate, description: vouchers.description,
+        debitAmount: voucherEntries.debitAmount, creditAmount: voucherEntries.creditAmount,
+        narration: voucherEntries.narration,
+      }).from(voucherEntries)
+        .innerJoin(vouchers, and(eq(voucherEntries.voucherId, vouchers.id), eq(vouchers.companyId, companyId),
+          sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`, sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`))
+        .where(voucherCondXlsx).orderBy(vouchers.voucherDate, voucherEntries.id);
+      for (const ve of rawVeXlsx) {
+        voucherRowsXlsx.push({
+          transactionDate: ve.voucherDate, transactionType: ve.voucherType || "VOUCHER",
+          referenceType: "VOUCHER", referenceNumber: ve.voucherNumber,
+          description: ve.narration || ve.description || ve.voucherType,
+          debitAmount: ve.debitAmount ?? "0", creditAmount: ve.creditAmount ?? "0", _fromVoucher: true,
+        });
+      }
+      const allRowsXlsx = [...balanceRows.map((r: any) => ({ ...r, _fromVoucher: false })), ...voucherRowsXlsx]
+        .sort((a, b) => {
+          const da = (a.transactionDate || "").toString(), db2 = (b.transactionDate || "").toString();
+          if (da !== db2) return da < db2 ? -1 : 1;
+          return (a._fromVoucher ? 1 : 0) - (b._fromVoucher ? 1 : 0);
+        });
+
       const openingBalance = parseFloat(customer.openingBalance || "0");
       const openingSide = customer.openingBalanceSide || "Dr";
       let runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
 
-      const rows = balanceRows.map((row: any) => {
+      const rows = allRowsXlsx.map((row: any) => {
         const debit = parseFloat(row.debitAmount || "0");
         const credit = parseFloat(row.creditAmount || "0");
         runningBalance += debit - credit;
