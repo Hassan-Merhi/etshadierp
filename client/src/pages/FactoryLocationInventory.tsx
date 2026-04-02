@@ -358,7 +358,7 @@ export default function FactoryLocationInventory() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-proformas"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/location-inventory"] });
       setSavedProformaId(result.id);
-      setTimeout(() => navigate("/factory/sales/proformas"), 800);
+      setTimeout(() => navigate("/factory/invoicing?tab=proformas"), 800);
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;

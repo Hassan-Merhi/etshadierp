@@ -276,7 +276,7 @@ export default function FactoryCustomers() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => navigate(`/factory/sales/proformas?customerId=${customer.id}`)}
+                            onClick={() => navigate(`/factory/invoicing?tab=proformas&customerId=${customer.id}`)}
                             title="View Proformas"
                             data-testid={`button-proformas-customer-${customer.id}`}
                           >

@@ -417,7 +417,7 @@ export default function FactoryContainerLoadingScan() {
         description: "Loading has been sent for office verification",
       });
       setShowFinalizeDialog(false);
-      navigate("/factory/sales/pending-invoices");
+      navigate("/factory/invoicing?tab=pending");
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;

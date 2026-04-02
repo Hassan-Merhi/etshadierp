@@ -87,11 +87,9 @@ const navSections: NavSection[] = [
       { title: "Factory POS",      url: "/factory/pos",                    icon: ShoppingCart   },
       { title: "Customers",        url: "/factory/customers",              icon: Users          },
       { title: "Price List",       url: "/factory/price-list",             icon: DollarSign     },
-      { title: "Proformas",        url: "/factory/sales/proformas",        icon: FileText       },
+      { title: "Invoicing",        url: "/factory/invoicing",              icon: FileText       },
       { title: "Stock Allocation", url: "/factory/stock-allocation",       icon: LayoutGrid     },
       { title: "Loadings",         url: "/factory/sales/loadings",         icon: Container      },
-      { title: "Pending Invoices", url: "/factory/sales/pending-invoices", icon: ClipboardCheck },
-      { title: "Invoices",         url: "/factory/sales/invoices",         icon: ClipboardList  },
     ],
   },
   {

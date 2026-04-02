@@ -130,7 +130,7 @@ export default function ProformaAddLine() {
   };
 
   const goBack = () => {
-    navigate(`/factory/sales/proformas${customerId ? `?customerId=${customerId}` : ""}`);
+    navigate(`/factory/invoicing?tab=proformas${customerId ? `&customerId=${customerId}` : ""}`);
   };
 
   const isAdded = (item: StockItem) => addedCodes.has(item.code) || existingCodes.has(item.code);

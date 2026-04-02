@@ -193,7 +193,7 @@ export default function FactoryPendingInvoiceVerify() {
     },
     onSuccess: () => {
       toast({ title: "Returned to loading", description: "The order has been returned for further loading" });
-      navigate("/factory/sales/pending-invoices");
+      navigate("/factory/invoicing?tab=pending");
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
@@ -361,7 +361,7 @@ export default function FactoryPendingInvoiceVerify() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/factory/sales/pending-invoices")}
+            onClick={() => navigate("/factory/invoicing?tab=pending")}
             data-testid="button-back"
           >
             <ArrowLeft className="h-5 w-5" />

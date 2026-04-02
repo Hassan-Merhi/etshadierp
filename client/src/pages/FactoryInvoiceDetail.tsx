@@ -117,7 +117,7 @@ export default function FactoryInvoiceDetail() {
     onSuccess: () => {
       toast({ title: "Deleted", description: "Invoice deleted successfully." });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders"] });
-      navigate("/factory/sales/invoices");
+      navigate("/factory/invoicing?tab=invoices");
     },
     onError: (error: any) => {
       if (error?._handledGlobally) return;
@@ -173,7 +173,7 @@ export default function FactoryInvoiceDetail() {
         <Button
           variant="outline"
           className="mt-4"
-          onClick={() => navigate("/factory/sales/invoices")}
+          onClick={() => navigate("/factory/invoicing?tab=invoices")}
           data-testid="button-back-to-list"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -206,7 +206,7 @@ export default function FactoryInvoiceDetail() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate("/factory/sales/invoices")}
+          onClick={() => navigate("/factory/invoicing?tab=invoices")}
           data-testid="button-back"
         >
           <ArrowLeft className="h-4 w-4" />
