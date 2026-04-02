@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, DollarSign, CalendarDays, Banknote, Gift } from "lucide-react";
+import { Users, DollarSign, CalendarDays, Banknote, Gift, ArrowDownCircle } from "lucide-react";
 import FactoryEmployees from "@/pages/FactoryEmployees";
 import FactoryEmployeePayrollTab from "@/pages/FactoryEmployeePayrollTab";
 import FactoryEmployeeAttendanceTab from "@/pages/FactoryEmployeeAttendanceTab";
 import FactoryEmployeeAdvancesTab from "@/pages/FactoryEmployeeAdvancesTab";
 import FactoryEmployeeBonusesTab from "@/pages/FactoryEmployeeBonusesTab";
+import FactoryEmployeeWithdrawalsTab from "@/pages/FactoryEmployeeWithdrawalsTab";
 
-type TabValue = "employees" | "payroll" | "attendance" | "advances" | "bonuses";
+type TabValue = "employees" | "payroll" | "attendance" | "advances" | "bonuses" | "withdrawals";
 
 function getInitialTab(): TabValue {
   const params = new URLSearchParams(window.location.search);
@@ -16,14 +17,31 @@ function getInitialTab(): TabValue {
   if (tab === "attendance") return "attendance";
   if (tab === "advances") return "advances";
   if (tab === "bonuses") return "bonuses";
+  if (tab === "withdrawals") return "withdrawals";
   return "employees";
+}
+
+function setTabInUrl(tab: TabValue) {
+  const url = new URL(window.location.href);
+  if (tab === "employees") {
+    url.searchParams.delete("tab");
+  } else {
+    url.searchParams.set("tab", tab);
+  }
+  window.history.replaceState(null, "", url.toString());
 }
 
 export default function FactoryEmployeesHub() {
   const [tab, setTab] = useState<TabValue>(getInitialTab);
 
+  const handleTabChange = (v: string) => {
+    const newTab = v as TabValue;
+    setTab(newTab);
+    setTabInUrl(newTab);
+  };
+
   return (
-    <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
+    <Tabs value={tab} onValueChange={handleTabChange}>
       <TabsList className="mb-4 flex flex-wrap gap-1">
         <TabsTrigger value="employees" data-testid="tab-employees">
           <Users className="h-4 w-4 mr-2" />
@@ -45,6 +63,10 @@ export default function FactoryEmployeesHub() {
           <Gift className="h-4 w-4 mr-2" />
           Bonuses
         </TabsTrigger>
+        <TabsTrigger value="withdrawals" data-testid="tab-employee-withdrawals">
+          <ArrowDownCircle className="h-4 w-4 mr-2" />
+          Withdrawals
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="employees" className="mt-0">
@@ -61,6 +83,9 @@ export default function FactoryEmployeesHub() {
       </TabsContent>
       <TabsContent value="bonuses" className="mt-0">
         <FactoryEmployeeBonusesTab />
+      </TabsContent>
+      <TabsContent value="withdrawals" className="mt-0">
+        <FactoryEmployeeWithdrawalsTab />
       </TabsContent>
     </Tabs>
   );
