@@ -54,6 +54,7 @@
     const [showDropdown, setShowDropdown] = useState(false);
     const [selectedLocationId, setSelectedLocationId] = useState<string>("");
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+    const [entryDate, setEntryDate] = useState<string>(new Date().toISOString().split("T")[0]);
     const scanRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
     const appMode = useAppMode();
@@ -367,6 +368,7 @@
         const body: any = {
           items,
           erpLocationId: parseInt(selectedLocationId),
+          entryDate,
         };
         const response = await modeApiRequest("POST", "/api/factory/stock-entry", body);
 
@@ -732,6 +734,28 @@
                     <div className="text-sm font-medium">{selectedLocationName.name}</div>
                   </div>
                 )}
+                <div>
+                  <div className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    Entry Date
+                  </div>
+                  <Input
+                    type="date"
+                    value={entryDate}
+                    onChange={(e) => setEntryDate(e.target.value || new Date().toISOString().split("T")[0])}
+                    className="w-full text-sm"
+                    data-testid="input-entry-date"
+                  />
+                  {entryDate !== new Date().toISOString().split("T")[0] && (
+                    <button
+                      className="text-xs text-muted-foreground underline mt-1 hover:text-foreground"
+                      onClick={() => setEntryDate(new Date().toISOString().split("T")[0])}
+                      data-testid="button-reset-entry-date"
+                    >
+                      Reset to today
+                    </button>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -756,6 +780,12 @@
               </DialogDescription>
             </DialogHeader>
             <div className="text-sm space-y-3">
+              {entryDate !== new Date().toISOString().split("T")[0] && (
+                <div className="flex items-center gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-amber-800 dark:text-amber-200 text-xs">
+                  <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                  <span>Backdated entry — will be recorded on <strong>{entryDate}</strong></span>
+                </div>
+              )}
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
