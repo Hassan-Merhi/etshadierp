@@ -145,7 +145,9 @@
     }, [activeLocations, selectedLocationId]);
 
     useEffect(() => {
-      if (scanRef.current) scanRef.current.focus();
+      const active = document.activeElement;
+      const isOtherInputFocused = active && active !== scanRef.current && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT");
+      if (scanRef.current && !isOtherInputFocused) scanRef.current.focus();
     }, [cart]);
 
     const handleScan = (value: string) => {
