@@ -15490,61 +15490,128 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Invoice ${order.invoiceNumber || "DRAFT"}</title>
 <style>
-body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
-h1 { margin-bottom: 5px; }
-.header-info { margin-bottom: 20px; }
-.header-info p { margin: 2px 0; }
-table { border-collapse: collapse; margin-bottom: 20px; }
-.lines-table { width: 100%; table-layout: fixed; }
-.lines-table col.col-num { width: 40px; }
-.lines-table col.col-article { width: 100px; }
-.lines-table col.col-product { width: auto; }
-.lines-table col.col-qty { width: 55px; }
-.lines-table col.col-wt-bale { width: 85px; }
-.lines-table col.col-total-wt { width: 90px; }
-.lines-table col.col-price { width: 80px; }
-.lines-table col.col-total { width: 85px; }
-th, td { border: 1px solid #ddd; padding: 5px 7px; font-size: 13px; }
-th { background-color: #f5f5f5; white-space: nowrap; }
-.totals-table { min-width: 280px; margin-left: auto; }
-.totals-table td:last-child { text-align: right; font-weight: bold; white-space: nowrap; }
-.grand-total { font-size: 15px; font-weight: bold; background: #f0f0f0; }
-@media print { body { margin: 20px; } }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #1a1a2e; background: #fff; }
+
+  /* ── Top header bar ── */
+  .top-bar { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%); color: #fff; padding: 24px 32px; }
+  .top-bar h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .top-bar .subtitle { font-size: 11px; color: #a8c0e8; letter-spacing: 1px; text-transform: uppercase; }
+
+  /* ── Invoice meta strip ── */
+  .meta-strip { display: flex; gap: 0; border-bottom: 3px solid #e94560; }
+  .meta-box { flex: 1; padding: 10px 16px; border-right: 1px solid #e8edf5; background: #f7f9fc; }
+  .meta-box:last-child { border-right: none; }
+  .meta-box .label { font-size: 9px; font-weight: 700; color: #7a8ba0; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }
+  .meta-box .value { font-size: 13px; font-weight: 600; color: #1a1a2e; }
+
+  /* ── Section heading ── */
+  .section-heading { background: #e94560; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 5px 16px; margin: 0; }
+
+  /* ── Lines table ── */
+  .lines-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .lines-table col.col-num     { width: 32px; }
+  .lines-table col.col-article { width: 90px; }
+  .lines-table col.col-product { width: 130px; }
+  .lines-table col.col-qty     { width: 42px; }
+  .lines-table col.col-wt-bale { width: 72px; }
+  .lines-table col.col-total-wt{ width: 78px; }
+  .lines-table col.col-price   { width: 72px; }
+  .lines-table col.col-total   { width: 78px; }
+  .lines-table thead tr { background: #16213e; color: #fff; }
+  .lines-table thead th { padding: 7px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; border: none; white-space: nowrap; }
+  .lines-table tbody td { padding: 5px 8px; font-size: 11px; border-bottom: 1px solid #eaeff5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lines-table tbody tr:nth-child(even) { background: #f4f7fb; }
+  .lines-table tbody tr:hover { background: #e8f0fe; }
+  .lines-table tfoot td { padding: 6px 8px; font-size: 11px; font-weight: 600; background: #eef2f9; border-top: 2px solid #16213e; }
+
+  /* ── Charges table ── */
+  .charges-table { width: 60%; border-collapse: collapse; margin: 0 0 0 0; }
+  .charges-table thead tr { background: #0f3460; color: #fff; }
+  .charges-table thead th { padding: 6px 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; border: none; }
+  .charges-table tbody td { padding: 5px 10px; font-size: 11px; border-bottom: 1px solid #eaeff5; }
+  .charges-table tbody tr:nth-child(even) { background: #f4f7fb; }
+
+  /* ── Totals box ── */
+  .totals-wrap { display: flex; justify-content: flex-end; padding: 16px 0; }
+  .totals-table { width: 280px; border-collapse: collapse; }
+  .totals-table td { padding: 5px 12px; font-size: 12px; border-bottom: 1px solid #eaeff5; }
+  .totals-table td:last-child { text-align: right; font-weight: 600; }
+  .totals-table tr.grand { background: #e94560; color: #fff; }
+  .totals-table tr.grand td { font-size: 14px; font-weight: 700; border: none; padding: 8px 12px; }
+
+  .content { padding: 0 0 24px; }
+  @media print { body { margin: 0; } }
 </style></head><body>
-<h1>${company?.name || ""}</h1>
-<div class="header-info">
-<p><strong>Invoice:</strong> ${order.invoiceNumber || "DRAFT"}</p>
-<p><strong>Customer:</strong> ${order.customerName || "-"}</p>
-<p><strong>Date:</strong> ${order.orderDate}</p>
-${order.containerNumber ? `<p><strong>Container:</strong> ${order.containerNumber}</p>` : ""}
+
+<div class="top-bar">
+  <h1>${company?.name || ""}</h1>
+  <div class="subtitle">Commercial Invoice</div>
 </div>
-<h3>Order Lines</h3>
-<table class="lines-table">
-<colgroup>
-  <col class="col-num"><col class="col-article"><col class="col-product">
-  <col class="col-qty"><col class="col-wt-bale"><col class="col-total-wt">
-  <col class="col-price"><col class="col-total">
-</colgroup>
-<thead><tr>
-  <th style="text-align:center">#</th>
-  <th>Article Code</th>
-  <th>Product</th>
-  <th style="text-align:right">Qty</th>
-  <th style="text-align:right">Weight/Bale</th>
-  <th style="text-align:right">Total Weight</th>
-  <th style="text-align:right">Price/Bale</th>
-  <th style="text-align:right">Total Price</th>
-</tr></thead>
-<tbody>${linesHtml}</tbody>
-</table>
-${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type</th><th style="text-align:right">Amount</th></tr></thead><tbody>${chargesHtml}</tbody></table>` : ""}
-<table class="totals-table">
-<tr><td>Subtotal Bales</td><td>${fmtMoney(order.subtotalBales)}</td></tr>
-<tr><td>Freight</td><td>${fmtMoney(order.freightAmount)}</td></tr>
-<tr><td>Other Charges</td><td>${fmtMoney(order.otherChargesTotal)}</td></tr>
-<tr class="grand-total"><td>Grand Total</td><td>${fmtMoney(order.grandTotal)}</td></tr>
-<tr><td>Total Qty Bales</td><td style="text-align:right;font-weight:bold">${fmtNum(order.totalQtyBales)}</td></tr>
-</table>
+
+<div class="meta-strip">
+  <div class="meta-box">
+    <div class="label">Invoice No.</div>
+    <div class="value">${order.invoiceNumber || "DRAFT"}</div>
+  </div>
+  <div class="meta-box">
+    <div class="label">Customer</div>
+    <div class="value">${order.customerName || "-"}</div>
+  </div>
+  <div class="meta-box">
+    <div class="label">Date</div>
+    <div class="value">${order.orderDate}</div>
+  </div>
+  ${order.containerNumber ? `<div class="meta-box"><div class="label">Container</div><div class="value">${order.containerNumber}</div></div>` : ""}
+</div>
+
+<div class="content">
+  <div class="section-heading">Order Lines</div>
+  <table class="lines-table">
+    <colgroup>
+      <col class="col-num"><col class="col-article"><col class="col-product">
+      <col class="col-qty"><col class="col-wt-bale"><col class="col-total-wt">
+      <col class="col-price"><col class="col-total">
+    </colgroup>
+    <thead><tr>
+      <th style="text-align:center">#</th>
+      <th>Article Code</th>
+      <th>Product</th>
+      <th style="text-align:right">Qty</th>
+      <th style="text-align:right">Wt/Bale</th>
+      <th style="text-align:right">Total Wt</th>
+      <th style="text-align:right">Price/Bale</th>
+      <th style="text-align:right">Total</th>
+    </tr></thead>
+    <tbody>${linesHtml}</tbody>
+    <tfoot><tr>
+      <td colspan="3" style="text-align:right;color:#555">Totals</td>
+      <td style="text-align:right">${fmtNum(order.totalQtyBales)}</td>
+      <td></td>
+      <td style="text-align:right"></td>
+      <td></td>
+      <td style="text-align:right">${fmtMoney(order.grandTotal)}</td>
+    </tr></tfoot>
+  </table>
+
+  ${charges.length > 0 ? `
+  <div class="section-heading" style="margin-top:16px">Charges</div>
+  <table class="charges-table">
+    <thead><tr><th>Name</th><th>Type</th><th style="text-align:right">Amount</th></tr></thead>
+    <tbody>${chargesHtml}</tbody>
+  </table>` : ""}
+
+  <div class="totals-wrap">
+    <table class="totals-table">
+      <tr><td>Subtotal (Bales)</td><td>${fmtMoney(order.subtotalBales)}</td></tr>
+      <tr><td>Freight</td><td>${fmtMoney(order.freightAmount)}</td></tr>
+      <tr><td>Other Charges</td><td>${fmtMoney(order.otherChargesTotal)}</td></tr>
+      <tr><td>Total Qty Bales</td><td>${fmtNum(order.totalQtyBales)}</td></tr>
+      <tr class="grand"><td>Grand Total</td><td>${fmtMoney(order.grandTotal)}</td></tr>
+    </table>
+  </div>
+</div>
+
 </body></html>`;
 
       res.setHeader("Content-Type", "text/html");
