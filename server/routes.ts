@@ -27249,7 +27249,79 @@ if (asOfDate) {
         .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
         .where(and(...salesConditions))
         .execute();
-      const salesAccountsTotal = parseFloat(salesData[0]?.total || "0");
+      const posSalesTotal = parseFloat(salesData[0]?.total || "0");
+
+      // For ERP companies (non-POS): income may be recorded via voucher entries crediting
+      // income-type accounts (like SALES_REV). These are excluded from directIncomes/indirectIncomes
+      // to avoid double-counting with POS salesItems, but for ERP vouchers (no salesItems),
+      // we must capture them here so they appear as Sales Revenue in the P&L.
+      //
+      // "Missed" income accounts = those NOT already counted in directIncomes or indirectIncomes:
+      //   - Income accounts with SALES in code/name (excluded by SALES filter in directIncomes)
+      //   - Income accounts with null/unrecognized subType (don't match Direct or Indirect Income)
+      const missedIncomeAccounts = companyAccounts.filter((acc) => {
+        if (acc.accountType !== "Income") return false;
+        if (acc.subType === "Indirect Income") return false; // already in indirectIncomesTotal
+        if (
+          acc.subType === "Direct Income" &&
+          !acc.code?.includes("SALES") &&
+          !acc.name?.toLowerCase().includes("sales")
+        ) return false; // already in directIncomesTotal
+        return true;
+      });
+
+      let erpSalesTotal = 0;
+      const erpSalesAccountsDetails: { id: number; code: string; name: string; debit: number; credit: number; balance: number }[] = [];
+      if (missedIncomeAccounts.length > 0 && companyVoucherIds.length > 0) {
+        // Get the set of voucherIds that already have salesItems (POS sales) — exclude these
+        const posVouchersData = await db
+          .select({ voucherId: salesItems.voucherId })
+          .from(salesItems)
+          .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+          .where(and(...salesConditions))
+          .execute();
+        const posVoucherIdSet = new Set(posVouchersData.map((r) => r.voucherId));
+
+        const nonPosVoucherIds = companyVoucherIds.filter((id) => !posVoucherIdSet.has(id));
+        if (nonPosVoucherIds.length > 0) {
+          const missedAccountIds = missedIncomeAccounts.map((a) => a.id);
+          const erpSalesEntries = await db
+            .select()
+            .from(voucherEntries)
+            .where(
+              and(
+                inArray(voucherEntries.voucherId, nonPosVoucherIds),
+                inArray(voucherEntries.ledgerAccountId, missedAccountIds)
+              )
+            )
+            .execute();
+
+          const erpSalesByAccount = new Map<number, { debit: number; credit: number }>();
+          for (const e of erpSalesEntries) {
+            const d = parseFloat(e.debitAmount || "0");
+            const c = parseFloat(e.creditAmount || "0");
+            const cur = erpSalesByAccount.get(e.ledgerAccountId!) || { debit: 0, credit: 0 };
+            erpSalesByAccount.set(e.ledgerAccountId!, { debit: cur.debit + d, credit: cur.credit + c });
+          }
+          for (const acc of missedIncomeAccounts) {
+            const bal = erpSalesByAccount.get(acc.id) || { debit: 0, credit: 0 };
+            const netBalance = bal.credit - bal.debit;
+            if (Math.abs(netBalance) > 0.001) {
+              erpSalesTotal += netBalance;
+              erpSalesAccountsDetails.push({
+                id: acc.id,
+                code: acc.code || "",
+                name: acc.name,
+                debit: bal.debit,
+                credit: bal.credit,
+                balance: netBalance,
+              });
+            }
+          }
+        }
+      }
+
+      const salesAccountsTotal = posSalesTotal + erpSalesTotal;
 
       // 6. Closing Stock - Current inventory value (quantity × weighted average cost) across all active locations
       const activeLocationsData = await db
@@ -27535,6 +27607,9 @@ if (asOfDate) {
           // Trading Account - Credit Side
           salesAccounts: {
             total: salesAccountsTotal,
+            posTotal: posSalesTotal,
+            ledgerTotal: erpSalesTotal,
+            accounts: erpSalesAccountsDetails,
           },
           directIncomes: {
             total: directIncomesTotal,
@@ -38196,7 +38271,7 @@ if (asOfDate) {
       const allSalesRows = await db.select({ voucherDate: vouchers.voucherDate, total: salesItems.totalSales })
         .from(salesItems).innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id)).where(and(...salesConditions)).execute();
 
-      // Group sales by month
+      // Group POS sales by month
       const salesByMonth = new Map<string, number>();
       let totalSalesAll = 0;
       for (const s of allSalesRows) {
@@ -38205,6 +38280,49 @@ if (asOfDate) {
         const v = parseFloat(s.total || "0");
         salesByMonth.set(mk, (salesByMonth.get(mk) || 0) + v);
         totalSalesAll += v;
+      }
+
+      // ERP voucher-based income: income accounts excluded from directIncomes/indirectIncomes
+      // (SALES-named accounts and uncategorized income) that appear in non-POS vouchers.
+      const xlsxMissedIncomeAccounts = companyAccounts.filter((acc: any) => {
+        if (acc.accountType !== "Income") return false;
+        if (acc.subType === "Indirect Income") return false;
+        if (acc.subType === "Direct Income" && !acc.code?.includes("SALES") && !acc.name?.toLowerCase().includes("sales")) return false;
+        return true;
+      });
+      // Re-fetch pos voucher IDs for the period to exclude from ERP income calculation
+      const posPeriodVouchersXlsx = allPeriodVoucherIds.length > 0 && xlsxMissedIncomeAccounts.length > 0
+        ? await db.select({ voucherId: salesItems.voucherId })
+            .from(salesItems)
+            .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+            .where(and(...salesConditions))
+            .execute()
+        : [];
+      const posVIdSetXlsx = new Set(posPeriodVouchersXlsx.map((r) => r.voucherId));
+      const nonPosVIdsXlsx = allPeriodVoucherIds.filter((id) => !posVIdSetXlsx.has(id));
+
+      // Map voucherId → voucherDate for nonPosVouchers
+      const voucherDateMap = new Map<number, string>();
+      for (const v of allPeriodVouchers) voucherDateMap.set(v.id, v.voucherDate as string);
+
+      if (xlsxMissedIncomeAccounts.length > 0 && nonPosVIdsXlsx.length > 0) {
+        const missedAccIdsXlsx = xlsxMissedIncomeAccounts.map((a: any) => a.id);
+        const erpIncEntries = await db.select()
+          .from(voucherEntries)
+          .where(and(inArray(voucherEntries.voucherId, nonPosVIdsXlsx), inArray(voucherEntries.ledgerAccountId, missedAccIdsXlsx)))
+          .execute();
+        for (const e of erpIncEntries) {
+          const credit = parseFloat(e.creditAmount || "0");
+          const debit = parseFloat(e.debitAmount || "0");
+          const net = credit - debit;
+          if (Math.abs(net) < 0.001) continue;
+          const vDate = voucherDateMap.get(e.voucherId);
+          if (!vDate) continue;
+          const d = new Date(vDate);
+          const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          salesByMonth.set(mk, (salesByMonth.get(mk) || 0) + net);
+          totalSalesAll += net;
+        }
       }
 
       // allTimeAccountBalances for Net Position (no startDate filter)
