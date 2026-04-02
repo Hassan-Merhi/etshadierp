@@ -362,10 +362,6 @@ export default function ProductionRawStock() {
   // Mix batch section state
   const [createMixBatchOpen, setCreateMixBatchOpen] = useState(false);
   const [mixBatchStatusFilter, setMixBatchStatusFilter] = useState<string>("OPEN");
-  const [useTodayOpen, setUseTodayOpen] = useState(false);
-  const [useTodayDate, setUseTodayDate] = useState<string>(new Date().toISOString().slice(0, 10));
-  const [useTodayOperator, setUseTodayOperator] = useState("");
-  const [useTodayUsages, setUseTodayUsages] = useState<{ batchId: number; batchCode: string; totalKg: number; remainingKg: number; kgUsed: string }[]>([]);
   const [dailyReportOpen, setDailyReportOpen] = useState(false);
   const [dailyReportDate, setDailyReportDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [deleteBatchId, setDeleteBatchId] = useState<number | null>(null);
@@ -439,22 +435,19 @@ export default function ProductionRawStock() {
     enabled: dailyReportOpen,
   });
 
-  const consumeMutation = useMutation({
-    mutationFn: async (payload: { usages: { batchId: number; kgUsed: number }[]; operatorUser?: string; usedDate: string }) => {
-      const res = await modeApiRequest("POST", "/api/factory/mix-batches/consume", payload);
+  const finalizeBatchMutation = useMutation({
+    mutationFn: async (batchId: number) => {
+      const res = await modeApiRequest("POST", `/api/factory/mix-batches/${batchId}/finalize`, {});
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.message || "Consumption failed");
+        throw new Error(err.message || "Finalize failed");
       }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/daily-report"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
-      setUseTodayOpen(false);
-      setUseTodayUsages([]);
-      toast({ title: "Consumption recorded", description: "Daily usage logged. Carry-forward batches created where needed." });
+      toast({ title: "Batch finalized", description: "Mix batch marked as fully consumed." });
     },
     onError: (err: any) => {
       if (err?._handledGlobally) return;
@@ -1001,14 +994,6 @@ export default function ProductionRawStock() {
     return mixBatches.filter((b) => b.status === mixBatchStatusFilter);
   }, [mixBatches, mixBatchStatusFilter]);
 
-  const openBatchesForUsage = useMemo(() => {
-    if (!mixBatches) return [];
-    return mixBatches.filter((b) => {
-      const remaining = parseFloat(b.remainingKg);
-      return remaining > 0.001 && (b.status === "OPEN" || b.status === "ACTIVE" || b.status === "CARRY_FORWARD");
-    });
-  }, [mixBatches]);
-
   const mixBatchKpis = useMemo(() => {
     const active = (mixBatches || []).filter((b) => b.status === "OPEN" || b.status === "ACTIVE" || b.status === "CARRY_FORWARD");
     const totalMixKg = active.reduce((s, b) => s + parseFloat(b.remainingKg), 0);
@@ -1354,10 +1339,6 @@ export default function ProductionRawStock() {
                 <BarChart3 className="h-4 w-4 mr-1" />
                 Daily Report
               </Button>
-              <Button variant="outline" size="sm" onClick={() => { setUseTodayUsages([]); setUseTodayOpen(true); }} disabled={openBatchesForUsage.length === 0} data-testid="button-use-today">
-                <CheckCircle className="h-4 w-4 mr-1" />
-                Record Consumption
-              </Button>
               <Button size="sm" onClick={() => setCreateMixBatchOpen(true)} data-testid="button-create-mix-batch">
                 <Plus className="h-4 w-4 mr-1" />
                 Create Batch
@@ -1527,6 +1508,18 @@ export default function ProductionRawStock() {
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
+                          {(batch.status === "OPEN" || batch.status === "ACTIVE" || batch.status === "CARRY_FORWARD") && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => finalizeBatchMutation.mutate(batch.id)}
+                              disabled={finalizeBatchMutation.isPending}
+                              data-testid={`button-finalize-mix-batch-${batch.id}`}
+                            >
+                              <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                              Finalize
+                            </Button>
+                          )}
                           <Button
                             size="icon"
                             variant="ghost"
@@ -2978,131 +2971,6 @@ export default function ProductionRawStock() {
               {createAdjustmentMutation.isPending ? "Saving..." : "Save Adjustment"}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Use Mix Batches Today Dialog ── */}
-      <Dialog open={useTodayOpen} onOpenChange={(open) => { setUseTodayOpen(open); if (!open) setUseTodayUsages([]); }}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Record Daily Consumption</DialogTitle>
-            <DialogDescription>
-              Select a date and enter how many kg were consumed from each open batch. Partial consumption will create a carry-forward batch automatically.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label>Date</Label>
-                <Input
-                  type="date"
-                  value={useTodayDate}
-                  onChange={(e) => setUseTodayDate(e.target.value)}
-                  data-testid="input-use-today-date"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Operator (optional)</Label>
-                <Input
-                  placeholder="Operator name"
-                  value={useTodayOperator}
-                  onChange={(e) => setUseTodayOperator(e.target.value)}
-                  data-testid="input-use-today-operator"
-                />
-              </div>
-            </div>
-
-            {/* Batch selection for consumption */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Select batches to consume from:</Label>
-              <div className="max-h-64 overflow-y-auto border rounded-md divide-y">
-                {openBatchesForUsage.map((batch) => {
-                  const existing = useTodayUsages.find((u) => u.batchId === batch.id);
-                  const remaining = parseFloat(batch.remainingKg);
-                  return (
-                    <div key={batch.id} className="flex items-center gap-3 p-3" data-testid={`row-use-batch-${batch.id}`}>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-mono text-sm font-medium">{batch.batchCode}</p>
-                        <p className="text-xs text-muted-foreground">{batch.name || ""} · {formatNumber(remaining)} kg remaining</p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {existing ? (
-                          <>
-                            <Input
-                              type="number"
-                              placeholder="kg used"
-                              value={existing.kgUsed}
-                              step="0.001"
-                              min="0.001"
-                              max={remaining}
-                              className="w-28 font-mono"
-                              onChange={(e) => {
-                                setUseTodayUsages((prev) =>
-                                  prev.map((u) => u.batchId === batch.id ? { ...u, kgUsed: e.target.value } : u)
-                                );
-                              }}
-                              data-testid={`input-kg-used-${batch.id}`}
-                            />
-                            <Button size="icon" variant="ghost" onClick={() => setUseTodayUsages((prev) => prev.filter((u) => u.batchId !== batch.id))}>
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setUseTodayUsages((prev) => [...prev, { batchId: batch.id, batchCode: batch.batchCode, totalKg: parseFloat(batch.totalWeightKg), remainingKg: remaining, kgUsed: remaining.toFixed(3) }])}
-                            data-testid={`button-add-batch-usage-${batch.id}`}
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Add
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {useTodayUsages.length > 0 && (
-              <div className="bg-muted/50 rounded-md p-3 space-y-1">
-                <p className="text-sm font-medium">Summary:</p>
-                {useTodayUsages.map((u) => {
-                  const kgUsed = parseFloat(u.kgUsed) || 0;
-                  const isPartial = kgUsed < u.remainingKg - 0.001;
-                  return (
-                    <p key={u.batchId} className="text-sm text-muted-foreground">
-                      {u.batchCode}: {formatNumber(kgUsed)} kg consumed
-                      {isPartial && <span className="text-amber-600 dark:text-amber-400"> → {formatNumber(u.remainingKg - kgUsed)} kg carry-forward</span>}
-                    </p>
-                  );
-                })}
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2 flex-wrap">
-              <Button variant="outline" onClick={() => setUseTodayOpen(false)} data-testid="button-use-today-cancel">
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  const validUsages = useTodayUsages
-                    .map((u) => ({ batchId: u.batchId, kgUsed: parseFloat(u.kgUsed) || 0 }))
-                    .filter((u) => u.kgUsed > 0);
-                  if (validUsages.length === 0) {
-                    toast({ title: "Nothing to record", description: "Enter kg used for at least one batch", variant: "destructive" });
-                    return;
-                  }
-                  consumeMutation.mutate({ usages: validUsages, operatorUser: useTodayOperator || undefined, usedDate: useTodayDate });
-                }}
-                disabled={consumeMutation.isPending || useTodayUsages.length === 0}
-                data-testid="button-use-today-confirm"
-              >
-                {consumeMutation.isPending ? "Recording..." : "Record Consumption"}
-              </Button>
-            </div>
-          </div>
         </DialogContent>
       </Dialog>
 

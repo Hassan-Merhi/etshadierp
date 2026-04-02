@@ -8551,6 +8551,42 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // ── Finalize a mix batch (mark as fully consumed/completed) ──
+  app.post("/api/factory/mix-batches/:id/finalize", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+
+      const [batch] = await db
+        .select()
+        .from(factoryMixBatches)
+        .where(and(eq(factoryMixBatches.id, id), eq(factoryMixBatches.companyId, companyId)));
+
+      if (!batch) return res.status(404).json({ message: "Mix batch not found" });
+
+      if (batch.status === "COMPLETED" || batch.status === "CLOSED") {
+        return res.status(400).json({ message: "Batch is already finalized" });
+      }
+
+      const [updated] = await db
+        .update(factoryMixBatches)
+        .set({
+          usedKg: batch.totalWeightKg,
+          status: "COMPLETED",
+          updatedAt: new Date(),
+        })
+        .where(eq(factoryMixBatches.id, id))
+        .returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error finalizing mix batch:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/factory/mix-batches/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
