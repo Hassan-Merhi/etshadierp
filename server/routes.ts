@@ -22176,13 +22176,11 @@ if (asOfDate) {
       const assetAccountTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
       
       // Fixed asset name patterns - only apply to asset-type accounts
-      // NOTE: "guarantee", "deposit", "caution" are intentionally NOT excluded —
-      // they are refundable cash deposits (caution douane, dépôt de garantie, etc.)
-      // that are current assets the company expects to recover, not fixed assets.
       const fixedAssetNamePatterns = [
         "rover", "toyota", "mercedes", "vehicle", "car", "truck",
         "land", "property", "building", "house",
         "rolex", "watch", "luxury", "jewelry",
+        "guarantee", "deposit", "caution"
       ];
       
       // Stock/Inventory account patterns - exclude from ledger assets because we add computed stockOnFloor separately
@@ -22361,12 +22359,20 @@ if (asOfDate) {
         forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: stockOnFloor, category: "Inventory" });
       }
 
-      // Opening stock (stockItems.openingValue) is intentionally NOT added separately here.
-      // Physical opening stock is already recorded in the inventory table and is therefore
-      // already captured in stockOnFloor above. Adding it again would double-count it.
+      // Opening stock — initial inventory cost entered outside the double-entry ledger.
+      // Not an expense: it is the cost basis of goods brought into the system at setup.
+      const dashStockItems = await storage.getAllStockItems(companyId);
+      let dashOpeningStock = 0;
+      for (const item of dashStockItems) dashOpeningStock += parseFloat((item as any).openingValue || '0');
+      if (dashOpeningStock > 0) {
+        forUsTotal += dashOpeningStock;
+        categoryTotals["asset_Opening Stock"] = dashOpeningStock;
+        forUsAccounts.push({ name: "Opening Stock (Initial Inventory)", code: "COMPUTED", value: dashOpeningStock, category: "Opening Stock" });
+      }
 
-      // NOTE: Stock OTW (containers pending offload) IS included below as an asset.
-      // Containers in transit represent goods we own and have paid/committed to pay for.
+      // NOTE: Stock OTW (containers pending offload) is intentionally EXCLUDED
+      // Containers in transit are not yet assets - they become assets only when offloaded
+      // At that point, they increase inventory (asset) and create supplier/agent liabilities
 
       // Add Workers/Payroll - employee balances (what we owe them)
       const companyEmployees = await db
@@ -27437,7 +27443,7 @@ if (asOfDate) {
       const stmtAssetTypes = ['Asset', 'Current Asset', 'Fixed Asset', 'Bank', 'Cash'];
       const stmtStockPatterns = ['closing stock', 'opening stock', 'stock in hand', 'stock on hand', 'inventory', 'stock account', 'goods in stock', 'merchandise'];
       const stmtStockCodes = ['CLOSING_STOCK', 'OPENING_STOCK', 'STOCK', 'INVENTORY', 'STOCK_IN_HAND'];
-      const stmtFixedAssetNames = ['rover', 'toyota', 'mercedes', 'vehicle', 'car', 'truck', 'land', 'property', 'building', 'house', 'rolex', 'watch', 'luxury', 'jewelry'];
+      const stmtFixedAssetNames = ['rover', 'toyota', 'mercedes', 'vehicle', 'car', 'truck', 'land', 'property', 'building', 'house', 'rolex', 'watch', 'luxury', 'jewelry', 'guarantee', 'deposit', 'caution'];
       const isExcludedFromStmtNp = (acc: typeof companyAccounts[0]) => {
         if (stmtExcludedTypes.includes(acc.accountType || '')) return true;
         if (acc.code === 'PRODUCTION_ADJUSTMENT' || acc.code === 'CONSUMPTION_EXPENSE') return true;
@@ -27470,8 +27476,11 @@ if (asOfDate) {
       // ledger account balances + supplier balances which ARE properly bounded by endDate.
       const stmtIsAllTime = !endDate;
       if (stmtIsAllTime) {
-        // Opening stock (openingStockValue) is intentionally NOT added separately here.
-        // Physical opening stock is already in the inventory table and captured in closingStockValue.
+        // Add opening stock as an asset (entered outside ledger via stockItems.openingValue)
+        // This is NOT an expense — it is the initial cost basis of inventory brought into the system
+        if (openingStockValue > 0) {
+          stmtNpForUs += openingStockValue;
+        }
 
         // Add stock on floor (inventory) as asset
         stmtNpForUs += closingStockValue;
@@ -38369,7 +38378,7 @@ if (asOfDate) {
       const npAssetTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
       const npStockPatterns = ["closing stock", "opening stock", "stock in hand", "stock on hand", "inventory", "stock account", "goods in stock", "merchandise"];
       const npStockCodes = ["CLOSING_STOCK", "OPENING_STOCK", "STOCK", "INVENTORY", "STOCK_IN_HAND"];
-      const npFixedAssetNames = ["rover", "toyota", "mercedes", "vehicle", "car", "truck", "land", "property", "building", "house", "rolex", "watch", "luxury", "jewelry"];
+      const npFixedAssetNames = ["rover", "toyota", "mercedes", "vehicle", "car", "truck", "land", "property", "building", "house", "rolex", "watch", "luxury", "jewelry", "guarantee", "deposit", "caution"];
       const isExcludedFromNp = (acc: any) => {
         if (npExcludedTypes.includes(acc.accountType || "")) return true;
         if (acc.code === "PRODUCTION_ADJUSTMENT" || acc.code === "CONSUMPTION_EXPENSE") return true;
