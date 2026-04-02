@@ -1,4 +1,4 @@
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import FactoryProformas from "@/pages/FactoryProformas";
 import FactoryPendingInvoices from "@/pages/FactoryPendingInvoices";
 import FactoryInvoices from "@/pages/FactoryInvoices";
@@ -13,8 +13,8 @@ function getTab(search: string): InvoicingTab {
 }
 
 export default function FactoryInvoicing() {
-  const [location, navigate] = useLocation();
-  const search = typeof window !== "undefined" ? window.location.search : "";
+  const [, navigate] = useLocation();
+  const search = useSearch();
   const activeTab = getTab(search);
 
   const tabs: { key: InvoicingTab; label: string }[] = [
