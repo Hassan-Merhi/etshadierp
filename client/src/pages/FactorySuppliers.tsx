@@ -213,6 +213,18 @@ export default function FactorySuppliers() {
   const toggleStmtSection = (key: string) =>
     setCollapsedStmtSections(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
 
+  // Broker overview pool balances query (fires when viewing broker overview page)
+  const { data: brokerOverviewStatement, isLoading: brokerOverviewLoading } = useQuery<any>({
+    queryKey: ["/api/factory/suppliers", parentViewSupplierId, "broker-statement"],
+    queryFn: async () => {
+      const res = await factoryApiRequest("GET", `/api/factory/suppliers/${parentViewSupplierId}/broker-statement`);
+      if (!res.ok) throw new Error("Failed to load broker overview");
+      return res.json();
+    },
+    enabled: !!parentViewSupplierId && !statementSupplierId,
+    staleTime: 30000,
+  });
+
   // Broker consolidated statement query (fires when viewing a broker's own statement)
   const isBrokerStatement = !!(statementData?.linkedSupplierGroups?.length);
   const { data: brokerStatement, isLoading: brokerStatementLoading } = useQuery<any>({
@@ -835,8 +847,11 @@ export default function FactorySuppliers() {
     const parentSup = allSuppliers.find(s => s.id === parentViewSupplierId);
     const children = subAccountsByParent[parentViewSupplierId] || [];
 
-    // Broker True Balance — only the broker's own direct entries + FX-in transfers
-    const brokerOwnBalances = (parentSup?.currencyBalances || []).filter(b => Math.abs(b.balance) > 0.001);
+    // Pool balances from broker activity ledger (all currencies, net balance per currency section)
+    const brokerOwnBalances: { currencyCode: string; balance: number; isBrokerPool: boolean }[] =
+      (brokerOverviewStatement?.currencyLedgers || [])
+        .map((section: any) => ({ currencyCode: section.currencyCode, balance: parseFloat(section.netBalance || "0"), isBrokerPool: !!section.isBrokerPool }))
+        .filter((b: any) => Math.abs(b.balance) > 0.001);
 
     // Linked Supplier Exposure — from server's linkedSupplierExposure or children's own currencyBalances
     // Server returns exposureCurrencyBalances (aggregate) and linkedSupplierExposure (per-supplier)
@@ -915,11 +930,18 @@ export default function FactorySuppliers() {
                 </div>
               </CardContent>
             </Card>
-            {brokerOwnBalances.map((b) => (
+            {brokerOverviewLoading ? (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-xs text-muted-foreground">Pool Balance</div>
+                  <div className="text-2xl font-bold mt-1 text-muted-foreground animate-pulse">—</div>
+                </CardContent>
+              </Card>
+            ) : brokerOwnBalances.map((b) => (
               <Card key={b.currencyCode}>
                 <CardContent className="p-4">
                   <div className="text-xs text-muted-foreground">
-                    Pool Balance {b.currencyCode !== "USD" ? `(${b.currencyCode})` : "(USD)"}
+                    {b.isBrokerPool ? "Pool Balance" : "Net Balance"} ({b.currencyCode})
                   </div>
                   <div
                     className={`text-2xl font-bold mt-1 tabular-nums ${b.balance > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
@@ -928,7 +950,9 @@ export default function FactorySuppliers() {
                     {b.currencyCode === "USD" ? "$" : `${b.currencyCode} `}{formatNum(Math.abs(b.balance).toFixed(2))}
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5">
-                    {b.balance > 0 ? "Received" : b.balance < 0 ? "Owed" : "Settled"}
+                    {b.isBrokerPool
+                      ? (b.balance > 0 ? "Received" : b.balance < 0 ? "Owed" : "Settled")
+                      : (b.balance > 0 ? "Payable to suppliers" : b.balance < 0 ? "Overpaid" : "Settled")}
                   </div>
                 </CardContent>
               </Card>
