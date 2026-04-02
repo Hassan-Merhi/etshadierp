@@ -77,6 +77,10 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
             wasteTrackingEnabled: true,
             cashflowEnabled: true,
             rolesEnabled: true,
+            netProfitEnabled: true,
+            productionSummaryEnabled: true,
+            supplierReportEnabled: true,
+            supplierStatementEnabled: true,
           })
           .returning();
       }
@@ -97,6 +101,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         dashboardEnabled, kpisEnabled, profitabilityEnabled, alertsEnabled,
         supplierScoringEnabled, mixOptimizerEnabled, traceabilityEnabled,
         balePhotosEnabled, wasteTrackingEnabled, cashflowEnabled, rolesEnabled,
+        netProfitEnabled, productionSummaryEnabled, supplierReportEnabled, supplierStatementEnabled,
         laborCostPerKg, overheadPerKg,
       } = req.body;
 
@@ -112,6 +117,10 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       if (wasteTrackingEnabled !== undefined) updateData.wasteTrackingEnabled = wasteTrackingEnabled;
       if (cashflowEnabled !== undefined) updateData.cashflowEnabled = cashflowEnabled;
       if (rolesEnabled !== undefined) updateData.rolesEnabled = rolesEnabled;
+      if (netProfitEnabled !== undefined) updateData.netProfitEnabled = netProfitEnabled;
+      if (productionSummaryEnabled !== undefined) updateData.productionSummaryEnabled = productionSummaryEnabled;
+      if (supplierReportEnabled !== undefined) updateData.supplierReportEnabled = supplierReportEnabled;
+      if (supplierStatementEnabled !== undefined) updateData.supplierStatementEnabled = supplierStatementEnabled;
       if (laborCostPerKg !== undefined) updateData.laborCostPerKg = String(laborCostPerKg);
       if (overheadPerKg !== undefined) updateData.overheadPerKg = String(overheadPerKg);
 

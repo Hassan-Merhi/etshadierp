@@ -60,6 +60,7 @@ interface NavSection {
   label: string;
   color: string;
   items: NavItem[];
+  developerOnly?: boolean;
 }
 
 const navSections: NavSection[] = [
@@ -129,26 +130,27 @@ const navSections: NavSection[] = [
     label: "Reports",
     color: "#06b6d4",
     items: [
-      { title: "Analytics",          url: "/factory/analytics",            icon: TrendingUp     },
-      { title: "Net Profit",         url: "/factory/net-profit-analytics", icon: BarChart3      },
-      { title: "Production Summary", url: "/factory/production-summary",   icon: BarChart3      },
-      { title: "Supplier Report",    url: "/factory/supplier-report",      icon: ClipboardCheck },
-      { title: "Supplier Statement", url: "/factory/supplier-statement",   icon: ClipboardCheck },
+      { title: "Analytics", url: "/factory/analytics", icon: TrendingUp },
     ],
   },
   {
     label: "Intelligence",
     color: "#f43f5e",
+    developerOnly: true,
     items: [
-      { title: "Factory Dashboard", url: "/factory/intelligence/dashboard",       icon: Activity,   featureFlag: "dashboardEnabled"       },
-      { title: "KPIs",              url: "/factory/intelligence/kpis",            icon: Gauge,      featureFlag: "kpisEnabled"            },
-      { title: "Profitability",     url: "/factory/intelligence/profitability",   icon: DollarSign, featureFlag: "profitabilityEnabled"   },
-      { title: "Waste Tracking",    url: "/factory/intelligence/waste",           icon: Trash2,     featureFlag: "wasteTrackingEnabled"   },
-      { title: "Alerts",            url: "/factory/intelligence/alerts",          icon: Bell,       featureFlag: "alertsEnabled"          },
-      { title: "Supplier Scores",   url: "/factory/intelligence/supplier-scores", icon: Award,     featureFlag: "supplierScoringEnabled" },
-      { title: "Mix Optimizer",     url: "/factory/intelligence/mix-optimizer",   icon: Beaker,    featureFlag: "mixOptimizerEnabled"    },
-      { title: "Cash Flow",         url: "/factory/intelligence/cashflow",        icon: DollarSign, featureFlag: "cashflowEnabled"       },
-      { title: "Intel Settings",    url: "/factory/intelligence/settings",        icon: Settings,   adminOnly: true                     },
+      { title: "Factory Dashboard", url: "/factory/intelligence/dashboard",       icon: Activity,   featureFlag: "dashboardEnabled"           },
+      { title: "KPIs",              url: "/factory/intelligence/kpis",            icon: Gauge,      featureFlag: "kpisEnabled"                },
+      { title: "Profitability",     url: "/factory/intelligence/profitability",   icon: DollarSign, featureFlag: "profitabilityEnabled"       },
+      { title: "Waste Tracking",    url: "/factory/intelligence/waste",           icon: Trash2,     featureFlag: "wasteTrackingEnabled"       },
+      { title: "Alerts",            url: "/factory/intelligence/alerts",          icon: Bell,       featureFlag: "alertsEnabled"              },
+      { title: "Supplier Scores",   url: "/factory/intelligence/supplier-scores", icon: Award,      featureFlag: "supplierScoringEnabled"     },
+      { title: "Mix Optimizer",     url: "/factory/intelligence/mix-optimizer",   icon: Beaker,     featureFlag: "mixOptimizerEnabled"        },
+      { title: "Cash Flow",         url: "/factory/intelligence/cashflow",        icon: DollarSign, featureFlag: "cashflowEnabled"            },
+      { title: "Net Profit",        url: "/factory/net-profit-analytics",         icon: BarChart3,  featureFlag: "netProfitEnabled"           },
+      { title: "Production Summary",url: "/factory/production-summary",           icon: BarChart3,  featureFlag: "productionSummaryEnabled"   },
+      { title: "Supplier Report",   url: "/factory/supplier-report",              icon: ClipboardCheck, featureFlag: "supplierReportEnabled"  },
+      { title: "Supplier Statement",url: "/factory/supplier-statement",           icon: ClipboardCheck, featureFlag: "supplierStatementEnabled"},
+      { title: "Intel Settings",    url: "/factory/intelligence/settings",        icon: Settings,   adminOnly: true                           },
     ],
   },
 ];
@@ -195,20 +197,24 @@ export function FactorySidebar({ user }: { user?: any }) {
     staleTime: 30000,
   });
 
-  const visibleSections = navSections.map(s => ({
-    ...s,
-    items: s.items.filter(item => {
-      if (item.adminOnly && !isAdmin) return false;
-      if (item.featureFlag) { if (!settings || settings[item.featureFlag] !== true) return false; }
-      if (myAccess && !myAccess.fullAccess && myAccess.pageKeys.length > 0)
-        if (!myAccess.pageKeys.includes(item.url.replace(/^\//, ""))) return false;
-      if (item.requiresExplicitAccess && !isAdmin && myAccess) {
-        if (myAccess.fullAccess) return false;
-        if (!myAccess.pageKeys.includes(item.url.replace(/^\//, ""))) return false;
-      }
-      return true;
-    }),
-  })).filter(s => s.items.length > 0);
+  const isDeveloper = user?.role === "Developer";
+
+  const visibleSections = navSections
+    .filter(s => !s.developerOnly || isDeveloper)
+    .map(s => ({
+      ...s,
+      items: s.items.filter(item => {
+        if (item.adminOnly && !isAdmin) return false;
+        if (item.featureFlag) { if (!settings || settings[item.featureFlag] !== true) return false; }
+        if (myAccess && !myAccess.fullAccess && myAccess.pageKeys.length > 0)
+          if (!myAccess.pageKeys.includes(item.url.replace(/^\//, ""))) return false;
+        if (item.requiresExplicitAccess && !isAdmin && myAccess) {
+          if (myAccess.fullAccess) return false;
+          if (!myAccess.pageKeys.includes(item.url.replace(/^\//, ""))) return false;
+        }
+        return true;
+      }),
+    })).filter(s => s.items.length > 0);
 
   // Auto-open the section that contains the active route
   const activeSection = visibleSections.find(s => s.items.some(i => location === i.url));

@@ -30,6 +30,10 @@ interface FactorySettingsData {
   wasteTrackingEnabled: boolean;
   cashflowEnabled: boolean;
   rolesEnabled: boolean;
+  netProfitEnabled: boolean;
+  productionSummaryEnabled: boolean;
+  supplierReportEnabled: boolean;
+  supplierStatementEnabled: boolean;
   laborCostPerKg: number;
   overheadPerKg: number;
 }
@@ -46,6 +50,10 @@ const defaultSettings: FactorySettingsData = {
   wasteTrackingEnabled: true,
   cashflowEnabled: true,
   rolesEnabled: true,
+  netProfitEnabled: true,
+  productionSummaryEnabled: true,
+  supplierReportEnabled: true,
+  supplierStatementEnabled: true,
   laborCostPerKg: 0,
   overheadPerKg: 0,
 };
@@ -303,6 +311,10 @@ export default function FactorySettings() {
       wasteTrackingEnabled: true,
       cashflowEnabled: true,
       rolesEnabled: true,
+      netProfitEnabled: true,
+      productionSummaryEnabled: true,
+      supplierReportEnabled: true,
+      supplierStatementEnabled: true,
     };
     setSettings(allEnabled);
     mutation.mutate(allEnabled);
@@ -393,6 +405,19 @@ export default function FactorySettings() {
           <CardContent className="divide-y">
             {toggleItem("Alerts System", "alertsEnabled")}
             {toggleItem("Roles & Permissions", "rolesEnabled")}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle data-testid="text-section-reports">Reports</CardTitle>
+            <CardDescription>Toggle report pages on or off for all users</CardDescription>
+          </CardHeader>
+          <CardContent className="divide-y">
+            {toggleItem("Net Profit", "netProfitEnabled")}
+            {toggleItem("Production Summary", "productionSummaryEnabled")}
+            {toggleItem("Supplier Report", "supplierReportEnabled")}
+            {toggleItem("Supplier Statement", "supplierStatementEnabled")}
           </CardContent>
         </Card>
 
