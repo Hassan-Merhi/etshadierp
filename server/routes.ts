@@ -103,6 +103,7 @@ import {
   factoryBales,
   factorySuppliers,
   factoryContainers,
+  factoryRawStock,
   factorySupplierPayments,
   loginHistory,
   storedFiles,
@@ -26937,6 +26938,14 @@ if (asOfDate) {
       const startDate = req.query.startDate ? new Date(req.query.startDate as string) : null;
       const endDate = req.query.endDate ? new Date(req.query.endDate as string) : null;
 
+      // Check if this is a factory company (uses factory_raw_stock for purchases/stock)
+      const [companyRecord] = await db
+        .select({ companyType: companies.companyType })
+        .from(companies)
+        .where(eq(companies.id, companyId))
+        .execute();
+      const isFactoryCompany = companyRecord?.companyType === "factory";
+
       // Get all ledger accounts for this company
       const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
 
@@ -27037,19 +27046,77 @@ if (asOfDate) {
         (acc) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-")
       );
       let purchaseAccountsTotal = 0;
-      const purchaseAccountsDetails = purchaseAccounts.map((acc) => {
+      const purchaseAccountsDetails: { id: number; code: string; name: string; debit: number; credit: number; balance: number }[] = purchaseAccounts.map((acc) => {
         const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
         const netBalance = balance.debit - balance.credit; // Purchases are debits
         purchaseAccountsTotal += netBalance;
         return {
           id: acc.id,
-          code: acc.code,
+          code: acc.code || "",
           name: acc.name,
           debit: balance.debit,
           credit: balance.credit,
           balance: netBalance,
         };
       });
+
+      // For factory companies: calculate raw material purchases from factory_raw_stock table
+      // and raw material remaining value for closing stock adjustment
+      let factoryRawStockRemainingValue = 0;
+      if (isFactoryCompany) {
+        // Build filter for raw materials received in the period
+        const frsConditions: any[] = [eq(factoryRawStock.companyId, companyId)];
+        if (startDate) {
+          frsConditions.push(gte(factoryRawStock.offloadedAt, startDate));
+        }
+        if (endDate) {
+          frsConditions.push(lte(factoryRawStock.offloadedAt, endDate));
+        }
+        const frsInPeriod = await db
+          .select({
+            receivedKg: factoryRawStock.receivedKg,
+            costPerKg: factoryRawStock.costPerKg,
+          })
+          .from(factoryRawStock)
+          .where(and(...frsConditions))
+          .execute();
+
+        let factoryRawPurchaseCost = 0;
+        for (const row of frsInPeriod) {
+          const qty = parseFloat(row.receivedKg || "0");
+          const cost = parseFloat(row.costPerKg || "0");
+          factoryRawPurchaseCost += qty * cost;
+        }
+
+        if (factoryRawPurchaseCost > 0) {
+          purchaseAccountsTotal += factoryRawPurchaseCost;
+          purchaseAccountsDetails.push({
+            id: -1,
+            code: "FACTORY_RAW_MATERIALS",
+            name: "Factory Raw Materials",
+            debit: factoryRawPurchaseCost,
+            credit: 0,
+            balance: factoryRawPurchaseCost,
+          });
+        }
+
+        // Closing stock: sum remaining (received - used) × cost per kg across ALL factory raw stock
+        const allFrs = await db
+          .select({
+            receivedKg: factoryRawStock.receivedKg,
+            usedKg: factoryRawStock.usedKg,
+            costPerKg: factoryRawStock.costPerKg,
+          })
+          .from(factoryRawStock)
+          .where(eq(factoryRawStock.companyId, companyId))
+          .execute();
+        for (const row of allFrs) {
+          const received = parseFloat(row.receivedKg || "0");
+          const used = parseFloat(row.usedKg || "0");
+          const cost = parseFloat(row.costPerKg || "0");
+          factoryRawStockRemainingValue += (received - used) * cost;
+        }
+      }
 
       // 3. Direct Incomes - accounts with accountType="Income" AND subType="Direct Income"
       // EXCLUDE sales-related accounts because Sales is already counted from salesItems table
@@ -27165,6 +27232,11 @@ if (asOfDate) {
           const rate = parseFloat(inv.averageRate || "0");
           closingStockValue += qty * rate;
         }
+      }
+
+      // For factory companies: add raw material remaining stock to closing stock value
+      if (isFactoryCompany) {
+        closingStockValue += factoryRawStockRemainingValue;
       }
 
       // 7. Gross Profit Calculation - TALLY PRIME TRADING ACCOUNT STYLE
