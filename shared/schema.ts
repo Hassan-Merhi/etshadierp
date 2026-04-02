@@ -3028,7 +3028,7 @@ export const insertFactoryDaybookEntrySchema = createInsertSchema(factoryDaybook
   referenceId: z.number().optional().nullable(),
   referenceTable: z.string().optional().nullable(),
   metaJson: z.string().optional().nullable(),
-  createdBy: z.number().optional().nullable(),
+  createdBy: z.string().optional().nullable(),
 });
 
 export type InsertFactoryDaybookEntry = z.infer<typeof insertFactoryDaybookEntrySchema>;
@@ -3066,7 +3066,7 @@ export const containerDocuments = pgTable("container_documents", {
   fileName: text("file_name").notNull(),
   storageKey: text("storage_key").notNull(),
   mimeType: varchar("mime_type", { length: 100 }),
-  uploadedBy: integer("uploaded_by"),
+  uploadedBy: varchar("uploaded_by"),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
 }, (t) => ({
   containerIdx: index("container_docs_container_idx").on(t.containerId),
@@ -3082,7 +3082,7 @@ export const insertContainerDocumentSchema = createInsertSchema(containerDocumen
   fileName: z.string().min(1),
   storageKey: z.string().min(1),
   mimeType: z.string().optional().nullable(),
-  uploadedBy: z.number().optional().nullable(),
+  uploadedBy: z.string().optional().nullable(),
 });
 
 export type InsertContainerDocument = z.infer<typeof insertContainerDocumentSchema>;
@@ -3161,7 +3161,7 @@ export const factoryDaybookEntryEdits = pgTable("factory_daybook_entry_edits", {
   id: serial("id").primaryKey(),
   daybookEntryId: integer("daybook_entry_id").notNull(),
   editedAt: timestamp("edited_at").notNull().defaultNow(),
-  editedBy: integer("edited_by"),
+  editedBy: varchar("edited_by"),
   beforeJson: text("before_json"),
   afterJson: text("after_json"),
   reason: text("reason").notNull(),
@@ -3535,7 +3535,7 @@ export const factoryBalePhotos = pgTable("factory_bale_photos", {
   baleId: integer("bale_id").notNull(),
   url: text("url").notNull(),
   fileName: varchar("file_name", { length: 255 }),
-  uploadedBy: integer("uploaded_by"),
+  uploadedBy: varchar("uploaded_by"),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
 }, (t) => ({
   baleIdx: index("factory_bale_photos_bale_idx").on(t.baleId),
@@ -3784,7 +3784,7 @@ export const storedFiles = pgTable("stored_files", {
   fileSize: integer("file_size").notNull(),
   fileData: text("file_data").notNull(),
   description: text("description"),
-  uploadedBy: integer("uploaded_by"),
+  uploadedBy: varchar("uploaded_by"),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
 });
 
@@ -3798,7 +3798,7 @@ export const insertStoredFileSchema = createInsertSchema(storedFiles).omit({
   fileSize: z.number().min(0),
   fileData: z.string().min(1),
   description: z.string().optional(),
-  uploadedBy: z.number().optional(),
+  uploadedBy: z.string().optional().nullable(),
 });
 
 export type InsertStoredFile = z.infer<typeof insertStoredFileSchema>;
