@@ -9175,7 +9175,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+      const date = req.query.date as string | undefined;
+      const allTime = !date || date === "all";
+
+      const whereClause = allTime
+        ? eq(factoryDailyUsages.companyId, companyId)
+        : and(eq(factoryDailyUsages.companyId, companyId), sql`${factoryDailyUsages.usedDate} = ${date}`);
 
       const usages = await db
         .select({
@@ -9192,11 +9197,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         })
         .from(factoryDailyUsages)
         .innerJoin(factoryMixBatches, eq(factoryDailyUsages.mixBatchId, factoryMixBatches.id))
-        .where(and(eq(factoryDailyUsages.companyId, companyId), sql`${factoryDailyUsages.usedDate} = ${date}`))
-        .orderBy(factoryDailyUsages.createdAt);
+        .where(whereClause)
+        .orderBy(factoryDailyUsages.usedDate, factoryDailyUsages.createdAt);
 
       const totalKgUsed = usages.reduce((s: number, u: any) => s + (parseFloat(u.kgUsed) || 0), 0);
-      res.json({ date, usages, totalKgUsed: totalKgUsed.toFixed(3) });
+      res.json({ date: allTime ? "all" : date, allTime, usages, totalKgUsed: totalKgUsed.toFixed(3) });
     } catch (error: any) {
       console.error("Error fetching daily report:", error);
       res.status(500).json({ message: error.message });
@@ -9208,8 +9213,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+      const dateParam = req.query.date as string | undefined;
       const format = (req.query.format as string) || "excel";
+      const allTime = !dateParam || dateParam === "all";
+      const filenameDate = allTime ? "all-time" : dateParam;
+
+      const whereClause = allTime
+        ? eq(factoryDailyUsages.companyId, companyId)
+        : and(eq(factoryDailyUsages.companyId, companyId), sql`${factoryDailyUsages.usedDate} = ${dateParam}`);
 
       const usages = await db
         .select({
@@ -9226,15 +9237,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         })
         .from(factoryDailyUsages)
         .innerJoin(factoryMixBatches, eq(factoryDailyUsages.mixBatchId, factoryMixBatches.id))
-        .where(and(eq(factoryDailyUsages.companyId, companyId), sql`${factoryDailyUsages.usedDate} = ${date}`))
-        .orderBy(factoryDailyUsages.createdAt);
+        .where(whereClause)
+        .orderBy(factoryDailyUsages.usedDate, factoryDailyUsages.createdAt);
 
       const totalKgUsed = usages.reduce((s: number, u: any) => s + (parseFloat(u.kgUsed) || 0), 0);
 
       if (format === "excel") {
         const ExcelJS = (await import("exceljs")).default;
         const workbook = new ExcelJS.Workbook();
-        const sheet = workbook.addWorksheet("Daily Report");
+        const sheet = workbook.addWorksheet("Production Report");
 
         sheet.columns = [
           { header: "Date", key: "date", width: 14 },
@@ -9265,8 +9276,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
 
         const totalRow = sheet.addRow({
-          date: "",
-          batchCode: "TOTAL",
+          date: "TOTAL",
+          batchCode: "",
           batchName: "",
           operatorUser: "",
           kgUsed: totalKgUsed,
@@ -9276,36 +9287,40 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         totalRow.eachCell((cell) => { cell.font = { bold: true }; });
 
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        res.setHeader("Content-Disposition", `attachment; filename="raw-production-daily-report-${date}.xlsx"`);
+        res.setHeader("Content-Disposition", `attachment; filename="raw-production-report-${filenameDate}.xlsx"`);
         await workbook.xlsx.write(res);
         return res.end();
       }
 
       if (format === "pdf") {
         const PDFDocument = (await import("pdfkit")).default;
-        const doc = new PDFDocument({ margin: 40, size: "A4" });
+        const doc = new PDFDocument({ margin: 40, size: "A4", layout: "landscape" });
 
         res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `attachment; filename="raw-production-daily-report-${date}.pdf"`);
+        res.setHeader("Content-Disposition", `attachment; filename="raw-production-report-${filenameDate}.pdf"`);
         doc.pipe(res);
 
-        doc.fontSize(16).font("Helvetica-Bold").text("Raw Production Daily Report", { align: "center" });
-        doc.fontSize(11).font("Helvetica").text(`Date: ${date}`, { align: "center" });
+        const title = allTime ? "Raw Production Report — All Time" : "Raw Production Report";
+        doc.fontSize(16).font("Helvetica-Bold").text(title, { align: "center" });
+        if (!allTime) doc.fontSize(11).font("Helvetica").text(`Date: ${dateParam}`, { align: "center" });
         doc.moveDown();
 
-        const colX = [40, 140, 270, 360, 430, 490];
-        const headers = ["Batch Code", "Batch Name", "Operator", "KG Used", "Cost/KG", "Notes"];
+        // Landscape A4: usable width ~752px (margin 40 each side)
+        const colX = [40, 120, 230, 380, 470, 545, 620];
+        const colW = [75, 105, 145, 85, 70, 70, 120];
+        const headers = ["Date", "Batch Code", "Batch Name", "Operator", "KG Used", "Cost/KG", "Notes"];
 
         doc.fontSize(9).font("Helvetica-Bold");
-        headers.forEach((h, i) => doc.text(h, colX[i], doc.y, { continued: i < headers.length - 1, width: colX[i + 1] ? colX[i + 1] - colX[i] - 4 : 80 }));
+        headers.forEach((h, i) => doc.text(h, colX[i], doc.y, { continued: i < headers.length - 1, width: colW[i] }));
         doc.moveDown(0.3);
-        doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+        doc.moveTo(40, doc.y).lineTo(752, doc.y).stroke();
         doc.moveDown(0.3);
 
-        doc.font("Helvetica").fontSize(9);
+        doc.font("Helvetica").fontSize(8);
         for (const u of usages) {
           const y = doc.y;
           const cols = [
+            u.usedDate || "—",
             u.batchCode,
             u.batchName || "—",
             u.operatorUser || "—",
@@ -9314,13 +9329,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             u.notes || "—",
           ];
           cols.forEach((c, i) => {
-            doc.text(String(c), colX[i], y, { width: colX[i + 1] ? colX[i + 1] - colX[i] - 4 : 60, lineBreak: false });
+            doc.text(String(c), colX[i], y, { width: colW[i], lineBreak: false });
           });
           doc.moveDown(1);
+          if (doc.y > doc.page.height - 80) {
+            doc.addPage({ layout: "landscape" });
+          }
         }
 
         doc.moveDown(0.5);
-        doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+        doc.moveTo(40, doc.y).lineTo(752, doc.y).stroke();
         doc.moveDown(0.3);
         doc.font("Helvetica-Bold").fontSize(10).text(`Total KG Consumed: ${totalKgUsed.toFixed(3)} kg`, { align: "right" });
 
@@ -9330,7 +9348,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       return res.status(400).json({ message: "Invalid format. Use excel or pdf." });
     } catch (error: any) {
-      console.error("Error exporting daily report:", error);
+      console.error("Error exporting production report:", error);
       res.status(500).json({ message: error.message });
     }
   });

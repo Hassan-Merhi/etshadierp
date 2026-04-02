@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, Upload, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, CalendarDays, FlaskConical, FileSpreadsheet, FileText, RefreshCw, SlidersHorizontal, PlusCircle } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, Upload, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, FlaskConical, FileSpreadsheet, FileText, RefreshCw, SlidersHorizontal, PlusCircle } from "lucide-react";
 import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
 import { EditMixBatchDialog } from "@/components/EditMixBatchDialog";
 import type { FactoryMixBatch } from "@shared/schema";
@@ -361,7 +361,6 @@ export default function ProductionRawStock() {
   // Mix batch section state
   const [createMixBatchOpen, setCreateMixBatchOpen] = useState(false);
   const [dailyReportOpen, setDailyReportOpen] = useState(false);
-  const [dailyReportDate, setDailyReportDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [deleteBatchId, setDeleteBatchId] = useState<number | null>(null);
   const [editBatch, setEditBatch] = useState<FactoryMixBatch | null>(null);
   const [batchDetailOpen, setBatchDetailOpen] = useState(false);
@@ -425,9 +424,9 @@ export default function ProductionRawStock() {
   });
 
   const { data: dailyReport, isLoading: dailyReportLoading } = useQuery<any>({
-    queryKey: ["/api/factory/daily-report", dailyReportDate],
+    queryKey: ["/api/factory/daily-report"],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/daily-report?date=${dailyReportDate}`, { credentials: "include" });
+      const res = await fetch(`/api/factory/daily-report`, { credentials: "include" });
       return res.json();
     },
     enabled: dailyReportOpen,
@@ -1203,7 +1202,7 @@ export default function ProductionRawStock() {
             <div className="flex gap-2 flex-wrap">
               <Button variant="outline" size="sm" onClick={() => setDailyReportOpen(!dailyReportOpen)} data-testid="button-toggle-daily-report">
                 <BarChart3 className="h-4 w-4 mr-1" />
-                Daily Report
+                Report
               </Button>
               <Button size="sm" onClick={() => setCreateMixBatchOpen(true)} data-testid="button-create-mix-batch">
                 <Plus className="h-4 w-4 mr-1" />
@@ -1212,37 +1211,31 @@ export default function ProductionRawStock() {
             </div>
           </div>
 
-          {/* Daily report panel */}
+          {/* All-time report panel */}
           {dailyReportOpen && (
             <div className="mt-4 border rounded-md p-4 space-y-3">
-              <div className="flex items-center gap-3 flex-wrap">
-                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Report date:</span>
-                <Input
-                  type="date"
-                  value={dailyReportDate}
-                  onChange={(e) => setDailyReportDate(e.target.value)}
-                  className="w-auto"
-                  data-testid="input-daily-report-date"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(`/api/factory/daily-report/export?date=${dailyReportDate}&format=excel`, "_blank")}
-                  data-testid="button-export-daily-excel"
-                >
-                  <FileSpreadsheet className="h-4 w-4 mr-1" />
-                  Excel
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(`/api/factory/daily-report/export?date=${dailyReportDate}&format=pdf`, "_blank")}
-                  data-testid="button-export-daily-pdf"
-                >
-                  <FileText className="h-4 w-4 mr-1" />
-                  PDF
-                </Button>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="text-sm font-medium text-muted-foreground">All-time production consumption</span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(`/api/factory/daily-report/export?format=excel`, "_blank")}
+                    data-testid="button-export-daily-excel"
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-1" />
+                    Excel
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(`/api/factory/daily-report/export?format=pdf`, "_blank")}
+                    data-testid="button-export-daily-pdf"
+                  >
+                    <FileText className="h-4 w-4 mr-1" />
+                    PDF
+                  </Button>
+                </div>
               </div>
               {dailyReportLoading ? (
                 <div className="space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></div>
@@ -1251,6 +1244,7 @@ export default function ProductionRawStock() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Date</TableHead>
                         <TableHead>Batch Code</TableHead>
                         <TableHead>Batch Name</TableHead>
                         <TableHead>Operator</TableHead>
@@ -1262,6 +1256,7 @@ export default function ProductionRawStock() {
                     <TableBody>
                       {dailyReport.usages.map((u: any) => (
                         <TableRow key={u.id} data-testid={`row-daily-usage-${u.id}`}>
+                          <TableCell className="text-sm font-mono">{u.usedDate || "—"}</TableCell>
                           <TableCell className="font-mono text-sm">{u.batchCode}</TableCell>
                           <TableCell className="text-sm">{u.batchName || "—"}</TableCell>
                           <TableCell className="text-sm">{u.operatorUser || "—"}</TableCell>
@@ -1277,7 +1272,7 @@ export default function ProductionRawStock() {
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground py-4 text-center">No consumption recorded for {dailyReportDate}</p>
+                <p className="text-sm text-muted-foreground py-4 text-center">No consumption records found.</p>
               )}
             </div>
           )}
