@@ -53,6 +53,7 @@ export default function FactoryContainers() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editingContainer, setEditingContainer] = useState<ContainerWithSupplier | null>(null);
   const [expandedSuppliers, setExpandedSuppliers] = useState<Set<string>>(new Set(["__all__"]));
+  const [viewContainer, setViewContainer] = useState<ContainerWithSupplier | null>(null);
   const [formData, setFormData] = useState({
     containerNumber: "",
     supplierId: "",
@@ -144,6 +145,16 @@ export default function FactoryContainers() {
 
   const { data: ledgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts"],
+  });
+
+  const { data: viewContainerCharges = [] } = useQuery<any[]>({
+    queryKey: ["/api/factory/containers", viewContainer?.id, "other-charges"],
+    queryFn: async () => {
+      if (!viewContainer) return [];
+      const res = await factoryApiRequest("GET", `/api/factory/containers/${viewContainer.id}/other-charges`);
+      return res.ok ? res.json() : [];
+    },
+    enabled: !!viewContainer,
   });
 
   useEffect(() => {
@@ -838,10 +849,8 @@ export default function FactoryContainers() {
                     <TableHead>Container #</TableHead>
                     <TableHead>Broker</TableHead>
                     <TableHead>Commission</TableHead>
-                    <TableHead>Charges</TableHead>
                     <TableHead>Total Value</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Arrival</TableHead>
                     <TableHead className="w-24">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -883,13 +892,12 @@ export default function FactoryContainers() {
                             <Badge variant="outline" className="text-xs">{count} container{count !== 1 ? "s" : ""}</Badge>
                           </div>
                         </TableCell>
-                        <TableCell />
                         <TableCell className="font-mono text-sm font-medium">
                           {Array.from(groupTotals.entries()).map(([cc, amt]) => (
                             <div key={cc}>{cc} {formatNumber(amt)}</div>
                           ))}
                         </TableCell>
-                        <TableCell colSpan={3} />
+                        <TableCell colSpan={2} />
                       </TableRow>,
                       // Container rows (only when expanded)
                       ...(isExpanded ? groupContainers.map((c) => {
@@ -924,7 +932,15 @@ export default function FactoryContainers() {
                                 data-testid={`checkbox-container-${c.id}`}
                               />
                             </TableCell>
-                            <TableCell className="font-medium font-mono">{c.containerNumber}</TableCell>
+                            <TableCell className="font-medium font-mono">
+                              <button
+                                className="hover:underline text-left cursor-pointer text-foreground"
+                                onClick={() => setViewContainer(c)}
+                                data-testid={`button-view-container-${c.id}`}
+                              >
+                                {c.containerNumber}
+                              </button>
+                            </TableCell>
                             <TableCell>
                               {brokerName
                                 ? <span className="text-sm text-muted-foreground">{brokerName}</span>
@@ -933,9 +949,6 @@ export default function FactoryContainers() {
                             <TableCell className="font-mono text-sm">
                               {commAmt > 0 ? `${commCcy} ${formatNumber(commAmt)}` : <span className="text-muted-foreground">—</span>}
                             </TableCell>
-                            <TableCell className="font-mono text-sm">
-                              {renderCharges(c)}
-                            </TableCell>
                             <TableCell className="font-mono text-sm font-medium">
                               {totalValue > 0 ? `${ccy} ${formatNumber(totalValue)}` : <span className="text-muted-foreground">—</span>}
                             </TableCell>
@@ -943,9 +956,6 @@ export default function FactoryContainers() {
                               <Badge variant={c.status === "AVAILABLE" ? "default" : "secondary"}>
                                 {c.status}
                               </Badge>
-                            </TableCell>
-                            <TableCell className="text-muted-foreground text-sm">
-                              {c.arrivalDate || "—"}
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-1">
@@ -1640,6 +1650,166 @@ export default function FactoryContainers() {
               {bulkDeleteMutation.isPending ? "Deleting..." : `Delete ${selectedIds.size} Container${selectedIds.size !== 1 ? "s" : ""}`}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Container Detail Dialog */}
+      <Dialog open={!!viewContainer} onOpenChange={(open) => { if (!open) setViewContainer(null); }}>
+        <DialogContent className="max-w-lg">
+          {viewContainer && (() => {
+            const vc = viewContainer as any;
+            const ccy = vc.currencyCode || "USD";
+            const totalKg = parseFloat(vc.totalKg || "0");
+            const ratePerKg = parseFloat(vc.ratePerKg || "0");
+            const baseValue = totalKg * ratePerKg;
+            const freightAmt = parseFloat(vc.freight || "0");
+            const freightCcy = vc.freightCurrencyCode || ccy;
+            const commAmt = parseFloat(vc.commissionAmount || "0");
+            const commCcy = vc.commissionCurrencyCode || "USD";
+            const brokerSupId = vc.commissionSupplierId;
+            const brokerName = brokerSupId ? suppliers?.find(s => s.id === brokerSupId)?.name ?? null : null;
+            const freightAccName = vc.freightAccountId
+              ? ledgerAccounts.find((a: any) => a.id === vc.freightAccountId)?.name ?? `Account #${vc.freightAccountId}`
+              : null;
+            const commAccName = vc.commissionAccountId
+              ? ledgerAccounts.find((a: any) => a.id === vc.commissionAccountId)?.name ?? `Account #${vc.commissionAccountId}`
+              : null;
+            const legacyOtherAmt = parseFloat(vc.otherCharges || "0");
+            const legacyOtherAccName = vc.otherChargesAccountId
+              ? ledgerAccounts.find((a: any) => a.id === vc.otherChargesAccountId)?.name ?? `Account #${vc.otherChargesAccountId}`
+              : null;
+            const fxRate = parseFloat(vc.fxRateToUsd || "1");
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 font-mono">
+                    <Container className="h-5 w-5" />
+                    {viewContainer.containerNumber}
+                  </DialogTitle>
+                  <DialogDescription className="flex items-center gap-2 pt-1">
+                    <Badge variant={viewContainer.status === "AVAILABLE" ? "default" : "secondary"}>{viewContainer.status}</Badge>
+                    {viewContainer.supplierName && <span className="text-muted-foreground">{viewContainer.supplierName}</span>}
+                    {viewContainer.arrivalDate && <span className="text-muted-foreground">· Arrived {viewContainer.arrivalDate}</span>}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  {/* Base Value */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Goods</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                      <span className="text-muted-foreground">Weight</span>
+                      <span className="font-mono text-right">{formatNumber(totalKg)} kg</span>
+                      <span className="text-muted-foreground">Rate</span>
+                      <span className="font-mono text-right">{ccy} {formatNumber(ratePerKg)} / kg</span>
+                      {ccy !== "USD" && fxRate !== 1 && (
+                        <>
+                          <span className="text-muted-foreground">FX Rate</span>
+                          <span className="font-mono text-right">1 {ccy} = {fxRate} USD</span>
+                        </>
+                      )}
+                      <span className="text-muted-foreground font-medium">Base Value</span>
+                      <span className="font-mono font-semibold text-right">{ccy} {formatNumber(baseValue)}</span>
+                    </div>
+                  </div>
+                  <Separator />
+                  {/* Freight */}
+                  {freightAmt > 0 && (
+                    <>
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Freight</p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                          <span className="text-muted-foreground">Amount</span>
+                          <span className="font-mono text-right">{freightCcy} {formatNumber(freightAmt)}</span>
+                          {freightAccName && (
+                            <>
+                              <span className="text-muted-foreground">Account</span>
+                              <span className="text-right truncate">{freightAccName}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <Separator />
+                    </>
+                  )}
+                  {/* Other Charges */}
+                  {(legacyOtherAmt > 0 || viewContainerCharges.length > 0) && (
+                    <>
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Other Charges</p>
+                        <div className="space-y-2">
+                          {legacyOtherAmt > 0 && (
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                              <span className="text-muted-foreground">Other Charges (legacy)</span>
+                              <span className="font-mono text-right">{ccy} {formatNumber(legacyOtherAmt)}</span>
+                              {legacyOtherAccName && (
+                                <>
+                                  <span className="text-muted-foreground">Account</span>
+                                  <span className="text-right truncate">{legacyOtherAccName}</span>
+                                </>
+                              )}
+                            </div>
+                          )}
+                          {viewContainerCharges.map((ch: any) => {
+                            const accName = ch.ledgerAccountId
+                              ? ledgerAccounts.find((a: any) => a.id === ch.ledgerAccountId)?.name ?? `Account #${ch.ledgerAccountId}`
+                              : null;
+                            return (
+                              <div key={ch.id} className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                                <span className="text-muted-foreground">{ch.description || "Charge"}</span>
+                                <span className="font-mono text-right">{ch.currencyCode || ccy} {formatNumber(parseFloat(ch.amount || "0"))}</span>
+                                {accName && (
+                                  <>
+                                    <span className="text-muted-foreground pl-3">↳ Account</span>
+                                    <span className="text-right truncate text-xs text-muted-foreground">{accName}</span>
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <Separator />
+                    </>
+                  )}
+                  {/* Commission */}
+                  {commAmt > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Commission</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                        <span className="text-muted-foreground">Amount</span>
+                        <span className="font-mono text-right">{commCcy} {formatNumber(commAmt)}</span>
+                        {brokerName && (
+                          <>
+                            <span className="text-muted-foreground">Broker</span>
+                            <span className="text-right">{brokerName}</span>
+                          </>
+                        )}
+                        {commAccName && (
+                          <>
+                            <span className="text-muted-foreground">Account</span>
+                            <span className="text-right truncate">{commAccName}</span>
+                          </>
+                        )}
+                        {vc.commissionNotes && (
+                          <>
+                            <span className="text-muted-foreground">Notes</span>
+                            <span className="text-right">{vc.commissionNotes}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setViewContainer(null)}>Close</Button>
+                  <Button variant="ghost" onClick={() => { setViewContainer(null); openEdit(viewContainer); }}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                </DialogFooter>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
