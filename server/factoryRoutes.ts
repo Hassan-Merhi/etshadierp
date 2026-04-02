@@ -12763,26 +12763,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const [customer] = await db.insert(customers).values({ ...parsed, code }).returning();
 
-      const customerAccountCode = `CUST-${customer.code}`;
-      const [existingAccount] = await db.select().from(ledgerAccounts)
-        .where(and(eq(ledgerAccounts.code, customerAccountCode), eq(ledgerAccounts.companyId, companyId)));
-
-      if (!existingAccount) {
-        const [newAccount] = await db.insert(ledgerAccounts).values({
-          companyId,
-          code: customerAccountCode,
-          name: `${customer.legalName} - Customer Account`,
-          accountType: "Asset",
-          subType: "Accounts Receivable",
-          openingBalance: parsed.openingBalance || "0",
-          openingBalanceSide: parsed.openingBalanceSide || "Dr",
-          active: true,
-        }).returning();
-
-        await db.update(customers).set({ ledgerAccountId: newAccount.id })
-          .where(eq(customers.id, customer.id));
-      }
-
       res.status(201).json(customer);
     } catch (error: any) {
       console.error("Error creating factory customer:", error);

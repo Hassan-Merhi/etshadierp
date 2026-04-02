@@ -14146,7 +14146,11 @@ if (asOfDate) {
       }
 
       const accounts = [
-        ...ledgers.map((account) => {
+        ...ledgers
+          // Hide ledger accounts that are the auto-created mirror of a customer — the customer
+          // entry (type="customer") already appears in the list with the correct balance.
+          .filter((account) => !customerLedgerMap.has(account.id))
+          .map((account) => {
           const movements = ledgerBalances.get(account.id) || {
             debits: 0,
             credits: 0,
@@ -14511,6 +14515,12 @@ if (asOfDate) {
         return balance + debits - credits;
       };
 
+      // Build set of ledger account IDs that are auto-created mirrors of customers
+      // so they can be excluded from the ledger list (customers appear as type="customer")
+      const customerLedgerIds = new Set(
+        (customers as any[]).filter((c) => c.ledgerAccountId).map((c) => c.ledgerAccountId as number)
+      );
+
       // Build simplified account array for sidebar
       const accounts = [
         // Bank accounts
@@ -14554,8 +14564,10 @@ if (asOfDate) {
             parentId: null,
           };
         }),
-        // Ledger accounts
-        ...ledgers.map((account) => {
+        // Ledger accounts (excluding those that are auto-created mirrors of customers)
+        ...ledgers
+          .filter((account) => !customerLedgerIds.has(account.id))
+          .map((account) => {
           const movements = ledgerBalances.get(account.id) || { debits: 0, credits: 0 };
           const balance = calculateSignedBalance(
             account.openingBalance || "0",
