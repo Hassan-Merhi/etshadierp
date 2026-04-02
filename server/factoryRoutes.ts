@@ -12522,16 +12522,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const baleStockRows = zeroRows.filter((r: any) => r.txType === "BALE_STOCK_ENTRY");
         if (baleStockRows.length > 0) {
           // Collect all bale IDs across all zero bale stock entries
+          // Only integer IDs are valid — old entries may have stored UUIDs which Postgres rejects
           const baleIdToEntry = new Map<number, any[]>();
           for (const row of baleStockRows) {
             try {
               const meta = JSON.parse(row.metaJson || "{}");
               const bales: any[] = Array.isArray(meta.bales) ? meta.bales : [];
               for (const b of bales) {
-                if (b.id) {
-                  if (!baleIdToEntry.has(b.id)) baleIdToEntry.set(b.id, []);
-                  baleIdToEntry.get(b.id)!.push({ row, weightKg: parseFloat(b.weightKg || "0") });
-                }
+                const numId = parseInt(b.id, 10);
+                if (!b.id || isNaN(numId) || String(numId) !== String(b.id)) continue; // skip UUIDs / non-integers
+                if (!baleIdToEntry.has(numId)) baleIdToEntry.set(numId, []);
+                baleIdToEntry.get(numId)!.push({ row, weightKg: parseFloat(b.weightKg || "0") });
               }
             } catch {}
           }
