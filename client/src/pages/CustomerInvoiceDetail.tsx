@@ -70,6 +70,8 @@ interface OrderDetail {
   totalQtyBales: number;
   customerName: string;
   customerCode: string;
+  containerNumber?: string | null;
+  shippingCompany?: string | null;
   lines: OrderLine[];
   bales: OrderBale[];
   charges: OrderCharge[];
@@ -260,11 +262,29 @@ export default function CustomerInvoiceDetail() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div>
-          <p className="text-sm text-muted-foreground">Customer</p>
-          <p className="font-semibold text-lg" data-testid="text-customer-name">
-            {order.customerName || "-"}
-          </p>
+        <div className="flex flex-wrap gap-6">
+          <div>
+            <p className="text-sm text-muted-foreground">Customer</p>
+            <p className="font-semibold text-lg" data-testid="text-customer-name">
+              {order.customerName || "-"}
+            </p>
+          </div>
+          {order.containerNumber && (
+            <div>
+              <p className="text-sm text-muted-foreground">Container No.</p>
+              <p className="font-semibold font-mono" data-testid="text-container-number">
+                {order.containerNumber}
+              </p>
+            </div>
+          )}
+          {order.shippingCompany && (
+            <div>
+              <p className="text-sm text-muted-foreground">Shipping</p>
+              <p className="font-semibold" data-testid="text-shipping-company">
+                {order.shippingCompany}
+              </p>
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {order.status === "DRAFT" && (
