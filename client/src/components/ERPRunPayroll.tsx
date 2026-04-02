@@ -256,7 +256,6 @@ export default function ERPRunPayroll() {
     for (const g of workerGroups) addGroup(g.name, (g.members || []).map((m) => m.id));
     if (ungroupedWorkers.length > 0) addGroup("Ungrouped", ungroupedWorkers.map((w) => w.id));
     setPreviewItems(items);
-    setPreviewDate(new Date().toISOString().split("T")[0]);
     setPreviewNotes("");
     setStep(2);
   }
@@ -606,6 +605,16 @@ export default function ERPRunPayroll() {
                   />
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm whitespace-nowrap">Payroll Date</Label>
+                    <Input
+                      type="date"
+                      value={previewDate}
+                      onChange={(e) => setPreviewDate(e.target.value)}
+                      className="w-40"
+                      data-testid="input-payroll-date"
+                    />
+                  </div>
                   {selectedWorkers.size > 0 && (
                     <span className="text-sm text-muted-foreground">
                       {selectedWorkers.size} selected — {formatAmount(totalSelectedBase)}
