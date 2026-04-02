@@ -1773,8 +1773,8 @@ export default function FactorySuppliers() {
                     <div className="space-y-2">
                       {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
                     </div>
-                  ) : brokerStatement?.currencyLedgers?.length > 0 ? (
-                    brokerStatement.currencyLedgers.map((section: any) => {
+                  ) : brokerStatement?.currencyLedgers?.filter((s: any) => !s.isBrokerPool)?.length > 0 ? (
+                    brokerStatement.currencyLedgers.filter((s: any) => !s.isBrokerPool).map((section: any) => {
                       const typeLabel: Record<string, string> = {
                         container: "Container", payment: "Payment",
                         fx_out: "FX Out", fx_in: "FX In", commission: "Commission", other_charge: "Other Charge",
