@@ -5,7 +5,6 @@ import { Plus, Package, CheckCircle, PlayCircle, Link2, AlertTriangle, Pencil, T
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import {
   Table,
   TableBody,
@@ -231,7 +230,8 @@ export default function MixBatches() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead className="text-right">Total (kg)</TableHead>
-                  <TableHead>Usage</TableHead>
+                  <TableHead className="text-right">Used (kg)</TableHead>
+                  <TableHead className="text-right">Remaining (kg)</TableHead>
                   <TableHead className="text-right">Cost/kg</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
@@ -243,7 +243,6 @@ export default function MixBatches() {
                   const total = parseFloat(batch.totalWeightKg || "0");
                   const used = parseFloat(batch.usedKg || "0");
                   const remaining = total - used;
-                  const usagePercent = total > 0 ? Math.min((used / total) * 100, 100) : 0;
                   return (
                     <TableRow
                       key={batch.id}
@@ -257,17 +256,11 @@ export default function MixBatches() {
                       <TableCell className="text-right font-mono">
                         {formatNumber(total)}
                       </TableCell>
-                      <TableCell className="min-w-[200px]">
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>Used: <span className="font-mono font-medium text-foreground">{formatNumber(used)}</span> kg</span>
-                            <span>Left: <span className="font-mono font-medium text-foreground">{formatNumber(remaining)}</span> kg</span>
-                          </div>
-                          <Progress value={usagePercent} className="h-2" />
-                          <div className="text-xs text-muted-foreground text-right">
-                            {usagePercent.toFixed(0)}% used
-                          </div>
-                        </div>
+                      <TableCell className="text-right font-mono">
+                        {formatNumber(used)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatNumber(remaining)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         ${parseFloat(batch.costPerKg).toFixed(4)}
@@ -313,7 +306,6 @@ export default function MixBatches() {
                 const summaryTotal = filteredBatches.reduce((s, b) => s + parseFloat(b.totalWeightKg || "0"), 0);
                 const summaryUsed = filteredBatches.reduce((s, b) => s + parseFloat(b.usedKg || "0"), 0);
                 const summaryRemaining = summaryTotal - summaryUsed;
-                const summaryUsagePct = summaryTotal > 0 ? Math.min((summaryUsed / summaryTotal) * 100, 100) : 0;
                 const weightedCost = filteredBatches.reduce((s, b) => s + parseFloat(b.totalWeightKg || "0") * parseFloat(b.costPerKg || "0"), 0);
                 const blendedCost = summaryTotal > 0 ? weightedCost / summaryTotal : 0;
                 return (
@@ -326,15 +318,11 @@ export default function MixBatches() {
                       <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-summary-total-kg">
                         {formatNumber(summaryTotal)}
                       </td>
-                      <td className="px-4 py-3 min-w-[200px]">
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>Used: <span className="font-mono font-semibold text-foreground">{formatNumber(summaryUsed)}</span> kg</span>
-                            <span>Left: <span className="font-mono font-semibold text-foreground">{formatNumber(summaryRemaining)}</span> kg</span>
-                          </div>
-                          <Progress value={summaryUsagePct} className="h-2" />
-                          <div className="text-xs text-muted-foreground text-right">{summaryUsagePct.toFixed(0)}% used</div>
-                        </div>
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm">
+                        {formatNumber(summaryUsed)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm">
+                        {formatNumber(summaryRemaining)}
                       </td>
                       <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-summary-blended-cost">
                         ${blendedCost.toFixed(4)}<span className="text-xs text-muted-foreground font-normal">/kg</span>

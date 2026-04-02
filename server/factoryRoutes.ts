@@ -8914,12 +8914,13 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             batchNumber: batchCode,
             name: name || null,
             totalWeightKg: String(totalWeightKg),
+            usedKg: String(totalWeightKg),
             costPerKg: String(blendedCostPerKg),
             totalCost: String(totalCost),
             notes: notes || null,
             operatorUser: operatorUser || null,
             batchDate: batchDate || null,
-            status: "OPEN",
+            status: "COMPLETED",
           } as any)
           .returning();
 

@@ -2,8 +2,7 @@ import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, CalendarDays, FlaskConical, FileSpreadsheet, FileText, RefreshCw, SlidersHorizontal, PlusCircle } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, Upload, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, CalendarDays, FlaskConical, FileSpreadsheet, FileText, RefreshCw, SlidersHorizontal, PlusCircle } from "lucide-react";
 import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
 import { EditMixBatchDialog } from "@/components/EditMixBatchDialog";
 import type { FactoryMixBatch } from "@shared/schema";
@@ -432,26 +431,6 @@ export default function ProductionRawStock() {
       return res.json();
     },
     enabled: dailyReportOpen,
-  });
-
-  const finalizeBatchMutation = useMutation({
-    mutationFn: async (batchId: number) => {
-      const res = await modeApiRequest("POST", `/api/factory/mix-batches/${batchId}/finalize`, {});
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Finalize failed");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
-      toast({ title: "Batch finalized", description: "Mix batch marked as fully consumed." });
-    },
-    onError: (err: any) => {
-      if (err?._handledGlobally) return;
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    },
   });
 
   const deleteBatchMutation = useMutation({
@@ -1321,7 +1300,6 @@ export default function ProductionRawStock() {
                   <TableHead className="text-right">Used (kg)</TableHead>
                   <TableHead className="text-right">Remaining (kg)</TableHead>
                   <TableHead className="text-right">Blended Cost</TableHead>
-                  <TableHead>Progress</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
@@ -1361,12 +1339,6 @@ export default function ProductionRawStock() {
                       <TableCell className="text-right font-mono text-sm">
                         ${parseFloat(batch.costPerKg || "0").toFixed(4)}/kg
                       </TableCell>
-                      <TableCell className="w-28">
-                        <div className="space-y-1">
-                          <Progress value={pct} className="h-2" />
-                          <p className="text-xs text-muted-foreground">{pct.toFixed(0)}%</p>
-                        </div>
-                      </TableCell>
                       <TableCell>
                         <span className={`text-xs font-medium px-2 py-1 rounded-md ${statusColors[batch.status] || "bg-muted text-muted-foreground"}`}>
                           {batch.status === "CARRY_FORWARD" ? "Carry Fwd" : batch.status}
@@ -1374,19 +1346,7 @@ export default function ProductionRawStock() {
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
-                          {(batch.status === "OPEN" || batch.status === "ACTIVE" || batch.status === "CARRY_FORWARD") && (
                             <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => finalizeBatchMutation.mutate(batch.id)}
-                              disabled={finalizeBatchMutation.isPending}
-                              data-testid={`button-finalize-mix-batch-${batch.id}`}
-                            >
-                              <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                              Finalize
-                            </Button>
-                          )}
-                          <Button
                             size="icon"
                             variant="ghost"
                             onClick={() => setEditBatch(batch as unknown as FactoryMixBatch)}
@@ -1426,12 +1386,6 @@ export default function ProductionRawStock() {
                       <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-used">{formatNumber(sumUsed)}</td>
                       <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-remaining">{formatNumber(sumRemaining)}</td>
                       <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-cost">${blendedCost.toFixed(4)}/kg</td>
-                      <td className="px-4 py-3 w-28">
-                        <div className="space-y-1">
-                          <Progress value={sumUsagePct} className="h-2" />
-                          <p className="text-xs text-muted-foreground">{sumUsagePct.toFixed(0)}%</p>
-                        </div>
-                      </td>
                       <td colSpan={2} />
                     </tr>
                   </tfoot>
