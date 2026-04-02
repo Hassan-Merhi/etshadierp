@@ -23,8 +23,6 @@ import {
   UserRound,
   ClipboardCheck,
   Activity,
-  RefreshCw,
-  Printer,
   Bell,
   Award,
   Beaker,
@@ -80,8 +78,6 @@ const navSections: NavSection[] = [
       { title: "Bales & Lookup",  url: "/factory/bales-hub",          icon: History   },
       { title: "Bale Products",   url: "/factory/bale-products",      icon: Tags      },
       { title: "Bale Ledger",     url: "/factory/bale-ledger",        icon: Layers    },
-      { title: "Bale Relabeling", url: "/factory/bale-relabeling",    icon: RefreshCw },
-      { title: "Reprint Labels",  url: "/factory/reprint-labels",     icon: Printer   },
     ],
   },
   {

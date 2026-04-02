@@ -64,7 +64,7 @@
   import { useAppMode } from "@/contexts/AppModeContext";
   import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
   import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2 } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -4889,6 +4889,44 @@ function OfflineSyncPanel() {
                           <h3 className="font-semibold" data-testid="link-company-data-reset">Company Data Reset</h3>
                           <p className="text-sm text-muted-foreground">
                             Clear vouchers and opening balances for selected accounts
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </Card>
+                </Link>
+
+                <Link href="/factory/bale-relabeling">
+                  <Card className="p-6 hover-elevate cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-yellow-500/10 rounded-lg">
+                          <RefreshCw className="h-6 w-6 text-yellow-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="link-bale-relabeling">Bale Relabeling</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Reassign or relabel bales and re-enter wipers stock by date
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </Card>
+                </Link>
+
+                <Link href="/factory/reprint-labels">
+                  <Card className="p-6 hover-elevate cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-blue-500/10 rounded-lg">
+                          <Printer className="h-6 w-6 text-blue-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="link-reprint-labels">Reprint Labels</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Reprint bale barcode labels for any existing bales
                           </p>
                         </div>
                       </div>
