@@ -932,7 +932,6 @@ export default function ProductionRawStock() {
   const totalUsed = rawStock?.reduce((sum, r) => sum + parseFloat(r.usedKg), 0) || 0;
   const totalRemaining = rawStock?.reduce((sum, r) => sum + parseFloat(r.remainingKg), 0) || 0;
   const totalValue = rawStock?.reduce((sum, r) => sum + parseFloat(r.valueRemainingUsd || r.valueRemaining), 0) || 0;
-  const totalReserved = rawStock?.reduce((sum, r) => sum + parseFloat(r.reservedKg || "0"), 0) || 0;
   const totalFree = rawStock?.reduce((sum, r) => sum + parseFloat(r.freeKg || "0"), 0) || 0;
 
   const filteredMixBatches = useMemo(() => mixBatches || [], [mixBatches]);
@@ -980,14 +979,6 @@ export default function ProductionRawStock() {
             <p className="text-sm text-muted-foreground">Remaining Stock</p>
             <p className="text-xl font-bold font-mono" data-testid="text-total-remaining">
               {formatNumber(totalRemaining)} kg
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Reserved in Batches</p>
-            <p className="text-xl font-bold font-mono text-amber-600 dark:text-amber-400" data-testid="text-total-reserved">
-              {formatNumber(totalReserved)} kg
             </p>
           </CardContent>
         </Card>
@@ -1050,7 +1041,6 @@ export default function ProductionRawStock() {
                   <TableHead>Supplier</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead className="text-right">Received (kg)</TableHead>
-                  <TableHead className="text-right">Used (kg)</TableHead>
                   <TableHead className="text-right">Free (kg)</TableHead>
                   <TableHead className="text-right">Avg Cost/kg ($)</TableHead>
                   <TableHead className="text-right">Value Remaining ($)</TableHead>
@@ -1078,9 +1068,6 @@ export default function ProductionRawStock() {
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatNumber(parseFloat(row.receivedKg))}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatNumber(parseFloat(row.usedKg))}
                       </TableCell>
                       <TableCell className="text-right font-mono text-green-600 dark:text-green-400 font-medium">
                         {formatNumber(parseFloat(row.freeKg || "0"))}
@@ -1251,7 +1238,6 @@ export default function ProductionRawStock() {
                   <TableHead>Name</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead className="text-right">Total (kg)</TableHead>
-                  <TableHead className="text-right">Used (kg)</TableHead>
                   <TableHead className="text-right">Remaining (kg)</TableHead>
                   <TableHead className="text-right">Blended Cost</TableHead>
                   <TableHead>Status</TableHead>
@@ -1261,9 +1247,7 @@ export default function ProductionRawStock() {
               <TableBody>
                 {filteredMixBatches.map((batch) => {
                   const total = parseFloat(batch.totalWeightKg) || 0;
-                  const used = parseFloat(batch.usedKg) || 0;
                   const remaining = parseFloat(batch.remainingKg) || 0;
-                  const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
                   const statusColors: Record<string, string> = {
                     OPEN: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
                     ACTIVE: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
@@ -1288,7 +1272,6 @@ export default function ProductionRawStock() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{batch.batchDate ? formatDisplayDate(batch.batchDate) : formatDisplayDate(batch.createdAt)}</TableCell>
                       <TableCell className="text-right font-mono text-sm">{formatNumber(total)}</TableCell>
-                      <TableCell className="text-right font-mono text-sm">{formatNumber(used)}</TableCell>
                       <TableCell className="text-right font-mono font-medium text-sm">{formatNumber(remaining)}</TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         ${parseFloat(batch.costPerKg || "0").toFixed(4)}/kg
