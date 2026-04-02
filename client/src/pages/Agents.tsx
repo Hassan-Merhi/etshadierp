@@ -351,7 +351,6 @@ export default function Agents() {
                   data-testid={`button-select-agent-${account.id}`}
                 >
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs shrink-0">{account.type}</Badge>
                     <span className="text-sm flex-1 truncate">{account.name}</span>
                   </div>
                   {account.balance !== 0 && (
@@ -597,7 +596,6 @@ export default function Agents() {
                     }}
                     data-testid={`button-add-account-${account.id}`}
                   >
-                    <Badge variant="outline" className="text-xs shrink-0">{account.type}</Badge>
                     <span className="text-sm flex-1">{account.name}</span>
                     {account.balance !== 0 && (
                       <span className="text-xs tabular-nums text-muted-foreground shrink-0">

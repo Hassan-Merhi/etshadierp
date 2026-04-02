@@ -134,9 +134,12 @@ export function AppSidebar({ user }: { user?: any }) {
   const [pinnedOrder, setPinnedOrder] = useState<string[]>(() => {
     const saved = loadPinnedOrder();
     if (saved) {
-      // Merge: any new items in defaultPinnedItems that aren't in saved get appended
-      const newUrls = defaultPinnedItems.map(i => i.url).filter(u => !saved.includes(u));
-      return [...saved, ...newUrls];
+      const defaultUrls = defaultPinnedItems.map(i => i.url);
+      // If all defaults are already in saved, use saved (preserving user's custom order)
+      const allPresent = defaultUrls.every(u => saved.includes(u));
+      if (allPresent) return saved.filter(u => defaultUrls.includes(u));
+      // Otherwise reset to default (new items added to defaults)
+      return defaultUrls;
     }
     return defaultPinnedItems.map(i => i.url);
   });
@@ -328,20 +331,21 @@ export function AppSidebar({ user }: { user?: any }) {
             return (
               <div
                 key={item.url}
-                draggable
-                onDragStart={() => handlePinnedDragStart(item.url)}
                 onDragOver={(e) => handlePinnedDragOver(e, item.url)}
                 onDrop={() => handlePinnedDrop(item.url)}
                 className="flex items-center group"
               >
                 <span
-                  className="flex items-center justify-center w-5 h-full cursor-grab opacity-0 group-hover:opacity-40 shrink-0"
+                  draggable
+                  onDragStart={(e) => { e.stopPropagation(); handlePinnedDragStart(item.url); }}
+                  className="flex items-center justify-center w-5 py-1.5 cursor-grab opacity-0 group-hover:opacity-40 shrink-0"
                   title="Drag to reorder"
                 >
                   <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
                 </span>
                 <a
                   href={item.url}
+                  draggable={false}
                   data-testid={`link-${item.url}`}
                   className={`flex flex-1 items-center gap-2.5 rounded-md py-1.5 text-sm transition-colors ${
                     isActive
