@@ -1437,6 +1437,35 @@ export default function ProductionRawStock() {
                   );
                 })}
               </TableBody>
+              {(() => {
+                const sumTotal = filteredMixBatches.reduce((s, b) => s + (parseFloat(b.totalWeightKg) || 0), 0);
+                const sumUsed = filteredMixBatches.reduce((s, b) => s + (parseFloat(b.usedKg) || 0), 0);
+                const sumRemaining = filteredMixBatches.reduce((s, b) => s + (parseFloat(b.remainingKg) || 0), 0);
+                const sumUsagePct = sumTotal > 0 ? Math.min(100, (sumUsed / sumTotal) * 100) : 0;
+                const weightedCost = filteredMixBatches.reduce((s, b) => s + (parseFloat(b.totalWeightKg) || 0) * (parseFloat(b.costPerKg) || 0), 0);
+                const blendedCost = sumTotal > 0 ? weightedCost / sumTotal : 0;
+                return (
+                  <tfoot className="border-t-2 border-border bg-muted/40">
+                    <tr>
+                      <td colSpan={4} className="px-4 py-3 text-sm font-semibold text-foreground">
+                        Combined Total
+                        <div className="text-xs text-muted-foreground font-normal">{filteredMixBatches.length} batch{filteredMixBatches.length !== 1 ? "es" : ""}</div>
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-total">{formatNumber(sumTotal)}</td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-used">{formatNumber(sumUsed)}</td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-remaining">{formatNumber(sumRemaining)}</td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-cost">${blendedCost.toFixed(4)}/kg</td>
+                      <td className="px-4 py-3 w-28">
+                        <div className="space-y-1">
+                          <Progress value={sumUsagePct} className="h-2" />
+                          <p className="text-xs text-muted-foreground">{sumUsagePct.toFixed(0)}%</p>
+                        </div>
+                      </td>
+                      <td colSpan={2} />
+                    </tr>
+                  </tfoot>
+                );
+              })()}
             </Table>
           ) : (
             <div className="text-center py-10">
