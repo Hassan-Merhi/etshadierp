@@ -898,7 +898,7 @@ export default function FactorySuppliers() {
 
         {/* ── Broker KPIs ───────────────────────────────────────────── */}
         {parentSup && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             <Card>
               <CardContent className="p-4">
                 <div className="text-xs text-muted-foreground">Total Containers</div>
@@ -915,6 +915,24 @@ export default function FactorySuppliers() {
                 </div>
               </CardContent>
             </Card>
+            {brokerOwnBalances.map((b) => (
+              <Card key={b.currencyCode}>
+                <CardContent className="p-4">
+                  <div className="text-xs text-muted-foreground">
+                    Pool Balance {b.currencyCode !== "USD" ? `(${b.currencyCode})` : "(USD)"}
+                  </div>
+                  <div
+                    className={`text-2xl font-bold mt-1 tabular-nums ${b.balance > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+                    data-testid={`text-pool-balance-${b.currencyCode}`}
+                  >
+                    {b.currencyCode === "USD" ? "$" : `${b.currencyCode} `}{formatNum(Math.abs(b.balance).toFixed(2))}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {b.balance > 0 ? "Received" : b.balance < 0 ? "Owed" : "Settled"}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
 
