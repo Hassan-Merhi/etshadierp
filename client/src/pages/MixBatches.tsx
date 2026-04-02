@@ -309,6 +309,41 @@ export default function MixBatches() {
                   );
                 })}
               </TableBody>
+              {(() => {
+                const summaryTotal = filteredBatches.reduce((s, b) => s + parseFloat(b.totalWeightKg || "0"), 0);
+                const summaryUsed = filteredBatches.reduce((s, b) => s + parseFloat(b.usedKg || "0"), 0);
+                const summaryRemaining = summaryTotal - summaryUsed;
+                const summaryUsagePct = summaryTotal > 0 ? Math.min((summaryUsed / summaryTotal) * 100, 100) : 0;
+                const weightedCost = filteredBatches.reduce((s, b) => s + parseFloat(b.totalWeightKg || "0") * parseFloat(b.costPerKg || "0"), 0);
+                const blendedCost = summaryTotal > 0 ? weightedCost / summaryTotal : 0;
+                return (
+                  <tfoot className="border-t-2 border-border bg-muted/40">
+                    <tr>
+                      <td className="px-4 py-3 text-sm font-semibold text-foreground">
+                        Combined Total
+                        <div className="text-xs text-muted-foreground font-normal">{filteredBatches.length} batch{filteredBatches.length !== 1 ? "es" : ""}</div>
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-summary-total-kg">
+                        {formatNumber(summaryTotal)}
+                      </td>
+                      <td className="px-4 py-3 min-w-[200px]">
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Used: <span className="font-mono font-semibold text-foreground">{formatNumber(summaryUsed)}</span> kg</span>
+                            <span>Left: <span className="font-mono font-semibold text-foreground">{formatNumber(summaryRemaining)}</span> kg</span>
+                          </div>
+                          <Progress value={summaryUsagePct} className="h-2" />
+                          <div className="text-xs text-muted-foreground text-right">{summaryUsagePct.toFixed(0)}% used</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-summary-blended-cost">
+                        ${blendedCost.toFixed(4)}<span className="text-xs text-muted-foreground font-normal">/kg</span>
+                      </td>
+                      <td colSpan={3} />
+                    </tr>
+                  </tfoot>
+                );
+              })()}
             </Table>
             </div>
           ) : (
