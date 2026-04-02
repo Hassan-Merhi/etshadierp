@@ -899,56 +899,25 @@ export default function FactorySuppliers() {
           )}
         </div>
 
-        {/* ── Broker True Balance ───────────────────────────────────────────── */}
+        {/* ── Broker KPIs ───────────────────────────────────────────── */}
         {parentSup && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-foreground">Broker True Balance</h2>
-              <span className="text-xs text-muted-foreground">— direct entries &amp; FX-in transfers only</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              {brokerOwnBalances.length === 0 ? (
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="text-xs text-muted-foreground">Broker Balance</div>
-                    <div className="text-2xl font-bold mt-1 tabular-nums text-muted-foreground" data-testid="text-parent-total-balance">
-                      $0.00
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">No direct entries yet</div>
-                  </CardContent>
-                </Card>
-              ) : (
-                brokerOwnBalances.map((b, idx) => (
-                  <Card key={b.currencyCode}>
-                    <CardContent className="p-4">
-                      <div className="text-xs text-muted-foreground">Broker {b.currencyCode}</div>
-                      <div
-                        className={`text-2xl font-bold mt-1 tabular-nums ${b.currencyCode !== "USD" ? "text-amber-600 dark:text-amber-400" : ""}`}
-                        data-testid={idx === 0 ? "text-parent-total-balance" : undefined}
-                      >
-                        {b.currencyCode === "USD" ? "$" : `${b.currencyCode} `}{formatNum(b.balance.toFixed(2))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-xs text-muted-foreground">Total Containers</div>
-                  <div className="text-2xl font-bold mt-1" data-testid="text-parent-total-containers">
-                    {parentSup.totalContainers}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-xs text-muted-foreground">Linked Suppliers</div>
-                  <div className="text-2xl font-bold mt-1">
-                    {children.length}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-xs text-muted-foreground">Total Containers</div>
+                <div className="text-2xl font-bold mt-1" data-testid="text-parent-total-containers">
+                  {parentSup.totalContainers}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-xs text-muted-foreground">Linked Suppliers</div>
+                <div className="text-2xl font-bold mt-1">
+                  {children.length}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -1773,8 +1742,8 @@ export default function FactorySuppliers() {
                     <div className="space-y-2">
                       {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
                     </div>
-                  ) : brokerStatement?.currencyLedgers?.filter((s: any) => !s.isBrokerPool)?.length > 0 ? (
-                    brokerStatement.currencyLedgers.filter((s: any) => !s.isBrokerPool).map((section: any) => {
+                  ) : brokerStatement?.currencyLedgers?.length > 0 ? (
+                    brokerStatement.currencyLedgers.map((section: any) => {
                       const typeLabel: Record<string, string> = {
                         container: "Container", payment: "Payment",
                         fx_out: "FX Out", fx_in: "FX In", commission: "Commission", other_charge: "Other Charge",
