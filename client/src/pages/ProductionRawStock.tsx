@@ -1140,8 +1140,6 @@ export default function ProductionRawStock() {
                   <TableHead>Source</TableHead>
                   <TableHead className="text-right">Received (kg)</TableHead>
                   <TableHead className="text-right">Used (kg)</TableHead>
-                  <TableHead className="text-right">Remaining (kg)</TableHead>
-                  <TableHead className="text-right">Reserved (kg)</TableHead>
                   <TableHead className="text-right">Free (kg)</TableHead>
                   <TableHead className="text-right">Avg Cost/kg ($)</TableHead>
                   <TableHead className="text-right">Value Remaining ($)</TableHead>
@@ -1172,14 +1170,6 @@ export default function ProductionRawStock() {
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatNumber(parseFloat(row.usedKg))}
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-medium">
-                        <Badge variant={remaining <= 0 ? "secondary" : "default"}>
-                          {formatNumber(remaining)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-amber-600 dark:text-amber-400">
-                        {formatNumber(parseFloat(row.reservedKg || "0"))}
                       </TableCell>
                       <TableCell className="text-right font-mono text-green-600 dark:text-green-400 font-medium">
                         {formatNumber(parseFloat(row.freeKg || "0"))}
