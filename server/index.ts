@@ -766,6 +766,82 @@ let migrationsDone = false;
       created_at timestamp NOT NULL DEFAULT now(),
       UNIQUE(company_id, proforma_id, article_code)
     )`,
+    // factory_settings columns added in phases — add missing boolean columns
+    `ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS net_profit_enabled boolean NOT NULL DEFAULT false`,
+    `ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS production_summary_enabled boolean NOT NULL DEFAULT false`,
+    `ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS supplier_report_enabled boolean NOT NULL DEFAULT false`,
+    `ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS supplier_statement_enabled boolean NOT NULL DEFAULT false`,
+    // Several factory tables have created_by as integer but users now use UUID strings — migrate all
+    `DO $$ BEGIN
+       IF EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'factory_daybook_entries' AND column_name = 'created_by' AND data_type = 'integer'
+       ) THEN
+         ALTER TABLE factory_daybook_entries
+           ALTER COLUMN created_by TYPE character varying
+           USING CASE WHEN created_by IS NULL THEN NULL ELSE created_by::text END;
+       END IF;
+     END $$`,
+    `DO $$ BEGIN
+       IF EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'factory_bale_waste_dispatches' AND column_name = 'created_by' AND data_type = 'integer'
+       ) THEN
+         ALTER TABLE factory_bale_waste_dispatches
+           ALTER COLUMN created_by TYPE character varying
+           USING CASE WHEN created_by IS NULL THEN NULL ELSE created_by::text END;
+       END IF;
+     END $$`,
+    `DO $$ BEGIN
+       IF EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'factory_pos_sales' AND column_name = 'created_by' AND data_type = 'integer'
+       ) THEN
+         ALTER TABLE factory_pos_sales
+           ALTER COLUMN created_by TYPE character varying
+           USING CASE WHEN created_by IS NULL THEN NULL ELSE created_by::text END;
+       END IF;
+     END $$`,
+    `DO $$ BEGIN
+       IF EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'factory_pressing_batches' AND column_name = 'created_by' AND data_type = 'integer'
+       ) THEN
+         ALTER TABLE factory_pressing_batches
+           ALTER COLUMN created_by TYPE character varying
+           USING CASE WHEN created_by IS NULL THEN NULL ELSE created_by::text END;
+       END IF;
+     END $$`,
+    `DO $$ BEGIN
+       IF EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'factory_waste_entries' AND column_name = 'created_by' AND data_type = 'integer'
+       ) THEN
+         ALTER TABLE factory_waste_entries
+           ALTER COLUMN created_by TYPE character varying
+           USING CASE WHEN created_by IS NULL THEN NULL ELSE created_by::text END;
+       END IF;
+     END $$`,
+    `DO $$ BEGIN
+       IF EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'container_freight_payments' AND column_name = 'created_by' AND data_type = 'integer'
+       ) THEN
+         ALTER TABLE container_freight_payments
+           ALTER COLUMN created_by TYPE character varying
+           USING CASE WHEN created_by IS NULL THEN NULL ELSE created_by::text END;
+       END IF;
+     END $$`,
+    `DO $$ BEGIN
+       IF EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'pressing_batches' AND column_name = 'created_by' AND data_type = 'integer'
+       ) THEN
+         ALTER TABLE pressing_batches
+           ALTER COLUMN created_by TYPE character varying
+           USING CASE WHEN created_by IS NULL THEN NULL ELSE created_by::text END;
+       END IF;
+     END $$`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's

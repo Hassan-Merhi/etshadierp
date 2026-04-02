@@ -16648,6 +16648,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   app.put("/api/factory/daybook/:entryId", requireAuth, async (req: any, res: any) => {
     try {
       const rawEntryId = Number(req.params.entryId);
+      if (isNaN(rawEntryId)) return res.status(400).json({ message: "Invalid entry ID" });
       const session = req.session as any;
       const companyId = session.factoryCompanyId || session.currentCompanyId;
       const userId = session.userId || null;
