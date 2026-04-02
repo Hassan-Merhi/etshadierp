@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, Upload, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, FlaskConical, FileSpreadsheet, FileText, RefreshCw, SlidersHorizontal, PlusCircle } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, FlaskConical, FileSpreadsheet, FileText, SlidersHorizontal, PlusCircle } from "lucide-react";
 import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
 import { EditMixBatchDialog } from "@/components/EditMixBatchDialog";
 import type { FactoryMixBatch } from "@shared/schema";
@@ -372,15 +372,6 @@ export default function ProductionRawStock() {
 
   const { data: rawStock, isLoading } = useQuery<RawStockRow[]>({
     queryKey: ["/api/factory/raw-stock"],
-  });
-
-  const recalculateMutation = useMutation({
-    mutationFn: () => modeApiRequest("POST", "/api/factory/raw-stock/recalculate-used").then(r => r.json()),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
-      toast({ title: "Used kg recalculated", description: data.message });
-    },
-    onError: (err: any) => { if (err?._handledGlobally) return; toast({ title: "Recalculate failed", description: err.message, variant: "destructive" }); },
   });
 
   const { data: availableContainers } = useQuery<ContainerOption[]>({
@@ -905,24 +896,6 @@ export default function ProductionRawStock() {
     setObCommissionFxRate("1");
   };
 
-  const recalcUsedMutation = useMutation({
-    mutationFn: async () => {
-      const response = await modeApiRequest("POST", "/api/factory/raw-stock/recalculate-used", {});
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.message || "Failed to recalculate");
-      }
-      return response.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
-      toast({ title: "Recalculated", description: data.message || "Remaining balances updated" });
-    },
-    onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
 
   const handleSubmitOpeningBalance = () => {
     if (!obSupplierName.trim()) {
@@ -978,13 +951,6 @@ export default function ProductionRawStock() {
           <p className="text-muted-foreground mt-1">Raw stock inventory and daily mix batch management</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => recalcUsedMutation.mutate()} disabled={recalcUsedMutation.isPending} data-testid="button-recalc-balance">
-            {recalcUsedMutation.isPending ? "Recalculating..." : "Recalculate Balance"}
-          </Button>
-          <Button variant="outline" onClick={() => setObDialogOpen(true)} data-testid="button-opening-balance">
-            <Upload className="h-4 w-4 mr-2" />
-            Add Opening Balance
-          </Button>
           <Button onClick={() => setOffloadDialogOpen(true)} data-testid="button-offload-container">
             <ArrowDown className="h-4 w-4 mr-2" />
             Offload Container
@@ -1067,16 +1033,6 @@ export default function ProductionRawStock() {
             >
               <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
               New Manual Material
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => recalculateMutation.mutate()}
-              disabled={recalculateMutation.isPending}
-              data-testid="button-recalculate-used-kg"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${recalculateMutation.isPending ? "animate-spin" : ""}`} />
-              Recalculate Used kg
             </Button>
           </div>
         </CardHeader>
