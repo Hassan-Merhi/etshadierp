@@ -2544,7 +2544,7 @@ export default function FactorySuppliers() {
 
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <div className="text-xs text-muted-foreground">Balance</div>
+                          <div className="text-xs text-muted-foreground">{isParent ? "Pool Balance USD" : "Balance"}</div>
                           {isChild && sup.currencyBalances && sup.currencyBalances.length > 0 && sup.currencyBalances[0].currencyCode !== "USD" ? (
                             <>
                               <div className="text-lg font-bold tabular-nums" data-testid={`text-supplier-balance-${sup.id}`}>
