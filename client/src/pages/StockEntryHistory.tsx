@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
-import { ChevronDown, ChevronRight, Download, Search, RotateCcw, Grid3X3, List, AlignJustify } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Search, RotateCcw, Grid3X3, List, AlignJustify, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -451,6 +451,177 @@ export default function StockEntryHistory() {
     win.document.close();
   }
 
+  function handleExportWorkerPDF() {
+    if (filteredGroups.length === 0) return;
+
+    // Collect all bales across all groups
+    const allBales: BaleDetail[] = filteredGroups.flatMap(g => g.bales);
+
+    // Group bales by worker
+    const byWorker = new Map<string, BaleDetail[]>();
+    for (const b of allBales) {
+      const w = b.workerName || "Unassigned";
+      if (!byWorker.has(w)) byWorker.set(w, []);
+      byWorker.get(w)!.push(b);
+    }
+
+    // Sort workers alphabetically
+    const sortedWorkers = Array.from(byWorker.keys()).sort((a, b) => a.localeCompare(b, "ar"));
+
+    // Build detail rows (grouped by worker, bales sorted by product)
+    let detailRowsHtml = "";
+    for (const worker of sortedWorkers) {
+      const bales = byWorker.get(worker)!.sort((a, b) =>
+        (a.productName || "").localeCompare(b.productName || "")
+      );
+      const workerBaleCount = bales.length;
+      const workerTotalKg = bales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0);
+
+      bales.forEach((b, idx) => {
+        const isFirst = idx === 0;
+        const isLast = idx === bales.length - 1;
+        const productLabel = b.productName
+          ? (b.articleCode ? `${b.productName} (${b.articleCode})` : b.productName)
+          : "—";
+        const evenOdd = idx % 2 === 0 ? "#fff" : "#f8fafc";
+        detailRowsHtml += `<tr style="background:${evenOdd};">
+          <td class="ref">${b.referenceNumber || "—"}</td>
+          <td class="worker">${isFirst ? `<span class="worker-name">${worker}</span>` : ""}</td>
+          <td class="prod">${productLabel}</td>
+          <td class="wt">${parseFloat(b.weightKg || "0").toFixed(0)}</td>
+          <td class="total-pp">${isLast ? `<strong>${workerBaleCount}</strong><br/><span class="total-kg">${workerTotalKg.toFixed(0)} kg</span>` : ""}</td>
+        </tr>`;
+      });
+    }
+
+    // Summary — sorted by bale count descending
+    const summaryRows = sortedWorkers
+      .map(w => {
+        const bales = byWorker.get(w)!;
+        const count = bales.length;
+        const totalKg = bales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0);
+        return { worker: w, count, totalKg };
+      })
+      .sort((a, b) => b.count - a.count);
+
+    const grandBales = summaryRows.reduce((s, r) => s + r.count, 0);
+    const grandKg = summaryRows.reduce((s, r) => s + r.totalKg, 0);
+
+    const summaryRowsHtml = summaryRows.map((r, idx) => `
+      <tr style="background:${idx % 2 === 0 ? "#fff" : "#f8fafc"};">
+        <td class="sum-worker">${r.worker}</td>
+        <td class="sum-num">${r.count}</td>
+        <td class="sum-num">${r.totalKg.toFixed(0)}</td>
+      </tr>`).join("");
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Worker Bales Report — ${fromDate} to ${toDate}</title>
+  <style>
+    @page { size: portrait; margin: 10mm 8mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9px; color: #1e293b; background: #fff; }
+
+    .page-header { display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 2px solid #1e3a8a; padding-bottom: 4px; margin-bottom: 8px; }
+    .page-header h1 { font-size: 13px; font-weight: 800; color: #1e3a8a; }
+    .page-header .sub { font-size: 8.5px; color: #64748b; margin-top: 2px; }
+    .page-header .meta { text-align: right; font-size: 8px; color: #64748b; line-height: 1.6; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #1e3a8a; color: #fff; font-weight: 700; padding: 3px 5px; text-align: left; font-size: 8.5px; border: 1px solid #c8d5e8; }
+    th.r { text-align: right; }
+    td { padding: 2px 5px; border: 1px solid #e2e8f0; vertical-align: middle; font-size: 8.5px; }
+
+    td.ref { font-family: monospace; font-size: 7.5px; color: #334155; white-space: nowrap; }
+    td.worker { min-width: 60px; }
+    .worker-name { font-weight: 700; color: #1e3a8a; }
+    td.prod { color: #334155; }
+    td.wt { text-align: right; font-variant-numeric: tabular-nums; }
+    td.total-pp { text-align: center; font-size: 8px; color: #0369a1; border-left: 2px solid #bae6fd; }
+    .total-kg { font-size: 7px; color: #64748b; }
+
+    .page-break { page-break-before: always; }
+    .section-title { font-size: 12px; font-weight: 700; color: #1e3a8a; margin-bottom: 6px; border-bottom: 1.5px solid #1e3a8a; padding-bottom: 3px; }
+
+    td.sum-worker { font-weight: 600; }
+    td.sum-num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+    tr.grand-total td { background: #1e3a8a !important; color: #fff; font-weight: 700; }
+    tr.grand-total td.sum-num { text-align: right; }
+  </style>
+</head>
+<body>
+  <div class="page-header">
+    <div>
+      <h1>Worker Bales Report</h1>
+      <div class="sub">Stock Entry History &nbsp;&middot;&nbsp; ${fromDate} &rarr; ${toDate}</div>
+    </div>
+    <div class="meta">
+      ${sortedWorkers.length} workers &nbsp;|&nbsp; ${grandBales} bales &nbsp;|&nbsp; ${grandKg.toFixed(0)} kg total
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:16%">Reference</th>
+        <th style="width:18%">Worker</th>
+        <th>Product</th>
+        <th class="r" style="width:9%">Weight (kg)</th>
+        <th class="r" style="width:14%">Total / Person</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${detailRowsHtml}
+      <tr style="background:#1e3a8a;color:#fff;font-weight:800;">
+        <td colspan="3" style="color:#fff;padding:3px 5px;">TOTAL</td>
+        <td style="text-align:right;color:#fff;padding:3px 5px;">${grandKg.toFixed(0)}</td>
+        <td style="text-align:center;color:#fff;padding:3px 5px;">${grandBales}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="page-break"></div>
+
+  <div class="page-header">
+    <div>
+      <h1>Worker Summary</h1>
+      <div class="sub">Stock Entry History &nbsp;&middot;&nbsp; ${fromDate} &rarr; ${toDate}</div>
+    </div>
+    <div class="meta">
+      ${sortedWorkers.length} workers &nbsp;|&nbsp; ${grandBales} bales &nbsp;|&nbsp; ${grandKg.toFixed(0)} kg
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Worker</th>
+        <th class="r" style="width:18%">Bales</th>
+        <th class="r" style="width:22%">Total Weight (kg)</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${summaryRowsHtml}
+      <tr class="grand-total">
+        <td></td>
+        <td class="sum-num">${grandBales}</td>
+        <td class="sum-num">${grandKg.toFixed(0)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <script>window.onload = function(){ window.print(); };<\/script>
+</body>
+</html>`;
+
+    const win = window.open("", "_blank", "width=900,height=1000");
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+  }
+
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -482,6 +653,9 @@ export default function StockEntryHistory() {
           </Button>
           <Button variant="outline" size="sm" onClick={handlePrintMatrix} disabled={filteredGroups.length === 0} data-testid="button-print-matrix">
             <Grid3X3 className="w-3 h-3 mr-1" /> Print Matrix
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportWorkerPDF} disabled={filteredGroups.length === 0} data-testid="button-export-worker-pdf">
+            <FileDown className="w-3 h-3 mr-1" /> Worker PDF
           </Button>
           <Button variant="outline" size="sm" onClick={exportExcel} disabled={filteredGroups.length === 0} data-testid="button-export-excel">
             <Download className="w-3 h-3 mr-1" /> Export Excel
