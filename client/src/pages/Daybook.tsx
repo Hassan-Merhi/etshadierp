@@ -69,6 +69,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -3495,6 +3496,22 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 )}
               </div>
             </div>
+          )}
+          {selectedVoucher && (
+            <DialogFooter className="gap-2 pt-2 border-t">
+              <Button variant="outline" onClick={() => setViewDialogOpen(false)} data-testid="button-close-view-dialog">
+                Close
+              </Button>
+              {canEdit(selectedVoucher) && (
+                <Button
+                  onClick={() => { setViewDialogOpen(false); handleEdit(selectedVoucher); }}
+                  data-testid="button-edit-from-view-dialog"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit
+                </Button>
+              )}
+            </DialogFooter>
           )}
         </DialogContent>
       </Dialog>
