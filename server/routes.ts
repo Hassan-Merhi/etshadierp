@@ -22411,6 +22411,33 @@ if (asOfDate) {
       // Opening stock is intentionally excluded — it is already captured inside
       // "Stock In Hand" (the live inventory table). Adding it separately would double-count.
 
+      // Customer receivables — add balances for customers that no longer have a linked ledger account
+      // (post-migration: their entries are stored by customer_id, not ledger_account_id)
+      const allCustomers = await storage.getAllCustomers(companyId);
+      for (const customer of allCustomers) {
+        // Skip customers that still have a ledger account — they're already counted via companyAccounts
+        if (customer.ledgerAccountId) continue;
+        const custEntries = await storage.getVoucherEntriesByCustomer(customer.id);
+        const openingBalance = parseFloat(customer.openingBalance || "0");
+        const openingSide = customer.openingBalanceSide || "Dr";
+        const custBalance = custEntries.reduce((sum, entry) => {
+          const dr = parseFloat(entry.debitAmount || "0");
+          const cr = parseFloat(entry.creditAmount || "0");
+          if (dr > 0 && cr === 0) return sum + dr;
+          if (cr > 0 && dr === 0) return sum - cr;
+          return sum;
+        }, openingSide === "Dr" ? openingBalance : -openingBalance);
+        if (custBalance > 0) {
+          forUsTotal += custBalance;
+          categoryTotals["asset_Customer Receivables"] = (categoryTotals["asset_Customer Receivables"] || 0) + custBalance;
+          forUsAccounts.push({ name: customer.legalName, code: customer.code || "", value: custBalance, category: "Customer Receivables" });
+        } else if (custBalance < 0) {
+          onUsTotal += Math.abs(custBalance);
+          categoryTotals["liability_Customer Advances"] = (categoryTotals["liability_Customer Advances"] || 0) + Math.abs(custBalance);
+          onUsAccounts.push({ name: customer.legalName, code: customer.code || "", value: Math.abs(custBalance), category: "Customer Advances" });
+        }
+      }
+
       // NOTE: Stock OTW (containers pending offload) is intentionally EXCLUDED
       // Containers in transit are not yet assets - they become assets only when offloaded
       // At that point, they increase inventory (asset) and create supplier/agent liabilities
