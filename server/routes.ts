@@ -22408,8 +22408,15 @@ if (asOfDate) {
         forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: stockOnFloor, category: "Inventory" });
       }
 
-      // Opening stock is intentionally excluded — it is already captured inside
-      // "Stock In Hand" (the live inventory table). Adding it separately would double-count.
+      // Opening stock — initial inventory cost entered at system setup
+      const dashStockItems = await storage.getAllStockItems(companyId);
+      let dashOpeningStock = 0;
+      for (const item of dashStockItems) dashOpeningStock += parseFloat((item as any).openingValue || '0');
+      if (dashOpeningStock > 0) {
+        forUsTotal += dashOpeningStock;
+        categoryTotals["asset_Opening Stock"] = dashOpeningStock;
+        forUsAccounts.push({ name: "Opening Stock (Initial Inventory)", code: "COMPUTED", value: dashOpeningStock, category: "Opening Stock" });
+      }
 
       // Customer receivables — add balances for customers that no longer have a linked ledger account
       // (post-migration: their entries are stored by customer_id, not ledger_account_id)
