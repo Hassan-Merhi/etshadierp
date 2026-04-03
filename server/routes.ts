@@ -22063,14 +22063,25 @@ if (asOfDate) {
         return res.status(400).json({ message: "No company selected" });
       }
 
+      // Optional "as of" date filter — only include vouchers up to this date
+      const asOfDate = req.query.asOfDate ? String(req.query.asOfDate) : null;
+
       // Get all ledger accounts for this company
       const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
 
-      // Get all non-optional vouchers for this company
+      // Get all non-optional vouchers for this company (filtered by asOfDate if provided)
+      const voucherConditions: any[] = [
+        eq(vouchers.companyId, companyId),
+        eq(vouchers.optional, false),
+        isNull(vouchers.deletedAt),
+      ];
+      if (asOfDate) {
+        voucherConditions.push(lte(vouchers.voucherDate, asOfDate));
+      }
       const companyVouchers = await db
         .select({ id: vouchers.id })
         .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
+        .where(and(...voucherConditions))
         .execute();
       const companyVoucherIds = companyVouchers.map((v) => v.id);
 

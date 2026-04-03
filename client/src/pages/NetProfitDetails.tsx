@@ -8,6 +8,8 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft,
@@ -18,6 +20,8 @@ import {
   ChevronDown,
   ChevronRight,
   RefreshCw,
+  Calendar,
+  X,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -213,11 +217,25 @@ function CollapsibleSection({
   );
 }
 
+function todayStr() {
+  return new Date().toISOString().split("T")[0];
+}
+
 export default function NetProfitDetails() {
   const { formatAmount } = useCurrencyContext();
+  const [asOfDate, setAsOfDate] = useState<string>("");
+
+  const queryParam = asOfDate ? `?asOfDate=${asOfDate}` : "";
   const { data, isLoading, error, refetch } = useQuery<NetProfitData>({
-    queryKey: ["/api/stats/net-profit"],
+    queryKey: ["/api/stats/net-profit", asOfDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/stats/net-profit${queryParam}`, { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
   });
+
+  const isFiltered = !!asOfDate;
 
   if (isLoading) {
     return (
@@ -262,13 +280,48 @@ export default function NetProfitDetails() {
             <h1 className="text-2xl font-bold" data-testid="text-page-title">
               Net Profit Details
             </h1>
-            <p className="text-muted-foreground text-sm">Breakdown of all accounts</p>
+            <p className="text-muted-foreground text-sm">
+              {isFiltered
+                ? `As of ${new Date(asOfDate + "T00:00:00").toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}`
+                : "Current balances — all time"}
+            </p>
           </div>
         </div>
-        <Button onClick={() => refetch()} variant="outline" size="default" data-testid="button-refresh">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Date filter */}
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Label htmlFor="asOfDate" className="text-sm text-muted-foreground whitespace-nowrap">
+              As of date:
+            </Label>
+            <Input
+              id="asOfDate"
+              type="date"
+              value={asOfDate}
+              max={todayStr()}
+              onChange={(e) => setAsOfDate(e.target.value)}
+              className="w-44"
+              data-testid="input-as-of-date"
+            />
+            {isFiltered && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setAsOfDate("")}
+                data-testid="button-clear-date"
+                title="Clear date filter"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          <Button onClick={() => refetch()} variant="outline" size="default" data-testid="button-refresh">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Formula bar */}
