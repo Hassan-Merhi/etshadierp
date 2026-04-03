@@ -31,7 +31,7 @@ import {
 import {
   ArrowRight,
   ExternalLink,
-  Pencil,
+  Eye,
   Save,
   X,
   ArrowLeftRight,
@@ -270,11 +270,11 @@ export default function StockTransfers() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            title="Edit notes"
+                            title="View details"
                             onClick={() => startEdit(t)}
-                            data-testid={`button-edit-${t.transferId}`}
+                            data-testid={`button-view-${t.transferId}`}
                           >
-                            <Pencil className="h-3.5 w-3.5" />
+                            <Eye className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             size="icon"
@@ -300,7 +300,7 @@ export default function StockTransfers() {
       <Dialog open={!!editingTransfer} onOpenChange={(open) => { if (!open) setEditingTransfer(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Notes — {editingTransfer?.voucherNumber}</DialogTitle>
+            <DialogTitle>Transfer Details — {editingTransfer?.voucherNumber}</DialogTitle>
           </DialogHeader>
           <div className="space-y-2 py-2">
             <p className="text-sm text-muted-foreground">
