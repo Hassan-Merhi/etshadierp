@@ -61,6 +61,13 @@ interface Employee {
   active: boolean;
 }
 
+interface LedgerAccount {
+  id: number;
+  name: string;
+  code: string;
+  accountType: string;
+}
+
 function fmt(val: string | number | null | undefined, formatAmount: (n: number) => string) {
   const n = parseFloat(String(val || 0));
   return isNaN(n) ? formatAmount(0) : formatAmount(n);
@@ -107,12 +114,14 @@ function AdvancesView() {
   const [bulkForm, setBulkForm] = useState({
     advanceDate: new Date().toISOString().split("T")[0],
     notes: "",
+    cashAccountId: "",
   });
   const [form, setForm] = useState({
     employeeId: "",
     advanceDate: new Date().toISOString().split("T")[0],
     amount: "",
     notes: "",
+    cashAccountId: "",
   });
 
   const { data: advances, isLoading } = useQuery<AdvanceRecord[]>({
@@ -122,6 +131,11 @@ function AdvancesView() {
   const { data: allEmployees } = useQuery<Employee[]>({
     queryKey: ["/api/employees"],
   });
+
+  const { data: ledgerAccounts } = useQuery<LedgerAccount[]>({
+    queryKey: ["/api/ledger-accounts"],
+  });
+  const cashAccounts = (ledgerAccounts || []).filter((a) => a.accountType === "Cash");
 
   const workers = useMemo(
     () => (allEmployees || []).filter((e) => e.employeeType === "Worker"),
@@ -169,6 +183,7 @@ function AdvancesView() {
     mutationFn: async () => {
       if (!form.employeeId) throw new Error("Please select a worker");
       if (!form.amount || parseFloat(form.amount) <= 0) throw new Error("Please enter a valid amount");
+      if (!form.cashAccountId) throw new Error("Please select a cash account");
       const res = await apiRequest("POST", "/api/salary-advances", {
         employeeId: parseInt(form.employeeId),
         advanceDate: form.advanceDate,
@@ -176,6 +191,7 @@ function AdvancesView() {
         remainingBalance: form.amount,
         notes: form.notes || undefined,
         isOpeningBalance: false,
+        cashAccountId: parseInt(form.cashAccountId),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to create advance");
@@ -185,7 +201,7 @@ function AdvancesView() {
       queryClient.invalidateQueries({ queryKey: ["/api/salary-advances"] });
       toast({ title: "Advance recorded" });
       setAddOpen(false);
-      setForm({ employeeId: "", advanceDate: new Date().toISOString().split("T")[0], amount: "", notes: "" });
+      setForm({ employeeId: "", advanceDate: new Date().toISOString().split("T")[0], amount: "", notes: "", cashAccountId: "" });
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
@@ -210,6 +226,7 @@ function AdvancesView() {
         .map((wid) => ({ employeeId: wid, amount: bulkAmounts[wid] || "" }))
         .filter((i) => parseFloat(i.amount) > 0);
       if (items.length === 0) throw new Error("No workers with valid amounts");
+      if (!bulkForm.cashAccountId) throw new Error("Please select a cash account");
       const results = await Promise.all(
         items.map((item) =>
           apiRequest("POST", "/api/salary-advances", {
@@ -219,6 +236,7 @@ function AdvancesView() {
             remainingBalance: item.amount,
             notes: bulkForm.notes || undefined,
             isOpeningBalance: false,
+            cashAccountId: parseInt(bulkForm.cashAccountId),
           }),
         ),
       );
@@ -232,7 +250,7 @@ function AdvancesView() {
       setBulkOpen(false);
       setBulkAmounts({});
       setBulkSelected(new Set());
-      setBulkForm({ advanceDate: new Date().toISOString().split("T")[0], notes: "" });
+      setBulkForm({ advanceDate: new Date().toISOString().split("T")[0], notes: "", cashAccountId: "" });
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
@@ -468,6 +486,28 @@ function AdvancesView() {
               </div>
             </div>
             <div className="space-y-2">
+              <Label>Cash Account</Label>
+              <Select
+                value={form.cashAccountId}
+                onValueChange={(v) => setForm((p) => ({ ...p, cashAccountId: v }))}
+              >
+                <SelectTrigger data-testid="select-erp-advance-cash-account">
+                  <SelectValue placeholder="Select cash account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cashAccounts.length === 0 ? (
+                    <SelectItem value="none" disabled>No cash accounts available</SelectItem>
+                  ) : (
+                    cashAccounts.map((acc) => (
+                      <SelectItem key={acc.id} value={String(acc.id)}>
+                        {acc.name} ({acc.code})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label>Notes (optional)</Label>
               <Textarea
                 placeholder="Reason or notes..."
@@ -519,6 +559,29 @@ function AdvancesView() {
                   data-testid="input-erp-bulk-notes"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Cash Account</Label>
+              <Select
+                value={bulkForm.cashAccountId}
+                onValueChange={(v) => setBulkForm((p) => ({ ...p, cashAccountId: v }))}
+              >
+                <SelectTrigger data-testid="select-erp-bulk-cash-account">
+                  <SelectValue placeholder="Select cash account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cashAccounts.length === 0 ? (
+                    <SelectItem value="none" disabled>No cash accounts available</SelectItem>
+                  ) : (
+                    cashAccounts.map((acc) => (
+                      <SelectItem key={acc.id} value={String(acc.id)}>
+                        {acc.name} ({acc.code})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
