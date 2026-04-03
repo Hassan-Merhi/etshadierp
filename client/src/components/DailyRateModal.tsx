@@ -93,7 +93,6 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates"] });
       await queryClient.refetchQueries({ queryKey: ["/api/exchange-rates/latest"] });
       queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates/check-today", companyId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats/net-profit"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-balance"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/balance-sheet"] });

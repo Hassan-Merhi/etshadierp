@@ -1,6 +1,16 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
+// Heavy analytical queries that are intentionally excluded from blanket WS invalidation.
+// These are expensive to compute, have a manual Refresh button, and should not jump
+// around every time any write happens anywhere in the system.
+const STABLE_QUERY_PREFIXES = [
+  "/api/auth/me",           // staleTime=Infinity on purpose — spurious auth re-checks cause login redirects
+  "/api/stats/net-profit",  // full balance-sheet computation; user refreshes manually
+  "/api/reports/net-profit-statement", // P&L report; heavy computation
+  "/api/balance-sheet",     // balance sheet; heavy computation
+];
+
 export function useWsInvalidation() {
   const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
@@ -16,14 +26,12 @@ export function useWsInvalidation() {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = setTimeout(() => {
         if (!unmountedRef.current) {
-          // Only refetch queries that are currently active (mounted) and stale.
-          // Exclude the auth session query — its staleTime is Infinity on purpose;
-          // re-checking auth on every WS event causes spurious login redirects.
           queryClient.invalidateQueries({
             refetchType: "active",
             predicate: (query) => {
               const key = query.queryKey[0];
-              return typeof key !== "string" || !key.includes("/api/auth/me");
+              if (typeof key !== "string") return true;
+              return !STABLE_QUERY_PREFIXES.some((prefix) => key.startsWith(prefix));
             },
           });
         }

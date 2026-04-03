@@ -90,7 +90,6 @@ export function ExchangeRateSettings() {
       toast({ title: "Exchange rate saved" });
       queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates"] });
       await queryClient.refetchQueries({ queryKey: ["/api/exchange-rates/latest"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats/net-profit"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-balance"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/balance-sheet"] });
