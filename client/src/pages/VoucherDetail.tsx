@@ -257,7 +257,7 @@ export default function VoucherDetail() {
                               {item.stockItemName}
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              {formatNumber(item.quantity)} {item.unit}
+                              {formatNumber(item.quantity, 0)} {item.unit}
                             </TableCell>
                             <TableCell className="text-right font-mono">
                               {formatAmount(item.rate)}

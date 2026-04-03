@@ -122,7 +122,7 @@ export default function OffloadDetail() {
                     {offload.items.map((item) => (
                       <tr key={item.id} className="border-b last:border-0">
                         <td className="p-3">{item.stockItemName || item.stockItemCode || `Item #${item.stockItemId}`}</td>
-                        <td className="p-3 text-right font-mono">{formatNumber(Number(item.quantity))}</td>
+                        <td className="p-3 text-right font-mono">{formatNumber(Number(item.quantity), 0)}</td>
                         <td className="p-3 text-right font-mono">{formatAmount(Number(item.rate))}</td>
                         <td className="p-3 text-right font-mono">{formatAmount(Number(item.totalValue))}</td>
                       </tr>

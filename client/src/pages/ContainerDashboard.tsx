@@ -1011,7 +1011,7 @@ export default function ContainerDashboard() {
                                   <span className="font-mono text-[10px] text-muted-foreground">{item.stockItemCode}</span>
                                   <span className="ml-1">{item.stockItemName}</span>
                                 </td>
-                                <td className="py-1 px-2 text-right">{formatNumber(parseFloat(item.quantity || "0"))}</td>
+                                <td className="py-1 px-2 text-right">{formatNumber(parseFloat(item.quantity || "0"), 0)}</td>
                                 <td className="py-1 px-2 text-right">{formatNumber(parseFloat(item.rate || "0"))}</td>
                                 <td className="py-1 px-2 text-right font-medium">{formatAmount(parseFloat(item.lineTotal || "0"))}</td>
                               </tr>

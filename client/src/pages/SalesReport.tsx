@@ -795,10 +795,10 @@ export default function SalesReport() {
                     >
                       <TableCell className="font-medium">{group.displayDate}</TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatNumber(group.itemCount)}
+                        {formatNumber(group.itemCount, 0)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatNumber(group.totalQty)}
+                        {formatNumber(group.totalQty, 0)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatAmount(group.totalSales)}
@@ -824,10 +824,10 @@ export default function SalesReport() {
                   <TableRow className="font-bold bg-muted/50">
                     <TableCell>TOTAL</TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatNumber(salesData.length)}
+                      {formatNumber(salesData.length, 0)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatNumber(totals.totalQty)}
+                      {formatNumber(totals.totalQty, 0)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {formatAmount(totals.totalSales)}
@@ -865,11 +865,11 @@ export default function SalesReport() {
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div>
                         <span className="text-muted-foreground">Items: </span>
-                        <span className="font-mono">{formatNumber(group.itemCount)}</span>
+                        <span className="font-mono">{formatNumber(group.itemCount, 0)}</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Qty: </span>
-                        <span className="font-mono">{formatNumber(group.totalQty)}</span>
+                        <span className="font-mono">{formatNumber(group.totalQty, 0)}</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Sales: </span>

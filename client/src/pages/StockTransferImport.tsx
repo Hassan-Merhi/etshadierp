@@ -515,7 +515,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
                         </TableCell>
                         <TableCell className="text-right">{item.quantity}</TableCell>
                         <TableCell className="text-right">
-                          {validation?.currentStock !== undefined ? formatNumber(validation.currentStock) : "-"}
+                          {validation?.currentStock !== undefined ? formatNumber(validation.currentStock, 0) : "-"}
                         </TableCell>
                         <TableCell>
                           {validation ? (

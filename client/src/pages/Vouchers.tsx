@@ -2937,7 +2937,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             currentInventory,
             delta,
             resultingInventory,
-            error: `${item?.name} will have ${formatNumber(resultingInventory)} in ${sourceLocation?.name} after this transfer (currently ${formatNumber(currentInventory)}, need ${formatNumber(delta)} more)`
+            error: `${item?.name} will have ${formatNumber(resultingInventory, 0)} in ${sourceLocation?.name} after this transfer (currently ${formatNumber(currentInventory, 0)}, need ${formatNumber(delta, 0)} more)`
           };
         })
         .catch(err => ({
@@ -4993,7 +4993,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                       setShowItemSidebar(false);
                                     }}>
                                     <div className="font-medium truncate">{item.stockItemName}</div>
-                                    <div className="text-xs text-muted-foreground">Qty: {formatNumber(item.quantity)}</div>
+                                    <div className="text-xs text-muted-foreground">Qty: {formatNumber(item.quantity, 0)}</div>
                                   </button>
                                 ))}
                               </div>

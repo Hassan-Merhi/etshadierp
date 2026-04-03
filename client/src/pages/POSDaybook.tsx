@@ -820,7 +820,7 @@ export default function POSDaybook() {
                               {item.stockItemName || `Item ${item.stockItemId}`}
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              {formatNumber(parseFloat(item.quantity))}
+                              {formatNumber(parseFloat(item.quantity), 0)}
                             </TableCell>
                             <TableCell className="text-right font-mono">
                               {formatAmount(parseFloat(item.sellingPrice))}

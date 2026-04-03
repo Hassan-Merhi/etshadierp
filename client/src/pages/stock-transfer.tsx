@@ -697,7 +697,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                             />
                           </TableCell>
                           <TableCell className="text-right font-mono text-muted-foreground">
-                            {entry.stockItemId > 0 ? formatNumber(entry.availableQty) : "-"}
+                            {entry.stockItemId > 0 ? formatNumber(entry.availableQty, 0) : "-"}
                           </TableCell>
                           <TableCell>
                             <Button
@@ -924,7 +924,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                     <div key={idx} className="flex justify-between text-sm py-1">
                       <span className="font-medium">{item.name}</span>
                       <span className="text-destructive font-mono">
-                        Available: {formatNumber(item.available)} / Requested: {formatNumber(item.requested)}
+                        Available: {formatNumber(item.available, 0)} / Requested: {formatNumber(item.requested, 0)}
                       </span>
                     </div>
                   ))}
@@ -983,7 +983,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                         <TableRow key={idx}>
                           <TableCell>{item.stockItemName || `Item ${item.stockItemId}`}</TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatNumber(parseFloat(item.quantity || "0"))}
+                            {formatNumber(parseFloat(item.quantity || "0"), 0)}
                           </TableCell>
                         </TableRow>
                       ))}

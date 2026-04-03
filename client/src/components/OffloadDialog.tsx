@@ -620,7 +620,7 @@ export function OffloadDialog({
                       <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
                         <div>
                           <span>Qty: </span>
-                          <span className="font-medium" data-testid={`text-correction-qty-${r.stockItemId}`}>{formatNumber(parseFloat(r.quantity))}</span>
+                          <span className="font-medium" data-testid={`text-correction-qty-${r.stockItemId}`}>{formatNumber(parseFloat(r.quantity), 0)}</span>
                         </div>
                         <div>
                           <span>Avg Rate: </span>

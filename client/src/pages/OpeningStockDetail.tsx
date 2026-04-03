@@ -326,7 +326,7 @@ export default function OpeningStockDetail() {
                             )}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatNumber(rec.quantity)}
+                            {formatNumber(rec.quantity, 0)}
                           </TableCell>
                           <TableCell className="text-right font-mono">
                             {formatNumber(rec.averageRate)}
