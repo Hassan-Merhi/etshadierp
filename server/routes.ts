@@ -22508,9 +22508,6 @@ if (asOfDate) {
       
       let stockOtwValue = 0;
       for (const container of otwContainers) {
-        // For Statement of Accounts (byAgent), only include OTW containers with plate numbers
-        const hasPlate = container.numberPlate && container.numberPlate.trim() !== "";
-        // Use grandTotal (items + charges) if available, otherwise use itemsTotal
         const containerValue = parseFloat(container.grandTotal || container.itemsTotal || "0");
         stockOtwValue += containerValue;
       }
