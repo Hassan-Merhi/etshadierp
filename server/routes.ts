@@ -22427,10 +22427,15 @@ if (asOfDate) {
         forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: stockOnFloor, category: "Inventory" });
       }
 
-      // NOTE: Opening Stock (stock_items.openingValue) is intentionally NOT added here.
-      // Those initial quantities were loaded into the inventory table at setup, so they
-      // are already captured inside "Stock In Hand" above. Adding them separately would
-      // double-count the same goods.
+      // Opening stock — initial inventory cost entered at system setup
+      const dashStockItems = await storage.getAllStockItems(companyId);
+      let dashOpeningStock = 0;
+      for (const item of dashStockItems) dashOpeningStock += parseFloat((item as any).openingValue || '0');
+      if (dashOpeningStock > 0) {
+        forUsTotal += dashOpeningStock;
+        categoryTotals["asset_Opening Stock"] = dashOpeningStock;
+        forUsAccounts.push({ name: "Opening Stock (Initial Inventory)", code: "COMPUTED", value: dashOpeningStock, category: "Opening Stock" });
+      }
 
       // NOTE: Stock OTW (containers pending offload) is intentionally EXCLUDED
       // Containers in transit are not yet assets - they become assets only when offloaded
