@@ -363,7 +363,7 @@ export default function Agents() {
                   )}
                 </button>
                 <button
-                  className="p-2 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                  className="p-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
                   onClick={() => removeMutation.mutate(account.id)}
                   data-testid={`button-remove-agent-${account.id}`}
                   title="Remove from agents"

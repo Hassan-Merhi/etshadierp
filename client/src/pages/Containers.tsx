@@ -1152,7 +1152,7 @@ export default function Containers() {
                             ) : (
                               <div className="flex items-center gap-1 group">
                                 <span>{container.containerNumber}</span>
-                                <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => { setEditingNumberId(container.id); setEditingNumberValue(container.containerNumber); }} data-testid={`button-edit-number-${container.id}`}>
+                                <Button size="icon" variant="ghost" className="h-6 w-6 opacity-100 md:opacity-0 md:group-hover:opacity-100" onClick={() => { setEditingNumberId(container.id); setEditingNumberValue(container.containerNumber); }} data-testid={`button-edit-number-${container.id}`}>
                                   <Pencil className="h-3 w-3" />
                                 </Button>
                               </div>

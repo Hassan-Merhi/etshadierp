@@ -560,7 +560,7 @@ export default function BalesHistory() {
                           ) : (
                             <div className="flex items-center gap-1 group cursor-pointer" onClick={() => startEditName(bale.id, product?.name || bale.productName || "")} data-testid={`text-product-name-${bale.id}`}>
                               <span>{product?.name || bale.productName || "-"}</span>
-                              <Pencil className="h-3 w-3 text-muted-foreground invisible group-hover:visible" />
+                              <Pencil className="h-3 w-3 text-muted-foreground visible md:invisible md:group-hover:visible" />
                             </div>
                           )}
                         </TableCell>

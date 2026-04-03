@@ -394,7 +394,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                                       </Badge>
                                     )}
                                     {!posUser && (
-                                      <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-60 transition-opacity shrink-0" />
+                                      <Pencil className="w-3 h-3 text-muted-foreground opacity-40 md:opacity-0 md:group-hover:opacity-60 transition-opacity shrink-0" />
                                     )}
                                   </div>
                                 )}

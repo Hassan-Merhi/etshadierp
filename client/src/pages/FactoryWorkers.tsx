@@ -635,7 +635,7 @@ export default function FactoryWorkers() {
                       {worker.employeeCode || "—"}
                     </span>
                     <div
-                      className="flex gap-1 invisible group-hover:visible"
+                      className="flex gap-1 visible md:invisible md:group-hover:visible"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Button size="icon" variant="ghost" onClick={() => openEdit(worker)} data-testid={`button-edit-worker-${worker.id}`}>
