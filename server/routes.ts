@@ -22119,11 +22119,7 @@ if (asOfDate) {
       // Helper function to calculate net balance for an account
       const getAccountNetBalance = (acc: typeof companyAccounts[0]): number => {
         const opening = parseFloat(acc.openingBalance || "0");
-        // Default null opening_balance_side based on account type:
-        // Liability-type accounts naturally have Cr balances; everything else (Asset, Bank, Cash, Customer) is Dr
-        const naturallyCredit = ["Liability", "Duty Agent", "Transporter Agent", "Loan", "Loans", "Income", "Profit", "Equity", "EQUITY"].includes(acc.accountType || "");
-        const defaultSide = naturallyCredit ? "Cr" : "Dr";
-        const openingSide = (acc.openingBalanceSide || defaultSide) === "Dr" ? 1 : -1;
+        const openingSide = acc.openingBalanceSide === "Dr" ? 1 : -1;
         const signedOpening = opening * openingSide;
         const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
         return signedOpening + balance.debit - balance.credit;
