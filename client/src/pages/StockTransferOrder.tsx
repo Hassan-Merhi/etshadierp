@@ -508,7 +508,7 @@ export default function StockTransferOrder() {
     if (totalAfterAdd > availableQty) {
       toast({
         title: "Exceeds Available Stock",
-        description: `You can only add up to ${formatNumber(availableQty - currentAllocated)} more units. Available: ${formatNumber(availableQty)}, Already in order: ${formatNumber(currentAllocated)}`,
+        description: `You can only add up to ${formatNumber(availableQty - currentAllocated, 0)} more units. Available: ${formatNumber(availableQty, 0)}, Already in order: ${formatNumber(currentAllocated, 0)}`,
         variant: "destructive",
       });
       return;
@@ -543,7 +543,7 @@ export default function StockTransferOrder() {
     setQuantityPicker({ ...quantityPicker, open: false });
     toast({
       title: "Added to Order",
-      description: `${formatNumber(qty)} ${stockItem.uom} of ${stockItem.name} added`,
+      description: `${formatNumber(qty, 0)} ${stockItem.uom} of ${stockItem.name} added`,
     });
   };
 
@@ -564,7 +564,7 @@ export default function StockTransferOrder() {
 
     for (const item of orderItems) {
       if (item.quantity > item.availableQty) {
-        errors.push(`${item.stockItemName} from ${item.sourceLocationName}: Requested ${formatNumber(item.quantity)} but only ${formatNumber(item.availableQty)} available`);
+        errors.push(`${item.stockItemName} from ${item.sourceLocationName}: Requested ${formatNumber(item.quantity, 0)} but only ${formatNumber(item.availableQty, 0)} available`);
       }
       if (item.sourceLocationId === destinationLocationId) {
         errors.push(`${item.stockItemName}: Source and destination cannot be the same location`);
@@ -1099,7 +1099,7 @@ export default function StockTransferOrder() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{item.stockItemName}</p>
                             <p className="text-xs text-muted-foreground">
-                              From: {item.sourceLocationName} | {formatNumber(item.quantity)} {item.uom}
+                              From: {item.sourceLocationName} | {formatNumber(item.quantity, 0)} {item.uom}
                             </p>
                           </div>
                           <Button
@@ -1170,7 +1170,7 @@ export default function StockTransferOrder() {
                 From: {quantityPicker.locationName}
               </p>
               <p className="text-sm text-muted-foreground">
-                Available: <span className="font-mono">{formatNumber(quantityPicker.availableQty)}</span>{" "}
+                Available: <span className="font-mono">{formatNumber(quantityPicker.availableQty, 0)}</span>{" "}
                 {quantityPicker.stockItem?.uom}
               </p>
             </div>
