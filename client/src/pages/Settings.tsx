@@ -4867,7 +4867,7 @@ function OfflineSyncPanel() {
                           <PieChart className="h-6 w-6 text-purple-500" />
                         </div>
                         <div>
-                          <h3 className="font-semibold" data-testid="link-net-profit-details">Net Profit Details</h3>
+                          <h3 className="font-semibold" data-testid="link-net-profit-details">Net Position Details</h3>
                           <p className="text-sm text-muted-foreground">
                             View detailed breakdown of income, expenses, and net position
                           </p>

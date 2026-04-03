@@ -278,7 +278,7 @@ export default function NetProfitDetails() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold" data-testid="text-page-title">
-              Net Profit Details
+              Net Position Details
             </h1>
             <p className="text-muted-foreground text-sm">
               {isFiltered
@@ -340,14 +340,14 @@ export default function NetProfitDetails() {
             <Equal className="h-4 w-4 text-muted-foreground shrink-0" />
             <div className={`flex items-center gap-2 px-4 py-2.5 rounded-md ${(data?.netPosition || 0) >= 0 ? "bg-green-100 dark:bg-green-900/40" : "bg-red-100 dark:bg-red-900/40"}`}>
               <span className={`text-sm font-medium ${(data?.netPosition || 0) >= 0 ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`}>
-                Net Profit
+                Net Position
               </span>
               <span className={`font-bold font-mono ${(data?.netPosition || 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {formatAmount(data?.netPosition || 0)}
               </span>
             </div>
             <Badge variant={(data?.netPosition || 0) >= 0 ? "default" : "destructive"} className="ml-auto sm:ml-2">
-              {data?.netPositionLabel || "Net Profit"}
+              {data?.netPositionLabel || "Net Position"}
             </Badge>
           </div>
         </CardContent>

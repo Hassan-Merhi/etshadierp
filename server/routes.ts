@@ -22624,7 +22624,7 @@ if (asOfDate) {
       res.json({
         totalIncome: incomeTotal,
         totalExpenses: expensesTotal,
-        netProfit: incomeTotal - expensesTotal,
+        netProfit,
         forUs: {
           total: forUsTotal,
           breakdown: forUsBreakdown,
