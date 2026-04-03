@@ -21372,6 +21372,103 @@ if (asOfDate) {
     }
   });
 
+  // Stock Transfers - LIST all for current company (with location names and item counts)
+  app.get("/api/stock-transfers/list", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const startDate = req.query.startDate ? String(req.query.startDate) : null;
+      const endDate   = req.query.endDate   ? String(req.query.endDate)   : null;
+
+      // Fetch all stock transfer vouchers for this company via vouchers join
+      const voucherConditions: any[] = [
+        eq(vouchers.companyId, companyId),
+        eq(vouchers.voucherType, "Stock Transfer"),
+        isNull(vouchers.deletedAt),
+      ];
+      if (startDate) voucherConditions.push(gte(vouchers.voucherDate, startDate));
+      if (endDate)   voucherConditions.push(lte(vouchers.voucherDate, endDate));
+
+      const rows = await db
+        .select({
+          transferId:            stockTransferVouchers.id,
+          voucherId:             vouchers.id,
+          voucherNumber:         vouchers.voucherNumber,
+          voucherDate:           vouchers.voucherDate,
+          notes:                 stockTransferVouchers.notes,
+          inventoryApplied:      stockTransferVouchers.inventoryApplied,
+          sourceLocationId:      stockTransferVouchers.sourceLocationId,
+          destinationLocationId: stockTransferVouchers.destinationLocationId,
+          createdAt:             stockTransferVouchers.createdAt,
+        })
+        .from(stockTransferVouchers)
+        .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
+        .where(and(...voucherConditions))
+        .orderBy(desc(vouchers.voucherDate), desc(vouchers.id))
+        .execute();
+
+      if (rows.length === 0) return res.json([]);
+
+      // Batch-fetch location names
+      const locationIds = new Set<number>();
+      for (const r of rows) {
+        if (r.sourceLocationId)      locationIds.add(r.sourceLocationId);
+        if (r.destinationLocationId) locationIds.add(r.destinationLocationId);
+      }
+      const locationRows = locationIds.size > 0
+        ? await db.select({ id: locations.id, name: locations.name })
+            .from(locations)
+            .where(inArray(locations.id, Array.from(locationIds)))
+            .execute()
+        : [];
+      const locationMap = new Map(locationRows.map(l => [l.id, l.name]));
+
+      // Batch-fetch item counts and totals per transfer
+      const transferIds = rows.map(r => r.transferId);
+      const itemRows = await db
+        .select({
+          transferId:  stockTransferItems.transferId,
+          totalAmount: stockTransferItems.totalAmount,
+          stockItemId: stockTransferItems.stockItemId,
+          quantity:    stockTransferItems.quantity,
+        })
+        .from(stockTransferItems)
+        .where(inArray(stockTransferItems.transferId, transferIds))
+        .execute();
+
+      // Group items by transfer
+      const itemsByTransfer = new Map<number, typeof itemRows>();
+      for (const item of itemRows) {
+        const arr = itemsByTransfer.get(item.transferId) || [];
+        arr.push(item);
+        itemsByTransfer.set(item.transferId, arr);
+      }
+
+      const result = rows.map(r => {
+        const items = itemsByTransfer.get(r.transferId) || [];
+        const totalAmount = items.reduce((s, i) => s + parseFloat(i.totalAmount || "0"), 0);
+        return {
+          transferId:           r.transferId,
+          voucherId:            r.voucherId,
+          voucherNumber:        r.voucherNumber,
+          voucherDate:          r.voucherDate,
+          notes:                r.notes,
+          inventoryApplied:     r.inventoryApplied,
+          sourceLocationName:   r.sourceLocationId ? (locationMap.get(r.sourceLocationId) ?? "Multi-source") : "Multi-source",
+          destinationLocationName: locationMap.get(r.destinationLocationId) ?? "Unknown",
+          itemCount:            items.length,
+          totalAmount:          Math.round(totalAmount * 100) / 100,
+          createdAt:            r.createdAt,
+        };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Stock Transfers - GET endpoint
   app.get(
     "/api/stock-transfers",
@@ -21655,6 +21752,23 @@ if (asOfDate) {
       }
     },
   );
+
+  // Stock Transfers - PATCH endpoint (notes-only update)
+  app.patch("/api/stock-transfers/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!id) return res.status(400).json({ message: "Transfer ID is required" });
+      const { notes } = req.body;
+      await db
+        .update(stockTransferVouchers)
+        .set({ notes: notes ?? null })
+        .where(eq(stockTransferVouchers.id, id))
+        .execute();
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Stock Transfers - PUT endpoint (update)
   app.put(

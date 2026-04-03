@@ -115,6 +115,7 @@ const NetProfitReport = lazy(() => import("@/pages/NetProfitReport"));
 const FactoryNetProfitAnalytics = lazy(() => import("@/pages/FactoryNetProfitAnalytics"));
 const CompanyDataReset = lazy(() => import("@/pages/CompanyDataReset"));
 const StockTransferOrder = lazy(() => import("@/pages/StockTransferOrder"));
+const StockTransfers = lazy(() => import("@/pages/StockTransfers"));
 const OptionalVouchers = lazy(() => import("@/pages/OptionalVouchers"));
 const BaleLedger = lazy(() => import("@/pages/BaleLedger"));
 const SalesReportDetail = lazy(() => import("@/pages/SalesReportDetail"));
@@ -242,6 +243,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/stock-query" component={StockQuery} />
       <Route path="/location-summary"><Redirect to="/stock-query?tab=summary" /></Route>
       <Route path="/stock-transfer-order" component={StockTransferOrder} />
+      <Route path="/stock-transfers" component={StockTransfers} />
       <Route path="/optional-vouchers" component={OptionalVouchers} />
       <Route path="/stock-items/:id/history" component={StockItemHistory} />
       <Route path="/stock-items/:id/history/:year/:month" component={StockItemVouchers} />

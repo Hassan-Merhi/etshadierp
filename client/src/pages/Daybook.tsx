@@ -833,6 +833,32 @@ export default function Daybook({ user }: { user?: any } = {}) {
   });
 
 
+  // Auto-open voucher when ?voucherId= is present in URL (e.g. from Stock Transfers page)
+  const [urlVoucherHandled, setUrlVoucherHandled] = useState(false);
+  useEffect(() => {
+    if (urlVoucherHandled) return;
+    const params = new URLSearchParams(window.location.search);
+    const id = parseInt(params.get("voucherId") ?? "");
+    if (!id || isNaN(id)) return;
+    const loadAndOpen = async () => {
+      try {
+        const res = await fetch(`/api/vouchers/${id}`, { credentials: "include" });
+        if (!res.ok) return;
+        const voucher = await res.json();
+        if (voucher?.id) {
+          setSelectedVoucher(voucher);
+          setViewDialogOpen(true);
+          setUrlVoucherHandled(true);
+          // Clear the param from the URL without reloading
+          const url = new URL(window.location.href);
+          url.searchParams.delete("voucherId");
+          window.history.replaceState({}, "", url.toString());
+        }
+      } catch { /* ignore */ }
+    };
+    loadAndOpen();
+  }, [urlVoucherHandled]);
+
   // Fetch account names for Payment/Receipt/Journal vouchers
   useEffect(() => {
     const paymentVouchers = vouchers.filter(

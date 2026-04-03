@@ -25,6 +25,7 @@ import {
   UserRound,
   ChevronDown,
   GripVertical,
+  ArrowLeftRight,
 } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
@@ -91,9 +92,10 @@ const navSections: NavSection[] = [
     label: "Sales & POS",
     color: "#22c55e",
     items: [
-      { title: "POS",         url: "/pos",          icon: ShoppingCart },
-      { title: "POS Daybook", url: "/pos-daybook",  icon: Book         },
-      { title: "Price List",  url: "/price-list",   icon: Tag          },
+      { title: "POS",               url: "/pos",              icon: ShoppingCart },
+      { title: "POS Daybook",      url: "/pos-daybook",      icon: Book         },
+      { title: "Stock Transfers",  url: "/stock-transfers",  icon: ArrowLeftRight },
+      { title: "Price List",       url: "/price-list",       icon: Tag          },
     ],
   },
   {
