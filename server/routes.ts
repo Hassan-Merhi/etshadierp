@@ -22160,15 +22160,34 @@ if (asOfDate) {
         }
       }
 
+      // Calculate employee balances from voucher entries (respects asOfDate filter)
+      const employeeBalances = new Map<number, { debit: number; credit: number }>();
+      for (const entry of companyEntries) {
+        if (entry.employeeId) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const current = employeeBalances.get(entry.employeeId) || { debit: 0, credit: 0 };
+          employeeBalances.set(entry.employeeId, {
+            debit: current.debit + debit,
+            credit: current.credit + credit,
+          });
+        }
+      }
+
       // ============ SIMPLIFIED NET POSITION CALCULATION ============
       // Logic: Positive balance = Asset (owed to us), Negative balance = Liability (we owe them)
       // Expenses (except IMPORT_CHARGES) are subtracted from Net Position
       // Suppliers only counted for parent company (or all companies if no parent set)
 
       // Helper function to calculate net balance for an account
+      // Uses smart defaults for null opening_balance_side based on account type:
+      //   Asset/Bank/Cash/Customer accounts default to Dr (positive = asset)
+      //   All other types (Liability, Supplier, etc.) default to Cr (positive = liability)
+      const assetDefaultDrTypes = ["Asset", "Current Asset", "Bank", "Cash", "Customer"];
       const getAccountNetBalance = (acc: typeof companyAccounts[0]): number => {
         const opening = parseFloat(acc.openingBalance || "0");
-        const openingSide = acc.openingBalanceSide === "Dr" ? 1 : -1;
+        const defaultSide = assetDefaultDrTypes.includes(acc.accountType || "") ? 1 : -1;
+        const openingSide = acc.openingBalanceSide === "Dr" ? 1 : acc.openingBalanceSide === "Cr" ? -1 : defaultSide;
         const signedOpening = opening * openingSide;
         const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
         return signedOpening + balance.debit - balance.credit;
@@ -22408,16 +22427,10 @@ if (asOfDate) {
         forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: stockOnFloor, category: "Inventory" });
       }
 
-      // Opening stock — initial inventory cost entered at system setup
-      const dashStockItems = await storage.getAllStockItems(companyId);
-      let dashOpeningStock = 0;
-      for (const item of dashStockItems) dashOpeningStock += parseFloat((item as any).openingValue || '0');
-      if (dashOpeningStock > 0) {
-        forUsTotal += dashOpeningStock;
-        categoryTotals["asset_Opening Stock"] = dashOpeningStock;
-        forUsAccounts.push({ name: "Opening Stock (Initial Inventory)", code: "COMPUTED", value: dashOpeningStock, category: "Opening Stock" });
-      }
-
+      // NOTE: Opening Stock (stock_items.openingValue) is intentionally NOT added here.
+      // Those initial quantities were loaded into the inventory table at setup, so they
+      // are already captured inside "Stock In Hand" above. Adding them separately would
+      // double-count the same goods.
 
       // NOTE: Stock OTW (containers pending offload) is intentionally EXCLUDED
       // Containers in transit are not yet assets - they become assets only when offloaded
@@ -22429,20 +22442,32 @@ if (asOfDate) {
         .from(employees)
         .where(and(eq(employees.companyId, companyId), eq(employees.active, true), isNull(employees.deletedAt)))
         .execute();
+      // Compute each employee's balance from live voucher entries (respects asOfDate)
+      // Dr entry = payment/advance paid to them; Cr entry = salary/earnings owed to them
+      // netBalance > 0: we paid more than owed (advance/asset); < 0: we owe them (liability)
       let workerLiabilities = 0;
+      let workerAdvances = 0;
       for (const emp of companyEmployees) {
-        workerLiabilities += parseFloat(emp.currentBalance || "0");
-      }
-      if (workerLiabilities !== 0) {
-        if (workerLiabilities > 0) {
-          onUsTotal += workerLiabilities;
-          categoryTotals["liability_Workers"] = (categoryTotals["liability_Workers"] || 0) + workerLiabilities;
-          onUsAccounts.push({ name: "Workers/Employees Payable", code: "COMPUTED", value: workerLiabilities, category: "Workers" });
-        } else {
-          forUsTotal += Math.abs(workerLiabilities);
-          categoryTotals["asset_Worker Advances"] = (categoryTotals["asset_Worker Advances"] || 0) + Math.abs(workerLiabilities);
-          forUsAccounts.push({ name: "Worker Advances", code: "COMPUTED", value: Math.abs(workerLiabilities), category: "Worker Advances" });
+        const opening = parseFloat((emp as any).openingBalance || "0");
+        const openingSide = (emp as any).openingBalanceSide === "Dr" ? 1 : -1; // default Cr = we owe them
+        const signedOpening = opening * openingSide;
+        const balance = employeeBalances.get(emp.id) || { debit: 0, credit: 0 };
+        const netBalance = signedOpening + balance.debit - balance.credit;
+        if (netBalance < 0) {
+          workerLiabilities += Math.abs(netBalance);
+        } else if (netBalance > 0) {
+          workerAdvances += netBalance;
         }
+      }
+      if (workerLiabilities > 0) {
+        onUsTotal += workerLiabilities;
+        categoryTotals["liability_Workers"] = (categoryTotals["liability_Workers"] || 0) + workerLiabilities;
+        onUsAccounts.push({ name: "Workers/Employees Payable", code: "COMPUTED", value: workerLiabilities, category: "Workers" });
+      }
+      if (workerAdvances > 0) {
+        forUsTotal += workerAdvances;
+        categoryTotals["asset_Worker Advances"] = (categoryTotals["asset_Worker Advances"] || 0) + workerAdvances;
+        forUsAccounts.push({ name: "Worker Advances (Prepaid)", code: "COMPUTED", value: workerAdvances, category: "Worker Advances" });
       }
 
       // Add Suppliers (only for parent company or if no parent set)
