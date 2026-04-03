@@ -22370,16 +22370,8 @@ if (asOfDate) {
         forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: stockOnFloor, category: "Inventory" });
       }
 
-      // Opening stock — initial inventory cost entered outside the double-entry ledger.
-      // Not an expense: it is the cost basis of goods brought into the system at setup.
-      const dashStockItems = await storage.getAllStockItems(companyId);
-      let dashOpeningStock = 0;
-      for (const item of dashStockItems) dashOpeningStock += parseFloat((item as any).openingValue || '0');
-      if (dashOpeningStock > 0) {
-        forUsTotal += dashOpeningStock;
-        categoryTotals["asset_Opening Stock"] = dashOpeningStock;
-        forUsAccounts.push({ name: "Opening Stock (Initial Inventory)", code: "COMPUTED", value: dashOpeningStock, category: "Opening Stock" });
-      }
+      // Opening stock is intentionally excluded — it is already captured inside
+      // "Stock In Hand" (the live inventory table). Adding it separately would double-count.
 
       // NOTE: Stock OTW (containers pending offload) is intentionally EXCLUDED
       // Containers in transit are not yet assets - they become assets only when offloaded
