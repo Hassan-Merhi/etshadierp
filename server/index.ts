@@ -842,6 +842,18 @@ let migrationsDone = false;
            USING CASE WHEN created_by IS NULL THEN NULL ELSE created_by::text END;
        END IF;
      END $$`,
+    // Fix NULL opening_balance_side on ledger accounts — causes customer/asset balances to
+    // appear as liabilities in Net Position because the code treats NULL as Cr (credit side).
+    // Asset-type accounts (including Customer Accounts) naturally carry Dr balances.
+    // Liability/Loan accounts naturally carry Cr balances.
+    `UPDATE ledger_accounts
+     SET opening_balance_side = 'Dr'
+     WHERE opening_balance_side IS NULL
+       AND account_type IN ('Asset', 'Bank', 'Cash', 'Current Asset', 'Government Taxes', 'Expense', 'Direct Expense', 'Indirect Expense')`,
+    `UPDATE ledger_accounts
+     SET opening_balance_side = 'Cr'
+     WHERE opening_balance_side IS NULL
+       AND account_type IN ('Liability', 'Loans', 'Duty Agent', 'Transporter Agent', 'Income', 'Profit', 'Equity', 'EQUITY', 'LIABILITY')`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's
