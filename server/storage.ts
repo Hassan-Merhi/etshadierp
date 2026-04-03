@@ -217,6 +217,7 @@ export interface IStorage {
   getVoucherById(id: number): Promise<Voucher | undefined>;
   getVouchersByDateRange(companyId: number, startDate: string, endDate: string): Promise<any[]>;
   getVoucherEntriesByLedger(ledgerAccountId: number, startDate?: string, endDate?: string): Promise<any[]>;
+  getVoucherEntriesByCustomer(customerId: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesByBankAccount(bankAccountId: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesByFixedAsset(fixedAssetId: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesBySupplier(supplierId: number, companyId?: number, startDate?: string, endDate?: string): Promise<any[]>;
@@ -2910,6 +2911,42 @@ export class DbStorage implements IStorage {
       .where(and(...conditions));
 
     return await query;
+  }
+
+  async getVoucherEntriesByCustomer(
+    customerId: number,
+    startDate?: string,
+    endDate?: string
+  ): Promise<any[]> {
+    const conditions = [
+      eq(schema.voucherEntries.customerId, customerId),
+      eq(schema.vouchers.optional, false),
+      isNull(schema.vouchers.deletedAt)
+    ];
+
+    if (startDate) {
+      conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
+    }
+    if (endDate) {
+      conditions.push(sql`${schema.vouchers.voucherDate} <= ${endDate}`);
+    }
+
+    return await db
+      .select({
+        entryId: schema.voucherEntries.id,
+        voucherId: schema.voucherEntries.voucherId,
+        debitAmount: schema.voucherEntries.debitAmount,
+        creditAmount: schema.voucherEntries.creditAmount,
+        narration: schema.voucherEntries.narration,
+        voucherNumber: schema.vouchers.voucherNumber,
+        voucherType: schema.vouchers.voucherType,
+        voucherDate: schema.vouchers.voucherDate,
+        voucherDescription: schema.vouchers.description,
+        currency: schema.vouchers.currency,
+      })
+      .from(schema.voucherEntries)
+      .leftJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
+      .where(and(...conditions));
   }
 
   async getVoucherEntriesByBankAccount(

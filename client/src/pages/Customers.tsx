@@ -50,13 +50,14 @@ export default function Customers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statementCustomer, setStatementCustomer] = useState<(Customer & { balance: number; balanceSide: string }) | null>(null);
 
-  // Fetch ledger transactions when a customer is selected for statement
+  // Fetch transactions when a customer is selected for statement
+  // Works whether entries are stored by ledger_account_id or customer_id (post-migration)
   const { data: ledgerTxns = [], isLoading: txnsLoading } = useQuery<any[]>({
-    queryKey: ["/api/accounts/ledger", statementCustomer?.ledgerAccountId, "transactions"],
+    queryKey: ["/api/customers", statementCustomer?.id, "transactions"],
     queryFn: () =>
-      fetch(`/api/accounts/ledger/${statementCustomer!.ledgerAccountId}/transactions`)
+      fetch(`/api/customers/${statementCustomer!.id}/transactions`)
         .then((r) => r.json()),
-    enabled: !!statementCustomer?.ledgerAccountId,
+    enabled: !!statementCustomer?.id,
   });
 
   const { data: customers = [], isLoading } = useQuery<(Customer & { balance: number; balanceSide: string })[]>({

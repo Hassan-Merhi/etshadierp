@@ -6241,23 +6241,61 @@ if (asOfDate) {
             };
           }
 
-          // If no ledger account, check customer_balances table for balance from credit sales
-          const customerBalance = await storage.getCustomerBalance(customer.id, req.session.currentCompanyId!);
+          // No ledger account — use customer_id on voucher_entries (post-migration path)
+          const customerEntries = await storage.getVoucherEntriesByCustomer(customer.id);
           const openingBalance = parseFloat(customer.openingBalance || "0");
           const openingSide = customer.openingBalanceSide || "Dr";
-          
-          // Combine opening balance with transactions from customer_balances table
-          const totalBalance = (openingSide === "Dr" ? openingBalance : -openingBalance) + customerBalance;
-          
+
+          const balance = customerEntries.reduce((sum, entry) => {
+            const debit = parseFloat(entry.debitAmount || "0");
+            const credit = parseFloat(entry.creditAmount || "0");
+            if (debit > 0 && credit === 0) return sum + debit;
+            if (credit > 0 && debit === 0) return sum - credit;
+            return sum;
+          }, openingSide === "Dr" ? openingBalance : -openingBalance);
+
           return {
             ...customer,
-            balance: Math.abs(totalBalance),
-            balanceSide: totalBalance >= 0 ? "Dr" : "Cr",
+            balance: Math.abs(balance),
+            balanceSide: balance >= 0 ? "Dr" : "Cr",
           };
         })
       );
 
       res.json(customersWithBalances);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get transactions for a specific customer (supports both ledger_account_id and customer_id paths)
+  app.get("/api/customers/:id/transactions", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const customerId = parseInt(req.params.id);
+      if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
+
+      const { startDate, endDate } = req.query;
+      const customer = await storage.getCustomerById(customerId);
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+      let transactions: any[] = [];
+      if (customer.ledgerAccountId) {
+        // Old path: entries stored against ledger account
+        transactions = await storage.getVoucherEntriesByLedger(
+          customer.ledgerAccountId,
+          startDate as string | undefined,
+          endDate as string | undefined
+        );
+      } else {
+        // New path (post-migration): entries stored against customer_id
+        transactions = await storage.getVoucherEntriesByCustomer(
+          customerId,
+          startDate as string | undefined,
+          endDate as string | undefined
+        );
+      }
+
+      res.json(transactions);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
