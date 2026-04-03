@@ -21437,6 +21437,16 @@ if (asOfDate) {
         .where(inArray(stockTransferItems.transferId, transferIds))
         .execute();
 
+      // Batch-fetch stock item names
+      const stockItemIds = [...new Set(itemRows.map(i => i.stockItemId).filter(Boolean))] as number[];
+      const stockItemRows = stockItemIds.length > 0
+        ? await db.select({ id: stockItems.id, name: stockItems.name })
+            .from(stockItems)
+            .where(inArray(stockItems.id, stockItemIds))
+            .execute()
+        : [];
+      const stockItemMap = new Map(stockItemRows.map(s => [s.id, s.name]));
+
       // Group items by transfer
       const itemsByTransfer = new Map<number, typeof itemRows>();
       for (const item of itemRows) {
@@ -21448,6 +21458,9 @@ if (asOfDate) {
       const result = rows.map(r => {
         const items = itemsByTransfer.get(r.transferId) || [];
         const totalAmount = items.reduce((s, i) => s + parseFloat(i.totalAmount || "0"), 0);
+        const stockItemNames = [...new Set(
+          items.map(i => stockItemMap.get(i.stockItemId) ?? "").filter(Boolean)
+        )];
         return {
           transferId:           r.transferId,
           voucherId:            r.voucherId,
@@ -21459,6 +21472,7 @@ if (asOfDate) {
           destinationLocationName: locationMap.get(r.destinationLocationId) ?? "Unknown",
           itemCount:            items.length,
           totalAmount:          Math.round(totalAmount * 100) / 100,
+          stockItemNames,
           createdAt:            r.createdAt,
         };
       });

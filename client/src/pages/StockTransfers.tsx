@@ -23,6 +23,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   ArrowRight,
   ExternalLink,
   Pencil,
@@ -50,6 +56,7 @@ interface StockTransferRow {
   destinationLocationName: string;
   itemCount: number;
   totalAmount: number;
+  stockItemNames: string[];
   createdAt: string;
 }
 
@@ -106,7 +113,8 @@ export default function StockTransfers() {
       t.voucherNumber?.toLowerCase().includes(q) ||
       t.sourceLocationName?.toLowerCase().includes(q) ||
       t.destinationLocationName?.toLowerCase().includes(q) ||
-      (t.notes ?? "").toLowerCase().includes(q)
+      (t.notes ?? "").toLowerCase().includes(q) ||
+      (t.stockItemNames ?? []).some(n => n.toLowerCase().includes(q))
     );
   });
 
@@ -186,7 +194,7 @@ export default function StockTransfers() {
                     <TableHead className="whitespace-nowrap">From</TableHead>
                     <TableHead className="whitespace-nowrap"></TableHead>
                     <TableHead className="whitespace-nowrap">To</TableHead>
-                    <TableHead className="whitespace-nowrap text-right">Items</TableHead>
+                    <TableHead className="whitespace-nowrap">Stock Items</TableHead>
                     <TableHead className="whitespace-nowrap text-right">Total</TableHead>
                     <TableHead className="whitespace-nowrap">Status</TableHead>
                     <TableHead className="whitespace-nowrap">Notes</TableHead>
@@ -216,8 +224,32 @@ export default function StockTransfers() {
                       <TableCell className="whitespace-nowrap text-sm">
                         {t.destinationLocationName}
                       </TableCell>
-                      <TableCell className="text-right text-sm tabular-nums">
-                        {t.itemCount}
+                      <TableCell className="text-sm max-w-56">
+                        <TooltipProvider>
+                          {(t.stockItemNames ?? []).length === 0 ? (
+                            <span className="text-muted-foreground/50 italic">—</span>
+                          ) : (t.stockItemNames ?? []).length <= 2 ? (
+                            <span className="text-sm">
+                              {(t.stockItemNames ?? []).join(", ")}
+                            </span>
+                          ) : (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="cursor-default underline decoration-dotted underline-offset-2 text-sm">
+                                  {(t.stockItemNames ?? [])[0]}{" "}
+                                  <span className="text-muted-foreground text-xs">+{(t.stockItemNames ?? []).length - 1} more</span>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                <ul className="text-xs space-y-0.5">
+                                  {(t.stockItemNames ?? []).map((n, i) => (
+                                    <li key={i}>{n}</li>
+                                  ))}
+                                </ul>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </TooltipProvider>
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm tabular-nums whitespace-nowrap">
                         {formatAmount(t.totalAmount)}
