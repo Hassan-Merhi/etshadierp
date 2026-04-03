@@ -385,37 +385,6 @@ export default function NetProfitDetails() {
         />
       </div>
 
-      {/* Income + Expenses side by side, full width */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-        <CollapsibleSection
-          id="income"
-          title="Income"
-          subtitle={`${data?.income.accounts?.length || 0} accounts`}
-          accentColor="text-green-600"
-          icon={<Plus className="h-5 w-5" />}
-          total={data?.incomeTotal || 0}
-          totalLabel="Total Income"
-          totalColor="text-green-600"
-          accounts={data?.income.accounts || []}
-          amountColor={(v) => (v >= 0 ? "text-green-600" : "text-red-600")}
-          amountPrefix={(v) => (v >= 0 ? "+" : "-")}
-          formatAmount={formatAmount}
-        />
-        <CollapsibleSection
-          id="expenses"
-          title="Expenses"
-          subtitle={`${data?.expenses.accounts?.length || 0} accounts`}
-          accentColor="text-red-600"
-          icon={<Minus className="h-5 w-5" />}
-          total={data?.expensesTotal || 0}
-          totalLabel="Total Expenses"
-          totalColor="text-red-600"
-          accounts={data?.expenses.accounts || []}
-          amountColor={(v) => (v >= 0 ? "text-red-600" : "text-green-600")}
-          amountPrefix={(v) => (v >= 0 ? "-" : "+")}
-          formatAmount={formatAmount}
-        />
-      </div>
     </div>
   );
 }
