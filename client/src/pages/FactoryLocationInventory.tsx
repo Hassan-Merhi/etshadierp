@@ -136,7 +136,6 @@ export default function FactoryLocationInventory() {
   const [proformaMode, setProformaMode] = useState(false);
   const [selections, setSelections] = useState<Map<number, ProformaSelection>>(new Map());
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
-  const [hideZeroAvailable, setHideZeroAvailable] = useState(true);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [proformaName, setProformaName] = useState("");
@@ -324,14 +323,15 @@ export default function FactoryLocationInventory() {
   });
 
   // In proforma mode use the reservations-aware data; otherwise use the plain inventory.
-  // When !hideZeroAvailable, also merge in every catalog product that has no stock at this location.
+  // In proforma mode always merge all catalog products (even those with 0 stock) so every product is visible for selection.
   const activeInventoryData: FactoryBaleProduct[] = useMemo(() => {
     const base = proformaMode && availableInventoryData.length > 0 ? availableInventoryData : inventoryData;
-    if (hideZeroAvailable || !proformaMode) return base;
+    // In proforma mode always show everything (catalog products with 0 stock included)
+    if (!proformaMode) return base;
     const catNameMap = new Map(catalogCategories.map((c) => [c.id, c.name]));
     const inStockIds = new Set(base.map((p) => p.productId));
     const zeroItems: FactoryBaleProduct[] = catalogBaleProducts
-      .filter((p) => p.active && !inStockIds.has(p.id))
+      .filter((p) => p.active !== false && !inStockIds.has(p.id))
       .map((p) => ({
         productId: p.id,
         articleCode: p.articleCode || "",
@@ -345,7 +345,7 @@ export default function FactoryLocationInventory() {
         sellingPrice: String(p.sellingPrice || "0"),
       }));
     return [...base, ...zeroItems];
-  }, [proformaMode, availableInventoryData, inventoryData, hideZeroAvailable, catalogBaleProducts, catalogCategories]);
+  }, [proformaMode, availableInventoryData, inventoryData, catalogBaleProducts, catalogCategories]);
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/factory/customers"],
@@ -560,12 +560,11 @@ export default function FactoryLocationInventory() {
     if (!categorySearch.trim() || !activeInventoryData.length) return null;
     const q = categorySearch.toLowerCase();
     const matched = activeInventoryData.filter(
-      (p) => (p.productName.toLowerCase().includes(q) || p.articleCode.toLowerCase().includes(q)) &&
-              !(hideZeroAvailable && p.baleCount === 0)
+      (p) => p.productName.toLowerCase().includes(q) || p.articleCode.toLowerCase().includes(q)
     );
     if (matched.length === 0) return null;
     return matched;
-  }, [categorySearch, activeInventoryData, hideZeroAvailable]);
+  }, [categorySearch, activeInventoryData]);
 
   const filteredCategories = applySortCategories(
     categoryGroups.filter((c) =>
@@ -579,7 +578,6 @@ export default function FactoryLocationInventory() {
   const specialCategories = filteredCategories.filter((c) => isSpecialFactoryCategory(c.categoryName));
 
   // Derive products dynamically from activeInventoryData (never from the stale snapshot in selectedCategory.products)
-  // so that toggling hideZeroAvailable instantly re-filters without requiring a re-click on the category.
   const selectedCategoryProducts: FactoryBaleProduct[] = useMemo(() => {
     if (!selectedCategory) return [];
     if (selectedCategory.categoryId === -1) return activeInventoryData.slice().sort((a, b) => a.productName.localeCompare(b.productName));
@@ -595,7 +593,7 @@ export default function FactoryLocationInventory() {
             const matchesCatFilter = selectedCategory.categoryId === -1
               ? (categoryFilter === "__all__" || p.category === categoryFilter)
               : true;
-            if (hideZeroAvailable && p.baleCount === 0) return false;
+            if (!proformaMode && p.baleCount === 0) return false;
             if (proformaMode && showSelectedOnly) return matchesSearch && matchesCatFilter && selections.has(p.productId);
             return matchesSearch && matchesCatFilter;
           }
@@ -667,6 +665,21 @@ export default function FactoryLocationInventory() {
       setProformaMode(true);
     }
   }, [proformaMode]);
+
+  // In proforma mode, auto-jump to "All Items" table as soon as a location is selected and inventory is ready
+  useEffect(() => {
+    if (proformaMode && selectedLocation && !inventoryLoading && !selectedCategory) {
+      setSelectedCategory({
+        categoryId: -1,
+        categoryName: "All Items",
+        baleCount: 0,
+        totalWeight: 0,
+        totalCost: 0,
+        productCount: 0,
+        products: [],
+      });
+    }
+  }, [proformaMode, selectedLocation, inventoryLoading, selectedCategory]);
 
   const selectAllVisible = useCallback(() => {
     setSelections((prev) => {
@@ -1555,7 +1568,7 @@ export default function FactoryLocationInventory() {
   const spProdTotalCost = specialProducts.reduce((s, p) => s + p.totalCost, 0);
   const spProdTotalSellValue = specialProducts.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
   const allCategoryNamesForProducts = isAllItems
-    ? [...new Set(selectedCategory.products.map((p) => p.category || ""))].filter(Boolean).sort()
+    ? [...new Set(activeInventoryData.map((p) => p.category || ""))].filter(Boolean).sort()
     : [];
   const colSpanAll = (isAllItems ? 9 : 8) + (proformaMode ? 2 : 0);
   const colSpanLabel = isAllItems ? 3 : 2;
@@ -1624,14 +1637,6 @@ export default function FactoryLocationInventory() {
               Selected only
             </label>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setHideZeroAvailable((v) => !v)}
-            data-testid="button-toggle-zero-available"
-          >
-            {hideZeroAvailable ? "Show 0" : "Hide 0"}
-          </Button>
           {selections.size > 0 && (
             <Badge variant="secondary" className="text-sm ml-auto">
               {selections.size} items, {Array.from(selections.values()).reduce((s, v) => s + v.selectedQty, 0)} bales
