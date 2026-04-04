@@ -20500,21 +20500,22 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         });
       }
 
-      // Same exclusion logic as ERP net-profit
-      const excludedTypes = ["Income", "Profit", "Equity", "EQUITY", "Fixed Asset"];
+      // Account types that must never appear in net position — expenses of any kind
+      // (all casing variants), plus income/equity/profit accounts.
+      const excludedAccountTypes = new Set([
+        "Expense", "Direct Expense", "Indirect Expense", "EXPENSE",
+        "Income", "Profit", "Equity", "EQUITY", "Fixed Asset",
+      ]);
+
       const assetTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
       const fixedAssetPatterns = ["rover","toyota","mercedes","vehicle","car","truck","land","property","building","house","rolex","watch","luxury","jewelry","guarantee","deposit","caution"];
       const stockPatterns = ["closing stock","opening stock","stock in hand","stock on hand","inventory","stock account","goods in stock","merchandise"];
       const stockCodes = ["CLOSING_STOCK","OPENING_STOCK","STOCK","INVENTORY","STOCK_IN_HAND"];
 
-      // Factory auto-generated cost/clearing accounts that must be excluded:
-      // - FACTORY_IMPORT_COST: records raw-material cost (Dr) when container offloads;
-      //   the liability side (Cr) is already captured in factory supplier balances.
-      //   Including this debit balance would double-count the goods value as an "asset".
-      // - FACTORY_CHARGES_PAYABLE: records other charges incurred (Dr); the real
-      //   payable sits on the credited account. This is a cost-recording entry, not an asset.
-      // Also exclude any account whose type is "EXPENSE" (all-caps) — that is the default
-      // type assigned by getOrCreateLedgerAccount() for factory auto-created cost accounts.
+      // Specific codes to exclude regardless of account type:
+      // - FACTORY_IMPORT_COST: Dr side of goods-received journal; liability already in supplier balances
+      // - FACTORY_CHARGES_PAYABLE: Dr side of other-charges journal; cost entry, not an asset
+      // - PRODUCTION_ADJUSTMENT / CONSUMPTION_EXPENSE: production cost clearing accounts
       const excludedCodes = new Set([
         "FACTORY_IMPORT_COST",
         "FACTORY_CHARGES_PAYABLE",
@@ -20528,7 +20529,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       let ledgerOnUsTotal = 0;
 
       for (const acc of factoryAccounts as any[]) {
-        if (excludedTypes.includes(acc.accountType || "")) continue;
+        if (excludedAccountTypes.has(acc.accountType || "")) continue;
         if (excludedCodes.has(acc.code || "")) continue;
         const nameLow = (acc.name || "").toLowerCase();
         const codeLow = (acc.code || "").toLowerCase();
@@ -20537,9 +20538,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (stockCodes.some((c: string) => codeLow === c.toLowerCase() || codeLow.startsWith(c.toLowerCase() + "_"))) continue;
           if (fixedAssetPatterns.some((p: string) => nameLow.includes(p))) continue;
         }
-        // Skip expense and income account types — both mixed-case and all-caps variants
-        const expenseTypes = ["Expense", "Direct Expense", "Indirect Expense", "EXPENSE"];
-        if (expenseTypes.includes(acc.accountType || "")) continue;
 
         const opening = parseFloat(acc.openingBalance || "0");
         const side = acc.openingBalanceSide;
