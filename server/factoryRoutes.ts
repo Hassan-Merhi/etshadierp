@@ -20472,27 +20472,38 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         });
       }
 
-      // Account types that must never appear in net position — expenses of any kind
-      // (all casing variants), plus income/equity/profit accounts.
-      const excludedAccountTypes = new Set([
-        "Expense", "Direct Expense", "Indirect Expense", "EXPENSE",
-        "Income", "Revenue", "Profit", "Equity", "EQUITY", "Fixed Asset",
-      ]);
+      // Account types that must never appear in net position — expenses and income
+      // of any kind. Comparison is case-insensitive to handle DB values like
+      // "EXPENSE", "Expense", "expense", "Indirect Expense", etc.
+      const isExcludedAccountType = (rawType: string | null | undefined): boolean => {
+        const t = (rawType || "").trim().toLowerCase();
+        return (
+          t.includes("expense") ||      // catches "expense", "EXPENSE", "indirect expense", etc.
+          t === "income" ||
+          t === "revenue" ||
+          t === "profit" ||
+          t === "equity" ||
+          t === "fixed asset"
+        );
+      };
 
       const assetTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
       const fixedAssetPatterns = ["rover","toyota","mercedes","vehicle","car","truck","land","property","building","house","rolex","watch","luxury","jewelry","guarantee","deposit","caution"];
       const stockPatterns = ["closing stock","opening stock","stock in hand","stock on hand","inventory","stock account","goods in stock","merchandise"];
       const stockCodes = ["CLOSING_STOCK","OPENING_STOCK","STOCK","INVENTORY","STOCK_IN_HAND"];
 
-      // Specific codes to exclude regardless of account type:
+      // Specific codes to exclude regardless of account type (case-insensitive):
       // - FACTORY_IMPORT_COST: Dr side of goods-received journal; liability already in supplier balances
       // - FACTORY_CHARGES_PAYABLE: Dr side of other-charges journal; cost entry, not an asset
       // - PRODUCTION_ADJUSTMENT / CONSUMPTION_EXPENSE: production cost clearing accounts
-      const excludedCodes = new Set([
+      const excludedCodeSet = new Set([
         "FACTORY_IMPORT_COST",
         "FACTORY_CHARGES_PAYABLE",
+        "FACTORY_OC_EXPENSE",
+        "OC_OTHER_CHARGE",
         "PRODUCTION_ADJUSTMENT",
         "CONSUMPTION_EXPENSE",
+        "FREIGHT",
       ]);
 
       const ledgerForUs: { name: string; code: string; value: number; category: string }[] = [];
@@ -20501,11 +20512,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       let ledgerOnUsTotal = 0;
 
       for (const acc of factoryAccounts as any[]) {
-        if (excludedAccountTypes.has(acc.accountType || "")) continue;
-        if (excludedCodes.has(acc.code || "")) continue;
+        // Support both camelCase (Drizzle ORM) and snake_case (raw query) column names
+        const accType: string = acc.accountType ?? acc["account_type"] ?? "";
+        const accCode: string = acc.code ?? "";
+        if (isExcludedAccountType(accType)) continue;
+        if (excludedCodeSet.has((accCode).trim().toUpperCase())) continue;
         const nameLow = (acc.name || "").toLowerCase();
-        const codeLow = (acc.code || "").toLowerCase();
-        if (assetTypes.includes(acc.accountType || "")) {
+        const codeLow = (accCode).toLowerCase();
+        const assetTypesLow = assetTypes.map(t => t.toLowerCase());
+        if (assetTypesLow.includes(accType.trim().toLowerCase())) {
           if (stockPatterns.some((p: string) => nameLow.includes(p))) continue;
           if (stockCodes.some((c: string) => codeLow === c.toLowerCase() || codeLow.startsWith(c.toLowerCase() + "_"))) continue;
           if (fixedAssetPatterns.some((p: string) => nameLow.includes(p))) continue;
@@ -20516,7 +20531,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const bal = accBalances.get(acc.id) || { debit: 0, credit: 0 };
 
         let netBalance: number;
-        const hasAssetDefault = ["Asset", "Current Asset", "Bank", "Cash", "Customer"].includes(acc.accountType || "");
+        const hasAssetDefault = ["Asset", "Current Asset", "Bank", "Cash", "Customer"].map(t => t.toLowerCase()).includes(accType.trim().toLowerCase());
         if (side === "Dr" || (!side && hasAssetDefault)) {
           netBalance = opening + bal.debit - bal.credit;
         } else {
@@ -20525,14 +20540,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
 
         if (Math.abs(netBalance) < 0.01) continue;
-        const cat = acc.accountType || "Other";
+        const cat = accType || "Other";
 
         if (netBalance > 0) {
           ledgerForUsTotal += netBalance;
-          ledgerForUs.push({ name: acc.name, code: acc.code || "", value: round2(netBalance), category: cat });
+          ledgerForUs.push({ name: acc.name, code: accCode, value: round2(netBalance), category: cat });
         } else {
           ledgerOnUsTotal += Math.abs(netBalance);
-          ledgerOnUs.push({ name: acc.name, code: acc.code || "", value: round2(Math.abs(netBalance)), category: cat });
+          ledgerOnUs.push({ name: acc.name, code: accCode, value: round2(Math.abs(netBalance)), category: cat });
         }
       }
 
