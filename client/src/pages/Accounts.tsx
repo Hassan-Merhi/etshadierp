@@ -461,14 +461,19 @@ export default function Accounts() {
     const account = accounts.find((a) => a.id === accountId);
     setSelectedAccount(account || null);
     setSearchTerm("");
+    // Reset period filter to this_month when switching accounts
+    const defaultPeriod = getDefaultPeriodValue("this_month");
+    setPeriodFilter(defaultPeriod);
     // Save to URL
     if (account) {
       updateUrlParams({
         accountId: account.accountId.toString(),
         accountType: (account.type || "").toLowerCase(),
+        startDate: defaultPeriod.fromDate,
+        endDate: defaultPeriod.toDate,
       });
     } else {
-      updateUrlParams({ accountId: null, accountType: null });
+      updateUrlParams({ accountId: null, accountType: null, startDate: null, endDate: null });
     }
   };
 
