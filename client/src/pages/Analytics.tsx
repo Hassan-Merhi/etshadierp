@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { useDateJump } from "@/hooks/use-date-jump";
 import { 
   TrendingUp,
   TrendingDown, 
@@ -289,6 +290,7 @@ export default function Analytics() {
   const [selectedPeriod, setSelectedPeriod] = useState("all");
   const [detailsPeriod, setDetailsPeriod] = useState("all");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
+  useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   const [selectedLocationForDetails, setSelectedLocationForDetails] = useState<number | null>(null);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set());
   const [ratiosStartDate, setRatiosStartDate] = useState("");

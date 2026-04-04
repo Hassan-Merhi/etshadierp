@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { useDateJump } from "@/hooks/use-date-jump";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -104,6 +105,7 @@ const formatSmartNumber = (value: string | number) => {
 
 export default function SalesReport() {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
+  useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [selectedStockItem, setSelectedStockItem] = useState<string>("");
   const [selectedStockGroup, setSelectedStockGroup] = useState<string>("");

@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { useDateJump } from "@/hooks/use-date-jump";
 
 interface LocationData {
   quantity: number;
@@ -82,6 +83,7 @@ export default function LocationSummary() {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => 
     savedState?.periodFilter || getDefaultPeriodValue("this_month")
   );
+  useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [selectedRowKey, setSelectedRowKey] = useState<string | null>(savedState?.selectedRowKey || null);
   const [highlightedRows, setHighlightedRows] = useState<Set<string>>(() => 

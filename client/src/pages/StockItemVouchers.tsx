@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { useDateJump } from "@/hooks/use-date-jump";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -75,6 +76,7 @@ export default function StockItemVouchers() {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => 
     getDefaultPeriodValue("this_month")
   );
+  useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   
   const { data, isLoading } = useQuery<VouchersData>({
     queryKey: [`/api/stock-items/${stockItemId}/vouchers/${year}/${month}`, { startDate: periodFilter.fromDate, endDate: periodFilter.toDate }],

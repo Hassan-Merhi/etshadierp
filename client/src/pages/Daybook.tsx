@@ -109,6 +109,7 @@ import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
 import { utils, writeFile } from "@/lib/excelHelper";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { useDateJump } from "@/hooks/use-date-jump";
 
 // Account types
 interface LedgerAccount {
@@ -453,6 +454,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const hiddenErpCosts = myErpPages?.hiddenErpCostFields ?? [];
   const hideAmounts = hiddenErpCosts.includes("daybook_amounts");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("today"));
+  useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   const [filters, setFilters] = useState({
     voucherType: "all",
     searchQuery: "",

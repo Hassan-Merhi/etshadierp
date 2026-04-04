@@ -37,6 +37,7 @@ import {
   Printer,
 } from "lucide-react";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { useDateJump } from "@/hooks/use-date-jump";
 import { useReactToPrint } from "react-to-print";
 import { format } from "date-fns";
 import { utils, writeFile } from "@/lib/excelHelper";
@@ -101,6 +102,7 @@ export default function Agents() {
 
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
+  useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   const [agentSearch, setAgentSearch] = useState("");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [addSearch, setAddSearch] = useState("");

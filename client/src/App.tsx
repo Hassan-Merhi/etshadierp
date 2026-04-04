@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search, Tag } from "lucide-react";
 import { FactorySidebar } from "@/components/FactorySidebar";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { DateJumpDialog } from "@/components/DateJumpDialog";
 import { PendingSyncIndicator } from "@/components/PendingSyncIndicator";
 import { ConnectivityProvider } from "@/contexts/ConnectivityContext";
 import { usePresence } from "@/hooks/use-presence";
@@ -843,6 +844,7 @@ export default function App() {
                       </Switch>
                       <Toaster />
                       <ChatWidget />
+                      <DateJumpDialog />
                     </CursorNavProvider>
                   </CurrencyProvider>
                 </DateFormatProvider>

@@ -44,6 +44,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber } from "@/lib/formatNumber";
 import { utils, writeFile } from "@/lib/excelHelper";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { useDateJump } from "@/hooks/use-date-jump";
 import { cn } from "@/lib/utils";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 
@@ -424,6 +425,7 @@ export default function FactoryDaybook() {
 
   // ── Filter state ──────────────────────────────────────────────────────────
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("today"));
+  useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   const [txTypeFilter, setTxTypeFilter] = useState("ALL");
   const [currencyFilter, setCurrencyFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState<"all" | "exclude" | "only">("all");

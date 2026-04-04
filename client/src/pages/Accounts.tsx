@@ -91,6 +91,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { useDateJump } from "@/hooks/use-date-jump";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 
 interface Account {
@@ -176,7 +177,6 @@ export default function Accounts() {
     }
     return getDefaultPeriodValue("this_month");
   });
-  
   const [accountToEdit, setAccountToEdit] = useState<LedgerAccount | null>(
     null,
   );
@@ -207,6 +207,11 @@ export default function Accounts() {
     },
     [],
   );
+  useDateJump((date) => {
+    const jumped = { fromDate: date, toDate: date, preset: "custom" as const };
+    setPeriodFilter(jumped);
+    updateUrlParams({ startDate: date, endDate: date });
+  });
 
   const [editSearchTerm, setEditSearchTerm] = useState("");
   const [expandedParents, setExpandedParents] = useState<Set<string>>(

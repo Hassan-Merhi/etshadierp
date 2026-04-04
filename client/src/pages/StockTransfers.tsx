@@ -44,6 +44,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { useDateJump } from "@/hooks/use-date-jump";
 
 interface StockTransferRow {
   transferId: number;
@@ -67,6 +68,7 @@ export default function StockTransfers() {
   const { toast } = useToast();
 
   const [period, setPeriod] = useState<PeriodFilterValue>(getDefaultPeriodValue());
+  useDateJump((date) => setPeriod({ fromDate: date, toDate: date, preset: "custom" }));
   const [search, setSearch] = useState("");
   const [editingTransfer, setEditingTransfer] = useState<StockTransferRow | null>(null);
   const [editNotes, setEditNotes] = useState("");

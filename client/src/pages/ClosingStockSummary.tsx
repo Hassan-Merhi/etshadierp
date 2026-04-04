@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { useDateJump } from "@/hooks/use-date-jump";
 
 interface StockGroupSummary {
   id: number;
@@ -58,6 +59,7 @@ export default function ClosingStockSummary() {
   const { selectedCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("this_month"));
+  useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
 
   const { data, isLoading } = useQuery<ClosingStockData>({
     queryKey: ["/api/reports/closing-stock-summary", selectedCompany?.id, periodFilter.fromDate, periodFilter.toDate],

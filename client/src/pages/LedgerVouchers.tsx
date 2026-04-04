@@ -12,6 +12,7 @@ import {
   FileText,
 } from "lucide-react";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { useDateJump } from "@/hooks/use-date-jump";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -92,6 +93,7 @@ export default function LedgerVouchers() {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => 
     getInitialPeriodValue(year, month)
   );
+  useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
 
   useEffect(() => {
     if (year && month) {

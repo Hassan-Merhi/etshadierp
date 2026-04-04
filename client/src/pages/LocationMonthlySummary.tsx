@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PeriodFilter, getDefaultPeriodValue, PeriodFilterValue } from "@/components/ui/period-filter";
+import { useDateJump } from "@/hooks/use-date-jump";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useCursorNav } from "@/contexts/CursorNavContext";
@@ -68,6 +69,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
   const isAllLocationsMode = locationId === 0;
 
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_year"));
+  useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1);
   const [showAllMonths, setShowAllMonths] = useState(false);
   const tableScrollContainer = useRef<HTMLDivElement>(null);

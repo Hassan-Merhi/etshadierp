@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { useDateJump } from "@/hooks/use-date-jump";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCursorNav } from "@/contexts/CursorNavContext";
@@ -77,6 +78,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1);
   const tableScrollContainer = useRef<HTMLDivElement>(null);
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
+  useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   const [showStockTransfers, setShowStockTransfers] = useState(false);
   
   const { data, isLoading } = useQuery<LocationVouchersData>({

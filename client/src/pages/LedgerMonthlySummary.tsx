@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { useDateJump } from "@/hooks/use-date-jump";
 import {
   BarChart,
   Bar,
@@ -96,6 +97,7 @@ export default function LedgerMonthlySummary() {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(
     getDefaultPeriodValue("this_year")
   );
+  useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

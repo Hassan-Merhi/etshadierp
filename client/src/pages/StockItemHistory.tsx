@@ -22,6 +22,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { PeriodFilter, getDefaultPeriodValue, type PeriodFilterValue } from "@/components/ui/period-filter";
+import { useDateJump } from "@/hooks/use-date-jump";
 import {
   BarChart,
   Bar,
@@ -72,6 +73,7 @@ export default function StockItemHistory() {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear.toString());
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_year"));
+  useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   
   const { data, isLoading } = useQuery<StockItemSummary>({
     queryKey: [`/api/stock-items/${stockItemId}/monthly-summary`, { year: selectedYear, startDate: periodFilter.fromDate, endDate: periodFilter.toDate }],
