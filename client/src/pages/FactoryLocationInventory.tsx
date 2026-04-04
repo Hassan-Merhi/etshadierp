@@ -136,6 +136,7 @@ export default function FactoryLocationInventory() {
   const [proformaMode, setProformaMode] = useState(false);
   const [selections, setSelections] = useState<Map<number, ProformaSelection>>(new Map());
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
+  const [hideZeroAvailable, setHideZeroAvailable] = useState(false);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [proformaName, setProformaName] = useState("");
@@ -519,11 +520,12 @@ export default function FactoryLocationInventory() {
     if (!categorySearch.trim() || !activeInventoryData.length) return null;
     const q = categorySearch.toLowerCase();
     const matched = activeInventoryData.filter(
-      (p) => p.productName.toLowerCase().includes(q) || p.articleCode.toLowerCase().includes(q)
+      (p) => (p.productName.toLowerCase().includes(q) || p.articleCode.toLowerCase().includes(q)) &&
+              !(hideZeroAvailable && p.baleCount === 0)
     );
     if (matched.length === 0) return null;
     return matched;
-  }, [categorySearch, activeInventoryData]);
+  }, [categorySearch, activeInventoryData, hideZeroAvailable]);
 
   const filteredCategories = applySortCategories(
     categoryGroups.filter((c) =>
@@ -544,6 +546,7 @@ export default function FactoryLocationInventory() {
             const matchesCatFilter = selectedCategory.categoryId === -1
               ? (categoryFilter === "__all__" || p.category === categoryFilter)
               : true;
+            if (hideZeroAvailable && p.baleCount === 0) return false;
             if (proformaMode && showSelectedOnly) return matchesSearch && matchesCatFilter && selections.has(p.productId);
             return matchesSearch && matchesCatFilter;
           }
@@ -1572,6 +1575,14 @@ export default function FactoryLocationInventory() {
               Selected only
             </label>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setHideZeroAvailable((v) => !v)}
+            data-testid="button-toggle-zero-available"
+          >
+            {hideZeroAvailable ? "Show 0" : "Hide 0"}
+          </Button>
           {selections.size > 0 && (
             <Badge variant="secondary" className="text-sm ml-auto">
               {selections.size} items, {Array.from(selections.values()).reduce((s, v) => s + v.selectedQty, 0)} bales
