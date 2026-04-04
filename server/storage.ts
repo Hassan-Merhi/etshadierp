@@ -2424,10 +2424,14 @@ export class DbStorage implements IStorage {
       }
     }
 
-    // Update container status to OFFLOADED
-    // When status changes from OTW to OFFLOADED, the container is no longer counted in Stock OTW
-    // The import cycle balance uses container.status to filter which containers to include
-    await tx.update(schema.containers).set({ status: "OFFLOADED" }).where(eq(schema.containers.id, containerId));
+    // Update container status to OFFLOADED and persist the offload date on the containers row.
+    // offloadDate must be stored here so the Container Report date filter can use it directly.
+    // When status changes from OTW to OFFLOADED, the container is no longer counted in Stock OTW.
+    // The import cycle balance uses container.status to filter which containers to include.
+    const resolvedOffloadDate = offloadDate || new Date().toISOString().split("T")[0];
+    await tx.update(schema.containers)
+      .set({ status: "OFFLOADED", offloadDate: resolvedOffloadDate })
+      .where(eq(schema.containers.id, containerId));
 
     // Get location details for voucher entries (container already fetched at top)
     const location = await this.getLocationById(locationId);

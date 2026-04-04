@@ -25169,8 +25169,13 @@ if (asOfDate) {
 
       const conditions = [companyCondition];
 
+      // Normalise status: the DB stores "OFFLOADED" (all-caps) while the
+      // frontend select sends "Offloaded" (mixed-case). Uppercase comparison
+      // handles both, and also tolerates any future casing differences.
+      const isOffloaded = (status as string | undefined)?.toLowerCase() === "offloaded";
       if (status) {
-        conditions.push(eq(containers.status, status as string));
+        const dbStatus = isOffloaded ? "OFFLOADED" : (status as string);
+        conditions.push(eq(containers.status, dbStatus));
       }
       if (supplierId) {
         conditions.push(
@@ -25178,17 +25183,18 @@ if (asOfDate) {
         );
       }
 
-      // For Offloaded containers, filter by offloadDate; otherwise use importDate
-      const isOffloaded = (status as string | undefined)?.toLowerCase() === "offloaded";
-      if (startDate) {
-        conditions.push(isOffloaded
-          ? sql`${containers.offloadDate} >= ${startDate}`
-          : sql`${containers.importDate} >= ${startDate}`);
-      }
-      if (endDate) {
-        conditions.push(isOffloaded
-          ? sql`${containers.offloadDate} <= ${endDate}`
-          : sql`${containers.importDate} <= ${endDate}`);
+      // For offloaded containers, use COALESCE(containers.offload_date, DATE(container_offloads.offloaded_at))
+      // so that older containers whose offload_date was not stored still appear in date-filtered reports.
+      if (isOffloaded) {
+        if (startDate) {
+          conditions.push(sql`COALESCE(${containers.offloadDate}, DATE(${containerOffloads.offloadedAt})) >= ${startDate}`);
+        }
+        if (endDate) {
+          conditions.push(sql`COALESCE(${containers.offloadDate}, DATE(${containerOffloads.offloadedAt})) <= ${endDate}`);
+        }
+      } else {
+        if (startDate) conditions.push(sql`${containers.importDate} >= ${startDate}`);
+        if (endDate) conditions.push(sql`${containers.importDate} <= ${endDate}`);
       }
 
       const containerData = await db
@@ -25198,15 +25204,16 @@ if (asOfDate) {
           supplierName: suppliers.legalName,
           status: containers.status,
           importDate: containers.importDate,
-          offloadDate: containers.offloadDate,
+          offloadDate: sql<string | null>`COALESCE(${containers.offloadDate}, TO_CHAR(${containerOffloads.offloadedAt}, 'YYYY-MM-DD'))`.as("offload_date"),
           itemsTotal: containers.itemsTotal,
           chargesTotal: containers.chargesTotal,
           grandTotal: containers.grandTotal,
         })
         .from(containers)
         .innerJoin(suppliers, eq(containers.supplierId, suppliers.id))
+        .leftJoin(containerOffloads, eq(containerOffloads.containerId, containers.id))
         .where(and(...conditions))
-        .orderBy(isOffloaded ? containers.offloadDate : containers.importDate);
+        .orderBy(isOffloaded ? sql`COALESCE(${containers.offloadDate}, DATE(${containerOffloads.offloadedAt}))` : containers.importDate);
 
       const totalItemsTotal = containerData.reduce(
         (sum, c) => sum + parseFloat(c.itemsTotal || "0"),
