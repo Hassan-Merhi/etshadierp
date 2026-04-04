@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { ChevronDown, ChevronRight, Download, Search, RotateCcw, Grid3X3, List, AlignJustify, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -123,76 +122,6 @@ function buildWorkerMatrix(filteredGroups: GroupRow[]): WorkerMatrix {
 function formatDailyNum(val: number): string {
   if (val === 0) return "0";
   return val % 1 === 0 ? val.toFixed(0) : parseFloat(val.toFixed(3)).toString();
-}
-
-function DailyStockSummary() {
-  const todayStr = new Date().toISOString().split("T")[0];
-  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
-
-  const { data: balesData } = useQuery<any[]>({
-    queryKey: ["/api/factory/bales"],
-  });
-
-  const dayInStock = (balesData || []).filter((row: any) => {
-    const bale = row.bale;
-    if (bale.status !== "IN_STOCK") return false;
-    const baleDate = bale.createdAt ? new Date(bale.createdAt).toISOString().split("T")[0] : null;
-    return baleDate === selectedDate;
-  });
-
-  const getCategory = (row: any) => (row.bale.category || "").toLowerCase().trim();
-  const dayGarbage = dayInStock.filter((row: any) => getCategory(row) === "garbage");
-  const dayWipers = dayInStock.filter((row: any) => getCategory(row) === "wipers");
-  const dayRegular = dayInStock.filter((row: any) => getCategory(row) !== "garbage" && getCategory(row) !== "wipers");
-
-  const totalQty = dayRegular.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
-  const totalKg = dayRegular.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
-  const garbageQty = dayGarbage.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
-  const garbageKg = dayGarbage.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
-  const wipersQty = dayWipers.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
-  const wipersKg = dayWipers.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
-
-  const isToday = selectedDate === todayStr;
-  const dateLabel = isToday ? "Today's In Stock" : `${selectedDate} In Stock`;
-
-  return (
-    <Card className="border-dashed">
-      <CardContent className="py-2 px-4">
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value || todayStr)}
-              className="h-7 w-36 text-xs px-2 py-1 border-muted-foreground/30"
-              data-testid="input-history-summary-date"
-            />
-            <span className="text-xs text-muted-foreground font-medium">{dateLabel}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold" data-testid="text-history-today-qty">{totalQty} qty</span>
-            <span className="text-sm font-semibold" data-testid="text-history-today-kg">{formatDailyNum(totalKg)} kg</span>
-          </div>
-          <>
-            <div className="w-px h-4 bg-border" />
-            <span className="text-xs text-muted-foreground font-medium">Garbage</span>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold">{garbageQty} qty</span>
-              <span className="text-sm font-semibold">{formatDailyNum(garbageKg)} kg</span>
-            </div>
-          </>
-          <>
-            <div className="w-px h-4 bg-border" />
-            <span className="text-xs text-muted-foreground font-medium">Wipers</span>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold">{wipersQty} qty</span>
-              <span className="text-sm font-semibold">{formatDailyNum(wipersKg)} kg</span>
-            </div>
-          </>
-        </div>
-      </CardContent>
-    </Card>
-  );
 }
 
 export default function StockEntryHistory() {
@@ -700,7 +629,6 @@ export default function StockEntryHistory() {
 
   return (
     <div className="p-4 space-y-4">
-      <DailyStockSummary />
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-base font-semibold">Stock Entry History</h2>
         <div className="flex items-center gap-2">

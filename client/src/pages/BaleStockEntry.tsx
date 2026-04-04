@@ -1971,61 +1971,70 @@
     const wipersKg = dayWipers.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
 
     const isToday = selectedDate === todayStr;
-    const dateLabel = isToday ? "Today's In Stock" : `${selectedDate} In Stock`;
 
     return (
-      <Card className="border-dashed">
-        <CardContent className="py-2 px-4">
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value || todayStr)}
-                className="h-7 w-36 text-xs px-2 py-1 border-muted-foreground/30"
-                data-testid="input-summary-date"
-              />
-              <span className="text-xs text-muted-foreground font-medium">{dateLabel}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold" data-testid="text-entry-today-qty">{totalQty} qty</span>
-              <span className="text-sm font-semibold" data-testid="text-entry-today-kg">{formatDailyNum(totalKg)} kg</span>
-            </div>
-            <>
-              <div className="w-px h-4 bg-border" />
-              <span className="text-xs text-muted-foreground font-medium">Garbage</span>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold" data-testid="text-entry-garbage-qty">{garbageQty} qty</span>
-                <span className="text-sm font-semibold" data-testid="text-entry-garbage-kg">{formatDailyNum(garbageKg)} kg</span>
-              </div>
-            </>
-            <>
-              <div className="w-px h-4 bg-border" />
-              <span className="text-xs text-muted-foreground font-medium">Wipers</span>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold" data-testid="text-entry-wipers-qty">{wipersQty} qty</span>
-                <span className="text-sm font-semibold" data-testid="text-entry-wipers-kg">{formatDailyNum(wipersKg)} kg</span>
-              </div>
-            </>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/30 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value || todayStr)}
+            className="h-7 w-36 text-xs"
+            data-testid="input-summary-date"
+          />
+          <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+            {isToday ? "Today's In Stock" : "In Stock"}
+          </span>
+        </div>
+
+        <div className="w-px h-4 bg-border hidden sm:block" />
+
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-bold tabular-nums" data-testid="text-entry-today-qty">{totalQty}</span>
+          <span className="text-xs text-muted-foreground">qty</span>
+          <span className="text-sm font-bold tabular-nums" data-testid="text-entry-today-kg">{formatDailyNum(totalKg)}</span>
+          <span className="text-xs text-muted-foreground">kg</span>
+        </div>
+
+        <div className="w-px h-4 bg-border hidden sm:block" />
+
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/25 text-orange-700 dark:text-orange-400">
+            Garbage
+          </span>
+          <span className="text-sm font-semibold tabular-nums" data-testid="text-entry-garbage-qty">{garbageQty}</span>
+          <span className="text-xs text-muted-foreground">qty</span>
+          <span className="text-sm font-semibold tabular-nums" data-testid="text-entry-garbage-kg">{formatDailyNum(garbageKg)}</span>
+          <span className="text-xs text-muted-foreground">kg</span>
+        </div>
+
+        <div className="w-px h-4 bg-border hidden sm:block" />
+
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/25 text-blue-700 dark:text-blue-400">
+            Wipers
+          </span>
+          <span className="text-sm font-semibold tabular-nums" data-testid="text-entry-wipers-qty">{wipersQty}</span>
+          <span className="text-xs text-muted-foreground">qty</span>
+          <span className="text-sm font-semibold tabular-nums" data-testid="text-entry-wipers-kg">{formatDailyNum(wipersKg)}</span>
+          <span className="text-xs text-muted-foreground">kg</span>
+        </div>
+      </div>
     );
   }
 
   export default function BaleStockEntry() {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">Bale Stock Entry</h1>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <DailyStockSummary />
+      <div className="space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">Bale Stock Entry</h1>
+          <div className="flex items-center gap-2">
             <LabelPrintSettings />
             <Badge variant="secondary" data-testid="badge-stock-entry">STOCK ENTRY</Badge>
           </div>
         </div>
+
+        <DailyStockSummary />
 
         <Tabs defaultValue="entry">
           <TabsList>
