@@ -453,7 +453,7 @@ export default function FactoryLocationInventory() {
     (inventoryData as any[]).forEach((prod: any) => {
       const line = lineMap.get(prod.articleCode);
       if (line) {
-        const available = prod.availableQty ?? prod.baleCount;
+        const available = prod.baleCount;
         newSelections.set(prod.productId, {
           productId: prod.productId,
           articleCode: prod.articleCode,
@@ -605,7 +605,7 @@ export default function FactoryLocationInventory() {
       const next = new Map(prev);
       filteredProducts.forEach((prod) => {
         if (!next.has(prod.productId)) {
-          const available = prod.availableQty ?? prod.baleCount;
+          const available = prod.baleCount;
           next.set(prod.productId, {
             productId: prod.productId,
             articleCode: prod.articleCode,
@@ -636,7 +636,7 @@ export default function FactoryLocationInventory() {
       if (next.has(prod.productId)) {
         next.delete(prod.productId);
       } else {
-        const available = prod.availableQty ?? prod.baleCount;
+        const available = prod.baleCount;
         next.set(prod.productId, {
           productId: prod.productId,
           articleCode: prod.articleCode,
@@ -1691,10 +1691,7 @@ export default function FactoryLocationInventory() {
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div>
                         <span className="text-muted-foreground">Bales: </span>
-                        <span className="font-mono">{proformaMode ? (prod.availableQty ?? prod.baleCount) : prod.baleCount}</span>
-                        {proformaMode && (prod.reservedQty ?? 0) > 0 && (
-                          <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">({prod.reservedQty} reserved)</span>
-                        )}
+                        <span className="font-mono">{prod.baleCount}</span>
                       </div>
                       <div className="text-right"><span className="text-muted-foreground">Wt/Bale: </span><span className="font-mono">{fmt(weightPerBale)} KG</span></div>
                       <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
@@ -1714,7 +1711,7 @@ export default function FactoryLocationInventory() {
                           min={1}
                           data-testid={`input-qty-mobile-${prod.productId}`}
                         />
-                        <span className="text-xs text-muted-foreground">/ {prod.availableQty ?? prod.baleCount}</span>
+                        <span className="text-xs text-muted-foreground">/ {prod.baleCount}</span>
                         <span className="text-xs text-muted-foreground ml-2">Price:</span>
                         <Input
                           type="number"
@@ -1795,10 +1792,7 @@ export default function FactoryLocationInventory() {
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           <div>
                             <span className="text-muted-foreground">Bales: </span>
-                            <span className="font-mono">{proformaMode ? (prod.availableQty ?? prod.baleCount) : prod.baleCount}</span>
-                            {proformaMode && (prod.reservedQty ?? 0) > 0 && (
-                              <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">({prod.reservedQty} reserved)</span>
-                            )}
+                            <span className="font-mono">{prod.baleCount}</span>
                           </div>
                           <div className="text-right"><span className="text-muted-foreground">Wt/Bale: </span><span className="font-mono">{fmt(weightPerBale)} KG</span></div>
                           <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
@@ -1811,7 +1805,7 @@ export default function FactoryLocationInventory() {
                           <div className="mt-2 pt-2 border-t flex items-center gap-2 flex-wrap">
                             <span className="text-xs text-muted-foreground">Qty:</span>
                             <Input type="number" value={selection.selectedQty} onChange={(e) => updateSelectionQty(prod.productId, e.target.value)} className="w-20 text-right" min={1} data-testid={`input-qty-mobile-sp-${prod.productId}`} />
-                            <span className="text-xs text-muted-foreground">/ {prod.availableQty ?? prod.baleCount}</span>
+                            <span className="text-xs text-muted-foreground">/ {prod.baleCount}</span>
                             <span className="text-xs text-muted-foreground ml-2">Price:</span>
                             <Input type="number" value={selection.pricePerBale} onChange={(e) => updateSelectionPrice(prod.productId, e.target.value)} className="w-24 text-right" step="0.01" data-testid={`input-price-mobile-sp-${prod.productId}`} />
                           </div>
@@ -1899,10 +1893,7 @@ export default function FactoryLocationInventory() {
                             </button>
                           </td>
                           <td className="text-right px-3 font-mono whitespace-nowrap">
-                            {proformaMode ? (prod.availableQty ?? prod.baleCount) : prod.baleCount}
-                            {proformaMode && (prod.reservedQty ?? 0) > 0 && (
-                              <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">({prod.reservedQty}R)</span>
-                            )}
+                            {prod.baleCount}
                           </td>
                           {proformaMode && (
                             <td className="text-right px-3">
@@ -2033,10 +2024,7 @@ export default function FactoryLocationInventory() {
                             </button>
                           </td>
                           <td className="text-right px-3 font-mono whitespace-nowrap">
-                            {proformaMode ? (prod.availableQty ?? prod.baleCount) : prod.baleCount}
-                            {proformaMode && (prod.reservedQty ?? 0) > 0 && (
-                              <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">({prod.reservedQty}R)</span>
-                            )}
+                            {prod.baleCount}
                           </td>
                           {proformaMode && (
                             <td className="text-right px-3">

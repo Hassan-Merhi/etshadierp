@@ -1093,37 +1093,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
       }
 
-      // --- pending proforma reservations ---
-      const proformas = await db.select().from(customerProformas).where(eq(customerProformas.companyId, companyId));
-      const proformaIds = proformas.map(p => p.id);
-
-      // reservedByArticle: articleCode (lowercase) → { qty, details }
-      const reservedByArticle = new Map<string, { qty: number; details: Array<{ proformaId: number; proformaName: string; customerId: number; qty: number }> }>();
-
-      if (proformaIds.length > 0) {
-        const lines = await db.select().from(customerProformaLines).where(inArray(customerProformaLines.proformaId, proformaIds));
-        const proformaMap = new Map(proformas.map(p => [p.id, p]));
-        for (const line of lines) {
-          const key = (line.articleCode || "").toLowerCase();
-          const proforma = proformaMap.get(line.proformaId);
-          const existing = reservedByArticle.get(key);
-          const detail = { proformaId: line.proformaId, proformaName: proforma?.name || `#${line.proformaId}`, customerId: proforma?.customerId || 0, qty: line.quantity };
-          if (existing) {
-            existing.qty += line.quantity;
-            existing.details.push(detail);
-          } else {
-            reservedByArticle.set(key, { qty: line.quantity, details: [detail] });
-          }
-        }
-      }
-
-      // merge reservations into grouped stock
+      // Return stock as-is — no reservation subtraction
       const result = Array.from(grouped.values()).map(item => {
-        const key = (item.articleCode || "").toLowerCase();
-        const reservation = reservedByArticle.get(key);
-        const reservedQty = reservation?.qty ?? 0;
-        const availableQty = Math.max(0, item.baleCount - reservedQty);
-        return { ...item, reservedQty, availableQty, reservations: reservation?.details ?? [] };
+        return { ...item, reservedQty: 0, availableQty: item.baleCount, reservations: [] };
       }).sort((a, b) => a.productName.localeCompare(b.productName));
 
       res.json(result);
