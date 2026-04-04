@@ -578,9 +578,18 @@ export default function FactoryLocationInventory() {
   const regularCategories = filteredCategories.filter((c) => !isSpecialFactoryCategory(c.categoryName));
   const specialCategories = filteredCategories.filter((c) => isSpecialFactoryCategory(c.categoryName));
 
+  // Derive products dynamically from activeInventoryData (never from the stale snapshot in selectedCategory.products)
+  // so that toggling hideZeroAvailable instantly re-filters without requiring a re-click on the category.
+  const selectedCategoryProducts: FactoryBaleProduct[] = useMemo(() => {
+    if (!selectedCategory) return [];
+    if (selectedCategory.categoryId === -1) return activeInventoryData.slice().sort((a, b) => a.productName.localeCompare(b.productName));
+    const catId = selectedCategory.categoryId || 0;
+    return activeInventoryData.filter((p) => (p.categoryId || 0) === catId);
+  }, [selectedCategory, activeInventoryData]);
+
   const filteredProducts = selectedCategory
     ? applySortProducts(
-        selectedCategory.products.filter(
+        selectedCategoryProducts.filter(
           (p) => {
             const matchesSearch = p.productName.toLowerCase().includes(productSearch.toLowerCase()) || p.articleCode.toLowerCase().includes(productSearch.toLowerCase());
             const matchesCatFilter = selectedCategory.categoryId === -1
