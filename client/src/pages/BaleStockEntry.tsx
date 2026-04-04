@@ -33,6 +33,7 @@
   import { LabelPrintSettings, getPaperFormat } from "@/components/LabelPrintSettings";
   import { Label } from "@/components/ui/label";
   import * as XLSX from "xlsx";
+  import StockEntryHistory from "./StockEntryHistory";
   import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
   import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, formatLabelNum, A4_DESIGN_OPTIONS, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
   import { consumeRef } from "@/lib/refPool";
@@ -969,7 +970,7 @@
     );
   }
 
-  function RemoveFromStockTab() {
+  export function RemoveFromStockTab() {
     const [selectedLocationId, setSelectedLocationId] = useState<string>("");
     const [dateFilter, setDateFilter] = useState<string>("");
     const [selectedBaleIds, setSelectedBaleIds] = useState<Set<number>>(new Set());
@@ -1672,7 +1673,7 @@
     refNumber?: string;
   }
 
-  function ImportBalesTab() {
+  export function ImportBalesTab() {
     const [selectedLocationId, setSelectedLocationId] = useState<string>("");
     const [importRows, setImportRows] = useState<ImportBaleRow[]>([]);
     const [fileName, setFileName] = useState("");
@@ -2032,23 +2033,16 @@
               <ScanLine className="h-4 w-4 mr-1" />
               Stock Entry
             </TabsTrigger>
-            <TabsTrigger value="remove" data-testid="tab-remove-stock">
-              <ShieldAlert className="h-4 w-4 mr-1" />
-              Remove from Stock
-            </TabsTrigger>
-            <TabsTrigger value="import" data-testid="tab-import-bales">
-              <FileSpreadsheet className="h-4 w-4 mr-1" />
-              Import Bales
+            <TabsTrigger value="history" data-testid="tab-stock-entry-history">
+              <List className="h-4 w-4 mr-1" />
+              Stock Entry History
             </TabsTrigger>
           </TabsList>
           <TabsContent value="entry" className="mt-4">
             <StockEntryTab />
           </TabsContent>
-          <TabsContent value="remove" className="mt-4">
-            <RemoveFromStockTab />
-          </TabsContent>
-          <TabsContent value="import" className="mt-4">
-            <ImportBalesTab />
+          <TabsContent value="history" className="mt-0 p-0">
+            <StockEntryHistory />
           </TabsContent>
         </Tabs>
       </div>

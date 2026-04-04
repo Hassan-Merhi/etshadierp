@@ -9,9 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download, WifiOff, ToggleRight, DollarSign, AlertTriangle } from "lucide-react";
+import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download, WifiOff, ToggleRight, DollarSign, AlertTriangle, FileSpreadsheet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
+import { ImportBalesTab } from "./BaleStockEntry";
 
 interface Location {
   id: number;
@@ -865,6 +866,22 @@ export default function FactorySettings() {
               </span>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* ── Import Bales ─────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
+            Import Bales
+          </CardTitle>
+          <CardDescription>
+            Bulk import bales from an Excel spreadsheet template.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <ImportBalesTab />
         </CardContent>
       </Card>
 
