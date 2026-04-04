@@ -141,6 +141,7 @@ const navSections: NavSection[] = [
       { title: "Mix Optimizer",     url: "/factory/intelligence/mix-optimizer",   icon: Beaker,     featureFlag: "mixOptimizerEnabled"        },
       { title: "Cash Flow",         url: "/factory/intelligence/cashflow",        icon: DollarSign, featureFlag: "cashflowEnabled"            },
       { title: "Net Profit",        url: "/factory/net-profit-analytics",         icon: BarChart3,  featureFlag: "netProfitEnabled"           },
+      { title: "Net Position",      url: "/factory/net-position",                 icon: Wallet,     featureFlag: "netProfitEnabled"           },
       { title: "Production Summary",url: "/factory/production-summary",           icon: BarChart3,  featureFlag: "productionSummaryEnabled"   },
       { title: "Supplier Report",   url: "/factory/supplier-report",              icon: ClipboardCheck, featureFlag: "supplierReportEnabled"  },
       { title: "Supplier Statement",url: "/factory/supplier-statement",           icon: ClipboardCheck, featureFlag: "supplierStatementEnabled"},

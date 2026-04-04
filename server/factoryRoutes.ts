@@ -20366,4 +20366,243 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       res.json({ ok: true });
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Factory Net Position  —  "What We Have" vs "What We Owe"
+  // Same logic as ERP /api/stats/net-profit but uses factory supplier tables
+  // ─────────────────────────────────────────────────────────────────────────
+  app.get("/api/factory/net-position", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+      // ── 1. Factory supplier balances (What We Owe) ──────────────────────
+      const suppliersList = await db.select().from(factorySuppliers)
+        .where(eq(factorySuppliers.companyId, companyId))
+        .orderBy(factorySuppliers.name);
+
+      const allContainersF = await db.select().from(factoryContainers)
+        .where(eq(factoryContainers.companyId, companyId));
+
+      const allPaymentsF = await db.select().from(factorySupplierPayments)
+        .where(eq(factorySupplierPayments.companyId, companyId));
+
+      const allFxTransfersF = await db.select().from(factorySupplierFxTransfers)
+        .where(eq(factorySupplierFxTransfers.companyId, companyId));
+
+      // Voucher-based payments (exclude auto-generated FACTORY-PAY-* to avoid double-count)
+      const allSupplierIds = (suppliersList as any[]).map((s: any) => s.id);
+      const voucherPaidBySupplier: Record<number, number> = {};
+      if (allSupplierIds.length > 0) {
+        const voucherRows = await db
+          .select({
+            factorySupplierId: voucherEntries.factorySupplierId,
+            debitAmount: voucherEntries.debitAmount,
+            currency: vouchers.currency,
+            exchangeRate: vouchers.exchangeRate,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(and(
+            inArray(voucherEntries.factorySupplierId, allSupplierIds),
+            sql`${voucherEntries.debitAmount}::numeric > 0`,
+            sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`
+          ));
+        for (const row of voucherRows as any[]) {
+          const sid = row.factorySupplierId;
+          if (!sid) continue;
+          const fx = parseFloat(row.exchangeRate || "1") || 1;
+          const usd = row.currency === "USD"
+            ? parseFloat(row.debitAmount || "0")
+            : parseFloat(row.debitAmount || "0") / fx;
+          voucherPaidBySupplier[sid] = (voucherPaidBySupplier[sid] || 0) + usd;
+        }
+      }
+
+      const supplierItems: { name: string; balanceUsd: number }[] = [];
+      let totalSupplierLiabilities = 0;
+
+      for (const s of suppliersList as any[]) {
+        const sc = allContainersF.filter((c: any) => c.supplierId === s.id);
+        const containerValue = sc.reduce((sum: number, c: any) => {
+          const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+          const rate = parseFloat(c.ratePerKg || "0");
+          const freight = parseFloat(c.freight || "0");
+          const fx = parseFloat(c.fxRateToUsd || "1");
+          const cc = c.currencyCode || "USD";
+          const fcc = c.freightCurrencyCode || cc;
+          const freightInCC = fcc === cc ? freight : 0;
+          const freightUsd = fcc === "USD" && fcc !== cc ? freight : 0;
+          return sum + (kg * rate + freightInCC) * fx + freightUsd;
+        }, 0);
+
+        const commission = sc.reduce((sum: number, c: any) => {
+          const amt = parseFloat(c.commissionAmount || "0");
+          if (amt <= 0) return sum;
+          const commCc = c.commissionCurrencyCode || c.currencyCode || "USD";
+          const fx = parseFloat(c.fxRateToUsd || "1");
+          return sum + (commCc === "USD" ? amt : amt * fx);
+        }, 0);
+
+        const otherCharges = allContainersF.reduce((sum: number, c: any) => {
+          if (c.otherChargesSupplierId !== s.id) return sum;
+          const oc = parseFloat(c.otherCharges || "0");
+          if (oc <= 0) return sum;
+          const ocCc = c.otherChargesCurrencyCode || "USD";
+          const fx = ocCc === "USD" ? 1 : parseFloat(c.fxRateToUsd || "1");
+          return sum + oc * fx;
+        }, 0);
+
+        let fxNet = 0;
+        for (const t of allFxTransfersF as any[]) {
+          if (t.toSupplierId === s.id) fxNet += parseFloat(t.toAmountUsd || "0");
+          if (t.fromSupplierId === s.id) fxNet -= parseFloat(t.toAmountUsd || "0");
+        }
+
+        const payments = allPaymentsF
+          .filter((p: any) => p.supplierId === s.id)
+          .reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
+
+        const voucherPaid = voucherPaidBySupplier[s.id] || 0;
+        const balance = round2(
+          parseFloat(s.openingBalance || "0") + containerValue + commission + otherCharges + fxNet - payments - voucherPaid
+        );
+
+        if (Math.abs(balance) > 0.01) {
+          supplierItems.push({ name: s.name, balanceUsd: balance });
+          if (balance > 0) totalSupplierLiabilities += balance;
+        }
+      }
+
+      // ── 2. ERP ledger account balances for the factory company ──────────
+      const factoryAccounts = await db.select().from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt)));
+
+      const factoryVouchers = await db.select({ id: vouchers.id })
+        .from(vouchers)
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)));
+
+      const fVoucherIds = factoryVouchers.map((v: any) => v.id);
+      const factoryEntries = fVoucherIds.length > 0
+        ? await db.select().from(voucherEntries)
+            .where(inArray(voucherEntries.voucherId, fVoucherIds))
+        : [];
+
+      const accBalances = new Map<number, { debit: number; credit: number }>();
+      for (const e of factoryEntries as any[]) {
+        if (!e.ledgerAccountId) continue;
+        const cur = accBalances.get(e.ledgerAccountId) || { debit: 0, credit: 0 };
+        accBalances.set(e.ledgerAccountId, {
+          debit: cur.debit + parseFloat(e.debitAmount || "0"),
+          credit: cur.credit + parseFloat(e.creditAmount || "0"),
+        });
+      }
+
+      // Same exclusion logic as ERP net-profit
+      const excludedTypes = ["Income", "Profit", "Equity", "EQUITY", "Fixed Asset"];
+      const assetTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
+      const fixedAssetPatterns = ["rover","toyota","mercedes","vehicle","car","truck","land","property","building","house","rolex","watch","luxury","jewelry","guarantee","deposit","caution"];
+      const stockPatterns = ["closing stock","opening stock","stock in hand","stock on hand","inventory","stock account","goods in stock","merchandise"];
+      const stockCodes = ["CLOSING_STOCK","OPENING_STOCK","STOCK","INVENTORY","STOCK_IN_HAND"];
+
+      const ledgerForUs: { name: string; code: string; value: number; category: string }[] = [];
+      const ledgerOnUs: { name: string; code: string; value: number; category: string }[] = [];
+      let ledgerForUsTotal = 0;
+      let ledgerOnUsTotal = 0;
+
+      for (const acc of factoryAccounts as any[]) {
+        if (excludedTypes.includes(acc.accountType || "")) continue;
+        if (acc.code === "PRODUCTION_ADJUSTMENT" || acc.code === "CONSUMPTION_EXPENSE") continue;
+        const nameLow = (acc.name || "").toLowerCase();
+        const codeLow = (acc.code || "").toLowerCase();
+        if (assetTypes.includes(acc.accountType || "")) {
+          if (stockPatterns.some((p: string) => nameLow.includes(p))) continue;
+          if (stockCodes.some((c: string) => codeLow === c.toLowerCase() || codeLow.startsWith(c.toLowerCase() + "_"))) continue;
+          if (fixedAssetPatterns.some((p: string) => nameLow.includes(p))) continue;
+        }
+        // Skip expense and income account types
+        const expenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
+        if (expenseTypes.includes(acc.accountType || "")) continue;
+
+        const opening = parseFloat(acc.openingBalance || "0");
+        const side = acc.openingBalanceSide;
+        const bal = accBalances.get(acc.id) || { debit: 0, credit: 0 };
+
+        let netBalance: number;
+        const hasAssetDefault = ["Asset", "Current Asset", "Bank", "Cash", "Customer"].includes(acc.accountType || "");
+        if (side === "Dr" || (!side && hasAssetDefault)) {
+          netBalance = opening + bal.debit - bal.credit;
+        } else {
+          netBalance = opening + bal.credit - bal.debit;
+          netBalance = -netBalance; // positive = asset, negative = liability
+        }
+
+        if (Math.abs(netBalance) < 0.01) continue;
+        const cat = acc.accountType || "Other";
+
+        if (netBalance > 0) {
+          ledgerForUsTotal += netBalance;
+          ledgerForUs.push({ name: acc.name, code: acc.code || "", value: round2(netBalance), category: cat });
+        } else {
+          ledgerOnUsTotal += Math.abs(netBalance);
+          ledgerOnUs.push({ name: acc.name, code: acc.code || "", value: round2(Math.abs(netBalance)), category: cat });
+        }
+      }
+
+      // ── 3. Combine and return ────────────────────────────────────────────
+      const forUsTotal = round2(ledgerForUsTotal);
+      const onUsTotal = round2(ledgerOnUsTotal + totalSupplierLiabilities);
+      const netPosition = round2(forUsTotal - onUsTotal);
+
+      // Build breakdown arrays
+      const forUsAccounts = ledgerForUs
+        .sort((a, b) => b.value - a.value)
+        .map(a => ({ ...a, value: round2(a.value) }));
+
+      // Group ledger on-us by category
+      const ledgerOnUsGrouped: Record<string, number> = {};
+      for (const a of ledgerOnUs) {
+        ledgerOnUsGrouped[a.category] = (ledgerOnUsGrouped[a.category] || 0) + a.value;
+      }
+
+      const onUsAccounts: { name: string; code: string; value: number; category: string }[] = [
+        ...supplierItems
+          .filter(s => s.balanceUsd > 0)
+          .sort((a, b) => b.balanceUsd - a.balanceUsd)
+          .map(s => ({ name: s.name, code: "SUPPLIER", value: round2(s.balanceUsd), category: "Supplier" })),
+        ...ledgerOnUs.sort((a, b) => b.value - a.value).map(a => ({ ...a, value: round2(a.value) })),
+      ];
+
+      const forUsBreakdown = Object.entries(
+        forUsAccounts.reduce((m: Record<string,number>, a) => {
+          m[a.category] = (m[a.category] || 0) + a.value;
+          return m;
+        }, {})
+      ).map(([name, value]) => ({ name, value: round2(value) })).sort((a, b) => b.value - a.value);
+
+      const onUsBreakdown = [
+        ...(totalSupplierLiabilities > 0 ? [{ name: "Suppliers", value: round2(totalSupplierLiabilities) }] : []),
+        ...Object.entries(ledgerOnUsGrouped)
+          .map(([name, value]) => ({ name, value: round2(value) }))
+          .sort((a, b) => b.value - a.value),
+      ];
+
+      res.json({
+        forUsTotal,
+        onUsTotal,
+        netPosition,
+        netPositionLabel: netPosition >= 0 ? "We have more than we owe" : "We owe more than we have",
+        forUs: { total: forUsTotal, breakdown: forUsBreakdown, accounts: forUsAccounts },
+        onUs: { total: onUsTotal, breakdown: onUsBreakdown, accounts: onUsAccounts },
+        supplierLiabilities: round2(totalSupplierLiabilities),
+        ledgerAssets: round2(ledgerForUsTotal),
+        ledgerLiabilities: round2(ledgerOnUsTotal),
+      });
+    } catch (error: any) {
+      console.error("Factory net-position error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
 }
