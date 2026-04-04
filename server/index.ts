@@ -842,6 +842,20 @@ let migrationsDone = false;
            USING CASE WHEN created_by IS NULL THEN NULL ELSE created_by::text END;
        END IF;
      END $$`,
+    // Backfill offload_date on containers that were offloaded before the column was written.
+    // The offloadContainer() function previously set status=OFFLOADED but never wrote offload_date.
+    // Pull the date from the container_offloads record (offloaded_at) so the Container Report
+    // date filter and all ERP displays show the correct offload date for historical data.
+    `UPDATE containers c
+     SET offload_date = (
+       SELECT DATE(co.offloaded_at)
+       FROM container_offloads co
+       WHERE co.container_id = c.id
+       ORDER BY co.id DESC
+       LIMIT 1
+     )
+     WHERE c.status = 'OFFLOADED'
+       AND c.offload_date IS NULL`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's
