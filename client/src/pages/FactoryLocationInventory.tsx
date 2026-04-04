@@ -302,7 +302,7 @@ export default function FactoryLocationInventory() {
     enabled: !!selectedLocation && proformaMode,
   });
 
-  // Catalog of all bale products (used to show 0-stock items in proforma mode)
+  // Catalog of all bale products — always fetched in proforma mode so "Show 0" is instant
   const { data: catalogBaleProducts = [] } = useQuery<Array<{ id: number; articleCode: string | null; name: string; sellingPrice: string | null; categoryId: number | null; active: boolean }>>({
     queryKey: ["/api/factory/bale-products"],
     queryFn: async () => {
@@ -310,8 +310,7 @@ export default function FactoryLocationInventory() {
       if (!res.ok) throw new Error("Failed to fetch bale products catalog");
       return res.json();
     },
-    staleTime: 0,
-    enabled: proformaMode && !hideZeroAvailable,
+    enabled: proformaMode,
   });
 
   const { data: catalogCategories = [] } = useQuery<Array<{ id: number; name: string }>>({
@@ -321,12 +320,11 @@ export default function FactoryLocationInventory() {
       if (!res.ok) throw new Error("Failed to fetch categories");
       return res.json();
     },
-    staleTime: 0,
-    enabled: proformaMode && !hideZeroAvailable,
+    enabled: proformaMode,
   });
 
   // In proforma mode use the reservations-aware data; otherwise use the plain inventory.
-  // When !hideZeroAvailable, also merge catalog items that have no stock at this location.
+  // When !hideZeroAvailable, also merge in every catalog product that has no stock at this location.
   const activeInventoryData: FactoryBaleProduct[] = useMemo(() => {
     const base = proformaMode && availableInventoryData.length > 0 ? availableInventoryData : inventoryData;
     if (hideZeroAvailable || !proformaMode) return base;
