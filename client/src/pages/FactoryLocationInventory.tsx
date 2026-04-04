@@ -305,11 +305,23 @@ export default function FactoryLocationInventory() {
   // Catalog of all bale products (used to show 0-stock items in proforma mode)
   const { data: catalogBaleProducts = [] } = useQuery<Array<{ id: number; articleCode: string | null; name: string; sellingPrice: string | null; categoryId: number | null; active: boolean }>>({
     queryKey: ["/api/factory/bale-products"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/bale-products", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch bale products catalog");
+      return res.json();
+    },
+    staleTime: 0,
     enabled: proformaMode && !hideZeroAvailable,
   });
 
   const { data: catalogCategories = [] } = useQuery<Array<{ id: number; name: string }>>({
     queryKey: ["/api/factory/categories"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/categories", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch categories");
+      return res.json();
+    },
+    staleTime: 0,
     enabled: proformaMode && !hideZeroAvailable,
   });
 
@@ -317,11 +329,11 @@ export default function FactoryLocationInventory() {
   // When !hideZeroAvailable, also merge catalog items that have no stock at this location.
   const activeInventoryData: FactoryBaleProduct[] = useMemo(() => {
     const base = proformaMode && availableInventoryData.length > 0 ? availableInventoryData : inventoryData;
-    if (hideZeroAvailable || !proformaMode || !catalogBaleProducts.length) return base;
+    if (hideZeroAvailable || !proformaMode) return base;
     const catNameMap = new Map(catalogCategories.map((c) => [c.id, c.name]));
     const inStockIds = new Set(base.map((p) => p.productId));
     const zeroItems: FactoryBaleProduct[] = catalogBaleProducts
-      .filter((p) => p.active && !inStockIds.has(p.id) && (p.articleCode || p.name))
+      .filter((p) => p.active && !inStockIds.has(p.id))
       .map((p) => ({
         productId: p.id,
         articleCode: p.articleCode || "",
