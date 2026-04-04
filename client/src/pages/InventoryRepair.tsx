@@ -23,8 +23,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { useAppMode, getApiRequest } from "@/lib/factoryApi";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { Loader2, AlertTriangle, CheckCircle, Search, Wrench, ShieldAlert } from "lucide-react";
 
 interface Discrepancy {

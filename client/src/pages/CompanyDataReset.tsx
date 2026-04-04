@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, Trash2, Shield, Undo2 } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useAppMode, getApiRequest } from "@/lib/factoryApi";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import type { Company, LedgerAccount } from "@shared/schema";
 import {
   AlertDialog,
