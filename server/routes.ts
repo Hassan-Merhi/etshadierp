@@ -25187,10 +25187,10 @@ if (asOfDate) {
       // so that older containers whose offload_date was not stored still appear in date-filtered reports.
       if (isOffloaded) {
         if (startDate) {
-          conditions.push(sql`COALESCE(${containers.offloadDate}, DATE(${containerOffloads.offloadedAt})) >= ${startDate}`);
+          conditions.push(sql`COALESCE(${containers.offloadDate}, DATE(latest_offload.offloaded_at)) >= ${startDate}`);
         }
         if (endDate) {
-          conditions.push(sql`COALESCE(${containers.offloadDate}, DATE(${containerOffloads.offloadedAt})) <= ${endDate}`);
+          conditions.push(sql`COALESCE(${containers.offloadDate}, DATE(latest_offload.offloaded_at)) <= ${endDate}`);
         }
       } else {
         if (startDate) conditions.push(sql`${containers.importDate} >= ${startDate}`);
@@ -25204,16 +25204,28 @@ if (asOfDate) {
           supplierName: suppliers.legalName,
           status: containers.status,
           importDate: containers.importDate,
-          offloadDate: sql<string | null>`COALESCE(${containers.offloadDate}, TO_CHAR(${containerOffloads.offloadedAt}, 'YYYY-MM-DD'))`.as("offload_date"),
+          offloadDate: sql<string | null>`COALESCE(${containers.offloadDate}, TO_CHAR(latest_offload.offloaded_at, 'YYYY-MM-DD'))`.as("offload_date"),
           itemsTotal: containers.itemsTotal,
           chargesTotal: containers.chargesTotal,
           grandTotal: containers.grandTotal,
         })
         .from(containers)
         .innerJoin(suppliers, eq(containers.supplierId, suppliers.id))
-        .leftJoin(containerOffloads, eq(containerOffloads.containerId, containers.id))
+        // Use DISTINCT ON to get exactly one offload record per container (the latest by id).
+        // This prevents duplicate rows if a container ever has more than one containerOffloads
+        // row (edge-case), and is safe for "All Companies" mode which spans many containers.
+        .leftJoin(
+          db.selectDistinctOn([containerOffloads.containerId], {
+            containerId: containerOffloads.containerId,
+            offloadedAt: containerOffloads.offloadedAt,
+          })
+            .from(containerOffloads)
+            .orderBy(containerOffloads.containerId, sql`${containerOffloads.id} DESC`)
+            .as("latest_offload"),
+          sql`latest_offload.container_id = ${containers.id}`
+        )
         .where(and(...conditions))
-        .orderBy(isOffloaded ? sql`COALESCE(${containers.offloadDate}, DATE(${containerOffloads.offloadedAt}))` : containers.importDate);
+        .orderBy(isOffloaded ? sql`COALESCE(${containers.offloadDate}, DATE(latest_offload.offloaded_at))` : containers.importDate);
 
       const totalItemsTotal = containerData.reduce(
         (sum, c) => sum + parseFloat(c.itemsTotal || "0"),
