@@ -54,6 +54,8 @@ interface FactoryBaleProduct {
   reservedQty?: number;
   availableQty?: number;
   reservations?: Array<{ proformaId: number; proformaName: string; customerId: number; qty: number }>;
+  // True for zero-stock catalog items whose underlying bale product is marked inactive
+  isInactive?: boolean;
 }
 
 interface CategoryGroup {
@@ -134,6 +136,7 @@ export default function FactoryLocationInventory() {
   const modeApiRequest = getApiRequest(appMode);
 
   const [proformaMode, setProformaMode] = useState(false);
+  const [hideZeroAvailable, setHideZeroAvailable] = useState(true);
   const [selections, setSelections] = useState<Map<number, ProformaSelection>>(new Map());
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
@@ -326,12 +329,13 @@ export default function FactoryLocationInventory() {
   // In proforma mode always merge all catalog products (even those with 0 stock) so every product is visible for selection.
   const activeInventoryData: FactoryBaleProduct[] = useMemo(() => {
     const base = proformaMode && availableInventoryData.length > 0 ? availableInventoryData : inventoryData;
-    // In proforma mode always show everything (catalog products with 0 stock included)
-    if (!proformaMode) return base;
+    // When hiding zero-stock items (or outside proforma mode), return base as-is
+    if (hideZeroAvailable || !proformaMode) return base;
     const catNameMap = new Map(catalogCategories.map((c) => [c.id, c.name]));
     const inStockIds = new Set(base.map((p) => p.productId));
+    // Include ALL catalog products not already in stock — active or inactive
     const zeroItems: FactoryBaleProduct[] = catalogBaleProducts
-      .filter((p) => p.active !== false && !inStockIds.has(p.id))
+      .filter((p) => !inStockIds.has(p.id))
       .map((p) => ({
         productId: p.id,
         articleCode: p.articleCode || "",
@@ -343,9 +347,10 @@ export default function FactoryLocationInventory() {
         totalCost: 0,
         baleCount: 0,
         sellingPrice: String(p.sellingPrice || "0"),
+        isInactive: p.active === false,
       }));
     return [...base, ...zeroItems];
-  }, [proformaMode, availableInventoryData, inventoryData, catalogBaleProducts, catalogCategories]);
+  }, [proformaMode, hideZeroAvailable, availableInventoryData, inventoryData, catalogBaleProducts, catalogCategories]);
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/factory/customers"],
@@ -593,7 +598,7 @@ export default function FactoryLocationInventory() {
             const matchesCatFilter = selectedCategory.categoryId === -1
               ? (categoryFilter === "__all__" || p.category === categoryFilter)
               : true;
-            if (!proformaMode && p.baleCount === 0) return false;
+            if (hideZeroAvailable && p.baleCount === 0) return false;
             if (proformaMode && showSelectedOnly) return matchesSearch && matchesCatFilter && selections.has(p.productId);
             return matchesSearch && matchesCatFilter;
           }
@@ -1637,6 +1642,14 @@ export default function FactoryLocationInventory() {
               Selected only
             </label>
           </div>
+          <Button
+            variant={hideZeroAvailable ? "outline" : "secondary"}
+            size="sm"
+            onClick={() => setHideZeroAvailable((v) => !v)}
+            data-testid="button-toggle-zero-available"
+          >
+            {hideZeroAvailable ? "Show 0" : "Hide 0"}
+          </Button>
           {selections.size > 0 && (
             <Badge variant="secondary" className="text-sm ml-auto">
               {selections.size} items, {Array.from(selections.values()).reduce((s, v) => s + v.selectedQty, 0)} bales
@@ -1722,6 +1735,7 @@ export default function FactoryLocationInventory() {
                       >
                         {prod.productName}
                       </button>
+                      {prod.isInactive && <Badge variant="outline" className="text-xs text-muted-foreground no-default-active-elevate shrink-0">Inactive</Badge>}
                       {!proformaMode && (
                         <div className="flex items-center gap-0.5 ml-auto">
                           <Button
@@ -1822,6 +1836,7 @@ export default function FactoryLocationInventory() {
                           >
                             {prod.productName}
                           </button>
+                          {prod.isInactive && <Badge variant="outline" className="text-xs text-muted-foreground no-default-active-elevate shrink-0">Inactive</Badge>}
                           {!proformaMode && (
                             <div className="flex items-center gap-0.5 ml-auto">
                               <Button
@@ -1941,9 +1956,12 @@ export default function FactoryLocationInventory() {
                           {isAllItems && <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>}
                           <td className="px-3 text-muted-foreground font-mono text-xs">{prod.articleCode}</td>
                           <td className="px-3 font-medium">
-                            <button onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)} className={`text-left whitespace-nowrap ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`} data-testid={`link-product-desktop-${prod.productId}`}>
-                              {prod.productName}
-                            </button>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <button onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)} className={`text-left whitespace-nowrap ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`} data-testid={`link-product-desktop-${prod.productId}`}>
+                                {prod.productName}
+                              </button>
+                              {prod.isInactive && <Badge variant="outline" className="text-xs text-muted-foreground no-default-active-elevate">Inactive</Badge>}
+                            </div>
                           </td>
                           <td className="text-right px-3 font-mono whitespace-nowrap">
                             {prod.baleCount}
@@ -2064,9 +2082,12 @@ export default function FactoryLocationInventory() {
                           <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>
                           <td className="px-3 text-muted-foreground font-mono text-xs">{prod.articleCode}</td>
                           <td className="px-3 font-medium">
-                            <button onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)} className={`text-left whitespace-nowrap ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`} data-testid={`link-product-desktop-sp-${prod.productId}`}>
-                              {prod.productName}
-                            </button>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <button onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)} className={`text-left whitespace-nowrap ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`} data-testid={`link-product-desktop-sp-${prod.productId}`}>
+                                {prod.productName}
+                              </button>
+                              {prod.isInactive && <Badge variant="outline" className="text-xs text-muted-foreground no-default-active-elevate">Inactive</Badge>}
+                            </div>
                           </td>
                           <td className="text-right px-3 font-mono whitespace-nowrap">
                             {prod.baleCount}
