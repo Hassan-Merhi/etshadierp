@@ -20504,7 +20504,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       // (all casing variants), plus income/equity/profit accounts.
       const excludedAccountTypes = new Set([
         "Expense", "Direct Expense", "Indirect Expense", "EXPENSE",
-        "Income", "Profit", "Equity", "EQUITY", "Fixed Asset",
+        "Income", "Revenue", "Profit", "Equity", "EQUITY", "Fixed Asset",
       ]);
 
       const assetTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
