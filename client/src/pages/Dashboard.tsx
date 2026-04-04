@@ -517,18 +517,16 @@ export default function Dashboard() {
       <Card className="p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-medium">Net Position Breakdown</h3>
-          {isFactoryMode && (
-            <Button size="icon" variant="outline" onClick={() => setLocation(isFactoryMode ? "/factory/net-profit-details" : "/net-profit-details")} data-testid="button-net-position-detail">
-              <ExternalLink className="h-4 w-4" />
-            </Button>
-          )}
+          <Button size="icon" variant="outline" onClick={() => setLocation(isFactoryMode ? "/factory/net-position" : "/net-profit-details")} data-testid="button-net-position-detail">
+            <ExternalLink className="h-4 w-4" />
+          </Button>
         </div>
         {isLoading ? (
           <div className="flex items-center justify-center h-[200px]">
             <p className="text-muted-foreground">Loading...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${isFactoryMode ? "lg:grid-cols-3" : "lg:grid-cols-4"} gap-3 sm:gap-6`}>
             {/* What We Have (Assets) - Full Breakdown */}
             <div className="border rounded-lg p-4">
               <h4 className="font-medium text-green-600 mb-3 flex items-center gap-2">
@@ -577,29 +575,31 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Expenses */}
-            <div className="border rounded-lg p-4">
-              <h4 className="font-medium text-orange-600 mb-3 flex items-center gap-2">
-                <Wallet className="h-4 w-4" />
-                What We Spent
-              </h4>
-              <div className="space-y-2 text-sm">
-                {(profitData?.expenses?.breakdown ?? []).map((item, idx) => (
-                  <div key={idx} className="flex justify-between">
-                    <span className="text-muted-foreground">{item.name}:</span>
+            {/* Expenses — ERP only */}
+            {!isFactoryMode && (
+              <div className="border rounded-lg p-4">
+                <h4 className="font-medium text-orange-600 mb-3 flex items-center gap-2">
+                  <Wallet className="h-4 w-4" />
+                  What We Spent
+                </h4>
+                <div className="space-y-2 text-sm">
+                  {(profitData?.expenses?.breakdown ?? []).map((item, idx) => (
+                    <div key={idx} className="flex justify-between">
+                      <span className="text-muted-foreground">{item.name}:</span>
+                      <span className="font-mono text-orange-600">
+                        {formatAmount(item.value)}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="border-t pt-2 mt-2 flex justify-between font-medium">
+                    <span>Total Expenses:</span>
                     <span className="font-mono text-orange-600">
-                      {formatAmount(item.value)}
+                      {formatAmount(profitData?.expensesTotal ?? 0)}
                     </span>
                   </div>
-                ))}
-                <div className="border-t pt-2 mt-2 flex justify-between font-medium">
-                  <span>Total Expenses:</span>
-                  <span className="font-mono text-orange-600">
-                    {formatAmount(profitData?.expensesTotal ?? 0)}
-                  </span>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Net Position Calculation */}
             <div className="border rounded-lg p-4 bg-muted/30">
