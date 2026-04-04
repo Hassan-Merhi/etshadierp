@@ -4759,8 +4759,11 @@ function OfflineSyncPanel() {
                 <h2 className="text-2xl font-semibold">System Tools</h2>
               </div>
 
+              {(() => {
+                const pfx = appMode === "factory" ? "/factory" : "";
+                return (
               <div className="grid gap-4 md:grid-cols-2">
-                <Link href="/deleted-items">
+                <Link href={`${pfx}/deleted-items`}>
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -4780,7 +4783,7 @@ function OfflineSyncPanel() {
                 </Link>
 
                 {currentUser?.role === "Developer" && (
-                <Link href="/orphaned-records">
+                <Link href={`${pfx}/orphaned-records`}>
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -4800,7 +4803,7 @@ function OfflineSyncPanel() {
                 </Link>
                 )}
 
-                <Link href="/chatbot-settings">
+                <Link href={`${pfx}/chatbot-settings`}>
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -4819,7 +4822,7 @@ function OfflineSyncPanel() {
                   </Card>
                 </Link>
 
-                <Link href="/import-cycle-diagnostics">
+                <Link href={`${pfx}/import-cycle-diagnostics`}>
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -4839,7 +4842,7 @@ function OfflineSyncPanel() {
                 </Link>
 
                 {currentUser?.role === "Developer" && (
-                <Link href="/inventory-repair">
+                <Link href={`${pfx}/inventory-repair`}>
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -4859,7 +4862,7 @@ function OfflineSyncPanel() {
                 </Link>
                 )}
 
-                <Link href="/net-profit-details">
+                <Link href={`${pfx}/net-profit-details`}>
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -4878,7 +4881,7 @@ function OfflineSyncPanel() {
                   </Card>
                 </Link>
 
-                <Link href="/company-data-reset">
+                <Link href={`${pfx}/company-data-reset`}>
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -5702,6 +5705,8 @@ function OfflineSyncPanel() {
                   <NetPositionAdjustmentCard />
                 )}
               </div>
+              );
+              })()}
             </div>
           )}
 
