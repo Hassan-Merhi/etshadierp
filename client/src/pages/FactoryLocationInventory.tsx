@@ -136,7 +136,7 @@ export default function FactoryLocationInventory() {
   const [proformaMode, setProformaMode] = useState(false);
   const [selections, setSelections] = useState<Map<number, ProformaSelection>>(new Map());
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
-  const [hideZeroAvailable, setHideZeroAvailable] = useState(false);
+  const [hideZeroAvailable, setHideZeroAvailable] = useState(true);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [proformaName, setProformaName] = useState("");
@@ -302,10 +302,40 @@ export default function FactoryLocationInventory() {
     enabled: !!selectedLocation && proformaMode,
   });
 
-  // In proforma mode use the reservations-aware data; otherwise use the plain inventory
-  const activeInventoryData: FactoryBaleProduct[] = proformaMode && availableInventoryData.length > 0
-    ? availableInventoryData
-    : inventoryData;
+  // Catalog of all bale products (used to show 0-stock items in proforma mode)
+  const { data: catalogBaleProducts = [] } = useQuery<Array<{ id: number; articleCode: string | null; name: string; sellingPrice: string | null; categoryId: number | null; active: boolean }>>({
+    queryKey: ["/api/factory/bale-products"],
+    enabled: proformaMode && !hideZeroAvailable,
+  });
+
+  const { data: catalogCategories = [] } = useQuery<Array<{ id: number; name: string }>>({
+    queryKey: ["/api/factory/categories"],
+    enabled: proformaMode && !hideZeroAvailable,
+  });
+
+  // In proforma mode use the reservations-aware data; otherwise use the plain inventory.
+  // When !hideZeroAvailable, also merge catalog items that have no stock at this location.
+  const activeInventoryData: FactoryBaleProduct[] = useMemo(() => {
+    const base = proformaMode && availableInventoryData.length > 0 ? availableInventoryData : inventoryData;
+    if (hideZeroAvailable || !proformaMode || !catalogBaleProducts.length) return base;
+    const catNameMap = new Map(catalogCategories.map((c) => [c.id, c.name]));
+    const inStockIds = new Set(base.map((p) => p.productId));
+    const zeroItems: FactoryBaleProduct[] = catalogBaleProducts
+      .filter((p) => p.active && !inStockIds.has(p.id) && (p.articleCode || p.name))
+      .map((p) => ({
+        productId: p.id,
+        articleCode: p.articleCode || "",
+        productName: p.name,
+        category: p.categoryId ? (catNameMap.get(p.categoryId) ?? "Uncategorized") : "Uncategorized",
+        categoryId: p.categoryId,
+        quantity: 0,
+        totalWeight: 0,
+        totalCost: 0,
+        baleCount: 0,
+        sellingPrice: String(p.sellingPrice || "0"),
+      }));
+    return [...base, ...zeroItems];
+  }, [proformaMode, availableInventoryData, inventoryData, hideZeroAvailable, catalogBaleProducts, catalogCategories]);
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/factory/customers"],
