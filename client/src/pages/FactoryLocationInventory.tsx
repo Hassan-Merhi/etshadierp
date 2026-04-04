@@ -444,19 +444,37 @@ export default function FactoryLocationInventory() {
 
   // When inventory loads in edit mode, pre-populate selections from existing proforma lines
   useEffect(() => {
-    if (!editingProformaId || editProformaLines.length === 0 || inventoryData.length === 0 || editModeInitialized) return;
-    const lineMap = new Map(editProformaLines.map((l) => [l.articleCode, l]));
-    const newSelections = new Map<number, ProformaSelection>();
+    if (!editingProformaId || editProformaLines.length === 0 || inventoryLoading || editModeInitialized) return;
+    // Build a lookup map from inventory data by articleCode
+    const productByArticleCode = new Map<string, any>();
     (inventoryData as any[]).forEach((prod: any) => {
-      const line = lineMap.get(prod.articleCode);
-      if (line) {
-        const available = prod.baleCount;
+      productByArticleCode.set((prod.articleCode || "").toLowerCase(), prod);
+    });
+    const newSelections = new Map<number, ProformaSelection>();
+    // Loop through proforma lines (source of truth) instead of inventory.
+    // This ensures lines whose bales are fully reserved (RESERVED_FOR_ORDER) are not dropped.
+    editProformaLines.forEach((line: any, index: number) => {
+      const prod = productByArticleCode.get((line.articleCode || "").toLowerCase());
+      if (prod) {
         newSelections.set(prod.productId, {
           productId: prod.productId,
           articleCode: prod.articleCode,
           productName: prod.productName,
-          availableBales: available,
+          availableBales: prod.baleCount,
           totalWeight: prod.totalWeight,
+          selectedQty: line.quantity,
+          pricePerBale: line.pricePerBale,
+        });
+      } else {
+        // Product not visible in current inventory — all bales may be reserved for an active loading.
+        // Still include this line so it is preserved when the proforma is saved.
+        const syntheticId = -(index + 1);
+        newSelections.set(syntheticId, {
+          productId: syntheticId,
+          articleCode: line.articleCode,
+          productName: line.productName || line.articleCode,
+          availableBales: 0,
+          totalWeight: 0,
           selectedQty: line.quantity,
           pricePerBale: line.pricePerBale,
         });
@@ -464,7 +482,7 @@ export default function FactoryLocationInventory() {
     });
     if (newSelections.size > 0) setSelections(newSelections);
     setEditModeInitialized(true);
-  }, [editingProformaId, editProformaLines, inventoryData, editModeInitialized]);
+  }, [editingProformaId, editProformaLines, inventoryData, inventoryLoading, editModeInitialized]);
 
   const categoryGroups: CategoryGroup[] = activeInventoryData.reduce((groups, item) => {
     const catId = item.categoryId || 0;
