@@ -4693,7 +4693,7 @@ function OfflineSyncPanel() {
           )}
 
           {activeSection === "fiscal" && (
-            <FiscalPeriodTab />
+            <FiscalPeriodTab currentCompanyId={selectedCompany?.id} userRole={currentUser?.role} />
           )}
 
           {activeSection === "preferences" && (
