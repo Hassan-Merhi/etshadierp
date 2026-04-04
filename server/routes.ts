@@ -10,6 +10,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { chat, saveMessage, getConversationHistory, getConversationHistoryForAI, getAllChatHistory } from "./chatService";
 import { adjustInventory, reverseInventoryByExactValue } from "./inventoryHelper";
+import { classifyNetPositionAccounts, getAccountNetBalance } from "./netPositionHelper";
 import { registerFactoryRoutes } from "./factoryRoutes";
 import { registerFactoryWorkerRoutes } from "./factoryWorkerRoutes";
 import { registerFactoryPayrollRoutes } from "./factoryPayrollRoutes";
@@ -22302,233 +22303,85 @@ if (asOfDate) {
         }
       }
 
-      // ============ SIMPLIFIED NET POSITION CALCULATION ============
-      // Logic: Positive balance = Asset (owed to us), Negative balance = Liability (we owe them)
-      // Expenses (except IMPORT_CHARGES) are subtracted from Net Position
-      // Suppliers only counted for parent company (or all companies if no parent set)
+      // ============ NET POSITION CALCULATION ============
+      // Uses shared helper (netPositionHelper.ts) – single source of truth for
+      // the asset vs liability classification formula used by both ERP and Factory.
 
-      // Helper function to calculate net balance for an account
-      // Uses smart defaults for null opening_balance_side based on account type:
-      //   Asset/Bank/Cash/Customer accounts default to Dr (positive = asset)
-      //   All other types (Liability, Supplier, etc.) default to Cr (positive = liability)
-      const assetDefaultDrTypes = ["Asset", "Current Asset", "Bank", "Cash", "Customer"];
-      const getAccountNetBalance = (acc: typeof companyAccounts[0]): number => {
-        const opening = parseFloat(acc.openingBalance || "0");
-        const defaultSide = assetDefaultDrTypes.includes(acc.accountType || "") ? 1 : -1;
-        const openingSide = acc.openingBalanceSide === "Dr" ? 1 : acc.openingBalanceSide === "Cr" ? -1 : defaultSide;
-        const signedOpening = opening * openingSide;
-        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
-        return signedOpening + balance.debit - balance.credit;
-      };
-
-      // Get parent company setting for supplier handling
+      // Parent company determines whether ERP supplier ledger accounts are included
       const parentCompanyId = await storage.getParentCompanyId();
       const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
 
-      // Find accounts to EXCLUDE from expenses:
-      // 1. IMPORT_CHARGES parent and children (import costs capitalized into inventory)
-      // 2. PURCHASES accounts (inventory cost, not expense until sold)
+      // Build excluded-from-expenses set (needed for the P&L expense pass below)
       const importChargesParent = companyAccounts.find(acc => acc.code === "IMPORT_CHARGES");
       const excludedFromExpenses = new Set<number>();
-      
       if (importChargesParent) {
         excludedFromExpenses.add(importChargesParent.id);
-        // Also find all children of IMPORT_CHARGES
         for (const acc of companyAccounts) {
-          if (acc.parentId === importChargesParent.id) {
-            excludedFromExpenses.add(acc.id);
-          }
+          if (acc.parentId === importChargesParent.id) excludedFromExpenses.add(acc.id);
         }
       }
-      
-      // Exclude PURCHASES accounts - these are inventory costs, not expenses
       for (const acc of companyAccounts) {
-        if (acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES_")) {
+        if (
+          acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES_") ||
+          acc.code === "PRODUCTION_ADJUSTMENT" || acc.code === "CONSUMPTION_EXPENSE"
+        ) {
           excludedFromExpenses.add(acc.id);
         }
       }
 
-      // Exclude Production/Consumption stock adjustment auto-accounts
-      // Their inventory effect is already captured in stockOnFloor — showing them double-counts
-      for (const acc of companyAccounts) {
-        if (acc.code === "PRODUCTION_ADJUSTMENT" || acc.code === "CONSUMPTION_EXPENSE") {
-          excludedFromExpenses.add(acc.id);
-        }
-      }
+      // 1. Classify balance-sheet accounts (assets vs liabilities) via shared helper
+      const classified = classifyNetPositionAccounts(companyAccounts, accountBalances, {
+        includeSupplierTypeAccounts: shouldIncludeSuppliers,
+      });
+      let forUsTotal = classified.forUsTotal;
+      let onUsTotal = classified.onUsTotal;
+      const forUsAccounts = classified.forUsAccounts;
+      const onUsAccounts = classified.onUsAccounts;
+      const categoryTotals = classified.categoryTotals;
 
-      // Categorize accounts
-      const expenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
-      const isExpenseAccount = (acc: typeof companyAccounts[0]) => 
-        expenseTypes.includes(acc.accountType || "") && !excludedFromExpenses.has(acc.id);
-      
-      // Exclude these account types from Net Position calculation:
-      // - Income: P&L account, not balance sheet
-      // - Profit: Equity/Capital, not operating liability
-      // - Equity: Owner's capital
-      // - Fixed Asset: Not liquid assets for operating position
-      const excludedAccountTypes = ["Income", "Profit", "Equity", "EQUITY", "Fixed Asset"];
-      
-      // Asset types that might contain fixed assets by name pattern
-      const assetAccountTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
-      
-      // Fixed asset name patterns - only apply to asset-type accounts
-      const fixedAssetNamePatterns = [
-        "rover", "toyota", "mercedes", "vehicle", "car", "truck",
-        "land", "property", "building", "house",
-        "rolex", "watch", "luxury", "jewelry",
-        "guarantee", "deposit", "caution"
-      ];
-      
-      // Stock/Inventory account patterns - exclude from ledger assets because we add computed stockOnFloor separately
-      // This prevents double-counting inventory (once from ledger accounts, once from inventory table)
-      const stockInventoryPatterns = [
-        "closing stock", "opening stock", "stock in hand", "stock on hand",
-        "inventory", "stock account", "goods in stock", "merchandise"
-      ];
-      const stockInventoryCodes = [
-        "CLOSING_STOCK", "OPENING_STOCK", "STOCK", "INVENTORY", "STOCK_IN_HAND"
-      ];
-      
-      const isExcludedFromNetPosition = (acc: typeof companyAccounts[0]) => {
-        // First check excluded account types
-        if (excludedAccountTypes.includes(acc.accountType || "")) return true;
-
-        // Exclude stock adjustment auto-accounts — their effect is already in stockOnFloor
-        if (acc.code === "PRODUCTION_ADJUSTMENT" || acc.code === "CONSUMPTION_EXPENSE") return true;
-        
-        // Exclude Supplier-type ledger accounts for subsidiary companies
-        // Suppliers are only tracked for the parent company (Lubumbashi)
-        if (acc.accountType === "Supplier" && !shouldIncludeSuppliers) return true;
-        
-        const nameLower = (acc.name || "").toLowerCase();
-        const codeLower = (acc.code || "").toLowerCase();
-        
-        // Only apply pattern-based filters to asset-type accounts (not liabilities)
-        // This prevents accidentally excluding liability accounts that happen to contain these words
-        if (assetAccountTypes.includes(acc.accountType || "")) {
-          // Exclude stock/inventory ledger accounts - we add computed stockOnFloor separately
-          // This prevents double-counting inventory
-          if (stockInventoryPatterns.some(pattern => nameLower.includes(pattern))) {
-            return true;
-          }
-          if (stockInventoryCodes.some(code => codeLower === (code || "").toLowerCase() || codeLower.startsWith((code || "").toLowerCase() + "_"))) {
-            return true;
-          }
-          
-          // Exclude fixed assets by name pattern
-          if (fixedAssetNamePatterns.some(pattern => nameLower.includes(pattern))) {
-            return true;
-          }
-        }
-        
-        return false;
-      };
-
-      // Track totals
-      let forUsTotal = 0;
-      let onUsTotal = 0;
+      // 2. Process income and expense accounts for the P&L breakdown (ERP-specific)
+      //    The helper skips expense/income types; we handle them here.
+      const expenseTypesArr = ["Expense", "Direct Expense", "Indirect Expense"];
       let expensesTotal = 0;
       let incomeTotal = 0;
-      const forUsBreakdown: { name: string; value: number }[] = [];
-      const onUsBreakdown: { name: string; value: number }[] = [];
-      const expensesBreakdown: { name: string; value: number }[] = [];
-      const incomeBreakdown: { name: string; value: number }[] = [];
-
-      // Track individual accounts for detailed view
-      const forUsAccounts: { name: string; code: string; value: number; category: string }[] = [];
-      const onUsAccounts: { name: string; code: string; value: number; category: string }[] = [];
       const expensesAccounts: { name: string; code: string; value: number; category: string }[] = [];
       const incomeAccounts: { name: string; code: string; value: number; category: string }[] = [];
 
-      // Group accounts by category for cleaner breakdown
-      const categoryTotals: Record<string, number> = {};
-
-      // Process all ledger accounts with sign-based logic
       for (const acc of companyAccounts) {
-        const netBalance = getAccountNetBalance(acc);
-        
-        // Check if this is ANY expense-type account (regardless of excludedFromExpenses)
-        const isAnyExpenseType = expenseTypes.includes(acc.accountType || "");
-        
-        // Check if this is an Income account
+        const netBalance = getAccountNetBalance(acc, accountBalances);
+        const isAnyExpenseType = expenseTypesArr.includes(acc.accountType || "");
         const isIncomeAccount = acc.accountType === "Income";
-        
+
         if (isIncomeAccount) {
-          // Income accounts: track in incomeTotal (typically have credit balances = negative netBalance)
-          // Income credits show as negative netBalance, so we take absolute value
           if (netBalance < 0) {
             incomeTotal += Math.abs(netBalance);
             categoryTotals["income_Sales/Revenue"] = (categoryTotals["income_Sales/Revenue"] || 0) + Math.abs(netBalance);
             incomeAccounts.push({ name: acc.name, code: acc.code || "", value: Math.abs(netBalance), category: "Income" });
           } else if (netBalance > 0) {
-            // Rare: debit balance on income = refund/return, reduce income
             incomeTotal -= netBalance;
-            // Also reduce categoryTotals so breakdown matches total
             categoryTotals["income_Sales/Revenue"] = (categoryTotals["income_Sales/Revenue"] || 0) - netBalance;
             incomeAccounts.push({ name: acc.name, code: acc.code || "", value: -netBalance, category: "Income (Refund)" });
           }
-          continue;
-        } else if (isAnyExpenseType) {
-          // Skip PURCHASES / IMPORT_CHARGES (handled elsewhere)
-          if (!excludedFromExpenses.has(acc.id)) {
-            const category = acc.accountType || "Expense";
-            if (netBalance > 0) {
-              // Normal expense (debit)
-              expensesTotal += netBalance;
-              categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) + netBalance;
-              expensesAccounts.push({ name: acc.name, code: acc.code || "", value: netBalance, category });
-            } else if (netBalance < 0) {
-              // Contra-expense / refund (credit) - reduces expenses
-              const credit = Math.abs(netBalance);
-              expensesTotal -= credit;
-              categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) - credit;
-              expensesAccounts.push({ name: acc.name, code: acc.code || "", value: -credit, category: category + " (Refund)" });
-            }
-          }
-          // Skip all expense-type accounts from asset/liability calculation
-          continue;
-        } else if (isExcludedFromNetPosition(acc)) {
-          // Skip Profit/Equity accounts - they're not part of Net Position (Income now handled separately)
-          continue;
-        } else {
-          // Determine if account is naturally a liability type (should be treated as liability regardless of balance sign)
-          const liabilityAccountTypes = ["Liability", "Duty Agent", "Transporter Agent", "Loan"];
-          const isLiabilityType = liabilityAccountTypes.includes(acc.accountType || "");
-          
-          if (isLiabilityType) {
-            // Liability-type accounts with SIGN-based classification:
-            // - POSITIVE balance (debit side) = we paid a deposit/advance = ASSET (we'll get it back)
-            // - NEGATIVE balance (credit side) = we owe them = LIABILITY
-            // Examples: Guarantee deposits PAID by us have positive balances = assets
-            if (netBalance > 0) {
-              // Positive = we paid/deposited, it's an asset (refundable deposit)
-              forUsTotal += netBalance;
-              const category = acc.accountType || "Liability";
-              categoryTotals[`asset_${category} Deposits`] = (categoryTotals[`asset_${category} Deposits`] || 0) + netBalance;
-              forUsAccounts.push({ name: acc.name, code: acc.code || "", value: netBalance, category: category + " Deposits" });
-            } else if (netBalance < 0) {
-              // Negative = we owe them, it's a liability
-              onUsTotal += Math.abs(netBalance);
-              const category = acc.accountType || "Liability";
-              categoryTotals[`liability_${category}`] = (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
-              onUsAccounts.push({ name: acc.name, code: acc.code || "", value: Math.abs(netBalance), category });
-            }
-          } else {
-            // Asset-type accounts: positive = asset, negative = liability (overdraft)
-            if (netBalance > 0) {
-              forUsTotal += netBalance;
-              const category = acc.accountType || "Other";
-              categoryTotals[`asset_${category}`] = (categoryTotals[`asset_${category}`] || 0) + netBalance;
-              forUsAccounts.push({ name: acc.name, code: acc.code || "", value: netBalance, category });
-            } else if (netBalance < 0) {
-              onUsTotal += Math.abs(netBalance);
-              const category = acc.accountType || "Other";
-              categoryTotals[`liability_${category}`] = (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
-              onUsAccounts.push({ name: acc.name, code: acc.code || "", value: Math.abs(netBalance), category });
-            }
+        } else if (isAnyExpenseType && !excludedFromExpenses.has(acc.id)) {
+          const category = acc.accountType || "Expense";
+          if (netBalance > 0) {
+            expensesTotal += netBalance;
+            categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) + netBalance;
+            expensesAccounts.push({ name: acc.name, code: acc.code || "", value: netBalance, category });
+          } else if (netBalance < 0) {
+            const credit = Math.abs(netBalance);
+            expensesTotal -= credit;
+            categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) - credit;
+            expensesAccounts.push({ name: acc.name, code: acc.code || "", value: -credit, category: category + " (Refund)" });
           }
         }
       }
+
+      // Breakdown arrays — populated from categoryTotals after all extra sources are added below
+      const forUsBreakdown: { name: string; value: number }[] = [];
+      const onUsBreakdown: { name: string; value: number }[] = [];
+      const expensesBreakdown: { name: string; value: number }[] = [];
+      const incomeBreakdown: { name: string; value: number }[] = [];
 
       // Add Stock on Floor (current inventory value) - always positive asset
       const activeLocationsData = await db

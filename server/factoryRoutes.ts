@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { classifyNetPositionAccounts, type AccountLike } from "./netPositionHelper";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -20472,31 +20473,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         });
       }
 
-      // Account types that must never appear in net position — expenses and income
-      // of any kind. Comparison is case-insensitive to handle DB values like
-      // "EXPENSE", "Expense", "expense", "Indirect Expense", etc.
-      const isExcludedAccountType = (rawType: string | null | undefined): boolean => {
-        const t = (rawType || "").trim().toLowerCase();
-        return (
-          t.includes("expense") ||      // catches "expense", "EXPENSE", "indirect expense", etc.
-          t === "income" ||
-          t === "revenue" ||
-          t === "profit" ||
-          t === "equity" ||
-          t === "fixed asset"
-        );
-      };
-
-      const assetTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
-      const fixedAssetPatterns = ["rover","toyota","mercedes","vehicle","car","truck","land","property","building","house","rolex","watch","luxury","jewelry","guarantee","deposit","caution"];
-      const stockPatterns = ["closing stock","opening stock","stock in hand","stock on hand","inventory","stock account","goods in stock","merchandise"];
-      const stockCodes = ["CLOSING_STOCK","OPENING_STOCK","STOCK","INVENTORY","STOCK_IN_HAND"];
-
-      // Specific codes to exclude regardless of account type (case-insensitive):
-      // - FACTORY_IMPORT_COST: Dr side of goods-received journal; liability already in supplier balances
-      // - FACTORY_CHARGES_PAYABLE: Dr side of other-charges journal; cost entry, not an asset
-      // - PRODUCTION_ADJUSTMENT / CONSUMPTION_EXPENSE: production cost clearing accounts
-      const excludedCodeSet = new Set([
+      // ── 2b. Classify accounts using the shared ERP formula ─────────────────
+      // Factory-specific clearing/cost codes must not appear in net position:
+      //   FACTORY_IMPORT_COST   – Dr side of goods-received journal; liability already in supplier balances
+      //   FACTORY_CHARGES_PAYABLE – Dr side of other-charges journal; cost entry, not an asset
+      //   FREIGHT / OC_OTHER_CHARGE – factory cost clearing codes
+      const factoryExcludedCodes = new Set([
         "FACTORY_IMPORT_COST",
         "FACTORY_CHARGES_PAYABLE",
         "FACTORY_OC_EXPENSE",
@@ -20506,50 +20488,21 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         "FREIGHT",
       ]);
 
-      const ledgerForUs: { name: string; code: string; value: number; category: string }[] = [];
-      const ledgerOnUs: { name: string; code: string; value: number; category: string }[] = [];
-      let ledgerForUsTotal = 0;
-      let ledgerOnUsTotal = 0;
+      const classified = classifyNetPositionAccounts(
+        factoryAccounts as AccountLike[],
+        accBalances,
+        {
+          additionalExcludedCodes: factoryExcludedCodes,
+          // Supplier-type ledger accounts excluded: factory supplier balances are
+          // calculated separately above from factorySuppliers / factoryContainers.
+          includeSupplierTypeAccounts: false,
+        },
+      );
 
-      for (const acc of factoryAccounts as any[]) {
-        // Support both camelCase (Drizzle ORM) and snake_case (raw query) column names
-        const accType: string = acc.accountType ?? acc["account_type"] ?? "";
-        const accCode: string = acc.code ?? "";
-        if (isExcludedAccountType(accType)) continue;
-        if (excludedCodeSet.has((accCode).trim().toUpperCase())) continue;
-        const nameLow = (acc.name || "").toLowerCase();
-        const codeLow = (accCode).toLowerCase();
-        const assetTypesLow = assetTypes.map(t => t.toLowerCase());
-        if (assetTypesLow.includes(accType.trim().toLowerCase())) {
-          if (stockPatterns.some((p: string) => nameLow.includes(p))) continue;
-          if (stockCodes.some((c: string) => codeLow === c.toLowerCase() || codeLow.startsWith(c.toLowerCase() + "_"))) continue;
-          if (fixedAssetPatterns.some((p: string) => nameLow.includes(p))) continue;
-        }
-
-        const opening = parseFloat(acc.openingBalance || "0");
-        const side = acc.openingBalanceSide;
-        const bal = accBalances.get(acc.id) || { debit: 0, credit: 0 };
-
-        let netBalance: number;
-        const hasAssetDefault = ["Asset", "Current Asset", "Bank", "Cash", "Customer"].map(t => t.toLowerCase()).includes(accType.trim().toLowerCase());
-        if (side === "Dr" || (!side && hasAssetDefault)) {
-          netBalance = opening + bal.debit - bal.credit;
-        } else {
-          netBalance = opening + bal.credit - bal.debit;
-          netBalance = -netBalance; // positive = asset, negative = liability
-        }
-
-        if (Math.abs(netBalance) < 0.01) continue;
-        const cat = accType || "Other";
-
-        if (netBalance > 0) {
-          ledgerForUsTotal += netBalance;
-          ledgerForUs.push({ name: acc.name, code: accCode, value: round2(netBalance), category: cat });
-        } else {
-          ledgerOnUsTotal += Math.abs(netBalance);
-          ledgerOnUs.push({ name: acc.name, code: accCode, value: round2(Math.abs(netBalance)), category: cat });
-        }
-      }
+      const ledgerForUs = classified.forUsAccounts;
+      const ledgerOnUs = classified.onUsAccounts;
+      const ledgerForUsTotal = classified.forUsTotal;
+      const ledgerOnUsTotal = classified.onUsTotal;
 
       // ── 3. Combine and return ────────────────────────────────────────────
       const forUsTotal = round2(ledgerForUsTotal);
