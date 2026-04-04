@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useAppMode, getApiRequest } from "@/lib/factoryApi";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -120,6 +121,8 @@ const typeIcons: Record<string, any> = {
 
 export default function DeletedItems() {
   const { toast } = useToast();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const { formatDisplayDate } = useDateFormat();
   const [filterType, setFilterType] = useState<string>("all");
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -135,7 +138,7 @@ export default function DeletedItems() {
 
   const restoreMutation = useMutation({
     mutationFn: async ({ type, id }: { type: string; id: number }) => {
-      return apiRequest("POST", `/api/deleted-items/${type}/${id}/restore`);
+      return modeApiRequest("POST", `/api/deleted-items/${type}/${id}/restore`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deleted-items"] });
@@ -166,7 +169,7 @@ export default function DeletedItems() {
 
   const permanentDeleteMutation = useMutation({
     mutationFn: async ({ type, id }: { type: string; id: number }) => {
-      return apiRequest("DELETE", `/api/deleted-items/${type}/${id}/permanent`);
+      return modeApiRequest("DELETE", `/api/deleted-items/${type}/${id}/permanent`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deleted-items"] });

@@ -35,6 +35,10 @@ const ALLOWED_SHARED_PREFIXES = [
   "/api/payroll",
   "/api/company-settings",
   "/api/bale-label-prints",
+  "/api/deleted-items",
+  "/api/orphaned-records",
+  "/api/stock-group-archives",
+  "/api/admin",
 ];
 
 function isAllowedFactoryPath(url: string): boolean {

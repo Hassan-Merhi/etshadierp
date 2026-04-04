@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, Trash2, Shield, Undo2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAppMode, getApiRequest } from "@/lib/factoryApi";
 import type { Company, LedgerAccount } from "@shared/schema";
 import {
   AlertDialog,
@@ -23,6 +24,8 @@ import {
 
 export default function CompanyDataReset() {
   const { toast } = useToast();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
   const [selectedAccountIds, setSelectedAccountIds] = useState<number[]>([]);
   const [clearStockOpeningBalances, setClearStockOpeningBalances] = useState(false);
@@ -43,7 +46,7 @@ export default function CompanyDataReset() {
 
   const resetMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/admin/company-data-reset", {
+      return modeApiRequest("POST", "/api/admin/company-data-reset", {
         companyId: parseInt(selectedCompanyId),
         accountIds: selectedAccountIds,
         clearStockOpeningBalances,
@@ -65,7 +68,7 @@ export default function CompanyDataReset() {
 
   const undoMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/admin/undo-company-reset", {
+      return modeApiRequest("POST", "/api/admin/undo-company-reset", {
         companyId: parseInt(selectedCompanyId),
       });
     },

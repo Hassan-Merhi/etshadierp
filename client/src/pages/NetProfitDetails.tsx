@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useAppMode, getApiRequest } from "@/lib/factoryApi";
 import {
   Card,
   CardContent,
@@ -223,13 +225,15 @@ function todayStr() {
 
 export default function NetProfitDetails() {
   const { formatAmount } = useCurrencyContext();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const [asOfDate, setAsOfDate] = useState<string>("");
 
   const queryParam = asOfDate ? `?asOfDate=${asOfDate}` : "";
   const { data, isLoading, error, refetch } = useQuery<NetProfitData>({
-    queryKey: ["/api/stats/net-profit", asOfDate],
+    queryKey: ["/api/stats/net-profit", asOfDate, appMode],
     queryFn: async () => {
-      const res = await fetch(`/api/stats/net-profit${queryParam}`, { credentials: "include" });
+      const res = await modeApiRequest("GET", `/api/stats/net-profit${queryParam}`);
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useAppMode, getApiRequest } from "@/lib/factoryApi";
 import { Loader2, AlertTriangle, CheckCircle, Search, Wrench, ShieldAlert } from "lucide-react";
 
 interface Discrepancy {
@@ -67,6 +68,8 @@ interface ValueRepairRow {
 
 export default function InventoryRepair() {
   const { toast } = useToast();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const [result, setResult] = useState<RebuildResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<"idle" | "preview" | "applied">("idle");
@@ -77,7 +80,7 @@ export default function InventoryRepair() {
   async function runRebuild(dryRun: boolean) {
     setLoading(true);
     try {
-      const res = await apiRequest("POST", "/api/admin/rebuild-inventory", { dryRun });
+      const res = await modeApiRequest("POST", "/api/admin/rebuild-inventory", { dryRun });
       const data: RebuildResult = await res.json();
       setResult(data);
       setMode(dryRun ? "preview" : "applied");
@@ -101,7 +104,7 @@ export default function InventoryRepair() {
   async function previewValueRepair() {
     setValueRepairState("previewing");
     try {
-      const res = await fetch("/api/admin/repair-inventory-values/preview", { credentials: "include" });
+      const res = await modeApiRequest("GET", "/api/admin/repair-inventory-values/preview");
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Preview failed");
@@ -128,7 +131,7 @@ export default function InventoryRepair() {
   async function finalizeValueRepair() {
     setValueRepairState("finalizing");
     try {
-      const res = await apiRequest("POST", "/api/admin/repair-inventory-values", {});
+      const res = await modeApiRequest("POST", "/api/admin/repair-inventory-values", {});
       const data = await res.json();
       toast({
         title: "Repair Complete",

@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useAppMode, getApiRequest } from "@/lib/factoryApi";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { AlertCircle, RefreshCw, AlertTriangle, Archive, RotateCcw, Trash2 } from "lucide-react";
@@ -69,6 +70,8 @@ interface StockGroupArchive {
 }
 
 export default function OrphanedRecordsPage() {
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
   const { toast } = useToast();
@@ -93,7 +96,7 @@ export default function OrphanedRecordsPage() {
 
   const restoreArchiveMutation = useMutation({
     mutationFn: async (archiveId: number) => {
-      return apiRequest("POST", `/api/stock-group-archives/${archiveId}/restore`);
+      return modeApiRequest("POST", `/api/stock-group-archives/${archiveId}/restore`);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Stock group inventory restored successfully" });
@@ -109,7 +112,7 @@ export default function OrphanedRecordsPage() {
 
   const deleteArchiveMutation = useMutation({
     mutationFn: async ({ archiveId, permanent }: { archiveId: number; permanent: boolean }) => {
-      return apiRequest("DELETE", `/api/stock-group-archives/${archiveId}?permanent=${permanent}`);
+      return modeApiRequest("DELETE", `/api/stock-group-archives/${archiveId}?permanent=${permanent}`);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Archive deleted successfully" });
@@ -123,7 +126,7 @@ export default function OrphanedRecordsPage() {
 
   const reassignMutation = useMutation({
     mutationFn: async (data: { voucherIds: number[]; newLocationId: number }) => {
-      return apiRequest("POST", "/api/orphaned-records/reassign", data);
+      return modeApiRequest("POST", "/api/orphaned-records/reassign", data);
     },
     onSuccess: (data: any) => {
       toast({ 
@@ -143,7 +146,7 @@ export default function OrphanedRecordsPage() {
 
   const deleteAllMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("DELETE", "/api/orphaned-records/delete-all");
+      const res = await modeApiRequest("DELETE", "/api/orphaned-records/delete-all");
       return res.json();
     },
     onSuccess: (data: any) => {
