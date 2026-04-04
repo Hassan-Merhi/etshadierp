@@ -4862,7 +4862,7 @@ function OfflineSyncPanel() {
                 </Link>
                 )}
 
-                <Link href={`${pfx}/net-profit-details`}>
+                <Link href={`${pfx}/net-position-details`}>
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">

@@ -287,7 +287,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/test-data-import" component={TestDataImport} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/import-cycle-diagnostics" component={ImportCycleDiagnostics} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/inventory-repair" component={InventoryRepair} />}
-      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/net-profit-details" component={NetProfitDetails} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/net-position-details" component={NetProfitDetails} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/company-data-reset" component={CompanyDataReset} />}
       <Route component={NotFound} />
     </Switch>
@@ -741,7 +741,7 @@ function AuthenticatedApp() {
                     {user?.role === "Admin" && <Route path="/factory/import-cycle-diagnostics" component={ImportCycleDiagnostics} />}
                     {user?.role === "Admin" && <Route path="/factory/inventory-repair" component={InventoryRepair} />}
                     {user?.role === "Admin" && <Route path="/factory/company-data-reset" component={CompanyDataReset} />}
-                    <Route path="/factory/net-profit-details" component={NetProfitDetails} />
+                    <Route path="/factory/net-position-details" component={NetProfitDetails} />
                     <Route path="/factory/net-profit-analytics" component={FactoryNetProfitAnalytics} />
                     <Route path="/factory/net-position" component={FactoryNetPosition} />
                     <Route><Redirect to={factoryDefaultPage} /></Route>

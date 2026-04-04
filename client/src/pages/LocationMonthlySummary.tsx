@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
+import { useEscapeBack, hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import { ArrowLeft, MapPin, Globe, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -122,14 +122,11 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
     return formatAmount(n);
   };
 
+  useEscapeBack(() => window.history.back());
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (hasAnyOpenDialog()) return;
-        e.preventDefault();
-        window.history.back();
-        return;
-      }
+      if (e.key === "Escape") return;
       if (hasAnyOpenDialog()) return;
       if (!visibleRows.length) return;
 

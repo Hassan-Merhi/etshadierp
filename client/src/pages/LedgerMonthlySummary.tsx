@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 import { useQuery } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -99,13 +100,7 @@ export default function LedgerMonthlySummary() {
   );
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") window.history.back();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  useEscapeBack(() => navigate("/analytics"));
 
   const startDate = periodFilter.fromDate;
   const endDate = periodFilter.toDate;

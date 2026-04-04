@@ -517,7 +517,7 @@ export default function Dashboard() {
       <Card className="p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-medium">Net Position Breakdown</h3>
-          <Button size="icon" variant="outline" onClick={() => setLocation(isFactoryMode ? "/factory/net-position" : "/net-profit-details")} data-testid="button-net-position-detail">
+          <Button size="icon" variant="outline" onClick={() => setLocation(isFactoryMode ? "/factory/net-position" : "/net-position-details")} data-testid="button-net-position-detail">
             <ExternalLink className="h-4 w-4" />
           </Button>
         </div>

@@ -199,7 +199,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
     if (e.key === "Escape") {
       if (hasAnyOpenDialog()) return;
       e.preventDefault();
-      window.history.back();
+      navigate(`/locations/${locationId}/stock-items/${stockItemId}/history`);
       return;
     }
     
