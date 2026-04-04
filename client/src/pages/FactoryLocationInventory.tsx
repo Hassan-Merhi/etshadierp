@@ -444,7 +444,8 @@ export default function FactoryLocationInventory() {
 
   // When inventory loads in edit mode, pre-populate selections from existing proforma lines
   useEffect(() => {
-    if (!editingProformaId || editProformaLines.length === 0 || inventoryLoading || editModeInitialized) return;
+    // Wait until: proforma ID set, lines fetched, a location chosen (so inventory query fires), inventory done loading
+    if (!editingProformaId || editProformaLines.length === 0 || !selectedLocation || inventoryLoading || editModeInitialized) return;
     // Build a lookup map from inventory data by articleCode
     const productByArticleCode = new Map<string, any>();
     (inventoryData as any[]).forEach((prod: any) => {
@@ -482,7 +483,7 @@ export default function FactoryLocationInventory() {
     });
     if (newSelections.size > 0) setSelections(newSelections);
     setEditModeInitialized(true);
-  }, [editingProformaId, editProformaLines, inventoryData, inventoryLoading, editModeInitialized]);
+  }, [editingProformaId, editProformaLines, selectedLocation, inventoryData, inventoryLoading, editModeInitialized]);
 
   const categoryGroups: CategoryGroup[] = activeInventoryData.reduce((groups, item) => {
     const catId = item.categoryId || 0;
