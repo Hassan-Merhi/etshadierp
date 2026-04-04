@@ -20507,6 +20507,21 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const stockPatterns = ["closing stock","opening stock","stock in hand","stock on hand","inventory","stock account","goods in stock","merchandise"];
       const stockCodes = ["CLOSING_STOCK","OPENING_STOCK","STOCK","INVENTORY","STOCK_IN_HAND"];
 
+      // Factory auto-generated cost/clearing accounts that must be excluded:
+      // - FACTORY_IMPORT_COST: records raw-material cost (Dr) when container offloads;
+      //   the liability side (Cr) is already captured in factory supplier balances.
+      //   Including this debit balance would double-count the goods value as an "asset".
+      // - FACTORY_CHARGES_PAYABLE: records other charges incurred (Dr); the real
+      //   payable sits on the credited account. This is a cost-recording entry, not an asset.
+      // Also exclude any account whose type is "EXPENSE" (all-caps) — that is the default
+      // type assigned by getOrCreateLedgerAccount() for factory auto-created cost accounts.
+      const excludedCodes = new Set([
+        "FACTORY_IMPORT_COST",
+        "FACTORY_CHARGES_PAYABLE",
+        "PRODUCTION_ADJUSTMENT",
+        "CONSUMPTION_EXPENSE",
+      ]);
+
       const ledgerForUs: { name: string; code: string; value: number; category: string }[] = [];
       const ledgerOnUs: { name: string; code: string; value: number; category: string }[] = [];
       let ledgerForUsTotal = 0;
@@ -20514,7 +20529,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       for (const acc of factoryAccounts as any[]) {
         if (excludedTypes.includes(acc.accountType || "")) continue;
-        if (acc.code === "PRODUCTION_ADJUSTMENT" || acc.code === "CONSUMPTION_EXPENSE") continue;
+        if (excludedCodes.has(acc.code || "")) continue;
         const nameLow = (acc.name || "").toLowerCase();
         const codeLow = (acc.code || "").toLowerCase();
         if (assetTypes.includes(acc.accountType || "")) {
@@ -20522,8 +20537,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (stockCodes.some((c: string) => codeLow === c.toLowerCase() || codeLow.startsWith(c.toLowerCase() + "_"))) continue;
           if (fixedAssetPatterns.some((p: string) => nameLow.includes(p))) continue;
         }
-        // Skip expense and income account types
-        const expenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
+        // Skip expense and income account types — both mixed-case and all-caps variants
+        const expenseTypes = ["Expense", "Direct Expense", "Indirect Expense", "EXPENSE"];
         if (expenseTypes.includes(acc.accountType || "")) continue;
 
         const opening = parseFloat(acc.openingBalance || "0");
