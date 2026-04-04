@@ -234,7 +234,7 @@ export default function Agents() {
           voucherType: txn.voucherType,
           voucherDate: txn.voucherDate,
           voucherDescription: txn.voucherDescription,
-          narration: txn.narration || txn.voucherDescription || "",
+          narration: txn.voucherDescription || txn.narration || "",
           totalDebit: debit,
           totalCredit: credit,
         });

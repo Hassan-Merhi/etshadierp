@@ -15202,7 +15202,7 @@ if (asOfDate) {
             voucherType: e.voucherType ?? "",
             voucherDate: e.voucherDate ?? "",
             description: e.voucherDescription ?? "",
-            narration: e.narration || e.voucherDescription || "",
+            narration: e.voucherDescription || e.narration || "",
             totalDebit: d,
             totalCredit: c,
           });
