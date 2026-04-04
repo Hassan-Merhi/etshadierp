@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 import {
   ArrowLeft, Upload, Pencil, UserX, UserCheck, Package, DollarSign, Calculator,
   CheckCircle2, X, CreditCard, Building, Phone, Calendar,
@@ -204,6 +205,7 @@ function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, formatDa
 
 export default function FactoryWorkerDetail() {
   const [, navigate] = useLocation();
+  useEscapeBack(() => navigate("/factory/workers"));
   const [, params] = useRoute("/factory/workers/:id");
   const workerId = params?.id ? parseInt(params.id) : null;
   const { toast } = useToast();

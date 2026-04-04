@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +70,7 @@ function fmtMoney(value: number): string {
 export default function FactoryCustomerStatement() {
   const { formatDisplayDate } = useDateFormat();
   const [, navigate] = useLocation();
+  useEscapeBack(() => navigate("/factory/customers"));
   const params = useParams<{ id: string }>();
   const customerId = params.id;
   const [activeTab, setActiveTab] = useState<"invoices" | "statement">("invoices");

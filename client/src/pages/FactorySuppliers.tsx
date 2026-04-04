@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -173,6 +174,13 @@ export default function FactorySuppliers() {
   const [statementSupplierId, setStatementSupplierId] = useState<number | null>(null);
   const [statementReturnToParent, setStatementReturnToParent] = useState(false);
   const [parentViewSupplierId, setParentViewSupplierId] = useState<number | null>(null);
+  useEscapeBack(
+    statementSupplierId
+      ? () => { setStatementSupplierId(null); setStatementReturnToParent(false); }
+      : parentViewSupplierId
+      ? () => setParentViewSupplierId(null)
+      : null
+  );
   const [showInactive, setShowInactive] = useState(false);
   const [expandedSupplierIds, setExpandedSupplierIds] = useState<Set<number>>(new Set());
   const [createSubAccountParentId, setCreateSubAccountParentId] = useState<number | null>(null);

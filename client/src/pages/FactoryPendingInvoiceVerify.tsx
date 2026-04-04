@@ -13,6 +13,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation, useParams } from "wouter";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 import { ArrowLeft, Check, RotateCcw, Ship, Truck, AlertTriangle, CheckCircle, Package, Trash2, Plus, Wrench } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -109,6 +110,7 @@ export default function FactoryPendingInvoiceVerify() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
+  useEscapeBack(() => navigate("/factory/invoicing?tab=pending"));
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const params = useParams<{ id: string }>();

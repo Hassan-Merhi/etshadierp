@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 import {
   ArrowLeft, DollarSign, Calendar, Phone, Plus, Loader2, Pencil,
   TrendingUp, TrendingDown, CheckCircle2,
@@ -87,6 +88,7 @@ function fmt(val: string | number | null | undefined) {
 
 export default function FactoryEmployeeDetail() {
   const [, navigate] = useLocation();
+  useEscapeBack(() => navigate("/factory/workers?tab=employees"));
   const [, params] = useRoute("/factory/employees/:id");
   const employeeId = params?.id ? parseInt(params.id) : null;
   const { toast } = useToast();

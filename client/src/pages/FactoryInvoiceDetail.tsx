@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation, useRoute } from "wouter";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import {
@@ -77,6 +78,7 @@ export default function FactoryInvoiceDetail() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
+  useEscapeBack(() => navigate("/factory/invoicing?tab=invoices"));
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const [, params] = useRoute("/factory/sales/invoices/:id");
