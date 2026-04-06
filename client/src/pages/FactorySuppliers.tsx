@@ -2429,8 +2429,12 @@ export default function FactorySuppliers() {
 
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <div className="text-xs text-muted-foreground">{isParent ? "Pool Balance USD" : "Balance"}</div>
-                          {isChild && sup.currencyBalances && sup.currencyBalances.length > 0 && sup.currencyBalances[0].currencyCode !== "USD" ? (
+                          <div className="text-xs text-muted-foreground">{isParent ? "Pool Balance" : "Balance"}</div>
+                          {isParent ? (
+                            <div className="text-sm text-muted-foreground italic" data-testid={`text-supplier-balance-${sup.id}`}>
+                              Click to view
+                            </div>
+                          ) : isChild && sup.currencyBalances && sup.currencyBalances.length > 0 && sup.currencyBalances[0].currencyCode !== "USD" ? (
                             <>
                               <div className="text-lg font-bold tabular-nums" data-testid={`text-supplier-balance-${sup.id}`}>
                                 {sup.currencyBalances[0].currencyCode} {formatNum(sup.currencyBalances[0].balance.toFixed(2))}
@@ -2440,10 +2444,7 @@ export default function FactorySuppliers() {
                           ) : (
                             <>
                               <div className="text-lg font-bold tabular-nums" data-testid={`text-supplier-balance-${sup.id}`}>
-                                ${formatNum(isParent
-                                  ? String(((sup.currencyBalances?.find((b: any) => b.currencyCode === "USD")?.balance) ?? 0).toFixed(2))
-                                  : sup.totalValue
-                                )}
+                                ${formatNum(sup.totalValue)}
                               </div>
                             </>
                           )}
