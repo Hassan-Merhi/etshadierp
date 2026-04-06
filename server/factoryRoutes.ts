@@ -1588,8 +1588,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         return res.status(400).json({ message: "openingBalance is required" });
       }
       const val = parseFloat(openingBalance);
-      if (isNaN(val) || val < 0) {
-        return res.status(400).json({ message: "openingBalance must be a non-negative number" });
+      if (isNaN(val)) {
+        return res.status(400).json({ message: "openingBalance must be a valid number" });
       }
 
       const [supplier] = await db
