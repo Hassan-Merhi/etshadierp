@@ -2257,30 +2257,20 @@ export default function FactorySuppliers() {
       </div>
 
       {/* Filter bar */}
-      <div className="flex gap-2 flex-wrap">
-        {(["all", "brokers", "standalone", "with-balance", "zero-balance", "has-foreign", "has-recent"] as const).map(f => {
-          const labels: Record<string, string> = {
-            all: "All",
-            brokers: "Brokers",
-            standalone: "Standalone",
-            "with-balance": "With Balance",
-            "zero-balance": "Zero Balance",
-            "has-foreign": "Has Foreign Currency",
-            "has-recent": "Recent Activity",
-          };
-          return (
-            <Button
-              key={f}
-              variant={activeFilter === f ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveFilter(f)}
-              data-testid={`filter-${f}`}
-            >
-              {labels[f]}
-            </Button>
-          );
-        })}
-      </div>
+      <Select value={activeFilter} onValueChange={(v) => setActiveFilter(v as SupplierFilter)}>
+        <SelectTrigger className="w-44" data-testid="filter-dropdown">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All</SelectItem>
+          <SelectItem value="brokers">Brokers</SelectItem>
+          <SelectItem value="standalone">Standalone</SelectItem>
+          <SelectItem value="with-balance">With Balance</SelectItem>
+          <SelectItem value="zero-balance">Zero Balance</SelectItem>
+          <SelectItem value="has-foreign">Has Foreign Currency</SelectItem>
+          <SelectItem value="has-recent">Recent Activity</SelectItem>
+        </SelectContent>
+      </Select>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card>
