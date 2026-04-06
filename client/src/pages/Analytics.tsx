@@ -1962,8 +1962,6 @@ export default function Analytics() {
                         <TableHead>Supplier</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>{reportContainerStatus === "Offloaded" ? "Offload Date" : "Import Date"}</TableHead>
-                        <TableHead className="text-right">Items Total</TableHead>
-                        <TableHead className="text-right">Charges Total</TableHead>
                         <TableHead className="text-right">Grand Total</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1975,12 +1973,6 @@ export default function Analytics() {
                           <TableCell>{container.status}</TableCell>
                           <TableCell>{reportContainerStatus === "Offloaded" ? (container.offloadDate || "-") : container.importDate}</TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatAmount(parseFloat(container.itemsTotal))}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatAmount(parseFloat(container.chargesTotal))}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
                             {formatAmount(parseFloat(container.grandTotal))}
                           </TableCell>
                         </TableRow>
@@ -1988,13 +1980,8 @@ export default function Analytics() {
                     </TableBody>
                     <TableBody className="font-semibold border-t-2">
                       <TableRow>
-                        <TableCell colSpan={4}>TOTALS</TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatAmount(containerData.summary.totalItemsTotal)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatAmount(containerData.summary.totalChargesTotal)}
-                        </TableCell>
+                        <TableCell colSpan={3}>TOTALS ({containerData.summary.totalContainers} containers)</TableCell>
+                        <TableCell></TableCell>
                         <TableCell className="text-right font-mono">
                           {formatAmount(containerData.summary.totalGrandTotal)}
                         </TableCell>
@@ -2010,41 +1997,17 @@ export default function Analytics() {
                           <span className="font-mono font-medium">{container.containerNumber}</span>
                           <span className="text-sm text-muted-foreground">{container.status}</span>
                         </div>
-                        <div className="text-sm text-muted-foreground">{container.supplierName} - {reportContainerStatus === "Offloaded" ? (container.offloadDate || "-") : container.importDate}</div>
-                        <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t">
-                          <div>
-                            <span className="text-muted-foreground block">Items</span>
-                            <span className="font-mono">{formatAmount(parseFloat(container.itemsTotal))}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground block">Charges</span>
-                            <span className="font-mono">{formatAmount(parseFloat(container.chargesTotal))}</span>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-muted-foreground block">Total</span>
-                            <span className="font-mono font-semibold">{formatAmount(parseFloat(container.grandTotal))}</span>
-                          </div>
+                        <div className="flex items-center justify-between gap-2 text-sm">
+                          <span className="text-muted-foreground">{container.supplierName} · {reportContainerStatus === "Offloaded" ? (container.offloadDate || "-") : container.importDate}</span>
+                          <span className="font-mono font-semibold">{formatAmount(parseFloat(container.grandTotal))}</span>
                         </div>
                       </CardContent>
                     </Card>
                   ))}
                   <Card className="bg-muted/50">
-                    <CardContent className="p-4">
-                      <div className="font-bold text-sm mb-2">TOTALS</div>
-                      <div className="grid grid-cols-3 gap-2 text-xs">
-                        <div>
-                          <span className="text-muted-foreground block">Items</span>
-                          <span className="font-mono font-semibold">{formatAmount(containerData.summary.totalItemsTotal)}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground block">Charges</span>
-                          <span className="font-mono font-semibold">{formatAmount(containerData.summary.totalChargesTotal)}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-muted-foreground block">Grand Total</span>
-                          <span className="font-mono font-semibold">{formatAmount(containerData.summary.totalGrandTotal)}</span>
-                        </div>
-                      </div>
+                    <CardContent className="p-4 flex items-center justify-between gap-2">
+                      <span className="font-bold text-sm">TOTALS ({containerData.summary.totalContainers} containers)</span>
+                      <span className="font-mono font-semibold">{formatAmount(containerData.summary.totalGrandTotal)}</span>
                     </CardContent>
                   </Card>
                 </div>
