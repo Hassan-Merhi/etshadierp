@@ -25008,7 +25008,7 @@ if (asOfDate) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { status, supplierId, startDate, endDate, allCompanies } = req.query;
+      const { status, supplierId, startDate, endDate, allCompanies, specificCompanyId } = req.query;
 
       // Determine which companies to include
       let companyCondition;
@@ -25016,6 +25016,8 @@ if (asOfDate) {
         const userCompanies = await storage.getUserCompaniesWithRoles(req.user!.id);
         const companyIds = userCompanies.map((uc) => uc.companyId);
         companyCondition = companyIds.length > 0 ? inArray(containers.companyId, companyIds) : eq(containers.companyId, companyId);
+      } else if (specificCompanyId) {
+        companyCondition = eq(containers.companyId, parseInt(specificCompanyId as string));
       } else {
         companyCondition = eq(containers.companyId, companyId);
       }

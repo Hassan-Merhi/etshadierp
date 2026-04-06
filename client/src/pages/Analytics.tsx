@@ -302,8 +302,8 @@ export default function Analytics() {
   const [reportLocationId, setReportLocationId] = useState("all");
   const [reportStockGroupId, setReportStockGroupId] = useState("all");
   const [reportSupplierId, setReportSupplierId] = useState("all");
-  const [reportContainerStatus, setReportContainerStatus] = useState("all");
-  const [reportAllCompanies, setReportAllCompanies] = useState("current");
+  const [reportContainerStatus, setReportContainerStatus] = useState("Offloaded");
+  const [reportAllCompanies, setReportAllCompanies] = useState("all");
   
   // Opening Stock Summary state
   const [openingStockLocationId, setOpeningStockLocationId] = useState("all");
@@ -484,14 +484,29 @@ export default function Analytics() {
     enabled: false, // Manual trigger via Generate button
   });
 
+  // Fetch user's accessible companies for the Container Report company filter
+  const { data: userCompanies = [] } = useQuery<{ companyId: number; companyName: string }[]>({
+    queryKey: ["/api/user/companies"],
+    queryFn: async () => {
+      const res = await fetch("/api/user/companies", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
   // Fetch container report
   const buildContainerUrl = () => {
     const params = new URLSearchParams();
     if (reportStartDate) params.append("startDate", reportStartDate);
     if (reportEndDate) params.append("endDate", reportEndDate);
     if (reportSupplierId && reportSupplierId !== "all") params.append("supplierId", reportSupplierId);
-    if (reportContainerStatus && reportContainerStatus !== "all") params.append("status", reportContainerStatus);
-    if (reportAllCompanies === "all") params.append("allCompanies", "true");
+    // Status is always set (Offloaded or OTW)
+    params.append("status", reportContainerStatus);
+    if (reportAllCompanies === "all") {
+      params.append("allCompanies", "true");
+    } else {
+      params.append("specificCompanyId", reportAllCompanies);
+    }
     return `/api/reports/containers?${params}`;
   };
 
@@ -1024,11 +1039,13 @@ export default function Analytics() {
               Comprehensive financial analysis and reporting
             </p>
           </div>
-          <PeriodFilter
-            value={periodFilter}
-            onChange={setPeriodFilter}
-            data-testid="analytics-period-filter"
-          />
+          {activeSection !== "containers" && (
+            <PeriodFilter
+              value={periodFilter}
+              onChange={setPeriodFilter}
+              data-testid="analytics-period-filter"
+            />
+          )}
         </div>
 
 
@@ -1907,14 +1924,11 @@ export default function Analytics() {
                 <Label htmlFor="container-status">Status</Label>
                 <Select value={reportContainerStatus} onValueChange={setReportContainerStatus}>
                   <SelectTrigger id="container-status">
-                    <SelectValue placeholder="All Status" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="OTW">OTW</SelectItem>
-                    <SelectItem value="In Transit">In Transit</SelectItem>
-                    <SelectItem value="Arrived">Arrived</SelectItem>
                     <SelectItem value="Offloaded">Offloaded</SelectItem>
+                    <SelectItem value="OTW">OTW</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1925,8 +1939,12 @@ export default function Analytics() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="current">Current Company</SelectItem>
                     <SelectItem value="all">All Companies</SelectItem>
+                    {userCompanies.map((c: any) => (
+                      <SelectItem key={c.companyId} value={String(c.companyId)}>
+                        {c.companyName}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
