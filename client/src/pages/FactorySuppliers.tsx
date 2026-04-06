@@ -1283,21 +1283,6 @@ export default function FactorySuppliers() {
                   )}
 
 
-                  {/* ── Issues panel ──────────────────────────────────────── */}
-                  {issues.length > 0 && (
-                    <div className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-1.5">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400 mb-1">
-                        <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                        {issues.length} Pending Issue{issues.length !== 1 ? "s" : ""}
-                      </div>
-                      {issues.map((issue, i) => (
-                        <div key={i} className="flex items-start gap-2 text-sm text-amber-800 dark:text-amber-300">
-                          <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-amber-500 flex-shrink-0" />
-                          {issue.msg}
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </>
               );
             })()}
