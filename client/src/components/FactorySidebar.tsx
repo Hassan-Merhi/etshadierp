@@ -124,7 +124,8 @@ const navSections: NavSection[] = [
     label: "Reports",
     color: "#06b6d4",
     items: [
-      { title: "Analytics", url: "/factory/analytics", icon: TrendingUp },
+      { title: "Analytics",           url: "/factory/analytics",          icon: TrendingUp },
+      { title: "Financial Snapshot",  url: "/factory/financial-snapshot", icon: LayoutGrid  },
     ],
   },
   {
