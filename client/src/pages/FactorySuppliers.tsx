@@ -968,36 +968,6 @@ export default function FactorySuppliers() {
           </div>
         )}
 
-        {/* ── Linked Supplier Exposure ──────────────────────────────────────── */}
-        {activeExposure.length > 0 && (
-          <Card className="border-dashed">
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
-                <div className="flex items-center gap-2">
-                  <Link2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <div>
-                    <div className="text-sm font-semibold text-foreground">Linked Supplier Exposure</div>
-                    <div className="text-xs text-muted-foreground">supplier-owned balances · not broker-owned</div>
-                  </div>
-                </div>
-                <Badge variant="outline" className="text-xs">
-                  {children.length} supplier{children.length !== 1 ? "s" : ""}
-                </Badge>
-              </div>
-              <div className="divide-y">
-                {activeExposure.map((b, i) => (
-                  <div key={b.currencyCode} className={`flex items-center justify-between gap-4 ${i === 0 ? "pb-2.5" : i === activeExposure.length - 1 ? "pt-2.5" : "py-2.5"}`}>
-                    <span className="text-xs font-medium text-muted-foreground tracking-wider uppercase">{b.currencyCode}</span>
-                    <span className={`tabular-nums font-bold ${i === 0 ? "text-2xl" : "text-lg"} ${b.currencyCode !== "USD" ? "text-amber-600 dark:text-amber-400" : "text-foreground"}`}>
-                      {b.currencyCode === "USD" ? "$" : `${b.currencyCode} `}{formatNum(b.balance.toFixed(2))}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Linked Suppliers list */}
         <Card>
           <CardHeader className="pb-2">
@@ -1548,84 +1518,6 @@ export default function FactorySuppliers() {
                       </TableBody>
                     </Table>
                   </div>
-                </CardContent>}
-              </Card>
-            )}
-
-            {/* Linked Supplier Exposure detail — informational, not broker-owned */}
-            {statementData.linkedSupplierGroups && statementData.linkedSupplierGroups.length > 0 && (
-              <Card>
-                <CardHeader className="pb-2 cursor-pointer hover-elevate rounded-t-md" onClick={() => toggleStmtSection("linkedExposureDetail")}>
-                  <CardTitle className="text-base flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2">
-                      <Link2 className="h-4 w-4" />
-                      Linked Supplier Exposure
-                    </span>
-                    <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform flex-shrink-0 ${collapsedStmtSections.has("linkedExposureDetail") ? "" : "rotate-180"}`} />
-                  </CardTitle>
-                  {!collapsedStmtSections.has("linkedExposureDetail") && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Informational only — these are balances owed to linked suppliers, not amounts owed by or to the broker.
-                      They do not add to Broker Net Balance.
-                    </p>
-                  )}
-                </CardHeader>
-                {!collapsedStmtSections.has("linkedExposureDetail") && <CardContent className="space-y-4">
-                  {statementData.linkedSupplierGroups.map(group => (
-                    <div key={group.supplierId} className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs"><Link2 className="h-3 w-3 mr-1" />{group.supplierName}</Badge>
-                        <span className="text-xs text-muted-foreground">{group.containerCount} container{group.containerCount !== 1 ? "s" : ""}</span>
-                      </div>
-                      {group.currencyGroups.map(cg => (
-                        <div key={cg.currencyCode} className="pl-4 border-l-2 border-muted space-y-1">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="font-medium">{cg.currencyCode} · {cg.containerCount} containers</span>
-                            <div className="flex gap-4 text-xs text-muted-foreground">
-                              <span>Total: {cg.currencyCode} {formatNum(cg.totalValue)}</span>
-                              <span>Paid: {cg.currencyCode} {formatNum(cg.totalPaid)}</span>
-                              {(() => {
-                                const nb = parseFloat(cg.netPayable);
-                                if (nb > 0.005) return <span className="font-medium text-foreground">Balance: {cg.currencyCode} {formatNum(cg.netPayable)}</span>;
-                                if (nb < -0.005) return <span className="text-green-600 dark:text-green-400">Balance: {cg.currencyCode} {formatNum(String(Math.abs(nb)))} CR</span>;
-                                return <span className="text-green-600 dark:text-green-400">Settled</span>;
-                              })()}
-                            </div>
-                          </div>
-                          <div className="overflow-x-auto">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead className="h-8 text-xs">Date</TableHead>
-                                  <TableHead className="h-8 text-xs">Container</TableHead>
-                                  <TableHead className="h-8 text-xs">Status</TableHead>
-                                  <TableHead className="h-8 text-xs text-right">Value ({cg.currencyCode})</TableHead>
-                                  <TableHead className="h-8 text-xs text-right">Commission</TableHead>
-                                  <TableHead className="h-8 text-xs">Notes</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {cg.containers.map((c: any) => (
-                                  <TableRow key={c.id} className="text-xs">
-                                    <TableCell className="py-1 whitespace-nowrap">{formatDate(c.date)}</TableCell>
-                                    <TableCell className="py-1 font-medium">{c.containerNumber}</TableCell>
-                                    <TableCell className="py-1">
-                                      <Badge variant={statusColor(c.status)} className="text-xs">{c.status}</Badge>
-                                    </TableCell>
-                                    <TableCell className="py-1 text-right tabular-nums font-medium">{formatNum(c.value)}</TableCell>
-                                    <TableCell className="py-1 text-right tabular-nums text-destructive">
-                                      {parseFloat(c.commissionAmount || "0") > 0 ? `${c.commissionCurrencyCode} ${formatNum(c.commissionAmount)}` : "—"}
-                                    </TableCell>
-                                    <TableCell className="py-1 text-muted-foreground max-w-[100px] truncate">{c.notes || "—"}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
                 </CardContent>}
               </Card>
             )}
