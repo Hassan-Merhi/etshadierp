@@ -202,6 +202,15 @@ function StockOTWContent() {
   const totalValue = filteredItems.reduce((sum, item) => sum + item.totalCost, 0);
   const uniqueItemCount = filteredItems.length;
 
+  // Container-level grand total (matches Container Tracking page) — includes freight, charges, discounts
+  const containerGrandTotal = otwContainers.reduce(
+    (sum, c) => sum + parseFloat((c as any).grandTotal || "0"),
+    0,
+  );
+  // When no search filter is applied, show the authoritative container grand total so both pages agree.
+  // When filtered, fall back to the item-level partial total.
+  const displayTotal = searchTerm.trim() === "" ? containerGrandTotal : totalValue;
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -402,7 +411,7 @@ function StockOTWContent() {
                     <TableCell></TableCell>
                     <TableCell>Total</TableCell>
                     <TableCell className="text-right font-mono" data-testid="text-summary-quantity">{Math.round(totalQuantity).toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-mono" data-testid="text-summary-value">{formatAmount(totalValue)}</TableCell>
+                    <TableCell className="text-right font-mono" data-testid="text-summary-value">{formatAmount(displayTotal)}</TableCell>
                     <TableCell></TableCell>
                   </TableRow>
                 </TableFooter>
