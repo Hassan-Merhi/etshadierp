@@ -25246,9 +25246,12 @@ if (asOfDate) {
           itemsTotal: containers.itemsTotal,
           chargesTotal: containers.chargesTotal,
           grandTotal: containers.grandTotal,
+          companyId: containers.companyId,
+          companyName: companies.name,
         })
         .from(containers)
         .innerJoin(suppliers, eq(containers.supplierId, suppliers.id))
+        .innerJoin(companies, eq(containers.companyId, companies.id))
         .where(and(...conditions))
         .orderBy(isOffloaded ? sql`${containers.offloadDate} DESC NULLS LAST` : sql`${containers.importDate} DESC NULLS LAST`);
 

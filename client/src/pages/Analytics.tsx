@@ -120,8 +120,22 @@ interface Container {
   grandTotal: string;
 }
 
+interface ReportContainer {
+  id: number;
+  containerNumber: string;
+  supplierName: string;
+  status: string;
+  importDate: string | null;
+  offloadDate: string | null;
+  itemsTotal: string;
+  chargesTotal: string;
+  grandTotal: string;
+  companyId: number;
+  companyName: string;
+}
+
 interface ContainerData {
-  containers: Container[];
+  containers: ReportContainer[];
   summary: {
     totalContainers: number;
     totalItemsTotal: number;
@@ -1952,7 +1966,29 @@ export default function Analytics() {
 
             {loadingContainers ? (
               <div className="text-center py-8 text-muted-foreground">Loading...</div>
-            ) : containerData ? (
+            ) : containerData ? (() => {
+              const isAllCompanies = reportAllCompanies === "all";
+              const dateCol = reportContainerStatus === "Offloaded" ? "Offload Date" : "Import Date";
+              const getDate = (c: ReportContainer) => reportContainerStatus === "Offloaded" ? (c.offloadDate || "-") : (c.importDate || "-");
+
+              // Build company groups when showing all companies
+              const companyGroups: { companyId: number; companyName: string; containers: ReportContainer[]; total: number }[] = [];
+              if (isAllCompanies) {
+                const map = new Map<number, typeof companyGroups[0]>();
+                for (const c of containerData.containers) {
+                  if (!map.has(c.companyId)) {
+                    map.set(c.companyId, { companyId: c.companyId, companyName: c.companyName, containers: [], total: 0 });
+                  }
+                  const g = map.get(c.companyId)!;
+                  g.containers.push(c);
+                  g.total += parseFloat(c.grandTotal || "0");
+                }
+                companyGroups.push(...Array.from(map.values()).sort((a, b) => a.companyName.localeCompare(b.companyName)));
+              }
+
+              const colSpanTotal = isAllCompanies ? 6 : 5;
+
+              return (
               <div className="space-y-4">
                 <div className="hidden md:block overflow-x-auto">
                   <Table>
@@ -1960,37 +1996,100 @@ export default function Analytics() {
                       <TableRow>
                         <TableHead>Container #</TableHead>
                         <TableHead>Supplier</TableHead>
+                        {isAllCompanies && <TableHead>Company</TableHead>}
                         <TableHead>Status</TableHead>
-                        <TableHead>{reportContainerStatus === "Offloaded" ? "Offload Date" : "Import Date"}</TableHead>
+                        <TableHead>{dateCol}</TableHead>
                         <TableHead className="text-right">Grand Total</TableHead>
                       </TableRow>
                     </TableHeader>
-                    <TableBody>
-                      {containerData.containers.map((container) => (
-                        <TableRow key={container.id}>
-                          <TableCell className="font-mono">{container.containerNumber}</TableCell>
-                          <TableCell>{container.supplierName}</TableCell>
-                          <TableCell>{container.status}</TableCell>
-                          <TableCell>{reportContainerStatus === "Offloaded" ? (container.offloadDate || "-") : container.importDate}</TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatAmount(parseFloat(container.grandTotal))}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                    <TableBody className="font-semibold border-t-2">
-                      <TableRow>
-                        <TableCell colSpan={3}>TOTALS ({containerData.summary.totalContainers} containers)</TableCell>
-                        <TableCell></TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatAmount(containerData.summary.totalGrandTotal)}
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
+                    {isAllCompanies ? (
+                      <>
+                        {companyGroups.map((group) => (
+                          <>
+                            {group.containers.map((container) => (
+                              <TableBody key={container.id}>
+                                <TableRow>
+                                  <TableCell className="font-mono text-sm">{container.containerNumber}</TableCell>
+                                  <TableCell className="text-sm">{container.supplierName}</TableCell>
+                                  <TableCell className="text-sm">{container.companyName}</TableCell>
+                                  <TableCell className="text-sm">{container.status}</TableCell>
+                                  <TableCell className="text-sm">{getDate(container)}</TableCell>
+                                  <TableCell className="text-right font-mono text-sm">{formatAmount(parseFloat(container.grandTotal))}</TableCell>
+                                </TableRow>
+                              </TableBody>
+                            ))}
+                            <TableBody key={`subtotal-${group.companyId}`}>
+                              <TableRow className="bg-muted/50 font-semibold">
+                                <TableCell colSpan={colSpanTotal - 1} className="text-sm">
+                                  {group.companyName} — {group.containers.length} container{group.containers.length !== 1 ? "s" : ""}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {formatAmount(group.total)}
+                                </TableCell>
+                              </TableRow>
+                            </TableBody>
+                          </>
+                        ))}
+                        <TableBody>
+                          <TableRow className="font-bold border-t-2">
+                            <TableCell colSpan={colSpanTotal - 1}>TOTALS ({containerData.summary.totalContainers} containers)</TableCell>
+                            <TableCell className="text-right font-mono">{formatAmount(containerData.summary.totalGrandTotal)}</TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </>
+                    ) : (
+                      <>
+                        <TableBody>
+                          {containerData.containers.map((container) => (
+                            <TableRow key={container.id}>
+                              <TableCell className="font-mono">{container.containerNumber}</TableCell>
+                              <TableCell>{container.supplierName}</TableCell>
+                              <TableCell>{container.status}</TableCell>
+                              <TableCell>{getDate(container)}</TableCell>
+                              <TableCell className="text-right font-mono">{formatAmount(parseFloat(container.grandTotal))}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                        <TableBody className="font-semibold border-t-2">
+                          <TableRow>
+                            <TableCell colSpan={3}>TOTALS ({containerData.summary.totalContainers} containers)</TableCell>
+                            <TableCell></TableCell>
+                            <TableCell className="text-right font-mono">{formatAmount(containerData.summary.totalGrandTotal)}</TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </>
+                    )}
                   </Table>
                 </div>
                 <div className="md:hidden space-y-3">
-                  {containerData.containers.map((container) => (
+                  {isAllCompanies ? (
+                    companyGroups.map((group) => (
+                      <div key={group.companyId} className="space-y-2">
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">{group.companyName}</div>
+                        {group.containers.map((container) => (
+                          <Card key={container.id}>
+                            <CardContent className="p-4 space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-mono font-medium">{container.containerNumber}</span>
+                                <span className="text-sm text-muted-foreground">{container.status}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-2 text-sm">
+                                <span className="text-muted-foreground">{container.supplierName} · {getDate(container)}</span>
+                                <span className="font-mono font-semibold">{formatAmount(parseFloat(container.grandTotal))}</span>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                        <Card className="bg-muted/40">
+                          <CardContent className="p-3 flex items-center justify-between gap-2">
+                            <span className="text-sm font-semibold">{group.companyName} Total ({group.containers.length})</span>
+                            <span className="font-mono font-semibold text-sm">{formatAmount(group.total)}</span>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    ))
+                  ) : (
+                  containerData.containers.map((container) => (
                     <Card key={container.id}>
                       <CardContent className="p-4 space-y-2">
                         <div className="flex items-center justify-between gap-2">
@@ -1998,12 +2097,13 @@ export default function Analytics() {
                           <span className="text-sm text-muted-foreground">{container.status}</span>
                         </div>
                         <div className="flex items-center justify-between gap-2 text-sm">
-                          <span className="text-muted-foreground">{container.supplierName} · {reportContainerStatus === "Offloaded" ? (container.offloadDate || "-") : container.importDate}</span>
+                          <span className="text-muted-foreground">{container.supplierName} · {getDate(container)}</span>
                           <span className="font-mono font-semibold">{formatAmount(parseFloat(container.grandTotal))}</span>
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
+                  ))
+                  )}
                   <Card className="bg-muted/50">
                     <CardContent className="p-4 flex items-center justify-between gap-2">
                       <span className="font-bold text-sm">TOTALS ({containerData.summary.totalContainers} containers)</span>
@@ -2012,7 +2112,8 @@ export default function Analytics() {
                   </Card>
                 </div>
               </div>
-            ) : (
+              );
+            })() : (
               <div className="text-center py-8 text-muted-foreground">
                 No data available. Click Generate to load report.
               </div>
