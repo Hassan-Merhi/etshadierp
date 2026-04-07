@@ -1425,7 +1425,16 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const companyName = companyRow?.name || "Company";
 
       const PDFDocument = (await import("pdfkit")).default;
+      const pathMod = await import("path");
+
+      // Arabic / Unicode font setup
+      const psumFontDir = pathMod.join(process.cwd(), "server", "fonts");
+      const psumArabicFontPath = pathMod.join(psumFontDir, "Amiri-Regular.ttf");
+      const psumHasArabicFont = fs.existsSync(psumArabicFontPath);
+
       const doc = new PDFDocument({ margin: 40, size: "A4" });
+      if (psumHasArabicFont) doc.registerFont("Arabic", psumArabicFontPath);
+
       const chunks: Buffer[] = [];
       doc.on("data", (c: Buffer) => chunks.push(c));
       doc.on("end", () => {
@@ -1435,7 +1444,35 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         res.send(pdf);
       });
 
-      // Header
+      // Arabic reshaping helpers
+      let psumConvertArabic: ((t: string) => string) | null = null;
+      let psumBidi: { getEmbeddingLevels: (t: string, d: string) => any; getReorderedString: (t: string, l: any) => string } | null = null;
+      try {
+        psumConvertArabic = (require("arabic-reshaper") as any).convertArabic;
+        psumBidi = (require("bidi-js") as any)();
+      } catch {}
+
+      const psumContainsArabic = (text: string) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
+      const psumShapeText = (text: string): string => {
+        if (!text || !psumConvertArabic) return text;
+        try {
+          const reshaped = psumConvertArabic(text);
+          if (psumBidi) {
+            const levels = psumBidi.getEmbeddingLevels(reshaped, "rtl");
+            return psumBidi.getReorderedString(reshaped, levels);
+          }
+          return reshaped;
+        } catch { return text; }
+      };
+
+      // Render text with automatic Arabic/Unicode font switching
+      const psumRenderText = (text: string, x: number, yPos: number, w: number, align: "left" | "right" | "center", size = 8) => {
+        const hasAr = psumHasArabicFont && psumContainsArabic(text);
+        doc.font(hasAr ? "Arabic" : "Helvetica").fontSize(size)
+          .text(hasAr ? psumShapeText(text) : text, x, yPos, { width: w, align: hasAr ? "right" : align });
+      };
+
+      // Header logo
       const hmdLogoPathPay = path.join(process.cwd(), "server", "hmd-logo.png");
       if (fs.existsSync(hmdLogoPathPay)) {
         try { doc.image(hmdLogoPathPay, (doc.page.width - 220) / 2, doc.y, { width: 220 }); doc.moveDown(0.5); } catch {}
@@ -1451,21 +1488,24 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       doc.fontSize(8).fillColor("#333333").text(`Period: ${periods.join(", ")}`);
       doc.moveDown(0.5);
 
-      // Table header
-      const COL = { name: 40, present: 280, absent: 330, amount: 400 };
-      const rowH = 18;
+      // Table layout — 5 columns: Name | Present | Absent | Amount | Signature
+      // Total table: x=40 to x=555 = 515px wide
+      const COL = { name: 40, present: 265, absent: 313, amount: 368, signature: 445 };
+      const COL_W = { name: 215, present: 40, absent: 40, amount: 70, signature: 110 };
+      const rowH = 20;
       const tableTop = doc.y;
 
+      // Table header row
       doc.rect(40, tableTop, 515, rowH).fill("#1F3864");
       doc.fillColor("#ffffff").fontSize(8).font("Helvetica-Bold");
-      doc.text("Worker Name", COL.name, tableTop + 5, { width: 220 });
-      doc.text("Present", COL.present, tableTop + 5, { width: 45, align: "center" });
-      doc.text("Absent", COL.absent, tableTop + 5, { width: 45, align: "center" });
-      doc.text("Amount", COL.amount, tableTop + 5, { width: 90, align: "right" });
+      doc.text("Worker Name", COL.name, tableTop + 6, { width: COL_W.name });
+      doc.text("Present", COL.present, tableTop + 6, { width: COL_W.present, align: "center" });
+      doc.text("Absent", COL.absent, tableTop + 6, { width: COL_W.absent, align: "center" });
+      doc.text("Amount", COL.amount, tableTop + 6, { width: COL_W.amount, align: "right" });
+      doc.text("Signature", COL.signature, tableTop + 6, { width: COL_W.signature, align: "center" });
 
       let y = tableTop + rowH;
       let totalAmt = 0;
-      doc.font("Helvetica").fillColor("#000000");
 
       payrollRows.forEach((p: any, i: number) => {
         const name = (workerMap.get(p.workerId) as string) || `Worker #${p.workerId}`;
@@ -1475,20 +1515,29 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         totalAmt += net;
 
         if (i % 2 === 1) doc.rect(40, y, 515, rowH).fill("#f5f7fa");
-        doc.fillColor("#000000").fontSize(8);
-        doc.text(name, COL.name, y + 5, { width: 220 });
-        doc.text(typeof present === "number" ? (present % 1 === 0 ? present.toFixed(0) : present.toFixed(1)) : "—", COL.present, y + 5, { width: 45, align: "center" });
-        doc.text(typeof absent === "number" ? (absent % 1 === 0 ? absent.toFixed(0) : absent.toFixed(1)) : "—", COL.absent, y + 5, { width: 45, align: "center" });
-        doc.text(net.toFixed(2), COL.amount, y + 5, { width: 90, align: "right" });
+        doc.fillColor("#000000");
+
+        // Worker name — supports Arabic/Unicode
+        psumRenderText(name, COL.name, y + 6, COL_W.name, "left");
+
+        doc.font("Helvetica").fontSize(8);
+        doc.text(typeof present === "number" ? (present % 1 === 0 ? present.toFixed(0) : present.toFixed(1)) : "—", COL.present, y + 6, { width: COL_W.present, align: "center" });
+        doc.text(typeof absent === "number" ? (absent % 1 === 0 ? absent.toFixed(0) : absent.toFixed(1)) : "—", COL.absent, y + 6, { width: COL_W.absent, align: "center" });
+        doc.text(net.toFixed(2), COL.amount, y + 6, { width: COL_W.amount, align: "right" });
+
+        // Signature box — a horizontal line for the worker to sign
+        const sigLineY = y + rowH - 5;
+        doc.moveTo(COL.signature + 8, sigLineY).lineTo(COL.signature + COL_W.signature - 8, sigLineY)
+          .strokeColor("#aaaaaa").lineWidth(0.5).stroke();
+
         y += rowH;
       });
 
-      // Footer total
-      doc.moveDown(0.5);
-      doc.rect(40, y + 4, 515, rowH).fill("#1F3864");
+      // Footer total row
+      doc.rect(40, y + 2, 515, rowH).fill("#1F3864");
       doc.fillColor("#ffffff").fontSize(9).font("Helvetica-Bold");
-      doc.text("Total Amount Paid", COL.name, y + 9, { width: 340 });
-      doc.text(totalAmt.toFixed(2), COL.amount, y + 9, { width: 90, align: "right" });
+      doc.text("Total Amount Paid", COL.name, y + 7, { width: COL_W.name + COL_W.present + COL_W.absent + 8 });
+      doc.text(totalAmt.toFixed(2), COL.amount, y + 7, { width: COL_W.amount, align: "right" });
 
       doc.end();
     } catch (error: any) {
