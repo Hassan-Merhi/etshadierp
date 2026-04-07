@@ -1321,11 +1321,10 @@ export default function FactoryDaybook() {
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      {hasNonUsd && <TableHead className="text-right">FX Rate</TableHead>}
+                      <TableHead className="whitespace-nowrap">Date</TableHead>
+                      <TableHead className="w-full">Description</TableHead>
+                      <TableHead className="text-right whitespace-nowrap">Amount</TableHead>
+                      {hasNonUsd && <TableHead className="text-right whitespace-nowrap">FX Rate</TableHead>}
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1356,9 +1355,7 @@ export default function FactoryDaybook() {
                             <div className="text-xs text-muted-foreground mt-0.5 font-mono">
                               {format(new Date(entry.createdAt), "hh:mm a")}
                             </div>
-                          </TableCell>
-                          <TableCell className="py-4">
-                            <div className="flex items-center gap-1 flex-wrap">
+                            <div className="flex items-center gap-1 flex-wrap mt-1">
                               <Badge variant={bv} className={cn(bc, "whitespace-nowrap")} data-testid={`badge-type-${entry.id}`}>
                                 {formatTxType(entry.txType)}
                               </Badge>
