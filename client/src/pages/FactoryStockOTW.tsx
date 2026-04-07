@@ -18,6 +18,7 @@ interface FactoryContainer {
   arrivalDate: string | null;
   currencyCode: string;
   fxRateToUsd: string;
+  ratePerKg: string | null;
   finalPayableAmount: string | null;
   finalPayableAmountUsd: string | null;
   freight: string | null;
@@ -77,8 +78,11 @@ function computeContainerByCurrency(c: FactoryContainer): Record<string, number>
   const amounts: Record<string, number> = {};
   const containerCcy = c.currencyCode || "USD";
 
-  // Goods (finalPayableAmount in container's currency)
-  addToCurrency(amounts, containerCcy, num(c.finalPayableAmount));
+  // Goods value: use confirmed finalPayableAmount, or fall back to ratePerKg × totalKg estimate
+  const goodsValue = num(c.finalPayableAmount) > 0
+    ? num(c.finalPayableAmount)
+    : num(c.ratePerKg) * num(c.totalKg);
+  addToCurrency(amounts, containerCcy, goodsValue);
 
   // Freight
   const freightCcy = c.freightCurrencyCode || containerCcy;
@@ -246,6 +250,7 @@ export default function FactoryStockOTW() {
                     <TableBody>
                       {group.containers.map((c) => {
                         const byCurrency = computeContainerByCurrency(c);
+                        const isEstimated = num(c.finalPayableAmount) === 0 && num(c.ratePerKg) > 0;
                         return (
                           <TableRow
                             key={c.id}
@@ -260,7 +265,12 @@ export default function FactoryStockOTW() {
                               {fmtKg(num(c.totalKg))}
                             </TableCell>
                             <TableCell className="text-right">
-                              {renderCurrencyBreakdown(byCurrency)}
+                              <div className="flex flex-col items-end gap-0.5">
+                                {renderCurrencyBreakdown(byCurrency)}
+                                {isEstimated && (
+                                  <span className="text-xs text-muted-foreground italic">est.</span>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline" className="text-xs">
