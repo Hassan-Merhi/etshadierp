@@ -1114,8 +1114,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const locationId = parseInt(req.params.locationId);
       if (isNaN(locationId)) return res.status(400).json({ message: "Invalid location ID" });
 
-      const includeCost = req.query.includeCost !== "0";
-      const includeSellPrice = req.query.includeSellPrice !== "0";
+      const [fCfg] = await db.select({ hideAvgCost: factorySettings.hideAvgCost, hideSellingPrice: factorySettings.hideSellingPrice }).from(factorySettings).where(eq(factorySettings.companyId, companyId)).limit(1);
+      const includeCost = req.query.includeCost !== "0" && !fCfg?.hideAvgCost;
+      const includeSellPrice = req.query.includeSellPrice !== "0" && !fCfg?.hideSellingPrice;
 
       const bales = await db
         .select()
@@ -1303,7 +1304,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const includeCost = req.query.includeCost !== "0";
+      const [fCfgAll] = await db.select({ hideAvgCost: factorySettings.hideAvgCost, hideSellingPrice: factorySettings.hideSellingPrice }).from(factorySettings).where(eq(factorySettings.companyId, companyId)).limit(1);
+      const includeCost = req.query.includeCost !== "0" && !fCfgAll?.hideAvgCost;
 
       // Fetch all in-stock / finalized bales
       const bales = await db
@@ -9244,20 +9246,24 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const totalKgUsed = usages.reduce((s: number, u: any) => s + (parseFloat(u.kgUsed) || 0), 0);
 
+      const [fCfgDR] = await db.select({ hideAvgCost: factorySettings.hideAvgCost }).from(factorySettings).where(eq(factorySettings.companyId, companyId)).limit(1);
+      const showCostDR = !fCfgDR?.hideAvgCost;
+
       if (format === "excel") {
         const ExcelJS = (await import("exceljs")).default;
         const workbook = new ExcelJS.Workbook();
         const sheet = workbook.addWorksheet("Production Report");
 
-        sheet.columns = [
+        const drCols: any[] = [
           { header: "Date", key: "date", width: 14 },
           { header: "Batch Code", key: "batchCode", width: 18 },
           { header: "Batch Name", key: "batchName", width: 28 },
           { header: "Operator", key: "operatorUser", width: 20 },
           { header: "KG Used", key: "kgUsed", width: 14 },
-          { header: "Cost / KG", key: "costPerKg", width: 14 },
-          { header: "Notes", key: "notes", width: 32 },
         ];
+        if (showCostDR) drCols.push({ header: "Cost / KG", key: "costPerKg", width: 14 });
+        drCols.push({ header: "Notes", key: "notes", width: 32 });
+        sheet.columns = drCols;
 
         const headerRow = sheet.getRow(1);
         headerRow.eachCell((cell) => {
@@ -9266,26 +9272,21 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         });
 
         for (const u of usages) {
-          sheet.addRow({
+          const rowData: any = {
             date: u.usedDate,
             batchCode: u.batchCode,
             batchName: u.batchName || "",
             operatorUser: u.operatorUser || "",
             kgUsed: parseFloat(u.kgUsed || "0"),
-            costPerKg: parseFloat(u.costPerKg || "0"),
             notes: u.notes || "",
-          });
+          };
+          if (showCostDR) rowData.costPerKg = parseFloat(u.costPerKg || "0");
+          sheet.addRow(rowData);
         }
 
-        const totalRow = sheet.addRow({
-          date: "TOTAL",
-          batchCode: "",
-          batchName: "",
-          operatorUser: "",
-          kgUsed: totalKgUsed,
-          costPerKg: "",
-          notes: "",
-        });
+        const totalRowData: any = { date: "TOTAL", batchCode: "", batchName: "", operatorUser: "", kgUsed: totalKgUsed, notes: "" };
+        if (showCostDR) totalRowData.costPerKg = "";
+        const totalRow = sheet.addRow(totalRowData);
         totalRow.eachCell((cell) => { cell.font = { bold: true }; });
 
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -10593,18 +10594,25 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         : [];
       const locMap = new Map(locs.map((l: any) => [l.id, l]));
 
+      const [fCfgBale] = await db.select({ hideAvgCost: factorySettings.hideAvgCost }).from(factorySettings).where(eq(factorySettings.companyId, companyId)).limit(1);
+      const showCostBale = !fCfgBale?.hideAvgCost;
+
       const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("Bales");
 
-      sheet.columns = [
+      const baleCols: any[] = [
         { header: "Reference Number", key: "referenceNumber", width: 22 },
         { header: "Article Code", key: "articleCode", width: 20 },
         { header: "Product Name", key: "productName", width: 30 },
         { header: "Category", key: "category", width: 18 },
         { header: "Weight (kg)", key: "weightKg", width: 14 },
-        { header: "Cost Per Kg", key: "costPerKg", width: 14 },
-        { header: "Total Cost", key: "totalCost", width: 14 },
+      ];
+      if (showCostBale) {
+        baleCols.push({ header: "Cost Per Kg", key: "costPerKg", width: 14 });
+        baleCols.push({ header: "Total Cost", key: "totalCost", width: 14 });
+      }
+      baleCols.push(
         { header: "Location Code", key: "locationCode", width: 16 },
         { header: "Location ID", key: "locationId", width: 12 },
         { header: "Status", key: "status", width: 14 },
@@ -10612,7 +10620,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         { header: "Bale Code", key: "baleCode", width: 18 },
         { header: "Grade", key: "grade", width: 12 },
         { header: "Finalized At", key: "finalizedAt", width: 22 },
-      ];
+      );
+      sheet.columns = baleCols;
 
       const headerRow = sheet.getRow(1);
       headerRow.eachCell((cell) => {
@@ -10622,22 +10631,25 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       for (const bale of bales) {
         const loc = locMap.get(bale.erpLocationId);
-        sheet.addRow({
+        const baleRowData: any = {
           referenceNumber: bale.referenceNumber,
           articleCode: bale.articleCode ?? "",
           productName: bale.productName ?? "",
           category: bale.category ?? "",
           weightKg: parseFloat(bale.weightKg || "0"),
-          costPerKg: parseFloat(bale.costPerKg || "0"),
-          totalCost: parseFloat(bale.totalCost || "0"),
-          locationCode: loc ? `${loc.code} - ${loc.name}` : "",
-          locationId: bale.erpLocationId ?? "",
-          status: bale.status ?? "IN_STOCK",
-          mixBatchId: bale.mixBatchId ?? "",
-          baleCode: bale.baleCode ?? "",
-          grade: bale.grade ?? "",
-          finalizedAt: bale.finalizedAt ? new Date(bale.finalizedAt).toISOString() : "",
-        });
+        };
+        if (showCostBale) {
+          baleRowData.costPerKg = parseFloat(bale.costPerKg || "0");
+          baleRowData.totalCost = parseFloat(bale.totalCost || "0");
+        }
+        baleRowData.locationCode = loc ? `${loc.code} - ${loc.name}` : "";
+        baleRowData.locationId = bale.erpLocationId ?? "";
+        baleRowData.status = bale.status ?? "IN_STOCK";
+        baleRowData.mixBatchId = bale.mixBatchId ?? "";
+        baleRowData.baleCode = bale.baleCode ?? "";
+        baleRowData.grade = bale.grade ?? "";
+        baleRowData.finalizedAt = bale.finalizedAt ? new Date(bale.finalizedAt).toISOString() : "";
+        sheet.addRow(baleRowData);
       }
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -15475,18 +15487,22 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       summaryRows.forEach((r) => summarySheet.addRow(r));
       summarySheet.getRow(1).font = { bold: true };
 
+      const [fCfgOrder] = await db.select({ hideAvgCost: factorySettings.hideAvgCost, hideSellingPrice: factorySettings.hideSellingPrice }).from(factorySettings).where(eq(factorySettings.companyId, companyId)).limit(1);
+      const showCostOrder = !fCfgOrder?.hideAvgCost;
+
       // ── Sheet 2: Bale Details ──
       const baleSheet = workbook.addWorksheet("Bale Details");
-      baleSheet.columns = [
+      const baleSheetCols: any[] = [
         { header: "#", key: "seq", width: 6 },
         { header: "Reference", key: "ref", width: 18 },
         { header: "Article Code", key: "articleCode", width: 14 },
         { header: "Product Name", key: "productName", width: 30 },
         { header: "Weight (kg)", key: "weightKg", width: 14 },
-        { header: "Cost/kg", key: "costPerKg", width: 12 },
-        { header: "Status", key: "status", width: 16 },
-        { header: "Price Used", key: "priceUsed", width: 14 },
       ];
+      if (showCostOrder) baleSheetCols.push({ header: "Cost/kg", key: "costPerKg", width: 12 });
+      baleSheetCols.push({ header: "Status", key: "status", width: 16 });
+      if (!fCfgOrder?.hideSellingPrice) baleSheetCols.push({ header: "Price Used", key: "priceUsed", width: 14 });
+      baleSheet.columns = baleSheetCols;
       baleSheet.getRow(1).font = { bold: true };
 
       // Map baleId -> price from link table
@@ -15494,30 +15510,32 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       baleRows.forEach((bale: any, i: number) => {
         const product = productMap.get(bale.productId);
-        baleSheet.addRow({
+        const baleDetailRow: any = {
           seq: i + 1,
           ref: bale.referenceNumber || bale.baleCode || "-",
           articleCode: product?.articleCode || bale.articleCode || "-",
           productName: product?.name || product?.articleCode || "-",
           weightKg: parseFloat(bale.weightKg || "0"),
-          costPerKg: parseFloat(bale.costPerKg || "0"),
-          status: bale.status || "-",
-          priceUsed: parseFloat(balePriceMap.get(bale.id) || "0"),
-        });
+        };
+        if (showCostOrder) baleDetailRow.costPerKg = parseFloat(bale.costPerKg || "0");
+        baleDetailRow.status = bale.status || "-";
+        if (!fCfgOrder?.hideSellingPrice) baleDetailRow.priceUsed = parseFloat(balePriceMap.get(bale.id) || "0");
+        baleSheet.addRow(baleDetailRow);
       });
 
       // Totals row
       if (baleRows.length > 0) {
-        const totalRow = baleSheet.addRow({
+        const totalDetailRow: any = {
           seq: "",
           ref: "TOTAL",
           articleCode: "",
           productName: "",
           weightKg: baleRows.reduce((s: number, b: any) => s + parseFloat(b.weightKg || "0"), 0),
-          costPerKg: "",
-          status: "",
-          priceUsed: "",
-        });
+        };
+        if (showCostOrder) totalDetailRow.costPerKg = "";
+        totalDetailRow.status = "";
+        if (!fCfgOrder?.hideSellingPrice) totalDetailRow.priceUsed = "";
+        const totalRow = baleSheet.addRow(totalDetailRow);
         totalRow.font = { bold: true };
       }
 

@@ -102,7 +102,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         supplierScoringEnabled, mixOptimizerEnabled, traceabilityEnabled,
         balePhotosEnabled, wasteTrackingEnabled, cashflowEnabled, rolesEnabled,
         netProfitEnabled, productionSummaryEnabled, supplierReportEnabled, supplierStatementEnabled,
-        laborCostPerKg, overheadPerKg, hideSellingPrice,
+        laborCostPerKg, overheadPerKg, hideSellingPrice, hideAvgCost,
       } = req.body;
 
       const updateData: any = { updatedAt: new Date() };
@@ -124,6 +124,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       if (laborCostPerKg !== undefined) updateData.laborCostPerKg = String(laborCostPerKg);
       if (overheadPerKg !== undefined) updateData.overheadPerKg = String(overheadPerKg);
       if (hideSellingPrice !== undefined) updateData.hideSellingPrice = hideSellingPrice;
+      if (hideAvgCost !== undefined) updateData.hideAvgCost = hideAvgCost;
 
       const [result] = await db
         .insert(factorySettings)

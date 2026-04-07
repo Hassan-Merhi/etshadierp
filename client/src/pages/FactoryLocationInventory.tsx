@@ -280,7 +280,7 @@ export default function FactoryLocationInventory() {
     queryKey: ["/api/factory/my-access"],
   });
 
-  const { data: factorySettingsData } = useQuery<{ hideSellingPrice?: boolean }>({
+  const { data: factorySettingsData } = useQuery<{ hideSellingPrice?: boolean; hideAvgCost?: boolean }>({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
       const res = await fetch("/api/factory/settings", { credentials: "include" });
@@ -288,6 +288,7 @@ export default function FactoryLocationInventory() {
     },
   });
   const hideSellingPrice = !!factorySettingsData?.hideSellingPrice;
+  const hideAvgCost = !!factorySettingsData?.hideAvgCost;
 
   const { data: inventoryData = [], isLoading: inventoryLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: selectedLocation
@@ -1104,7 +1105,7 @@ export default function FactoryLocationInventory() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => window.open("/api/factory/location-inventory/export/all", "_blank")}
+            onClick={() => { const p = new URLSearchParams(); if (hideAvgCost) p.set("includeCost","0"); if (hideSellingPrice) p.set("includeSellPrice","0"); const qs = p.toString(); window.open(`/api/factory/location-inventory/export/all${qs ? "?"+qs : ""}`, "_blank"); }}
             data-testid="button-export-all-locations"
           >
             <FileSpreadsheet className="h-4 w-4 mr-1" /> Export All (Excel)
@@ -1229,7 +1230,7 @@ export default function FactoryLocationInventory() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(`/api/factory/location-inventory/${selectedLocation.id}/export/excel`, "_blank")}
+              onClick={() => { const p = new URLSearchParams(); if (hideAvgCost) p.set("includeCost","0"); if (hideSellingPrice) p.set("includeSellPrice","0"); const qs = p.toString(); window.open(`/api/factory/location-inventory/${selectedLocation.id}/export/excel${qs ? "?"+qs : ""}`, "_blank"); }}
               data-testid="button-export-location-excel"
             >
               <FileSpreadsheet className="h-4 w-4 mr-1" /> Export Excel
@@ -1604,7 +1605,7 @@ export default function FactoryLocationInventory() {
             variant="outline"
             size="sm"
             onClick={() => {
-              window.open(`/api/factory/location-inventory/${selectedLocation!.id}/export/excel?includeCost=0${hideSellingPrice ? "&includeSellPrice=0" : ""}`, "_blank");
+              const p = new URLSearchParams(); if (hideAvgCost) p.set("includeCost","0"); if (hideSellingPrice) p.set("includeSellPrice","0"); const qs = p.toString(); window.open(`/api/factory/location-inventory/${selectedLocation!.id}/export/excel${qs ? "?"+qs : ""}`, "_blank");
             }}
             data-testid="button-export-inventory-excel"
           >

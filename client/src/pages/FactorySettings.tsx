@@ -38,6 +38,7 @@ interface FactorySettingsData {
   laborCostPerKg: number;
   overheadPerKg: number;
   hideSellingPrice: boolean;
+  hideAvgCost: boolean;
 }
 
 const defaultSettings: FactorySettingsData = {
@@ -59,6 +60,7 @@ const defaultSettings: FactorySettingsData = {
   laborCostPerKg: 0,
   overheadPerKg: 0,
   hideSellingPrice: false,
+  hideAvgCost: false,
 };
 
 interface RenamePreviewItem {
@@ -431,6 +433,7 @@ export default function FactorySettings() {
           </CardHeader>
           <CardContent className="divide-y">
             {toggleItem("Hide Selling Price", "hideSellingPrice")}
+            {toggleItem("Hide Avg Cost", "hideAvgCost")}
           </CardContent>
         </Card>
 

@@ -95,7 +95,12 @@ export default function BaleProducts() {
   const { data: myAccess } = useQuery<{ hiddenCostFields: string[] }>({
     queryKey: ["/api/factory/my-access"],
   });
-  const hideAvgRate = (myAccess?.hiddenCostFields ?? []).includes("inventory_avg_rate");
+  const { data: factorySettingsData } = useQuery<{ hideAvgCost?: boolean; hideSellingPrice?: boolean }>({
+    queryKey: ["/api/factory/settings"],
+    queryFn: async () => { const res = await fetch("/api/factory/settings", { credentials: "include" }); return res.ok ? res.json() : {}; },
+  });
+  const hideAvgRate = (myAccess?.hiddenCostFields ?? []).includes("inventory_avg_rate") || !!factorySettingsData?.hideAvgCost;
+  const hideSellingPriceBP = !!factorySettingsData?.hideSellingPrice;
 
   const { data: products, isLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: ["/api/factory/bale-products"],
@@ -631,7 +636,7 @@ export default function BaleProducts() {
                     <TableHead>Category</TableHead>
                     <TableHead className="text-right">Wt/Bale (kg)</TableHead>
                     {!hideAvgRate && <TableHead className="text-right">Prod. Price</TableHead>}
-                    {!hideAvgRate && <TableHead className="text-right">Sell Price</TableHead>}
+                    {!hideAvgRate && !hideSellingPriceBP && <TableHead className="text-right">Sell Price</TableHead>}
                     <TableHead className="text-right">Count</TableHead>
                     <TableHead className="w-[60px]">Actions</TableHead>
                   </TableRow>
@@ -658,7 +663,7 @@ export default function BaleProducts() {
                           {group.items[0]?.categoryId ? categoryMap.get(group.items[0].categoryId) || "-" : "-"}
                         </TableCell>
                         {!hideAvgRate && <TableCell></TableCell>}
-                        {!hideAvgRate && <TableCell></TableCell>}
+                        {!hideAvgRate && !hideSellingPriceBP && <TableCell></TableCell>}
                         <TableCell className="text-right">
                           <Badge variant="secondary">{group.count}</Badge>
                         </TableCell>
@@ -682,7 +687,7 @@ export default function BaleProducts() {
                                 {product.productionPrice && parseFloat(product.productionPrice) > 0 ? parseFloat(product.productionPrice).toLocaleString() : "—"}
                               </TableCell>
                             )}
-                            {!hideAvgRate && (
+                            {!hideAvgRate && !hideSellingPriceBP && (
                               <TableCell className="text-right text-sm font-mono text-muted-foreground">
                                 {product.sellingPrice && parseFloat(product.sellingPrice) > 0 ? parseFloat(product.sellingPrice).toLocaleString() : "—"}
                               </TableCell>
@@ -716,7 +721,7 @@ export default function BaleProducts() {
                   <TableHead>Category</TableHead>
                   <TableHead className="text-right">Weight/Bale (kg)</TableHead>
                   {!hideAvgRate && <TableHead className="text-right">Prod. Price</TableHead>}
-                  {!hideAvgRate && <TableHead className="text-right">Sell Price</TableHead>}
+                  {!hideAvgRate && !hideSellingPriceBP && <TableHead className="text-right">Sell Price</TableHead>}
                   <TableHead>Description</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[60px]">Actions</TableHead>
@@ -736,7 +741,7 @@ export default function BaleProducts() {
                         {product.productionPrice && parseFloat(product.productionPrice) > 0 ? parseFloat(product.productionPrice).toLocaleString() : "—"}
                       </TableCell>
                     )}
-                    {!hideAvgRate && (
+                    {!hideAvgRate && !hideSellingPriceBP && (
                       <TableCell className="text-right font-mono">
                         {product.sellingPrice && parseFloat(product.sellingPrice) > 0 ? parseFloat(product.sellingPrice).toLocaleString() : "—"}
                       </TableCell>
@@ -808,34 +813,38 @@ export default function BaleProducts() {
                 data-testid="input-edit-product-weight"
               />
             </div>
-            {!hideAvgRate && (
+            {(!hideAvgRate || !hideSellingPriceBP) && (
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-productionPrice">Cost Price</Label>
-                  <Input
-                    id="edit-productionPrice"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    value={editForm.productionPrice}
-                    onChange={(e) => setEditForm({ ...editForm, productionPrice: e.target.value })}
-                    data-testid="input-edit-product-production-price"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-sellingPrice">Sell Price</Label>
-                  <Input
-                    id="edit-sellingPrice"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    value={editForm.sellingPrice}
-                    onChange={(e) => setEditForm({ ...editForm, sellingPrice: e.target.value })}
-                    data-testid="input-edit-product-selling-price"
-                  />
-                </div>
+                {!hideAvgRate && (
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-productionPrice">Cost Price</Label>
+                    <Input
+                      id="edit-productionPrice"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={editForm.productionPrice}
+                      onChange={(e) => setEditForm({ ...editForm, productionPrice: e.target.value })}
+                      data-testid="input-edit-product-production-price"
+                    />
+                  </div>
+                )}
+                {!hideSellingPriceBP && (
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-sellingPrice">Sell Price</Label>
+                    <Input
+                      id="edit-sellingPrice"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={editForm.sellingPrice}
+                      onChange={(e) => setEditForm({ ...editForm, sellingPrice: e.target.value })}
+                      data-testid="input-edit-product-selling-price"
+                    />
+                  </div>
+                )}
               </div>
             )}
             <div className="space-y-2">
