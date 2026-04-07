@@ -13482,17 +13482,27 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         lines = await db.select().from(customerProformaLines).where(inArray(customerProformaLines.proformaId, proformaIds));
       }
 
-      // Enrich lines with weightPerBaleKg from factoryBaleProducts
+      // Enrich lines with weightPerBaleKg and correct productName from factoryBaleProducts
       const articleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
       let weightMap = new Map<string, string>();
+      let nameMap = new Map<string, string>();
       if (articleCodes.length > 0) {
-        const baleProds = await db.select({ articleCode: factoryBaleProducts.articleCode, weightPerBaleKg: factoryBaleProducts.weightPerBaleKg })
+        const baleProds = await db.select({ articleCode: factoryBaleProducts.articleCode, weightPerBaleKg: factoryBaleProducts.weightPerBaleKg, name: factoryBaleProducts.name })
           .from(factoryBaleProducts)
           .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes as string[])));
-        baleProds.forEach((p: any) => { if (p.articleCode) weightMap.set(p.articleCode, p.weightPerBaleKg || "0"); });
+        baleProds.forEach((p: any) => {
+          if (p.articleCode) {
+            weightMap.set(p.articleCode, p.weightPerBaleKg || "0");
+            if (p.name) nameMap.set(p.articleCode, p.name);
+          }
+        });
       }
 
-      const enrichedLines = lines.map((l: any) => ({ ...l, weightPerBaleKg: weightMap.get(l.articleCode) || "0" }));
+      const enrichedLines = lines.map((l: any) => ({
+        ...l,
+        weightPerBaleKg: weightMap.get(l.articleCode) || "0",
+        productName: nameMap.get(l.articleCode) || l.productName,
+      }));
 
       const result = proformas.map((p: any) => ({
         ...p,
