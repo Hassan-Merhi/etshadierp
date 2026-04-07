@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X, AlertTriangle, FileSpreadsheet } from "lucide-react";
+import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X, AlertTriangle, FileSpreadsheet, EyeOff, Eye } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -72,6 +73,8 @@ export default function BaleProducts() {
   const [editForm, setEditForm] = useState({ name: "", articleCode: "", weightPerBaleKg: "", categoryId: "", description: "", grade: "", productionPrice: "", sellingPrice: "" });
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showHidden, setShowHidden] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const appMode = useAppMode();
@@ -113,7 +116,29 @@ export default function BaleProducts() {
   const categoryMap = new Map<number, string>();
   categories?.forEach((c) => categoryMap.set(c.id, c.name));
 
-  const activeProducts = products?.filter((p) => p.active);
+  const activeProducts = products?.filter((p) => p.active !== false);
+  const hiddenProducts = products?.filter((p) => p.active === false);
+
+  const toggleSelectId = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (list: FactoryBaleProduct[]) => {
+    const ids = list.map((p) => p.id);
+    const allSelected = ids.every((id) => selectedIds.has(id));
+    if (allSelected) {
+      setSelectedIds((prev) => { const next = new Set(prev); ids.forEach((id) => next.delete(id)); return next; });
+    } else {
+      setSelectedIds((prev) => { const next = new Set(prev); ids.forEach((id) => next.add(id)); return next; });
+    }
+  };
+
+  const selectedActiveIds = Array.from(selectedIds).filter((id) => activeProducts?.some((p) => p.id === id));
+  const selectedHiddenIds = Array.from(selectedIds).filter((id) => hiddenProducts?.some((p) => p.id === id));
 
   const createCategoryMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -256,6 +281,23 @@ export default function BaleProducts() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
       setEditingProduct(null);
       toast({ title: "Product deleted", description: "The product has been removed." });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const bulkToggleActiveMutation = useMutation({
+    mutationFn: async ({ ids, active }: { ids: number[]; active: boolean }) => {
+      const response = await modeApiRequest("POST", "/api/factory/bale-products/bulk-toggle-active", { ids, active });
+      if (!response.ok) throw new Error("Failed to update products");
+      return response.json();
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
+      setSelectedIds(new Set());
+      toast({ title: variables.active ? "Products unhidden" : "Products hidden", description: `${variables.ids.length} product(s) updated.` });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -605,16 +647,63 @@ export default function BaleProducts() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <CardTitle>Product List</CardTitle>
-            <div className="flex items-center gap-2">
-              <List className="h-4 w-4 text-muted-foreground" />
-              <Switch
-                checked={condensedView}
-                onCheckedChange={setCondensedView}
-                data-testid="switch-condensed-view"
-              />
-              <LayoutGrid className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">{condensedView ? "Condensed" : "Normal"}</span>
+            <div className="flex items-center gap-3 flex-wrap">
+              <CardTitle>Product List</CardTitle>
+              {selectedIds.size > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">{selectedIds.size} selected</span>
+                  {selectedActiveIds.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => bulkToggleActiveMutation.mutate({ ids: selectedActiveIds, active: false })}
+                      disabled={bulkToggleActiveMutation.isPending}
+                      data-testid="button-bulk-hide"
+                    >
+                      <EyeOff className="h-4 w-4 mr-1" />
+                      Hide {selectedActiveIds.length > 0 ? `(${selectedActiveIds.length})` : ""}
+                    </Button>
+                  )}
+                  {selectedHiddenIds.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => bulkToggleActiveMutation.mutate({ ids: selectedHiddenIds, active: true })}
+                      disabled={bulkToggleActiveMutation.isPending}
+                      data-testid="button-bulk-unhide"
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      Unhide {selectedHiddenIds.length > 0 ? `(${selectedHiddenIds.length})` : ""}
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())} data-testid="button-clear-selection">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              {hiddenProducts && hiddenProducts.length > 0 && (
+                <Button
+                  size="sm"
+                  variant={showHidden ? "secondary" : "outline"}
+                  onClick={() => { setShowHidden(!showHidden); setSelectedIds(new Set()); }}
+                  data-testid="button-show-hidden"
+                >
+                  <EyeOff className="h-4 w-4 mr-1" />
+                  {showHidden ? "Hide Hidden" : `Show Hidden (${hiddenProducts.length})`}
+                </Button>
+              )}
+              <div className="flex items-center gap-2">
+                <List className="h-4 w-4 text-muted-foreground" />
+                <Switch
+                  checked={condensedView}
+                  onCheckedChange={setCondensedView}
+                  data-testid="switch-condensed-view"
+                />
+                <LayoutGrid className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">{condensedView ? "Condensed" : "Normal"}</span>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -630,6 +719,7 @@ export default function BaleProducts() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-8"></TableHead>
                     <TableHead className="w-8"></TableHead>
                     <TableHead>Article Code</TableHead>
                     <TableHead>Name</TableHead>
@@ -650,6 +740,12 @@ export default function BaleProducts() {
                         onClick={() => toggleGroup(group._key)}
                         data-testid={`row-group-${group._key}`}
                       >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={group.items.length > 0 && group.items.every((p) => selectedIds.has(p.id))}
+                            onCheckedChange={() => toggleSelectAll(group.items)}
+                          />
+                        </TableCell>
                         <TableCell>
                           {expandedGroups.has(group._key) ? (
                             <ChevronDown className="h-4 w-4" />
@@ -670,7 +766,14 @@ export default function BaleProducts() {
                       </TableRow>
                       {expandedGroups.has(group._key) &&
                         group.items.map((product) => (
-                          <TableRow key={product.id} className="bg-muted/30" data-testid={`row-product-${product.id}`}>
+                          <TableRow key={product.id} className={`bg-muted/30 ${selectedIds.has(product.id) ? "bg-muted/60" : ""}`} data-testid={`row-product-${product.id}`}>
+                            <TableCell onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={selectedIds.has(product.id)}
+                                onCheckedChange={() => toggleSelectId(product.id)}
+                                data-testid={`checkbox-product-${product.id}`}
+                              />
+                            </TableCell>
                             <TableCell></TableCell>
                             <TableCell className="font-mono text-muted-foreground text-sm pl-8">
                               {product.articleCode || "-"}
@@ -716,6 +819,13 @@ export default function BaleProducts() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8">
+                    <Checkbox
+                      checked={activeProducts.length > 0 && activeProducts.every((p) => selectedIds.has(p.id))}
+                      onCheckedChange={() => toggleSelectAll(activeProducts)}
+                      data-testid="checkbox-select-all"
+                    />
+                  </TableHead>
                   <TableHead>Article Code</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Category</TableHead>
@@ -729,7 +839,14 @@ export default function BaleProducts() {
               </TableHeader>
               <TableBody>
                 {activeProducts.map((product) => (
-                  <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
+                  <TableRow key={product.id} data-testid={`row-product-${product.id}`} className={selectedIds.has(product.id) ? "bg-muted/50" : ""}>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(product.id)}
+                        onCheckedChange={() => toggleSelectId(product.id)}
+                        data-testid={`checkbox-product-${product.id}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-mono font-medium">{product.articleCode || "-"}</TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell className="text-muted-foreground">
@@ -768,6 +885,62 @@ export default function BaleProducts() {
             </Table>
           ) : (
             <EmptyState onCreateClick={() => setCreateDialogOpen(true)} />
+          )}
+
+          {showHidden && hiddenProducts && hiddenProducts.length > 0 && (
+            <div className="mt-6 border-t pt-4">
+              <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                <EyeOff className="h-4 w-4" />
+                Hidden Products ({hiddenProducts.length})
+              </h3>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8">
+                      <Checkbox
+                        checked={hiddenProducts.length > 0 && hiddenProducts.every((p) => selectedIds.has(p.id))}
+                        onCheckedChange={() => toggleSelectAll(hiddenProducts)}
+                        data-testid="checkbox-select-all-hidden"
+                      />
+                    </TableHead>
+                    <TableHead>Article Code</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead className="w-[100px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {hiddenProducts.map((product) => (
+                    <TableRow key={product.id} className={selectedIds.has(product.id) ? "bg-muted/50" : ""} data-testid={`row-hidden-product-${product.id}`}>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(product.id)}
+                          onCheckedChange={() => toggleSelectId(product.id)}
+                          data-testid={`checkbox-hidden-product-${product.id}`}
+                        />
+                      </TableCell>
+                      <TableCell className="font-mono text-muted-foreground">{product.articleCode || "-"}</TableCell>
+                      <TableCell className="text-muted-foreground">{product.name}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {product.categoryId ? categoryMap.get(product.categoryId) || "-" : "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => bulkToggleActiveMutation.mutate({ ids: [product.id], active: true })}
+                          disabled={bulkToggleActiveMutation.isPending}
+                          data-testid={`button-unhide-product-${product.id}`}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Unhide
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

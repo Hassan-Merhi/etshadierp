@@ -4811,6 +4811,25 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.post("/api/factory/bale-products/bulk-toggle-active", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { ids, active } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: "ids array required" });
+      if (typeof active !== "boolean") return res.status(400).json({ message: "active boolean required" });
+
+      await db.update(factoryBaleProducts)
+        .set({ active, updatedAt: new Date() })
+        .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.id, ids)));
+
+      res.json({ updated: ids.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/bale-products/bulk-rename-preview", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
