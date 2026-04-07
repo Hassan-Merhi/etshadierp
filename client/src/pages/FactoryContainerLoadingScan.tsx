@@ -38,6 +38,8 @@ import {
   Rows3,
   AlignJustify,
   Upload,
+  Download,
+  ArrowRight,
 } from "lucide-react";
 import {
   Dialog,
@@ -124,6 +126,8 @@ export default function FactoryContainerLoadingScan() {
   const [importMode, setImportMode] = useState<"articleCode" | "refNumber">("articleCode");
   const [importPreview, setImportPreview] = useState<Array<{ articleCode: string; qty: number }>>([]);
   const [importRefNumbers, setImportRefNumbers] = useState<string[]>([]);
+  const [showPendingWarning, setShowPendingWarning] = useState(false);
+  const [pendingOrders, setPendingOrders] = useState<Array<{ id: number; invoiceNumber: string | null; status: string; totalQtyBales: number }>>([]);
   const scannerRef = useRef<HTMLInputElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -431,9 +435,33 @@ export default function FactoryContainerLoadingScan() {
     },
   });
 
-  const handleStartLoading = useCallback(() => {
+  const handleStartLoading = useCallback(async () => {
     if (!customerId || !selectedLocationId) return;
     const activeProforma = proformas.find((p) => p.isActive) || null;
+
+    // Check if there are already pending loading orders for this proforma
+    if (activeProforma) {
+      try {
+        const res = await fetch(
+          `/api/factory/customer-orders?customerId=${customerId}&proformaId=${activeProforma.id}`,
+          { credentials: "include" }
+        );
+        if (res.ok) {
+          const allOrders: any[] = await res.json();
+          const pending = allOrders.filter((o) =>
+            ["LOADING", "DRAFT", "PENDING_VERIFICATION"].includes(o.status)
+          );
+          if (pending.length > 0) {
+            setPendingOrders(pending);
+            setShowPendingWarning(true);
+            return;
+          }
+        }
+      } catch {
+        // If check fails, proceed with creation anyway
+      }
+    }
+
     createOrderMutation.mutate({
       customerId,
       proformaIdUsed: activeProforma?.id || null,
@@ -447,6 +475,34 @@ export default function FactoryContainerLoadingScan() {
     orderDate,
     createOrderMutation,
   ]);
+
+  const downloadTemplate = useCallback((mode: "ref" | "articleCode") => {
+    const wb = XLSX.utils.book_new();
+    let ws;
+    if (mode === "ref") {
+      ws = XLSX.utils.aoa_to_sheet([
+        ["Ref Number"],
+        ["REF00001"],
+        ["REF00002"],
+        ["REF00003"],
+      ]);
+      ws["!cols"] = [{ wch: 20 }];
+    } else {
+      ws = XLSX.utils.aoa_to_sheet([
+        ["Article Code", "Qty"],
+        ["ART001", 10],
+        ["ART002", 5],
+      ]);
+      ws["!cols"] = [{ wch: 20 }, { wch: 10 }];
+    }
+    XLSX.utils.book_append_sheet(wb, ws, "Import");
+    XLSX.writeFile(
+      wb,
+      mode === "ref"
+        ? "bale-import-ref-number-template.xlsx"
+        : "bale-import-article-code-template.xlsx"
+    );
+  }, []);
 
   const handleScan = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -730,15 +786,26 @@ export default function FactoryContainerLoadingScan() {
                     <ScanLine className="inline h-4 w-4 mr-1" />
                     Scan Bale
                   </label>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => importFileRef.current?.click()}
-                    data-testid="button-import-excel"
-                  >
-                    <Upload className="h-3 w-3 mr-1" />
-                    Import from Excel
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => importFileRef.current?.click()}
+                      data-testid="button-import-excel"
+                    >
+                      <Upload className="h-3 w-3 mr-1" />
+                      Import from Excel
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => downloadTemplate("ref")}
+                      data-testid="button-template-ref"
+                      title="Download Ref Number template"
+                    >
+                      <Download className="h-3 w-3" />
+                    </Button>
+                  </div>
                   <input
                     ref={importFileRef}
                     type="file"
@@ -1184,6 +1251,27 @@ export default function FactoryContainerLoadingScan() {
             <DialogTitle>Import Bales from Excel</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-muted-foreground">Download template:</span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => downloadTemplate("ref")}
+                data-testid="button-download-ref-template"
+              >
+                <Download className="h-3 w-3 mr-1" />
+                Ref Number
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => downloadTemplate("articleCode")}
+                data-testid="button-download-article-template"
+              >
+                <Download className="h-3 w-3 mr-1" />
+                Article Code
+              </Button>
+            </div>
             {importMode === "refNumber" ? (
               <>
                 <p className="text-sm text-muted-foreground">
@@ -1263,6 +1351,76 @@ export default function FactoryContainerLoadingScan() {
                   ? `Add ${importRefNumbers.length} Bale${importRefNumbers.length !== 1 ? "s" : ""}`
                   : `Add ${importPreview.reduce((s, r) => s + r.qty, 0)} Bales`
               }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pending Loading Warning Dialog */}
+      <Dialog open={showPendingWarning} onOpenChange={setShowPendingWarning}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              Proforma Already Being Loaded
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              This proforma already has {pendingOrders.length === 1 ? "an active loading order" : `${pendingOrders.length} active loading orders`}. You can continue one of them or start a new loading.
+            </p>
+            <div className="space-y-2">
+              {pendingOrders.map((order) => (
+                <div
+                  key={order.id}
+                  className="flex items-center justify-between gap-2 rounded-md border p-3"
+                >
+                  <div className="text-sm">
+                    <span className="font-medium">
+                      {order.invoiceNumber || `Order #${order.id}`}
+                    </span>
+                    <span className="text-muted-foreground ml-2">
+                      · {order.totalQtyBales} bales · {order.status}
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setShowPendingWarning(false);
+                      navigate(`/factory/sales/loading/new?orderId=${order.id}`);
+                    }}
+                    data-testid={`button-resume-order-${order.id}`}
+                  >
+                    Resume
+                    <ArrowRight className="h-3 w-3 ml-1" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter className="flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowPendingWarning(false)}
+              data-testid="button-cancel-pending-warning"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setShowPendingWarning(false);
+                const activeProforma = proformas.find((p) => p.isActive) || null;
+                createOrderMutation.mutate({
+                  customerId: customerId!,
+                  proformaIdUsed: activeProforma?.id || null,
+                  locationId: parseInt(selectedLocationId),
+                  orderDate,
+                });
+              }}
+              data-testid="button-create-new-loading"
+            >
+              Start New Loading
             </Button>
           </DialogFooter>
         </DialogContent>

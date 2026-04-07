@@ -14300,6 +14300,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const conditions: any[] = [eq(customerOrders.companyId, companyId)];
       if (req.query.customerId) conditions.push(eq(customerOrders.customerId, parseInt(req.query.customerId)));
       if (req.query.status) conditions.push(eq(customerOrders.status, req.query.status));
+      if (req.query.proformaId) conditions.push(eq(customerOrders.proformaIdUsed, parseInt(req.query.proformaId)));
 
       const orders = await db
         .select({
