@@ -17299,6 +17299,46 @@ if (asOfDate) {
                 }
               }
             }
+
+            // Handle Sales items inventory when toggling optional
+            const hasSalesItems = await tx
+              .select()
+              .from(salesItems)
+              .where(eq(salesItems.voucherId, id));
+
+            if (hasSalesItems.length > 0 && existingVoucher.locationId) {
+              for (const item of hasSalesItems) {
+                const quantity = parseFloat(item.quantity);
+                const costPrice = parseFloat(item.costPrice);
+                if (willBeOptional) {
+                  // Reverse: add back stock that was deducted by the sale
+                  await adjustInventory(tx, existingVoucher.locationId, item.stockItemId, quantity, existingVoucher.companyId, costPrice);
+                } else {
+                  // Apply: deduct stock for the sale
+                  await adjustInventory(tx, existingVoucher.locationId, item.stockItemId, -quantity, existingVoucher.companyId);
+                }
+              }
+            }
+
+            // Handle Credit Note items inventory when toggling optional
+            const hasCreditNoteItems = await tx
+              .select()
+              .from(creditNoteItems)
+              .where(eq(creditNoteItems.voucherId, id));
+
+            if (hasCreditNoteItems.length > 0) {
+              for (const item of hasCreditNoteItems) {
+                const quantity = parseFloat(item.quantity);
+                const rate = parseFloat(item.rate);
+                if (willBeOptional) {
+                  // Reverse: remove stock that was added by the credit note (customer return)
+                  await adjustInventory(tx, item.locationId, item.stockItemId, -quantity, existingVoucher.companyId);
+                } else {
+                  // Apply: add stock back for the credit note (customer return)
+                  await adjustInventory(tx, item.locationId, item.stockItemId, quantity, existingVoucher.companyId, rate);
+                }
+              }
+            }
           }
 
           await tx
@@ -17517,6 +17557,46 @@ if (asOfDate) {
                   }
                 }
               }
+          }
+
+          // Handle Sales items inventory when toggling optional
+          const hasSalesItems = await tx
+            .select()
+            .from(salesItems)
+            .where(eq(salesItems.voucherId, id));
+
+          if (hasSalesItems.length > 0 && existingVoucher.locationId) {
+            for (const item of hasSalesItems) {
+              const quantity = parseFloat(item.quantity);
+              const costPrice = parseFloat(item.costPrice);
+              if (willBeOptional) {
+                // Reverse: add back stock that was deducted by the sale
+                await adjustInventory(tx, existingVoucher.locationId, item.stockItemId, quantity, existingVoucher.companyId, costPrice);
+              } else {
+                // Apply: deduct stock for the sale
+                await adjustInventory(tx, existingVoucher.locationId, item.stockItemId, -quantity, existingVoucher.companyId);
+              }
+            }
+          }
+
+          // Handle Credit Note items inventory when toggling optional
+          const hasCreditNoteItems = await tx
+            .select()
+            .from(creditNoteItems)
+            .where(eq(creditNoteItems.voucherId, id));
+
+          if (hasCreditNoteItems.length > 0) {
+            for (const item of hasCreditNoteItems) {
+              const quantity = parseFloat(item.quantity);
+              const rate = parseFloat(item.rate);
+              if (willBeOptional) {
+                // Reverse: remove stock that was added by the credit note (customer return)
+                await adjustInventory(tx, item.locationId, item.stockItemId, -quantity, existingVoucher.companyId);
+              } else {
+                // Apply: add stock back for the credit note (customer return)
+                await adjustInventory(tx, item.locationId, item.stockItemId, quantity, existingVoucher.companyId, rate);
+              }
+            }
           }
           }
 
