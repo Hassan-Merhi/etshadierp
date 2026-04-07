@@ -4335,6 +4335,7 @@ function OfflineSyncPanel() {
                             <SelectContent>
                               <SelectItem value="erp">Normal ERP</SelectItem>
                               <SelectItem value="factory">Factory Production</SelectItem>
+                              <SelectItem value="properties">Properties</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -4452,8 +4453,8 @@ function OfflineSyncPanel() {
                         {company.name}
                       </TableCell>
                       <TableCell data-testid={`text-company-type-${company.id}`}>
-                        <Badge variant={company.companyType === "factory" ? "default" : "secondary"}>
-                          {company.companyType === "factory" ? "Factory" : "ERP"}
+                        <Badge variant={company.companyType === "factory" ? "default" : company.companyType === "properties" ? "outline" : "secondary"}>
+                          {company.companyType === "factory" ? "Factory" : company.companyType === "properties" ? "Properties" : "ERP"}
                         </Badge>
                       </TableCell>
                       <TableCell data-testid={`text-company-status-${company.id}`}>
