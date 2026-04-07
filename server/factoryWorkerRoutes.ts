@@ -1436,7 +1436,11 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       });
 
       // Header
-      doc.fontSize(14).font("Helvetica-Bold").text(companyName, { align: "center" });
+      const hmdLogoPathPay = path.join(process.cwd(), "server", "hmd-logo.png");
+      if (fs.existsSync(hmdLogoPathPay)) {
+        try { doc.image(hmdLogoPathPay, (doc.page.width - 90) / 2, doc.y, { width: 90 }); doc.moveDown(0.4); } catch {}
+      }
+      doc.fontSize(14).font("Helvetica-Bold").text("HMD INTERNATIONAL GROUP", { align: "center" });
       doc.fontSize(10).font("Helvetica").text("Payment Summary", { align: "center" });
       doc.moveDown(0.3);
       doc.fontSize(8).fillColor("#666666")
@@ -2766,13 +2770,12 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       // Header
       let headerY = 40;
       let logoWidth = 0;
-      if (logoUrl && logoUrl.startsWith("/") && fs.existsSync(`.${logoUrl}`)) {
-        try { doc.image(`.${logoUrl}`, 40, headerY, { height: 48, fit: [80, 48] }); logoWidth = 90; } catch {}
+      const wHmdLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+      if (fs.existsSync(wHmdLogoPath)) {
+        try { doc.image(wHmdLogoPath, 40, headerY, { height: 56, fit: [80, 56] }); logoWidth = 90; } catch {}
       }
-      // Company name — may contain Arabic
-      const cNameHasAr = hasArabicFont && wContainsArabic(companyName);
-      doc.fontSize(18).font(cNameHasAr ? "Arabic" : "Helvetica-Bold").fillColor("#000000")
-        .text(cNameHasAr ? wShapeText(companyName) : companyName, 40 + logoWidth, headerY, { width: 515 - logoWidth, align: cNameHasAr ? "right" : "left" });
+      doc.fontSize(18).font("Helvetica-Bold").fillColor("#000000")
+        .text("HMD INTERNATIONAL GROUP", 40 + logoWidth, headerY, { width: 515 - logoWidth });
       const wNameHasAr = hasArabicFont && wContainsArabic(workerName);
       doc.fontSize(10).font(wNameHasAr ? "Arabic" : "Helvetica").fillColor("#555555")
         .text(wNameHasAr ? `كشف حساب: ${wShapeText(workerName)}` : `Account Statement: ${workerName}`, 40 + logoWidth, headerY + 22, { width: 515 - logoWidth, align: wNameHasAr ? "right" : "left" });

@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { eq, and, sql, asc, gte, lte, desc, inArray, isNull } from "drizzle-orm";
 import PDFDocument from "pdfkit";
+import path from "path";
+import fs from "fs";
 import ExcelJS from "exceljs";
 import {
   factoryWorkers,
@@ -560,8 +562,12 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       res.setHeader("Content-Disposition", `attachment; filename=payroll_${startDate}_${endDate}.pdf`);
       doc.pipe(res);
 
-      doc.fontSize(16).text(companyName, { align: "center" });
-      doc.fontSize(12).text("Factory Payroll Report", { align: "center" });
+      const hmdLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+      if (fs.existsSync(hmdLogoPath)) {
+        try { doc.image(hmdLogoPath, (doc.page.width - 100) / 2, doc.y, { width: 100 }); doc.moveDown(0.5); } catch {}
+      }
+      doc.fontSize(16).font("Helvetica-Bold").text("HMD INTERNATIONAL GROUP", { align: "center" });
+      doc.fontSize(12).font("Helvetica").text("Factory Payroll Report", { align: "center" });
       doc.fontSize(10).text(`Period: ${startDate} to ${endDate}`, { align: "center" });
       doc.moveDown(1);
 
@@ -686,32 +692,54 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         .orderBy(factoryWorkers.fullName);
 
       const workbook = new ExcelJS.Workbook();
+      const xlogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+      let xlogoId: number | null = null;
+      try { if (fs.existsSync(xlogoPath)) { const buf = fs.readFileSync(xlogoPath); xlogoId = workbook.addImage({ buffer: buf as Buffer, extension: "png" }); } } catch {}
 
+      function addSheetHeader(sheet: ExcelJS.Worksheet, title: string, numCols: number) {
+        const logoRow = sheet.addRow([]); logoRow.height = 75;
+        if (xlogoId !== null) sheet.addImage(xlogoId, { tl: { col: 0, row: 0 }, ext: { width: 150, height: 75 } });
+        const rName = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
+        rName.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
+        rName.getCell(1).alignment = { horizontal: "center" };
+        sheet.mergeCells(rName.number, 1, rName.number, numCols);
+        const rTitle = sheet.addRow([title]);
+        rTitle.getCell(1).font = { bold: true, size: 12 };
+        rTitle.getCell(1).alignment = { horizontal: "center" };
+        sheet.mergeCells(rTitle.number, 1, rTitle.number, numCols);
+        const rPeriod = sheet.addRow([`Period: ${startDate} to ${endDate}`]);
+        rPeriod.getCell(1).font = { size: 10, color: { argb: "FF555555" } };
+        sheet.mergeCells(rPeriod.number, 1, rPeriod.number, numCols);
+        sheet.addRow([]);
+      }
+
+      const SUMMARY_COLS = 18;
       const summarySheet = workbook.addWorksheet("Payroll Summary");
       summarySheet.columns = [
-        { header: "Employee Code", key: "code", width: 15 },
-        { header: "Name", key: "name", width: 25 },
-        { header: "Position", key: "position", width: 18 },
-        { header: "Salary Type", key: "salaryType", width: 14 },
-        { header: "Working Days", key: "totalDays", width: 13 },
-        { header: "Present Days", key: "presentDays", width: 13 },
-        { header: "Absent Days", key: "absentDays", width: 13 },
-        { header: "Base Salary", key: "base", width: 14 },
-        { header: "Bale Earnings", key: "bale", width: 14 },
-        { header: "KG Earnings", key: "kg", width: 14 },
-        { header: "Overtime Pay", key: "ot", width: 14 },
-        { header: "Bonuses", key: "bonus", width: 12 },
-        { header: "Deductions", key: "deduct", width: 12 },
-        { header: "Advances", key: "advance", width: 12 },
-        { header: "Net Salary", key: "net", width: 14 },
-        { header: "Bales Count", key: "balesCount", width: 12 },
-        { header: "KG Processed", key: "kgProcessed", width: 14 },
-        { header: "Status", key: "status", width: 12 },
+        { key: "code", width: 15 },
+        { key: "name", width: 25 },
+        { key: "position", width: 18 },
+        { key: "salaryType", width: 14 },
+        { key: "totalDays", width: 13 },
+        { key: "presentDays", width: 13 },
+        { key: "absentDays", width: 13 },
+        { key: "base", width: 14 },
+        { key: "bale", width: 14 },
+        { key: "kg", width: 14 },
+        { key: "ot", width: 14 },
+        { key: "bonus", width: 12 },
+        { key: "deduct", width: 12 },
+        { key: "advance", width: 12 },
+        { key: "net", width: 14 },
+        { key: "balesCount", width: 12 },
+        { key: "kgProcessed", width: 14 },
+        { key: "status", width: 12 },
       ];
-
-      const headerRow = summarySheet.getRow(1);
+      addSheetHeader(summarySheet, "Payroll Summary", SUMMARY_COLS);
+      const headerRow = summarySheet.addRow(["Employee Code", "Name", "Position", "Salary Type", "Working Days", "Present Days", "Absent Days", "Base Salary", "Bale Earnings", "KG Earnings", "Overtime Pay", "Bonuses", "Deductions", "Advances", "Net Salary", "Bales Count", "KG Processed", "Status"]);
       headerRow.font = { bold: true };
       headerRow.alignment = { horizontal: "center" };
+      headerRow.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F3864" } }; cell.font = { bold: true, color: { argb: "FFFFFFFF" } }; });
 
       for (const row of payrollData) {
         const p = row.payroll;
@@ -743,25 +771,27 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         col.numFmt = "#,##0.0";
       });
 
+      const DETAILS_COLS = 12;
       const detailsSheet = workbook.addWorksheet("Worker Details");
       detailsSheet.columns = [
-        { header: "Employee Code", key: "code", width: 15 },
-        { header: "Full Name", key: "name", width: 25 },
-        { header: "Position", key: "position", width: 18 },
-        { header: "Department", key: "department", width: 18 },
-        { header: "Salary Type", key: "salaryType", width: 14 },
-        { header: "Base Salary", key: "baseSalary", width: 14 },
-        { header: "Per Bale Rate", key: "perBaleRate", width: 14 },
-        { header: "Per KG Rate", key: "perKgRate", width: 14 },
-        { header: "Overtime Rate", key: "overtimeRate", width: 14 },
-        { header: "Phone", key: "phone", width: 16 },
-        { header: "Date Joined", key: "dateJoined", width: 14 },
-        { header: "Payment Method", key: "paymentMethod", width: 16 },
+        { key: "code", width: 15 },
+        { key: "name", width: 25 },
+        { key: "position", width: 18 },
+        { key: "department", width: 18 },
+        { key: "salaryType", width: 14 },
+        { key: "baseSalary", width: 14 },
+        { key: "perBaleRate", width: 14 },
+        { key: "perKgRate", width: 14 },
+        { key: "overtimeRate", width: 14 },
+        { key: "phone", width: 16 },
+        { key: "dateJoined", width: 14 },
+        { key: "paymentMethod", width: 16 },
       ];
-
-      const detailsHeaderRow = detailsSheet.getRow(1);
+      addSheetHeader(detailsSheet, "Worker Details", DETAILS_COLS);
+      const detailsHeaderRow = detailsSheet.addRow(["Employee Code", "Full Name", "Position", "Department", "Salary Type", "Base Salary", "Per Bale Rate", "Per KG Rate", "Overtime Rate", "Phone", "Date Joined", "Payment Method"]);
       detailsHeaderRow.font = { bold: true };
       detailsHeaderRow.alignment = { horizontal: "center" };
+      detailsHeaderRow.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F3864" } }; cell.font = { bold: true, color: { argb: "FFFFFFFF" } }; });
 
       const seenWorkers = new Set<number>();
       for (const row of payrollData) {

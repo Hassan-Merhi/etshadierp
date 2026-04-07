@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import PDFDocument from "pdfkit";
 import ExcelJS from "exceljs";
+import path from "path";
+import fs from "fs";
 import { eq, and, sql, desc } from "drizzle-orm";
 import {
   factorySuppliers,
@@ -301,13 +303,22 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     }
   });
 
+  const hmdLogo = path.join(process.cwd(), "server", "hmd-logo.png");
+  function addPdfBranding(doc: any) {
+    if (fs.existsSync(hmdLogo)) {
+      try { doc.image(hmdLogo, (doc.page.width - 100) / 2, doc.y, { width: 100 }); doc.moveDown(0.4); } catch {}
+    }
+    doc.fontSize(18).font("Helvetica-Bold").text("HMD INTERNATIONAL GROUP", { align: "center" });
+    doc.font("Helvetica");
+  }
+
   function generateEmptyPdf(res: any, companyName: string, startDate: string, endDate: string) {
     const doc = new PDFDocument({ margin: 40, size: "A4" });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="supplier_usage_report_${startDate}_${endDate}.pdf"`);
     doc.pipe(res);
 
-    doc.fontSize(18).text(companyName, { align: "center" });
+    addPdfBranding(doc);
     doc.moveDown(0.5);
     doc.fontSize(14).text("Supplier Usage Report", { align: "center" });
     doc.moveDown(0.3);
@@ -321,7 +332,12 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
   async function generateEmptyExcel(res: any, companyName: string, startDate: string, endDate: string) {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Summary");
-    sheet.addRow([`${companyName} - Supplier Usage Report`]);
+    let xlLogoId: number | null = null;
+    try { if (fs.existsSync(hmdLogo)) { xlLogoId = workbook.addImage({ buffer: fs.readFileSync(hmdLogo) as Buffer, extension: "png" }); } } catch {}
+    const lr = sheet.addRow([]); lr.height = 75;
+    if (xlLogoId !== null) sheet.addImage(xlLogoId, { tl: { col: 0, row: 0 }, ext: { width: 150, height: 75 } });
+    const rn = sheet.addRow(["HMD INTERNATIONAL GROUP"]); rn.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
+    sheet.addRow(["Supplier Usage Report"]).getCell(1).font = { bold: true, size: 13 };
     sheet.addRow([`Period: ${startDate} to ${endDate}`]);
     sheet.addRow([]);
     sheet.addRow(["No data found for the selected period and filters."]);
@@ -345,7 +361,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     res.setHeader("Content-Disposition", `attachment; filename="supplier_usage_report_${startDate}_${endDate}.pdf"`);
     doc.pipe(res);
 
-    doc.fontSize(18).text(companyName, { align: "center" });
+    addPdfBranding(doc);
     doc.moveDown(0.3);
     doc.fontSize(14).text("Supplier Usage Report", { align: "center" });
     doc.moveDown(0.2);
@@ -461,8 +477,13 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     const numberFmt = "#,##0.000";
     const moneyFmt = "$#,##0.00";
 
+    let xlLogoId2: number | null = null;
+    try { if (fs.existsSync(hmdLogo)) { xlLogoId2 = workbook.addImage({ buffer: fs.readFileSync(hmdLogo) as Buffer, extension: "png" }); } } catch {}
     const sheet1 = workbook.addWorksheet("Summary");
-    sheet1.addRow([`${companyName} - Supplier Usage Report`]).font = boldFont;
+    const lr1 = sheet1.addRow([]); lr1.height = 75;
+    if (xlLogoId2 !== null) sheet1.addImage(xlLogoId2, { tl: { col: 0, row: 0 }, ext: { width: 150, height: 75 } });
+    const rn1 = sheet1.addRow(["HMD INTERNATIONAL GROUP"]); rn1.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
+    sheet1.addRow(["Supplier Usage Report"]).getCell(1).font = boldFont;
     sheet1.addRow([`Period: ${startDate} to ${endDate}`]);
     sheet1.addRow([`Generated: ${new Date().toISOString().replace("T", " ").substring(0, 19)}`]);
     sheet1.addRow([]);

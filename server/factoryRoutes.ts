@@ -9302,6 +9302,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         res.setHeader("Content-Disposition", `attachment; filename="raw-production-report-${filenameDate}.pdf"`);
         doc.pipe(res);
 
+        const rpLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+        if (fs.existsSync(rpLogoPath)) {
+          try { doc.image(rpLogoPath, (doc.page.width - 100) / 2, doc.y, { width: 100 }); doc.moveDown(0.3); } catch {}
+        }
+        doc.fontSize(13).font("Helvetica-Bold").text("HMD INTERNATIONAL GROUP", { align: "center" });
         const title = allTime ? "Raw Production Report — All Time" : "Raw Production Report";
         doc.fontSize(16).font("Helvetica-Bold").text(title, { align: "center" });
         if (!allTime) doc.fontSize(11).font("Helvetica").text(`Date: ${dateParam}`, { align: "center" });
@@ -9742,9 +9747,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const pageW = doc.page.width - 60; // usable width
         const rowH = 14;
 
+        const wpLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+
         for (let wi = 0; wi < sortedWeekKeys.length; wi++) {
           const wk = sortedWeekKeys[wi];
           if (wi > 0) doc.addPage({ layout: "landscape" });
+
+          if (wi === 0 && fs.existsSync(wpLogoPath)) {
+            try { doc.image(wpLogoPath, (doc.page.width - 90) / 2, 10, { width: 90 }); } catch {}
+            doc.fontSize(12).font("Helvetica-Bold").text("HMD INTERNATIONAL GROUP", 30, 105, { width: pageW, align: "center" });
+            doc.moveDown(0.5);
+          }
 
           const dates = weekMap.get(wk)!;
           const monDate = mondayOfWeek(dates[0]);
@@ -11451,16 +11464,23 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const pageW = 515; // usable width with 40px margin each side
 
       // ── Header bar ──────────────────────────────────────────────────────
-      doc.rect(40, 40, pageW, 44).fill(NAVY);
-      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(15)
-        .text("Stock Entry History", 52, 47, { width: 340 });
-      doc.font("Helvetica").fontSize(9)
-        .text("Factory Bales Report", 52, 65, { width: 300 });
+      doc.rect(40, 40, pageW, 60).fill(NAVY);
+      const sehLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+      let sehLogoW = 0;
+      if (fs.existsSync(sehLogoPath)) {
+        try { doc.image(sehLogoPath, 44, 42, { height: 56, fit: [70, 56] }); sehLogoW = 76; } catch {}
+      }
+      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(13)
+        .text("HMD INTERNATIONAL GROUP", 44 + sehLogoW, 44, { width: 340 - sehLogoW });
+      doc.font("Helvetica-Bold").fontSize(11)
+        .text("Stock Entry History", 44 + sehLogoW, 59, { width: 340 - sehLogoW });
+      doc.font("Helvetica").fontSize(8)
+        .text("Factory Bales Report", 44 + sehLogoW, 73, { width: 300 - sehLogoW });
       const generatedStr = `Generated: ${new Date().toLocaleDateString("en-GB")}`;
-      doc.fontSize(8).text(generatedStr, 400, 58, { width: 155, align: "right" });
+      doc.fontSize(8).text(generatedStr, 400, 65, { width: 155, align: "right" });
 
       // ── Sub-header: period & summary ─────────────────────────────────────
-      const subY = 96;
+      const subY = 112;
       doc.fillColor("#000000").font("Helvetica").fontSize(9);
       doc.text(`Period: ${effectiveStart}  →  ${effectiveEnd}`, 40, subY);
       doc.font("Helvetica-Bold")
@@ -13176,14 +13196,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       };
 
       // ── Dark header bar ──
-      doc.rect(40, 40, 515, 44).fill("#1F3864");
-      const cnHasAr = custHasArabicFont && custHasAr(companyName);
-      doc.fillColor("#FFFFFF").font(cnHasAr ? "Arabic" : "Helvetica-Bold").fontSize(15)
-        .text(cnHasAr ? custShape(companyName) : companyName, 52, 47, { width: 400, align: cnHasAr ? "right" : "left" });
+      const custHmdLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+      doc.rect(40, 40, 515, 60).fill("#1F3864");
+      let custLogoW = 0;
+      if (fs.existsSync(custHmdLogoPath)) {
+        try { doc.image(custHmdLogoPath, 44, 42, { height: 56, fit: [70, 56] }); custLogoW = 76; } catch {}
+      }
+      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(14)
+        .text("HMD INTERNATIONAL GROUP", 44 + custLogoW, 47, { width: 505 - custLogoW });
       doc.font("Helvetica").fontSize(9)
-        .text("Account Statement", 52, 65, { width: 300 });
+        .text("Account Statement", 44 + custLogoW, 64, { width: 300 });
       const printDate = fmtDate(new Date().toISOString().split("T")[0]);
-      doc.fontSize(8).text(`Printed: ${printDate}`, 450, 58, { width: 105, align: "right" });
+      doc.fontSize(8).text(`Printed: ${printDate}`, 450, 72, { width: 105, align: "right" });
 
       // ── Customer info block ──
       const infoY = 96;
@@ -13361,24 +13385,33 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         { key: "cr",    width: 16 },
       ];
 
-      // Rows 1–5: Customer info block
-      const companyName = (company as any)?.legalName || "Company";
-      const r1 = sheet.addRow([companyName]);
-      r1.getCell(1).font = { bold: true, size: 14 };
-      sheet.mergeCells(`A1:E1`);
+      // Rows 1–5+: Customer info block with HMD branding
+      try {
+        const stmtLogo = path.join(process.cwd(), "server", "hmd-logo.png");
+        if (fs.existsSync(stmtLogo)) {
+          const slBuf = fs.readFileSync(stmtLogo);
+          const slId = workbook.addImage({ buffer: slBuf as Buffer, extension: "png" });
+          const slRow = sheet.addRow([]); slRow.height = 75;
+          sheet.addImage(slId, { tl: { col: 0, row: 0 }, ext: { width: 150, height: 75 } });
+          sheet.mergeCells(`A1:E1`);
+        }
+      } catch {}
+      const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
+      r1.getCell(1).font = { bold: true, size: 14, color: { argb: "FF1F3864" } };
+      sheet.mergeCells(`A${r1.number}:E${r1.number}`);
       const r2 = sheet.addRow(["Account Statement"]);
       r2.getCell(1).font = { bold: true, size: 11 };
-      sheet.mergeCells(`A2:E2`);
-      sheet.addRow([`Customer: ${customer.legalName}   |   Code: ${customer.code || "—"}   |   Phone: ${customer.phone || "—"}`]);
-      sheet.mergeCells(`A3:E3`);
-      sheet.addRow([`Opening Balance: ${openingBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${openingSide}`]);
-      sheet.mergeCells(`A4:E4`);
-      sheet.addRow([`Printed: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`]);
-      sheet.mergeCells(`A5:E5`);
-      // Row 6: spacer
+      sheet.mergeCells(`A${r2.number}:E${r2.number}`);
+      const r3 = sheet.addRow([`Customer: ${customer.legalName}   |   Code: ${customer.code || "—"}   |   Phone: ${customer.phone || "—"}`]);
+      sheet.mergeCells(`A${r3.number}:E${r3.number}`);
+      const r4 = sheet.addRow([`Opening Balance: ${openingBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${openingSide}`]);
+      sheet.mergeCells(`A${r4.number}:E${r4.number}`);
+      const r5 = sheet.addRow([`Printed: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`]);
+      sheet.mergeCells(`A${r5.number}:E${r5.number}`);
+      // spacer
       sheet.addRow([]);
 
-      // Row 7: Column headers
+      // Column headers
       const hdrRow = sheet.addRow(["Date", "Type", "Description", "Debit (Dr)", "Credit (Cr)"]);
       hdrRow.eachCell((cell) => {
         cell.fill = navyFill;
@@ -14101,9 +14134,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         { key: "totalPrice", width: 15 },
       ];
 
-      const companyName = (company as any)?.legalName || "Company";
-      const r1 = sheet.addRow([companyName]);
-      r1.getCell(1).font = { bold: true, size: 16 };
+      try {
+        const pxLogo = path.join(process.cwd(), "server", "hmd-logo.png");
+        if (fs.existsSync(pxLogo)) {
+          const pxBuf = fs.readFileSync(pxLogo);
+          const pxId = workbook.addImage({ buffer: pxBuf as Buffer, extension: "png" });
+          const pxLogoRow = sheet.addRow([]); pxLogoRow.height = 75;
+          sheet.addImage(pxId, { tl: { col: 0, row: 0 }, ext: { width: 150, height: 75 } });
+        }
+      } catch {}
+      const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
+      r1.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
       r1.getCell(1).alignment = { horizontal: "center" };
       sheet.mergeCells(r1.number, 1, r1.number, COL_COUNT);
 
@@ -14208,28 +14249,25 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const PDFDocument = (await import("pdfkit")).default;
       const fs = await import("fs");
 
-      const companyName = (company as any)?.legalName || "Company";
-      const logoUrl: string | null = (settings as any)?.logoUrl || null;
-
       const doc = new PDFDocument({ margin: 40, size: "A4" });
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename=proforma_${proforma.name.replace(/\s+/g, "_")}.pdf`);
       doc.pipe(res);
 
       // ── Header ──
+      const hmdProformaLogo = path.join(process.cwd(), "server", "hmd-logo.png");
       let headerY = 40;
       let logoWidth = 0;
 
-      // Attempt to embed logo if it's a local file path
-      if (logoUrl && logoUrl.startsWith("/") && fs.existsSync(`.${logoUrl}`)) {
+      if (fs.existsSync(hmdProformaLogo)) {
         try {
-          doc.image(`.${logoUrl}`, 40, headerY, { height: 48, fit: [80, 48] });
+          doc.image(hmdProformaLogo, 40, headerY, { height: 60, fit: [80, 60] });
           logoWidth = 90;
         } catch {}
       }
 
       doc.fontSize(20).font("Helvetica-Bold")
-        .text(companyName, 40 + logoWidth, headerY, { width: 515 - logoWidth });
+        .text("HMD INTERNATIONAL GROUP", 40 + logoWidth, headerY, { width: 515 - logoWidth });
       doc.fontSize(10).font("Helvetica").fillColor("#555555")
         .text("PROFORMA INVOICE", 40 + logoWidth, headerY + 24, { width: 515 - logoWidth });
 
