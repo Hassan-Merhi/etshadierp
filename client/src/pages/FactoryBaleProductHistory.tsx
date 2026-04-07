@@ -41,11 +41,13 @@ interface MonthlyBaleData {
   baleCount: number;
   balesIn: number;
   balesOut: number;
+  balesPending: number;
   balesNet: number;
   totalWeight: number;
   totalWeightOut: number;
   totalWeightNet: number;
   totalCost: number;
+  totalSellingValue: number;
 }
 
 interface BaleProductHistoryResponse {
@@ -54,6 +56,7 @@ interface BaleProductHistoryResponse {
     name: string;
     articleCode: string;
     weightPerBaleKg: number;
+    sellingPrice: string;
   };
   location: {
     id: number;
@@ -65,11 +68,13 @@ interface BaleProductHistoryResponse {
     baleCount: number;
     balesIn: number;
     balesOut: number;
+    balesPending: number;
     balesNet: number;
     totalWeight: number;
     totalWeightOut: number;
     totalWeightNet: number;
     totalCost: number;
+    totalSellingValue: number;
   };
 }
 
@@ -216,10 +221,11 @@ export default function FactoryBaleProductHistory() {
                   <TableHead>Month</TableHead>
                   <TableHead className="text-right text-green-600 dark:text-green-400">Bales IN</TableHead>
                   <TableHead className="text-right text-red-500 dark:text-red-400">Bales OUT</TableHead>
+                  <TableHead className="text-right text-orange-500 dark:text-orange-400">Pending</TableHead>
                   <TableHead className="text-right font-semibold">Net (In Stock)</TableHead>
                   <TableHead className="text-right">KG In</TableHead>
                   <TableHead className="text-right">KG Net</TableHead>
-                  {!hiddenCost.includes("bale_history_total_cost") && <TableHead className="text-right">Total Cost</TableHead>}
+                  {!hiddenCost.includes("bale_history_total_cost") && <TableHead className="text-right">Sell Value</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -239,6 +245,9 @@ export default function FactoryBaleProductHistory() {
                       <TableCell className="text-right font-mono text-red-500 dark:text-red-400">
                         {month.balesOut > 0 ? formatNumber(month.balesOut, 0) : ""}
                       </TableCell>
+                      <TableCell className="text-right font-mono text-orange-500 dark:text-orange-400">
+                        {month.balesPending > 0 ? formatNumber(month.balesPending, 0) : ""}
+                      </TableCell>
                       <TableCell className="text-right font-mono font-semibold">
                         {month.balesIn > 0 ? formatNumber(month.balesNet, 0) : ""}
                       </TableCell>
@@ -250,7 +259,7 @@ export default function FactoryBaleProductHistory() {
                       </TableCell>
                       {!hiddenCost.includes("bale_history_total_cost") && (
                         <TableCell className="text-right font-mono">
-                          {month.totalCost > 0 ? formatAmount(month.totalCost) : ""}
+                          {month.totalSellingValue > 0 ? formatAmount(month.totalSellingValue) : ""}
                         </TableCell>
                       )}
                     </TableRow>
@@ -265,6 +274,9 @@ export default function FactoryBaleProductHistory() {
                   <TableCell className="text-right font-mono text-red-500 dark:text-red-400" data-testid="text-total-bales-out">
                     {formatNumber(data?.grandTotal.balesOut || 0, 0)}
                   </TableCell>
+                  <TableCell className="text-right font-mono text-orange-500 dark:text-orange-400" data-testid="text-total-bales-pending">
+                    {(data?.grandTotal.balesPending || 0) > 0 ? formatNumber(data?.grandTotal.balesPending || 0, 0) : ""}
+                  </TableCell>
                   <TableCell className="text-right font-mono" data-testid="text-total-bales-net">
                     {formatNumber(data?.grandTotal.balesNet || 0, 0)}
                   </TableCell>
@@ -275,8 +287,8 @@ export default function FactoryBaleProductHistory() {
                     {formatNumber(data?.grandTotal.totalWeightNet || 0)}
                   </TableCell>
                   {!hiddenCost.includes("bale_history_total_cost") && (
-                    <TableCell className="text-right font-mono" data-testid="text-total-cost">
-                      {formatAmount(data?.grandTotal.totalCost || 0)}
+                    <TableCell className="text-right font-mono" data-testid="text-total-sell-value">
+                      {formatAmount(data?.grandTotal.totalSellingValue || 0)}
                     </TableCell>
                   )}
                 </TableRow>
@@ -297,7 +309,7 @@ export default function FactoryBaleProductHistory() {
                   data-testid={`card-month-${month.month}`}
                 >
                   <div className="font-medium text-base mb-2">{month.monthName}</div>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="grid grid-cols-4 gap-2 text-xs">
                     <div>
                       <div className="text-green-600 dark:text-green-400">IN</div>
                       <div className="font-mono text-green-600 dark:text-green-400">
@@ -308,6 +320,12 @@ export default function FactoryBaleProductHistory() {
                       <div className="text-red-500 dark:text-red-400">OUT</div>
                       <div className="font-mono text-red-500 dark:text-red-400">
                         {month.balesOut > 0 ? formatNumber(month.balesOut, 0) : "-"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-orange-500 dark:text-orange-400">Pending</div>
+                      <div className="font-mono text-orange-500 dark:text-orange-400">
+                        {month.balesPending > 0 ? formatNumber(month.balesPending, 0) : "-"}
                       </div>
                     </div>
                     <div>
@@ -324,8 +342,8 @@ export default function FactoryBaleProductHistory() {
                     </div>
                     {!hiddenCost.includes("bale_history_total_cost") && (
                       <div>
-                        <div className="text-muted-foreground">Total Cost</div>
-                        <div className="font-mono">{month.totalCost > 0 ? formatAmount(month.totalCost) : "-"}</div>
+                        <div className="text-muted-foreground">Sell Value</div>
+                        <div className="font-mono">{month.totalSellingValue > 0 ? formatAmount(month.totalSellingValue) : "-"}</div>
                       </div>
                     )}
                   </div>
@@ -336,7 +354,7 @@ export default function FactoryBaleProductHistory() {
             {data && (
               <div className="p-3 rounded-md border bg-muted/50 text-sm font-bold" data-testid="card-grand-total">
                 <div className="mb-2">Grand Total</div>
-                <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="grid grid-cols-4 gap-2 text-xs">
                   <div>
                     <div className="text-green-600 dark:text-green-400 font-normal">IN</div>
                     <div className="font-mono text-green-600 dark:text-green-400">{formatNumber(data.grandTotal.balesIn, 0)}</div>
@@ -344,6 +362,10 @@ export default function FactoryBaleProductHistory() {
                   <div>
                     <div className="text-red-500 dark:text-red-400 font-normal">OUT</div>
                     <div className="font-mono text-red-500 dark:text-red-400">{formatNumber(data.grandTotal.balesOut, 0)}</div>
+                  </div>
+                  <div>
+                    <div className="text-orange-500 dark:text-orange-400 font-normal">Pending</div>
+                    <div className="font-mono text-orange-500 dark:text-orange-400">{formatNumber(data.grandTotal.balesPending, 0)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground font-normal">Net</div>

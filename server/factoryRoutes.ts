@@ -4690,6 +4690,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           name: factoryBaleProducts.name,
           articleCode: factoryBaleProducts.articleCode,
           weightPerBaleKg: factoryBaleProducts.weightPerBaleKg,
+          sellingPrice: factoryBaleProducts.sellingPrice,
         })
         .from(factoryBaleProducts)
         .where(and(eq(factoryBaleProducts.id, productId), eq(factoryBaleProducts.companyId, companyId)));
@@ -4707,12 +4708,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const startDate = new Date(year, 0, 1);
       const endDate = new Date(year + 1, 0, 1);
+      const sellingPricePerBale = parseFloat(product.sellingPrice || "0");
 
       const rows = await db
         .select({
           month: sql<number>`EXTRACT(MONTH FROM ${factoryBales.createdAt})`.as("month"),
           balesIn: sql<number>`COUNT(*)::int`.as("bales_in"),
           balesOut: sql<number>`SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED') THEN 1 ELSE 0 END)::int`.as("bales_out"),
+          balesPending: sql<number>`SUM(CASE WHEN ${factoryBales.status} = 'FINALIZED' THEN 1 ELSE 0 END)::int`.as("bales_pending"),
           totalWeightIn: sql<number>`COALESCE(SUM(${factoryBales.weightKg}::numeric), 0)`.as("total_weight_in"),
           totalWeightOut: sql<number>`COALESCE(SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED') THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_out"),
           totalCost: sql<number>`COALESCE(SUM(${factoryBales.totalCost}::numeric), 0)`.as("total_cost"),
@@ -4728,31 +4731,43 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .groupBy(sql`EXTRACT(MONTH FROM ${factoryBales.createdAt})`)
         .orderBy(sql`EXTRACT(MONTH FROM ${factoryBales.createdAt})`);
 
-      const monthlyData = rows.map((r: any) => ({
-        month: Number(r.month),
-        monthName: monthNames[Number(r.month) - 1],
-        baleCount: Number(r.balesIn),
-        balesIn: Number(r.balesIn),
-        balesOut: Number(r.balesOut),
-        balesNet: Number(r.balesIn) - Number(r.balesOut),
-        totalWeight: Number(r.totalWeightIn),
-        totalWeightOut: Number(r.totalWeightOut),
-        totalWeightNet: Number(r.totalWeightIn) - Number(r.totalWeightOut),
-        totalCost: Number(r.totalCost),
-      }));
+      const monthlyData = rows.map((r: any) => {
+        const balesIn = Number(r.balesIn);
+        const balesOut = Number(r.balesOut);
+        const balesPending = Number(r.balesPending);
+        const balesNet = balesIn - balesOut - balesPending;
+        const totalWeightIn = Number(r.totalWeightIn);
+        const totalWeightOut = Number(r.totalWeightOut);
+        return {
+          month: Number(r.month),
+          monthName: monthNames[Number(r.month) - 1],
+          baleCount: balesIn,
+          balesIn,
+          balesOut,
+          balesPending,
+          balesNet,
+          totalWeight: totalWeightIn,
+          totalWeightOut,
+          totalWeightNet: totalWeightIn - totalWeightOut,
+          totalCost: Number(r.totalCost),
+          totalSellingValue: balesNet * sellingPricePerBale,
+        };
+      });
 
       const grandTotal = monthlyData.reduce(
         (acc: any, m: any) => ({
           baleCount: acc.baleCount + m.balesIn,
           balesIn: acc.balesIn + m.balesIn,
           balesOut: acc.balesOut + m.balesOut,
+          balesPending: acc.balesPending + m.balesPending,
           balesNet: acc.balesNet + m.balesNet,
           totalWeight: acc.totalWeight + m.totalWeight,
           totalWeightOut: acc.totalWeightOut + m.totalWeightOut,
           totalWeightNet: acc.totalWeightNet + m.totalWeightNet,
           totalCost: acc.totalCost + m.totalCost,
+          totalSellingValue: acc.totalSellingValue + m.totalSellingValue,
         }),
-        { baleCount: 0, balesIn: 0, balesOut: 0, balesNet: 0, totalWeight: 0, totalWeightOut: 0, totalWeightNet: 0, totalCost: 0 }
+        { baleCount: 0, balesIn: 0, balesOut: 0, balesPending: 0, balesNet: 0, totalWeight: 0, totalWeightOut: 0, totalWeightNet: 0, totalCost: 0, totalSellingValue: 0 }
       );
 
       res.json({ product, location, year, monthlyData, grandTotal });
