@@ -3400,7 +3400,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                       Math.abs(parseFloat(e.quantity || "0")),
                                     0,
                                   )
-                                  .toFixed(3)}
+                                  .toFixed(3).replace(/\.?0+$/, "")}
                               </TableCell>
                               {user && !user?.role?.startsWith("POS") && (
                                 <>
