@@ -15417,6 +15417,61 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.patch("/api/factory/customer-orders/:id/bales/reprice-article", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const { articleCode, pricePerBale } = req.body;
+
+      if (!articleCode || pricePerBale === undefined || pricePerBale === null) {
+        return res.status(400).json({ message: "articleCode and pricePerBale are required" });
+      }
+
+      const price = parseFloat(pricePerBale);
+      if (isNaN(price) || price < 0) {
+        return res.status(400).json({ message: "Invalid price value" });
+      }
+
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+
+      await db.update(customerOrderBales)
+        .set({ priceUsed: String(price) })
+        .where(and(
+          eq(customerOrderBales.orderId, orderId),
+          eq(customerOrderBales.articleCode, articleCode)
+        ));
+
+      await recalculateOrderTotals(db, orderId);
+
+      const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
+
+      const newGrandTotal = parseFloat(updatedOrder.grandTotal || "0");
+      const [existingLedgerEntry] = await db
+        .select({ id: customerBalances.id })
+        .from(customerBalances)
+        .where(and(
+          eq(customerBalances.companyId, companyId),
+          eq(customerBalances.referenceType, "INVOICE"),
+          eq(customerBalances.referenceId, orderId)
+        ));
+      if (existingLedgerEntry) {
+        await db
+          .update(customerBalances)
+          .set({ debitAmount: String(newGrandTotal), balance: String(newGrandTotal) })
+          .where(eq(customerBalances.id, existingLedgerEntry.id));
+      }
+
+      res.json(updatedOrder);
+    } catch (error: any) {
+      console.error("Error repricing article:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/customer-orders/:id/force-sync-bale-status", requireAuth, async (req: any, res: any) => {
     try {
       const session = req.session as any;

@@ -13,7 +13,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation, useParams } from "wouter";
-import { ArrowLeft, Check, RotateCcw, Ship, Truck, AlertTriangle, CheckCircle, Package, Trash2, Plus, Wrench } from "lucide-react";
+import { ArrowLeft, Check, RotateCcw, Ship, Truck, AlertTriangle, CheckCircle, Package, Trash2, Plus, Wrench, Pencil, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -132,6 +132,7 @@ export default function PendingInvoiceVerify() {
   const [finalizePreview, setFinalizePreview] = useState<FinalizePreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [showFixBalesDialog, setShowFixBalesDialog] = useState(false);
+  const [editingPrice, setEditingPrice] = useState<{ articleCode: string; value: string } | null>(null);
 
   const { data: verification, isLoading: verificationLoading } = useQuery<VerificationSummary>({
     queryKey: ["/api/factory/customer-orders", orderId, "verification"],
@@ -274,6 +275,32 @@ export default function PendingInvoiceVerify() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const repriceArticleMutation = useMutation({
+    mutationFn: async (data: { articleCode: string; pricePerBale: number }) => {
+      await modeApiRequest("PATCH", `/api/factory/customer-orders/${orderId}/bales/reprice-article`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId, "verification"] });
+      setEditingPrice(null);
+      toast({ title: "Price updated", description: "Bale prices have been updated and totals recalculated" });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSavePrice = (articleCode: string) => {
+    if (!editingPrice || editingPrice.articleCode !== articleCode) return;
+    const price = parseFloat(editingPrice.value);
+    if (isNaN(price) || price < 0) {
+      toast({ title: "Invalid price", description: "Please enter a valid price", variant: "destructive" });
+      return;
+    }
+    repriceArticleMutation.mutate({ articleCode, pricePerBale: price });
+  };
 
   const fetchFinalizePreview = async () => {
     setPreviewLoading(true);
@@ -478,21 +505,73 @@ export default function PendingInvoiceVerify() {
                           <TableHead>Product</TableHead>
                           <TableHead className="text-right">Qty</TableHead>
                           <TableHead className="text-right">Weight</TableHead>
-                          <TableHead className="text-right">Price</TableHead>
+                          <TableHead className="text-right">$/Bale</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {verification.loadedItems.map((group, i) => (
-                          <TableRow key={i} data-testid={`row-loaded-${group.articleCode}`}>
-                            <TableCell className="font-mono text-sm" data-testid={`text-loaded-article-${group.articleCode}`}>
-                              {group.articleCode}
-                            </TableCell>
-                            <TableCell className="text-sm">{group.productName}</TableCell>
-                            <TableCell className="text-right font-mono">{group.qty}</TableCell>
-                            <TableCell className="text-right font-mono">{(group.totalWeight || 0).toFixed(2)}</TableCell>
-                            <TableCell className="text-right font-mono">{(group.totalPrice || 0).toFixed(2)}</TableCell>
-                          </TableRow>
-                        ))}
+                        {verification.loadedItems.map((group, i) => {
+                          const isEditing = editingPrice?.articleCode === group.articleCode;
+                          return (
+                            <TableRow key={i} data-testid={`row-loaded-${group.articleCode}`}>
+                              <TableCell className="font-mono text-sm" data-testid={`text-loaded-article-${group.articleCode}`}>
+                                {group.articleCode}
+                              </TableCell>
+                              <TableCell className="text-sm">{group.productName}</TableCell>
+                              <TableCell className="text-right font-mono">{group.qty}</TableCell>
+                              <TableCell className="text-right font-mono">{(group.totalWeight || 0).toFixed(2)}</TableCell>
+                              <TableCell className="text-right">
+                                {isEditing ? (
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      className="w-24 h-7 text-right text-sm font-mono px-2"
+                                      value={editingPrice!.value}
+                                      onChange={(e) => setEditingPrice({ articleCode: group.articleCode, value: e.target.value })}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") handleSavePrice(group.articleCode);
+                                        if (e.key === "Escape") setEditingPrice(null);
+                                      }}
+                                      autoFocus
+                                      data-testid={`input-price-${group.articleCode}`}
+                                    />
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-7 w-7"
+                                      onClick={() => handleSavePrice(group.articleCode)}
+                                      disabled={repriceArticleMutation.isPending}
+                                      data-testid={`button-save-price-${group.articleCode}`}
+                                    >
+                                      <Check className="h-3 w-3 text-green-600" />
+                                    </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-7 w-7"
+                                      onClick={() => setEditingPrice(null)}
+                                      data-testid={`button-cancel-price-${group.articleCode}`}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div
+                                    className="flex items-center justify-end gap-1 group cursor-pointer"
+                                    onClick={() => setEditingPrice({ articleCode: group.articleCode, value: String(group.pricePerBale || "0") })}
+                                    data-testid={`cell-price-${group.articleCode}`}
+                                  >
+                                    <span className="font-mono text-sm">{parseFloat(group.pricePerBale || "0").toFixed(2)}</span>
+                                    <Pencil className="h-3 w-3 text-muted-foreground invisible group-hover:visible" />
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">{(group.totalPrice || 0).toFixed(2)}</TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   ) : (
