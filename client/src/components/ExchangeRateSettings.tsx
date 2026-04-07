@@ -87,12 +87,17 @@ export function ExchangeRateSettings() {
       });
     },
     onSuccess: async () => {
-      toast({ title: "Exchange rate saved" });
+      toast({
+        title: "Exchange rate saved",
+        description: "Cash account balances have been revalued at the new rate.",
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates"] });
       await queryClient.refetchQueries({ queryKey: ["/api/exchange-rates/latest"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-balance"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/balance-sheet"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       form.reset({ rate: "", effectiveDate: format(new Date(), "yyyy-MM-dd") });
       setShowForm(false);
     },
