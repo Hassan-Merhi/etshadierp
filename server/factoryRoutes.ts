@@ -13614,6 +13614,22 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       }).returning();
 
       // For each proforma line, grab available bales from stock at the location
+      // Pre-fetch product names for all article codes in this proforma
+      const proformaArticleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
+      const proformaProductNameMap = new Map<string, string>();
+      if (proformaArticleCodes.length > 0) {
+        const proformaProducts = await db
+          .select({ articleCode: factoryBaleProducts.articleCode, name: factoryBaleProducts.name })
+          .from(factoryBaleProducts)
+          .where(and(
+            eq(factoryBaleProducts.companyId, companyId),
+            inArray(factoryBaleProducts.articleCode, proformaArticleCodes)
+          ));
+        for (const p of proformaProducts) {
+          if (p.articleCode) proformaProductNameMap.set(p.articleCode, p.name);
+        }
+      }
+
       let totalBalesAdded = 0;
       for (const line of lines) {
         if (!line.articleCode) continue;
@@ -13632,6 +13648,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .limit(qty);
 
         for (const bale of available) {
+          const resolvedBaleName = proformaProductNameMap.get(bale.articleCode || "") || bale.productName || bale.articleCode || bale.baleCode;
           await db.insert(customerOrderBales).values({
             orderId: order.id,
             baleId: bale.id,
@@ -13639,7 +13656,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             locationId: parseInt(locationId),
             weight: bale.weightKg,
             articleCode: bale.articleCode,
-            baleName: bale.productName || bale.articleCode || bale.baleCode,
+            baleName: resolvedBaleName,
             priceUsed: line.pricePerBale,
           });
           await db.update(factoryBales)
@@ -14596,13 +14613,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
       }
 
-      if (priceUsed === "0" && bale.productId) {
-        const [product] = await db.select().from(factoryBaleProducts)
+      let productForBale: any = null;
+      if (bale.productId) {
+        const [p] = await db.select().from(factoryBaleProducts)
           .where(eq(factoryBaleProducts.id, bale.productId));
-        if (product && product.sellingPrice) {
-          priceUsed = product.sellingPrice;
+        productForBale = p || null;
+        if (productForBale && priceUsed === "0" && productForBale.sellingPrice) {
+          priceUsed = productForBale.sellingPrice;
         }
       }
+
+      // Always prefer the canonical product name from factoryBaleProducts
+      const resolvedBaleName = productForBale?.name || bale.productName || bale.articleCode || bale.baleCode;
 
       await db.insert(customerOrderBales).values({
         orderId,
@@ -14611,7 +14633,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         locationId: parseInt(locationId),
         weight: bale.weightKg,
         articleCode: bale.articleCode,
-        baleName: bale.productName || bale.articleCode || bale.baleCode,
+        baleName: resolvedBaleName,
         priceUsed,
       });
 
@@ -14708,6 +14730,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             if (product?.sellingPrice) priceUsed = product.sellingPrice;
           }
 
+          const baleProductForName1 = bale.productId ? allProducts.find((p: any) => p.id === bale.productId) : null;
+
           await db.insert(customerOrderBales).values({
             orderId,
             baleId: bale.id,
@@ -14715,7 +14739,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             locationId: bale.erpLocationId ?? parsedLocationId,
             weight: bale.weightKg,
             articleCode: bale.articleCode,
-            baleName: bale.productName || bale.articleCode || bale.baleCode,
+            baleName: baleProductForName1?.name || bale.productName || bale.articleCode || bale.baleCode,
             priceUsed,
           });
 
@@ -14792,6 +14816,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             if (product?.sellingPrice) priceUsed = product.sellingPrice;
           }
 
+          const baleProductForName2 = bale.productId ? allProducts.find((p: any) => p.id === bale.productId) : null;
+
           await db.insert(customerOrderBales).values({
             orderId,
             baleId: bale.id,
@@ -14799,7 +14825,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             locationId: parsedLocationId,
             weight: bale.weightKg,
             articleCode: bale.articleCode,
-            baleName: bale.productName || bale.articleCode || bale.baleCode,
+            baleName: baleProductForName2?.name || bale.productName || bale.articleCode || bale.baleCode,
             priceUsed,
           });
 
@@ -15927,7 +15953,28 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const lines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
       const charges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
 
-      const sortedLines = lines.sort((a: any, b: any) => (a.baleName || "").localeCompare(b.baleName || ""));
+      // Build article-code → product name map from factoryBaleProducts so the export
+      // always shows the canonical product name regardless of what was stored in baleName
+      const articleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
+      const productNameMap = new Map<string, string>();
+      if (articleCodes.length > 0) {
+        const products = await db
+          .select({ articleCode: factoryBaleProducts.articleCode, name: factoryBaleProducts.name })
+          .from(factoryBaleProducts)
+          .where(and(
+            eq(factoryBaleProducts.companyId, companyId),
+            inArray(factoryBaleProducts.articleCode, articleCodes)
+          ));
+        for (const p of products) {
+          if (p.articleCode) productNameMap.set(p.articleCode, p.name);
+        }
+      }
+
+      const sortedLines = lines.sort((a: any, b: any) => {
+        const nameA = productNameMap.get(a.articleCode) || a.baleName || "";
+        const nameB = productNameMap.get(b.articleCode) || b.baleName || "";
+        return nameA.localeCompare(nameB);
+      });
 
       const csvFmtNum = (val: any): string => {
         const n = parseFloat(val);
@@ -15943,7 +15990,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       csv += `#,Article Code,Product Name,Qty,Weight/Bale,Total Weight,Price/Bale,Total Price\n`;
 
       sortedLines.forEach((line: any, idx: number) => {
-        csv += `${idx + 1},${line.articleCode},${(line.baleName || "").replace(/,/g, " ")},${csvFmtNum(line.qty)},${csvFmtNum(line.weightPerBale)},${csvFmtNum(line.totalWeight)},${csvFmtMoney(line.pricePerBale)},${csvFmtMoney(line.totalPrice)}\n`;
+        const productName = productNameMap.get(line.articleCode) || line.baleName || "";
+        csv += `${idx + 1},${line.articleCode},${productName.replace(/,/g, " ")},${csvFmtNum(line.qty)},${csvFmtNum(line.weightPerBale)},${csvFmtNum(line.totalWeight)},${csvFmtMoney(line.pricePerBale)},${csvFmtMoney(line.totalPrice)}\n`;
       });
 
       csv += `\nCharges\n`;
