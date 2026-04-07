@@ -3467,6 +3467,7 @@ export const factorySettings = pgTable("factory_settings", {
   supplierStatementEnabled: boolean("supplier_statement_enabled").notNull().default(false),
   laborCostPerKg: decimal("labor_cost_per_kg", { precision: 10, scale: 4 }).default("0"),
   overheadPerKg: decimal("overhead_per_kg", { precision: 10, scale: 4 }).default("0"),
+  hideSellingPrice: boolean("hide_selling_price").notNull().default(false),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
   companyUnique: uniqueIndex("factory_settings_company_unique").on(t.companyId),

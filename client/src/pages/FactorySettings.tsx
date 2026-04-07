@@ -37,6 +37,7 @@ interface FactorySettingsData {
   supplierStatementEnabled: boolean;
   laborCostPerKg: number;
   overheadPerKg: number;
+  hideSellingPrice: boolean;
 }
 
 const defaultSettings: FactorySettingsData = {
@@ -57,6 +58,7 @@ const defaultSettings: FactorySettingsData = {
   supplierStatementEnabled: true,
   laborCostPerKg: 0,
   overheadPerKg: 0,
+  hideSellingPrice: false,
 };
 
 interface RenamePreviewItem {
@@ -419,6 +421,16 @@ export default function FactorySettings() {
             {toggleItem("Production Summary", "productionSummaryEnabled")}
             {toggleItem("Supplier Report", "supplierReportEnabled")}
             {toggleItem("Supplier Statement", "supplierStatementEnabled")}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle data-testid="text-section-display">Display Options</CardTitle>
+            <CardDescription>Control what prices and values are visible to users</CardDescription>
+          </CardHeader>
+          <CardContent className="divide-y">
+            {toggleItem("Hide Selling Price", "hideSellingPrice")}
           </CardContent>
         </Card>
 

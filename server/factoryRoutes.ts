@@ -1115,6 +1115,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (isNaN(locationId)) return res.status(400).json({ message: "Invalid location ID" });
 
       const includeCost = req.query.includeCost !== "0";
+      const includeSellPrice = req.query.includeSellPrice !== "0";
 
       const bales = await db
         .select()
@@ -1139,14 +1140,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const categoryMap = new Map(categories.map(c => [c.id, c.name]));
       const productCategoryNameMap = new Map(products.map(p => [p.id, categoryMap.get(p.categoryId!) || ""]));
       const productProductionPriceMap = new Map(products.map(p => [p.id, parseFloat((p as any).productionPrice || "0")]));
+      const productSellingPriceMap = new Map(products.map(p => [p.id, parseFloat((p as any).sellingPrice || "0")]));
 
-      const grouped = new Map<number, { articleCode: string; productName: string; category: string; baleCount: number; totalWeight: number; productionPrice: number }>();
+      const grouped = new Map<number, { articleCode: string; productName: string; category: string; baleCount: number; totalWeight: number; productionPrice: number; sellingPrice: number }>();
 
       for (const b of bales) {
         const pid = b.productId || 0;
         const existing = grouped.get(pid);
         const weight = parseFloat(String(b.weightKg || "0"));
         const productionPrice = productProductionPriceMap.get(pid) || 0;
+        const sellingPrice = productSellingPriceMap.get(pid) || 0;
         if (existing) {
           existing.totalWeight += weight;
           existing.baleCount += 1;
@@ -1158,6 +1161,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             totalWeight: weight,
             baleCount: 1,
             productionPrice,
+            sellingPrice,
           });
         }
       }
@@ -1217,7 +1221,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       ];
       if (includeCost) {
         columns.push({ header: "Avg Rate (Cost)", key: "productionPrice", width: 16 });
-        columns.push({ header: "Total Value", key: "totalValue", width: 16 });
+        columns.push({ header: "Total Cost Value", key: "totalCostValue", width: 16 });
+      }
+      if (includeSellPrice) {
+        columns.push({ header: "Sell Price", key: "sellingPrice", width: 14 });
+        columns.push({ header: "Total Sell Value", key: "totalSellValue", width: 16 });
       }
       sheet.columns = columns;
 
@@ -1228,13 +1236,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       let totalBales = 0;
       let totalKg = 0;
       let totalValue = 0;
+      let totalSellValueSum = 0;
 
       for (const row of rows) {
         const weightPerBale = row.baleCount > 0 ? row.totalWeight / row.baleCount : 0;
         const rowTotalValue = row.productionPrice * row.baleCount;
+        const rowTotalSellValue = row.sellingPrice * row.baleCount;
         totalBales += row.baleCount;
         totalKg += row.totalWeight;
         totalValue += rowTotalValue;
+        totalSellValueSum += rowTotalSellValue;
 
         const rowData: any = {
           articleCode: row.articleCode,
@@ -1246,7 +1257,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         };
         if (includeCost) {
           rowData.productionPrice = row.productionPrice;
-          rowData.totalValue = parseFloat(rowTotalValue.toFixed(2));
+          rowData.totalCostValue = parseFloat(rowTotalValue.toFixed(2));
+        }
+        if (includeSellPrice) {
+          rowData.sellingPrice = row.sellingPrice;
+          rowData.totalSellValue = parseFloat(rowTotalSellValue.toFixed(2));
         }
         sheet.addRow(rowData);
       }
@@ -1262,7 +1277,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       };
       if (includeCost) {
         totalRowData.productionPrice = "";
-        totalRowData.totalValue = parseFloat(totalValue.toFixed(2));
+        totalRowData.totalCostValue = parseFloat(totalValue.toFixed(2));
+      }
+      if (includeSellPrice) {
+        totalRowData.sellingPrice = "";
+        totalRowData.totalSellValue = parseFloat(totalSellValueSum.toFixed(2));
       }
       const tr = sheet.addRow(totalRowData);
       tr.font = { bold: true };

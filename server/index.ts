@@ -771,6 +771,7 @@ let migrationsDone = false;
     `ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS production_summary_enabled boolean NOT NULL DEFAULT false`,
     `ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS supplier_report_enabled boolean NOT NULL DEFAULT false`,
     `ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS supplier_statement_enabled boolean NOT NULL DEFAULT false`,
+    `ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS hide_selling_price boolean NOT NULL DEFAULT false`,
     // Several factory tables have created_by as integer but users now use UUID strings — migrate all
     `DO $$ BEGIN
        IF EXISTS (
