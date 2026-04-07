@@ -4711,8 +4711,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const rows = await db
         .select({
           month: sql<number>`EXTRACT(MONTH FROM ${factoryBales.createdAt})`.as("month"),
-          baleCount: sql<number>`COUNT(*)::int`.as("bale_count"),
-          totalWeight: sql<number>`COALESCE(SUM(${factoryBales.weightKg}::numeric), 0)`.as("total_weight"),
+          balesIn: sql<number>`COUNT(*)::int`.as("bales_in"),
+          balesOut: sql<number>`SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED') THEN 1 ELSE 0 END)::int`.as("bales_out"),
+          totalWeightIn: sql<number>`COALESCE(SUM(${factoryBales.weightKg}::numeric), 0)`.as("total_weight_in"),
+          totalWeightOut: sql<number>`COALESCE(SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED') THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_out"),
           totalCost: sql<number>`COALESCE(SUM(${factoryBales.totalCost}::numeric), 0)`.as("total_cost"),
         })
         .from(factoryBales)
@@ -4729,18 +4731,28 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const monthlyData = rows.map((r: any) => ({
         month: Number(r.month),
         monthName: monthNames[Number(r.month) - 1],
-        baleCount: Number(r.baleCount),
-        totalWeight: Number(r.totalWeight),
+        baleCount: Number(r.balesIn),
+        balesIn: Number(r.balesIn),
+        balesOut: Number(r.balesOut),
+        balesNet: Number(r.balesIn) - Number(r.balesOut),
+        totalWeight: Number(r.totalWeightIn),
+        totalWeightOut: Number(r.totalWeightOut),
+        totalWeightNet: Number(r.totalWeightIn) - Number(r.totalWeightOut),
         totalCost: Number(r.totalCost),
       }));
 
       const grandTotal = monthlyData.reduce(
-        (acc: { baleCount: number; totalWeight: number; totalCost: number }, m: { baleCount: number; totalWeight: number; totalCost: number }) => ({
-          baleCount: acc.baleCount + m.baleCount,
+        (acc: any, m: any) => ({
+          baleCount: acc.baleCount + m.balesIn,
+          balesIn: acc.balesIn + m.balesIn,
+          balesOut: acc.balesOut + m.balesOut,
+          balesNet: acc.balesNet + m.balesNet,
           totalWeight: acc.totalWeight + m.totalWeight,
+          totalWeightOut: acc.totalWeightOut + m.totalWeightOut,
+          totalWeightNet: acc.totalWeightNet + m.totalWeightNet,
           totalCost: acc.totalCost + m.totalCost,
         }),
-        { baleCount: 0, totalWeight: 0, totalCost: 0 }
+        { baleCount: 0, balesIn: 0, balesOut: 0, balesNet: 0, totalWeight: 0, totalWeightOut: 0, totalWeightNet: 0, totalCost: 0 }
       );
 
       res.json({ product, location, year, monthlyData, grandTotal });

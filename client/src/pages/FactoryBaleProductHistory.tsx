@@ -39,7 +39,12 @@ interface MonthlyBaleData {
   month: number;
   monthName: string;
   baleCount: number;
+  balesIn: number;
+  balesOut: number;
+  balesNet: number;
   totalWeight: number;
+  totalWeightOut: number;
+  totalWeightNet: number;
   totalCost: number;
 }
 
@@ -58,7 +63,12 @@ interface BaleProductHistoryResponse {
   monthlyData: MonthlyBaleData[];
   grandTotal: {
     baleCount: number;
+    balesIn: number;
+    balesOut: number;
+    balesNet: number;
     totalWeight: number;
+    totalWeightOut: number;
+    totalWeightNet: number;
     totalCost: number;
   };
 }
@@ -113,7 +123,8 @@ export default function FactoryBaleProductHistory() {
   const chartData =
     data?.monthlyData.map((m) => ({
       name: m.monthName.substring(0, 3),
-      Bales: m.baleCount,
+      "Bales In": m.balesIn,
+      "Bales Out": m.balesOut,
     })) || [];
 
   const handleMonthClick = (month: number) => {
@@ -155,7 +166,7 @@ export default function FactoryBaleProductHistory() {
               className="text-lg sm:text-2xl font-bold"
               data-testid="text-page-title"
             >
-              Bale Production History
+              Bale Stock History
             </h1>
             {data?.product && data?.location && (
               <p
@@ -194,7 +205,7 @@ export default function FactoryBaleProductHistory() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg" data-testid="text-table-title">
-            Monthly Bale Production — {selectedYear}
+            Monthly Bale Stock Movement — {selectedYear}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -203,69 +214,68 @@ export default function FactoryBaleProductHistory() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Month</TableHead>
-                  <TableHead className="text-right">Bales</TableHead>
-                  <TableHead className="text-right">Total KG</TableHead>
+                  <TableHead className="text-right text-green-600 dark:text-green-400">Bales IN</TableHead>
+                  <TableHead className="text-right text-red-500 dark:text-red-400">Bales OUT</TableHead>
+                  <TableHead className="text-right font-semibold">Net (In Stock)</TableHead>
+                  <TableHead className="text-right">KG In</TableHead>
+                  <TableHead className="text-right">KG Net</TableHead>
                   {!hiddenCost.includes("bale_history_total_cost") && <TableHead className="text-right">Total Cost</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {data?.monthlyData.map((month) => {
-                  const hasData = month.baleCount > 0;
+                  const hasData = month.balesIn > 0;
                   return (
                     <TableRow
                       key={month.month}
-                      className={
-                        hasData ? "cursor-pointer hover:bg-muted/50" : ""
-                      }
+                      className={hasData ? "cursor-pointer hover:bg-muted/50" : ""}
                       onClick={() => hasData && handleMonthClick(month.month)}
                       data-testid={`row-month-${month.month}`}
                     >
-                      <TableCell className="font-medium">
-                        {month.monthName}
+                      <TableCell className="font-medium">{month.monthName}</TableCell>
+                      <TableCell className="text-right font-mono text-green-600 dark:text-green-400">
+                        {month.balesIn > 0 ? formatNumber(month.balesIn, 0) : ""}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-red-500 dark:text-red-400">
+                        {month.balesOut > 0 ? formatNumber(month.balesOut, 0) : ""}
+                      </TableCell>
+                      <TableCell className="text-right font-mono font-semibold">
+                        {month.balesIn > 0 ? formatNumber(month.balesNet, 0) : ""}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {month.baleCount > 0
-                          ? formatNumber(month.baleCount, 0)
-                          : ""}
+                        {month.totalWeight > 0 ? formatNumber(month.totalWeight) : ""}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {month.totalWeight > 0
-                          ? formatNumber(month.totalWeight)
-                          : ""}
+                        {month.balesIn > 0 ? formatNumber(month.totalWeightNet) : ""}
                       </TableCell>
                       {!hiddenCost.includes("bale_history_total_cost") && (
                         <TableCell className="text-right font-mono">
-                          {month.totalCost > 0
-                            ? formatAmount(month.totalCost)
-                            : ""}
+                          {month.totalCost > 0 ? formatAmount(month.totalCost) : ""}
                         </TableCell>
                       )}
                     </TableRow>
                   );
                 })}
 
-                <TableRow
-                  className="bg-muted/50 font-bold"
-                  data-testid="row-grand-total"
-                >
+                <TableRow className="bg-muted/50 font-bold" data-testid="row-grand-total">
                   <TableCell>Grand Total</TableCell>
-                  <TableCell
-                    className="text-right font-mono"
-                    data-testid="text-total-bales"
-                  >
-                    {formatNumber(data?.grandTotal.baleCount || 0, 0)}
+                  <TableCell className="text-right font-mono text-green-600 dark:text-green-400" data-testid="text-total-bales-in">
+                    {formatNumber(data?.grandTotal.balesIn || 0, 0)}
                   </TableCell>
-                  <TableCell
-                    className="text-right font-mono"
-                    data-testid="text-total-weight"
-                  >
+                  <TableCell className="text-right font-mono text-red-500 dark:text-red-400" data-testid="text-total-bales-out">
+                    {formatNumber(data?.grandTotal.balesOut || 0, 0)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono" data-testid="text-total-bales-net">
+                    {formatNumber(data?.grandTotal.balesNet || 0, 0)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono" data-testid="text-total-weight">
                     {formatNumber(data?.grandTotal.totalWeight || 0)}
                   </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {formatNumber(data?.grandTotal.totalWeightNet || 0)}
+                  </TableCell>
                   {!hiddenCost.includes("bale_history_total_cost") && (
-                    <TableCell
-                      className="text-right font-mono"
-                      data-testid="text-total-cost"
-                    >
+                    <TableCell className="text-right font-mono" data-testid="text-total-cost">
                       {formatAmount(data?.grandTotal.totalCost || 0)}
                     </TableCell>
                   )}
@@ -276,7 +286,7 @@ export default function FactoryBaleProductHistory() {
 
           <div className="md:hidden space-y-2">
             {data?.monthlyData.map((month) => {
-              const hasData = month.baleCount > 0;
+              const hasData = month.balesIn > 0;
               return (
                 <div
                   key={month.month}
@@ -286,34 +296,36 @@ export default function FactoryBaleProductHistory() {
                   onClick={() => hasData && handleMonthClick(month.month)}
                   data-testid={`card-month-${month.month}`}
                 >
-                  <div className="font-medium text-base mb-2">
-                    {month.monthName}
-                  </div>
+                  <div className="font-medium text-base mb-2">{month.monthName}</div>
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div>
-                      <div className="text-muted-foreground">Bales</div>
-                      <div className="font-mono">
-                        {month.baleCount > 0
-                          ? formatNumber(month.baleCount, 0)
-                          : "-"}
+                      <div className="text-green-600 dark:text-green-400">IN</div>
+                      <div className="font-mono text-green-600 dark:text-green-400">
+                        {month.balesIn > 0 ? formatNumber(month.balesIn, 0) : "-"}
                       </div>
                     </div>
                     <div>
-                      <div className="text-muted-foreground">Total KG</div>
-                      <div className="font-mono">
-                        {month.totalWeight > 0
-                          ? formatNumber(month.totalWeight)
-                          : "-"}
+                      <div className="text-red-500 dark:text-red-400">OUT</div>
+                      <div className="font-mono text-red-500 dark:text-red-400">
+                        {month.balesOut > 0 ? formatNumber(month.balesOut, 0) : "-"}
                       </div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Net</div>
+                      <div className="font-mono font-semibold">
+                        {month.balesIn > 0 ? formatNumber(month.balesNet, 0) : "-"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs mt-2">
+                    <div>
+                      <div className="text-muted-foreground">KG In</div>
+                      <div className="font-mono">{month.totalWeight > 0 ? formatNumber(month.totalWeight) : "-"}</div>
                     </div>
                     {!hiddenCost.includes("bale_history_total_cost") && (
                       <div>
                         <div className="text-muted-foreground">Total Cost</div>
-                        <div className="font-mono">
-                          {month.totalCost > 0
-                            ? formatAmount(month.totalCost)
-                            : "-"}
-                        </div>
+                        <div className="font-mono">{month.totalCost > 0 ? formatAmount(month.totalCost) : "-"}</div>
                       </div>
                     )}
                   </div>
@@ -322,38 +334,21 @@ export default function FactoryBaleProductHistory() {
             })}
 
             {data && (
-              <div
-                className="p-3 rounded-md border bg-muted/50 text-sm font-bold"
-                data-testid="card-grand-total"
-              >
+              <div className="p-3 rounded-md border bg-muted/50 text-sm font-bold" data-testid="card-grand-total">
                 <div className="mb-2">Grand Total</div>
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   <div>
-                    <div className="text-muted-foreground font-normal">
-                      Bales
-                    </div>
-                    <div className="font-mono">
-                      {formatNumber(data.grandTotal.baleCount, 0)}
-                    </div>
+                    <div className="text-green-600 dark:text-green-400 font-normal">IN</div>
+                    <div className="font-mono text-green-600 dark:text-green-400">{formatNumber(data.grandTotal.balesIn, 0)}</div>
                   </div>
                   <div>
-                    <div className="text-muted-foreground font-normal">
-                      Total KG
-                    </div>
-                    <div className="font-mono">
-                      {formatNumber(data.grandTotal.totalWeight)}
-                    </div>
+                    <div className="text-red-500 dark:text-red-400 font-normal">OUT</div>
+                    <div className="font-mono text-red-500 dark:text-red-400">{formatNumber(data.grandTotal.balesOut, 0)}</div>
                   </div>
-                  {!hiddenCost.includes("bale_history_total_cost") && (
-                    <div>
-                      <div className="text-muted-foreground font-normal">
-                        Total Cost
-                      </div>
-                      <div className="font-mono">
-                        {formatAmount(data.grandTotal.totalCost)}
-                      </div>
-                    </div>
-                  )}
+                  <div>
+                    <div className="text-muted-foreground font-normal">Net</div>
+                    <div className="font-mono">{formatNumber(data.grandTotal.balesNet, 0)}</div>
+                  </div>
                 </div>
               </div>
             )}
@@ -364,7 +359,7 @@ export default function FactoryBaleProductHistory() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg" data-testid="text-chart-title">
-            Monthly Bale Count Chart
+            Monthly IN / OUT Chart
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -386,8 +381,13 @@ export default function FactoryBaleProductHistory() {
                 />
                 <Legend />
                 <Bar
-                  dataKey="Bales"
-                  fill="hsl(var(--primary))"
+                  dataKey="Bales In"
+                  fill="hsl(142 76% 36%)"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="Bales Out"
+                  fill="hsl(0 84% 60%)"
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>
