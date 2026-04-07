@@ -21,8 +21,9 @@ import { CursorNavProvider } from "@/contexts/CursorNavContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search, Tag } from "lucide-react";
+import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search, Tag, Building2 } from "lucide-react";
 import { FactorySidebar } from "@/components/FactorySidebar";
+import { PropertiesSidebar } from "@/components/PropertiesSidebar";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { DateJumpDialog } from "@/components/DateJumpDialog";
 import { PendingSyncIndicator } from "@/components/PendingSyncIndicator";
@@ -162,6 +163,7 @@ const ConflictCenter = lazy(() => import("@/pages/ConflictCenter"));
 const Chat = lazy(() => import("@/pages/Chat"));
 const SpreadsheetEditor = lazy(() => import("@/pages/SpreadsheetEditor"));
 const LiveSheets = lazy(() => import("@/pages/LiveSheets"));
+const PropertiesDashboard = lazy(() => import("@/pages/PropertiesDashboard"));
 import { CommandPalette } from "@/components/CommandPalette";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowLeft } from "lucide-react";
@@ -587,6 +589,81 @@ function AuthenticatedApp() {
         />
         {leaveConfirmDialog}
       </>
+    );
+  }
+
+  const isPropertiesCompany = selectedCompany?.companyType === "properties";
+  const isPropertiesRoute = currentLocation.startsWith("/properties/");
+
+  if (isPropertiesCompany && !isPropertiesRoute) {
+    return <Redirect to="/properties/dashboard" />;
+  }
+
+  if (isPropertiesRoute && isPropertiesCompany) {
+    return (
+      <AppModeProvider mode="properties">
+        <SidebarProvider style={style as React.CSSProperties}>
+          <div className="flex h-screen w-full">
+            <PropertiesSidebar user={user} />
+            <div className="flex flex-col flex-1 overflow-hidden">
+              <header className="flex items-center justify-between p-2 sm:p-4 border-b min-h-14 sm:h-16 gap-2 sm:gap-4 no-print">
+                <div className="flex items-center gap-2">
+                  <SidebarTrigger data-testid="button-sidebar-toggle" />
+                  <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-indigo-600/10 border border-indigo-600/20">
+                    <Building2 className="h-4 w-4 text-indigo-600" />
+                    <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wider">Properties</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex items-center gap-1.5 text-muted-foreground"
+                    onClick={() => setPaletteOpen(true)}
+                    data-testid="button-open-palette"
+                  >
+                    <Search className="h-4 w-4" />
+                    <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 text-[10px] font-mono">
+                      Ctrl K
+                    </kbd>
+                  </Button>
+                  <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
+                  <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
+                    <LogOut className="h-4 w-4" />
+                  </Button>
+                  <CurrencyToggle />
+                  <CompanySelector />
+                  <ThemeToggle />
+                </div>
+              </header>
+              <OfflineBanner />
+              <main className="flex-1 overflow-y-auto p-3 sm:p-6">
+                <div className="w-full">
+                  <ErrorBoundary resetKey={currentLocation}>
+                    <Suspense fallback={<div className="flex items-center justify-center h-48 text-muted-foreground text-sm">Loading...</div>}>
+                      <Switch>
+                        <Route path="/properties/dashboard" component={PropertiesDashboard} />
+                        <Route path="/properties/accounts" component={FactoryAccounts} />
+                        <Route path="/properties/vouchers/:id/edit" component={VoucherEdit} />
+                        <Route path="/properties/voucher-detail/:voucherId" component={VoucherDetail} />
+                        <Route path="/properties/vouchers">{() => <FactoryVouchers />}</Route>
+                        <Route path="/properties/create" component={AccountingCreate} />
+                        <Route path="/properties/analytics" component={Analytics} />
+                        <Route path="/properties/daybook" component={FactoryDaybook} />
+                        <Route path="/properties/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
+                        <Route path="/properties/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
+                        {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/settings" component={Settings} />}
+                        <Route><Redirect to="/properties/dashboard" /></Route>
+                      </Switch>
+                    </Suspense>
+                  </ErrorBoundary>
+                </div>
+              </main>
+            </div>
+          </div>
+        </SidebarProvider>
+        {leaveConfirmDialog}
+      </AppModeProvider>
     );
   }
 

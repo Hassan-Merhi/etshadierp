@@ -1,6 +1,6 @@
 import { queryClient, apiRequest } from "./queryClient";
 
-export type AppMode = "erp" | "factory";
+export type AppMode = "erp" | "factory" | "properties";
 
 const FACTORY_PREFIX = "/api/factory/";
 const ALLOWED_SHARED_PREFIXES = [

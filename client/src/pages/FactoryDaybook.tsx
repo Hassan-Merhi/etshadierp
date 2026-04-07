@@ -29,6 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
+import { useAppMode } from "@/contexts/AppModeContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -415,6 +416,8 @@ export default function FactoryDaybook() {
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const appMode = useAppMode();
+  const routePrefix = appMode === "properties" ? "/properties" : "/factory";
 
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner";
@@ -698,7 +701,7 @@ export default function FactoryDaybook() {
   useEffect(() => {
     return () => {
       const path = window.location.pathname;
-      const isDaybookFlow = path.includes("/factory/daybook") || path.includes("/factory/vouchers");
+      const isDaybookFlow = path.includes("/factory/daybook") || path.includes("/factory/vouchers") || path.includes("/properties/daybook") || path.includes("/properties/vouchers");
       if (!isDaybookFlow) sessionStorage.removeItem(FACTORY_DAYBOOK_STATE_KEY);
     };
   }, []);
@@ -856,21 +859,21 @@ export default function FactoryDaybook() {
 
   const handleEntryClick = (entry: DaybookEntry, e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest("button")) return;
-    if (entry.txType === "BALE_TRANSFER") navigate("/factory/bale-transfers");
+    if (entry.txType === "BALE_TRANSFER") navigate(`${routePrefix}/bale-transfers`);
   };
 
   const editSourceRecord = (entry: DaybookEntry) => {
     if (entry.txType === "BALE_STOCK_ENTRY") return;
     if (entry.txType === "INVOICE" && entry.referenceId) {
-      navigate(`/factory/sales/invoices/${entry.referenceId}`);
+      navigate(`${routePrefix}/sales/invoices/${entry.referenceId}`);
       return;
     }
     if (entry.txType === "BALE_SALE" && entry.referenceId) {
-      navigate(`/factory/pos?edit=${entry.referenceId}`);
+      navigate(`${routePrefix}/pos?edit=${entry.referenceId}`);
       return;
     }
     const tab = VOUCHER_TX_TYPES[entry.txType];
-    if (tab && entry.referenceId) navigate(`/factory/vouchers?edit=${entry.referenceId}&tab=${tab}`);
+    if (tab && entry.referenceId) navigate(`${routePrefix}/vouchers?edit=${entry.referenceId}&tab=${tab}`);
   };
 
   const handleEditSubmit = () => {
