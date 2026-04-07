@@ -2411,6 +2411,10 @@ export class DbStorage implements IStorage {
           .from(schema.locations)
           .where(eq(schema.locations.id, locationId));
 
+        if (!location) {
+          throw new Error(`Location ${locationId} not found when creating inventory record`);
+        }
+
         // Use offloadValue which includes rounding adjustment for last item
         await tx.insert(schema.inventory).values({
           companyId: location.companyId,
@@ -2446,7 +2450,7 @@ export class DbStorage implements IStorage {
     // Helper function to find or create parent IMPORT_CHARGES account
     // This is a DEDICATED parent for import cycle tracking - separate from general EXPENSES
     const findOrCreateImportChargesParent = async () => {
-      let [parentAccount] = await db
+      let [parentAccount] = await tx
         .select()
         .from(schema.ledgerAccounts)
         .where(
@@ -2474,7 +2478,7 @@ export class DbStorage implements IStorage {
     
     // Helper function to find or create expense accounts
     const findOrCreateExpenseAccount = async (code: string, name: string, parentId: number) => {
-      let account = await db
+      let account = await tx
         .select()
         .from(schema.ledgerAccounts)
         .where(
@@ -2559,7 +2563,7 @@ export class DbStorage implements IStorage {
       // T001: Validate that the office charges debit account is an Asset type.
       // If an Expense or Liability type is used here, the import cycle becomes permanently imbalanced
       // because the expense/liability movement is excluded from the formula while the cash deduction is not.
-      const [officeChargesAccount] = await db
+      const [officeChargesAccount] = await tx
         .select({ accountType: schema.ledgerAccounts.accountType, name: schema.ledgerAccounts.name })
         .from(schema.ledgerAccounts)
         .where(and(eq(schema.ledgerAccounts.id, officeChargesAccountId), isNull(schema.ledgerAccounts.deletedAt)))
@@ -2612,7 +2616,7 @@ export class DbStorage implements IStorage {
       
       // Helper to find or create Transport Fees Payable liability
       const getTransportPayableAccount = async () => {
-        let transportPayableAccount = await db
+        let transportPayableAccount = await tx
           .select()
           .from(schema.ledgerAccounts)
           .where(
@@ -2641,7 +2645,7 @@ export class DbStorage implements IStorage {
       
       if (transportAccountId) {
         // Check if the selected account exists and is a valid type
-        const [selectedAccount] = await db
+        const [selectedAccount] = await tx
           .select()
           .from(schema.ledgerAccounts)
           .where(
@@ -2704,7 +2708,7 @@ export class DbStorage implements IStorage {
       const transferExpenseAccountId = await findOrCreateExpenseAccount("TRANSFER_CHARGES", "Transfer Charges", importChargesParentId);
       
       // Find or create a "Transfer Charges Payable" liability account (exclude soft-deleted)
-      let transferPayableAccount = await db
+      let transferPayableAccount = await tx
         .select()
         .from(schema.ledgerAccounts)
         .where(
@@ -2764,7 +2768,7 @@ export class DbStorage implements IStorage {
         // T002: Validate the credit account is not a Direct Expense (import charges family).
         // Crediting a Direct Expense account cancels part of the capitalized charge in the
         // excluded IMPORT_CHARGES bucket without reducing any included account, creating a +X imbalance.
-        const [additionalCreditAccount] = await db
+        const [additionalCreditAccount] = await tx
           .select({ accountType: schema.ledgerAccounts.accountType, name: schema.ledgerAccounts.name })
           .from(schema.ledgerAccounts)
           .where(and(eq(schema.ledgerAccounts.id, charge.ledgerAccountId), isNull(schema.ledgerAccounts.deletedAt)))
@@ -3460,9 +3464,12 @@ export class DbStorage implements IStorage {
                 })
                 .where(eq(schema.inventory.id, sourceInventory.id));
             } else {
+              if (!sourceLocationId) {
+                throw new Error(`Cannot reverse stock transfer: source location ID is missing for transfer voucher ${id}`);
+              }
               await tx.insert(schema.inventory).values({
                 companyId: voucher.companyId,
-                locationId: sourceLocationId || 0,
+                locationId: sourceLocationId,
                 stockItemId: item.stockItemId,
                 quantity: quantity.toFixed(3),
                 averageRate: rate.toFixed(2),

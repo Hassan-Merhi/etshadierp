@@ -372,7 +372,7 @@ export default function FactoryInvoiceDetail() {
               </TableRow>
             ) : (
               sortedLines.map((line, idx) => (
-                <TableRow key={idx} data-testid={`row-line-${idx}`}>
+                <TableRow key={`${line.articleCode ?? ""}-${idx}`} data-testid={`row-line-${idx}`}>
                   <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
                   <TableCell className="font-mono text-sm" data-testid={`text-article-code-${idx}`}>
                     {line.articleCode}
@@ -407,7 +407,7 @@ export default function FactoryInvoiceDetail() {
           <h3 className="font-semibold mb-3" data-testid="text-charges-header">Freight &amp; Charges</h3>
           <div className="space-y-2">
             {freightCharges.map((charge, idx) => (
-              <div key={`freight-${idx}`} className="flex items-center justify-between gap-2" data-testid={`row-freight-charge-${idx}`}>
+              <div key={`freight-${charge.name ?? idx}`} className="flex items-center justify-between gap-2" data-testid={`row-freight-charge-${idx}`}>
                 <span className="text-sm">{charge.name}</span>
                 <span className="font-mono text-sm" data-testid={`text-freight-amount-${idx}`}>
                   {Number(charge.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
@@ -415,7 +415,7 @@ export default function FactoryInvoiceDetail() {
               </div>
             ))}
             {otherCharges.map((charge, idx) => (
-              <div key={`other-${idx}`} className="flex items-center justify-between gap-2" data-testid={`row-other-charge-${idx}`}>
+              <div key={`other-${charge.name ?? idx}`} className="flex items-center justify-between gap-2" data-testid={`row-other-charge-${idx}`}>
                 <span className="text-sm">{charge.name}</span>
                 <span className="font-mono text-sm" data-testid={`text-other-amount-${idx}`}>
                   {Number(charge.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}

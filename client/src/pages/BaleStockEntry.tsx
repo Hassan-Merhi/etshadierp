@@ -411,7 +411,7 @@
           for (const item of cart) {
             for (let i = 0; i < item.qty; i++) {
               globalIdx++;
-              const articleCode = item.product.articleCode || item.product.code || "";
+              const articleCode = item.product?.articleCode || item.product?.code || "";
               const pooledRef = await consumeRef();
               const referenceNumber = pooledRef ?? `OFFL-${today}-${String(globalIdx).padStart(3, "0")}`;
 
@@ -420,7 +420,7 @@
                 articleCode,
                 pieces: 1,
                 approxWeightKg: String(item.weightPerBaleKg),
-                productName: item.product.name,
+                productName: item.product?.name ?? "",
               });
 
               if (pooledRef) {
@@ -662,8 +662,8 @@
                       {cart.map((item) => (
                         <TableRow key={item.productId} data-testid={`row-cart-${item.productId}`}>
                           <TableCell>
-                            <div className="font-medium" data-testid={`text-product-name-${item.productId}`}>{item.product.name}</div>
-                            <div className="text-sm text-muted-foreground font-mono">{item.product.articleCode || item.product.code}</div>
+                            <div className="font-medium" data-testid={`text-product-name-${item.productId}`}>{item.product?.name}</div>
+                            <div className="text-sm text-muted-foreground font-mono">{item.product?.articleCode || item.product?.code}</div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center justify-center gap-1">
@@ -815,8 +815,8 @@
                   {cart.map((item) => (
                     <TableRow key={item.productId}>
                       <TableCell>
-                        <div className="font-medium">{item.product.name}</div>
-                        <div className="text-xs text-muted-foreground font-mono">{item.product.articleCode || item.product.code}</div>
+                        <div className="font-medium">{item.product?.name}</div>
+                        <div className="text-xs text-muted-foreground font-mono">{item.product?.articleCode || item.product?.code}</div>
                       </TableCell>
                       <TableCell className="text-center font-medium">{item.qty}</TableCell>
                       <TableCell className="text-right">{formatNumber(item.weightPerBaleKg)} kg</TableCell>
