@@ -206,18 +206,14 @@ export default function FactoryStockOTW() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Container</TableHead>
-                        <TableHead>Origin</TableHead>
-                        <TableHead>Arrival</TableHead>
                         <TableHead className="text-right">KG</TableHead>
-                        <TableHead className="text-right">Goods Value</TableHead>
-                        <TableHead className="text-right">Charges</TableHead>
                         <TableHead className="text-right">Total Value</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {group.containers.map((c) => {
-                        const { goodsUsd, chargesUsd, totalUsd } = computeContainerTotals(c);
+                        const { totalUsd } = computeContainerTotals(c);
                         return (
                           <TableRow
                             key={c.id}
@@ -228,20 +224,8 @@ export default function FactoryStockOTW() {
                             <TableCell className="font-mono text-sm font-medium">
                               {c.containerNumber}
                             </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {c.origin || "—"}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {c.arrivalDate || "—"}
-                            </TableCell>
                             <TableCell className="text-right font-mono text-sm">
                               {fmtKg(num(c.totalKg))}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm">
-                              {goodsUsd > 0 ? formatAmount(goodsUsd) : "—"}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm text-muted-foreground">
-                              {chargesUsd > 0 ? formatAmount(chargesUsd) : "—"}
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm font-semibold">
                               {totalUsd > 0 ? formatAmount(totalUsd) : "—"}
@@ -258,17 +242,9 @@ export default function FactoryStockOTW() {
                     {/* Supplier subtotal row */}
                     <tfoot>
                       <TableRow className="bg-muted/40 font-medium">
-                        <TableCell colSpan={3} className="text-sm">
-                          Supplier Total
-                        </TableCell>
+                        <TableCell className="text-sm">Supplier Total</TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           {fmtKg(group.totalKg)} kg
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          {formatAmount(group.totalGoodsUsd)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm text-muted-foreground">
-                          {formatAmount(group.totalChargesUsd)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm font-semibold">
                           {formatAmount(group.totalValueUsd)}
@@ -287,7 +263,7 @@ export default function FactoryStockOTW() {
             className="sticky bottom-0 z-50 rounded-md border bg-background shadow-md"
             data-testid="div-grand-total"
           >
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4">
+            <div className="grid grid-cols-3 gap-4 p-4">
               <div className="flex items-center gap-2">
                 <Package className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div>
@@ -307,18 +283,9 @@ export default function FactoryStockOTW() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Ship className="h-4 w-4 text-muted-foreground shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Goods Value</p>
-                  <p className="text-lg font-bold font-mono" data-testid="text-grand-goods">
-                    {formatAmount(grandTotals.goodsUsd)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Total Value (incl. charges)</p>
+                  <p className="text-xs text-muted-foreground">Total Value</p>
                   <p className="text-lg font-bold font-mono" data-testid="text-grand-total">
                     {formatAmount(grandTotals.totalUsd)}
                   </p>
