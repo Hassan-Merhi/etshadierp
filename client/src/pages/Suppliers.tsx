@@ -130,7 +130,7 @@ export default function Suppliers() {
     if (tabName) {
       navigate(`/vouchers?edit=${txn.voucherId}&tab=${tabName}`);
     } else {
-      navigate(`/vouchers/${txn.voucherId}/edit`);
+      navigate(`/voucher-detail/${txn.voucherId}`);
     }
   };
   

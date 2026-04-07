@@ -161,6 +161,7 @@ export default function StockItems() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
       setAdjustDialogOpen(false);
       setAdjustStockItemId("");
       setAdjustLocationId("");

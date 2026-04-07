@@ -14467,8 +14467,8 @@ if (asOfDate) {
             credits: 0,
           };
           const openingBalance = parseFloat(employee.openingBalance || "0");
-          const netBalance = openingBalance + movements.credits - movements.debits;
-          const balanceSide = netBalance >= 0 ? "Cr" : "Dr";
+          const netBalance = openingBalance + movements.debits - movements.credits;
+          const balanceSide = netBalance >= 0 ? "Dr" : "Cr";
 
           return {
             id: `employee-${employee.id}`,
@@ -14785,8 +14785,8 @@ if (asOfDate) {
             credits: 0,
           };
           const openingBalance = parseFloat(employee.openingBalance || "0");
-          const netBalance = openingBalance + movements.credits - movements.debits;
-          const balanceSide = netBalance >= 0 ? "Cr" : "Dr";
+          const netBalance = openingBalance + movements.debits - movements.credits;
+          const balanceSide = netBalance >= 0 ? "Dr" : "Cr";
 
           return {
             id: `employee-${employee.id}`,
@@ -28880,9 +28880,12 @@ if (asOfDate) {
         )
         .execute();
 
-      let openingBalance = parseFloat(account.openingBalance || "0");
+      // Sign-adjust opening balance: use Cr-normal convention (positive = Cr balance)
+      const openingRawMonthly = parseFloat(account.openingBalance || "0");
+      const openingBalSideMonthly = (account.openingBalanceSide as string) || "Dr";
+      let openingBalance = openingBalSideMonthly === "Cr" ? openingRawMonthly : -openingRawMonthly;
       for (const entry of openingEntries) {
-        openingBalance += parseFloat(entry.debit || "0") - parseFloat(entry.credit || "0");
+        openingBalance += parseFloat(entry.credit || "0") - parseFloat(entry.debit || "0");
       }
 
       // Get all voucher entries in date range grouped by month
@@ -28929,7 +28932,7 @@ if (asOfDate) {
           credit += parseFloat(entry.credit || "0");
         }
 
-        runningBalance += debit - credit;
+        runningBalance += credit - debit;
 
         monthlyData.push({
           month: month + 1,
@@ -29018,9 +29021,12 @@ if (asOfDate) {
         )
         .execute();
 
-      let openingBalance = parseFloat(account.openingBalance || "0");
+      // Sign-adjust opening balance: use Cr-normal convention (positive = Cr balance)
+      const openingRaw = parseFloat(account.openingBalance || "0");
+      const openingBalSide = (account.openingBalanceSide as string) || "Dr";
+      let openingBalance = openingBalSide === "Cr" ? openingRaw : -openingRaw;
       for (const entry of openingEntries) {
-        openingBalance += parseFloat(entry.debit || "0") - parseFloat(entry.credit || "0");
+        openingBalance += parseFloat(entry.credit || "0") - parseFloat(entry.debit || "0");
       }
 
       // Get vouchers for the month
@@ -29109,7 +29115,7 @@ if (asOfDate) {
         credit: vouchersWithDetails.reduce((sum, v) => sum + v.credit, 0),
       };
 
-      const closingBalance = openingBalance + totals.debit - totals.credit;
+      const closingBalance = openingBalance + totals.credit - totals.debit;
 
       res.json({
         account: {

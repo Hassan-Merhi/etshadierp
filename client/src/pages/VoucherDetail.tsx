@@ -91,7 +91,7 @@ export default function VoucherDetail() {
   const voucherId = params?.voucherId ? parseInt(params.voucherId) : null;
   const fromDaybook = new URLSearchParams(window.location.search).get("from") === "daybook";
 
-  const { data, isLoading } = useQuery<VoucherDetailData>({
+  const { data, isLoading, isError } = useQuery<VoucherDetailData>({
     queryKey: ["/api/voucher-detail", voucherId],
     queryFn: async () => {
       const response = await fetch(
@@ -108,6 +108,17 @@ export default function VoucherDetail() {
     return (
       <div className="p-6">
         <p className="text-muted-foreground">Invalid voucher ID</p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6 flex flex-col items-center gap-4 text-center">
+        <p className="text-muted-foreground">Failed to load voucher details.</p>
+        <Button variant="outline" onClick={() => window.history.back()} data-testid="button-back-error">
+          Go Back
+        </Button>
       </div>
     );
   }

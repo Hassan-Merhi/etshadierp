@@ -212,7 +212,7 @@ export default function LedgerMonthlySummary() {
                       data-testid="text-closing-balance"
                     >
                       {formatAmount(Math.abs(data.grandTotal.closingBalance))}{" "}
-                      <span className={drCrClass(data.grandTotal.closingBalance >= 0 ? "Dr" : "Cr")}>{data.grandTotal.closingBalance >= 0 ? "Dr" : "Cr"}</span>
+                      <span className={drCrClass(data.grandTotal.closingBalance >= 0 ? "Cr" : "Dr")}>{data.grandTotal.closingBalance >= 0 ? "Cr" : "Dr"}</span>
                     </p>
                   </div>
                 </div>
@@ -246,7 +246,7 @@ export default function LedgerMonthlySummary() {
                         <TableCell></TableCell>
                         <TableCell className="text-right font-mono">
                           {formatAmount(Math.abs(data.openingBalance))}{" "}
-                          {data.openingBalance >= 0 ? "Dr" : "Cr"}
+                          {data.openingBalance >= 0 ? "Cr" : "Dr"}
                         </TableCell>
                         <TableCell></TableCell>
                       </TableRow>
@@ -272,7 +272,7 @@ export default function LedgerMonthlySummary() {
                             </TableCell>
                             <TableCell className="text-right font-mono">
                               {formatAmount(Math.abs(month.closingBalance))}{" "}
-                              <span className={`font-semibold ${drCrClass(month.closingBalance >= 0 ? "Dr" : "Cr")}`}>{month.closingBalance >= 0 ? "Dr" : "Cr"}</span>
+                              <span className={`font-semibold ${drCrClass(month.closingBalance >= 0 ? "Cr" : "Dr")}`}>{month.closingBalance >= 0 ? "Cr" : "Dr"}</span>
                             </TableCell>
                             <TableCell>
                               <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -292,7 +292,7 @@ export default function LedgerMonthlySummary() {
                         </TableCell>
                         <TableCell className="text-right font-mono">
                           {formatAmount(Math.abs(data.grandTotal.closingBalance))}{" "}
-                          <span className={`font-semibold ${drCrClass(data.grandTotal.closingBalance >= 0 ? "Dr" : "Cr")}`}>{data.grandTotal.closingBalance >= 0 ? "Dr" : "Cr"}</span>
+                          <span className={`font-semibold ${drCrClass(data.grandTotal.closingBalance >= 0 ? "Cr" : "Dr")}`}>{data.grandTotal.closingBalance >= 0 ? "Cr" : "Dr"}</span>
                         </TableCell>
                         <TableCell></TableCell>
                       </TableRow>

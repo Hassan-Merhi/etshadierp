@@ -477,7 +477,10 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const [hiddenRowIds, setHiddenRowIds] = useState<Set<string>>(new Set());
   const [showHidden, setShowHidden] = useState(false);
   const scrollYRef = useRef(0);
-  const [viewMode, setViewMode] = useState<"detailed" | "condensed">("detailed");
+  const [viewMode, setViewMode] = useState<"detailed" | "condensed">(() => {
+    const saved = loadDaybookState();
+    return saved?.viewMode ?? "detailed";
+  });
   const [expandedVoucherId, setExpandedVoucherId] = useState<number | null>(null);
   const [expandedCondensedGroups, setExpandedCondensedGroups] = useState<Set<string>>(new Set());
 
