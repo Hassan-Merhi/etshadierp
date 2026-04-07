@@ -287,8 +287,13 @@ export default function FactoryLocationInventory() {
       return res.ok ? res.json() : {};
     },
   });
-  const hideSellingPrice = !!factorySettingsData?.hideSellingPrice;
-  const hideAvgCost = !!factorySettingsData?.hideAvgCost;
+  const perUserHidden = myAccess?.hiddenCostFields ?? [];
+  const hideSellingPrice = !!factorySettingsData?.hideSellingPrice
+    || perUserHidden.includes("inventory_sell_price")
+    || perUserHidden.includes("inventory_sell_value");
+  const hideAvgCost = !!factorySettingsData?.hideAvgCost
+    || perUserHidden.includes("inventory_avg_rate")
+    || perUserHidden.includes("inventory_total_value");
 
   const { data: inventoryData = [], isLoading: inventoryLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: selectedLocation

@@ -2635,6 +2635,8 @@ const ERP_COST_FIELDS = [
 const FACTORY_COST_FIELDS = [
   { key: "inventory_avg_rate",      label: "Avg Rate Column" },
   { key: "inventory_total_value",   label: "Total Value Column" },
+  { key: "inventory_sell_price",    label: "Sell Price Column" },
+  { key: "inventory_sell_value",    label: "Sell Value Column" },
   { key: "bale_history_cost_per_kg", label: "Cost/KG Column" },
   { key: "bale_history_total_cost", label: "Total Cost Column" },
   { key: "bales_list_cost_per_kg",  label: "Cost/kg Column" },
@@ -2647,9 +2649,9 @@ const PAGE_COST_FIELD_MAP: Record<string, { key: string; label: string }[]> = {
   stock_items: [ERP_COST_FIELDS[3]],
   analytics: [ERP_COST_FIELDS[4]],
   vouchers: [ERP_COST_FIELDS[5]],
-  "factory/location-inventory": [FACTORY_COST_FIELDS[0], FACTORY_COST_FIELDS[1]],
-  "factory/bales-history": [FACTORY_COST_FIELDS[2], FACTORY_COST_FIELDS[3]],
-  "factory/stock-entry": [FACTORY_COST_FIELDS[4]],
+  "factory/location-inventory": [FACTORY_COST_FIELDS[0], FACTORY_COST_FIELDS[1], FACTORY_COST_FIELDS[2], FACTORY_COST_FIELDS[3]],
+  "factory/bales-history": [FACTORY_COST_FIELDS[4], FACTORY_COST_FIELDS[5]],
+  "factory/stock-entry": [FACTORY_COST_FIELDS[6]],
 };
 
 

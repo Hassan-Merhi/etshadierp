@@ -102,8 +102,9 @@ export default function BaleProducts() {
     queryKey: ["/api/factory/settings"],
     queryFn: async () => { const res = await fetch("/api/factory/settings", { credentials: "include" }); return res.ok ? res.json() : {}; },
   });
-  const hideAvgRate = (myAccess?.hiddenCostFields ?? []).includes("inventory_avg_rate") || !!factorySettingsData?.hideAvgCost;
-  const hideSellingPriceBP = !!factorySettingsData?.hideSellingPrice;
+  const perUserHiddenBP = myAccess?.hiddenCostFields ?? [];
+  const hideAvgRate = perUserHiddenBP.includes("inventory_avg_rate") || perUserHiddenBP.includes("inventory_total_value") || !!factorySettingsData?.hideAvgCost;
+  const hideSellingPriceBP = !!factorySettingsData?.hideSellingPrice || perUserHiddenBP.includes("inventory_sell_price") || perUserHiddenBP.includes("inventory_sell_value");
 
   const { data: products, isLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: ["/api/factory/bale-products"],

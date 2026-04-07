@@ -46,6 +46,8 @@ interface FactoryUser {
 const COST_FIELDS: { key: string; label: string }[] = [
   { key: "inventory_avg_rate", label: "Location Inventory: Avg Rate" },
   { key: "inventory_total_value", label: "Location Inventory: Total Value" },
+  { key: "inventory_sell_price", label: "Location Inventory: Sell Price" },
+  { key: "inventory_sell_value", label: "Location Inventory: Sell Value" },
   { key: "bale_history_cost_per_kg", label: "Bale History: Cost/KG" },
   { key: "bale_history_total_cost", label: "Bale History: Total Cost" },
   { key: "bales_list_cost_per_kg", label: "Bales List: Cost/kg" },
