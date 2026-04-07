@@ -575,6 +575,19 @@
                           <span className="text-muted-foreground font-mono text-xs">{p.articleCode || p.code}</span>
                         </button>
                       ))}
+                      <button
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover-elevate flex items-center gap-2 text-sm font-medium border-t text-muted-foreground"
+                        onClick={() => {
+                          setQuickCreateName(scanInput.trim());
+                          setQuickCreateOpen(true);
+                          setShowDropdown(false);
+                        }}
+                        data-testid="button-quick-create-product-inline"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Create New Product "{scanInput.trim()}"
+                      </button>
                     </div>
                   )}
                   {showDropdown && scanInput.trim().length > 0 && filteredProducts.length === 0 && (
