@@ -69,6 +69,7 @@ const EditSupplier = lazy(() => import("@/pages/EditSupplier"));
 const SupplierProformas = lazy(() => import("@/pages/SupplierProformas"));
 const ContainerVerification = lazy(() => import("@/pages/ContainerVerification"));
 const StockOTW = lazy(() => import("@/pages/StockOTW"));
+const FactoryStockOTW = lazy(() => import("@/pages/FactoryStockOTW"));
 const Customers = lazy(() => import("@/pages/Customers"));
 const SoldContainers = lazy(() => import("@/pages/SoldContainers"));
 const Bales = lazy(() => import("@/pages/Bales"));
@@ -683,7 +684,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/location-inventory" component={FactoryLocationInventory} />
                     <Route path="/factory/bale-product-history/:productId/:locationId/:year/:month" component={FactoryBaleProductMonthDetail} />
                     <Route path="/factory/bale-product-history/:productId/:locationId" component={FactoryBaleProductHistory} />
-                    <Route path="/factory/stock-otw" component={StockOTW} />
+                    <Route path="/factory/stock-otw" component={FactoryStockOTW} />
                     <Route path="/factory/stock-query/:id" component={FactoryStockItemDetail} />
                     <Route path="/factory/stock-query" component={StockQuery} />
                     <Route path="/factory/accounts" component={FactoryAccounts} />
