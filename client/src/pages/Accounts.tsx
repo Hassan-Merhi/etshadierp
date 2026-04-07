@@ -272,11 +272,13 @@ export default function Accounts() {
   });
 
   // Filter out inventory accounts - they have their own dedicated page
-  // Note: Suppliers are included here so users can view supplier statements
+  // Filter out supplier accounts - they have their own dedicated Suppliers page
   // Type comparison uses lowercase to match API response
   const baseAccounts = allAccounts.filter(
     (account) =>
-      account.code !== "PURCHASES" && account.code !== "IMPORT_CHARGES",
+      account.code !== "PURCHASES" &&
+      account.code !== "IMPORT_CHARGES" &&
+      account.type?.toLowerCase() !== "supplier",
   );
 
   // In factory mode, append factory suppliers as accounts
