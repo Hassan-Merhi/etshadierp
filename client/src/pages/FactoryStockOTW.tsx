@@ -4,8 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Ship, Package, TrendingUp, Boxes, Building2 } from "lucide-react";
-import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { Ship, Package, Boxes, Building2 } from "lucide-react";
 import { useLocation } from "wouter";
 
 interface FactoryContainer {
@@ -36,9 +35,7 @@ interface SupplierGroup {
   supplierName: string;
   containers: FactoryContainer[];
   totalKg: number;
-  totalGoodsUsd: number;
-  totalChargesUsd: number;
-  totalValueUsd: number;
+  totalsByCurrency: Record<string, number>;
 }
 
 function num(v: string | null | undefined): number {
@@ -47,37 +44,84 @@ function num(v: string | null | undefined): number {
   return isNaN(n) ? 0 : n;
 }
 
-function computeContainerTotals(c: FactoryContainer) {
-  const fxRate = num(c.fxRateToUsd) || 1;
+const CCY_SYMBOLS: Record<string, string> = {
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  AUD: "A$",
+  CAD: "C$",
+  CHF: "CHF",
+  JPY: "¥",
+  CNY: "¥",
+  AED: "AED",
+  SAR: "SAR",
+  LBP: "LL",
+};
 
-  const goodsUsd = num(c.finalPayableAmountUsd);
+function ccySymbol(code: string | null | undefined): string {
+  if (!code) return "$";
+  return CCY_SYMBOLS[code] || code;
+}
 
-  // Freight: convert to USD
-  const freightLocal = num(c.freight);
-  const freightCcy = c.freightCurrencyCode || c.currencyCode || "USD";
-  const freightUsd = freightCcy === "USD"
-    ? freightLocal
-    : freightLocal / fxRate;
+function fmtCcy(symbol: string, amount: number): string {
+  return `${symbol} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
-  // Commission: default USD
-  const commissionLocal = num(c.commissionAmount);
-  const commissionCcy = c.commissionCurrencyCode || "USD";
-  const commissionUsd = commissionCcy === "USD"
-    ? commissionLocal
-    : commissionLocal / fxRate;
+function addToCurrency(map: Record<string, number>, ccy: string, amount: number) {
+  if (amount > 0 && ccy) {
+    map[ccy] = (map[ccy] || 0) + amount;
+  }
+}
 
-  // Other charges (in container's local currency → USD)
-  const otherLocal = num(c.otherCharges);
-  const otherUsd = otherLocal / fxRate;
+function computeContainerByCurrency(c: FactoryContainer): Record<string, number> {
+  const amounts: Record<string, number> = {};
+  const containerCcy = c.currencyCode || "USD";
 
-  // Additional offload charges & pre-registered charges (already in container's currency)
-  const additionalUsd = num(c.additionalChargesSum) / fxRate;
-  const preRegUsd = num(c.preRegisteredChargesSum) / fxRate;
+  // Goods (finalPayableAmount in container's currency)
+  addToCurrency(amounts, containerCcy, num(c.finalPayableAmount));
 
-  const chargesUsd = freightUsd + commissionUsd + otherUsd + additionalUsd + preRegUsd;
-  const totalUsd = goodsUsd + chargesUsd;
+  // Freight
+  const freightCcy = c.freightCurrencyCode || containerCcy;
+  addToCurrency(amounts, freightCcy, num(c.freight));
 
-  return { goodsUsd, chargesUsd, totalUsd };
+  // Commission
+  const commCcy = c.commissionCurrencyCode || "USD";
+  addToCurrency(amounts, commCcy, num(c.commissionAmount));
+
+  // Other charges (in container's currency)
+  addToCurrency(amounts, containerCcy, num(c.otherCharges));
+
+  // Additional & pre-registered charges (in container's currency)
+  addToCurrency(amounts, containerCcy, num(c.additionalChargesSum));
+  addToCurrency(amounts, containerCcy, num(c.preRegisteredChargesSum));
+
+  return amounts;
+}
+
+function mergeCurrencyMaps(
+  target: Record<string, number>,
+  source: Record<string, number>
+) {
+  for (const [ccy, amt] of Object.entries(source)) {
+    target[ccy] = (target[ccy] || 0) + amt;
+  }
+}
+
+function renderCurrencyBreakdown(
+  amounts: Record<string, number>,
+  className = ""
+): React.ReactNode {
+  const entries = Object.entries(amounts).filter(([, v]) => v > 0);
+  if (entries.length === 0) return <span className="text-muted-foreground">—</span>;
+  return (
+    <div className={`flex flex-col items-end gap-0.5 ${className}`}>
+      {entries.map(([ccy, amt]) => (
+        <span key={ccy} className="font-mono text-sm font-semibold whitespace-nowrap">
+          {fmtCcy(ccySymbol(ccy), amt)}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
@@ -92,7 +136,6 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function FactoryStockOTW() {
-  const { formatAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
 
   const { data: containers = [], isLoading } = useQuery<FactoryContainer[]>({
@@ -104,7 +147,6 @@ export default function FactoryStockOTW() {
     [containers]
   );
 
-  // Group by supplier
   const supplierGroups = useMemo<SupplierGroup[]>(() => {
     const map = new Map<string, SupplierGroup>();
 
@@ -116,19 +158,13 @@ export default function FactoryStockOTW() {
           supplierName: c.supplierName || "No Supplier",
           containers: [],
           totalKg: 0,
-          totalGoodsUsd: 0,
-          totalChargesUsd: 0,
-          totalValueUsd: 0,
+          totalsByCurrency: {},
         });
       }
       const group = map.get(key)!;
       group.containers.push(c);
-
-      const { goodsUsd, chargesUsd, totalUsd } = computeContainerTotals(c);
       group.totalKg += num(c.totalKg);
-      group.totalGoodsUsd += goodsUsd;
-      group.totalChargesUsd += chargesUsd;
-      group.totalValueUsd += totalUsd;
+      mergeCurrencyMaps(group.totalsByCurrency, computeContainerByCurrency(c));
     }
 
     return Array.from(map.values()).sort((a, b) =>
@@ -136,18 +172,16 @@ export default function FactoryStockOTW() {
     );
   }, [otwContainers]);
 
-  // Grand totals
   const grandTotals = useMemo(() => {
-    return supplierGroups.reduce(
-      (acc, g) => ({
-        containers: acc.containers + g.containers.length,
-        kg: acc.kg + g.totalKg,
-        goodsUsd: acc.goodsUsd + g.totalGoodsUsd,
-        chargesUsd: acc.chargesUsd + g.totalChargesUsd,
-        totalUsd: acc.totalUsd + g.totalValueUsd,
-      }),
-      { containers: 0, kg: 0, goodsUsd: 0, chargesUsd: 0, totalUsd: 0 }
-    );
+    const totalsByCurrency: Record<string, number> = {};
+    let containers = 0;
+    let kg = 0;
+    for (const g of supplierGroups) {
+      containers += g.containers.length;
+      kg += g.totalKg;
+      mergeCurrencyMaps(totalsByCurrency, g.totalsByCurrency);
+    }
+    return { containers, kg, totalsByCurrency };
   }, [supplierGroups]);
 
   const fmtKg = (n: number) =>
@@ -165,7 +199,6 @@ export default function FactoryStockOTW() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-3">
         <Ship className="h-6 w-6 text-muted-foreground" />
         <div>
@@ -188,7 +221,6 @@ export default function FactoryStockOTW() {
         </Card>
       ) : (
         <>
-          {/* Supplier groups */}
           {supplierGroups.map((group) => (
             <Card key={group.supplierId ?? "none"} data-testid={`card-supplier-${group.supplierId ?? "none"}`}>
               <CardHeader className="pb-3">
@@ -207,13 +239,13 @@ export default function FactoryStockOTW() {
                       <TableRow>
                         <TableHead>Container</TableHead>
                         <TableHead className="text-right">KG</TableHead>
-                        <TableHead className="text-right">Total Value</TableHead>
+                        <TableHead className="text-right">Value</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {group.containers.map((c) => {
-                        const { totalUsd } = computeContainerTotals(c);
+                        const byCurrency = computeContainerByCurrency(c);
                         return (
                           <TableRow
                             key={c.id}
@@ -227,8 +259,8 @@ export default function FactoryStockOTW() {
                             <TableCell className="text-right font-mono text-sm">
                               {fmtKg(num(c.totalKg))}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-sm font-semibold">
-                              {totalUsd > 0 ? formatAmount(totalUsd) : "—"}
+                            <TableCell className="text-right">
+                              {renderCurrencyBreakdown(byCurrency)}
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline" className="text-xs">
@@ -239,15 +271,14 @@ export default function FactoryStockOTW() {
                         );
                       })}
                     </TableBody>
-                    {/* Supplier subtotal row */}
                     <tfoot>
                       <TableRow className="bg-muted/40 font-medium">
                         <TableCell className="text-sm">Supplier Total</TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           {fmtKg(group.totalKg)} kg
                         </TableCell>
-                        <TableCell className="text-right font-mono text-sm font-semibold">
-                          {formatAmount(group.totalValueUsd)}
+                        <TableCell className="text-right">
+                          {renderCurrencyBreakdown(group.totalsByCurrency)}
                         </TableCell>
                         <TableCell />
                       </TableRow>
@@ -263,7 +294,7 @@ export default function FactoryStockOTW() {
             className="sticky bottom-0 z-50 rounded-md border bg-background shadow-md"
             data-testid="div-grand-total"
           >
-            <div className="grid grid-cols-3 gap-4 p-4">
+            <div className="flex flex-wrap items-center gap-6 p-4">
               <div className="flex items-center gap-2">
                 <Package className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div>
@@ -282,13 +313,22 @@ export default function FactoryStockOTW() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-muted-foreground shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Total Value</p>
-                  <p className="text-lg font-bold font-mono" data-testid="text-grand-total">
-                    {formatAmount(grandTotals.totalUsd)}
-                  </p>
+              <div className="flex items-start gap-2 flex-1">
+                <div className="w-full">
+                  <p className="text-xs text-muted-foreground mb-1">Total Value by Currency</p>
+                  <div className="flex flex-wrap gap-x-6 gap-y-1" data-testid="text-grand-totals">
+                    {Object.entries(grandTotals.totalsByCurrency)
+                      .filter(([, v]) => v > 0)
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([ccy, amt]) => (
+                        <div key={ccy} className="flex flex-col">
+                          <span className="text-xs text-muted-foreground">{ccy}</span>
+                          <span className="text-lg font-bold font-mono whitespace-nowrap">
+                            {fmtCcy(ccySymbol(ccy), amt)}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
                 </div>
               </div>
             </div>
