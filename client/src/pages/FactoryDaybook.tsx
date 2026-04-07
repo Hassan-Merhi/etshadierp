@@ -120,8 +120,6 @@ const TX_TYPE_LABELS: Record<string, string> = {
   BALE_REIMPORT: "Bale Reimport",
   OPENING_BALANCE_RAW: "Opening Balance",
   MIX_BATCH_CREATED: "Mix Batch Created",
-  LOADING_CREATED: "Loading Created",
-  LOADING_SUBMITTED: "Loading Submitted",
   ORDER_VERIFIED: "Order Verified",
   INVOICE: "Invoice",
   PAYMENT: "Payment",
@@ -195,8 +193,6 @@ function getFactoryTxTypeBadge(type: string): { variant: "default" | "secondary"
       return { variant: "outline", className: "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/40" };
     case "FREIGHT_ADD":
       return { variant: "outline", className: "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/40" };
-    case "LOADING_CREATED":
-    case "LOADING_SUBMITTED":
     case "ORDER_VERIFIED":
       return { variant: "outline", className: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/40" };
     case "PAYROLL_GENERATED":

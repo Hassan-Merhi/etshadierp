@@ -12452,6 +12452,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         // Exclude void/delete audit entries — they are internal records, not daybook events
         sql`${factoryDaybookEntries.txType} NOT LIKE '%_VOIDED'`,
         sql`${factoryDaybookEntries.txType} NOT LIKE '%_DELETED'`,
+        // Exclude loading lifecycle events — these are operational, not financial
+        sql`${factoryDaybookEntries.txType} NOT IN ('LOADING_CREATED','LOADING_SUBMITTED')`,
       ];
       // If user is restricted to own entries only, show their entries + unattributed ones (NULL createdBy)
       if (ownOnly && currentUserId) {
