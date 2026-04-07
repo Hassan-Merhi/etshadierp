@@ -2198,12 +2198,18 @@ export default function Daybook({ user }: { user?: any } = {}) {
                       <TableBody>
                         {dates.map((date) => {
                           const typeMap = byDate.get(date)!;
+                          const dayTotal = Array.from(typeMap.values()).reduce((s, g) => s + g.total, 0);
                           const types = Array.from(typeMap.keys());
                           return (
                             <>
                               <TableRow key={`date-${date}`} className="bg-muted/40 pointer-events-none">
                                 <TableCell colSpan={hideAmounts ? 2 : 3} className="sticky left-0 bg-muted/40 z-10 py-1.5">
-                                  <span className="font-semibold text-sm">{formatDisplayDate(parseISO(date))}</span>
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-semibold text-sm">{formatDisplayDate(parseISO(date))}</span>
+                                    {!hideAmounts && (
+                                      <span className="font-mono font-medium text-sm">{formatAmount(dayTotal)}</span>
+                                    )}
+                                  </div>
                                 </TableCell>
                               </TableRow>
                               {types.map((type) => {
@@ -2323,15 +2329,26 @@ export default function Daybook({ user }: { user?: any } = {}) {
                             const d = r._type === "voucher" ? r.data.voucherDate : r.data.offloadedAt.slice(0, 10);
                             return d === rowDate;
                           });
+                          const dayTotal = dayRows.reduce((sum, r) => {
+                            const amt = r._type === "voucher"
+                              ? parseFloat(String(r.data.totalAmount || "0"))
+                              : parseFloat(String(r.data.itemsTotal || "0"));
+                            return sum + amt;
+                          }, 0);
                           tableRows.push(
                             <TableRow key={`date-sep-${rowDate}`} className="bg-muted/30 pointer-events-none select-none">
                               <TableCell colSpan={hideAmounts ? 4 : 5} className="sticky left-0 bg-muted/30 z-10 py-1.5">
-                                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                                  {formatDisplayDate(parseISO(rowDate))}
-                                  <span className="ml-2 font-normal normal-case text-muted-foreground/70">
-                                    ({dayRows.length} {dayRows.length === 1 ? "entry" : "entries"})
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                    {formatDisplayDate(parseISO(rowDate))}
+                                    <span className="ml-2 font-normal normal-case text-muted-foreground/70">
+                                      ({dayRows.length} {dayRows.length === 1 ? "entry" : "entries"})
+                                    </span>
                                   </span>
-                                </span>
+                                  {!hideAmounts && (
+                                    <span className="text-xs font-mono font-medium text-muted-foreground">{formatAmount(dayTotal)}</span>
+                                  )}
+                                </div>
                               </TableCell>
                             </TableRow>,
                           );
