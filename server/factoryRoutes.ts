@@ -9304,9 +9304,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
         const rpLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
         if (fs.existsSync(rpLogoPath)) {
-          try { doc.image(rpLogoPath, (doc.page.width - 100) / 2, doc.y, { width: 100 }); doc.moveDown(0.3); } catch {}
+          try { doc.image(rpLogoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 }); doc.moveDown(0.4); } catch {}
         }
-        doc.fontSize(13).font("Helvetica-Bold").text("HMD INTERNATIONAL GROUP", { align: "center" });
         const title = allTime ? "Raw Production Report — All Time" : "Raw Production Report";
         doc.fontSize(16).font("Helvetica-Bold").text(title, { align: "center" });
         if (!allTime) doc.fontSize(11).font("Helvetica").text(`Date: ${dateParam}`, { align: "center" });
@@ -9754,8 +9753,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (wi > 0) doc.addPage({ layout: "landscape" });
 
           if (wi === 0 && fs.existsSync(wpLogoPath)) {
-            try { doc.image(wpLogoPath, (doc.page.width - 90) / 2, 10, { width: 90 }); } catch {}
-            doc.fontSize(12).font("Helvetica-Bold").text("HMD INTERNATIONAL GROUP", 30, 105, { width: pageW, align: "center" });
+            try { doc.image(wpLogoPath, (doc.page.width - 220) / 2, 10, { width: 220 }); } catch {}
             doc.moveDown(0.5);
           }
 
@@ -11463,24 +11461,23 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const GROUP_BG = "#E8ECF4";
       const pageW = 515; // usable width with 40px margin each side
 
-      // ── Header bar ──────────────────────────────────────────────────────
-      doc.rect(40, 40, pageW, 60).fill(NAVY);
+      // ── Logo above header ────────────────────────────────────────────────
       const sehLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
-      let sehLogoW = 0;
       if (fs.existsSync(sehLogoPath)) {
-        try { doc.image(sehLogoPath, 44, 42, { height: 56, fit: [70, 56] }); sehLogoW = 76; } catch {}
+        try { doc.image(sehLogoPath, (doc.page.width - 200) / 2, 10, { width: 200 }); } catch {}
       }
+
+      // ── Header bar ──────────────────────────────────────────────────────
+      doc.rect(40, 100, pageW, 44).fill(NAVY);
       doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(13)
-        .text("HMD INTERNATIONAL GROUP", 44 + sehLogoW, 44, { width: 340 - sehLogoW });
-      doc.font("Helvetica-Bold").fontSize(11)
-        .text("Stock Entry History", 44 + sehLogoW, 59, { width: 340 - sehLogoW });
+        .text("Stock Entry History", 44, 105, { width: 340 });
       doc.font("Helvetica").fontSize(8)
-        .text("Factory Bales Report", 44 + sehLogoW, 73, { width: 300 - sehLogoW });
+        .text("Factory Bales Report", 44, 120, { width: 300 });
       const generatedStr = `Generated: ${new Date().toLocaleDateString("en-GB")}`;
-      doc.fontSize(8).text(generatedStr, 400, 65, { width: 155, align: "right" });
+      doc.fontSize(8).text(generatedStr, 400, 120, { width: 155, align: "right" });
 
       // ── Sub-header: period & summary ─────────────────────────────────────
-      const subY = 112;
+      const subY = 154;
       doc.fillColor("#000000").font("Helvetica").fontSize(9);
       doc.text(`Period: ${effectiveStart}  →  ${effectiveEnd}`, 40, subY);
       doc.font("Helvetica-Bold")
@@ -13195,22 +13192,21 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .text(ar ? custShape(text) : text, x, yPos, { width: w, align: ar ? "right" : align });
       };
 
-      // ── Dark header bar ──
+      // ── Logo above header ──
       const custHmdLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
-      doc.rect(40, 40, 515, 60).fill("#1F3864");
-      let custLogoW = 0;
       if (fs.existsSync(custHmdLogoPath)) {
-        try { doc.image(custHmdLogoPath, 44, 42, { height: 56, fit: [70, 56] }); custLogoW = 76; } catch {}
+        try { doc.image(custHmdLogoPath, (doc.page.width - 200) / 2, 10, { width: 200 }); } catch {}
       }
-      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(14)
-        .text("HMD INTERNATIONAL GROUP", 44 + custLogoW, 47, { width: 505 - custLogoW });
-      doc.font("Helvetica").fontSize(9)
-        .text("Account Statement", 44 + custLogoW, 64, { width: 300 });
+
+      // ── Dark header bar ──
+      doc.rect(40, 96, 515, 40).fill("#1F3864");
+      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(13)
+        .text("Account Statement", 44, 102, { width: 350 });
       const printDate = fmtDate(new Date().toISOString().split("T")[0]);
-      doc.fontSize(8).text(`Printed: ${printDate}`, 450, 72, { width: 105, align: "right" });
+      doc.font("Helvetica").fontSize(8).text(`Printed: ${printDate}`, 420, 116, { width: 135, align: "right" });
 
       // ── Customer info block ──
-      const infoY = 96;
+      const infoY = 140;
       doc.fillColor("#000000").font("Helvetica").fontSize(9);
       doc.text("Customer:", 40, infoY);
       custRender(customer.legalName, 40, infoY + 12, 250);
@@ -13390,9 +13386,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const stmtLogo = path.join(process.cwd(), "server", "hmd-logo.png");
         if (fs.existsSync(stmtLogo)) {
           const slBuf = fs.readFileSync(stmtLogo);
-          const slId = workbook.addImage({ buffer: slBuf as Buffer, extension: "png" });
-          const slRow = sheet.addRow([]); slRow.height = 75;
-          sheet.addImage(slId, { tl: { col: 0, row: 0 }, ext: { width: 150, height: 75 } });
+          const slId = workbook.addImage({ buffer: slBuf as Buffer, extension: "jpeg" });
+          const slRow = sheet.addRow([]); slRow.height = 90;
+          sheet.addImage(slId, { tl: { col: 0, row: 0 }, ext: { width: 300, height: 90 } });
           sheet.mergeCells(`A1:E1`);
         }
       } catch {}
@@ -14098,14 +14094,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
       const [settings] = await db.select().from(companySettings).where(eq(companySettings.companyId, companyId)).catch(() => [null]);
 
-      // Fetch weight per bale from factoryBaleProducts by articleCode
+      // Fetch weight per bale + canonical name from factoryBaleProducts by articleCode
       const articleCodes = [...new Set(rawLines.map((l: any) => l.articleCode).filter(Boolean))];
       const wMap = new Map<string, number>();
+      const nameMap = new Map<string, string>();
       if (articleCodes.length > 0) {
-        const prods = await db.select({ articleCode: factoryBaleProducts.articleCode, weightPerBaleKg: factoryBaleProducts.weightPerBaleKg })
+        const prods = await db.select({ articleCode: factoryBaleProducts.articleCode, weightPerBaleKg: factoryBaleProducts.weightPerBaleKg, name: factoryBaleProducts.name })
           .from(factoryBaleProducts)
           .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes as string[])));
-        prods.forEach((p: any) => { if (p.articleCode) wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0")); });
+        prods.forEach((p: any) => { if (p.articleCode) { wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0")); nameMap.set(p.articleCode, p.name || ""); } });
       }
 
       const baseCurrency = (company as any)?.baseCurrency || "USD";
@@ -14138,9 +14135,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const pxLogo = path.join(process.cwd(), "server", "hmd-logo.png");
         if (fs.existsSync(pxLogo)) {
           const pxBuf = fs.readFileSync(pxLogo);
-          const pxId = workbook.addImage({ buffer: pxBuf as Buffer, extension: "png" });
-          const pxLogoRow = sheet.addRow([]); pxLogoRow.height = 75;
-          sheet.addImage(pxId, { tl: { col: 0, row: 0 }, ext: { width: 150, height: 75 } });
+          const pxId = workbook.addImage({ buffer: pxBuf as Buffer, extension: "jpeg" });
+          const pxLogoRow = sheet.addRow([]); pxLogoRow.height = 90;
+          sheet.addImage(pxId, { tl: { col: 0, row: 0 }, ext: { width: 300, height: 90 } });
         }
       } catch {}
       const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
@@ -14181,7 +14178,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         totalKgAll += totalKg;
         totalPriceAll += totalPrice;
 
-        const dr = sheet.addRow([idx + 1, line.articleCode, line.productName, qty, fmtKg(kgPerBale), fmtPrice(price), fmtKg(totalKg), fmtPrice(totalPrice)]);
+        const dr = sheet.addRow([idx + 1, line.articleCode, nameMap.get(line.articleCode) || line.productName || "", qty, fmtKg(kgPerBale), fmtPrice(price), fmtKg(totalKg), fmtPrice(totalPrice)]);
         dr.getCell(4).alignment = { horizontal: "right" };
         dr.getCell(5).alignment = { horizontal: "right" };
         dr.getCell(6).alignment = { horizontal: "right" };
@@ -14226,14 +14223,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
       const [settings] = await db.select().from(companySettings).where(eq(companySettings.companyId, companyId)).catch(() => [null]);
 
-      // Fetch weight per bale from factoryBaleProducts by articleCode
+      // Fetch weight per bale + canonical name from factoryBaleProducts by articleCode
       const articleCodes = [...new Set(rawLines.map((l: any) => l.articleCode).filter(Boolean))];
       const wMap = new Map<string, number>();
+      const nameMap = new Map<string, string>();
       if (articleCodes.length > 0) {
-        const prods = await db.select({ articleCode: factoryBaleProducts.articleCode, weightPerBaleKg: factoryBaleProducts.weightPerBaleKg })
+        const prods = await db.select({ articleCode: factoryBaleProducts.articleCode, weightPerBaleKg: factoryBaleProducts.weightPerBaleKg, name: factoryBaleProducts.name })
           .from(factoryBaleProducts)
           .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes as string[])));
-        prods.forEach((p: any) => { if (p.articleCode) wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0")); });
+        prods.forEach((p: any) => { if (p.articleCode) { wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0")); nameMap.set(p.articleCode, p.name || ""); } });
       }
 
       const baseCurrencyPdf = (company as any)?.baseCurrency || "USD";
@@ -14256,22 +14254,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       // ── Header ──
       const hmdProformaLogo = path.join(process.cwd(), "server", "hmd-logo.png");
-      let headerY = 40;
-      let logoWidth = 0;
+      const headerY = 40;
 
+      const logoW = 220;
       if (fs.existsSync(hmdProformaLogo)) {
-        try {
-          doc.image(hmdProformaLogo, 40, headerY, { height: 60, fit: [80, 60] });
-          logoWidth = 90;
-        } catch {}
+        try { doc.image(hmdProformaLogo, (doc.page.width - logoW) / 2, headerY, { width: logoW }); } catch {}
       }
-
-      doc.fontSize(20).font("Helvetica-Bold")
-        .text("HMD INTERNATIONAL GROUP", 40 + logoWidth, headerY, { width: 515 - logoWidth });
       doc.fontSize(10).font("Helvetica").fillColor("#555555")
-        .text("PROFORMA INVOICE", 40 + logoWidth, headerY + 24, { width: 515 - logoWidth });
+        .text("PROFORMA INVOICE", 40, headerY + logoW * 0.37, { width: 515, align: "center" });
 
-      const headerBottom = Math.max(doc.y, headerY + 56);
+      const headerBottom = Math.max(doc.y, headerY + logoW * 0.42);
       doc.moveTo(40, headerBottom + 4).lineTo(555, headerBottom + 4).lineWidth(0.5).strokeColor("#cccccc").stroke();
       doc.lineWidth(1).strokeColor("#000000");
 
@@ -14327,7 +14319,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           doc.fillColor("#000000");
         }
 
-        const vals = [String(idx + 1), line.articleCode, line.productName, String(qty), fmtKgPdf(kgPerBale), fmtPricePdf(price), fmtKgPdf(totalKg), fmtPricePdf(totalPrice)];
+        const vals = [String(idx + 1), line.articleCode, nameMap.get(line.articleCode) || line.productName || "", String(qty), fmtKgPdf(kgPerBale), fmtPricePdf(price), fmtKgPdf(totalKg), fmtPricePdf(totalPrice)];
         vals.forEach((v, i) => {
           doc.text(v, colX[i] + 2, y + 3, { width: colW[i] - 4, align: colAlign[i] });
         });
@@ -16117,15 +16109,35 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("Loading");
 
+      const NUM_COLS_LOADING = 6;
       sheet.columns = [
-        { header: "#", key: "seq", width: 6 },
-        { header: "Ref Code", key: "refCode", width: 20 },
-        { header: "Article Code", key: "articleCode", width: 16 },
-        { header: "Name", key: "name", width: 32 },
-        { header: "Weight (kg)", key: "weight", width: 14 },
-        { header: "Total Weight (kg)", key: "totalWeight", width: 18 },
+        { key: "seq", width: 6 },
+        { key: "refCode", width: 20 },
+        { key: "articleCode", width: 16 },
+        { key: "name", width: 32 },
+        { key: "weight", width: 14 },
+        { key: "totalWeight", width: 18 },
       ];
-      sheet.getRow(1).font = { bold: true };
+
+      // Logo header rows
+      try {
+        const ldLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+        if (fs.existsSync(ldLogoPath)) {
+          const ldId = workbook.addImage({ buffer: fs.readFileSync(ldLogoPath) as Buffer, extension: "jpeg" });
+          const ldRow = sheet.addRow([]); ldRow.height = 90;
+          sheet.addImage(ldId, { tl: { col: 0, row: 0 }, ext: { width: 300, height: 90 } });
+        }
+      } catch {}
+      const ldTitle = sheet.addRow([`Loading List — ${customerName}`]);
+      ldTitle.getCell(1).font = { bold: true, size: 13 };
+      sheet.mergeCells(ldTitle.number, 1, ldTitle.number, NUM_COLS_LOADING);
+      sheet.addRow([]);
+
+      const ldHdr = sheet.addRow(["#", "Ref Code", "Article Code", "Name", "Weight (kg)", "Total Weight (kg)"]);
+      ldHdr.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F3864" } };
+      });
 
       let runningTotal = 0;
       for (let i = 0; i < baleLinks.length; i++) {
@@ -16204,7 +16216,31 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const lines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
       const charges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
 
-      const sortedLines = lines.sort((a: any, b: any) => (a.baleName || "").localeCompare(b.baleName || ""));
+      // Build nameMap for invoice HTML export
+      const invArticleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
+      const invNameMap = new Map<string, string>();
+      if (invArticleCodes.length > 0) {
+        const invProds = await db
+          .select({ articleCode: factoryBaleProducts.articleCode, name: factoryBaleProducts.name })
+          .from(factoryBaleProducts)
+          .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, invArticleCodes)));
+        for (const p of invProds) { if (p.articleCode) invNameMap.set(p.articleCode, p.name); }
+      }
+      const sortedLines = lines.sort((a: any, b: any) => {
+        const na = invNameMap.get(a.articleCode) || a.baleName || "";
+        const nb = invNameMap.get(b.articleCode) || b.baleName || "";
+        return na.localeCompare(nb);
+      });
+
+      // Read logo for embedding in HTML
+      const invLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+      let invLogoDataUri = "";
+      try {
+        if (fs.existsSync(invLogoPath)) {
+          const logoB64 = fs.readFileSync(invLogoPath).toString("base64");
+          invLogoDataUri = `data:image/jpeg;base64,${logoB64}`;
+        }
+      } catch {}
 
       const fmtNum = (val: any): string => {
         const n = parseFloat(val);
@@ -16220,7 +16256,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         linesHtml += `<tr>
           <td style="white-space:nowrap;text-align:center">${idx + 1}</td>
           <td style="white-space:nowrap">${line.articleCode}</td>
-          <td>${line.baleName || ""}</td>
+          <td>${invNameMap.get(line.articleCode) || line.baleName || ""}</td>
           <td style="white-space:nowrap;text-align:right">${fmtNum(line.qty)}</td>
           <td style="white-space:nowrap;text-align:right">${fmtNum(line.weightPerBale)}</td>
           <td style="white-space:nowrap;text-align:right">${fmtNum(line.totalWeight)}</td>
@@ -16241,9 +16277,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   body { font-family: Arial, sans-serif; font-size: 12px; color: #1a1a2e; background: #fff; }
 
   /* ── Top header bar ── */
-  .top-bar { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%); color: #fff; padding: 24px 32px; }
-  .top-bar h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 4px; }
-  .top-bar .subtitle { font-size: 11px; color: #a8c0e8; letter-spacing: 1px; text-transform: uppercase; }
+  .top-bar { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%); color: #fff; padding: 18px 32px; display: flex; align-items: center; gap: 20px; }
+  .top-bar-logo { height: 70px; width: auto; flex-shrink: 0; filter: brightness(0) invert(1); }
+  .top-bar-text h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .top-bar-text .subtitle { font-size: 11px; color: #a8c0e8; letter-spacing: 1px; text-transform: uppercase; }
 
   /* ── Invoice meta strip ── */
   .meta-strip { display: flex; gap: 0; border-bottom: 3px solid #e94560; }
@@ -16292,8 +16329,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 </style></head><body>
 
 <div class="top-bar">
-  <h1>${company?.name || ""}</h1>
-  <div class="subtitle">Commercial Invoice</div>
+  ${invLogoDataUri ? `<img class="top-bar-logo" src="${invLogoDataUri}" alt="HMD International Group" />` : ""}
+  <div class="top-bar-text">
+    <h1>HMD INTERNATIONAL GROUP</h1>
+    <div class="subtitle">Commercial Invoice</div>
+  </div>
 </div>
 
 <div class="meta-strip">

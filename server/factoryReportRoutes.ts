@@ -306,9 +306,8 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
   const hmdLogo = path.join(process.cwd(), "server", "hmd-logo.png");
   function addPdfBranding(doc: any) {
     if (fs.existsSync(hmdLogo)) {
-      try { doc.image(hmdLogo, (doc.page.width - 100) / 2, doc.y, { width: 100 }); doc.moveDown(0.4); } catch {}
+      try { doc.image(hmdLogo, (doc.page.width - 220) / 2, doc.y, { width: 220 }); doc.moveDown(0.4); } catch {}
     }
-    doc.fontSize(18).font("Helvetica-Bold").text("HMD INTERNATIONAL GROUP", { align: "center" });
     doc.font("Helvetica");
   }
 
@@ -333,9 +332,9 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Summary");
     let xlLogoId: number | null = null;
-    try { if (fs.existsSync(hmdLogo)) { xlLogoId = workbook.addImage({ buffer: fs.readFileSync(hmdLogo) as Buffer, extension: "png" }); } } catch {}
-    const lr = sheet.addRow([]); lr.height = 75;
-    if (xlLogoId !== null) sheet.addImage(xlLogoId, { tl: { col: 0, row: 0 }, ext: { width: 150, height: 75 } });
+    try { if (fs.existsSync(hmdLogo)) { xlLogoId = workbook.addImage({ buffer: fs.readFileSync(hmdLogo) as Buffer, extension: "jpeg" }); } } catch {}
+    const lr = sheet.addRow([]); lr.height = 90;
+    if (xlLogoId !== null) sheet.addImage(xlLogoId, { tl: { col: 0, row: 0 }, ext: { width: 300, height: 90 } });
     const rn = sheet.addRow(["HMD INTERNATIONAL GROUP"]); rn.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
     sheet.addRow(["Supplier Usage Report"]).getCell(1).font = { bold: true, size: 13 };
     sheet.addRow([`Period: ${startDate} to ${endDate}`]);
@@ -478,10 +477,10 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     const moneyFmt = "$#,##0.00";
 
     let xlLogoId2: number | null = null;
-    try { if (fs.existsSync(hmdLogo)) { xlLogoId2 = workbook.addImage({ buffer: fs.readFileSync(hmdLogo) as Buffer, extension: "png" }); } } catch {}
+    try { if (fs.existsSync(hmdLogo)) { xlLogoId2 = workbook.addImage({ buffer: fs.readFileSync(hmdLogo) as Buffer, extension: "jpeg" }); } } catch {}
     const sheet1 = workbook.addWorksheet("Summary");
-    const lr1 = sheet1.addRow([]); lr1.height = 75;
-    if (xlLogoId2 !== null) sheet1.addImage(xlLogoId2, { tl: { col: 0, row: 0 }, ext: { width: 150, height: 75 } });
+    const lr1 = sheet1.addRow([]); lr1.height = 90;
+    if (xlLogoId2 !== null) sheet1.addImage(xlLogoId2, { tl: { col: 0, row: 0 }, ext: { width: 300, height: 90 } });
     const rn1 = sheet1.addRow(["HMD INTERNATIONAL GROUP"]); rn1.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
     sheet1.addRow(["Supplier Usage Report"]).getCell(1).font = boldFont;
     sheet1.addRow([`Period: ${startDate} to ${endDate}`]);

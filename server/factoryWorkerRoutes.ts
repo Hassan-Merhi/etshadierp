@@ -1438,9 +1438,8 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       // Header
       const hmdLogoPathPay = path.join(process.cwd(), "server", "hmd-logo.png");
       if (fs.existsSync(hmdLogoPathPay)) {
-        try { doc.image(hmdLogoPathPay, (doc.page.width - 90) / 2, doc.y, { width: 90 }); doc.moveDown(0.4); } catch {}
+        try { doc.image(hmdLogoPathPay, (doc.page.width - 220) / 2, doc.y, { width: 220 }); doc.moveDown(0.5); } catch {}
       }
-      doc.fontSize(14).font("Helvetica-Bold").text("HMD INTERNATIONAL GROUP", { align: "center" });
       doc.fontSize(10).font("Helvetica").text("Payment Summary", { align: "center" });
       doc.moveDown(0.3);
       doc.fontSize(8).fillColor("#666666")
@@ -2768,19 +2767,15 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       };
 
       // Header
-      let headerY = 40;
-      let logoWidth = 0;
       const wHmdLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
       if (fs.existsSync(wHmdLogoPath)) {
-        try { doc.image(wHmdLogoPath, 40, headerY, { height: 56, fit: [80, 56] }); logoWidth = 90; } catch {}
+        try { doc.image(wHmdLogoPath, (doc.page.width - 220) / 2, 20, { width: 220 }); } catch {}
       }
-      doc.fontSize(18).font("Helvetica-Bold").fillColor("#000000")
-        .text("HMD INTERNATIONAL GROUP", 40 + logoWidth, headerY, { width: 515 - logoWidth });
       const wNameHasAr = hasArabicFont && wContainsArabic(workerName);
       doc.fontSize(10).font(wNameHasAr ? "Arabic" : "Helvetica").fillColor("#555555")
-        .text(wNameHasAr ? `كشف حساب: ${wShapeText(workerName)}` : `Account Statement: ${workerName}`, 40 + logoWidth, headerY + 22, { width: 515 - logoWidth, align: wNameHasAr ? "right" : "left" });
+        .text(wNameHasAr ? `كشف حساب: ${wShapeText(workerName)}` : `Account Statement: ${workerName}`, 40, 102, { width: 515, align: wNameHasAr ? "right" : "center" });
 
-      const headerBottom = Math.max(doc.y, headerY + 52);
+      const headerBottom = 110;
       doc.moveTo(40, headerBottom + 4).lineTo(555, headerBottom + 4).lineWidth(0.5).strokeColor("#cccccc").stroke();
       doc.lineWidth(1).strokeColor("#000000");
 

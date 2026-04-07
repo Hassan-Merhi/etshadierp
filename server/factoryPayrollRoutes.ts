@@ -564,9 +564,8 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
       const hmdLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
       if (fs.existsSync(hmdLogoPath)) {
-        try { doc.image(hmdLogoPath, (doc.page.width - 100) / 2, doc.y, { width: 100 }); doc.moveDown(0.5); } catch {}
+        try { doc.image(hmdLogoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 }); doc.moveDown(0.5); } catch {}
       }
-      doc.fontSize(16).font("Helvetica-Bold").text("HMD INTERNATIONAL GROUP", { align: "center" });
       doc.fontSize(12).font("Helvetica").text("Factory Payroll Report", { align: "center" });
       doc.fontSize(10).text(`Period: ${startDate} to ${endDate}`, { align: "center" });
       doc.moveDown(1);
@@ -694,11 +693,11 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       const workbook = new ExcelJS.Workbook();
       const xlogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
       let xlogoId: number | null = null;
-      try { if (fs.existsSync(xlogoPath)) { const buf = fs.readFileSync(xlogoPath); xlogoId = workbook.addImage({ buffer: buf as Buffer, extension: "png" }); } } catch {}
+      try { if (fs.existsSync(xlogoPath)) { const buf = fs.readFileSync(xlogoPath); xlogoId = workbook.addImage({ buffer: buf as Buffer, extension: "jpeg" }); } } catch {}
 
       function addSheetHeader(sheet: ExcelJS.Worksheet, title: string, numCols: number) {
-        const logoRow = sheet.addRow([]); logoRow.height = 75;
-        if (xlogoId !== null) sheet.addImage(xlogoId, { tl: { col: 0, row: 0 }, ext: { width: 150, height: 75 } });
+        const logoRow = sheet.addRow([]); logoRow.height = 90;
+        if (xlogoId !== null) sheet.addImage(xlogoId, { tl: { col: 0, row: 0 }, ext: { width: 300, height: 90 } });
         const rName = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
         rName.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
         rName.getCell(1).alignment = { horizontal: "center" };

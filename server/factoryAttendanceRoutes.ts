@@ -200,9 +200,8 @@ export function registerFactoryAttendanceRoutes(
       // Title
       const attLogoPath = require("path").join(process.cwd(), "server", "hmd-logo.png");
       if (require("fs").existsSync(attLogoPath)) {
-        try { doc.image(attLogoPath, (doc.page.width - 90) / 2, doc.y, { width: 90 }); doc.moveDown(0.3); } catch {}
+        try { doc.image(attLogoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 }); doc.moveDown(0.4); } catch {}
       }
-      doc.fontSize(14).font("Helvetica-Bold").text("HMD INTERNATIONAL GROUP", { align: "center" });
       doc.fontSize(18).font("Helvetica-Bold").text("Attendance Report", { align: "center" });
       doc.moveDown(0.3);
       doc.fontSize(11).font("Helvetica").text(`Date: ${date}${shift ? `   Shift: ${shift}` : ""}`, { align: "center" });
