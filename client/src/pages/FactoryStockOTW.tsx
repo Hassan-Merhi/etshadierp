@@ -80,11 +80,15 @@ function computeContainerTotals(c: FactoryContainer) {
   return { goodsUsd, chargesUsd, totalUsd };
 }
 
+const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
+
 const STATUS_LABEL: Record<string, string> = {
-  OTW: "On The Way",
   PENDING: "Pending",
   IN_TRANSIT: "In Transit",
   ARRIVED: "Arrived",
+  OFFLOADED: "Offloaded",
+  PARTIALLY_RECEIVED: "Partially Received",
+  RECEIVED: "Received",
 };
 
 export default function FactoryStockOTW() {
@@ -96,7 +100,7 @@ export default function FactoryStockOTW() {
   });
 
   const otwContainers = useMemo(
-    () => containers.filter((c) => c.status === "OTW"),
+    () => containers.filter((c) => STATUS_ACTIVE.has(c.status)),
     [containers]
   );
 
