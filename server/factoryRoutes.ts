@@ -14291,10 +14291,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (fs.existsSync(hmdProformaLogo)) {
         try { doc.image(hmdProformaLogo, (doc.page.width - logoW) / 2, headerY, { width: logoW }); } catch {}
       }
+      // Title goes below the logo — use doc.y which pdfkit advances after placing the image
+      const titleY = Math.max(doc.y, headerY + 10) + 6;
       doc.fontSize(10).font("Helvetica").fillColor("#555555")
-        .text("PROFORMA INVOICE", 40, headerY + logoW * 0.37, { width: 515, align: "center" });
+        .text("PROFORMA INVOICE", 40, titleY, { width: 515, align: "center" });
 
-      const headerBottom = Math.max(doc.y, headerY + logoW * 0.42);
+      const headerBottom = doc.y + 4;
       doc.moveTo(40, headerBottom + 4).lineTo(555, headerBottom + 4).lineWidth(0.5).strokeColor("#cccccc").stroke();
       doc.lineWidth(1).strokeColor("#000000");
 
