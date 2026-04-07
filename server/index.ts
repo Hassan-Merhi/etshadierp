@@ -1007,6 +1007,15 @@ let migrationsDone = false;
         `);
       } catch { /* table may not exist yet — skip */ }
 
+      // Ensure customer invoice sequences start at 11827 (or higher if already advanced)
+      try {
+        await migrationClient.query(`
+          UPDATE customer_invoice_sequences
+          SET next_number = 11827
+          WHERE next_number < 11827
+        `);
+      } catch { /* skip if table not ready */ }
+
       // Auto-fix sequence desyncs (can happen after data restores / bulk imports with explicit IDs)
       const seqFixes: Array<[string, string]> = [
         ["ledger_accounts", "ledger_accounts_id_seq"],

@@ -16365,7 +16365,20 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   .totals-table tr.grand td { font-size: 14px; font-weight: 700; border: none; padding: 8px 12px; }
 
   .content { padding: 0 0 24px; }
-  @media print { body { margin: 0; } }
+
+  @page { size: A4; margin: 0; }
+  @media print {
+    html, body { margin: 0; padding: 0; width: 210mm; }
+    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .top-bar { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .meta-strip { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .section-heading { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .lines-table thead tr { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .lines-table tbody tr:nth-child(even) { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .lines-table tbody tr:hover { background: transparent !important; }
+    .totals-table tr.grand { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .charges-table thead tr { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  }
 </style></head><body>
 
 <div class="top-bar">
