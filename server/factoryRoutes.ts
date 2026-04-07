@@ -13388,7 +13388,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const slBuf = fs.readFileSync(stmtLogo);
           const slId = workbook.addImage({ buffer: slBuf as Buffer, extension: "jpeg" });
           const slRow = sheet.addRow([]); slRow.height = 90;
-          sheet.addImage(slId, { tl: { col: 0, row: 0 }, ext: { width: 300, height: 90 } });
+          sheet.addImage(slId, { tl: { col: 1.9, row: 0 }, ext: { width: 300, height: 90 } });
           sheet.mergeCells(`A1:E1`);
         }
       } catch {}
@@ -14137,7 +14137,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const pxBuf = fs.readFileSync(pxLogo);
           const pxId = workbook.addImage({ buffer: pxBuf as Buffer, extension: "jpeg" });
           const pxLogoRow = sheet.addRow([]); pxLogoRow.height = 90;
-          sheet.addImage(pxId, { tl: { col: 0, row: 0 }, ext: { width: 300, height: 90 } });
+          sheet.addImage(pxId, { tl: { col: 2.5, row: 0 }, ext: { width: 300, height: 90 } });
         }
       } catch {}
       const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
@@ -16125,11 +16125,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         if (fs.existsSync(ldLogoPath)) {
           const ldId = workbook.addImage({ buffer: fs.readFileSync(ldLogoPath) as Buffer, extension: "jpeg" });
           const ldRow = sheet.addRow([]); ldRow.height = 90;
-          sheet.addImage(ldId, { tl: { col: 0, row: 0 }, ext: { width: 300, height: 90 } });
+          sheet.addImage(ldId, { tl: { col: 2.4, row: 0 }, ext: { width: 300, height: 90 } });
         }
       } catch {}
       const ldTitle = sheet.addRow([`Loading List — ${customerName}`]);
       ldTitle.getCell(1).font = { bold: true, size: 13 };
+      ldTitle.getCell(1).alignment = { horizontal: "center" };
       sheet.mergeCells(ldTitle.number, 1, ldTitle.number, NUM_COLS_LOADING);
       sheet.addRow([]);
 

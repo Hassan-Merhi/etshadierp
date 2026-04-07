@@ -334,9 +334,9 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     let xlLogoId: number | null = null;
     try { if (fs.existsSync(hmdLogo)) { xlLogoId = workbook.addImage({ buffer: fs.readFileSync(hmdLogo) as Buffer, extension: "jpeg" }); } } catch {}
     const lr = sheet.addRow([]); lr.height = 90;
-    if (xlLogoId !== null) sheet.addImage(xlLogoId, { tl: { col: 0, row: 0 }, ext: { width: 300, height: 90 } });
-    const rn = sheet.addRow(["HMD INTERNATIONAL GROUP"]); rn.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
-    sheet.addRow(["Supplier Usage Report"]).getCell(1).font = { bold: true, size: 13 };
+    if (xlLogoId !== null) sheet.addImage(xlLogoId, { tl: { col: 1.5, row: 0 }, ext: { width: 300, height: 90 } });
+    const rn = sheet.addRow(["HMD INTERNATIONAL GROUP"]); rn.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } }; rn.getCell(1).alignment = { horizontal: "center" };
+    const rnTitle = sheet.addRow(["Supplier Usage Report"]); rnTitle.getCell(1).font = { bold: true, size: 13 }; rnTitle.getCell(1).alignment = { horizontal: "center" };
     sheet.addRow([`Period: ${startDate} to ${endDate}`]);
     sheet.addRow([]);
     sheet.addRow(["No data found for the selected period and filters."]);
@@ -480,9 +480,9 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     try { if (fs.existsSync(hmdLogo)) { xlLogoId2 = workbook.addImage({ buffer: fs.readFileSync(hmdLogo) as Buffer, extension: "jpeg" }); } } catch {}
     const sheet1 = workbook.addWorksheet("Summary");
     const lr1 = sheet1.addRow([]); lr1.height = 90;
-    if (xlLogoId2 !== null) sheet1.addImage(xlLogoId2, { tl: { col: 0, row: 0 }, ext: { width: 300, height: 90 } });
-    const rn1 = sheet1.addRow(["HMD INTERNATIONAL GROUP"]); rn1.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
-    sheet1.addRow(["Supplier Usage Report"]).getCell(1).font = boldFont;
+    if (xlLogoId2 !== null) sheet1.addImage(xlLogoId2, { tl: { col: 1.5, row: 0 }, ext: { width: 300, height: 90 } });
+    const rn1 = sheet1.addRow(["HMD INTERNATIONAL GROUP"]); rn1.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } }; rn1.getCell(1).alignment = { horizontal: "center" };
+    const rn1Title = sheet1.addRow(["Supplier Usage Report"]); rn1Title.getCell(1).font = boldFont; rn1Title.getCell(1).alignment = { horizontal: "center" };
     sheet1.addRow([`Period: ${startDate} to ${endDate}`]);
     sheet1.addRow([`Generated: ${new Date().toISOString().replace("T", " ").substring(0, 19)}`]);
     sheet1.addRow([]);

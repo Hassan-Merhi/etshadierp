@@ -695,9 +695,9 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       let xlogoId: number | null = null;
       try { if (fs.existsSync(xlogoPath)) { const buf = fs.readFileSync(xlogoPath); xlogoId = workbook.addImage({ buffer: buf as Buffer, extension: "jpeg" }); } } catch {}
 
-      function addSheetHeader(sheet: ExcelJS.Worksheet, title: string, numCols: number) {
+      function addSheetHeader(sheet: ExcelJS.Worksheet, title: string, numCols: number, logoCenterCol: number = 0) {
         const logoRow = sheet.addRow([]); logoRow.height = 90;
-        if (xlogoId !== null) sheet.addImage(xlogoId, { tl: { col: 0, row: 0 }, ext: { width: 300, height: 90 } });
+        if (xlogoId !== null) sheet.addImage(xlogoId, { tl: { col: logoCenterCol, row: 0 }, ext: { width: 300, height: 90 } });
         const rName = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
         rName.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
         rName.getCell(1).alignment = { horizontal: "center" };
@@ -734,7 +734,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         { key: "kgProcessed", width: 14 },
         { key: "status", width: 12 },
       ];
-      addSheetHeader(summarySheet, "Payroll Summary", SUMMARY_COLS);
+      addSheetHeader(summarySheet, "Payroll Summary", SUMMARY_COLS, 6.5);
       const headerRow = summarySheet.addRow(["Employee Code", "Name", "Position", "Salary Type", "Working Days", "Present Days", "Absent Days", "Base Salary", "Bale Earnings", "KG Earnings", "Overtime Pay", "Bonuses", "Deductions", "Advances", "Net Salary", "Bales Count", "KG Processed", "Status"]);
       headerRow.font = { bold: true };
       headerRow.alignment = { horizontal: "center" };
@@ -786,7 +786,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         { key: "dateJoined", width: 14 },
         { key: "paymentMethod", width: 16 },
       ];
-      addSheetHeader(detailsSheet, "Worker Details", DETAILS_COLS);
+      addSheetHeader(detailsSheet, "Worker Details", DETAILS_COLS, 3.5);
       const detailsHeaderRow = detailsSheet.addRow(["Employee Code", "Full Name", "Position", "Department", "Salary Type", "Base Salary", "Per Bale Rate", "Per KG Rate", "Overtime Rate", "Phone", "Date Joined", "Payment Method"]);
       detailsHeaderRow.font = { bold: true };
       detailsHeaderRow.alignment = { horizontal: "center" };
