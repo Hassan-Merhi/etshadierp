@@ -164,6 +164,16 @@ const Chat = lazy(() => import("@/pages/Chat"));
 const SpreadsheetEditor = lazy(() => import("@/pages/SpreadsheetEditor"));
 const LiveSheets = lazy(() => import("@/pages/LiveSheets"));
 const PropertiesDashboard = lazy(() => import("@/pages/PropertiesDashboard"));
+const PropertiesAccounts = lazy(() => import("@/pages/PropertiesAccounts"));
+const PropertiesVouchers = lazy(() => import("@/pages/PropertiesVouchers"));
+const PropertiesVoucherEdit = lazy(() => import("@/pages/PropertiesVoucherEdit"));
+const PropertiesVoucherDetail = lazy(() => import("@/pages/PropertiesVoucherDetail"));
+const PropertiesCreate = lazy(() => import("@/pages/PropertiesCreate"));
+const PropertiesAnalytics = lazy(() => import("@/pages/PropertiesAnalytics"));
+const PropertiesDaybook = lazy(() => import("@/pages/PropertiesDaybook"));
+const PropertiesLedgerMonthly = lazy(() => import("@/pages/PropertiesLedgerMonthly"));
+const PropertiesLedgerVouchers = lazy(() => import("@/pages/PropertiesLedgerVouchers"));
+const PropertiesSettings = lazy(() => import("@/pages/PropertiesSettings"));
 import { CommandPalette } from "@/components/CommandPalette";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowLeft } from "lucide-react";
@@ -643,16 +653,16 @@ function AuthenticatedApp() {
                     <Suspense fallback={<div className="flex items-center justify-center h-48 text-muted-foreground text-sm">Loading...</div>}>
                       <Switch>
                         <Route path="/properties/dashboard" component={PropertiesDashboard} />
-                        <Route path="/properties/accounts" component={FactoryAccounts} />
-                        <Route path="/properties/vouchers/:id/edit" component={VoucherEdit} />
-                        <Route path="/properties/voucher-detail/:voucherId" component={VoucherDetail} />
-                        <Route path="/properties/vouchers">{() => <FactoryVouchers />}</Route>
-                        <Route path="/properties/create" component={AccountingCreate} />
-                        <Route path="/properties/analytics" component={Analytics} />
-                        <Route path="/properties/daybook" component={FactoryDaybook} />
-                        <Route path="/properties/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
-                        <Route path="/properties/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
-                        {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/settings" component={Settings} />}
+                        <Route path="/properties/accounts" component={PropertiesAccounts} />
+                        <Route path="/properties/vouchers/:id/edit" component={PropertiesVoucherEdit} />
+                        <Route path="/properties/voucher-detail/:voucherId" component={PropertiesVoucherDetail} />
+                        <Route path="/properties/vouchers">{() => <PropertiesVouchers />}</Route>
+                        <Route path="/properties/create" component={PropertiesCreate} />
+                        <Route path="/properties/analytics" component={PropertiesAnalytics} />
+                        <Route path="/properties/daybook" component={PropertiesDaybook} />
+                        <Route path="/properties/ledger-monthly/:accountId" component={PropertiesLedgerMonthly} />
+                        <Route path="/properties/ledger-vouchers/:accountId/:year/:month" component={PropertiesLedgerVouchers} />
+                        {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/settings" component={PropertiesSettings} />}
                         <Route><Redirect to="/properties/dashboard" /></Route>
                       </Switch>
                     </Suspense>
