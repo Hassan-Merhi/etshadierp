@@ -14330,7 +14330,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const colX  = [40,  62,  132, 310, 355, 403, 455, 508];
       const colW  = [22,  70,  178,  45,  48,  52,  53,  47];
       const colHdr= ["#","Code","Product Name","Qty","Kg/Bale","Pr/Bale","Total KG","Total Price"];
-      const colAlign: Array<"left"|"right"> = ["right","left","left","right","right","right","right","right"];
+      const colAlign: Array<"left"|"right"|"center"> = ["center","center","center","center","center","center","center","center"];
 
       const tableTop = doc.y + 4;
 
@@ -16308,20 +16308,20 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       let linesHtml = "";
       sortedLines.forEach((line: any, idx: number) => {
         linesHtml += `<tr>
-          <td style="white-space:nowrap;text-align:center">${idx + 1}</td>
-          <td style="white-space:nowrap">${line.articleCode}</td>
+          <td>${idx + 1}</td>
+          <td>${line.articleCode}</td>
           <td>${invNameMap.get(line.articleCode) || line.baleName || ""}</td>
-          <td style="white-space:nowrap;text-align:right">${fmtNum(line.qty)}</td>
-          <td style="white-space:nowrap;text-align:right">${fmtNum(line.weightPerBale)}</td>
-          <td style="white-space:nowrap;text-align:right">${fmtNum(line.totalWeight)}</td>
-          <td style="white-space:nowrap;text-align:right">${fmtMoney(line.pricePerBale)}</td>
-          <td style="white-space:nowrap;text-align:right">${fmtMoney(line.totalPrice)}</td>
+          <td>${fmtNum(line.qty)}</td>
+          <td>${fmtNum(line.weightPerBale)}</td>
+          <td>${fmtNum(line.totalWeight)}</td>
+          <td>${fmtMoney(line.pricePerBale)}</td>
+          <td>${fmtMoney(line.totalPrice)}</td>
         </tr>`;
       });
 
       let chargesHtml = "";
       for (const charge of charges) {
-        chargesHtml += `<tr><td>${charge.name}</td><td style="white-space:nowrap">${charge.chargeType}</td><td style="white-space:nowrap;text-align:right">${fmtMoney(charge.amount)}</td></tr>`;
+        chargesHtml += `<tr><td>${charge.name}</td><td>${charge.chargeType}</td><td>${fmtMoney(charge.amount)}</td></tr>`;
       }
 
       const html = `<!DOCTYPE html>
@@ -16357,17 +16357,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   .lines-table col.col-price   { width: 72px; }
   .lines-table col.col-total   { width: 78px; }
   .lines-table thead tr { background: #16213e; color: #fff; }
-  .lines-table thead th { padding: 7px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; border: none; white-space: nowrap; }
-  .lines-table tbody td { padding: 5px 8px; font-size: 11px; border-bottom: 1px solid #eaeff5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lines-table thead th { padding: 7px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; border: none; white-space: nowrap; text-align: center; }
+  .lines-table tbody td { padding: 5px 8px; font-size: 11px; border-bottom: 1px solid #eaeff5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
   .lines-table tbody tr:nth-child(even) { background: #f4f7fb; }
   .lines-table tbody tr:hover { background: #e8f0fe; }
-  .lines-table tfoot td { padding: 6px 8px; font-size: 11px; font-weight: 600; background: #eef2f9; border-top: 2px solid #16213e; }
+  .lines-table tfoot td { padding: 6px 8px; font-size: 11px; font-weight: 600; background: #eef2f9; border-top: 2px solid #16213e; text-align: center; }
 
   /* ── Charges table ── */
   .charges-table { width: 60%; border-collapse: collapse; margin: 0 0 0 0; }
   .charges-table thead tr { background: #0f3460; color: #fff; }
-  .charges-table thead th { padding: 6px 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; border: none; }
-  .charges-table tbody td { padding: 5px 10px; font-size: 11px; border-bottom: 1px solid #eaeff5; }
+  .charges-table thead th { padding: 6px 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; border: none; text-align: center; }
+  .charges-table tbody td { padding: 5px 10px; font-size: 11px; border-bottom: 1px solid #eaeff5; text-align: center; }
   .charges-table tbody tr:nth-child(even) { background: #f4f7fb; }
 
   /* ── Totals box ── */
@@ -16428,30 +16428,30 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       <col class="col-price"><col class="col-total">
     </colgroup>
     <thead><tr>
-      <th style="text-align:center">#</th>
+      <th>#</th>
       <th>Article Code</th>
       <th>Product</th>
-      <th style="text-align:right">Qty</th>
-      <th style="text-align:right">Wt/Bale</th>
-      <th style="text-align:right">Total Wt</th>
-      <th style="text-align:right">Price/Bale</th>
-      <th style="text-align:right">Total</th>
+      <th>Qty</th>
+      <th>Wt/Bale</th>
+      <th>Total Wt</th>
+      <th>Price/Bale</th>
+      <th>Total</th>
     </tr></thead>
     <tbody>${linesHtml}</tbody>
     <tfoot><tr>
-      <td colspan="3" style="text-align:right;color:#555">Totals</td>
-      <td style="text-align:right">${fmtNum(order.totalQtyBales)}</td>
+      <td colspan="3" style="color:#555">Totals</td>
+      <td>${fmtNum(order.totalQtyBales)}</td>
       <td></td>
-      <td style="text-align:right"></td>
       <td></td>
-      <td style="text-align:right">${fmtMoney(order.grandTotal)}</td>
+      <td></td>
+      <td>${fmtMoney(order.grandTotal)}</td>
     </tr></tfoot>
   </table>
 
   ${charges.length > 0 ? `
   <div class="section-heading" style="margin-top:16px">Charges</div>
   <table class="charges-table">
-    <thead><tr><th>Name</th><th>Type</th><th style="text-align:right">Amount</th></tr></thead>
+    <thead><tr><th>Name</th><th>Type</th><th>Amount</th></tr></thead>
     <tbody>${chargesHtml}</tbody>
   </table>` : ""}
 
