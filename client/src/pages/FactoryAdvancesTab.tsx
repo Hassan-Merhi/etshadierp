@@ -98,6 +98,7 @@ function AdvancesView() {
   const [filterWorker, setFilterWorker] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [deleteTarget, setDeleteTarget] = useState<AdvanceRecord | null>(null);
+  const [reverseTarget, setReverseTarget] = useState<AdvanceRecord | null>(null);
 
   const [form, setForm] = useState({
     workerId: "",
@@ -228,6 +229,25 @@ function AdvancesView() {
     },
     onError: (err: Error) => {
       if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const reverseMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/factory/advances/${id}/reverse`, {});
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to reverse advance");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances/unvouchered"] });
+      toast({ title: "Advance reversed", description: "Advance restored to outstanding — repayments removed." });
+      setReverseTarget(null);
+    },
+    onError: (err: Error) => {
+      if ((err as any)?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -435,16 +455,28 @@ function AdvancesView() {
                     {adv.notes || "\u2014"}
                   </TableCell>
                   <TableCell>
-                    {!adv.fullyPaid && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeleteTarget(adv)}
-                        data-testid={`button-delete-advance-${adv.id}`}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {adv.fullyPaid ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setReverseTarget(adv)}
+                          title="Reverse this advance"
+                          data-testid={`button-reverse-advance-${adv.id}`}
+                        >
+                          <RotateCcw className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeleteTarget(adv)}
+                          data-testid={`button-delete-advance-${adv.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -732,6 +764,34 @@ function AdvancesView() {
               data-testid="button-confirm-delete"
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reverse Advance Dialog */}
+      <Dialog open={!!reverseTarget} onOpenChange={(open) => !open && setReverseTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reverse Advance</DialogTitle>
+            <DialogDescription>
+              This will reverse the advance of <strong>{fmt(reverseTarget?.amount)}</strong> for <strong>{reverseTarget?.workerName}</strong>.
+              All repayments linked to this advance will be removed and the balance will be restored to outstanding.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3 text-sm text-amber-800 dark:text-amber-300">
+            Use this only if the advance was recorded by mistake or the repayments need to be undone. The advance record itself will remain but be marked outstanding again.
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReverseTarget(null)} data-testid="button-cancel-reverse">Cancel</Button>
+            <Button
+              variant="default"
+              className="bg-amber-600 text-white"
+              onClick={() => reverseTarget && reverseMutation.mutate(reverseTarget.id)}
+              disabled={reverseMutation.isPending}
+              data-testid="button-confirm-reverse"
+            >
+              {reverseMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Reversing...</> : <><RotateCcw className="h-4 w-4 mr-2" />Reverse Advance</>}
             </Button>
           </DialogFooter>
         </DialogContent>

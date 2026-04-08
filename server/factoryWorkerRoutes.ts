@@ -2096,6 +2096,59 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     }
   });
 
+  // POST /api/factory/advances/:id/reverse - Reverse a paid advance (restore to outstanding)
+  app.post("/api/factory/advances/:id/reverse", requireAuth, async (req: any, res: any) => {
+    try {
+      const currentRole = (req.session as any).currentRole;
+      if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
+        return res.status(403).json({ message: "Only Admin, Owner, or Developer can reverse advances" });
+      }
+      const companyId = req.body.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+
+      const [advance] = await db.select().from(factoryWorkerAdvances)
+        .where(and(eq(factoryWorkerAdvances.id, id), eq(factoryWorkerAdvances.companyId, companyId)));
+      if (!advance) return res.status(404).json({ message: "Advance not found" });
+
+      const [worker] = await db.select({ fullName: factoryWorkers.fullName })
+        .from(factoryWorkers).where(eq(factoryWorkers.id, advance.workerId));
+
+      const today = new Date().toISOString().split("T")[0];
+
+      await db.transaction(async (tx: any) => {
+        // Delete all repayment records for this advance
+        const repayments = await tx.select().from(factoryAdvanceRepayments)
+          .where(eq(factoryAdvanceRepayments.advanceId, id));
+
+        if (repayments.length > 0) {
+          await tx.delete(factoryAdvanceRepayments)
+            .where(eq(factoryAdvanceRepayments.advanceId, id));
+        }
+
+        // Reset advance back to outstanding
+        await tx.update(factoryWorkerAdvances)
+          .set({ fullyPaid: false, remainingBalance: advance.amount })
+          .where(eq(factoryWorkerAdvances.id, id));
+
+        await writeDaybookEntry(tx, {
+          companyId,
+          txDate: today,
+          txType: "ADVANCE_REVERSED",
+          referenceId: id,
+          referenceTable: "factory_worker_advances",
+          description: `Advance reversed for ${worker?.fullName || "Unknown"}: $${parseFloat(advance.amount).toFixed(2)} restored to outstanding (${repayments.length} repayment(s) removed)`,
+          createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+        });
+      });
+
+      res.json({ message: "Advance reversed and restored to outstanding" });
+    } catch (error: any) {
+      console.error("Error reversing advance:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/factory/advances/unvouchered", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
