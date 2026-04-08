@@ -433,7 +433,9 @@ export default function FactoryEmployees() {
             <DialogTitle>End Contract</DialogTitle>
           </DialogHeader>
           {endingContractEmployee && (() => {
-            const balance = parseFloat(endingContractEmployee.currentBalance || "0");
+            // Use live data from query instead of stale state snapshot
+            const liveEmp = employees.find(e => e.id === endingContractEmployee.id) ?? endingContractEmployee;
+            const balance = parseFloat(liveEmp.currentBalance || "0");
             const fmtBal = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             return (
               <div className="space-y-3">
