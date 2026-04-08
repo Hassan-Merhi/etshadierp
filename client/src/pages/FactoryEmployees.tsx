@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Search, Pencil, Users, UserX, UserCheck, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Plus, Search, Pencil, Users, UserX, UserCheck, AlertTriangle, CheckCircle2, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -63,6 +63,9 @@ export default function FactoryEmployees() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [endingContractEmployee, setEndingContractEmployee] = useState<Employee | null>(null);
   const [formData, setFormData] = useState({ ...emptyForm });
+  const [recalcConfirmOpen, setRecalcConfirmOpen] = useState(false);
+  const [recalcResultOpen, setRecalcResultOpen] = useState(false);
+  const [recalcResult, setRecalcResult] = useState<{ updated: number; employees: Array<{ id: number; name: string; oldBalance: number; newBalance: number }> } | null>(null);
 
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
     queryKey: ["/api/factory/employees"],
@@ -142,6 +145,27 @@ export default function FactoryEmployees() {
     onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
   });
 
+  const recalcMutation = useMutation({
+    mutationFn: async () => {
+      const res = await factoryApiRequest("POST", "/api/factory/employees/recalculate-balances", {});
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to recalculate balances");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
+      setRecalcConfirmOpen(false);
+      setRecalcResult(data);
+      setRecalcResultOpen(true);
+    },
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      toast({ variant: "destructive", title: "Recalculation failed", description: e.message });
+    },
+  });
+
   const filtered = employees.filter((e) => {
     const matchesSearch =
       !search ||
@@ -209,6 +233,10 @@ export default function FactoryEmployees() {
             </Button>
           ))}
         </div>
+        <Button size="sm" variant="outline" onClick={() => setRecalcConfirmOpen(true)} data-testid="button-recalculate-balances">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Recalculate Balances
+        </Button>
         <Button size="sm" onClick={openCreate} data-testid="button-create-employee">
           <Plus className="h-4 w-4 mr-2" />
           New Employee
@@ -487,6 +515,84 @@ export default function FactoryEmployees() {
             >
               {deactivateMutation.isPending ? "Ending..." : "End Contract Anyway"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Recalculate Balances — Confirmation */}
+      <Dialog open={recalcConfirmOpen} onOpenChange={setRecalcConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Recalculate All Employee Balances</DialogTitle>
+            <DialogDescription>
+              This will rebuild every employee's current balance, total deposits, and total withdrawals
+              from their actual accounting records. Use this to fix balances that were corrupted by
+              deletions that didn't reverse properly.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 p-3 flex items-start gap-2 text-sm text-amber-800 dark:text-amber-300">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>
+              This will overwrite the stored balances for <strong>all employees</strong> based on
+              surviving voucher records. Balances for employees with deleted vouchers will be corrected.
+            </span>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setRecalcConfirmOpen(false)} disabled={recalcMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => recalcMutation.mutate()}
+              disabled={recalcMutation.isPending}
+              data-testid="button-confirm-recalculate"
+            >
+              {recalcMutation.isPending
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Recalculating...</>
+                : <><RefreshCw className="h-4 w-4 mr-2" />Recalculate Now</>
+              }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Recalculate Balances — Results */}
+      <Dialog open={recalcResultOpen} onOpenChange={setRecalcResultOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              Balances Recalculated
+            </DialogTitle>
+            <DialogDescription>
+              {recalcResult?.updated ?? 0} employee{recalcResult?.updated !== 1 ? "s" : ""} updated from voucher records.
+            </DialogDescription>
+          </DialogHeader>
+          {recalcResult && recalcResult.employees.filter(e => Math.abs(e.oldBalance - e.newBalance) > 0.005).length > 0 && (
+            <div className="max-h-64 overflow-y-auto border rounded-md divide-y text-sm">
+              <div className="grid grid-cols-3 px-3 py-2 bg-muted text-xs font-medium text-muted-foreground">
+                <span>Employee</span>
+                <span className="text-right">Old Balance</span>
+                <span className="text-right">New Balance</span>
+              </div>
+              {recalcResult.employees
+                .filter(e => Math.abs(e.oldBalance - e.newBalance) > 0.005)
+                .map(e => (
+                  <div key={e.id} className="grid grid-cols-3 px-3 py-2">
+                    <span className="truncate">{e.name}</span>
+                    <span className="text-right font-mono text-muted-foreground">${e.oldBalance.toFixed(2)}</span>
+                    <span className={`text-right font-mono font-medium ${e.newBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                      ${e.newBalance.toFixed(2)}
+                    </span>
+                  </div>
+                ))
+              }
+            </div>
+          )}
+          {recalcResult && recalcResult.employees.filter(e => Math.abs(e.oldBalance - e.newBalance) > 0.005).length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">All balances were already correct — no changes needed.</p>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setRecalcResultOpen(false)} data-testid="button-close-recalc-result">Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

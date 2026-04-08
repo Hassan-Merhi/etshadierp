@@ -19521,6 +19521,81 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // POST /api/factory/employees/recalculate-balances
+  // Rebuilds currentBalance, totalDeposits, totalWithdrawals for every employee from surviving voucher entries.
+  // Useful after deletions that didn't reverse balances (legacy bug).
+  app.post("/api/factory/employees/recalculate-balances", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const role = ((req.session as any).currentRole || (req.session as any).role || "").toLowerCase();
+      if (role !== "admin" && role !== "owner" && role !== "developer") {
+        return res.status(403).json({ message: "Only Admin or Owner can recalculate balances" });
+      }
+
+      // Get all employees for this company
+      const allEmployees = await db.select().from(employees)
+        .where(and(eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"), sql`${employees.deletedAt} IS NULL`));
+
+      if (allEmployees.length === 0) return res.json({ updated: 0, employees: [] });
+
+      const empIds = allEmployees.map(e => e.id);
+
+      // For each employee, sum voucher entry credits and debits from non-deleted vouchers
+      const entrySums = await db.execute(sql`
+        SELECT
+          ve.employee_id,
+          COALESCE(SUM(ve.credit_amount::numeric), 0) AS total_credits,
+          COALESCE(SUM(ve.debit_amount::numeric), 0)  AS total_debits
+        FROM voucher_entries ve
+        INNER JOIN vouchers v ON v.id = ve.voucher_id
+        WHERE ve.employee_id = ANY(${empIds})
+          AND v.deleted_at IS NULL
+        GROUP BY ve.employee_id
+      `);
+
+      // Build a map: empId → { totalCredits, totalDebits }
+      const sumMap = new Map<number, { credits: number; debits: number }>();
+      for (const row of (entrySums as any).rows || (entrySums as any)) {
+        const empId = Number(row.employee_id);
+        sumMap.set(empId, {
+          credits: parseFloat(row.total_credits || "0"),
+          debits:  parseFloat(row.total_debits  || "0"),
+        });
+      }
+
+      const results = [];
+      for (const emp of allEmployees) {
+        const sums = sumMap.get(emp.id) || { credits: 0, debits: 0 };
+        const openingBal = parseFloat(emp.openingBalance || "0");
+        const newBalance      = openingBal + sums.credits - sums.debits;
+        const newDeposits     = sums.credits;
+        const newWithdrawals  = sums.debits;
+
+        await db.update(employees).set({
+          currentBalance:   newBalance.toFixed(2),
+          totalDeposits:    newDeposits.toFixed(2),
+          totalWithdrawals: newWithdrawals.toFixed(2),
+        }).where(eq(employees.id, emp.id));
+
+        results.push({
+          id: emp.id,
+          name: `${emp.firstName} ${emp.lastName}`,
+          oldBalance:   parseFloat(emp.currentBalance || "0"),
+          newBalance,
+          newDeposits,
+          newWithdrawals,
+        });
+      }
+
+      res.json({ updated: results.length, employees: results });
+    } catch (error: any) {
+      console.error("Error recalculating employee balances:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ─── Employee Attendance ──────────────────────────────────────────────────────
 
   app.get("/api/factory/employee-attendance", requireAuth, async (req: any, res: any) => {
