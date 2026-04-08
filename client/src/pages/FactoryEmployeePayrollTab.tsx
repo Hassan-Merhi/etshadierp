@@ -1,12 +1,11 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { Play, DollarSign, Users, Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { Play, DollarSign, Users, Loader2, ChevronDown, ChevronRight, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -42,6 +41,7 @@ export default function FactoryEmployeePayrollTab() {
   const [payDate, setPayDate] = useState(today());
   const [payNotes, setPayNotes] = useState("");
   const [amounts, setAmounts] = useState<Record<number, string>>({});
+  const [deductions, setDeductions] = useState<Record<number, string>>({});
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
 
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
@@ -58,17 +58,25 @@ export default function FactoryEmployeePayrollTab() {
     const initial: Record<number, string> = {};
     for (const e of employees) initial[e.id] = parseFloat(e.monthlySalary || "0") > 0 ? fmt(e.monthlySalary).replace(/,/g, "") : "";
     setAmounts(initial);
+    setDeductions({});
     setPayrollOpen(true);
   };
 
-  const totalPayroll = useMemo(() =>
-    Object.values(amounts).reduce((s, v) => s + (parseFloat(v) || 0), 0)
-  , [amounts]);
+  // net per employee = salary - deduction
+  const getNet = (empId: number) => {
+    const sal = parseFloat(amounts[empId] || "0") || 0;
+    const ded = parseFloat(deductions[empId] || "0") || 0;
+    return Math.max(0, sal - ded);
+  };
+
+  const totalNet = useMemo(() =>
+    employees.reduce((s, e) => s + getNet(e.id), 0)
+  , [amounts, deductions, employees]);
 
   const payrollMutation = useMutation({
     mutationFn: async () => {
       const deposits = employees
-        .map((e) => ({ employeeId: e.id, amount: parseFloat(amounts[e.id] || "0") }))
+        .map((e) => ({ employeeId: e.id, amount: getNet(e.id) }))
         .filter((d) => d.amount > 0);
       if (deposits.length === 0) throw new Error("No amounts entered");
       const res = await fetch("/api/factory/employees/bulk-payroll", {
@@ -81,9 +89,10 @@ export default function FactoryEmployeePayrollTab() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Payroll run complete", description: `Total paid: ${fmt(totalPayroll)}` });
+      toast({ title: "Payroll run complete", description: `Total paid: ${fmt(totalNet)}` });
       setPayrollOpen(false);
       setAmounts({});
+      setDeductions({});
       setPayNotes("");
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
     },
@@ -184,7 +193,7 @@ export default function FactoryEmployeePayrollTab() {
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Run Employee Payroll</DialogTitle>
-            <DialogDescription>Enter the amount to credit for each employee. Amounts pre-filled from monthly salary.</DialogDescription>
+            <DialogDescription>Enter the salary and any deduction per employee. Net = Salary − Deduction.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
@@ -198,35 +207,62 @@ export default function FactoryEmployeePayrollTab() {
               </div>
             </div>
 
+            {/* Column headers */}
+            <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-2 items-center px-3 pb-1 text-xs text-muted-foreground font-medium border-b">
+              <span>Employee</span>
+              <span className="w-24 text-right">Salary</span>
+              <span className="w-4" />
+              <span className="w-24 text-right">Deduct</span>
+              <span className="w-20 text-right">Net</span>
+            </div>
+
             <div className="rounded-md border divide-y">
-              {employees.map((emp) => (
-                <div key={emp.id} className="flex items-center gap-3 px-3 py-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{emp.firstName} {emp.lastName}</p>
-                    <p className="text-xs text-muted-foreground">Base: {fmt(emp.monthlySalary)}</p>
+              {employees.map((emp) => {
+                const sal = parseFloat(amounts[emp.id] || "0") || 0;
+                const ded = parseFloat(deductions[emp.id] || "0") || 0;
+                const net = Math.max(0, sal - ded);
+                return (
+                  <div key={emp.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-2 items-center px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{emp.firstName} {emp.lastName}</p>
+                      <p className="text-xs text-muted-foreground">{emp.code || emp.department || ""}</p>
+                    </div>
+                    <Input
+                      type="number"
+                      className="w-24 text-right"
+                      placeholder="0.00"
+                      value={amounts[emp.id] || ""}
+                      onChange={(e) => setAmounts((a) => ({ ...a, [emp.id]: e.target.value }))}
+                      data-testid={`input-payroll-amount-${emp.id}`}
+                    />
+                    <Minus className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <Input
+                      type="number"
+                      className="w-24 text-right"
+                      placeholder="0.00"
+                      min="0"
+                      value={deductions[emp.id] || ""}
+                      onChange={(e) => setDeductions((d) => ({ ...d, [emp.id]: e.target.value }))}
+                      data-testid={`input-payroll-deduction-${emp.id}`}
+                    />
+                    <div className={`w-20 text-right font-mono text-sm font-semibold ${ded > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}>
+                      {fmt(net)}
+                    </div>
                   </div>
-                  <Input
-                    type="number"
-                    className="w-28 text-right"
-                    placeholder="0.00"
-                    value={amounts[emp.id] || ""}
-                    onChange={(e) => setAmounts((a) => ({ ...a, [emp.id]: e.target.value }))}
-                    data-testid={`input-payroll-amount-${emp.id}`}
-                  />
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="flex justify-between text-sm font-medium pt-1 border-t">
-              <span>Total Payroll</span>
-              <span className="font-mono">{fmt(totalPayroll)}</span>
+              <span>Total Net Payroll</span>
+              <span className="font-mono">{fmt(totalNet)}</span>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPayrollOpen(false)}>Cancel</Button>
-            <Button onClick={() => payrollMutation.mutate()} disabled={payrollMutation.isPending || totalPayroll === 0} data-testid="button-confirm-payroll">
+            <Button onClick={() => payrollMutation.mutate()} disabled={payrollMutation.isPending || totalNet === 0} data-testid="button-confirm-payroll">
               {payrollMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <DollarSign className="h-4 w-4 mr-2" />}
-              Pay {fmt(totalPayroll)}
+              Pay {fmt(totalNet)}
             </Button>
           </DialogFooter>
         </DialogContent>
