@@ -128,6 +128,7 @@ const FactoryImport = lazy(() => import("@/pages/FactoryImport"));
 const FactoryBaleRelabeling = lazy(() => import("@/pages/FactoryBaleRelabeling"));
 const WipersReEntry = lazy(() => import("@/pages/WipersReEntry"));
 const FactoryUsers = lazy(() => import("@/pages/FactoryUsers"));
+const FactoryPayrollHub = lazy(() => import("@/pages/FactoryPayrollHub"));
 const FactoryWorkersHub = lazy(() => import("@/pages/FactoryWorkersHub"));
 const FactoryWorkerDetail = lazy(() => import("@/pages/FactoryWorkerDetail"));
 const FactoryEmployeesHub = lazy(() => import("@/pages/FactoryEmployeesHub"));
@@ -795,11 +796,12 @@ function AuthenticatedApp() {
                     <Route path="/factory/stock-allocation" component={FactoryStockAllocation} />
                     <Route path="/factory/customers/:id" component={FactoryCustomerStatement} />
                     <Route path="/factory/customers" component={FactoryCustomers} />
+                    <Route path="/factory/payroll" component={FactoryPayrollHub} />
                     <Route path="/factory/employees/:id" component={FactoryEmployeeDetail} />
-                    <Route path="/factory/employees" component={FactoryEmployeesHub} />
+                    <Route path="/factory/employees"><Redirect to="/factory/payroll?section=employees" /></Route>
                     <Route path="/factory/workers/:id" component={FactoryWorkerDetail} />
-                    <Route path="/factory/workers" component={FactoryWorkersHub} />
-                    <Route path="/factory/worker-payroll"><Redirect to="/factory/workers?tab=payroll" /></Route>
+                    <Route path="/factory/workers"><Redirect to="/factory/payroll?section=workers" /></Route>
+                    <Route path="/factory/worker-payroll"><Redirect to="/factory/payroll?section=workers&tab=payroll" /></Route>
                     <Route path="/factory/supplier-report" component={FactorySupplierReport} />
                     <Route path="/factory/supplier-statement" component={FactorySupplierStatement} />
                     <Route path="/factory/barcode-lookup" component={BarcodeLookup} />

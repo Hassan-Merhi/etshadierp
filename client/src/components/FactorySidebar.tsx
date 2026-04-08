@@ -106,9 +106,8 @@ const navSections: NavSection[] = [
     label: "Finance",
     color: "#10b981",
     items: [
-      { title: "Workers",   url: "/factory/workers",   icon: HardHat   },
-      { title: "Employees", url: "/factory/employees", icon: Users     },
-      { title: "Suppliers", url: "/factory/suppliers", icon: UserRound },
+      { title: "Payroll",   url: "/factory/payroll",   icon: DollarSign },
+      { title: "Suppliers", url: "/factory/suppliers", icon: UserRound  },
     ],
   },
   {
@@ -159,6 +158,9 @@ export const FACTORY_NAV_PAGES: { key: string; label: string; group: string }[] 
   { key: "factory/daybook",   label: "Daybook",   group: "Other"    },
   { key: "factory/chat",      label: "Chat",      group: "Other"    },
   { key: "factory/settings",  label: "Settings",  group: "Other"    },
+  // Legacy keys for backward compat with page access rules
+  { key: "factory/workers",   label: "Workers",   group: "Finance"  },
+  { key: "factory/employees", label: "Employees", group: "Finance"  },
 ];
 
 export function FactorySidebar({ user }: { user?: any }) {
