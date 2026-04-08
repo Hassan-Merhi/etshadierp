@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, type Dispatch, type SetStateAction } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import {
@@ -83,6 +83,156 @@ interface PayrollGroup {
   records: PayrollRecord[];
 }
 
+interface BatchRowProps {
+  group: PayrollGroup;
+  expanded: Set<string>;
+  toggleGroup: (key: string) => void;
+  selectedIds: Set<number>;
+  setSelectedIds: Dispatch<SetStateAction<Set<number>>>;
+  setPayTargetId: (id: number) => void;
+  setPayCashAccountId: (v: string) => void;
+  setPayOpen: (v: boolean) => void;
+  setFixAcctTargetId: (id: number) => void;
+  setFixAcctCashId: (v: string) => void;
+  setFixAcctOpen: (v: boolean) => void;
+  setUndoTargetId: (id: number) => void;
+  setDeleteBatchGroup: (g: PayrollGroup) => void;
+  formatDisplayDate: (d: string | Date) => string;
+  condensed?: boolean;
+}
+
+function BatchRow({ group, expanded, toggleGroup, selectedIds, setSelectedIds, setPayTargetId, setPayCashAccountId, setPayOpen, setFixAcctTargetId, setFixAcctCashId, setFixAcctOpen, setUndoTargetId, setDeleteBatchGroup, formatDisplayDate, condensed }: BatchRowProps) {
+  const isExpanded = expanded.has(group.key);
+  const total = group.records.reduce((s, p) => s + parseFloat(p.netSalary || "0"), 0);
+  const paidCount = group.records.filter((p) => p.status === "PAID").length;
+  const unpaidCount = group.records.length - paidCount;
+  const groupUnpaid = group.records.filter((p) => p.status !== "PAID");
+  const allGroupSelected = groupUnpaid.length > 0 && groupUnpaid.every((p) => selectedIds.has(p.id));
+
+  return (
+    <div>
+      <div
+        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover-elevate"
+        onClick={() => toggleGroup(group.key)}
+        data-testid={`group-${group.key}`}
+      >
+        {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+        <div className="flex-1 min-w-0">
+          <p className={`font-medium ${condensed ? "text-xs" : "text-sm"}`}>
+            {fmtDate(group.periodStart, formatDisplayDate)} – {fmtDate(group.periodEnd, formatDisplayDate)}
+          </p>
+          <p className="text-xs text-muted-foreground">{group.records.length} worker{group.records.length !== 1 ? "s" : ""}</p>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="text-right">
+            <p className={`font-semibold font-mono ${condensed ? "text-xs" : "text-sm"}`}>${total.toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground">
+              {paidCount > 0 && <span className="text-green-600 dark:text-green-400">{paidCount} paid</span>}
+              {paidCount > 0 && unpaidCount > 0 && " · "}
+              {unpaidCount > 0 && <span className="text-amber-600 dark:text-amber-400">{unpaidCount} pending</span>}
+            </p>
+          </div>
+          {groupUnpaid.length > 0 && (
+            <Checkbox
+              checked={allGroupSelected}
+              onCheckedChange={(v) => {
+                setSelectedIds((prev) => {
+                  const next = new Set(prev);
+                  groupUnpaid.forEach((p) => v ? next.add(p.id) : next.delete(p.id));
+                  return next;
+                });
+              }}
+              onClick={(e) => e.stopPropagation()}
+              data-testid={`checkbox-group-${group.key}`}
+            />
+          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={(e) => { e.stopPropagation(); setDeleteBatchGroup(group); }}
+            data-testid={`button-delete-batch-${group.key}`}
+            title="Delete batch — reverses all payments and accounting entries"
+          >
+            <Trash2 className="h-4 w-4 text-muted-foreground" />
+          </Button>
+        </div>
+      </div>
+
+      {isExpanded && (
+        <div className="overflow-x-auto bg-muted/30">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-10 pl-8"></TableHead>
+                <TableHead>Worker</TableHead>
+                <TableHead className="text-center">Present</TableHead>
+                <TableHead className="text-center">Absent</TableHead>
+                <TableHead className="text-right">Net</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Paid On</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {group.records.map((p) => {
+                const cfg = STATUS_CONFIG[p.status] || STATUS_CONFIG.DRAFT;
+                const canPay = p.status !== "PAID";
+                return (
+                  <TableRow key={p.id} data-testid={`row-payroll-${p.id}`}>
+                    <TableCell className="pl-8">
+                      {canPay && (
+                        <Checkbox
+                          checked={selectedIds.has(p.id)}
+                          onCheckedChange={() => setSelectedIds((prev) => { const n = new Set(prev); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n; })}
+                          data-testid={`checkbox-payroll-${p.id}`}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium text-sm">{p.worker?.fullName || `Worker #${p.workerId}`}</p>
+                        {p.worker?.position && <p className="text-xs text-muted-foreground">{p.worker.position}</p>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center font-mono text-sm" data-testid={`text-present-${p.id}`}>
+                      {p.presentDays != null ? (Number(p.presentDays) % 1 === 0 ? Number(p.presentDays).toFixed(0) : p.presentDays) : "—"}
+                    </TableCell>
+                    <TableCell className="text-center font-mono text-sm" data-testid={`text-absent-${p.id}`}>
+                      {p.absentDays != null ? (Number(p.absentDays) % 1 === 0 ? Number(p.absentDays).toFixed(0) : p.absentDays) : "—"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm font-semibold">${fmt(p.netSalary)}</TableCell>
+                    <TableCell>
+                      <Badge variant={cfg.variant} className={`text-xs ${cfg.className}`}>{cfg.label}</Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{p.paidAt ? fmtDate(p.paidAt, formatDisplayDate) : "—"}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        {canPay && (
+                          <Button size="sm" variant="outline" onClick={() => { setPayTargetId(p.id); setPayCashAccountId(""); setPayOpen(true); }} data-testid={`button-pay-${p.id}`}>
+                            Pay
+                          </Button>
+                        )}
+                        {p.status === "PAID" && !p.cashAccountId && (
+                          <Button size="icon" variant="ghost" onClick={() => { setFixAcctTargetId(p.id); setFixAcctCashId(""); setFixAcctOpen(true); }} data-testid={`button-fix-acct-${p.id}`} title="Generate missing accounting entry">
+                            <Wrench className="h-4 w-4 text-amber-500" />
+                          </Button>
+                        )}
+                        <Button size="icon" variant="ghost" onClick={() => setUndoTargetId(p.id)} data-testid={`button-undo-payroll-${p.id}`} title="Undo — reverses all accounting entries">
+                          <RotateCcw className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FactoryPayrollTab() {
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
@@ -96,6 +246,8 @@ export default function FactoryPayrollTab() {
   const [bulkCashAccountId, setBulkCashAccountId] = useState("");
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [undoTargetId, setUndoTargetId] = useState<number | null>(null);
+  const [deleteBatchGroup, setDeleteBatchGroup] = useState<PayrollGroup | null>(null);
+  const [showCompletedBatches, setShowCompletedBatches] = useState(false);
   const [fixAcctOpen, setFixAcctOpen] = useState(false);
   const [fixAcctTargetId, setFixAcctTargetId] = useState<number | null>(null);
   const [fixAcctCashId, setFixAcctCashId] = useState("");
@@ -339,6 +491,27 @@ export default function FactoryPayrollTab() {
     },
   });
 
+  const batchDeleteMutation = useMutation({
+    mutationFn: async (group: PayrollGroup) => {
+      for (const p of group.records) {
+        const res = await apiRequest("POST", `/api/factory/payroll/${p.id}/undo`);
+        if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed to undo"); }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances/unvouchered"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
+      toast({ title: "Batch deleted", description: "All records reversed and accounting entries removed." });
+      setDeleteBatchGroup(null);
+    },
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Batch delete failed", description: err.message, variant: "destructive" });
+    },
+  });
+
   const fixAcctMutation = useMutation({
     mutationFn: async ({ id, cashId }: { id: number; cashId: string }) => {
       const res = await apiRequest("PATCH", `/api/factory/payrolls/${id}/fix-accounting`, {
@@ -385,6 +558,8 @@ export default function FactoryPayrollTab() {
 
   const unpaidPayrolls = (payrolls || []).filter((p) => p.status !== "PAID");
   const allSelected = unpaidPayrolls.length > 0 && unpaidPayrolls.every((p) => selectedIds.has(p.id));
+  const activeGroups = payrollGroups.filter((g) => g.records.some((p) => p.status !== "PAID"));
+  const completedGroups = payrollGroups.filter((g) => g.records.every((p) => p.status === "PAID"));
 
   return (
     <div className="space-y-6">
@@ -450,153 +625,36 @@ export default function FactoryPayrollTab() {
               <p className="text-sm mt-1">Click "Run Payroll" to generate records</p>
             </div>
           ) : (
-            <div className="divide-y">
-              {payrollGroups.map((group) => {
-                const isExpanded = expandedGroups.has(group.key);
-                const total = group.records.reduce((s, p) => s + parseFloat(p.netSalary || "0"), 0);
-                const paidCount = group.records.filter((p) => p.status === "PAID").length;
-                const unpaidCount = group.records.length - paidCount;
-                const groupUnpaid = group.records.filter((p) => p.status !== "PAID");
-                const allGroupSelected = groupUnpaid.length > 0 && groupUnpaid.every((p) => selectedIds.has(p.id));
+            <div>
+              {/* ── Active batches (any pending records) ── */}
+              {activeGroups.length === 0 && completedGroups.length > 0 && (
+                <div className="text-center py-10 text-muted-foreground text-sm">
+                  All batches are fully paid — see completed batches below.
+                </div>
+              )}
+              <div className="divide-y">
+                {activeGroups.map((group) => <BatchRow key={group.key} group={group} expanded={expandedGroups} toggleGroup={toggleGroup} selectedIds={selectedIds} setSelectedIds={setSelectedIds} setPayTargetId={setPayTargetId} setPayCashAccountId={setPayCashAccountId} setPayOpen={setPayOpen} setFixAcctTargetId={setFixAcctTargetId} setFixAcctCashId={setFixAcctCashId} setFixAcctOpen={setFixAcctOpen} setUndoTargetId={setUndoTargetId} setDeleteBatchGroup={setDeleteBatchGroup} formatDisplayDate={formatDisplayDate} />)}
+              </div>
 
-                return (
-                  <div key={group.key}>
-                    {/* Batch summary row */}
-                    <div
-                      className="flex items-center gap-3 px-4 py-3 cursor-pointer hover-elevate"
-                      onClick={() => toggleGroup(group.key)}
-                      data-testid={`group-${group.key}`}
-                    >
-                      {isExpanded
-                        ? <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        : <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      }
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">
-                          {fmtDate(group.periodStart, formatDisplayDate)} – {fmtDate(group.periodEnd, formatDisplayDate)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{group.records.length} worker{group.records.length !== 1 ? "s" : ""}</p>
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <div className="text-right">
-                          <p className="text-sm font-semibold font-mono">${total.toFixed(2)}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {paidCount > 0 && <span className="text-green-600 dark:text-green-400">{paidCount} paid</span>}
-                            {paidCount > 0 && unpaidCount > 0 && " · "}
-                            {unpaidCount > 0 && <span className="text-amber-600 dark:text-amber-400">{unpaidCount} pending</span>}
-                          </p>
-                        </div>
-                        {groupUnpaid.length > 0 && (
-                          <Checkbox
-                            checked={allGroupSelected}
-                            onCheckedChange={(v) => {
-                              setSelectedIds((prev) => {
-                                const next = new Set(prev);
-                                groupUnpaid.forEach((p) => v ? next.add(p.id) : next.delete(p.id));
-                                return next;
-                              });
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            data-testid={`checkbox-group-${group.key}`}
-                          />
-                        )}
-                      </div>
+              {/* ── Completed batches (all paid) ── */}
+              {completedGroups.length > 0 && (
+                <div className={activeGroups.length > 0 ? "border-t" : ""}>
+                  <button
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-muted-foreground hover-elevate"
+                    onClick={() => setShowCompletedBatches((v) => !v)}
+                    data-testid="toggle-completed-batches"
+                  >
+                    {showCompletedBatches ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                    {completedGroups.length} completed batch{completedGroups.length !== 1 ? "es" : ""}
+                  </button>
+                  {showCompletedBatches && (
+                    <div className="divide-y bg-muted/20">
+                      {completedGroups.map((group) => <BatchRow key={group.key} group={group} expanded={expandedGroups} toggleGroup={toggleGroup} selectedIds={selectedIds} setSelectedIds={setSelectedIds} setPayTargetId={setPayTargetId} setPayCashAccountId={setPayCashAccountId} setPayOpen={setPayOpen} setFixAcctTargetId={setFixAcctTargetId} setFixAcctCashId={setFixAcctCashId} setFixAcctOpen={setFixAcctOpen} setUndoTargetId={setUndoTargetId} setDeleteBatchGroup={setDeleteBatchGroup} formatDisplayDate={formatDisplayDate} condensed />)}
                     </div>
-
-                    {/* Expanded worker rows */}
-                    {isExpanded && (
-                      <div className="overflow-x-auto bg-muted/30">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-10 pl-8"></TableHead>
-                              <TableHead>Worker</TableHead>
-                              <TableHead className="text-center">Present</TableHead>
-                              <TableHead className="text-center">Absent</TableHead>
-                              <TableHead className="text-right">Net</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Paid On</TableHead>
-                              <TableHead></TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {group.records.map((p) => {
-                              const cfg = STATUS_CONFIG[p.status] || STATUS_CONFIG.DRAFT;
-                              const canPay = p.status !== "PAID";
-                              return (
-                                <TableRow key={p.id} data-testid={`row-payroll-${p.id}`}>
-                                  <TableCell className="pl-8">
-                                    {canPay && (
-                                      <Checkbox
-                                        checked={selectedIds.has(p.id)}
-                                        onCheckedChange={() => toggleSelect(p.id)}
-                                        data-testid={`checkbox-payroll-${p.id}`}
-                                      />
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    <div>
-                                      <p className="font-medium text-sm">{p.worker?.fullName || `Worker #${p.workerId}`}</p>
-                                      {p.worker?.position && <p className="text-xs text-muted-foreground">{p.worker.position}</p>}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-center font-mono text-sm" data-testid={`text-present-${p.id}`}>
-                                    {p.presentDays != null ? (Number(p.presentDays) % 1 === 0 ? Number(p.presentDays).toFixed(0) : p.presentDays) : "—"}
-                                  </TableCell>
-                                  <TableCell className="text-center font-mono text-sm" data-testid={`text-absent-${p.id}`}>
-                                    {p.absentDays != null ? (Number(p.absentDays) % 1 === 0 ? Number(p.absentDays).toFixed(0) : p.absentDays) : "—"}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono text-sm font-semibold">${fmt(p.netSalary)}</TableCell>
-                                  <TableCell>
-                                    <Badge variant={cfg.variant} className={`text-xs ${cfg.className}`}>
-                                      {cfg.label}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-sm text-muted-foreground">{p.paidAt ? fmtDate(p.paidAt, formatDisplayDate) : "—"}</TableCell>
-                                  <TableCell>
-                                    <div className="flex items-center gap-1">
-                                      {canPay && (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => { setPayTargetId(p.id); setPayCashAccountId(""); setPayOpen(true); }}
-                                          data-testid={`button-pay-${p.id}`}
-                                        >
-                                          Pay
-                                        </Button>
-                                      )}
-                                      {p.status === "PAID" && !p.cashAccountId && (
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          onClick={() => { setFixAcctTargetId(p.id); setFixAcctCashId(""); setFixAcctOpen(true); }}
-                                          data-testid={`button-fix-acct-${p.id}`}
-                                          title="Generate missing accounting entry"
-                                        >
-                                          <Wrench className="h-4 w-4 text-amber-500" />
-                                        </Button>
-                                      )}
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        onClick={() => setUndoTargetId(p.id)}
-                                        data-testid={`button-undo-payroll-${p.id}`}
-                                        title="Undo — reverses all accounting entries"
-                                      >
-                                        <RotateCcw className="h-4 w-4 text-muted-foreground" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                  )}
+                </div>
+              )}
             </div>
           )}
         </CardContent>
@@ -1040,6 +1098,34 @@ export default function FactoryPayrollTab() {
           </Dialog>
         );
       })()}
+
+      {/* Batch Delete Confirmation */}
+      <Dialog open={deleteBatchGroup !== null} onOpenChange={(open) => !open && setDeleteBatchGroup(null)}>
+        <DialogContent data-testid="dialog-delete-batch">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-4 w-4 text-destructive" />
+              Delete Entire Batch
+            </DialogTitle>
+            <DialogDescription>
+              This will reverse all {deleteBatchGroup?.records.length} payroll record{deleteBatchGroup?.records.length !== 1 ? "s" : ""} for{" "}
+              <strong>{deleteBatchGroup ? `${fmtDate(deleteBatchGroup.periodStart, (d) => d.toString())} – ${fmtDate(deleteBatchGroup.periodEnd, (d) => d.toString())}` : ""}</strong>.
+              All payments will be undone, accounting entries deleted, and advance deductions restored.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteBatchGroup(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteBatchGroup && batchDeleteMutation.mutate(deleteBatchGroup)}
+              disabled={batchDeleteMutation.isPending}
+              data-testid="button-confirm-delete-batch"
+            >
+              {batchDeleteMutation.isPending ? "Deleting..." : "Delete Batch"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation */}
       <Dialog open={deleteTargetId !== null} onOpenChange={(open) => !open && setDeleteTargetId(null)}>
