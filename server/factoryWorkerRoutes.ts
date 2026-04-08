@@ -767,7 +767,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const effectiveStart = workerJoinDate && workerJoinDate > startDate ? workerJoinDate : startDate;
 
       if (effectiveStart > endDate && dryRun) {
-        return res.json({ earned: "0.00", paid: "0.00", balance: "0.00", effectiveStart, dryRun: true });
+        return res.json({ earned: "0.00", paid: "0.00", advances: "0.00", balance: "0.00", effectiveStart, dryRun: true });
       }
 
       // Helper functions
@@ -837,11 +837,20 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         inArray(factoryPayrolls.status, ["APPROVED", "PAID"]),
       ));
       const totalPaid = paidPayrolls.reduce((s: number, p: any) => s + parseFloat(p.netSalary || "0"), 0);
-      const balance = earned - totalPaid;
+
+      // Compute outstanding advances (remaining balance not yet recovered)
+      const outstandingAdvances = await db.select().from(factoryWorkerAdvances).where(and(
+        eq(factoryWorkerAdvances.workerId, id),
+        eq(factoryWorkerAdvances.companyId, companyId),
+        eq(factoryWorkerAdvances.fullyPaid, false),
+      ));
+      const totalAdvances = outstandingAdvances.reduce((s: number, a: any) => s + parseFloat(a.remainingBalance || "0"), 0);
+
+      const balance = earned - totalPaid - totalAdvances;
 
       // dryRun: just return calculation, no DB changes
       if (dryRun) {
-        return res.json({ earned: earned.toFixed(2), paid: totalPaid.toFixed(2), balance: balance.toFixed(2), effectiveStart, dryRun: true });
+        return res.json({ earned: earned.toFixed(2), paid: totalPaid.toFixed(2), advances: totalAdvances.toFixed(2), balance: balance.toFixed(2), effectiveStart, dryRun: true });
       }
 
       const settlementStatus = payNow ? "PAID" : "APPROVED";
@@ -859,7 +868,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         overtimePay: "0",
         bonuses: "0",
         deductions: String(totalPaid.toFixed(2)),
-        advances: "0",
+        advances: String(totalAdvances.toFixed(2)),
         netSalary: String(balance.toFixed(2)),
         balesCount: 0,
         kgProcessed: "0",
@@ -870,6 +879,15 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         paidAt: settlementPaidAt,
       } as any).returning();
 
+      // Mark all outstanding advances as fully paid (recovered on settlement)
+      if (outstandingAdvances.length > 0) {
+        for (const adv of outstandingAdvances) {
+          await db.update(factoryWorkerAdvances)
+            .set({ fullyPaid: true, remainingBalance: "0" })
+            .where(eq(factoryWorkerAdvances.id, adv.id));
+        }
+      }
+
       // Deactivate worker
       const today = new Date().toISOString().split("T")[0];
       await db.update(factoryWorkers).set({ active: false, contractEndDate: endDate, updatedAt: new Date() }).where(eq(factoryWorkers.id, id));
@@ -877,12 +895,12 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       await writeDaybookEntry(db, {
         companyId, txDate: today, txType: "CONTRACT_SETTLED",
         referenceId: id, referenceTable: "factory_workers",
-        description: `Settlement for ${worker.fullName}: earned $${earned.toFixed(2)}, paid $${totalPaid.toFixed(2)}, balance $${balance.toFixed(2)}`,
+        description: `Settlement for ${worker.fullName}: earned $${earned.toFixed(2)}, paid $${totalPaid.toFixed(2)}, advances $${totalAdvances.toFixed(2)}, balance $${balance.toFixed(2)}`,
         amountCurrency: Math.abs(balance), amountUsd: Math.abs(balance),
         createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
       });
 
-      res.json({ earned: earned.toFixed(2), paid: totalPaid.toFixed(2), balance: balance.toFixed(2), effectiveStart, settlementPayrollId: settlement.id, workerUpdated: true });
+      res.json({ earned: earned.toFixed(2), paid: totalPaid.toFixed(2), advances: totalAdvances.toFixed(2), balance: balance.toFixed(2), effectiveStart, settlementPayrollId: settlement.id, workerUpdated: true });
     } catch (error: any) {
       console.error("Error settling worker contract:", error);
       res.status(500).json({ message: error.message });

@@ -224,7 +224,7 @@ export default function FactoryWorkerDetail() {
   const [endStart, setEndStart] = useState("");
   const [endEnd, setEndEnd] = useState(new Date().toISOString().split("T")[0]);
   const [endCalculating, setEndCalculating] = useState(false);
-  const [endResult, setEndResult] = useState<{ earned: string; paid: string; balance: string } | null>(null);
+  const [endResult, setEndResult] = useState<{ earned: string; paid: string; advances: string; balance: string } | null>(null);
   const [endCashAccountId, setEndCashAccountId] = useState("");
   const [endSubmitting, setEndSubmitting] = useState(false);
 
@@ -1419,7 +1419,7 @@ export default function FactoryWorkerDetail() {
 
           {endStep === 2 && endResult && (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-md border p-3 text-center">
                   <p className="text-xs text-muted-foreground mb-1">Earned</p>
                   <p className="font-semibold text-sm" data-testid="text-earned">${fmtNum(endResult.earned)}</p>
@@ -1427,6 +1427,10 @@ export default function FactoryWorkerDetail() {
                 <div className="rounded-md border p-3 text-center">
                   <p className="text-xs text-muted-foreground mb-1">Already Paid</p>
                   <p className="font-semibold text-sm" data-testid="text-paid">${fmtNum(endResult.paid)}</p>
+                </div>
+                <div className={`rounded-md border p-3 text-center ${parseFloat(endResult.advances) > 0 ? "border-orange-300 bg-orange-50 dark:bg-orange-900/20" : ""}`}>
+                  <p className="text-xs text-muted-foreground mb-1">Advances</p>
+                  <p className="font-semibold text-sm" data-testid="text-advances">${fmtNum(endResult.advances)}</p>
                 </div>
                 <div className={`rounded-md border p-3 text-center ${payrollBalance > 0 ? "border-amber-300 bg-amber-50 dark:bg-amber-900/20" : "border-green-300 bg-green-50 dark:bg-green-900/20"}`}>
                   <p className="text-xs text-muted-foreground mb-1">Balance</p>
