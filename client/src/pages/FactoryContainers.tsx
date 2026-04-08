@@ -92,6 +92,7 @@ export default function FactoryContainers() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -313,6 +314,7 @@ export default function FactoryContainers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
       toast({ title: "Deleted", description: "Container removed" });
+      setPendingDeleteId(null);
     },
     onError: (err: Error) => {
       if (err?._handledGlobally) return;
@@ -979,7 +981,7 @@ export default function FactoryContainers() {
                                 <Button variant="ghost" size="icon" onClick={() => openEdit(c)} data-testid={`button-edit-container-${c.id}`}>
                                   <Pencil className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(c.id)} data-testid={`button-delete-container-${c.id}`}>
+                                <Button variant="ghost" size="icon" onClick={() => setPendingDeleteId(c.id)} data-testid={`button-delete-container-${c.id}`}>
                                   <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
                               </div>
@@ -1645,6 +1647,34 @@ export default function FactoryContainers() {
               data-testid="button-confirm-bulk-delete"
             >
               {bulkDeleteMutation.isPending ? "Deleting..." : `Delete ${selectedIds.size} Container${selectedIds.size !== 1 ? "s" : ""}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Single Container Delete Confirmation */}
+      <Dialog open={pendingDeleteId !== null} onOpenChange={(open) => { if (!open) setPendingDeleteId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Delete Container?
+            </DialogTitle>
+            <DialogDescription>
+              This will permanently delete the container and all its linked records — accounting entries, vouchers, FX allocations, mix batch links, offload charges, and raw stock. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPendingDeleteId(null)} disabled={deleteMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => { if (pendingDeleteId !== null) deleteMutation.mutate(pendingDeleteId); }}
+              data-testid="button-confirm-delete-container"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete Container"}
             </Button>
           </DialogFooter>
         </DialogContent>

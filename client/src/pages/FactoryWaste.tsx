@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Loader2, Plus, Trash2, AlertTriangle } from "lucide-react";
 
 interface WasteEntry {
   id: number;
@@ -40,6 +40,7 @@ export default function FactoryWaste() {
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
   const [formDate, setFormDate] = useState(new Date().toISOString().split("T")[0]);
   const [formKg, setFormKg] = useState("");
@@ -104,6 +105,7 @@ export default function FactoryWaste() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/waste", from, to] });
+      setPendingDeleteId(null);
     },
   });
 
@@ -319,7 +321,7 @@ export default function FactoryWaste() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={() => deleteMutation.mutate(entry.id)}
+                          onClick={() => setPendingDeleteId(entry.id)}
                           disabled={deleteMutation.isPending}
                           data-testid={`button-delete-waste-${entry.id}`}
                         >
@@ -334,6 +336,34 @@ export default function FactoryWaste() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Waste Entry Confirmation */}
+      <Dialog open={pendingDeleteId !== null} onOpenChange={(open) => { if (!open) setPendingDeleteId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-4 w-4" />
+              Delete Waste Entry?
+            </DialogTitle>
+            <DialogDescription>
+              This will permanently remove the waste record. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPendingDeleteId(null)} disabled={deleteMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => { if (pendingDeleteId !== null) deleteMutation.mutate(pendingDeleteId); }}
+              data-testid="button-confirm-delete-waste"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete Entry"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -254,6 +254,7 @@ export default function FactoryWorkerDetail() {
   const [repayCashAccountId, setRepayCashAccountId] = useState("");
   const [repayNotes, setRepayNotes] = useState("");
   const [expandedAdvanceId, setExpandedAdvanceId] = useState<number | null>(null);
+  const [pendingDeleteDocId, setPendingDeleteDocId] = useState<number | null>(null);
 
   const { data: worker, isLoading: workerLoading, error: workerError } = useQuery<WorkerWithStats>({
     queryKey: ["/api/factory/workers", workerId],
@@ -1363,7 +1364,7 @@ export default function FactoryWorkerDetail() {
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                onClick={() => deleteDocMutation.mutate(doc.id)}
+                                onClick={() => setPendingDeleteDocId(doc.id)}
                                 disabled={deleteDocMutation.isPending}
                                 data-testid={`button-delete-doc-${doc.id}`}
                               >
@@ -1602,6 +1603,31 @@ export default function FactoryWorkerDetail() {
               data-testid="button-confirm-pay"
             >
               {markPaidMutation.isPending ? "Saving..." : "Confirm Payment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Document Confirmation */}
+      <Dialog open={pendingDeleteDocId !== null} onOpenChange={(open) => { if (!open) setPendingDeleteDocId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Document?</DialogTitle>
+            <DialogDescription>
+              This will permanently remove the uploaded document. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPendingDeleteDocId(null)} disabled={deleteDocMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteDocMutation.isPending}
+              onClick={() => { if (pendingDeleteDocId !== null) { deleteDocMutation.mutate(pendingDeleteDocId); setPendingDeleteDocId(null); } }}
+              data-testid="button-confirm-delete-doc"
+            >
+              {deleteDocMutation.isPending ? "Deleting..." : "Delete Document"}
             </Button>
           </DialogFooter>
         </DialogContent>
