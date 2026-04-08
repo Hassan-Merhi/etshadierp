@@ -217,9 +217,9 @@ export default function FactoryEmployees() {
 
       {/* List */}
       {isLoading ? (
-        <div className="space-y-2">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-20 w-full" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {[...Array(8)].map((_, i) => (
+            <Skeleton key={i} className="h-44 w-full rounded-md" />
           ))}
         </div>
       ) : filtered.length === 0 ? (
@@ -234,7 +234,7 @@ export default function FactoryEmployees() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {filtered.map((emp) => {
             const fullName = `${emp.firstName} ${emp.lastName}`;
             const balance = parseFloat(emp.currentBalance || "0");
@@ -245,70 +245,72 @@ export default function FactoryEmployees() {
                 onClick={() => navigate(`/factory/employees/${emp.id}`)}
                 data-testid={`card-employee-${emp.id}`}
               >
-                <CardContent className="p-4">
-                  <div className="flex flex-wrap items-center gap-4">
-                    <Avatar className={`h-10 w-10 shrink-0 ${getAvatarColor(fullName)}`}>
+                <CardContent className="p-4 flex flex-col gap-3">
+                  {/* Top row: avatar + badge */}
+                  <div className="flex items-start justify-between">
+                    <Avatar className={`h-12 w-12 ${getAvatarColor(fullName)}`}>
                       <AvatarFallback className={`text-sm font-semibold ${getAvatarColor(fullName)}`}>
                         {getInitials(fullName)}
                       </AvatarFallback>
                     </Avatar>
+                    <Badge
+                      variant="outline"
+                      className={emp.active
+                        ? "bg-primary text-primary-foreground border-primary text-xs"
+                        : "border-red-400 text-red-600 dark:text-red-400 text-xs"}
+                    >
+                      {emp.active ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold">{fullName}</span>
-                        <Badge variant="outline" className="text-xs">{emp.code}</Badge>
-                        {!emp.active && (
-                          <Badge variant="outline" className="border-red-400 text-red-600 dark:text-red-400 text-xs">
-                            Inactive
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-sm text-muted-foreground mt-0.5">
-                        {emp.department || "No department"}
-                      </div>
+                  {/* Name + department */}
+                  <div className="min-w-0">
+                    <div className="font-semibold text-sm leading-tight truncate">{fullName}</div>
+                    <div className="text-xs text-muted-foreground truncate mt-0.5">
+                      {emp.department || "No department"}
                     </div>
+                  </div>
 
-                    <div className="flex flex-wrap gap-6 text-sm">
-                      <div>
-                        <div className="text-muted-foreground text-xs">Balance</div>
-                        <div className={`font-mono font-semibold ${balance < 0 ? "text-red-600 dark:text-red-400" : balance > 0 ? "text-green-600 dark:text-green-400" : ""}`}>
-                          {fmt(emp.currentBalance)}
-                        </div>
-                      </div>
-                    </div>
+                  {/* Code + balance row */}
+                  <div className="flex items-end justify-between mt-auto">
+                    <span className="font-mono text-xs text-muted-foreground">{emp.code}</span>
+                    <span className={`font-mono text-xs font-semibold ${balance < 0 ? "text-red-600 dark:text-red-400" : balance > 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                      {fmt(emp.currentBalance)}
+                    </span>
+                  </div>
 
-                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-1 border-t pt-2 -mx-4 px-3" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => openEdit(emp)}
+                      data-testid={`button-edit-employee-${emp.id}`}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    {emp.active ? (
                       <Button
                         size="icon"
                         variant="ghost"
-                        onClick={() => openEdit(emp)}
-                        data-testid={`button-edit-employee-${emp.id}`}
+                        onClick={() => setEndingContractEmployee(emp)}
+                        data-testid={`button-end-contract-${emp.id}`}
+                        title="End Contract"
                       >
-                        <Pencil className="h-4 w-4" />
+                        <UserX className="h-3.5 w-3.5 text-destructive" />
                       </Button>
-                      {emp.active ? (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setEndingContractEmployee(emp)}
-                          data-testid={`button-end-contract-${emp.id}`}
-                          title="End Contract"
-                        >
-                          <UserX className="h-4 w-4 text-destructive" />
-                        </Button>
-                      ) : (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => reactivateMutation.mutate(emp.id)}
-                          disabled={reactivateMutation.isPending}
-                          data-testid={`button-reactivate-${emp.id}`}
-                          title="Reactivate"
-                        >
-                          <UserCheck className="h-4 w-4 text-green-600" />
-                        </Button>
-                      )}
-                    </div>
+                    ) : (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => reactivateMutation.mutate(emp.id)}
+                        disabled={reactivateMutation.isPending}
+                        data-testid={`button-reactivate-${emp.id}`}
+                        title="Reactivate"
+                      >
+                        <UserCheck className="h-3.5 w-3.5 text-green-600" />
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
