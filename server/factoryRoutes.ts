@@ -19596,6 +19596,54 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // POST /api/factory/employees/:id/recalculate-balance
+  // Rebuilds currentBalance, totalDeposits, totalWithdrawals for a single employee from surviving voucher entries.
+  app.post("/api/factory/employees/:id/recalculate-balance", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const empId = parseInt(req.params.id);
+
+      const [emp] = await db.select().from(employees)
+        .where(and(eq(employees.id, empId), eq(employees.companyId, companyId), sql`${employees.deletedAt} IS NULL`));
+      if (!emp) return res.status(404).json({ message: "Employee not found" });
+
+      const entrySums = await db.execute(sql`
+        SELECT
+          COALESCE(SUM(ve.credit_amount::numeric), 0) AS total_credits,
+          COALESCE(SUM(ve.debit_amount::numeric), 0)  AS total_debits
+        FROM voucher_entries ve
+        INNER JOIN vouchers v ON v.id = ve.voucher_id
+        WHERE ve.employee_id = ${empId}
+          AND v.deleted_at IS NULL
+      `);
+
+      const row = ((entrySums as any).rows || (entrySums as any))[0] || {};
+      const credits = parseFloat(row.total_credits || "0");
+      const debits  = parseFloat(row.total_debits  || "0");
+      const openingBal = parseFloat(emp.openingBalance || "0");
+      const newBalance     = openingBal + credits - debits;
+      const newDeposits    = credits;
+      const newWithdrawals = debits;
+
+      await db.update(employees).set({
+        currentBalance:   newBalance.toFixed(2),
+        totalDeposits:    newDeposits.toFixed(2),
+        totalWithdrawals: newWithdrawals.toFixed(2),
+      }).where(eq(employees.id, empId));
+
+      res.json({
+        id: emp.id,
+        name: `${emp.firstName} ${emp.lastName}`,
+        oldBalance: parseFloat(emp.currentBalance || "0"),
+        newBalance, newDeposits, newWithdrawals,
+      });
+    } catch (error: any) {
+      console.error("Error recalculating employee balance:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ─── Employee Attendance ──────────────────────────────────────────────────────
 
   app.get("/api/factory/employee-attendance", requireAuth, async (req: any, res: any) => {

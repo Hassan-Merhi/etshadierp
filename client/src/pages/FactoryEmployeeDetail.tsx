@@ -4,7 +4,7 @@ import { useRoute, useLocation } from "wouter";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 import {
   ArrowLeft, DollarSign, Calendar, Phone, Plus, Loader2, Pencil,
-  TrendingUp, TrendingDown, CheckCircle2,
+  TrendingUp, TrendingDown, CheckCircle2, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -179,6 +179,20 @@ export default function FactoryEmployeeDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
       toast({ title: "Employee updated" });
       setEditOpen(false);
+    },
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
+  });
+
+  const recalcMutation = useMutation({
+    mutationFn: async () => {
+      const res = await factoryApiRequest("POST", `/api/factory/employees/${employeeId}/recalculate-balance`);
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/employees", employeeId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
+      toast({ title: "Balance recalculated", description: `New balance: $${data.newBalance?.toFixed(2)}` });
     },
     onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
   });
@@ -366,7 +380,7 @@ export default function FactoryEmployeeDetail() {
                 </div>
               </div>
 
-              <div className="border-t pt-3">
+              <div className="border-t pt-3 space-y-2">
                 <Button
                   variant="outline"
                   className="w-full"
@@ -384,6 +398,19 @@ export default function FactoryEmployeeDetail() {
                   data-testid="button-edit-employee"
                 >
                   <Pencil className="h-3.5 w-3.5 mr-2" />Edit
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  size="sm"
+                  onClick={() => recalcMutation.mutate()}
+                  disabled={recalcMutation.isPending}
+                  data-testid="button-recalculate-balance"
+                >
+                  {recalcMutation.isPending
+                    ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                    : <RefreshCw className="h-3.5 w-3.5 mr-2" />}
+                  Recalculate
                 </Button>
               </div>
             </CardContent>
