@@ -4922,6 +4922,98 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // GET /api/factory/bale-products/merge-stats — returns all bale products with bale counts
+  app.get("/api/factory/bale-products/merge-stats", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rows = await db.execute(sql`
+        SELECT
+          fbp.id,
+          fbp.code,
+          fbp.article_code AS "articleCode",
+          fbp.name,
+          fbp.active,
+          fbp.category_id AS "categoryId",
+          COUNT(fb.id) FILTER (WHERE fb.status NOT IN ('REMOVED')) AS "totalBales",
+          COUNT(fb.id) FILTER (WHERE fb.status IN ('IN_STOCK','FINALIZED')) AS "inStockBales"
+        FROM factory_bale_products fbp
+        LEFT JOIN factory_bales fb ON fb.product_id = fbp.id AND fb.company_id = ${companyId}
+        WHERE fbp.company_id = ${companyId}
+        GROUP BY fbp.id, fbp.code, fbp.article_code, fbp.name, fbp.active, fbp.category_id
+        ORDER BY fbp.name ASC
+      `);
+
+      res.json(rows.rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/bale-products/merge — merge source products into target
+  app.post("/api/factory/bale-products/merge", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const user = (req.session as any).user;
+      const role = user?.role;
+      if (!["Admin", "Owner", "Developer"].includes(role)) {
+        return res.status(403).json({ message: "Admin, Owner, or Developer role required" });
+      }
+
+      const { targetId, sourceIds } = req.body;
+      if (!targetId || !Array.isArray(sourceIds) || sourceIds.length === 0) {
+        return res.status(400).json({ message: "targetId and sourceIds[] are required" });
+      }
+
+      // Fetch target product
+      const [target] = await db
+        .select()
+        .from(factoryBaleProducts)
+        .where(and(eq(factoryBaleProducts.id, targetId), eq(factoryBaleProducts.companyId, companyId)));
+      if (!target) return res.status(404).json({ message: "Target product not found" });
+
+      // Verify all source products belong to this company
+      const sources = await db
+        .select()
+        .from(factoryBaleProducts)
+        .where(and(inArray(factoryBaleProducts.id, sourceIds), eq(factoryBaleProducts.companyId, companyId)));
+      if (sources.length !== sourceIds.length) {
+        return res.status(400).json({ message: "One or more source products not found for this company" });
+      }
+
+      // In a transaction: reroute bales then deactivate sources
+      let movedBales = 0;
+      await db.transaction(async (tx) => {
+        // Update factory_bales: reassign product + fix inline article_code and product_name
+        const updateResult = await tx.execute(sql`
+          UPDATE factory_bales
+          SET product_id = ${targetId},
+              article_code = ${target.articleCode || null},
+              product_name = ${target.name}
+          WHERE product_id = ANY(${sourceIds}::int[])
+            AND company_id = ${companyId}
+        `);
+        movedBales = (updateResult as any).rowCount ?? 0;
+
+        // Soft-delete source products
+        await tx.execute(sql`
+          UPDATE factory_bale_products
+          SET active = false, updated_at = NOW()
+          WHERE id = ANY(${sourceIds}::int[])
+            AND company_id = ${companyId}
+        `);
+      });
+
+      res.json({ movedBales, mergedProducts: sources.length, targetName: target.name });
+    } catch (error: any) {
+      console.error("Error merging bale products:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/bale-products/import-excel", requireAuth, async (req: any, res: any) => {
     try {
       const multer = (await import("multer")).default;
