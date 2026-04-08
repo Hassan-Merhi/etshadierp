@@ -11,7 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -391,65 +390,55 @@ export default function FactoryEmployeeDetail() {
           </Card>
         </div>
 
-        {/* Right Tabs */}
+        {/* Statement */}
         <div className="flex-1 min-w-0">
-          <Tabs defaultValue="statement">
-            <TabsList className="mb-4 flex flex-wrap gap-1">
-              <TabsTrigger value="statement" data-testid="tab-statement">Statement</TabsTrigger>
-            </TabsList>
-
-            {/* Statement Tab */}
-            <TabsContent value="statement" className="mt-0">
-              <Card>
-                <CardHeader className="pb-2 pt-4 px-5">
-                  <CardTitle className="text-sm text-muted-foreground">Running Statement</CardTitle>
-                </CardHeader>
-                <CardContent className="px-5 pb-4 overflow-x-auto">
-                  {stmtLoading ? (
-                    <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
-                  ) : !statement?.rows || statement.rows.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-8 text-center">No transactions yet</p>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Voucher</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead className="text-right">Deposit</TableHead>
-                          <TableHead className="text-right">Withdrawal</TableHead>
-                          <TableHead className="text-right">Balance</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {statement.rows.map((row) => (
-                          <TableRow key={row.id} data-testid={`row-stmt-${row.id}`}>
-                            <TableCell className="text-sm">{formatDate(row.voucherDate)}</TableCell>
-                            <TableCell className="font-mono text-xs text-muted-foreground">{row.voucherNumber}</TableCell>
-                            <TableCell className="text-sm">{row.narration || row.description || "—"}</TableCell>
-                            <TableCell className="text-right font-mono text-sm">
-                              {row.credit > 0 ? (
-                                <span className="text-green-600 dark:text-green-400">{fmt(row.credit)}</span>
-                              ) : "—"}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm">
-                              {row.debit > 0 ? (
-                                <span className="text-red-600 dark:text-red-400">{fmt(row.debit)}</span>
-                              ) : "—"}
-                            </TableCell>
-                            <TableCell className={`text-right font-mono text-sm font-semibold ${row.balance < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
-                              {fmt(row.balance)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-          </Tabs>
+          <Card>
+            <CardHeader className="pb-2 pt-4 px-5">
+              <CardTitle className="text-sm text-muted-foreground">Running Statement</CardTitle>
+            </CardHeader>
+            <CardContent className="px-5 pb-4 overflow-x-auto">
+              {stmtLoading ? (
+                <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+              ) : !statement?.rows || statement.rows.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">No transactions yet</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Voucher</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Deposit</TableHead>
+                      <TableHead className="text-right">Withdrawal</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {statement.rows.map((row) => (
+                      <TableRow key={row.id} data-testid={`row-stmt-${row.id}`}>
+                        <TableCell className="text-sm">{formatDate(row.voucherDate)}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{row.voucherNumber}</TableCell>
+                        <TableCell className="text-sm">{row.narration || row.description || "—"}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {row.credit > 0 ? (
+                            <span className="text-green-600 dark:text-green-400">{fmt(row.credit)}</span>
+                          ) : "—"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {row.debit > 0 ? (
+                            <span className="text-red-600 dark:text-red-400">{fmt(row.debit)}</span>
+                          ) : "—"}
+                        </TableCell>
+                        <TableCell className={`text-right font-mono text-sm font-semibold ${row.balance < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+                          {fmt(row.balance)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
 
