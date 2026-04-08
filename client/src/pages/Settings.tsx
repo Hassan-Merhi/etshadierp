@@ -565,6 +565,17 @@ function DataToolsTab() {
   const [isImportingStock, setIsImportingStock] = useState(false);
   const [stockImportComplete, setStockImportComplete] = useState(false);
 
+  // Current user (for developer-only features)
+  const { data: dtCurrentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
+
+  // Silent production / consumption state
+  const [silentProdOpen, setSilentProdOpen] = useState(false);
+  const [silentProdType, setSilentProdType] = useState<"Production" | "Consumption">("Production");
+  const [silentProdLocId, setSilentProdLocId] = useState("");
+  const [silentProdItems, setSilentProdItems] = useState<{ stockItemId: string; quantity: string; rate: string }[]>([{ stockItemId: "", quantity: "", rate: "" }]);
+  const [silentProdApplying, setSilentProdApplying] = useState(false);
+  const [silentProdDone, setSilentProdDone] = useState(0);
+
   // Silent inventory transfer state
   const [silentTransferOpen, setSilentTransferOpen] = useState(false);
   const [silentSrcId, setSilentSrcId] = useState("");
@@ -584,6 +595,12 @@ function DataToolsTab() {
   const { data: locations = [] } = useQuery<any[]>({
     queryKey: ["/api/locations", selectedCompany?.id],
     enabled: !!selectedCompany,
+  });
+
+  // Fetch stock items (for silent production picker)
+  const { data: allStockItems = [] } = useQuery<any[]>({
+    queryKey: ["/api/stock-items", selectedCompany?.id],
+    enabled: !!selectedCompany && dtCurrentUser?.role === "Developer",
   });
 
   // Convert Bale to BL mutation
@@ -1061,7 +1078,186 @@ function DataToolsTab() {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Silent Production / Consumption — Developer only, ERP mode only */}
+        {dtCurrentUser?.role === "Developer" && appMode !== "factory" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Silent Production / Consumption
+              </CardTitle>
+              <CardDescription>
+                Directly adjust inventory up (Production) or down (Consumption) — no daybook entry, developer only
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => { setSilentProdType("Production"); setSilentProdLocId(""); setSilentProdItems([{ stockItemId: "", quantity: "", rate: "" }]); setSilentProdDone(0); setSilentProdOpen(true); }}
+                data-testid="button-open-silent-production"
+              >
+                <Package className="h-4 w-4 mr-2" />
+                Open Silent Production / Consumption
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      {/* Silent Production / Consumption Dialog */}
+      {dtCurrentUser?.role === "Developer" && appMode !== "factory" && (
+        <Dialog open={silentProdOpen} onOpenChange={(o) => { if (!silentProdApplying) setSilentProdOpen(o); }}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Silent Production / Consumption</DialogTitle>
+              <DialogDescription>
+                Adjusts inventory directly without creating any accounting or daybook entries. Developer use only.
+              </DialogDescription>
+            </DialogHeader>
+
+            {silentProdDone > 0 ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <Check className="h-5 w-5" />
+                  <p className="font-semibold">Applied {silentProdDone} item(s) silently as {silentProdType}</p>
+                </div>
+                <Button variant="outline" onClick={() => setSilentProdOpen(false)} data-testid="button-silent-prod-close">Close</Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Type toggle */}
+                <div className="flex gap-2">
+                  <Button
+                    variant={silentProdType === "Production" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSilentProdType("Production")}
+                    data-testid="button-type-production"
+                  >
+                    Production (+)
+                  </Button>
+                  <Button
+                    variant={silentProdType === "Consumption" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSilentProdType("Consumption")}
+                    data-testid="button-type-consumption"
+                  >
+                    Consumption (−)
+                  </Button>
+                </div>
+
+                {/* Location */}
+                <div className="space-y-1">
+                  <Label>Location</Label>
+                  <Select value={silentProdLocId} onValueChange={setSilentProdLocId}>
+                    <SelectTrigger data-testid="select-silent-prod-location">
+                      <SelectValue placeholder="Select location..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(locations as any[]).map((loc: any) => (
+                        <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Items table */}
+                <div className="space-y-2">
+                  <Label>Items</Label>
+                  <div className="space-y-2">
+                    {silentProdItems.map((item, idx) => (
+                      <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                        <div className="col-span-5">
+                          <Select
+                            value={item.stockItemId}
+                            onValueChange={(v) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, stockItemId: v } : r))}
+                          >
+                            <SelectTrigger data-testid={`select-prod-item-${idx}`}>
+                              <SelectValue placeholder="Stock item..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(allStockItems as any[]).map((si: any) => (
+                                <SelectItem key={si.id} value={String(si.id)}>{si.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-3">
+                          <Input
+                            type="number"
+                            placeholder="Qty"
+                            value={item.quantity}
+                            onChange={(e) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, quantity: e.target.value } : r))}
+                            data-testid={`input-prod-qty-${idx}`}
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <Input
+                            type="number"
+                            placeholder={silentProdType === "Production" ? "Rate" : "Rate (opt)"}
+                            value={item.rate}
+                            onChange={(e) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, rate: e.target.value } : r))}
+                            data-testid={`input-prod-rate-${idx}`}
+                          />
+                        </div>
+                        <div className="col-span-1 flex justify-center">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setSilentProdItems(prev => prev.filter((_, i) => i !== idx))}
+                            disabled={silentProdItems.length === 1}
+                            data-testid={`button-remove-prod-row-${idx}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSilentProdItems(prev => [...prev, { stockItemId: "", quantity: "", rate: "" }])}
+                    data-testid="button-add-prod-row"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Item
+                  </Button>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setSilentProdOpen(false)} data-testid="button-silent-prod-cancel">Cancel</Button>
+                  <Button
+                    disabled={!silentProdLocId || silentProdItems.every(r => !r.stockItemId || !r.quantity) || silentProdApplying}
+                    onClick={async () => {
+                      const validItems = silentProdItems.filter(r => r.stockItemId && r.quantity);
+                      if (!silentProdLocId || validItems.length === 0) return;
+                      setSilentProdApplying(true);
+                      try {
+                        const res = await apiRequest("POST", "/api/inventory/silent-production", {
+                          locationId: silentProdLocId,
+                          type: silentProdType,
+                          items: validItems.map(r => ({ stockItemId: r.stockItemId, quantity: r.quantity, rate: r.rate || "0" })),
+                        });
+                        const data = await res.json();
+                        setSilentProdDone(data.applied || validItems.length);
+                      } catch (err: any) {
+                        console.error("Silent production error:", err);
+                      } finally {
+                        setSilentProdApplying(false);
+                      }
+                    }}
+                    data-testid="button-silent-prod-apply"
+                  >
+                    {silentProdApplying ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Applying...</> : `Apply ${silentProdType}`}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Silent Transfer Dialog */}
       <Dialog open={silentTransferOpen} onOpenChange={(o) => { if (!isSilentParsing && !isSilentApplying) setSilentTransferOpen(o); }}>
