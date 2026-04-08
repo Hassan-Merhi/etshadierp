@@ -522,6 +522,29 @@ export default function FactoryWorkerDetail() {
     }
   };
 
+  const handleSkipAndEnd = async () => {
+    if (!worker) return;
+    if (!navigator.onLine) { toast({ title: "Not available offline", description: "Requires a connection", variant: "destructive" }); return; }
+    setEndSubmitting(true);
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const res = await factoryApiRequest("POST", `/api/factory/workers/${workerId}/settle-and-end`, {
+        companyId: worker.companyId, endDate: endEnd || today, skipSettlement: true,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to end contract");
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", workerId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", workerId, "stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", workerId, "payrolls"] });
+      toast({ title: "Contract ended", description: "Worker deactivated. No settlement payroll was created." });
+      setEndOpen(false);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setEndSubmitting(false);
+    }
+  };
+
   const payrollBalance = endResult ? parseFloat(endResult.balance) : 0;
   const totalPaidSalary = payrolls?.filter((p) => p.status === "PAID").reduce((s, p) => s + parseFloat(p.netSalary || "0"), 0) ?? 0;
   const totalPaidBonuses = payrolls?.filter((p) => p.status === "PAID").reduce((s, p) => s + parseFloat(p.bonuses || "0"), 0) ?? 0;
@@ -1449,6 +1472,23 @@ export default function FactoryWorkerDetail() {
                 <Calculator className="h-4 w-4 mr-2" />
                 {endCalculating ? "Calculating..." : "Calculate Settlement"}
               </Button>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">or</span></div>
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleSkipAndEnd}
+                disabled={endSubmitting}
+                className="w-full text-muted-foreground"
+                data-testid="button-skip-end-contract"
+              >
+                <UserX className="h-4 w-4 mr-2" />
+                {endSubmitting ? "Ending..." : "End Contract Without Payment"}
+              </Button>
+              <p className="text-xs text-muted-foreground text-center">
+                Immediately deactivates the worker. No settlement payroll is created.
+              </p>
             </div>
           )}
 

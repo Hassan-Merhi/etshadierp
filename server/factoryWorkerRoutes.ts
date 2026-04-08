@@ -751,12 +751,28 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
-      const { startDate, endDate, hoursWorked, dryRun, payNow, cashAccountId } = req.body;
-      if (!startDate || !endDate) return res.status(400).json({ message: "startDate and endDate required" });
+      const { startDate, endDate, hoursWorked, dryRun, payNow, cashAccountId, skipSettlement } = req.body;
 
       const [worker] = await db.select().from(factoryWorkers).where(and(eq(factoryWorkers.id, id), eq(factoryWorkers.companyId, companyId)));
       if (!worker) return res.status(404).json({ message: "Worker not found" });
       if (!worker.active) return res.status(400).json({ message: "Worker contract already ended" });
+
+      // Skip-settlement: just deactivate the worker immediately, no payroll record created
+      if (skipSettlement) {
+        const today = new Date().toISOString().split("T")[0];
+        const endEffective = endDate || today;
+        await db.update(factoryWorkers).set({ active: false, contractEndDate: endEffective, updatedAt: new Date() }).where(eq(factoryWorkers.id, id));
+        await writeDaybookEntry(db, {
+          companyId, txDate: today, txType: "CONTRACT_ENDED",
+          referenceId: id, referenceTable: "factory_workers",
+          description: `Contract ended (no settlement) for ${worker.fullName}`,
+          amountCurrency: 0, amountUsd: 0,
+          createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+        });
+        return res.json({ skipped: true, workerUpdated: true });
+      }
+
+      if (!startDate || !endDate) return res.status(400).json({ message: "startDate and endDate required" });
 
       const toDateStr = (v: any): string | null => {
         if (!v) return null;
