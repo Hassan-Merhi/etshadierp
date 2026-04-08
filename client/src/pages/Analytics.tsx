@@ -1083,6 +1083,48 @@ export default function Analytics() {
           )}
         </div>
 
+        {(activeSection === "reports" || activeSection === "expenses" || activeSection === "direct-expenses" || activeSection === "indirect-expenses") && (
+          <div className="flex flex-wrap items-center gap-3 p-3 rounded-md bg-muted/40 border">
+            <span className="text-sm font-medium text-muted-foreground shrink-0">P&amp;L Date Range:</span>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="pl-start-date-top" className="text-sm whitespace-nowrap">From:</Label>
+              <Input
+                id="pl-start-date-top"
+                type="date"
+                value={plStartDate}
+                onChange={(e) => setPlStartDate(e.target.value)}
+                className="w-36"
+                data-testid="input-pl-start-date"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="pl-end-date-top" className="text-sm whitespace-nowrap">To:</Label>
+              <Input
+                id="pl-end-date-top"
+                type="date"
+                value={plEndDate}
+                onChange={(e) => setPlEndDate(e.target.value)}
+                className="w-36"
+                data-testid="input-pl-end-date"
+              />
+            </div>
+            {(plStartDate || plEndDate) && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setPlStartDate(""); setPlEndDate(""); }}
+                  data-testid="button-pl-clear-dates"
+                >
+                  Clear
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Showing: {plStartDate || "Beginning"} — {plEndDate || "Present"}
+                </span>
+              </>
+            )}
+          </div>
+        )}
 
         {activeSection === "assets" && (
           <Card>
@@ -2199,54 +2241,12 @@ export default function Analytics() {
         <div className="space-y-4">
           {/* Net Profit Report - Tally Prime style */}
           <Card className="p-6">
-            <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <div className="mb-4">
               <h3 className="text-lg font-medium flex items-center gap-2">
                 <DollarSign className="h-5 w-5" />
                 Net Profit (P&L Statement)
               </h3>
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="pl-start-date" className="text-sm whitespace-nowrap">From:</Label>
-                  <Input
-                    id="pl-start-date"
-                    type="date"
-                    value={plStartDate}
-                    onChange={(e) => setPlStartDate(e.target.value)}
-                    className="w-36"
-                    data-testid="input-pl-start-date"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="pl-end-date" className="text-sm whitespace-nowrap">To:</Label>
-                  <Input
-                    id="pl-end-date"
-                    type="date"
-                    value={plEndDate}
-                    onChange={(e) => setPlEndDate(e.target.value)}
-                    className="w-36"
-                    data-testid="input-pl-end-date"
-                  />
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setPlStartDate("");
-                    setPlEndDate("");
-                  }}
-                  data-testid="button-pl-clear-dates"
-                >
-                  Clear
-                </Button>
-              </div>
             </div>
-            
-            {/* Show date range info */}
-            {(plStartDate || plEndDate) && (
-              <div className="text-sm text-muted-foreground mb-4">
-                Showing data for: {plStartDate || "Beginning"} to {plEndDate || "Present"}
-              </div>
-            )}
 
             {loadingNetProfit ? (
               <div className="space-y-3">
