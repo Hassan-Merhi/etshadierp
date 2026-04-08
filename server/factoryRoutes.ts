@@ -19540,9 +19540,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       if (allEmployees.length === 0) return res.json({ updated: 0, employees: [] });
 
-      const empIds = allEmployees.map(e => e.id);
-
       // For each employee, sum voucher entry credits and debits from non-deleted vouchers
+      // Join through employees table to avoid passing an array parameter to ANY()
       const entrySums = await db.execute(sql`
         SELECT
           ve.employee_id,
@@ -19550,7 +19549,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           COALESCE(SUM(ve.debit_amount::numeric), 0)  AS total_debits
         FROM voucher_entries ve
         INNER JOIN vouchers v ON v.id = ve.voucher_id
-        WHERE ve.employee_id = ANY(${empIds})
+        INNER JOIN employees e ON e.id = ve.employee_id
+        WHERE e.company_id = ${companyId}
+          AND e.employee_type = 'Employee'
+          AND e.deleted_at IS NULL
           AND v.deleted_at IS NULL
         GROUP BY ve.employee_id
       `);
