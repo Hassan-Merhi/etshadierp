@@ -76,8 +76,12 @@ export default function FactoryEmployeePayrollTab() {
   const payrollMutation = useMutation({
     mutationFn: async () => {
       const deposits = employees
-        .map((e) => ({ employeeId: e.id, amount: getNet(e.id) }))
-        .filter((d) => d.amount > 0);
+        .map((e) => ({
+          employeeId: e.id,
+          amount: parseFloat(amounts[e.id] || "0") || 0,
+          deduction: parseFloat(deductions[e.id] || "0") || 0,
+        }))
+        .filter((d) => d.amount > 0 || d.deduction > 0);
       if (deposits.length === 0) throw new Error("No amounts entered");
       const res = await fetch("/api/factory/employees/bulk-payroll", {
         method: "POST",
