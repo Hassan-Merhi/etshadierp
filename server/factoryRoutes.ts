@@ -17159,6 +17159,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const today = new Date().toISOString().split("T")[0];
 
       await db.transaction(async (tx: any) => {
+        // 0. Read employee-linked entries BEFORE deletion so we can reverse balances
+        const empEntries = await tx.select().from(voucherEntries)
+          .where(and(eq(voucherEntries.voucherId, voucherId), sql`${voucherEntries.employeeId} IS NOT NULL`));
+
         // 1. Delete voucher entries (double-entry lines)
         await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
@@ -17230,6 +17234,39 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
               }).where(eq(factoryWorkerAdvances.id, advance.id));
             }
             await tx.delete(factoryAdvanceRepayments).where(eq(factoryAdvanceRepayments.id, repaymentId));
+          }
+        }
+
+        // 4b. Reverse employee balance/deposit/withdrawal for EMP-DEP, EMP-WD, EMP-PAY vouchers
+        if (empEntries.length > 0 && (vNum.startsWith("EMP-DEP-") || vNum.startsWith("EMP-WD-") || vNum.startsWith("EMP-PAY-"))) {
+          // Group deltas by employeeId
+          const empDeltas = new Map<number, { creditTotal: number; debitTotal: number }>();
+          for (const entry of empEntries) {
+            const empId = entry.employeeId as number;
+            const cr = parseFloat(entry.creditAmount || "0");
+            const dr = parseFloat(entry.debitAmount || "0");
+            if (!empDeltas.has(empId)) empDeltas.set(empId, { creditTotal: 0, debitTotal: 0 });
+            const d = empDeltas.get(empId)!;
+            d.creditTotal += cr;
+            d.debitTotal += dr;
+          }
+          for (const [empId, delta] of empDeltas) {
+            const [emp] = await tx.select().from(employees)
+              .where(and(eq(employees.id, empId), eq(employees.companyId, companyId)));
+            if (!emp) continue;
+            const curBal = parseFloat(emp.currentBalance || "0");
+            const curDep = parseFloat(emp.totalDeposits || "0");
+            const curWith = parseFloat(emp.totalWithdrawals || "0");
+            // CR entries = deposits (balance went up) → reverse: subtract
+            // DR entries = withdrawals/deductions (balance went down) → reverse: add back
+            const newBal = curBal - delta.creditTotal + delta.debitTotal;
+            const newDep = Math.max(0, curDep - delta.creditTotal);
+            const newWith = Math.max(0, curWith - delta.debitTotal);
+            await tx.update(employees).set({
+              currentBalance: newBal.toFixed(2),
+              totalDeposits: newDep.toFixed(2),
+              ...(delta.debitTotal > 0 ? { totalWithdrawals: newWith.toFixed(2) } : {}),
+            }).where(eq(employees.id, empId));
           }
         }
 
