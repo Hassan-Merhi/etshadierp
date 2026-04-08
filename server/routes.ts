@@ -27749,9 +27749,11 @@ if (asOfDate) {
       }
       
       const directExpenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Direct Expense" || 
-                 (acc.accountType === "Expense" && acc.subType === "Direct Expense") ||
-                 importChargesAccountIds.has(acc.id)
+        (acc) => acc.code !== "PURCHASES" && !acc.code?.startsWith("PURCHASES") && (
+                   acc.accountType === "Direct Expense" || 
+                   (acc.accountType === "Expense" && acc.subType === "Direct Expense") ||
+                   importChargesAccountIds.has(acc.id)
+                 )
       );
       let directExpensesTotal = 0;
       const directExpensesDetails = directExpenseAccounts.map((acc) => {
@@ -27918,10 +27920,13 @@ if (asOfDate) {
       // 8. Indirect Expenses - accounts with accountType="Indirect Expense"
       // Exclude PRODUCTION_ADJUSTMENT and CONSUMPTION_EXPENSE — their inventory effect
       // is already captured in stockOnFloor (closing stock), showing them would double-count.
+      // Also exclude PURCHASES accounts — those belong in the Trading Account, not Indirect Expenses.
       const indirectExpenseAccounts = companyAccounts.filter(
         (acc) => acc.accountType === "Indirect Expense" &&
                  acc.code !== "PRODUCTION_ADJUSTMENT" &&
-                 acc.code !== "CONSUMPTION_EXPENSE"
+                 acc.code !== "CONSUMPTION_EXPENSE" &&
+                 acc.code !== "PURCHASES" &&
+                 !acc.code?.startsWith("PURCHASES")
       );
       let indirectExpensesTotal = 0;
       const indirectExpensesDetails = indirectExpenseAccounts.map((acc) => {
@@ -28924,9 +28929,11 @@ if (asOfDate) {
       }
       
       const directExpenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Direct Expense" || 
-                 (acc.accountType === "Expense" && acc.subType === "Direct Expense") ||
-                 importChargesAccountIds.has(acc.id)
+        (acc) => acc.code !== "PURCHASES" && !acc.code?.startsWith("PURCHASES") && (
+                   acc.accountType === "Direct Expense" || 
+                   (acc.accountType === "Expense" && acc.subType === "Direct Expense") ||
+                   importChargesAccountIds.has(acc.id)
+                 )
       );
 
       const companyVouchers = await db
@@ -28996,7 +29003,9 @@ if (asOfDate) {
       const indirectExpenseAccounts = companyAccounts.filter(
         (acc) => acc.accountType === "Indirect Expense" &&
                  acc.code !== "PRODUCTION_ADJUSTMENT" &&
-                 acc.code !== "CONSUMPTION_EXPENSE"
+                 acc.code !== "CONSUMPTION_EXPENSE" &&
+                 acc.code !== "PURCHASES" &&
+                 !acc.code?.startsWith("PURCHASES")
       );
 
       const companyVouchers = await db
@@ -39041,7 +39050,7 @@ if (asOfDate) {
 
         // Direct Expenses
         const directExpAccounts = companyAccounts.filter((acc: any) =>
-          acc.accountType === 'Direct Expense' || (acc.accountType === 'Expense' && acc.subType === 'Direct Expense') || importChargesIds.has(acc.id)
+          (acc.code !== 'PURCHASES' && !acc.code?.startsWith('PURCHASES')) && (acc.accountType === 'Direct Expense' || (acc.accountType === 'Expense' && acc.subType === 'Direct Expense') || importChargesIds.has(acc.id))
         );
         let directExpTotal = 0;
         const directExpDetails = directExpAccounts.map((acc: any) => {
@@ -39052,7 +39061,7 @@ if (asOfDate) {
 
         // Indirect Expenses
         const indirectExpAccounts = companyAccounts.filter((acc: any) =>
-          acc.accountType === 'Indirect Expense' && acc.code !== 'PRODUCTION_ADJUSTMENT' && acc.code !== 'CONSUMPTION_EXPENSE'
+          acc.accountType === 'Indirect Expense' && acc.code !== 'PRODUCTION_ADJUSTMENT' && acc.code !== 'CONSUMPTION_EXPENSE' && acc.code !== 'PURCHASES' && !acc.code?.startsWith('PURCHASES')
         );
         let indirectExpTotal = 0;
         const indirectExpDetails = indirectExpAccounts.map((acc: any) => {
