@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, DollarSign, CalendarDays, Banknote, Gift, ArrowDownCircle } from "lucide-react";
 import FactoryEmployees from "@/pages/FactoryEmployees";
 import FactoryEmployeePayrollTab from "@/pages/FactoryEmployeePayrollTab";
@@ -9,6 +10,15 @@ import FactoryEmployeeBonusesTab from "@/pages/FactoryEmployeeBonusesTab";
 import FactoryEmployeeWithdrawalsTab from "@/pages/FactoryEmployeeWithdrawalsTab";
 
 type TabValue = "employees" | "payroll" | "attendance" | "advances" | "bonuses" | "withdrawals";
+
+const TAB_OPTIONS: { value: TabValue; label: string; icon: React.ElementType }[] = [
+  { value: "employees",   label: "Employees",   icon: Users },
+  { value: "payroll",     label: "Payroll",     icon: DollarSign },
+  { value: "attendance",  label: "Attendance",  icon: CalendarDays },
+  { value: "advances",    label: "Advances",    icon: Banknote },
+  { value: "bonuses",     label: "Bonuses",     icon: Gift },
+  { value: "withdrawals", label: "Withdrawals", icon: ArrowDownCircle },
+];
 
 function getInitialTab(): TabValue {
   const params = new URLSearchParams(window.location.search);
@@ -40,34 +50,33 @@ export default function FactoryEmployeesHub() {
     setTabInUrl(newTab);
   };
 
+  const current = TAB_OPTIONS.find((o) => o.value === tab)!;
+  const Icon = current.icon;
+
   return (
     <Tabs value={tab} onValueChange={handleTabChange}>
-      <TabsList className="mb-4 flex flex-wrap gap-1">
-        <TabsTrigger value="employees" data-testid="tab-employees">
-          <Users className="h-4 w-4 mr-2" />
-          Employees
-        </TabsTrigger>
-        <TabsTrigger value="payroll" data-testid="tab-employee-payroll">
-          <DollarSign className="h-4 w-4 mr-2" />
-          Payroll
-        </TabsTrigger>
-        <TabsTrigger value="attendance" data-testid="tab-employee-attendance">
-          <CalendarDays className="h-4 w-4 mr-2" />
-          Attendance
-        </TabsTrigger>
-        <TabsTrigger value="advances" data-testid="tab-employee-advances">
-          <Banknote className="h-4 w-4 mr-2" />
-          Advances
-        </TabsTrigger>
-        <TabsTrigger value="bonuses" data-testid="tab-employee-bonuses">
-          <Gift className="h-4 w-4 mr-2" />
-          Bonuses
-        </TabsTrigger>
-        <TabsTrigger value="withdrawals" data-testid="tab-employee-withdrawals">
-          <ArrowDownCircle className="h-4 w-4 mr-2" />
-          Withdrawals
-        </TabsTrigger>
-      </TabsList>
+      <div className="mb-4">
+        <Select value={tab} onValueChange={handleTabChange}>
+          <SelectTrigger className="w-52" data-testid="select-employees-section">
+            <SelectValue>
+              <span className="flex items-center gap-2">
+                <Icon className="h-4 w-4 shrink-0" />
+                {current.label}
+              </span>
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {TAB_OPTIONS.map(({ value, label, icon: ItemIcon }) => (
+              <SelectItem key={value} value={value} data-testid={`option-${value}`}>
+                <span className="flex items-center gap-2">
+                  <ItemIcon className="h-4 w-4 shrink-0" />
+                  {label}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       <TabsContent value="employees" className="mt-0">
         <FactoryEmployees />
