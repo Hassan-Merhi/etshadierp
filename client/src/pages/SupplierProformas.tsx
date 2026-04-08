@@ -14,6 +14,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, Plus, Trash2, Upload, Download, FileText, Pencil, Save, X } from "lucide-react";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
+import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 
 interface ProformaLine {
   id: number;
@@ -45,6 +46,7 @@ export default function SupplierProformas() {
 
   const [selectedProformaId, setSelectedProformaId] = useState<number | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const [createRef, setCreateRef] = useState("");
   const [createNotes, setCreateNotes] = useState("");
   const [addingLine, setAddingLine] = useState(false);
@@ -260,7 +262,7 @@ export default function SupplierProformas() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(p.id); }}
+                    onClick={(e) => { e.stopPropagation(); setPendingDelete(() => () => deleteMutation.mutate(p.id)); }}
                     data-testid={`button-delete-proforma-${p.id}`}
                   >
                     <Trash2 className="h-3 w-3" />
@@ -345,7 +347,7 @@ export default function SupplierProformas() {
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
                                 <Button size="icon" variant="ghost" onClick={() => startEdit(line)} data-testid={`button-edit-line-${line.id}`}><Pencil className="h-3 w-3" /></Button>
-                                <Button size="icon" variant="ghost" onClick={() => deleteLineMutation.mutate(line.id)} data-testid={`button-delete-line-${line.id}`}><Trash2 className="h-3 w-3" /></Button>
+                                <Button size="icon" variant="ghost" onClick={() => setPendingDelete(() => () => deleteLineMutation.mutate(line.id))} data-testid={`button-delete-line-${line.id}`}><Trash2 className="h-3 w-3" /></Button>
                               </div>
                             </TableCell>
                           </>
@@ -375,6 +377,12 @@ export default function SupplierProformas() {
           )}
         </div>
       </div>
+
+      <DeleteConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => { if (!o) setPendingDelete(null); }}
+        onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
+      />
 
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent className="max-w-md">
