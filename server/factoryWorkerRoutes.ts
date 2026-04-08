@@ -828,12 +828,15 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         }
       }
 
-      // Compute already paid in period (APPROVED or PAID payrolls)
+      // Compute already paid: any APPROVED/PAID payroll whose period overlaps the settlement window.
+      // Use overlap condition (periodStart <= endDate AND periodEnd >= effectiveStart) instead of
+      // strict containment so that date mismatches between the settlement input and the payroll
+      // period boundaries never silently drop prior payments.
       const paidPayrolls = await db.select().from(factoryPayrolls).where(and(
         eq(factoryPayrolls.workerId, id),
         eq(factoryPayrolls.companyId, companyId),
-        gte(factoryPayrolls.periodStart, effectiveStart),
-        lte(factoryPayrolls.periodEnd, endDate),
+        lte(factoryPayrolls.periodStart, endDate),
+        gte(factoryPayrolls.periodEnd, effectiveStart),
         inArray(factoryPayrolls.status, ["APPROVED", "PAID"]),
       ));
       const totalPaid = paidPayrolls.reduce((s: number, p: any) => s + parseFloat(p.netSalary || "0"), 0);
