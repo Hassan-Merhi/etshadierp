@@ -5857,12 +5857,14 @@ if (asOfDate) {
         if (totalAmount <= 0) return res.status(400).json({ message: "Total net pay must be > 0" });
 
         const allAccounts = await storage.getAllLedgerAccounts(companyId);
-        let salaryExpenseAccount = allAccounts.find((a: any) => a.code === "SALARY_EXPENSE");
-        if (!salaryExpenseAccount) {
-          salaryExpenseAccount = await storage.createLedgerAccount({
-            companyId, code: "SALARY_EXPENSE", name: "Salary Expense", accountType: "Expense", openingBalance: "0", active: true,
-          });
+
+        // Group run items by worker group name so each group gets its own expense account
+        const itemsByGroup = new Map<string, number>();
+        for (const item of runItems) {
+          const grp = (item.groupName || "").trim() || "__default__";
+          itemsByGroup.set(grp, (itemsByGroup.get(grp) || 0) + parseFloat(item.netPay));
         }
+
         const payDate = run.date;
         const voucherNumber = `SAL-${runId}-${Date.now()}`;
         const [voucher] = await db.insert(vouchers).values({
@@ -5870,11 +5872,31 @@ if (asOfDate) {
           description: run.notes || `Payroll run #${runId} — ${runItems.length} workers`,
           totalAmount: totalAmount.toFixed(2),
         }).returning();
-        await db.insert(voucherEntries).values({
-          voucherId: voucher.id, ledgerAccountId: salaryExpenseAccount.id,
-          debitAmount: totalAmount.toFixed(2), creditAmount: "0",
-          narration: `Salary expense — payroll run #${runId}`,
-        });
+
+        // Create one debit entry per worker group
+        for (const [grp, grpTotal] of itemsByGroup) {
+          const isDefault = grp === "__default__";
+          const expCode = isDefault
+            ? "SALARY_EXPENSE"
+            : `WORKER_PAY_${grp.toUpperCase().replace(/[^A-Z0-9]/g, "_").substring(0, 25)}`;
+          const expName = isDefault ? "Salary Expense" : `${grp} Worker Payroll Expense`;
+
+          let expAccount = allAccounts.find((a: any) => a.code === expCode);
+          if (!expAccount) {
+            expAccount = await storage.createLedgerAccount({
+              companyId, code: expCode, name: expName, accountType: "Expense", openingBalance: "0", active: true,
+            });
+          }
+          await db.insert(voucherEntries).values({
+            voucherId: voucher.id, ledgerAccountId: expAccount.id,
+            debitAmount: grpTotal.toFixed(2), creditAmount: "0",
+            narration: isDefault
+              ? `Salary expense — payroll run #${runId}`
+              : `${grp} worker payroll expense — run #${runId}`,
+          });
+        }
+
+        // Single credit entry for the total payment out
         await db.insert(voucherEntries).values({
           voucherId: voucher.id, ledgerAccountId: parseInt(paymentAccountId),
           debitAmount: "0", creditAmount: totalAmount.toFixed(2),
