@@ -847,7 +847,6 @@ export default function FactorySuppliers() {
   const activeTopLevel = topLevelSuppliers.filter((s) => s.isActive);
   const brokerCount = activeTopLevel.filter(isBroker).length;
   const standaloneCount = activeTopLevel.filter((s) => !isBroker(s)).length;
-  const totalBalance = activeTopLevel.reduce((sum, s) => sum + parseFloat(s.totalValue || "0"), 0);
   const totalContainers = activeTopLevel.reduce((sum, s) => sum + (s.totalContainers || 0), 0);
 
   // ── Broker Overview ──────────────────────────────────────────────────────
@@ -2272,7 +2271,7 @@ export default function FactorySuppliers() {
         </SelectContent>
       </Select>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <Card>
           <CardContent className="p-4">
             <div className="text-xs text-muted-foreground">Brokers</div>
@@ -2294,14 +2293,6 @@ export default function FactorySuppliers() {
             <div className="text-xs text-muted-foreground">Total Containers</div>
             <div className="text-2xl font-bold mt-1" data-testid="text-total-containers">
               {totalContainers}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-xs text-muted-foreground">Total Balance (USD)</div>
-            <div className="text-2xl font-bold mt-1" data-testid="text-total-balance">
-              ${totalBalance.toLocaleString(undefined, { minimumFractionDigits: totalBalance % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 })}
             </div>
           </CardContent>
         </Card>
