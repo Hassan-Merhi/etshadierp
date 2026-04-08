@@ -832,6 +832,14 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       // Use overlap condition (periodStart <= endDate AND periodEnd >= effectiveStart) instead of
       // strict containment so that date mismatches between the settlement input and the payroll
       // period boundaries never silently drop prior payments.
+      //
+      // IMPORTANT: use gross paid (netSalary + advances_deducted) rather than netSalary alone.
+      // netSalary already has advance-recovery deductions subtracted. If we only sum netSalary,
+      // the recovered advance money vanishes from the calculation, making the balance look higher
+      // than it actually is (phantom "still owed" amount equal to the advance that was recovered).
+      // Adding back the advances column gives us the gross salary amount, which correctly matches
+      // the gross "earned" figure from attendance/calendar — and outstanding advance debt is
+      // tracked separately in the advances field of the response.
       const paidPayrolls = await db.select().from(factoryPayrolls).where(and(
         eq(factoryPayrolls.workerId, id),
         eq(factoryPayrolls.companyId, companyId),
@@ -839,7 +847,8 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         gte(factoryPayrolls.periodEnd, effectiveStart),
         inArray(factoryPayrolls.status, ["APPROVED", "PAID"]),
       ));
-      const totalPaid = paidPayrolls.reduce((s: number, p: any) => s + parseFloat(p.netSalary || "0"), 0);
+      const totalPaid = paidPayrolls.reduce((s: number, p: any) =>
+        s + parseFloat(p.netSalary || "0") + parseFloat(p.advances || "0") + parseFloat(p.deductions || "0"), 0);
 
       // Compute outstanding advances (remaining balance not yet recovered)
       const outstandingAdvances = await db.select().from(factoryWorkerAdvances).where(and(
