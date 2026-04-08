@@ -270,22 +270,10 @@ export default function FactoryEmployees() {
 
                     <div className="flex flex-wrap gap-6 text-sm">
                       <div>
-                        <div className="text-muted-foreground text-xs">Monthly Salary</div>
-                        <div className="font-mono font-medium">{fmt(emp.monthlySalary)}</div>
-                      </div>
-                      <div>
                         <div className="text-muted-foreground text-xs">Balance</div>
                         <div className={`font-mono font-semibold ${balance < 0 ? "text-red-600 dark:text-red-400" : balance > 0 ? "text-green-600 dark:text-green-400" : ""}`}>
                           {fmt(emp.currentBalance)}
                         </div>
-                      </div>
-                      <div>
-                        <div className="text-muted-foreground text-xs">Total Deposits</div>
-                        <div className="font-mono">{fmt(emp.totalDeposits)}</div>
-                      </div>
-                      <div>
-                        <div className="text-muted-foreground text-xs">Withdrawals</div>
-                        <div className="font-mono">{fmt(emp.totalWithdrawals)}</div>
                       </div>
                     </div>
 
