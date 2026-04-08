@@ -6071,6 +6071,8 @@ if (asOfDate) {
         if (!empGroupMap.has(row.employeeId)) empGroupMap.set(row.employeeId, row.groupName);
       }
 
+      console.log(`[migrate-group-expenses] companyId=${companyId} paidRuns=${paidRuns.length} salaryExpenseAcct=${salaryExpenseAccount?.id} empGroupMap size=${empGroupMap.size}`);
+
       let migrated = 0;
       let skipped = 0;
 
@@ -6082,17 +6084,19 @@ if (asOfDate) {
             sql`${vouchers.voucherNumber} LIKE ${"SAL-" + run.id + "-%"}`,
             isNull(vouchers.deletedAt),
           ));
-        if (salVouchers.length === 0) { skipped++; continue; }
+        console.log(`[migrate] run#${run.id}: salVouchers=${salVouchers.length} (numbers: ${salVouchers.map(v=>v.voucherNumber).join(',')})`);
+        if (salVouchers.length === 0) { skipped++; console.log(`[migrate] run#${run.id}: SKIP — no SAL voucher`); continue; }
         const oldVoucher = salVouchers[0];
 
         // Only migrate if the voucher has a debit to SALARY_EXPENSE (old style)
-        if (!salaryExpenseAccount) { skipped++; continue; }
+        if (!salaryExpenseAccount) { skipped++; console.log(`[migrate] run#${run.id}: SKIP — no SALARY_EXPENSE account`); continue; }
         const oldDebitEntries = await db.select().from(voucherEntries)
           .where(and(
             eq(voucherEntries.voucherId, oldVoucher.id),
             eq(voucherEntries.ledgerAccountId, salaryExpenseAccount.id),
           ));
-        if (oldDebitEntries.length === 0) { skipped++; continue; }
+        console.log(`[migrate] run#${run.id}: voucher#${oldVoucher.id} SALARY_EXPENSE debit entries=${oldDebitEntries.length}`);
+        if (oldDebitEntries.length === 0) { skipped++; console.log(`[migrate] run#${run.id}: SKIP — no SALARY_EXPENSE debit`); continue; }
 
         // Get run items and group them — fall back to current group membership if groupName not stored
         const runItems = await db.select().from(erpPayrollRunItems)
@@ -6103,12 +6107,14 @@ if (asOfDate) {
         for (const item of runItems) {
           const stored = (item.groupName || "").trim();
           const grp = stored || (item.employeeId ? empGroupMap.get(item.employeeId) || "__default__" : "__default__");
+          console.log(`[migrate] run#${run.id} item empId=${item.employeeId} stored="${stored}" resolved="${grp}"`);
           itemsByGroup.set(grp, (itemsByGroup.get(grp) || 0) + parseFloat(item.netPay));
         }
 
         // Skip if all workers have no group (nothing to split)
         const hasNamedGroups = [...itemsByGroup.keys()].some(k => k !== "__default__");
-        if (!hasNamedGroups) { skipped++; continue; }
+        console.log(`[migrate] run#${run.id}: groups=[${[...itemsByGroup.keys()].join(',')}] hasNamedGroups=${hasNamedGroups}`);
+        if (!hasNamedGroups) { skipped++; console.log(`[migrate] run#${run.id}: SKIP — no named groups`); continue; }
 
         // Soft-delete old voucher
         await db.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, oldVoucher.id));
