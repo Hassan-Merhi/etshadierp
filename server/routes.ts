@@ -151,6 +151,8 @@ import {
   factorySettings,
   agentAccounts,
   FEATURE_KEYS,
+  employeeGroups,
+  employeeGroupMembers,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
@@ -6057,6 +6059,18 @@ if (asOfDate) {
       const paidRuns = await db.select().from(erpPayrollRuns)
         .where(and(eq(erpPayrollRuns.companyId, companyId), eq(erpPayrollRuns.status, "PAID")));
 
+      // Build a current group-membership lookup: employeeId → groupName
+      // Used as fallback when run items were created before groupName was stored
+      const groupMemberships = await db
+        .select({ employeeId: employeeGroupMembers.employeeId, groupName: employeeGroups.name })
+        .from(employeeGroupMembers)
+        .innerJoin(employeeGroups, eq(employeeGroupMembers.employeeGroupId, employeeGroups.id))
+        .where(and(eq(employeeGroups.companyId, companyId), eq(employeeGroups.active, true)));
+      const empGroupMap = new Map<number, string>();
+      for (const row of groupMemberships) {
+        if (!empGroupMap.has(row.employeeId)) empGroupMap.set(row.employeeId, row.groupName);
+      }
+
       let migrated = 0;
       let skipped = 0;
 
@@ -6080,14 +6094,15 @@ if (asOfDate) {
           ));
         if (oldDebitEntries.length === 0) { skipped++; continue; }
 
-        // Get run items and group them
+        // Get run items and group them — fall back to current group membership if groupName not stored
         const runItems = await db.select().from(erpPayrollRunItems)
           .where(eq(erpPayrollRunItems.runId, run.id));
         const totalAmount = runItems.reduce((s, i) => s + parseFloat(i.netPay), 0);
 
         const itemsByGroup = new Map<string, number>();
         for (const item of runItems) {
-          const grp = (item.groupName || "").trim() || "__default__";
+          const stored = (item.groupName || "").trim();
+          const grp = stored || (item.employeeId ? empGroupMap.get(item.employeeId) || "__default__" : "__default__");
           itemsByGroup.set(grp, (itemsByGroup.get(grp) || 0) + parseFloat(item.netPay));
         }
 
