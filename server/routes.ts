@@ -6047,6 +6047,46 @@ if (asOfDate) {
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
+  // ── Diagnostic: what does the server see for paid payroll runs? ──
+  app.get("/api/payroll/runs/diagnostic", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const allRuns = await db.select().from(erpPayrollRuns)
+        .where(eq(erpPayrollRuns.companyId, companyId));
+      const paidRuns = allRuns.filter(r => r.status === "PAID");
+
+      const allAccounts = await storage.getAllLedgerAccounts(companyId);
+      const salaryExpenseAccount = allAccounts.find((a: any) => a.code === "SALARY_EXPENSE");
+
+      const runDetails = await Promise.all(paidRuns.map(async (run) => {
+        const items = await db.select().from(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, run.id));
+        const salVouchers = await db.select().from(vouchers).where(and(
+          eq(vouchers.companyId, companyId),
+          sql`${vouchers.voucherNumber} LIKE ${"SAL-" + run.id + "-%"}`,
+          isNull(vouchers.deletedAt),
+        ));
+        const allVouchersForRun = await db.select().from(vouchers).where(and(
+          eq(vouchers.companyId, companyId),
+          sql`${vouchers.voucherNumber} LIKE ${"SAL-" + run.id + "-%"}`,
+        ));
+        return {
+          runId: run.id, status: run.status, date: run.date, itemCount: items.length,
+          itemGroupNames: [...new Set(items.map(i => i.groupName || "(none)"))],
+          salVouchersActive: salVouchers.map(v => ({ id: v.id, number: v.voucherNumber })),
+          allVouchersIncDeleted: allVouchersForRun.map(v => ({ id: v.id, number: v.voucherNumber, deleted: !!v.deletedAt })),
+        };
+      }));
+
+      res.json({
+        companyId, totalRuns: allRuns.length, paidRuns: paidRuns.length,
+        salaryExpenseAccount: salaryExpenseAccount ? { id: salaryExpenseAccount.id, code: salaryExpenseAccount.code } : null,
+        runs: runDetails,
+      });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
   // ── Migrate old PAID runs from single SALARY_EXPENSE to per-group accounts ──
   app.post("/api/payroll/runs/migrate-group-expenses", requireAuth, requireNonPOS, async (req: any, res: any) => {
     try {
@@ -6071,10 +6111,10 @@ if (asOfDate) {
         if (!empGroupMap.has(row.employeeId)) empGroupMap.set(row.employeeId, row.groupName);
       }
 
-      console.log(`[migrate-group-expenses] companyId=${companyId} paidRuns=${paidRuns.length} salaryExpenseAcct=${salaryExpenseAccount?.id} empGroupMap size=${empGroupMap.size}`);
-
       let migrated = 0;
-      let skipped = 0;
+      let alreadyCorrect = 0;
+      let noGroups = 0;
+      let noVoucher = 0;
 
       for (const run of paidRuns) {
         // Find the active SAL-{runId}-* voucher for this run
@@ -6084,19 +6124,18 @@ if (asOfDate) {
             sql`${vouchers.voucherNumber} LIKE ${"SAL-" + run.id + "-%"}`,
             isNull(vouchers.deletedAt),
           ));
-        console.log(`[migrate] run#${run.id}: salVouchers=${salVouchers.length} (numbers: ${salVouchers.map(v=>v.voucherNumber).join(',')})`);
-        if (salVouchers.length === 0) { skipped++; console.log(`[migrate] run#${run.id}: SKIP — no SAL voucher`); continue; }
+        if (salVouchers.length === 0) { noVoucher++; continue; }
         const oldVoucher = salVouchers[0];
 
         // Only migrate if the voucher has a debit to SALARY_EXPENSE (old style)
-        if (!salaryExpenseAccount) { skipped++; console.log(`[migrate] run#${run.id}: SKIP — no SALARY_EXPENSE account`); continue; }
+        // If no SALARY_EXPENSE debit → already using per-group accounts correctly
+        if (!salaryExpenseAccount) { alreadyCorrect++; continue; }
         const oldDebitEntries = await db.select().from(voucherEntries)
           .where(and(
             eq(voucherEntries.voucherId, oldVoucher.id),
             eq(voucherEntries.ledgerAccountId, salaryExpenseAccount.id),
           ));
-        console.log(`[migrate] run#${run.id}: voucher#${oldVoucher.id} SALARY_EXPENSE debit entries=${oldDebitEntries.length}`);
-        if (oldDebitEntries.length === 0) { skipped++; console.log(`[migrate] run#${run.id}: SKIP — no SALARY_EXPENSE debit`); continue; }
+        if (oldDebitEntries.length === 0) { alreadyCorrect++; continue; }
 
         // Get run items and group them — fall back to current group membership if groupName not stored
         const runItems = await db.select().from(erpPayrollRunItems)
@@ -6107,14 +6146,12 @@ if (asOfDate) {
         for (const item of runItems) {
           const stored = (item.groupName || "").trim();
           const grp = stored || (item.employeeId ? empGroupMap.get(item.employeeId) || "__default__" : "__default__");
-          console.log(`[migrate] run#${run.id} item empId=${item.employeeId} stored="${stored}" resolved="${grp}"`);
           itemsByGroup.set(grp, (itemsByGroup.get(grp) || 0) + parseFloat(item.netPay));
         }
 
         // Skip if all workers have no group (nothing to split)
         const hasNamedGroups = [...itemsByGroup.keys()].some(k => k !== "__default__");
-        console.log(`[migrate] run#${run.id}: groups=[${[...itemsByGroup.keys()].join(',')}] hasNamedGroups=${hasNamedGroups}`);
-        if (!hasNamedGroups) { skipped++; console.log(`[migrate] run#${run.id}: SKIP — no named groups`); continue; }
+        if (!hasNamedGroups) { noGroups++; continue; }
 
         // Soft-delete old voucher
         await db.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, oldVoucher.id));
@@ -6164,7 +6201,7 @@ if (asOfDate) {
         migrated++;
       }
 
-      res.json({ migrated, skipped, total: paidRuns.length });
+      res.json({ migrated, alreadyCorrect, noGroups, noVoucher, total: paidRuns.length });
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 

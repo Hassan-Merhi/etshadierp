@@ -140,7 +140,7 @@ export default function ERPRunPayroll() {
   const [deleteRunId, setDeleteRunId] = useState<number | null>(null);
   const [undoRunId, setUndoRunId] = useState<number | null>(null);
   const [migrateConfirmOpen, setMigrateConfirmOpen] = useState(false);
-  const [migrateResult, setMigrateResult] = useState<{ migrated: number; skipped: number; total: number } | null>(null);
+  const [migrateResult, setMigrateResult] = useState<{ migrated: number; alreadyCorrect: number; noGroups: number; noVoucher: number; total: number } | null>(null);
 
   // ── Queries ───────────────────────────────────────────────────────────────
   const { data: allEmployees, isLoading: empLoading } = useQuery<Employee[]>({
@@ -358,7 +358,7 @@ export default function ERPRunPayroll() {
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/payroll/runs/migrate-group-expenses", {});
       if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Migration failed"); }
-      return res.json() as Promise<{ migrated: number; skipped: number; total: number }>;
+      return res.json() as Promise<{ migrated: number; alreadyCorrect: number; noGroups: number; noVoucher: number; total: number }>;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/payroll/runs"] });
@@ -1054,15 +1054,39 @@ export default function ERPRunPayroll() {
       <AlertDialog open={!!migrateResult} onOpenChange={(open) => { if (!open) setMigrateResult(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Historical Runs Fixed</AlertDialogTitle>
-            <AlertDialogDescription>
-              {migrateResult && (
-                <span>
-                  Out of <strong>{migrateResult.total}</strong> paid runs:{" "}
-                  <strong>{migrateResult.migrated}</strong> were updated to per-group expense accounts,{" "}
-                  <strong>{migrateResult.skipped}</strong> were already correct or had no groups.
-                </span>
-              )}
+            <AlertDialogTitle>
+              {migrateResult && migrateResult.migrated > 0 ? "Runs Updated" : "Check Complete"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                {migrateResult && (
+                  <>
+                    {migrateResult.total === 0 && (
+                      <p>No paid payroll runs found for this company.</p>
+                    )}
+                    {migrateResult.migrated > 0 && (
+                      <p className="text-green-700 dark:text-green-400">
+                        <strong>{migrateResult.migrated}</strong> run{migrateResult.migrated !== 1 ? "s" : ""} successfully updated to use per-group expense accounts.
+                      </p>
+                    )}
+                    {migrateResult.alreadyCorrect > 0 && (
+                      <p>
+                        <strong>{migrateResult.alreadyCorrect}</strong> run{migrateResult.alreadyCorrect !== 1 ? "s" : ""} already using per-group expense accounts correctly — no changes needed.
+                      </p>
+                    )}
+                    {migrateResult.noGroups > 0 && (
+                      <p className="text-muted-foreground">
+                        <strong>{migrateResult.noGroups}</strong> run{migrateResult.noGroups !== 1 ? "s" : ""} have workers with no group assigned — kept as single "Salary Expense" account.
+                      </p>
+                    )}
+                    {migrateResult.noVoucher > 0 && (
+                      <p className="text-muted-foreground">
+                        <strong>{migrateResult.noVoucher}</strong> run{migrateResult.noVoucher !== 1 ? "s" : ""} had no payment voucher found — skipped.
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
