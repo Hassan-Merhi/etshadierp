@@ -1023,47 +1023,6 @@ export default function FactorySuppliers() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="text-right min-w-[90px]">
-                        <div className="text-xs text-muted-foreground mb-0.5">Balance</div>
-                        {(() => {
-                          const autoFreight = parseFloat(child.autoSettledFreightUsd || "0");
-                          const usdBal = (child.currencyBalances || []).find((b: any) => b.currencyCode === "USD");
-                          const usdBalance = usdBal?.balance || 0;
-                          const usdIsOnlyAutoFreight = autoFreight > 0 && Math.abs(usdBalance - autoFreight) < 1;
-                          const hasPositiveNonUsd = (child.currencyBalances || []).some((b: any) => b.currencyCode !== "USD" && b.balance > 0.5);
-                          if (!hasPositiveNonUsd && usdIsOnlyAutoFreight) {
-                            return (
-                              <div data-testid={`text-child-balance-${child.id}`}>
-                                <div className="text-sm text-muted-foreground font-medium">Settled</div>
-                                <div className="text-xs text-muted-foreground">Freight in pool</div>
-                              </div>
-                            );
-                          }
-                          if (child.currencyBalances && child.currencyBalances.some((b: any) => b.currencyCode !== "USD" && b.balance > 0)) {
-                            return (
-                              <div className="space-y-0.5" data-testid={`text-child-balance-${child.id}`}>
-                                {child.currencyBalances.filter((b: any) => b.balance > 0).map((b: any) => (
-                                  <div key={b.currencyCode} className="text-sm font-bold tabular-nums">
-                                    {b.currencyCode !== "USD" ? (
-                                      <span className="text-amber-600 dark:text-amber-400">{b.currencyCode} {formatNum(b.balance.toFixed(2))}</span>
-                                    ) : (
-                                      <span>${formatNum(b.balance.toFixed(2))}</span>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          }
-                          return (
-                            <>
-                              <div className="text-base font-bold tabular-nums" data-testid={`text-child-balance-${child.id}`}>
-                                {parseFloat(child.totalValue || "0") > 0 ? `$${formatNum(child.totalValue)}` : <span className="text-muted-foreground text-sm">Settled</span>}
-                              </div>
-                              {parseFloat(child.totalValue || "0") > 0 && <div className="text-xs text-muted-foreground">USD</div>}
-                            </>
-                          );
-                        })()}
-                      </div>
                       {child.isActive && (
                         <Button
                           variant="ghost"
