@@ -881,7 +881,7 @@ export default function FactoryWorkerDetail() {
                                         Pay
                                       </Button>
                                     )}
-                                    {p.status === "PAID" && !p.cashAccountId && (
+                                    {(p.status === "PAID" || p.status === "APPROVED") && !p.cashAccountId && (
                                       <Button
                                         size="icon"
                                         variant="ghost"

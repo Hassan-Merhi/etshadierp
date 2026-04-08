@@ -212,7 +212,7 @@ function BatchRow({ group, expanded, toggleGroup, selectedIds, setSelectedIds, s
                             Pay
                           </Button>
                         )}
-                        {p.status === "PAID" && !p.cashAccountId && (
+                        {(p.status === "PAID" || p.status === "APPROVED") && !p.cashAccountId && (
                           <Button size="icon" variant="ghost" onClick={() => { setFixAcctTargetId(p.id); setFixAcctCashId(""); setFixAcctOpen(true); }} data-testid={`button-fix-acct-${p.id}`} title="Generate missing accounting entry">
                             <Wrench className="h-4 w-4 text-amber-500" />
                           </Button>

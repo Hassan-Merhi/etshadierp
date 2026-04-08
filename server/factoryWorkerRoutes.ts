@@ -1354,7 +1354,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const [payroll] = await db.select().from(factoryPayrolls)
         .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)));
       if (!payroll) return res.status(404).json({ message: "Payroll not found" });
-      if (payroll.status !== "PAID") return res.status(400).json({ message: "Payroll is not in PAID status" });
+      if (!["PAID", "APPROVED"].includes(payroll.status)) return res.status(400).json({ message: "Payroll must be in PAID or APPROVED status" });
       if (payroll.cashAccountId) return res.status(400).json({ message: "Accounting entry already exists for this payroll" });
 
       const [cashAcc] = await db.select().from(ledgerAccounts)
