@@ -996,6 +996,7 @@ export default function Accounts() {
       toast({ title: "Success", description: "Customer updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/stats", selectedCompany?.id] });
       setCustomerToEdit(null);
       editForm.reset();
     },
@@ -1014,6 +1015,7 @@ export default function Accounts() {
       toast({ title: "Success", description: "Customer deleted successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/stats", selectedCompany?.id] });
       setCustomerToEdit(null);
       editForm.reset();
     },

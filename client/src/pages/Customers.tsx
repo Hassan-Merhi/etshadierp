@@ -99,6 +99,8 @@ export default function Customers() {
         description: "Customer created successfully with ledger account",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/customers/stats", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", selectedCompany?.id] });
       setIsCreateOpen(false);
       form.reset({
@@ -129,6 +131,8 @@ export default function Customers() {
         description: "Customer updated successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/customers/stats", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", selectedCompany?.id] });
       setIsEditOpen(false);
       setEditingCustomer(null);

@@ -562,7 +562,8 @@ export default function VoucherEdit() {
   }
 
   const { data: allAccountsData = [] } = useQuery<AccountWithBalance[]>({
-    queryKey: ["/api/accounts/all"],
+    queryKey: ["/api/accounts/all", selectedCompany?.id],
+    enabled: !!selectedCompany?.id,
   });
 
   // Determine voucher type early for form logic
