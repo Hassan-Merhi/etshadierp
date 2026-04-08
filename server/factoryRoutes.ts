@@ -1118,6 +1118,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const includeCost = req.query.includeCost !== "0" && !fCfg?.hideAvgCost;
       const includeSellPrice = req.query.includeSellPrice !== "0" && !fCfg?.hideSellingPrice;
 
+      // Only IN_STOCK — exclude FINALIZED and RESERVED
       const bales = await db
         .select()
         .from(factoryBales)
@@ -1125,7 +1126,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           and(
             eq(factoryBales.companyId, companyId),
             eq(factoryBales.erpLocationId, locationId),
-            or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+            eq(factoryBales.status, "IN_STOCK"),
           )
         );
 
@@ -1143,149 +1144,212 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const productProductionPriceMap = new Map(products.map(p => [p.id, parseFloat((p as any).productionPrice || "0")]));
       const productSellingPriceMap = new Map(products.map(p => [p.id, parseFloat((p as any).sellingPrice || "0")]));
 
-      const grouped = new Map<number, { articleCode: string; productName: string; category: string; baleCount: number; totalWeight: number; productionPrice: number; sellingPrice: number }>();
+      const isWiperOrGarbage = (catName: string) => {
+        const n = catName.toLowerCase();
+        return n.includes("wiper") || n.includes("garbage") || n.includes("rag");
+      };
+
+      type GroupedRow = { articleCode: string; productName: string; category: string; baleCount: number; totalWeight: number; productionPrice: number; sellingPrice: number };
+      const mainGrouped = new Map<number, GroupedRow>();
+      const wgGrouped = new Map<number, GroupedRow>();
 
       for (const b of bales) {
         const pid = b.productId || 0;
-        const existing = grouped.get(pid);
         const weight = parseFloat(String(b.weightKg || "0"));
-        const productionPrice = productProductionPriceMap.get(pid) || 0;
-        const sellingPrice = productSellingPriceMap.get(pid) || 0;
+        const catName = productCategoryNameMap.get(pid) || b.category || "";
+        const target = isWiperOrGarbage(catName) ? wgGrouped : mainGrouped;
+        const existing = target.get(pid);
         if (existing) {
           existing.totalWeight += weight;
           existing.baleCount += 1;
         } else {
-          grouped.set(pid, {
+          target.set(pid, {
             articleCode: b.articleCode || b.baleCode || "",
             productName: b.productName || "Unknown",
-            category: productCategoryNameMap.get(pid) || b.category || "",
+            category: catName,
             totalWeight: weight,
             baleCount: 1,
-            productionPrice,
-            sellingPrice,
+            productionPrice: productProductionPriceMap.get(pid) || 0,
+            sellingPrice: productSellingPriceMap.get(pid) || 0,
           });
         }
       }
 
-      const rows = Array.from(grouped.values()).sort((a, b) => a.productName.localeCompare(b.productName));
+      const mainRows = Array.from(mainGrouped.values()).sort((a, b) => a.productName.localeCompare(b.productName));
+      const wgRows = Array.from(wgGrouped.values()).sort((a, b) => a.productName.localeCompare(b.productName));
+      const sortedBales = [...bales].sort((a, b) => (a.productName || "").localeCompare(b.productName || ""));
 
       const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
+      workbook.creator = "Factory System";
+      workbook.created = new Date();
 
-      // Sheet 1: Bale Details — one row per bale with reference number (opens first)
+      const HEADER_BLUE   = "FF1F4E79";  // dark navy
+      const HEADER_PURPLE = "FF4B2D7F";  // dark purple for wiper/garbage sheet
+      const HEADER_TEAL   = "FF1D5F6A";  // dark teal for bale detail
+      const ROW_ALT       = "FFF5F8FF";  // very light blue alternating
+      const ROW_WG_ALT    = "FFFAF5FF";  // very light purple alternating
+      const TOTAL_BG      = "FFE8F0FE";
+      const NUM_FMT       = "#,##0.00";
+      const INT_FMT       = "#,##0";
+
+      const styleHeaderRow = (row: any, argbColor: string) => {
+        row.height = 20;
+        row.eachCell((cell: any) => {
+          cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: argbColor } };
+          cell.alignment = { vertical: "middle", horizontal: "center", wrapText: false };
+          cell.border = {
+            bottom: { style: "medium", color: { argb: "FFD0D0D0" } },
+          };
+        });
+      };
+
+      const applyDataRow = (row: any, isAlt: boolean, altArgb: string) => {
+        if (isAlt) {
+          row.eachCell({ includeEmpty: false }, (cell: any) => {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: altArgb } };
+          });
+        }
+        row.eachCell({ includeEmpty: false }, (cell: any) => {
+          cell.alignment = { vertical: "middle" };
+        });
+      };
+
+      const buildSummarySheet = (
+        ws: any,
+        rows: GroupedRow[],
+        label: string,
+        headerColor: string,
+        altColor: string,
+      ) => {
+        const cols: any[] = [
+          { header: "Article Code", key: "articleCode", width: 18 },
+          { header: "Product Name", key: "productName", width: 38 },
+          { header: "Category", key: "category", width: 22 },
+          { header: "Bales", key: "baleCount", width: 10 },
+          { header: "Wt/Bale (kg)", key: "weightPerBale", width: 14 },
+          { header: "Total KG", key: "totalWeight", width: 14 },
+        ];
+        if (includeCost) {
+          cols.push({ header: "Rate (Cost)", key: "productionPrice", width: 14 });
+          cols.push({ header: "Total Cost", key: "totalCostValue", width: 16 });
+        }
+        if (includeSellPrice) {
+          cols.push({ header: "Sell Price", key: "sellingPrice", width: 14 });
+          cols.push({ header: "Total Sell Value", key: "totalSellValue", width: 16 });
+        }
+        ws.columns = cols;
+        styleHeaderRow(ws.getRow(1), headerColor);
+
+        let totalBales = 0, totalKg = 0, totalCost = 0, totalSell = 0;
+        rows.forEach((row, idx) => {
+          const wpb = row.baleCount > 0 ? row.totalWeight / row.baleCount : 0;
+          const tc = row.productionPrice * row.baleCount;
+          const ts = row.sellingPrice * row.baleCount;
+          totalBales += row.baleCount;
+          totalKg += row.totalWeight;
+          totalCost += tc;
+          totalSell += ts;
+
+          const rd: any = {
+            articleCode: row.articleCode,
+            productName: row.productName,
+            category: row.category,
+            baleCount: row.baleCount,
+            weightPerBale: parseFloat(wpb.toFixed(2)),
+            totalWeight: parseFloat(row.totalWeight.toFixed(2)),
+          };
+          if (includeCost) { rd.productionPrice = row.productionPrice; rd.totalCostValue = parseFloat(tc.toFixed(2)); }
+          if (includeSellPrice) { rd.sellingPrice = row.sellingPrice; rd.totalSellValue = parseFloat(ts.toFixed(2)); }
+          const exRow = ws.addRow(rd);
+          applyDataRow(exRow, idx % 2 === 1, altColor);
+          // Number formats
+          exRow.getCell("baleCount").numFmt = INT_FMT;
+          exRow.getCell("weightPerBale").numFmt = NUM_FMT;
+          exRow.getCell("totalWeight").numFmt = NUM_FMT;
+          if (includeCost) { exRow.getCell("productionPrice").numFmt = NUM_FMT; exRow.getCell("totalCostValue").numFmt = NUM_FMT; }
+          if (includeSellPrice) { exRow.getCell("sellingPrice").numFmt = NUM_FMT; exRow.getCell("totalSellValue").numFmt = NUM_FMT; }
+        });
+
+        ws.addRow({});
+        const td: any = {
+          articleCode: "",
+          productName: `TOTAL — ${rows.length} ${label}`,
+          category: "",
+          baleCount: totalBales,
+          weightPerBale: "",
+          totalWeight: parseFloat(totalKg.toFixed(2)),
+        };
+        if (includeCost) { td.productionPrice = ""; td.totalCostValue = parseFloat(totalCost.toFixed(2)); }
+        if (includeSellPrice) { td.sellingPrice = ""; td.totalSellValue = parseFloat(totalSell.toFixed(2)); }
+        const tr = ws.addRow(td);
+        tr.font = { bold: true };
+        tr.eachCell({ includeEmpty: false }, (cell: any) => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TOTAL_BG } };
+        });
+        tr.getCell("baleCount").numFmt = INT_FMT;
+        tr.getCell("totalWeight").numFmt = NUM_FMT;
+        if (includeCost) tr.getCell("totalCostValue").numFmt = NUM_FMT;
+        if (includeSellPrice) tr.getCell("totalSellValue").numFmt = NUM_FMT;
+
+        ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cols.length } };
+        ws.views = [{ state: "frozen", ySplit: 1 }];
+      };
+
+      // Sheet 1: Stock Summary (main items only)
+      const summarySheet = workbook.addWorksheet("Stock Summary");
+      buildSummarySheet(summarySheet, mainRows, "products", HEADER_BLUE, ROW_ALT);
+
+      // Sheet 2: Wipers & Garbage
+      const wgSheet = workbook.addWorksheet("Wipers & Garbage");
+      buildSummarySheet(wgSheet, wgRows, "items", HEADER_PURPLE, ROW_WG_ALT);
+
+      // Sheet 3: Bale Details (main only — no wipers/garbage)
+      const mainBales = sortedBales.filter(b => {
+        const pid = b.productId ?? 0;
+        const cat = productCategoryNameMap.get(pid) || b.category || "";
+        return !isWiperOrGarbage(cat);
+      });
+
       const baleSheet = workbook.addWorksheet("Bale Details");
-      const baleColumns: any[] = [
-        { header: "Bale Ref #", key: "referenceNumber", width: 22 },
+      const baleCols: any[] = [
+        { header: "Bale Ref #", key: "referenceNumber", width: 24 },
         { header: "Article Code", key: "articleCode", width: 18 },
-        { header: "Product Name", key: "productName", width: 35 },
-        { header: "Category", key: "category", width: 20 },
+        { header: "Product Name", key: "productName", width: 38 },
+        { header: "Category", key: "category", width: 22 },
         { header: "Grade", key: "grade", width: 12 },
         { header: "Weight (kg)", key: "weightKg", width: 14 },
-        { header: "Status", key: "status", width: 14 },
       ];
       if (includeCost) {
-        baleColumns.push({ header: "Cost/kg", key: "costPerKg", width: 14 });
-        baleColumns.push({ header: "Total Cost", key: "totalCost", width: 14 });
+        baleCols.push({ header: "Cost/kg", key: "costPerKg", width: 14 });
+        baleCols.push({ header: "Total Cost", key: "totalCost", width: 14 });
       }
-      baleSheet.columns = baleColumns;
-      const baleHeaderRow = baleSheet.getRow(1);
-      baleHeaderRow.font = { bold: true };
-      baleHeaderRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0E4FF" } };
+      baleSheet.columns = baleCols;
+      styleHeaderRow(baleSheet.getRow(1), HEADER_TEAL);
 
-      const sortedBales = [...bales].sort((a, b) => (a.productName || "").localeCompare(b.productName || ""));
-      for (const b of sortedBales) {
-        const baleRowData: any = {
+      mainBales.forEach((b, idx) => {
+        const pid = b.productId ?? 0;
+        const rd: any = {
           referenceNumber: b.referenceNumber,
           articleCode: b.articleCode || "",
           productName: b.productName || "",
-          category: productCategoryNameMap.get(b.productId ?? 0) || b.category || "",
+          category: productCategoryNameMap.get(pid) || b.category || "",
           grade: (b as any).grade || "",
           weightKg: parseFloat(String(b.weightKg || "0")),
-          status: b.status,
         };
         if (includeCost) {
-          baleRowData.costPerKg = parseFloat(String(b.costPerKg || "0"));
-          baleRowData.totalCost = parseFloat(String(b.totalCost || "0"));
+          rd.costPerKg = parseFloat(String(b.costPerKg || "0"));
+          rd.totalCost = parseFloat(String(b.totalCost || "0"));
         }
-        baleSheet.addRow(baleRowData);
-      }
+        const exRow = baleSheet.addRow(rd);
+        applyDataRow(exRow, idx % 2 === 1, ROW_ALT);
+        exRow.getCell("weightKg").numFmt = NUM_FMT;
+        if (includeCost) { exRow.getCell("costPerKg").numFmt = NUM_FMT; exRow.getCell("totalCost").numFmt = NUM_FMT; }
+      });
 
-      // Sheet 2: Inventory Summary — grouped by product
-      const sheet = workbook.addWorksheet("Inventory Summary");
-      const columns: any[] = [
-        { header: "Article Code", key: "articleCode", width: 18 },
-        { header: "Product Name", key: "productName", width: 35 },
-        { header: "Category", key: "category", width: 20 },
-        { header: "Bales", key: "baleCount", width: 10 },
-        { header: "Wt/Bale (kg)", key: "weightPerBale", width: 14 },
-        { header: "Total KG", key: "totalWeight", width: 14 },
-      ];
-      if (includeCost) {
-        columns.push({ header: "Avg Rate (Cost)", key: "productionPrice", width: 16 });
-        columns.push({ header: "Total Cost Value", key: "totalCostValue", width: 16 });
-      }
-      if (includeSellPrice) {
-        columns.push({ header: "Sell Price", key: "sellingPrice", width: 14 });
-        columns.push({ header: "Total Sell Value", key: "totalSellValue", width: 16 });
-      }
-      sheet.columns = columns;
-
-      const headerRow = sheet.getRow(1);
-      headerRow.font = { bold: true };
-      headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E0E0" } };
-
-      let totalBales = 0;
-      let totalKg = 0;
-      let totalValue = 0;
-      let totalSellValueSum = 0;
-
-      for (const row of rows) {
-        const weightPerBale = row.baleCount > 0 ? row.totalWeight / row.baleCount : 0;
-        const rowTotalValue = row.productionPrice * row.baleCount;
-        const rowTotalSellValue = row.sellingPrice * row.baleCount;
-        totalBales += row.baleCount;
-        totalKg += row.totalWeight;
-        totalValue += rowTotalValue;
-        totalSellValueSum += rowTotalSellValue;
-
-        const rowData: any = {
-          articleCode: row.articleCode,
-          productName: row.productName,
-          category: row.category,
-          baleCount: row.baleCount,
-          weightPerBale: parseFloat(weightPerBale.toFixed(2)),
-          totalWeight: parseFloat(row.totalWeight.toFixed(2)),
-        };
-        if (includeCost) {
-          rowData.productionPrice = row.productionPrice;
-          rowData.totalCostValue = parseFloat(rowTotalValue.toFixed(2));
-        }
-        if (includeSellPrice) {
-          rowData.sellingPrice = row.sellingPrice;
-          rowData.totalSellValue = parseFloat(rowTotalSellValue.toFixed(2));
-        }
-        sheet.addRow(rowData);
-      }
-
-      sheet.addRow({});
-      const totalRowData: any = {
-        articleCode: "",
-        productName: `TOTAL (${rows.length} products)`,
-        category: "",
-        baleCount: totalBales,
-        weightPerBale: "",
-        totalWeight: parseFloat(totalKg.toFixed(2)),
-      };
-      if (includeCost) {
-        totalRowData.productionPrice = "";
-        totalRowData.totalCostValue = parseFloat(totalValue.toFixed(2));
-      }
-      if (includeSellPrice) {
-        totalRowData.sellingPrice = "";
-        totalRowData.totalSellValue = parseFloat(totalSellValueSum.toFixed(2));
-      }
-      const tr = sheet.addRow(totalRowData);
-      tr.font = { bold: true };
+      baleSheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: baleCols.length } };
+      baleSheet.views = [{ state: "frozen", ySplit: 1 }];
 
       const dateStr = new Date().toISOString().split("T")[0];
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -1298,7 +1362,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
-  // Export ALL locations inventory to Excel — summary + full bale detail with ref numbers
+  // Export ALL locations inventory to Excel — summary + bale detail, wipers/garbage on own sheet
   app.get("/api/factory/location-inventory/export/all", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -1307,14 +1371,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const [fCfgAll] = await db.select({ hideAvgCost: factorySettings.hideAvgCost, hideSellingPrice: factorySettings.hideSellingPrice }).from(factorySettings).where(eq(factorySettings.companyId, companyId)).limit(1);
       const includeCost = req.query.includeCost !== "0" && !fCfgAll?.hideAvgCost;
 
-      // Fetch all in-stock / finalized bales
+      // Only IN_STOCK — exclude FINALIZED and RESERVED
       const bales = await db
         .select()
         .from(factoryBales)
         .where(
           and(
             eq(factoryBales.companyId, companyId),
-            or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+            eq(factoryBales.status, "IN_STOCK"),
           )
         )
         .orderBy(factoryBales.erpLocationId, factoryBales.productName);
@@ -1339,63 +1403,200 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const productCategoryNameMap = new Map(products.map(p => [p.id, categoryMap.get(p.categoryId!) || ""]));
       const productProductionPriceMap = new Map(products.map(p => [p.id, parseFloat((p as any).productionPrice || "0")]));
 
+      const isWiperOrGarbage = (catName: string) => {
+        const n = catName.toLowerCase();
+        return n.includes("wiper") || n.includes("garbage") || n.includes("rag");
+      };
+
       const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
+      workbook.creator = "Factory System";
+      workbook.created = new Date();
 
-      // Group bales by locationId + productId (needed for summary sheet)
-      const grouped = new Map<string, { locationName: string; articleCode: string; productName: string; category: string; baleCount: number; totalWeight: number; productionPrice: number }>();
+      const HEADER_BLUE   = "FF1F4E79";
+      const HEADER_PURPLE = "FF4B2D7F";
+      const HEADER_TEAL   = "FF1D5F6A";
+      const ROW_ALT       = "FFF5F8FF";
+      const ROW_WG_ALT    = "FFFAF5FF";
+      const TOTAL_BG      = "FFE8F0FE";
+      const LOC_SEP       = "FFDCE6F1"; // light blue for location separator rows
+      const NUM_FMT       = "#,##0.00";
+      const INT_FMT       = "#,##0";
+
+      const styleHeaderRow = (row: any, argbColor: string) => {
+        row.height = 20;
+        row.eachCell((cell: any) => {
+          cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: argbColor } };
+          cell.alignment = { vertical: "middle", horizontal: "center" };
+          cell.border = { bottom: { style: "medium", color: { argb: "FFD0D0D0" } } };
+        });
+      };
+
+      const applyDataRow = (row: any, isAlt: boolean, altArgb: string) => {
+        if (isAlt) {
+          row.eachCell({ includeEmpty: false }, (cell: any) => {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: altArgb } };
+          });
+        }
+        row.eachCell({ includeEmpty: false }, (cell: any) => {
+          cell.alignment = { vertical: "middle" };
+        });
+      };
+
+      // Group bales by locationId + productId, split main vs wiper/garbage
+      type GroupedLocRow = { locationName: string; articleCode: string; productName: string; category: string; baleCount: number; totalWeight: number; productionPrice: number };
+      const mainGrouped = new Map<string, GroupedLocRow>();
+      const wgGrouped   = new Map<string, GroupedLocRow>();
+
       for (const b of bales) {
         const locId = b.erpLocationId ?? 0;
-        const pid = b.productId ?? 0;
-        const key = `${locId}::${pid}`;
+        const pid   = b.productId ?? 0;
+        const key   = `${locId}::${pid}`;
         const weight = parseFloat(String(b.weightKg || "0"));
-        const productionPrice = productProductionPriceMap.get(pid) || 0;
-        const existing = grouped.get(key);
+        const catName = productCategoryNameMap.get(pid) || b.category || "";
+        const target  = isWiperOrGarbage(catName) ? wgGrouped : mainGrouped;
+        const existing = target.get(key);
         if (existing) {
           existing.totalWeight += weight;
-          existing.baleCount += 1;
+          existing.baleCount   += 1;
         } else {
-          grouped.set(key, {
+          target.set(key, {
             locationName: locationMap.get(locId) || `Location #${locId}`,
             articleCode: b.articleCode || "",
             productName: b.productName || "Unknown",
-            category: productCategoryNameMap.get(pid) || b.category || "",
+            category: catName,
             totalWeight: weight,
             baleCount: 1,
-            productionPrice,
+            productionPrice: productProductionPriceMap.get(pid) || 0,
           });
         }
       }
 
-      const summaryRows = Array.from(grouped.values()).sort((a, b) =>
-        a.locationName.localeCompare(b.locationName) || a.productName.localeCompare(b.productName)
-      );
+      const sortRows = (rows: GroupedLocRow[]) =>
+        rows.sort((a, b) => a.locationName.localeCompare(b.locationName) || a.productName.localeCompare(b.productName));
 
-      // Sheet 1: Bale Details — one row per bale with ref # (opens first in Excel)
+      const mainRows = sortRows(Array.from(mainGrouped.values()));
+      const wgRows   = sortRows(Array.from(wgGrouped.values()));
+
+      // Helper: build a summary sheet (location-grouped)
+      const buildSheet = (ws: any, rows: GroupedLocRow[], label: string, headerColor: string, altColor: string) => {
+        const cols: any[] = [
+          { header: "Location", key: "locationName", width: 22 },
+          { header: "Article Code", key: "articleCode", width: 18 },
+          { header: "Product Name", key: "productName", width: 38 },
+          { header: "Category", key: "category", width: 22 },
+          { header: "Bales", key: "baleCount", width: 10 },
+          { header: "Wt/Bale (kg)", key: "weightPerBale", width: 14 },
+          { header: "Total KG", key: "totalWeight", width: 14 },
+        ];
+        if (includeCost) {
+          cols.push({ header: "Rate (Cost)", key: "productionPrice", width: 14 });
+          cols.push({ header: "Total Cost", key: "totalValue", width: 16 });
+        }
+        ws.columns = cols;
+        styleHeaderRow(ws.getRow(1), headerColor);
+
+        let totalBales = 0, totalKg = 0, totalValue = 0;
+        let lastLoc = "";
+        let altIdx = 0;
+
+        for (const row of rows) {
+          // Location separator row
+          if (row.locationName !== lastLoc && lastLoc !== "") {
+            const sepRow = ws.addRow({});
+            sepRow.height = 6;
+            altIdx = 0;
+          }
+          if (row.locationName !== lastLoc) {
+            lastLoc = row.locationName;
+          }
+
+          const wpb = row.baleCount > 0 ? row.totalWeight / row.baleCount : 0;
+          const tv  = row.productionPrice * row.baleCount;
+          totalBales += row.baleCount;
+          totalKg    += row.totalWeight;
+          totalValue += tv;
+
+          const rd: any = {
+            locationName: row.locationName,
+            articleCode:  row.articleCode,
+            productName:  row.productName,
+            category:     row.category,
+            baleCount:    row.baleCount,
+            weightPerBale: parseFloat(wpb.toFixed(2)),
+            totalWeight:  parseFloat(row.totalWeight.toFixed(2)),
+          };
+          if (includeCost) { rd.productionPrice = row.productionPrice; rd.totalValue = parseFloat(tv.toFixed(2)); }
+          const exRow = ws.addRow(rd);
+          applyDataRow(exRow, altIdx % 2 === 1, altColor);
+          exRow.getCell("baleCount").numFmt    = INT_FMT;
+          exRow.getCell("weightPerBale").numFmt = NUM_FMT;
+          exRow.getCell("totalWeight").numFmt   = NUM_FMT;
+          if (includeCost) { exRow.getCell("productionPrice").numFmt = NUM_FMT; exRow.getCell("totalValue").numFmt = NUM_FMT; }
+          altIdx++;
+        }
+
+        ws.addRow({});
+        const td: any = {
+          locationName: "GRAND TOTAL",
+          articleCode: "",
+          productName: `${rows.length} ${label} across ${locationRecords.length} locations`,
+          category: "",
+          baleCount: totalBales,
+          weightPerBale: "",
+          totalWeight: parseFloat(totalKg.toFixed(2)),
+        };
+        if (includeCost) { td.productionPrice = ""; td.totalValue = parseFloat(totalValue.toFixed(2)); }
+        const tr = ws.addRow(td);
+        tr.font = { bold: true };
+        tr.eachCell({ includeEmpty: false }, (cell: any) => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TOTAL_BG } };
+        });
+        tr.getCell("baleCount").numFmt   = INT_FMT;
+        tr.getCell("totalWeight").numFmt  = NUM_FMT;
+        if (includeCost) tr.getCell("totalValue").numFmt = NUM_FMT;
+
+        ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cols.length } };
+        ws.views = [{ state: "frozen", ySplit: 1 }];
+      };
+
+      // Sheet 1: Stock Summary (main items)
+      const summarySheet = workbook.addWorksheet("Stock Summary");
+      buildSheet(summarySheet, mainRows, "products", HEADER_BLUE, ROW_ALT);
+
+      // Sheet 2: Wipers & Garbage
+      const wgSheet = workbook.addWorksheet("Wipers & Garbage");
+      buildSheet(wgSheet, wgRows, "items", HEADER_PURPLE, ROW_WG_ALT);
+
+      // Sheet 3: Bale Details (main items only — no wipers/garbage)
       const baleSheet = workbook.addWorksheet("Bale Details");
-      const baleColumns: any[] = [
+      const baleCols: any[] = [
         { header: "Location", key: "locationName", width: 22 },
-        { header: "Bale Ref #", key: "referenceNumber", width: 22 },
+        { header: "Bale Ref #", key: "referenceNumber", width: 24 },
         { header: "Article Code", key: "articleCode", width: 18 },
-        { header: "Product Name", key: "productName", width: 35 },
-        { header: "Category", key: "category", width: 20 },
+        { header: "Product Name", key: "productName", width: 38 },
+        { header: "Category", key: "category", width: 22 },
         { header: "Grade", key: "grade", width: 12 },
         { header: "Weight (kg)", key: "weightKg", width: 14 },
-        { header: "Status", key: "status", width: 14 },
       ];
       if (includeCost) {
-        baleColumns.push({ header: "Cost/kg", key: "costPerKg", width: 14 });
-        baleColumns.push({ header: "Total Cost", key: "totalCost", width: 14 });
+        baleCols.push({ header: "Cost/kg", key: "costPerKg", width: 14 });
+        baleCols.push({ header: "Total Cost", key: "totalCost", width: 14 });
       }
-      baleSheet.columns = baleColumns;
-      const baleHeaderRow = baleSheet.getRow(1);
-      baleHeaderRow.font = { bold: true };
-      baleHeaderRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0E4FF" } };
+      baleSheet.columns = baleCols;
+      styleHeaderRow(baleSheet.getRow(1), HEADER_TEAL);
 
-      for (const b of bales) {
-        const locId = b.erpLocationId ?? 0;
+      const mainBales = bales.filter(b => {
         const pid = b.productId ?? 0;
-        const baleRowData: any = {
+        const cat = productCategoryNameMap.get(pid) || b.category || "";
+        return !isWiperOrGarbage(cat);
+      });
+
+      mainBales.forEach((b, idx) => {
+        const locId = b.erpLocationId ?? 0;
+        const pid   = b.productId ?? 0;
+        const rd: any = {
           locationName: locationMap.get(locId) || `Location #${locId}`,
           referenceNumber: b.referenceNumber,
           articleCode: b.articleCode || "",
@@ -1403,81 +1604,19 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           category: productCategoryNameMap.get(pid) || b.category || "",
           grade: (b as any).grade || "",
           weightKg: parseFloat(String(b.weightKg || "0")),
-          status: b.status,
         };
         if (includeCost) {
-          baleRowData.costPerKg = parseFloat(String(b.costPerKg || "0"));
-          baleRowData.totalCost = parseFloat(String(b.totalCost || "0"));
+          rd.costPerKg = parseFloat(String(b.costPerKg || "0"));
+          rd.totalCost = parseFloat(String(b.totalCost || "0"));
         }
-        baleSheet.addRow(baleRowData);
-      }
+        const exRow = baleSheet.addRow(rd);
+        applyDataRow(exRow, idx % 2 === 1, ROW_ALT);
+        exRow.getCell("weightKg").numFmt = NUM_FMT;
+        if (includeCost) { exRow.getCell("costPerKg").numFmt = NUM_FMT; exRow.getCell("totalCost").numFmt = NUM_FMT; }
+      });
 
-      // Sheet 2: Summary grouped by Location → Product
-      const summarySheet = workbook.addWorksheet("Summary");
-      const summaryColumns: any[] = [
-        { header: "Location", key: "locationName", width: 22 },
-        { header: "Article Code", key: "articleCode", width: 18 },
-        { header: "Product Name", key: "productName", width: 35 },
-        { header: "Category", key: "category", width: 20 },
-        { header: "Bales", key: "baleCount", width: 10 },
-        { header: "Wt/Bale (kg)", key: "weightPerBale", width: 14 },
-        { header: "Total KG", key: "totalWeight", width: 14 },
-      ];
-      if (includeCost) {
-        summaryColumns.push({ header: "Avg Rate (Cost)", key: "productionPrice", width: 16 });
-        summaryColumns.push({ header: "Total Value", key: "totalValue", width: 16 });
-      }
-      summarySheet.columns = summaryColumns;
-      const summaryHeader = summarySheet.getRow(1);
-      summaryHeader.font = { bold: true };
-      summaryHeader.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E0E0" } };
-
-      let totalBales = 0, totalKg = 0, totalValue = 0;
-      let lastLocation = "";
-      for (const row of summaryRows) {
-        if (row.locationName !== lastLocation && lastLocation !== "") {
-          summarySheet.addRow({});
-        }
-        lastLocation = row.locationName;
-
-        const weightPerBale = row.baleCount > 0 ? row.totalWeight / row.baleCount : 0;
-        const rowTotalValue = row.productionPrice * row.baleCount;
-        totalBales += row.baleCount;
-        totalKg += row.totalWeight;
-        totalValue += rowTotalValue;
-
-        const rowData: any = {
-          locationName: row.locationName,
-          articleCode: row.articleCode,
-          productName: row.productName,
-          category: row.category,
-          baleCount: row.baleCount,
-          weightPerBale: parseFloat(weightPerBale.toFixed(2)),
-          totalWeight: parseFloat(row.totalWeight.toFixed(2)),
-        };
-        if (includeCost) {
-          rowData.productionPrice = row.productionPrice;
-          rowData.totalValue = parseFloat(rowTotalValue.toFixed(2));
-        }
-        summarySheet.addRow(rowData);
-      }
-
-      summarySheet.addRow({});
-      const totalsData: any = {
-        locationName: "GRAND TOTAL",
-        articleCode: "",
-        productName: `${summaryRows.length} products across ${locationRecords.length} locations`,
-        category: "",
-        baleCount: totalBales,
-        weightPerBale: "",
-        totalWeight: parseFloat(totalKg.toFixed(2)),
-      };
-      if (includeCost) {
-        totalsData.productionPrice = "";
-        totalsData.totalValue = parseFloat(totalValue.toFixed(2));
-      }
-      const totalRow = summarySheet.addRow(totalsData);
-      totalRow.font = { bold: true };
+      baleSheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: baleCols.length } };
+      baleSheet.views = [{ state: "frozen", ySplit: 1 }];
 
       const dateStr = new Date().toISOString().split("T")[0];
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
