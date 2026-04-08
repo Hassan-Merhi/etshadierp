@@ -6045,6 +6045,108 @@ if (asOfDate) {
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
+  // ── Migrate old PAID runs from single SALARY_EXPENSE to per-group accounts ──
+  app.post("/api/payroll/runs/migrate-group-expenses", requireAuth, requireNonPOS, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const allAccounts = await storage.getAllLedgerAccounts(companyId);
+      const salaryExpenseAccount = allAccounts.find((a: any) => a.code === "SALARY_EXPENSE");
+
+      const paidRuns = await db.select().from(erpPayrollRuns)
+        .where(and(eq(erpPayrollRuns.companyId, companyId), eq(erpPayrollRuns.status, "PAID")));
+
+      let migrated = 0;
+      let skipped = 0;
+
+      for (const run of paidRuns) {
+        // Find the active SAL-{runId}-* voucher for this run
+        const salVouchers = await db.select().from(vouchers)
+          .where(and(
+            eq(vouchers.companyId, companyId),
+            sql`${vouchers.voucherNumber} LIKE ${"SAL-" + run.id + "-%"}`,
+            isNull(vouchers.deletedAt),
+          ));
+        if (salVouchers.length === 0) { skipped++; continue; }
+        const oldVoucher = salVouchers[0];
+
+        // Only migrate if the voucher has a debit to SALARY_EXPENSE (old style)
+        if (!salaryExpenseAccount) { skipped++; continue; }
+        const oldDebitEntries = await db.select().from(voucherEntries)
+          .where(and(
+            eq(voucherEntries.voucherId, oldVoucher.id),
+            eq(voucherEntries.ledgerAccountId, salaryExpenseAccount.id),
+          ));
+        if (oldDebitEntries.length === 0) { skipped++; continue; }
+
+        // Get run items and group them
+        const runItems = await db.select().from(erpPayrollRunItems)
+          .where(eq(erpPayrollRunItems.runId, run.id));
+        const totalAmount = runItems.reduce((s, i) => s + parseFloat(i.netPay), 0);
+
+        const itemsByGroup = new Map<string, number>();
+        for (const item of runItems) {
+          const grp = (item.groupName || "").trim() || "__default__";
+          itemsByGroup.set(grp, (itemsByGroup.get(grp) || 0) + parseFloat(item.netPay));
+        }
+
+        // Skip if all workers have no group (nothing to split)
+        const hasNamedGroups = [...itemsByGroup.keys()].some(k => k !== "__default__");
+        if (!hasNamedGroups) { skipped++; continue; }
+
+        // Soft-delete old voucher
+        await db.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, oldVoucher.id));
+
+        // Create replacement voucher
+        const newVoucherNumber = `SAL-${run.id}-${Date.now()}`;
+        const [newVoucher] = await db.insert(vouchers).values({
+          companyId, voucherNumber: newVoucherNumber, voucherType: "Payment",
+          voucherDate: run.date,
+          description: run.notes || `Payroll run #${run.id}`,
+          totalAmount: totalAmount.toFixed(2),
+        }).returning();
+
+        // Create per-group debit entries
+        const freshAccounts = await storage.getAllLedgerAccounts(companyId);
+        for (const [grp, grpTotal] of itemsByGroup) {
+          const isDefault = grp === "__default__";
+          const expCode = isDefault
+            ? "SALARY_EXPENSE"
+            : `WORKER_PAY_${grp.toUpperCase().replace(/[^A-Z0-9]/g, "_").substring(0, 25)}`;
+          const expName = isDefault ? "Salary Expense" : `${grp} Worker Payroll Expense`;
+
+          let expAccount = freshAccounts.find((a: any) => a.code === expCode);
+          if (!expAccount) {
+            expAccount = await storage.createLedgerAccount({
+              companyId, code: expCode, name: expName, accountType: "Expense", openingBalance: "0", active: true,
+            });
+          }
+          await db.insert(voucherEntries).values({
+            voucherId: newVoucher.id, ledgerAccountId: expAccount.id,
+            debitAmount: grpTotal.toFixed(2), creditAmount: "0",
+            narration: isDefault
+              ? `Salary expense — payroll run #${run.id}`
+              : `${grp} worker payroll expense — run #${run.id}`,
+          });
+        }
+
+        // Re-create the credit entry using the run's recorded payment account
+        if (run.paymentAccountId) {
+          await db.insert(voucherEntries).values({
+            voucherId: newVoucher.id, ledgerAccountId: run.paymentAccountId,
+            debitAmount: "0", creditAmount: totalAmount.toFixed(2),
+            narration: `Cash paid — payroll run #${run.id}`,
+          });
+        }
+
+        migrated++;
+      }
+
+      res.json({ migrated, skipped, total: paidRuns.length });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
   // ── End ERP Payroll Runs ──────────────────────────────────────────────────
 
   // Get employees with calculated balances from transactions

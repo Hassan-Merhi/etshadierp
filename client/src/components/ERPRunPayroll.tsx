@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Users, Search, ChevronDown, ChevronRight, DollarSign, Loader2,
   PlayCircle, Banknote, FileSpreadsheet, FileText, Printer,
-  CheckCircle2, History, ArrowLeft, Trash2, ClipboardList, RotateCcw,
+  CheckCircle2, History, ArrowLeft, Trash2, ClipboardList, RotateCcw, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -139,6 +139,8 @@ export default function ERPRunPayroll() {
   const [payAccountId, setPayAccountId] = useState("");
   const [deleteRunId, setDeleteRunId] = useState<number | null>(null);
   const [undoRunId, setUndoRunId] = useState<number | null>(null);
+  const [migrateConfirmOpen, setMigrateConfirmOpen] = useState(false);
+  const [migrateResult, setMigrateResult] = useState<{ migrated: number; skipped: number; total: number } | null>(null);
 
   // ── Queries ───────────────────────────────────────────────────────────────
   const { data: allEmployees, isLoading: empLoading } = useQuery<Employee[]>({
@@ -350,6 +352,25 @@ export default function ERPRunPayroll() {
       setUndoRunId(null);
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const migrateGroupExpensesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/payroll/runs/migrate-group-expenses", {});
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Migration failed"); }
+      return res.json() as Promise<{ migrated: number; skipped: number; total: number }>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/runs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      setMigrateConfirmOpen(false);
+      setMigrateResult(data);
+    },
+    onError: (e: Error) => {
+      setMigrateConfirmOpen(false);
+      toast({ title: "Migration failed", description: e.message, variant: "destructive" });
+    },
   });
 
   // ── Print ─────────────────────────────────────────────────────────────────
@@ -761,6 +782,21 @@ export default function ERPRunPayroll() {
               <p className="text-sm mt-1">Select workers and run a payroll to get started.</p>
             </div>
           ) : (
+            <>
+            <div className="flex justify-end mb-3">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setMigrateConfirmOpen(true)}
+                disabled={migrateGroupExpensesMutation.isPending}
+                data-testid="button-migrate-group-expenses"
+              >
+                {migrateGroupExpensesMutation.isPending
+                  ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                  : <RefreshCw className="h-3.5 w-3.5 mr-2" />}
+                Fix Historical Runs
+              </Button>
+            </div>
             <div className="border rounded-md overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -850,6 +886,7 @@ export default function ERPRunPayroll() {
                 </TableBody>
               </Table>
             </div>
+            </>
           )}
         </TabsContent>
       </Tabs>
@@ -988,6 +1025,54 @@ export default function ERPRunPayroll() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── Migrate Confirmation ─────────────────────────────────────────────── */}
+      <AlertDialog open={migrateConfirmOpen} onOpenChange={(open) => { if (!open) setMigrateConfirmOpen(false); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Fix Historical Payroll Runs?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will scan all paid payroll runs and re-post any that used the old single "Salary Expense" account.
+              They will be split into per-group expense accounts (e.g. "Kolwezi Worker Payroll Expense") based on the
+              worker groups recorded in each run. The old accounting entries will be replaced — totals stay the same,
+              only the expense account breakdown changes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => migrateGroupExpensesMutation.mutate()}
+              data-testid="button-confirm-migrate"
+            >
+              {migrateGroupExpensesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Fix Now"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Migrate Result ───────────────────────────────────────────────────── */}
+      <AlertDialog open={!!migrateResult} onOpenChange={(open) => { if (!open) setMigrateResult(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Historical Runs Fixed</AlertDialogTitle>
+            <AlertDialogDescription>
+              {migrateResult && (
+                <span>
+                  Out of <strong>{migrateResult.total}</strong> paid runs:{" "}
+                  <strong>{migrateResult.migrated}</strong> were updated to per-group expense accounts,{" "}
+                  <strong>{migrateResult.skipped}</strong> were already correct or had no groups.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setMigrateResult(null)} data-testid="button-close-migrate-result">
+              Done
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
