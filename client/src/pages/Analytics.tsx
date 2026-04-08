@@ -857,6 +857,27 @@ export default function Analytics() {
   const totalDirectExpense = Math.abs(calculatePLTotal(directExpenseAccounts));
   const totalIndirectExpense = Math.abs(calculatePLTotal(indirectExpenseAccounts));
   const totalExpenses = totalDirectExpense + totalIndirectExpense;
+
+  // Render a flat list of date-filtered NetProfitAccounts (from net-profit-statement)
+  const renderNetProfitAccountsList = (accts: NetProfitAccount[]) => {
+    const nonZero = accts.filter(a => Number(a.debit) !== 0 || Number(a.credit) !== 0);
+    if (nonZero.length === 0)
+      return (
+        <TableRow>
+          <TableCell colSpan={2} className="text-center text-muted-foreground py-8">
+            No transactions in this period
+          </TableCell>
+        </TableRow>
+      );
+    return nonZero.map(acc => (
+      <TableRow key={acc.id}>
+        <TableCell className="text-sm font-medium">{acc.name}</TableCell>
+        <TableCell className="text-right font-mono text-sm text-green-600 dark:text-green-400">
+          {formatSmartCurrency(Number(acc.balance))}
+        </TableCell>
+      </TableRow>
+    ));
+  };
   const netProfit = totalIncome - totalExpenses;
 
   const goToStatement = (accountId: number, customerId?: number, accountType?: string) => {
@@ -1249,15 +1270,34 @@ export default function Analytics() {
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Total</p>
                     <p className="text-2xl font-bold font-mono">
-                      {formatSmartCurrency(calculateTotal(expenseAccounts))}
+                      {netProfitData
+                        ? formatSmartCurrency((netProfitData.leftPane.directExpenses.total ?? 0) + (netProfitData.leftPane.indirectExpenses.total ?? 0))
+                        : formatSmartCurrency(calculateTotal(expenseAccounts))}
                     </p>
                   </div>
                 </div>
-                {accountsLoading ? (
+                {loadingNetProfit ? (
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
                       <Skeleton key={i} className="h-14 w-full" />
                     ))}
+                  </div>
+                ) : netProfitData ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Account Name</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {renderNetProfitAccountsList([
+                          ...netProfitData.leftPane.directExpenses.accounts,
+                          ...netProfitData.leftPane.indirectExpenses.accounts,
+                        ])}
+                      </TableBody>
+                    </Table>
                   </div>
                 ) : expenseAccounts.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-8">
@@ -1291,15 +1331,31 @@ export default function Analytics() {
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Total</p>
                     <p className="text-2xl font-bold font-mono">
-                      {formatSmartCurrency(calculateTotal(directExpenseAccounts))}
+                      {netProfitData
+                        ? formatSmartCurrency(netProfitData.leftPane.directExpenses.total ?? 0)
+                        : formatSmartCurrency(calculateTotal(directExpenseAccounts))}
                     </p>
                   </div>
                 </div>
-                {accountsLoading ? (
+                {loadingNetProfit ? (
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
                       <Skeleton key={i} className="h-14 w-full" />
                     ))}
+                  </div>
+                ) : netProfitData ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Account Name</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {renderNetProfitAccountsList(netProfitData.leftPane.directExpenses.accounts)}
+                      </TableBody>
+                    </Table>
                   </div>
                 ) : directExpenseAccounts.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-8">
@@ -1333,15 +1389,31 @@ export default function Analytics() {
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Total</p>
                     <p className="text-2xl font-bold font-mono">
-                      {formatSmartCurrency(calculateTotal(indirectExpenseAccounts))}
+                      {netProfitData
+                        ? formatSmartCurrency(netProfitData.leftPane.indirectExpenses.total ?? 0)
+                        : formatSmartCurrency(calculateTotal(indirectExpenseAccounts))}
                     </p>
                   </div>
                 </div>
-                {accountsLoading ? (
+                {loadingNetProfit ? (
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
                       <Skeleton key={i} className="h-14 w-full" />
                     ))}
+                  </div>
+                ) : netProfitData ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Account Name</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {renderNetProfitAccountsList(netProfitData.leftPane.indirectExpenses.accounts)}
+                      </TableBody>
+                    </Table>
                   </div>
                 ) : indirectExpenseAccounts.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-8">
