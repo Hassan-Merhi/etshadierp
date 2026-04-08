@@ -859,14 +859,13 @@ let migrationsDone = false;
      WHERE c.status = 'OFFLOADED'
        AND c.offload_date IS NULL`,
   ];
-  // Health check registered BEFORE registerRoutes so it takes precedence over the
-  // one in routes.ts. Returns 503 while migrations are running — this tells Render's
-  // health check to keep traffic on the old instance until the new one is fully ready.
+  // /api/health/db — reports migration status but does NOT block deployment.
+  // The deployment health check uses /api/health (always 200) so Render never times out.
   app.get("/api/health/db", (_req, res) => {
-    if (!migrationsDone) {
-      return res.status(503).json({ status: "starting", message: "Running startup migrations, please wait..." });
-    }
-    res.json({ status: "ok", message: "Database connection successful" });
+    res.json({
+      status: migrationsDone ? "ok" : "starting",
+      message: migrationsDone ? "Database ready" : "Running startup migrations, please wait...",
+    });
   });
 
   // Build info endpoint for frontend version checking (must be before registerRoutes)

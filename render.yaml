@@ -14,7 +14,7 @@ services:
           property: connectionString
       - key: SESSION_SECRET
         generateValue: true
-    healthCheckPath: /api/health/db
+    healthCheckPath: /api/health
     autoDeploy: true
 
 databases:
