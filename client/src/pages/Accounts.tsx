@@ -2291,7 +2291,7 @@ export default function Accounts() {
                                         className="flex items-center gap-1 text-primary hover:underline cursor-pointer text-sm text-left"
                                         data-testid={`link-voucher-${voucher.voucherId}`}
                                       >
-                                        <span className="truncate max-w-[280px]">
+                                        <span className="truncate max-w-[280px]" dir="ltr">
                                           {voucher.narration ||
                                             voucher.voucherDescription ||
                                             voucher.voucherNumber}
@@ -2307,7 +2307,7 @@ export default function Accounts() {
                                         className="flex items-center gap-1 text-primary hover:underline cursor-pointer text-sm text-left"
                                         data-testid={`link-voucher-${voucher.voucherId}`}
                                       >
-                                        <span className="truncate max-w-[280px]">
+                                        <span className="truncate max-w-[280px]" dir="ltr">
                                           {voucher.narration || voucher.voucherDescription || "-"}
                                         </span>
                                         <ExternalLink className="h-3 w-3 flex-shrink-0" />
@@ -2393,7 +2393,7 @@ export default function Accounts() {
                                             className="flex items-center gap-1 text-primary hover:underline cursor-pointer text-xs text-left"
                                             data-testid={`link-voucher-${voucher.voucherId}`}
                                           >
-                                            <span className="truncate text-muted-foreground">
+                                            <span className="truncate text-muted-foreground" dir="ltr">
                                               {voucher.narration || voucher.voucherDescription || "-"}
                                             </span>
                                             <ExternalLink className="h-3 w-3 flex-shrink-0" />
@@ -2405,7 +2405,7 @@ export default function Accounts() {
                                           className="flex items-center gap-1 text-primary hover:underline cursor-pointer text-sm text-left"
                                           data-testid={`link-voucher-${voucher.voucherId}`}
                                         >
-                                          <span className="truncate">
+                                          <span className="truncate" dir="ltr">
                                             {voucher.narration || voucher.voucherDescription || voucher.voucherNumber}
                                           </span>
                                           <ExternalLink className="h-3 w-3 flex-shrink-0" />

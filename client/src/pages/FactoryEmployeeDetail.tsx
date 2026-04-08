@@ -445,7 +445,7 @@ export default function FactoryEmployeeDetail() {
                       <TableRow key={row.id} data-testid={`row-stmt-${row.id}`}>
                         <TableCell className="text-sm">{formatDate(row.voucherDate)}</TableCell>
                         <TableCell className="font-mono text-xs text-muted-foreground">{row.voucherNumber}</TableCell>
-                        <TableCell className="text-sm">{row.narration || row.description || "—"}</TableCell>
+                        <TableCell className="text-sm" dir="ltr">{row.narration || row.description || "—"}</TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           {row.credit > 0 ? (
                             <span className="text-green-600 dark:text-green-400">{fmt(row.credit)}</span>

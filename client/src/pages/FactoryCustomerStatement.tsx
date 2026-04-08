@@ -288,7 +288,7 @@ export default function FactoryCustomerStatement() {
                     <TableCell data-testid={`text-balance-type-${entry.id}`}>
                       <Badge variant="outline" className="text-xs">{entry.transactionType}</Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground" data-testid={`text-balance-desc-${entry.id}`}>
+                    <TableCell className="text-sm text-muted-foreground" dir="ltr" data-testid={`text-balance-desc-${entry.id}`}>
                       {entry.description || "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-debit-${entry.id}`}>
