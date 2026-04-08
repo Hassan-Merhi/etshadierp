@@ -4601,7 +4601,7 @@ function OfflineSyncPanel() {
       {
         label: "Tools",
         items: [
-          { key: "data-tools", label: "Data Tools", icon: Database, devOnly: true },
+          { key: "data-tools", label: "Data Tools", icon: Database, devOnly: true, factoryAdminAllowed: true },
           { key: "bulk-rename", label: "Bulk Rename", icon: Package, devOnly: true },
           { key: "edit-log", label: "Edit Log", icon: History },
           { key: "files", label: "File Storage", icon: Upload },
@@ -4639,7 +4639,7 @@ function OfflineSyncPanel() {
             </SelectTrigger>
             <SelectContent>
               {sidebarGroups.map((group) =>
-                group.items.length > 0 ? group.items.filter((item) => !(item as any).devOnly || currentUser?.role === "Developer").map((item) => (
+                group.items.length > 0 ? group.items.filter((item) => !(item as any).devOnly || currentUser?.role === "Developer" || ((item as any).factoryAdminAllowed && appMode === "factory" && ["Admin", "Owner"].includes(currentUser?.role || ""))).map((item) => (
                   <SelectItem key={item.key} value={item.key} data-testid={`tab-mobile-${item.key}`}>
                     {item.label}
                   </SelectItem>
@@ -4655,7 +4655,7 @@ function OfflineSyncPanel() {
             <div key={group.label}>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-1">{group.label}</p>
               <div className="space-y-0.5">
-                {group.items.filter((item) => !(item as any).devOnly || currentUser?.role === "Developer").map((item) => {
+                {group.items.filter((item) => !(item as any).devOnly || currentUser?.role === "Developer" || ((item as any).factoryAdminAllowed && appMode === "factory" && ["Admin", "Owner"].includes(currentUser?.role || ""))).map((item) => {
                   const Icon = item.icon;
                   const isActive = activeSection === item.key;
                   return (
@@ -5392,7 +5392,7 @@ function OfflineSyncPanel() {
             </div>
           )}
 
-          {activeSection === "data-tools" && currentUser?.role === "Developer" && (
+          {activeSection === "data-tools" && (currentUser?.role === "Developer" || (appMode === "factory" && ["Admin", "Owner"].includes(currentUser?.role || ""))) && (
             <DataToolsTab />
           )}
           {activeSection === "exchange-rates" && (
