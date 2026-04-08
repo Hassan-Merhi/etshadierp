@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import {
-  Play, CheckCircle2, Clock, DollarSign, ChevronDown, ChevronRight, X, Users, Trash2, CalendarDays, Printer, RotateCcw,
+  Play, CheckCircle2, Clock, DollarSign, ChevronDown, ChevronRight, X, Users, Trash2, CalendarDays, Printer, RotateCcw, Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -96,6 +96,9 @@ export default function FactoryPayrollTab() {
   const [bulkCashAccountId, setBulkCashAccountId] = useState("");
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [undoTargetId, setUndoTargetId] = useState<number | null>(null);
+  const [fixAcctOpen, setFixAcctOpen] = useState(false);
+  const [fixAcctTargetId, setFixAcctTargetId] = useState<number | null>(null);
+  const [fixAcctCashId, setFixAcctCashId] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   // Post-pay PDF state
@@ -336,6 +339,26 @@ export default function FactoryPayrollTab() {
     },
   });
 
+  const fixAcctMutation = useMutation({
+    mutationFn: async ({ id, cashId }: { id: number; cashId: string }) => {
+      const res = await apiRequest("PATCH", `/api/factory/payrolls/${id}/fix-accounting`, {
+        cashAccountId: parseInt(cashId),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls"] });
+      toast({ title: "Accounting entry generated", description: "The payment voucher has been created for this payroll." });
+      setFixAcctOpen(false); setFixAcctTargetId(null); setFixAcctCashId("");
+    },
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const printSummaryPDF = async () => {
     const res = await apiRequest("POST", "/api/factory/payrolls/payment-summary-pdf", { payrollIds: paidPayrollIds });
     if (!res.ok) { toast({ title: "PDF failed", variant: "destructive" }); return; }
@@ -540,6 +563,17 @@ export default function FactoryPayrollTab() {
                                           data-testid={`button-pay-${p.id}`}
                                         >
                                           Pay
+                                        </Button>
+                                      )}
+                                      {p.status === "PAID" && !p.cashAccountId && (
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          onClick={() => { setFixAcctTargetId(p.id); setFixAcctCashId(""); setFixAcctOpen(true); }}
+                                          data-testid={`button-fix-acct-${p.id}`}
+                                          title="Generate missing accounting entry"
+                                        >
+                                          <Wrench className="h-4 w-4 text-amber-500" />
                                         </Button>
                                       )}
                                       <Button
@@ -882,6 +916,42 @@ export default function FactoryPayrollTab() {
               data-testid="button-confirm-pay"
             >
               {markPaidMutation.isPending ? "Saving..." : "Confirm Payment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Fix Accounting Dialog — generate missing voucher for old PAID payrolls */}
+      <Dialog open={fixAcctOpen} onOpenChange={(open) => { if (!open) { setFixAcctOpen(false); setFixAcctTargetId(null); } }}>
+        <DialogContent className="max-w-sm" data-testid="dialog-fix-accounting">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-amber-500" />
+              Generate Accounting Entry
+            </DialogTitle>
+            <DialogDescription>
+              This payroll was marked paid without recording a cash account. Select which account the money came from to generate the missing payment voucher.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Cash / Bank Account</Label>
+              <Select value={fixAcctCashId} onValueChange={setFixAcctCashId}>
+                <SelectTrigger data-testid="select-fix-cash-account"><SelectValue placeholder="Select account" /></SelectTrigger>
+                <SelectContent>
+                  {cashAccounts?.map((a) => <SelectItem key={a.id} value={String(a.id)}>{a.name} ({a.code})</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFixAcctOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => fixAcctTargetId && fixAcctMutation.mutate({ id: fixAcctTargetId, cashId: fixAcctCashId })}
+              disabled={fixAcctMutation.isPending || !fixAcctCashId}
+              data-testid="button-confirm-fix-acct"
+            >
+              {fixAcctMutation.isPending ? "Generating..." : "Generate Entry"}
             </Button>
           </DialogFooter>
         </DialogContent>

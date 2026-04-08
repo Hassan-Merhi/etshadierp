@@ -1314,6 +1314,75 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     }
   });
 
+  // PATCH /api/factory/payrolls/:id/fix-accounting - generate missing accounting entry for already-PAID payrolls
+  app.patch("/api/factory/payrolls/:id/fix-accounting", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.body.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
+      if (!cashAccountId) return res.status(400).json({ message: "cashAccountId is required" });
+
+      const [payroll] = await db.select().from(factoryPayrolls)
+        .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)));
+      if (!payroll) return res.status(404).json({ message: "Payroll not found" });
+      if (payroll.status !== "PAID") return res.status(400).json({ message: "Payroll is not in PAID status" });
+      if (payroll.cashAccountId) return res.status(400).json({ message: "Accounting entry already exists for this payroll" });
+
+      const [cashAcc] = await db.select().from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
+      if (!cashAcc) return res.status(400).json({ message: "Cash account not found" });
+
+      const payableAcc = await findOrCreateLedger(companyId, "Payroll Payable", "Liability");
+
+      const [prWorker] = await db.select({ fullName: factoryWorkers.fullName })
+        .from(factoryWorkers).where(eq(factoryWorkers.id, payroll.workerId));
+      const workerName = prWorker?.fullName?.trim() || `Worker #${payroll.workerId}`;
+      const paidDate = payroll.paidAt
+        ? new Date(payroll.paidAt).toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0];
+
+      const netAmt = parseFloat(payroll.netSalary || "0");
+      const narration = `Payroll payment (backdated): ${workerName} (${payroll.periodStart} – ${payroll.periodEnd})`;
+
+      const [pVoucher] = await db.insert(vouchers).values({
+        companyId,
+        voucherNumber: `PAYMENT-PAY-${payroll.id}-${Date.now()}`,
+        voucherType: "Payment",
+        voucherDate: paidDate,
+        description: narration,
+        totalAmount: netAmt.toFixed(2),
+        currency: "USD",
+        sourceModule: "FACTORY",
+      }).returning();
+
+      await db.insert(voucherEntries).values([
+        {
+          voucherId: pVoucher.id,
+          ledgerAccountId: payableAcc.id,
+          debitAmount: netAmt.toFixed(2),
+          creditAmount: "0",
+          narration,
+        },
+        {
+          voucherId: pVoucher.id,
+          ledgerAccountId: cashAccountId,
+          debitAmount: "0",
+          creditAmount: netAmt.toFixed(2),
+          narration,
+        },
+      ]);
+
+      // Update payroll to record which account was used
+      await db.update(factoryPayrolls).set({ cashAccountId } as any)
+        .where(eq(factoryPayrolls.id, id));
+
+      res.json({ message: "Accounting entry generated", voucherId: pVoucher.id });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   async function settleAdvancesForPayroll(tx: any, companyId: number, workerId: number, advanceAmount: number) {
     if (advanceAmount <= 0) return;
     const outstanding = await tx.select().from(factoryWorkerAdvances)
