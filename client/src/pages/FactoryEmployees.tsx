@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Search, Pencil, Users, UserX, UserCheck } from "lucide-react";
+import { Plus, Search, Pencil, Users, UserX, UserCheck, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -432,9 +432,47 @@ export default function FactoryEmployees() {
           <DialogHeader>
             <DialogTitle>End Contract</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            End contract for <span className="font-semibold text-foreground">{endingContractEmployee?.firstName} {endingContractEmployee?.lastName}</span>? They will be marked inactive but can be reactivated later.
-          </p>
+          {endingContractEmployee && (() => {
+            const balance = parseFloat(endingContractEmployee.currentBalance || "0");
+            const fmtBal = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Ending contract for <span className="font-semibold text-foreground">{endingContractEmployee.firstName} {endingContractEmployee.lastName}</span>.
+                  They will be marked inactive but can be reactivated later.
+                </p>
+
+                {/* Balance status */}
+                {balance > 0 ? (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 p-3 space-y-1.5">
+                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-medium text-sm">
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      Outstanding balance: ${fmtBal(balance)}
+                    </div>
+                    <p className="text-xs text-amber-700/80 dark:text-amber-400/80 leading-relaxed">
+                      Running payroll records salary as <em>earned</em> — it doesn't mean cash was handed out. 
+                      To clear this balance, go to <strong>Withdrawals</strong> and record a cash payment of ${fmtBal(balance)} before ending the contract.
+                    </p>
+                  </div>
+                ) : balance < 0 ? (
+                  <div className="rounded-md border border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-700 p-3 space-y-1.5">
+                    <div className="flex items-center gap-2 text-red-700 dark:text-red-400 font-medium text-sm">
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      Employee owes: ${fmtBal(Math.abs(balance))}
+                    </div>
+                    <p className="text-xs text-red-700/80 dark:text-red-400/80">
+                      This employee has a negative balance — they owe the company ${fmtBal(Math.abs(balance))}. Collect this before ending the contract if needed.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-green-300 bg-green-50 dark:bg-green-900/20 dark:border-green-700 p-3 flex items-center gap-2 text-green-700 dark:text-green-400 text-sm font-medium">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    Balance is clear — safe to end contract
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setEndingContractEmployee(null)} disabled={deactivateMutation.isPending}>
               Cancel
@@ -445,7 +483,7 @@ export default function FactoryEmployees() {
               disabled={deactivateMutation.isPending}
               data-testid="button-confirm-end-contract"
             >
-              {deactivateMutation.isPending ? "Ending..." : "End Contract"}
+              {deactivateMutation.isPending ? "Ending..." : "End Contract Anyway"}
             </Button>
           </DialogFooter>
         </DialogContent>
