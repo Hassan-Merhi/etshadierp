@@ -505,10 +505,11 @@ export default function FactoryWorkerDetail() {
   const totalPaidSalary = payrolls?.filter((p) => p.status === "PAID").reduce((s, p) => s + parseFloat(p.netSalary || "0"), 0) ?? 0;
   const totalPaidBonuses = payrolls?.filter((p) => p.status === "PAID").reduce((s, p) => s + parseFloat(p.bonuses || "0"), 0) ?? 0;
   const totalAdvancesGiven = workerAdvances?.reduce((s, a) => s + parseFloat(a.amount || "0"), 0) ?? 0;
-  const netBalance = totalPaidSalary + totalPaidBonuses - totalAdvancesGiven;
   const totalPaid = totalPaidSalary;
   const totalPending = payrolls?.filter((p) => p.status !== "PAID").reduce((s, p) => s + parseFloat(p.netSalary || "0"), 0) ?? 0;
   const advancesLeft = (workerAdvances || []).filter((a) => !a.fullyPaid).reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
+  // netSalary already has advance deductions baked in, so subtract only the REMAINING advance balance to avoid double-counting
+  const netBalance = totalPaidSalary + totalPaidBonuses - advancesLeft;
 
   if (!workerId) return <div className="flex items-center justify-center py-20 text-muted-foreground">Invalid worker ID</div>;
 
@@ -752,7 +753,7 @@ export default function FactoryWorkerDetail() {
                     <p className={`text-xl font-bold ${netBalance >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`} data-testid="stat-net-balance">
                       ${netBalance.toFixed(2)}
                     </p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Paid + Bonus − Advances</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Paid + Bonus − Outstanding Advances</p>
                   </CardContent>
                 </Card>
                 <Card>
