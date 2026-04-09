@@ -98,6 +98,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [groupSearchTerm, setGroupSearchTerm] = useState("");
   const [itemSearchTerm, setItemSearchTerm] = useState("");
   const [asOfDate, setAsOfDate] = useState<string>("");
+  const [fromDate, setFromDate] = useState<string>("");
   const [showNegativeStock, setShowNegativeStock] = useState(false);
   const [showZeroStock, setShowZeroStock] = useState(false);
   const [negativeSearchTerm, setNegativeSearchTerm] = useState("");
@@ -211,7 +212,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     console.log('[LocationInventory] asOfDate changed to:', asOfDate);
   }, [asOfDate]);
 
-  // Fetch inventory for selected location (with optional historical date)
+  // Fetch inventory for selected location (closing / as-of date)
   const { data: inventoryData = [], isLoading: inventoryLoading, isFetching } = useQuery<InventoryItem[]>({
     queryKey: selectedLocationLocal 
       ? [`/api/locations/${selectedLocationLocal.id}/inventory`, { asOfDate }] 
@@ -220,12 +221,25 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       const url = asOfDate 
         ? `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${asOfDate}`
         : `/api/locations/${selectedLocationLocal!.id}/inventory`;
-      console.log('[LocationInventory] Fetching from URL:', url);
       const response = await fetch(url, { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to fetch inventory');
       return response.json();
     },
     enabled: !!selectedLocationLocal,
+  });
+
+  // Fetch opening inventory for selected location (only when fromDate is set)
+  const { data: openingInventoryData = [], isLoading: openingInventoryLoading } = useQuery<InventoryItem[]>({
+    queryKey: selectedLocationLocal && fromDate
+      ? [`/api/locations/${selectedLocationLocal.id}/inventory`, { asOfDate: fromDate }]
+      : [],
+    queryFn: async () => {
+      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${fromDate}`;
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch opening inventory');
+      return response.json();
+    },
+    enabled: !!selectedLocationLocal && !!fromDate,
   });
 
   const { data: negativeStockData = [], isLoading: negativeStockLoading } = useQuery<any[]>({
@@ -393,6 +407,28 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       group.averageRate = group.totalValue / group.totalQuantity;
     }
   });
+
+  // Opening inventory map: stockItemId -> opening quantity (when fromDate is set)
+  const openingInventoryMap = useMemo(() => {
+    const map = new Map<number, number>();
+    openingInventoryData.forEach((item: InventoryItem) => {
+      map.set(item.stockItemId, parseFloat(item.quantity || "0"));
+    });
+    return map;
+  }, [openingInventoryData]);
+
+  // Opening quantity per stock group (summed from opening inventory map)
+  const openingGroupQtyMap = useMemo(() => {
+    const map = new Map<number, number>();
+    openingInventoryData.forEach((item: InventoryItem) => {
+      if (!item.stockGroupId) return;
+      map.set(item.stockGroupId, (map.get(item.stockGroupId) || 0) + parseFloat(item.quantity || "0"));
+    });
+    return map;
+  }, [openingInventoryData]);
+
+  // Show movement mode: both dates must be set
+  const showMovement = !!(fromDate && asOfDate);
 
   // Sort locations alphabetically (A-Z) by name
   const sortedLocations = [...locations].sort((a, b) => a.name.localeCompare(b.name));
@@ -949,44 +985,66 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         title="Location Inventory" 
         subtitle="Manage inventory across all locations"
       >
-        <div className="flex items-center gap-2 flex-wrap">
-          {!posUser && (
-            <Button
-              variant={showNegativeStock ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setShowNegativeStock(!showNegativeStock);
-                if (showNegativeStock) {
-                  setNegativeSearchTerm("");
-                }
-              }}
-              data-testid="button-negative-stock"
-              className="gap-1"
-            >
-              <AlertCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Negative Stock</span>
-              <span className="sm:hidden">-ve Stock</span>
-            </Button>
-          )}
-          <Label className="text-sm text-muted-foreground">As of Date:</Label>
-          <DatePickerInput
-            value={asOfDate}
-            onChange={setAsOfDate}
-            placeholder="Current (Today)"
-            data-testid="input-as-of-date"
-          />
-          {asOfDate && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setAsOfDate("")}
-              data-testid="button-clear-date"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+        {!posUser && (
+          <Button
+            variant={showNegativeStock ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setShowNegativeStock(!showNegativeStock);
+              if (showNegativeStock) setNegativeSearchTerm("");
+            }}
+            data-testid="button-negative-stock"
+            className="gap-1"
+          >
+            <AlertCircle className="h-4 w-4" />
+            <span className="hidden sm:inline">Negative Stock</span>
+            <span className="sm:hidden">-ve Stock</span>
+          </Button>
+        )}
       </PageHeader>
+
+      {/* Date range filter bar */}
+      <div className="flex flex-wrap items-center gap-3 px-3 py-2.5 rounded-md bg-muted/40 border">
+        <span className="text-sm font-medium text-muted-foreground shrink-0">Inventory Date Range:</span>
+        <div className="flex items-center gap-2">
+          <Label className="text-sm whitespace-nowrap text-muted-foreground">From:</Label>
+          <Input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="w-36 h-8 text-sm"
+            data-testid="input-from-date"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Label className="text-sm whitespace-nowrap text-muted-foreground">To:</Label>
+          <Input
+            type="date"
+            value={asOfDate}
+            onChange={(e) => setAsOfDate(e.target.value)}
+            className="w-36 h-8 text-sm"
+            data-testid="input-to-date"
+          />
+        </div>
+        {(fromDate || asOfDate) && (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setFromDate(""); setAsOfDate(""); }}
+              data-testid="button-clear-dates"
+            >
+              Clear
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              {fromDate || "Beginning"} — {asOfDate || "Present"}
+            </span>
+          </>
+        )}
+        {showMovement && (openingInventoryLoading || isFetching) && (
+          <span className="text-xs text-muted-foreground italic">Loading...</span>
+        )}
+      </div>
       {showNegativeStock && (
         <Card>
           <CardHeader className="pb-3">
@@ -1667,7 +1725,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 ) : (
                   <>
                     {filteredStockGroups.map((group) => {
-                      const isNegative = group.totalQuantity < 0;
+                      const closingQty = group.totalQuantity;
+                      const openingQty = showMovement ? (openingGroupQtyMap.get(group.groupId!) || 0) : 0;
+                      const movement = closingQty - openingQty;
+                      const isNegative = closingQty < 0;
                       return (
                         <Card
                           key={group.groupId || 0}
@@ -1684,12 +1745,31 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                               <span className="text-muted-foreground">Items: </span>
                               <span data-testid={`items-${group.groupId}`}>{group.itemCount.toLocaleString()}</span>
                             </div>
-                            <div className="text-right">
-                              <span className="text-muted-foreground">Qty: </span>
-                              <span className={`font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`} data-testid={`qty-${group.groupId}`}>
-                                {Math.floor(group.totalQuantity).toLocaleString()} BL
-                              </span>
-                            </div>
+                            {showMovement ? (
+                              <>
+                                <div className="text-right">
+                                  <span className="text-muted-foreground">Opening: </span>
+                                  <span className="font-mono text-muted-foreground">{Math.floor(openingQty).toLocaleString()} BL</span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Closing: </span>
+                                  <span className={`font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>{Math.floor(closingQty).toLocaleString()} BL</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-muted-foreground">Change: </span>
+                                  <span className={`font-mono font-medium ${movement < 0 ? "text-red-600" : movement > 0 ? "text-green-600" : "text-muted-foreground"}`}>
+                                    {movement > 0 ? "+" : ""}{Math.floor(movement).toLocaleString()} BL
+                                  </span>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="text-right">
+                                <span className="text-muted-foreground">Qty: </span>
+                                <span className={`font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`} data-testid={`qty-${group.groupId}`}>
+                                  {Math.floor(closingQty).toLocaleString()} BL
+                                </span>
+                              </div>
+                            )}
                             {!posUser && (
                               <>
                                 <div>
@@ -1729,7 +1809,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   <colgroup>
                     <col />
                     <col style={{ width: "100px" }} />
-                    <col style={{ width: "140px" }} />
+                    {showMovement ? (
+                      <>
+                        <col style={{ width: "130px" }} />
+                        <col style={{ width: "130px" }} />
+                        <col style={{ width: "120px" }} />
+                      </>
+                    ) : (
+                      <col style={{ width: "140px" }} />
+                    )}
                     {!posUser && (
                       <>
                         <col style={{ width: "120px" }} />
@@ -1741,7 +1829,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                     <tr className="h-12">
                       <th className="text-left px-3 font-medium">Name</th>
                       <th className="text-right px-3 font-medium">Items</th>
-                      <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>Total Qty (BL)</th>
+                      {showMovement ? (
+                        <>
+                          <th className="text-right px-3 font-medium">Opening (BL)</th>
+                          <th className="text-right px-3 font-medium">Closing (BL)</th>
+                          <th className="text-right px-3 font-medium">Movement</th>
+                        </>
+                      ) : (
+                        <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>Total Qty (BL)</th>
+                      )}
                       {!posUser && (
                         <>
                           <th className="text-right px-3 font-medium">Avg Rate</th>
@@ -1753,14 +1849,18 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   <tbody>
                     {filteredStockGroups.length === 0 ? (
                       <tr>
-                        <td colSpan={posUser ? 3 : 5} className="text-center py-8 text-muted-foreground">
+                        <td colSpan={posUser ? (showMovement ? 5 : 3) : (showMovement ? 7 : 5)} className="text-center py-8 text-muted-foreground">
                           No stock groups found matching your search
                         </td>
                       </tr>
                     ) : (
                       <>
                         {filteredStockGroups.map((group) => {
-                          const isNegative = group.totalQuantity < 0;
+                          const closingQty = group.totalQuantity;
+                          const openingQty = showMovement ? (openingGroupQtyMap.get(group.groupId!) || 0) : 0;
+                          const movement = closingQty - openingQty;
+                          const isNegative = closingQty < 0;
+                          const isMovementNeg = movement < 0;
                           return (
                           <tr
                             key={group.groupId || 0}
@@ -1777,9 +1877,23 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                             <td className="px-3 text-right" data-testid={`items-desktop-${group.groupId}`}>
                               {group.itemCount.toLocaleString()}
                             </td>
-                            <td className={`px-3 text-right font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`} data-testid={`qty-desktop-${group.groupId}`}>
-                              {Math.floor(group.totalQuantity).toLocaleString()}<span className="ml-3">BL</span>
-                            </td>
+                            {showMovement ? (
+                              <>
+                                <td className="px-3 text-right font-mono text-muted-foreground">
+                                  {Math.floor(openingQty).toLocaleString()} BL
+                                </td>
+                                <td className={`px-3 text-right font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>
+                                  {Math.floor(closingQty).toLocaleString()} BL
+                                </td>
+                                <td className={`px-3 text-right font-mono font-medium ${isMovementNeg ? "text-red-600" : movement > 0 ? "text-green-600" : "text-muted-foreground"}`}>
+                                  {movement > 0 ? "+" : ""}{Math.floor(movement).toLocaleString()} BL
+                                </td>
+                              </>
+                            ) : (
+                              <td className={`px-3 text-right font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`} data-testid={`qty-desktop-${group.groupId}`}>
+                                {Math.floor(closingQty).toLocaleString()}<span className="ml-3">BL</span>
+                              </td>
+                            )}
                             {!posUser && (
                               <>
                                 <td className="px-3 text-right font-mono" data-testid={`rate-desktop-${group.groupId}`}>
@@ -1796,9 +1910,26 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           <tr className="border-t h-12 bg-muted/50 font-bold">
                             <td className="px-3">Total</td>
                             <td className="px-3 text-right">{filteredStockGroups.reduce((sum, g) => sum + g.itemCount, 0).toLocaleString()}</td>
-                            <td className="px-3 text-right font-mono">
-                              {Math.floor(filteredStockGroups.reduce((sum, g) => sum + g.totalQuantity, 0)).toLocaleString()}<span className="ml-3">BL</span>
-                            </td>
+                            {showMovement ? (
+                              <>
+                                <td className="px-3 text-right font-mono text-muted-foreground">
+                                  {Math.floor(filteredStockGroups.reduce((sum, g) => sum + (openingGroupQtyMap.get(g.groupId!) || 0), 0)).toLocaleString()} BL
+                                </td>
+                                <td className="px-3 text-right font-mono">
+                                  {Math.floor(filteredStockGroups.reduce((sum, g) => sum + g.totalQuantity, 0)).toLocaleString()} BL
+                                </td>
+                                <td className="px-3 text-right font-mono">
+                                  {(() => {
+                                    const tot = filteredStockGroups.reduce((sum, g) => sum + g.totalQuantity - (openingGroupQtyMap.get(g.groupId!) || 0), 0);
+                                    return `${tot > 0 ? "+" : ""}${Math.floor(tot).toLocaleString()} BL`;
+                                  })()}
+                                </td>
+                              </>
+                            ) : (
+                              <td className="px-3 text-right font-mono">
+                                {Math.floor(filteredStockGroups.reduce((sum, g) => sum + g.totalQuantity, 0)).toLocaleString()}<span className="ml-3">BL</span>
+                              </td>
+                            )}
                             {!posUser && (
                               <>
                                 <td className="px-3 text-right font-mono"></td>
@@ -1866,8 +1997,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               ) : (
                 <>
                   {filteredStockItems.map((item, index) => {
-                    const itemQty = parseFloat(item.quantity || "0");
-                    const isNegative = itemQty < 0;
+                    const closingQty = parseFloat(item.quantity || "0");
+                    const openingQty = showMovement ? (openingInventoryMap.get(item.stockItemId) || 0) : 0;
+                    const movement = closingQty - openingQty;
+                    const isNegative = closingQty < 0;
                     return (
                       <Card
                         key={item.inventoryId}
@@ -1890,19 +2023,38 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           {item.stockItemName}
                         </button>
                         <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">Qty: </span>
-                            <span className={`font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>
-                              {Math.floor(itemQty).toLocaleString()} BL
-                            </span>
-                          </div>
+                          {showMovement ? (
+                            <>
+                              <div>
+                                <span className="text-muted-foreground">Opening: </span>
+                                <span className="font-mono text-muted-foreground">{Math.floor(openingQty).toLocaleString()} BL</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-muted-foreground">Closing: </span>
+                                <span className={`font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>{Math.floor(closingQty).toLocaleString()} BL</span>
+                              </div>
+                              <div className="col-span-2 text-right">
+                                <span className="text-muted-foreground">Change: </span>
+                                <span className={`font-mono font-medium ${movement < 0 ? "text-red-600" : movement > 0 ? "text-green-600" : "text-muted-foreground"}`}>
+                                  {movement > 0 ? "+" : ""}{Math.floor(movement).toLocaleString()} BL
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            <div>
+                              <span className="text-muted-foreground">Qty: </span>
+                              <span className={`font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>
+                                {Math.floor(closingQty).toLocaleString()} BL
+                              </span>
+                            </div>
+                          )}
                           {!posUser && (
                             <>
-                              <div className="text-right">
+                              <div className={showMovement ? "" : "text-right"}>
                                 <span className="text-muted-foreground">Rate: </span>
                                 <span className="font-mono">{formatAmount(parseFloat(item.averageRate))}</span>
                               </div>
-                              <div className="col-span-2 text-right">
+                              <div className={`${showMovement ? "" : "col-span-2"} text-right`}>
                                 <span className="text-muted-foreground">Value: </span>
                                 <span className="font-mono font-medium">{formatAmount(parseFloat(item.totalValue))}</span>
                               </div>
@@ -1934,7 +2086,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               <table className="w-full table-fixed text-sm">
                 <colgroup>
                   <col />
-                  <col style={{ width: "140px" }} />
+                  {showMovement ? (
+                    <>
+                      <col style={{ width: "130px" }} />
+                      <col style={{ width: "130px" }} />
+                      <col style={{ width: "120px" }} />
+                    </>
+                  ) : (
+                    <col style={{ width: "140px" }} />
+                  )}
                   {!posUser && (
                     <>
                       <col style={{ width: "120px" }} />
@@ -1945,7 +2105,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 <thead className="bg-muted/50 sticky top-0 z-10">
                   <tr className="h-12">
                     <th className="text-left px-3 font-medium">Name</th>
-                    <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>Quantity</th>
+                    {showMovement ? (
+                      <>
+                        <th className="text-right px-3 font-medium">Opening (BL)</th>
+                        <th className="text-right px-3 font-medium">Closing (BL)</th>
+                        <th className="text-right px-3 font-medium">Movement</th>
+                      </>
+                    ) : (
+                      <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>Quantity</th>
+                    )}
                     {!posUser && (
                       <>
                         <th className="text-right px-3 font-medium">Avg Rate</th>
@@ -1957,14 +2125,17 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 <tbody>
                   {filteredStockItems.length === 0 ? (
                     <tr>
-                      <td colSpan={posUser ? 2 : 4} className="text-center py-8 text-muted-foreground">
+                      <td colSpan={posUser ? (showMovement ? 4 : 2) : (showMovement ? 6 : 4)} className="text-center py-8 text-muted-foreground">
                         {itemSearchTerm ? "No items found matching your search" : "No items in this group"}
                       </td>
                     </tr>
                   ) : (
                     filteredStockItems.map((item, index) => {
-                      const itemQty = parseFloat(item.quantity || "0");
-                      const isNegative = itemQty < 0;
+                      const closingQty = parseFloat(item.quantity || "0");
+                      const openingQty = showMovement ? (openingInventoryMap.get(item.stockItemId) || 0) : 0;
+                      const movement = closingQty - openingQty;
+                      const isNegative = closingQty < 0;
+                      const isMovementNeg = movement < 0;
                       return (
                         <tr
                           key={item.inventoryId}
@@ -1988,9 +2159,23 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                               {item.stockItemName}
                             </button>
                           </td>
-                          <td className={`px-3 text-right font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>
-                            {Math.floor(itemQty).toLocaleString()}<span className="ml-3">BL</span>
-                          </td>
+                          {showMovement ? (
+                            <>
+                              <td className="px-3 text-right font-mono text-muted-foreground">
+                                {Math.floor(openingQty).toLocaleString()} BL
+                              </td>
+                              <td className={`px-3 text-right font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>
+                                {Math.floor(closingQty).toLocaleString()} BL
+                              </td>
+                              <td className={`px-3 text-right font-mono font-medium ${isMovementNeg ? "text-red-600" : movement > 0 ? "text-green-600" : "text-muted-foreground"}`}>
+                                {movement > 0 ? "+" : ""}{Math.floor(movement).toLocaleString()} BL
+                              </td>
+                            </>
+                          ) : (
+                            <td className={`px-3 text-right font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>
+                              {Math.floor(closingQty).toLocaleString()}<span className="ml-3">BL</span>
+                            </td>
+                          )}
                           {!posUser && (
                             <>
                               <td className="px-3 text-right font-mono">
@@ -2010,9 +2195,26 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   <tfoot className="bg-muted/50 border-t-2 font-semibold">
                     <tr className="h-12">
                       <td className="px-3 font-bold">Total</td>
-                      <td className="px-3 text-right font-mono font-bold">
-                        {Math.floor(filteredStockItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()}<span className="ml-3">BL</span>
-                      </td>
+                      {showMovement ? (
+                        <>
+                          <td className="px-3 text-right font-mono font-bold text-muted-foreground">
+                            {Math.floor(filteredStockItems.reduce((sum, item) => sum + (openingInventoryMap.get(item.stockItemId) || 0), 0)).toLocaleString()} BL
+                          </td>
+                          <td className="px-3 text-right font-mono font-bold">
+                            {Math.floor(filteredStockItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()} BL
+                          </td>
+                          <td className="px-3 text-right font-mono font-bold">
+                            {(() => {
+                              const tot = filteredStockItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0") - (openingInventoryMap.get(item.stockItemId) || 0), 0);
+                              return `${tot > 0 ? "+" : ""}${Math.floor(tot).toLocaleString()} BL`;
+                            })()}
+                          </td>
+                        </>
+                      ) : (
+                        <td className="px-3 text-right font-mono font-bold">
+                          {Math.floor(filteredStockItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()}<span className="ml-3">BL</span>
+                        </td>
+                      )}
                       {!posUser && (
                         <>
                           <td className="px-3"></td>
