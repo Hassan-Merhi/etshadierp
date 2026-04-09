@@ -2,12 +2,12 @@ import { useState } from "react";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, DollarSign, CalendarDays, Banknote, Gift, ArrowDownCircle } from "lucide-react";
-import FactoryEmployees from "@/pages/FactoryEmployees";
-import FactoryEmployeePayrollTab from "@/pages/FactoryEmployeePayrollTab";
-import FactoryEmployeeAttendanceTab from "@/pages/FactoryEmployeeAttendanceTab";
-import FactoryEmployeeAdvancesTab from "@/pages/FactoryEmployeeAdvancesTab";
-import FactoryEmployeeBonusesTab from "@/pages/FactoryEmployeeBonusesTab";
-import FactoryEmployeeWithdrawalsTab from "@/pages/FactoryEmployeeWithdrawalsTab";
+import FactoryEmployees from "@/pages/factory/FactoryEmployees";
+import FactoryEmployeePayrollTab from "@/pages/factory/FactoryEmployeePayrollTab";
+import FactoryEmployeeAttendanceTab from "@/pages/factory/FactoryEmployeeAttendanceTab";
+import FactoryEmployeeAdvancesTab from "@/pages/factory/FactoryEmployeeAdvancesTab";
+import FactoryEmployeeBonusesTab from "@/pages/factory/FactoryEmployeeBonusesTab";
+import FactoryEmployeeWithdrawalsTab from "@/pages/factory/FactoryEmployeeWithdrawalsTab";
 
 type TabValue = "employees" | "payroll" | "attendance" | "advances" | "bonuses" | "withdrawals";
 

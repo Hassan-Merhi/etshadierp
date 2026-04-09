@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HardHat, DollarSign, CalendarDays, Banknote, Gift } from "lucide-react";
-import FactoryWorkers from "@/pages/FactoryWorkers";
-import FactoryPayrollTab from "@/pages/FactoryPayrollTab";
-import FactoryAttendance from "@/pages/FactoryAttendance";
-import FactoryAdvancesTab from "@/pages/FactoryAdvancesTab";
-import FactoryWorkerBonusesTab from "@/pages/FactoryWorkerBonusesTab";
+import FactoryWorkers from "@/pages/factory/FactoryWorkers";
+import FactoryPayrollTab from "@/pages/factory/FactoryPayrollTab";
+import FactoryAttendance from "@/pages/factory/FactoryAttendance";
+import FactoryAdvancesTab from "@/pages/factory/FactoryAdvancesTab";
+import FactoryWorkerBonusesTab from "@/pages/factory/FactoryWorkerBonusesTab";
 
 type TabValue = "workers" | "payroll" | "attendance" | "advances" | "bonuses";
 

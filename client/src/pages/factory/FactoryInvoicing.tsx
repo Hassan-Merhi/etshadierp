@@ -1,7 +1,7 @@
 import { useLocation, useSearch } from "wouter";
-import FactoryProformas from "@/pages/FactoryProformas";
-import FactoryPendingInvoices from "@/pages/FactoryPendingInvoices";
-import FactoryInvoices from "@/pages/FactoryInvoices";
+import FactoryProformas from "@/pages/factory/FactoryProformas";
+import FactoryPendingInvoices from "@/pages/factory/FactoryPendingInvoices";
+import FactoryInvoices from "@/pages/factory/FactoryInvoices";
 
 type InvoicingTab = "proformas" | "pending" | "invoices";
 
