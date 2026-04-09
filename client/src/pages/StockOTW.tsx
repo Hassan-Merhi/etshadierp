@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -337,9 +337,8 @@ function StockOTWContent() {
                   {filteredItems.map((item, index) => {
                     const isExpanded = expandedItems.has(item.stockItemName);
                     return (
-                      <>
+                      <Fragment key={item.stockItemName}>
                         <TableRow 
-                          key={item.stockItemName} 
                           data-testid={`row-item-${index}`}
                           className="hover-elevate cursor-pointer"
                           onClick={() => toggleItemExpanded(item.stockItemName)}
@@ -402,7 +401,7 @@ function StockOTWContent() {
                             </TableCell>
                           </TableRow>
                         ))}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </TableBody>

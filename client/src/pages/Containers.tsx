@@ -140,7 +140,7 @@ export default function Containers() {
 
   // Auto-size inputs to fit their text.
   // Defaults are slightly wider so fields don't feel cramped (like Description).
-  const autoSizeStyle = async (
+  const autoSizeStyle = (
     value: unknown,
     placeholder = "",
     minCh = 10,
