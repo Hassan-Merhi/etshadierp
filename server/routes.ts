@@ -33,10 +33,17 @@ import { registerAccountRoutes } from "./routes/accountRoutes";
 import { registerPosRoutes } from "./routes/posRoutes";
 import { registerStatsRoutes } from "./routes/statsRoutes";
 import { registerVoucherRoutes } from "./routes/voucherRoutes";
+import { registerVoucherEntryRoutes } from "./routes/voucherEntryRoutes";
 import { registerFiscalTransferRoutes } from "./routes/fiscalTransferRoutes";
 import { registerReportsRoutes } from "./routes/reportsRoutes";
 import { registerBaleRoutes } from "./routes/baleRoutes";
 import { registerAdminRoutes } from "./routes/adminRoutes";
+import { registerStockSummaryRoutes } from "./routes/stockSummaryRoutes";
+import { registerChatbotRoutes } from "./routes/chatbotRoutes";
+import { registerCreditNoteRoutes } from "./routes/creditNoteRoutes";
+import { registerNetProfitExcelRoute } from "./routes/netProfitExcelRoute";
+import { registerImportCycleRoutes } from "./routes/importCycleRoutes";
+import { registerDebugRoutes } from "./routes/debugRoutes";
 import {
   requireAuth,
   requireRole,
@@ -1604,12 +1611,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerImportRoutes(app);
   registerAccountRoutes(app);
   registerVoucherRoutes(app);
+  registerVoucherEntryRoutes(app);
   registerFiscalTransferRoutes(app);
   registerPosRoutes(app);
   registerStatsRoutes(app);
+  registerImportCycleRoutes(app);
+  registerDebugRoutes(app);
   registerReportsRoutes(app);
   registerBaleRoutes(app);
   registerAdminRoutes(app);
+  registerStockSummaryRoutes(app);
+  registerChatbotRoutes(app);
+  registerCreditNoteRoutes(app);
+  registerNetProfitExcelRoute(app);
 
   const httpServer = createServer(app);
 

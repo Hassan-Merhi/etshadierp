@@ -1,0 +1,916 @@
+import type { Express } from "express";
+import { db } from "../db";
+import { requireAuth } from "../auth";
+import { classifyNetPositionAccounts } from "../netPositionHelper";
+import { adjustInventory } from "../inventoryHelper";
+import {
+  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
+  isLegacySHA256Hash, verifySupervisorPassword,
+} from "./_helpers";
+import {
+  factorySuppliers, factoryCategories, factoryBaleProducts,
+  factoryContainers, factoryRawStock, factoryMixBatches,
+  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
+  factoryBales, factoryBaleSequences, factoryContainerCommissions,
+  baleLabelPrints, stockItems, stockGroups, users,
+  insertFactorySupplierSchema, insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
+  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema, customerProformas, customerProformaLines,
+  customerOrders, customerOrderLines, customerOrderBales,
+  customerOrderCharges, customerInvoiceSequences, customerBalances,
+  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
+  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
+  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
+  containerDocumentTypes, containerDocuments, containerFreight,
+  containerFreightPayments, factoryDaybookEntryEdits,
+  containers, factoryUserProfiles, factoryUserPageAccess,
+  insertUserSchema, directMessages, insertDirectMessageSchema,
+  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges, companySettings, factorySettings,
+  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
+  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
+  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
+  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
+  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
+  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
+  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+} from "@shared/schema";
+import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
+import bcrypt from "bcryptjs";
+import CryptoJS from "crypto-js";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+
+export function registerFactoryCustomerProformaRoutes(app: Express) {
+  app.get("/api/factory/customer-proformas", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const customerId = req.query.customerId ? parseInt(req.query.customerId) : null;
+      if (!customerId) return res.status(400).json({ message: "customerId is required" });
+
+      const proformas = await db
+        .select()
+        .from(customerProformas)
+        .where(and(eq(customerProformas.companyId, companyId), eq(customerProformas.customerId, customerId)))
+        .orderBy(desc(customerProformas.createdAt));
+
+      const proformaIds = proformas.map((p: any) => p.id);
+      let lines: any[] = [];
+      if (proformaIds.length > 0) {
+        lines = await db.select().from(customerProformaLines).where(inArray(customerProformaLines.proformaId, proformaIds));
+      }
+
+      // Enrich lines with weightPerBaleKg and correct productName from factoryBaleProducts
+      const articleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
+      let weightMap = new Map<string, string>();
+      let nameMap = new Map<string, string>();
+      if (articleCodes.length > 0) {
+        const baleProds = await db.select({ articleCode: factoryBaleProducts.articleCode, weightPerBaleKg: factoryBaleProducts.weightPerBaleKg, name: factoryBaleProducts.name })
+          .from(factoryBaleProducts)
+          .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes as string[])));
+        baleProds.forEach((p: any) => {
+          if (p.articleCode) {
+            weightMap.set(p.articleCode, p.weightPerBaleKg || "0");
+            if (p.name) nameMap.set(p.articleCode, p.name);
+          }
+        });
+      }
+
+      const enrichedLines = lines.map((l: any) => ({
+        ...l,
+        weightPerBaleKg: weightMap.get(l.articleCode) || "0",
+        productName: nameMap.get(l.articleCode) || l.productName,
+      }));
+
+      const result = proformas.map((p: any) => ({
+        ...p,
+        lines: enrichedLines.filter((l: any) => l.proformaId === p.id),
+      }));
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching customer proformas:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customer-proformas", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const parsed = insertCustomerProformaSchema.parse({ ...req.body, companyId });
+
+      const [duplicate] = await db.select({ id: customerProformas.id }).from(customerProformas)
+        .where(and(
+          eq(customerProformas.companyId, companyId),
+          eq(customerProformas.customerId, parsed.customerId),
+          eq(customerProformas.name, parsed.name)
+        ));
+      if (duplicate) {
+        return res.status(409).json({ message: `A proforma named "${parsed.name}" already exists for this customer. Please choose a different name.` });
+      }
+
+      const [proforma] = await db.insert(customerProformas).values(parsed).returning();
+      res.json(proforma);
+    } catch (error: any) {
+      console.error("Error creating customer proforma:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/factory/customer-proformas/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const [existing] = await db.select().from(customerProformas)
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
+      if (!existing) return res.status(404).json({ message: "Proforma not found" });
+
+      if (req.body.name && req.body.name !== existing.name) {
+        const [duplicate] = await db.select({ id: customerProformas.id }).from(customerProformas)
+          .where(and(
+            eq(customerProformas.companyId, companyId),
+            eq(customerProformas.customerId, existing.customerId),
+            eq(customerProformas.name, req.body.name)
+          ));
+        if (duplicate) {
+          return res.status(409).json({ message: `A proforma named "${req.body.name}" already exists for this customer. Please choose a different name.` });
+        }
+      }
+
+      const [updated] = await db.update(customerProformas)
+        .set({ ...req.body, updatedAt: new Date() })
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)))
+        .returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating customer proforma:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/factory/customer-proformas/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+
+      // Fetch proforma before deleting so we can log which customer it belongs to
+      const [proformaBefore] = await db.select().from(customerProformas)
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
+      if (proformaBefore) {
+        const [custBefore] = await db.select({ id: customers.id, legalName: customers.legalName, deletedAt: customers.deletedAt })
+          .from(customers).where(eq(customers.id, proformaBefore.customerId));
+        console.log(`[PROFORMA DELETE] Deleting proforma id=${id} name="${proformaBefore.name}" customerId=${proformaBefore.customerId} customerName="${custBefore?.legalName}" customerDeletedAt=${custBefore?.deletedAt}`);
+      }
+
+      await db.delete(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
+      const [deleted] = await db.delete(customerProformas)
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)))
+        .returning();
+
+      if (!deleted) return res.status(404).json({ message: "Proforma not found" });
+
+      // Verify customer still exists after proforma deletion
+      if (proformaBefore) {
+        const [custAfter] = await db.select({ id: customers.id, legalName: customers.legalName, deletedAt: customers.deletedAt })
+          .from(customers).where(eq(customers.id, proformaBefore.customerId));
+        console.log(`[PROFORMA DELETE] After deletion: customerId=${proformaBefore.customerId} customerName="${custAfter?.legalName}" customerDeletedAt=${custAfter?.deletedAt}`);
+      }
+
+      res.json({ message: "Proforma deleted" });
+    } catch (error: any) {
+      console.error("Error deleting customer proforma:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create a pending loading from a proforma — auto-adds matching bales from stock
+  app.post("/api/factory/customer-proformas/:id/create-loading", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const proformaId = parseInt(req.params.id);
+      const { locationId, orderDate } = req.body;
+      if (!locationId) return res.status(400).json({ message: "locationId is required" });
+
+      // Fetch the proforma (validate ownership via customerId join)
+      const [proforma] = await db.select().from(customerProformas)
+        .where(and(eq(customerProformas.id, proformaId), eq(customerProformas.companyId, companyId)));
+      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+
+      // Fetch proforma lines
+      const lines = await db.select().from(customerProformaLines)
+        .where(eq(customerProformaLines.proformaId, proformaId));
+
+      // Create the LOADING order
+      const [order] = await db.insert(customerOrders).values({
+        companyId,
+        customerId: proforma.customerId,
+        proformaIdUsed: proformaId,
+        locationId: parseInt(locationId),
+        orderDate: orderDate || new Date().toISOString().split('T')[0],
+        status: "LOADING",
+        loadingStartedAt: new Date(),
+      }).returning();
+
+      // For each proforma line, grab available bales from stock at the location
+      // Pre-fetch product names for all article codes in this proforma
+      const proformaArticleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
+      const proformaProductNameMap = new Map<string, string>();
+      if (proformaArticleCodes.length > 0) {
+        const proformaProducts = await db
+          .select({ articleCode: factoryBaleProducts.articleCode, name: factoryBaleProducts.name })
+          .from(factoryBaleProducts)
+          .where(and(
+            eq(factoryBaleProducts.companyId, companyId),
+            inArray(factoryBaleProducts.articleCode, proformaArticleCodes)
+          ));
+        for (const p of proformaProducts) {
+          if (p.articleCode) proformaProductNameMap.set(p.articleCode, p.name);
+        }
+      }
+
+      let totalBalesAdded = 0;
+      for (const line of lines) {
+        if (!line.articleCode) continue;
+        const qty = line.quantity || 0;
+        if (qty <= 0) continue;
+
+        // Find available bales at this location with matching articleCode
+        const available = await db.select().from(factoryBales)
+          .where(and(
+            eq(factoryBales.companyId, companyId),
+            or(eq(factoryBales.status, "FINALIZED"), eq(factoryBales.status, "IN_STOCK")),
+            eq(factoryBales.erpLocationId, parseInt(locationId)),
+            eq(factoryBales.articleCode, line.articleCode),
+          ))
+          .orderBy(factoryBales.id)
+          .limit(qty);
+
+        for (const bale of available) {
+          const resolvedBaleName = proformaProductNameMap.get(bale.articleCode || "") || bale.productName || bale.articleCode || bale.baleCode;
+          await db.insert(customerOrderBales).values({
+            orderId: order.id,
+            baleId: bale.id,
+            baleReference: bale.referenceNumber,
+            locationId: parseInt(locationId),
+            weight: bale.weightKg,
+            articleCode: bale.articleCode,
+            baleName: resolvedBaleName,
+            priceUsed: line.pricePerBale,
+          });
+          await db.update(factoryBales)
+            .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
+            .where(eq(factoryBales.id, bale.id));
+          totalBalesAdded++;
+        }
+      }
+
+      await recalculateOrderTotals(db, order.id);
+
+      const [loadingCustomer] = await db.select({ legalName: customers.legalName })
+        .from(customers).where(eq(customers.id, proforma.customerId));
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: orderDate || new Date().toISOString().split('T')[0],
+        txType: "LOADING_CREATED",
+        referenceId: order.id,
+        description: `Loading created from proforma "${proforma.name}" for ${loadingCustomer?.legalName || "customer"} — ${totalBalesAdded} bale(s) added`,
+      });
+
+      res.json({ order, balesAdded: totalBalesAdded });
+    } catch (error: any) {
+      console.error("Error creating loading from proforma:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customer-proforma-lines", requireAuth, async (req: any, res: any) => {
+    try {
+      const parsed = insertCustomerProformaLineSchema.parse(req.body);
+
+      const [existingLine] = await db.select().from(customerProformaLines)
+        .where(and(eq(customerProformaLines.proformaId, parsed.proformaId), eq(customerProformaLines.articleCode, parsed.articleCode)));
+      if (existingLine) return res.status(400).json({ message: "Article code already exists in this proforma" });
+
+      const [line] = await db.insert(customerProformaLines).values(parsed).returning();
+      res.json(line);
+    } catch (error: any) {
+      console.error("Error creating proforma line:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/factory/customer-proforma-lines/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updateData: any = {};
+      if (req.body.productName !== undefined) updateData.productName = req.body.productName;
+      if (req.body.quantity !== undefined) updateData.quantity = parseInt(req.body.quantity);
+      if (req.body.pricePerBale !== undefined) updateData.pricePerBale = req.body.pricePerBale;
+
+      const [updated] = await db.update(customerProformaLines).set(updateData)
+        .where(eq(customerProformaLines.id, id)).returning();
+
+      if (!updated) return res.status(404).json({ message: "Proforma line not found" });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating proforma line:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/factory/customer-proforma-lines/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [deleted] = await db.delete(customerProformaLines).where(eq(customerProformaLines.id, id)).returning();
+      if (!deleted) return res.status(404).json({ message: "Proforma line not found" });
+      res.json({ message: "Proforma line deleted" });
+    } catch (error: any) {
+      console.error("Error deleting proforma line:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customer-proformas/bulk", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { customerId, name, isActive, lines } = req.body;
+      if (!customerId || !name || !Array.isArray(lines) || lines.length === 0) {
+        return res.status(400).json({ message: `customerId, name, and at least one line are required. Got: customerId=${customerId}, name=${name}, lines=${Array.isArray(lines) ? lines.length : 'not array'}` });
+      }
+
+      const validLines = lines.filter((l: any) => l.articleCode && l.productName && parseInt(l.quantity) > 0);
+      if (validLines.length === 0) {
+        return res.status(400).json({ message: "At least one line must have articleCode, productName, and quantity > 0" });
+      }
+
+      const parsed = insertCustomerProformaSchema.parse({ companyId, customerId, name, isActive: isActive || false });
+
+      const result = await db.transaction(async (tx: any) => {
+        const [proforma] = await tx.insert(customerProformas).values(parsed).returning();
+
+        const lineValues = validLines.map((l: any) => ({
+          proformaId: proforma.id,
+          articleCode: l.articleCode,
+          productName: l.productName,
+          quantity: parseInt(l.quantity),
+          pricePerBale: String(l.pricePerBale || "0"),
+        }));
+
+        const insertedLines = await tx.insert(customerProformaLines).values(lineValues).returning();
+
+        return { ...proforma, lines: insertedLines };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error bulk creating proforma:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/factory/customer-proformas/:id/replace-lines", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const [proforma] = await db.select().from(customerProformas)
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
+      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+
+      const { lines } = req.body;
+      if (!Array.isArray(lines) || lines.length === 0) {
+        return res.status(400).json({ message: "At least one line is required" });
+      }
+
+      const validLines = lines.filter((l: any) => l.articleCode && l.productName && parseInt(l.quantity) > 0);
+      if (validLines.length === 0) {
+        return res.status(400).json({ message: "At least one line must have articleCode, productName, and quantity > 0" });
+      }
+
+      const result = await db.transaction(async (tx: any) => {
+        await tx.delete(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
+        const lineValues = validLines.map((l: any) => ({
+          proformaId: id,
+          articleCode: l.articleCode,
+          productName: l.productName,
+          quantity: parseInt(l.quantity),
+          pricePerBale: String(l.pricePerBale || "0"),
+        }));
+        const insertedLines = await tx.insert(customerProformaLines).values(lineValues).returning();
+        return { ...proforma, lines: insertedLines };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error replacing proforma lines:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customer-proformas/:id/apply-catalog-prices", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+
+      const lines = await db.select().from(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
+      if (!lines.length) return res.json({ updated: 0, skipped: 0 });
+
+      const products = await db.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId));
+      const priceByArticleCode = new Map<string, string>();
+      for (const p of products) {
+        if (p.articleCode && p.sellingPrice && parseFloat(String(p.sellingPrice)) > 0) {
+          priceByArticleCode.set(p.articleCode.toLowerCase(), String(p.sellingPrice));
+        }
+      }
+
+      let updated = 0;
+      let skipped = 0;
+      let fixed = 0;
+      for (const line of lines) {
+        if ((line as any).priceFixed) { fixed++; continue; }
+        const newPrice = priceByArticleCode.get((line.articleCode || "").toLowerCase());
+        if (newPrice) {
+          await db.update(customerProformaLines)
+            .set({ pricePerBale: newPrice })
+            .where(eq(customerProformaLines.id, line.id));
+          updated++;
+        } else {
+          skipped++;
+        }
+      }
+
+      res.json({ updated, skipped, fixed });
+    } catch (error: any) {
+      console.error("Error applying catalog prices:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Toggle price_fixed flag on a proforma line
+  app.patch("/api/factory/customer-proforma-lines/:lineId/toggle-fixed", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const lineId = parseInt(req.params.lineId);
+      const [line] = await db.select().from(customerProformaLines).where(eq(customerProformaLines.id, lineId)).limit(1);
+      if (!line) return res.status(404).json({ message: "Line not found" });
+      const [updated] = await db.update(customerProformaLines)
+        .set({ priceFixed: !(line as any).priceFixed })
+        .where(eq(customerProformaLines.id, lineId))
+        .returning();
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─── Stock Allocation endpoints ─────────────────────────────────────────────
+
+  // GET /api/factory/stock-allocation — returns all article codes with IN_STOCK bale counts,
+  // all proformas with their lines, existing reservations, and LOADING/PENDING_VERIFICATION/VERIFIED order quantities
+  app.get("/api/factory/stock-allocation", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // 1. All proformas for this company
+      const allProformas = await db.select({
+        id: customerProformas.id,
+        companyId: customerProformas.companyId,
+        customerId: customerProformas.customerId,
+        name: customerProformas.name,
+        isActive: customerProformas.isActive,
+        createdAt: customerProformas.createdAt,
+      }).from(customerProformas)
+        .where(eq(customerProformas.companyId, companyId))
+        .orderBy(customerProformas.createdAt);
+
+      const proformaIds = allProformas.map((p: any) => p.id);
+      let allLines: any[] = [];
+      if (proformaIds.length > 0) {
+        allLines = await db.select({
+          id: customerProformaLines.id,
+          proformaId: customerProformaLines.proformaId,
+          articleCode: customerProformaLines.articleCode,
+          productName: customerProformaLines.productName,
+          quantity: customerProformaLines.quantity,
+          pricePerBale: customerProformaLines.pricePerBale,
+        }).from(customerProformaLines)
+          .where(inArray(customerProformaLines.proformaId, proformaIds));
+      }
+
+      // 2. IN_STOCK bale counts grouped by articleCode
+      const inStockCountsRaw = await db.execute(
+        sql`SELECT article_code as "articleCode", COUNT(*)::int as count FROM factory_bales WHERE company_id = ${companyId} AND status = 'IN_STOCK' GROUP BY article_code`
+      );
+      const inStockCounts = (inStockCountsRaw.rows || inStockCountsRaw as any[]).map((r: any) => ({
+        articleCode: r.articleCode,
+        count: Number(r.count),
+      }));
+
+      // 3. Existing reservations for this company
+      const reservations = await db.select({
+        id: proformaStockReservations.id,
+        companyId: proformaStockReservations.companyId,
+        proformaId: proformaStockReservations.proformaId,
+        articleCode: proformaStockReservations.articleCode,
+      }).from(proformaStockReservations)
+        .where(eq(proformaStockReservations.companyId, companyId));
+
+      // 4. Active orders (LOADING, PENDING_VERIFICATION, VERIFIED)
+      const activeOrdersRaw = await db.execute(
+        sql`SELECT id, proforma_id_used as "proformaIdUsed", status FROM customer_orders WHERE company_id = ${companyId} AND status IN ('LOADING','PENDING_VERIFICATION','VERIFIED')`
+      );
+      const activeOrders = (activeOrdersRaw.rows || activeOrdersRaw as any[]).map((o: any) => ({
+        id: o.id,
+        proformaIdUsed: o.proformaIdUsed,
+        status: o.status,
+      }));
+
+      // For active orders, get bale article code counts from customer_order_bales
+      let activeOrderBales: any[] = [];
+      if (activeOrders.length > 0) {
+        const orderIds = activeOrders.map((o: any) => o.id);
+        const activeOrderBalesRaw = await db.execute(
+          sql`SELECT order_id as "orderId", article_code as "articleCode", COUNT(*)::int as count FROM customer_order_bales WHERE order_id = ANY(${sql.raw(`ARRAY[${orderIds.join(',')}]`)}) GROUP BY order_id, article_code`
+        );
+        activeOrderBales = (activeOrderBalesRaw.rows || activeOrderBalesRaw as any[]).map((b: any) => ({
+          orderId: b.orderId,
+          articleCode: b.articleCode,
+          count: Number(b.count),
+        }));
+      }
+
+      // 5. Customers lookup — use legalName (the customers table has no "name" column)
+      const allCustomerIds = [...new Set(allProformas.map((p: any) => p.customerId))].filter((id): id is number => id != null && !isNaN(Number(id)));
+      let customerRows: any[] = [];
+      if (allCustomerIds.length > 0) {
+        customerRows = await db.select({ id: customers.id, legalName: customers.legalName })
+          .from(customers)
+          .where(inArray(customers.id, allCustomerIds));
+      }
+      const customerMap = new Map(customerRows.map((c: any) => [c.id, c.legalName]));
+
+      res.json({
+        proformas: allProformas.map((p: any) => ({
+          id: p.id,
+          companyId: p.companyId,
+          customerId: p.customerId,
+          name: p.name,
+          isActive: p.isActive,
+          createdAt: p.createdAt,
+          customerName: customerMap.get(p.customerId) || `Customer #${p.customerId}`,
+          lines: allLines.filter((l: any) => l.proformaId === p.id),
+        })),
+        inStockCounts,
+        reservations,
+        activeOrders: activeOrders.map((o: any) => ({
+          id: o.id,
+          proformaIdUsed: o.proformaIdUsed,
+          status: o.status,
+          balesByArticle: activeOrderBales
+            .filter((b: any) => b.orderId === o.id)
+            .map((b: any) => ({ articleCode: b.articleCode, count: b.count })),
+        })),
+      });
+    } catch (error: any) {
+      console.error("Error fetching stock allocation:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/stock-allocation/reservations/toggle — toggle a reservation on/off
+  app.post("/api/factory/stock-allocation/reservations/toggle", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { proformaId, articleCode } = req.body;
+      if (!proformaId || !articleCode) return res.status(400).json({ message: "proformaId and articleCode required" });
+
+      // Check if reservation exists
+      const [existing] = await db.select().from(proformaStockReservations)
+        .where(and(
+          eq(proformaStockReservations.companyId, companyId),
+          eq(proformaStockReservations.proformaId, proformaId),
+          eq(proformaStockReservations.articleCode, articleCode),
+        )).limit(1);
+
+      if (existing) {
+        await db.delete(proformaStockReservations)
+          .where(eq(proformaStockReservations.id, existing.id));
+        res.json({ reserved: false });
+      } else {
+        await db.insert(proformaStockReservations).values({ companyId, proformaId, articleCode });
+        res.json({ reserved: true });
+      }
+    } catch (error: any) {
+      console.error("Error toggling reservation:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─── End Stock Allocation ─────────────────────────────────────────────────────
+
+  app.get("/api/factory/customer-proformas/:id/export/excel", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const [proforma] = await db.select().from(customerProformas)
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
+      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+
+      const rawLines = await db.select().from(customerProformaLines)
+        .where(eq(customerProformaLines.proformaId, id));
+
+      const [customer] = await db.select().from(customers).where(eq(customers.id, proforma.customerId));
+      const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
+      const [settings] = await db.select().from(companySettings).where(eq(companySettings.companyId, companyId)).catch(() => [null]);
+
+      // Fetch weight per bale + canonical name from factoryBaleProducts by articleCode
+      const articleCodes = [...new Set(rawLines.map((l: any) => l.articleCode).filter(Boolean))];
+      const wMap = new Map<string, number>();
+      const nameMap = new Map<string, string>();
+      if (articleCodes.length > 0) {
+        const prods = await db.select({ articleCode: factoryBaleProducts.articleCode, weightPerBaleKg: factoryBaleProducts.weightPerBaleKg, name: factoryBaleProducts.name })
+          .from(factoryBaleProducts)
+          .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes as string[])));
+        prods.forEach((p: any) => { if (p.articleCode) { wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0")); nameMap.set(p.articleCode, p.name || ""); } });
+      }
+
+      const baseCurrency = (company as any)?.baseCurrency || "USD";
+      const currencySymbolMap: Record<string, string> = {
+        USD: "$ ", GBP: "£", EUR: "€", CFA: "CFA ", XOF: "CFA ", XAF: "CFA ",
+        CAD: "CA$ ", AUD: "A$ ", CHF: "CHF ", JPY: "¥", INR: "₹", AED: "AED ",
+        MXN: "MX$ ", BRL: "R$ ", ZAR: "R", SGD: "S$ ", HKD: "HK$ ", NOK: "kr ", SEK: "kr ", DKK: "kr ",
+      };
+      const currSym = currencySymbolMap[baseCurrency.toUpperCase()] ?? (baseCurrency + " ");
+      const fmtPrice = (n: number) => currSym + (n % 1 === 0 ? n.toLocaleString() : n.toFixed(2));
+      const fmtKg = (n: number) => n % 1 === 0 ? String(n) : n.toFixed(2);
+
+      const ExcelJS = (await import("exceljs")).default;
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Proforma Invoice");
+
+      const COL_COUNT = 8;
+      sheet.columns = [
+        { key: "num", width: 6 },
+        { key: "articleCode", width: 18 },
+        { key: "productName", width: 32 },
+        { key: "qty", width: 12 },
+        { key: "kgPerBale", width: 13 },
+        { key: "pricePerBale", width: 14 },
+        { key: "totalKg", width: 13 },
+        { key: "totalPrice", width: 15 },
+      ];
+
+      try {
+        const pxLogo = path.join(process.cwd(), "server", "hmd-logo.png");
+        if (fs.existsSync(pxLogo)) {
+          const pxBuf = fs.readFileSync(pxLogo);
+          const pxId = workbook.addImage({ buffer: pxBuf as Buffer, extension: "jpeg" });
+          const pxLogoRow = sheet.addRow([]); pxLogoRow.height = 90;
+          sheet.addImage(pxId, { tl: { col: 2.5, row: 0 }, ext: { width: 300, height: 90 } });
+        }
+      } catch {}
+      const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
+      r1.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
+      r1.getCell(1).alignment = { horizontal: "center" };
+      sheet.mergeCells(r1.number, 1, r1.number, COL_COUNT);
+
+      const r2 = sheet.addRow([`Customer: ${customer?.legalName || "N/A"}`]);
+      r2.getCell(1).font = { size: 11 };
+      sheet.mergeCells(r2.number, 1, r2.number, COL_COUNT);
+
+      const dateStr = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
+      const r3 = sheet.addRow([`Date: ${dateStr}`]);
+      r3.getCell(1).font = { size: 10, color: { argb: "FF555555" } };
+      sheet.mergeCells(r3.number, 1, r3.number, COL_COUNT);
+
+      const r4 = sheet.addRow([`Proforma: ${proforma.name}`]);
+      r4.getCell(1).font = { size: 10, color: { argb: "FF555555" } };
+      sheet.mergeCells(r4.number, 1, r4.number, COL_COUNT);
+
+      sheet.addRow([]);
+
+      const hdrRow = sheet.addRow(["#", "Article Code", "Product Name", "Qty (Bales)", "Kg / Bale", "Price / Bale", "Total KG", "Total Price"]);
+      hdrRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F3864" } };
+        cell.alignment = { horizontal: "center" };
+      });
+
+      let totalQty = 0, totalKgAll = 0, totalPriceAll = 0;
+      rawLines.forEach((line: any, idx: number) => {
+        const qty = parseInt(String(line.quantity));
+        const kgPerBale = wMap.get(line.articleCode) || 0;
+        const price = parseFloat(String(line.pricePerBale));
+        const totalKg = qty * kgPerBale;
+        const totalPrice = qty * price;
+        totalQty += qty;
+        totalKgAll += totalKg;
+        totalPriceAll += totalPrice;
+
+        const dr = sheet.addRow([idx + 1, line.articleCode, nameMap.get(line.articleCode) || line.productName || "", qty, fmtKg(kgPerBale), fmtPrice(price), fmtKg(totalKg), fmtPrice(totalPrice)]);
+        dr.getCell(4).alignment = { horizontal: "right" };
+        dr.getCell(5).alignment = { horizontal: "right" };
+        dr.getCell(6).alignment = { horizontal: "right" };
+        dr.getCell(7).alignment = { horizontal: "right" };
+        dr.getCell(8).alignment = { horizontal: "right" };
+        if (idx % 2 === 1) {
+          dr.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5F5F5" } }; });
+        }
+      });
+
+      sheet.addRow([]);
+      const totRow = sheet.addRow(["", "", "GRAND TOTAL", totalQty, "", "", fmtKg(totalKgAll), fmtPrice(totalPriceAll)]);
+      totRow.eachCell((cell) => { cell.font = { bold: true }; });
+      totRow.getCell(4).alignment = { horizontal: "right" };
+      totRow.getCell(7).alignment = { horizontal: "right" };
+      totRow.getCell(8).alignment = { horizontal: "right" };
+
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename=proforma_${proforma.name.replace(/\s+/g, "_")}.xlsx`);
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (error: any) {
+      console.error("Error exporting proforma to Excel:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/customer-proformas/:id/export/pdf", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const [proforma] = await db.select().from(customerProformas)
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
+      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+
+      const rawLines = await db.select().from(customerProformaLines)
+        .where(eq(customerProformaLines.proformaId, id));
+
+      const [customer] = await db.select().from(customers).where(eq(customers.id, proforma.customerId));
+      const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
+      const [settings] = await db.select().from(companySettings).where(eq(companySettings.companyId, companyId)).catch(() => [null]);
+
+      // Fetch weight per bale + canonical name from factoryBaleProducts by articleCode
+      const articleCodes = [...new Set(rawLines.map((l: any) => l.articleCode).filter(Boolean))];
+      const wMap = new Map<string, number>();
+      const nameMap = new Map<string, string>();
+      if (articleCodes.length > 0) {
+        const prods = await db.select({ articleCode: factoryBaleProducts.articleCode, weightPerBaleKg: factoryBaleProducts.weightPerBaleKg, name: factoryBaleProducts.name })
+          .from(factoryBaleProducts)
+          .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes as string[])));
+        prods.forEach((p: any) => { if (p.articleCode) { wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0")); nameMap.set(p.articleCode, p.name || ""); } });
+      }
+
+      const baseCurrencyPdf = (company as any)?.baseCurrency || "USD";
+      const currencySymbolMapPdf: Record<string, string> = {
+        USD: "$ ", GBP: "£", EUR: "€", CFA: "CFA ", XOF: "CFA ", XAF: "CFA ",
+        CAD: "CA$ ", AUD: "A$ ", CHF: "CHF ", JPY: "¥", INR: "₹", AED: "AED ",
+        MXN: "MX$ ", BRL: "R$ ", ZAR: "R", SGD: "S$ ", HKD: "HK$ ", NOK: "kr ", SEK: "kr ", DKK: "kr ",
+      };
+      const currSymPdf = currencySymbolMapPdf[baseCurrencyPdf.toUpperCase()] ?? (baseCurrencyPdf + " ");
+      const fmtPricePdf = (n: number) => currSymPdf + (n % 1 === 0 ? n.toLocaleString() : n.toFixed(2));
+      const fmtKgPdf = (n: number) => n % 1 === 0 ? String(n) : n.toFixed(2);
+
+      const PDFDocument = (await import("pdfkit")).default;
+      const fs = await import("fs");
+
+      const doc = new PDFDocument({ margin: 40, size: "A4" });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename=proforma_${proforma.name.replace(/\s+/g, "_")}.pdf`);
+      doc.pipe(res);
+
+      // ── Header ──
+      const hmdProformaLogo = path.join(process.cwd(), "server", "hmd-logo.png");
+      const headerY = 40;
+
+      const logoW = 220;
+      if (fs.existsSync(hmdProformaLogo)) {
+        try { doc.image(hmdProformaLogo, (doc.page.width - logoW) / 2, headerY, { width: logoW }); } catch {}
+      }
+      // Title goes below the logo — use doc.y which pdfkit advances after placing the image
+      const titleY = Math.max(doc.y, headerY + 10) + 6;
+      doc.fontSize(10).font("Helvetica").fillColor("#555555")
+        .text("PROFORMA INVOICE", 40, titleY, { width: 515, align: "center" });
+
+      const headerBottom = doc.y + 4;
+      doc.moveTo(40, headerBottom + 4).lineTo(555, headerBottom + 4).lineWidth(0.5).strokeColor("#cccccc").stroke();
+      doc.lineWidth(1).strokeColor("#000000");
+
+      // ── Meta info ──
+      const metaY = headerBottom + 12;
+      const dateStr = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
+      doc.fillColor("#000000").fontSize(10).font("Helvetica");
+      doc.text(`Customer:`, 40, metaY, { continued: true }).font("Helvetica-Bold").text(` ${customer?.legalName || "N/A"}`);
+      doc.font("Helvetica").text(`Proforma:`, 40, doc.y + 2, { continued: true }).font("Helvetica-Bold").text(` ${proforma.name}`);
+      doc.font("Helvetica").text(`Date:`, 40, doc.y + 2, { continued: true }).font("Helvetica-Bold").text(` ${dateStr}`);
+
+      doc.moveDown(1);
+
+      // ── Table ──
+      // Columns: # | Article Code | Product Name | Qty | Kg/Bale | Price/Bale | Total KG | Total Price
+      // x positions (left edge), total usable width = 515 (40..555)
+      const colX  = [40,  62,  132, 310, 355, 403, 455, 508];
+      const colW  = [22,  70,  178,  45,  48,  52,  53,  47];
+      const colHdr= ["#","Code","Product Name","Qty","Kg/Bale","Pr/Bale","Total KG","Total Price"];
+      const colAlign: Array<"left"|"right"|"center"> = ["center","center","center","center","center","center","center","center"];
+
+      const tableTop = doc.y + 4;
+
+      // Header row background
+      doc.rect(40, tableTop, 515, 14).fill("#1F3864");
+      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8);
+      colHdr.forEach((h, i) => {
+        doc.text(h, colX[i] + 2, tableTop + 3, { width: colW[i] - 4, align: colAlign[i] });
+      });
+
+      doc.fillColor("#000000").font("Helvetica").fontSize(8);
+      let y = tableTop + 16;
+      let totalQty = 0, totalKgAll = 0, totalPriceAll = 0;
+
+      rawLines.forEach((line: any, idx: number) => {
+        const qty = parseInt(String(line.quantity));
+        const kgPerBale = wMap.get(line.articleCode) || 0;
+        const price = parseFloat(String(line.pricePerBale));
+        const totalKg = qty * kgPerBale;
+        const totalPrice = qty * price;
+        totalQty += qty;
+        totalKgAll += totalKg;
+        totalPriceAll += totalPrice;
+
+        if (y > 770) {
+          doc.addPage();
+          y = 40;
+        }
+
+        const rowH = 14;
+        if (idx % 2 === 1) {
+          doc.rect(40, y, 515, rowH).fill("#F8F8F8");
+          doc.fillColor("#000000");
+        }
+
+        const vals = [String(idx + 1), line.articleCode, nameMap.get(line.articleCode) || line.productName || "", String(qty), fmtKgPdf(kgPerBale), fmtPricePdf(price), fmtKgPdf(totalKg), fmtPricePdf(totalPrice)];
+        vals.forEach((v, i) => {
+          doc.text(v, colX[i] + 2, y + 3, { width: colW[i] - 4, align: colAlign[i] });
+        });
+        y += rowH;
+      });
+
+      // Separator line
+      y += 2;
+      doc.moveTo(40, y).lineTo(555, y).lineWidth(0.5).strokeColor("#888888").stroke();
+      y += 6;
+      doc.lineWidth(1).strokeColor("#000000");
+
+      // Grand total row
+      doc.rect(40, y, 515, 16).fill("#EFF3FB");
+      doc.fillColor("#000000").font("Helvetica-Bold").fontSize(8);
+      const totVals = ["", "", "GRAND TOTAL", String(totalQty), "", "", fmtKgPdf(totalKgAll), fmtPricePdf(totalPriceAll)];
+      totVals.forEach((v, i) => {
+        if (v) doc.text(v, colX[i] + 2, y + 4, { width: colW[i] - 4, align: colAlign[i] });
+      });
+
+      doc.end();
+    } catch (error: any) {
+      console.error("Error exporting proforma to PDF:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ───────────────────────────────────────────────
+  // CUSTOMER ORDERS CRUD + FINALIZE
+  // ───────────────────────────────────────────────
+
+}
