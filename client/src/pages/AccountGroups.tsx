@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useCompany } from "@/contexts/CompanyContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +59,7 @@ const ACCOUNT_TYPES = [
 export default function AccountGroups() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { selectedCompany } = useCompany();
 
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -71,7 +73,16 @@ export default function AccountGroups() {
   const [newGroupType, setNewGroupType] = useState<string>("");
 
   const { data: allAccounts = [], isLoading } = useQuery<LedgerAccount[]>({
-    queryKey: ["/api/ledger-accounts"],
+    queryKey: ["/api/ledger-accounts", selectedCompany?.id],
+    queryFn: async () => {
+      const url = selectedCompany?.id
+        ? `/api/ledger-accounts?companyId=${selectedCompany.id}`
+        : "/api/ledger-accounts";
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch accounts");
+      return res.json();
+    },
+    enabled: !!selectedCompany,
   });
 
   // Derive parent groups: accounts that have at least one child OR we create them explicitly
@@ -120,7 +131,12 @@ export default function AccountGroups() {
   // --- Mutations ---
   const createGroupMutation = useMutation({
     mutationFn: async ({ name, accountType }: { name: string; accountType: string }) => {
-      return apiRequest("POST", "/api/ledger-accounts", { name, accountType });
+      if (!selectedCompany?.id) throw new Error("No company selected");
+      return apiRequest("POST", "/api/ledger-accounts", {
+        name,
+        accountType,
+        companyId: selectedCompany.id,
+      });
     },
     onSuccess: async (data: any) => {
       await queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
