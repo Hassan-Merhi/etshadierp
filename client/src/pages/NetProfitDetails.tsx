@@ -24,6 +24,7 @@ import {
   RefreshCw,
   Calendar,
   X,
+  Download,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -344,6 +345,20 @@ export default function NetProfitDetails() {
             )}
           </div>
 
+          <Button
+            variant="outline"
+            size="default"
+            data-testid="button-export-excel"
+            onClick={() => {
+              const p = new URLSearchParams();
+              if (fromDate) p.set("fromDate", fromDate);
+              if (toDate) p.set("toDate", toDate);
+              window.open(`/api/stats/net-position-excel${p.toString() ? `?${p.toString()}` : ""}`, "_blank");
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
           <Button onClick={() => refetch()} variant="outline" size="default" data-testid="button-refresh">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh

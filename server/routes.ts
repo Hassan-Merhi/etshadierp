@@ -23173,6 +23173,309 @@ if (asOfDate) {
     }
   });
 
+  // Net Position Excel Export
+  app.get("/api/stats/net-position-excel", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const fromDate = req.query.fromDate ? String(req.query.fromDate) : null;
+      const toDate   = req.query.toDate   ? String(req.query.toDate)   : null;
+
+      const allCompanies = await storage.getAllCompanies();
+      const company = allCompanies.find((c: any) => c.id === companyId);
+      const companyName = company?.name || "Company";
+
+      // ── 1. Accounts & voucher entries (same logic as /api/stats/net-profit) ──
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
+
+      const voucherConds: any[] = [
+        eq(vouchers.companyId, companyId),
+        eq(vouchers.optional, false),
+        isNull(vouchers.deletedAt),
+      ];
+      if (fromDate) voucherConds.push(gte(vouchers.voucherDate, fromDate));
+      if (toDate)   voucherConds.push(lte(vouchers.voucherDate, toDate));
+
+      const companyVouchers = await db.select({ id: vouchers.id }).from(vouchers).where(and(...voucherConds)).execute();
+      const voucherIds = companyVouchers.map((v: any) => v.id);
+      const companyEntries = voucherIds.length > 0
+        ? await db.select().from(voucherEntries).where(inArray(voucherEntries.voucherId, voucherIds)).execute()
+        : [];
+
+      const accountBalances = new Map<number, { debit: number; credit: number }>();
+      const supplierBalances = new Map<number, { debit: number; credit: number }>();
+      const employeeBalances = new Map<number, { debit: number; credit: number }>();
+      for (const e of companyEntries as any[]) {
+        if (e.ledgerAccountId) {
+          const cur = accountBalances.get(e.ledgerAccountId) || { debit: 0, credit: 0 };
+          accountBalances.set(e.ledgerAccountId, { debit: cur.debit + parseFloat(e.debitAmount || "0"), credit: cur.credit + parseFloat(e.creditAmount || "0") });
+        }
+        if (e.supplierId) {
+          const cur = supplierBalances.get(e.supplierId) || { debit: 0, credit: 0 };
+          supplierBalances.set(e.supplierId, { debit: cur.debit + parseFloat(e.debitAmount || "0"), credit: cur.credit + parseFloat(e.creditAmount || "0") });
+        }
+        if (e.employeeId) {
+          const cur = employeeBalances.get(e.employeeId) || { debit: 0, credit: 0 };
+          employeeBalances.set(e.employeeId, { debit: cur.debit + parseFloat(e.debitAmount || "0"), credit: cur.credit + parseFloat(e.creditAmount || "0") });
+        }
+      }
+
+      // ── 2. Classify accounts ──────────────────────────────────────────────
+      const parentCompanyId = await storage.getParentCompanyId();
+      const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
+      const classified = classifyNetPositionAccounts(companyAccounts, accountBalances, { includeSupplierTypeAccounts: shouldIncludeSuppliers });
+      let forUsTotal = classified.forUsTotal;
+      let onUsTotal  = classified.onUsTotal;
+      const forUsAccounts: any[] = [...classified.forUsAccounts];
+      const onUsAccounts: any[]  = [...classified.onUsAccounts];
+
+      // ── 3. Stock on floor ─────────────────────────────────────────────────
+      const activeLocsData = await db.select({ id: locations.id }).from(locations)
+        .where(and(eq(locations.companyId, companyId), eq(locations.active, true), isNull(locations.deletedAt))).execute();
+      const activeLocIds = activeLocsData.map((l: any) => l.id);
+      let stockOnFloor = 0;
+      if (activeLocIds.length > 0) {
+        const invData = await db.select({ quantity: inventory.quantity, averageRate: inventory.averageRate })
+          .from(inventory).where(inArray(inventory.locationId, activeLocIds)).execute();
+        for (const inv of invData as any[]) stockOnFloor += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
+      }
+      if (stockOnFloor > 0) {
+        forUsTotal += stockOnFloor;
+        forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: stockOnFloor, category: "Inventory" });
+      }
+
+      // ── 4. Payroll / employee balances ────────────────────────────────────
+      if (employeeBalances.size > 0) {
+        const { employees } = await import("../shared/schema");
+        const empList = await db.select().from(employees).where(eq(employees.companyId, companyId)).execute();
+        for (const emp of empList as any[]) {
+          const bal = employeeBalances.get(emp.id);
+          if (!bal) continue;
+          const net = bal.credit - bal.debit;
+          if (net > 0) {
+            onUsTotal += net;
+            onUsAccounts.push({ name: emp.name, code: "PAYROLL", value: net, category: "Payroll" });
+          } else if (net < 0) {
+            forUsTotal += Math.abs(net);
+            forUsAccounts.push({ name: emp.name, code: "PAYROLL", value: Math.abs(net), category: "Payroll Advance" });
+          }
+        }
+      }
+
+      const netPosition = forUsTotal - onUsTotal;
+      const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+      // ── 5. Build Excel ────────────────────────────────────────────────────
+      const ExcelJS = await import('exceljs');
+      const wb = new ExcelJS.default.Workbook();
+      wb.creator = companyName;
+      wb.created = new Date();
+
+      const DARK_GREEN  = "FF1A6B3C";
+      const DARK_RED    = "FF8B1A1A";
+      const DARK_NAVY   = "FF1F3864";
+      const LIGHT_GREEN = "FFE8F5E9";
+      const LIGHT_RED   = "FFFDECEA";
+      const ALT_ROW     = "FFF5F5F5";
+      const NUM_FMT     = '#,##0.00';
+
+      const currency = (n: number) => `$${new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)}`;
+
+      // ── Sheet 1: Summary ──────────────────────────────────────────────────
+      const ws1 = wb.addWorksheet("Net Position Summary");
+      ws1.columns = [
+        { key: "label", width: 35 },
+        { key: "value", width: 22 },
+        { key: "note",  width: 40 },
+      ];
+
+      const addTitle = (ws: any, text: string, argb: string) => {
+        const row = ws.addRow([text]);
+        row.height = 28;
+        const cell = row.getCell(1);
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 14 };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
+        cell.alignment = { vertical: "middle" };
+        ws.mergeCells(`A${row.number}:C${row.number}`);
+      };
+
+      const addSubheader = (ws: any, text: string, argb: string) => {
+        const row = ws.addRow([text]);
+        row.height = 18;
+        const cell = row.getCell(1);
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
+        ws.mergeCells(`A${row.number}:C${row.number}`);
+      };
+
+      addTitle(ws1, `${companyName} — Net Position Report`, DARK_NAVY);
+
+      const dateRange = fromDate && toDate ? `${fromDate} to ${toDate}` : fromDate ? `From ${fromDate}` : toDate ? `Up to ${toDate}` : "All Time";
+      const metaRow = ws1.addRow([`Date Range: ${dateRange}`, "", `Generated: ${new Date().toLocaleDateString()}`]);
+      metaRow.getCell(1).font = { italic: true, color: { argb: "FF555555" } };
+      metaRow.getCell(3).font = { italic: true, color: { argb: "FF555555" } };
+      metaRow.getCell(3).alignment = { horizontal: "right" };
+      ws1.addRow([]);
+
+      // Formula banner
+      addSubheader(ws1, "Net Position Formula", DARK_NAVY);
+      const formulaRow = ws1.addRow(["What We Have  −  What We Owe  =  Net Position"]);
+      ws1.mergeCells(`A${formulaRow.number}:C${formulaRow.number}`);
+      formulaRow.getCell(1).font = { bold: true, size: 12 };
+      formulaRow.height = 20;
+
+      ws1.addRow([]);
+
+      // Summary table
+      const sumHeaders = ws1.addRow(["Category", "Amount (USD)", "Notes"]);
+      sumHeaders.height = 18;
+      sumHeaders.eachCell((cell: any) => {
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: DARK_NAVY } };
+        cell.alignment = { horizontal: "center" };
+      });
+
+      const haveRow = ws1.addRow(["What We Have (Total Assets)", currency(round2(forUsTotal)), `${forUsAccounts.length} accounts`]);
+      haveRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GREEN } };
+      haveRow.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GREEN } };
+      haveRow.getCell(3).fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GREEN } };
+      haveRow.getCell(1).font = { bold: true, color: { argb: DARK_GREEN } };
+      haveRow.getCell(2).font = { bold: true, color: { argb: DARK_GREEN } };
+      haveRow.getCell(2).alignment = { horizontal: "right" };
+
+      const oweRow = ws1.addRow(["What We Owe (Total Liabilities)", currency(round2(onUsTotal)), `${onUsAccounts.length} accounts`]);
+      oweRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_RED } };
+      oweRow.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_RED } };
+      oweRow.getCell(3).fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_RED } };
+      oweRow.getCell(1).font = { bold: true, color: { argb: DARK_RED } };
+      oweRow.getCell(2).font = { bold: true, color: { argb: DARK_RED } };
+      oweRow.getCell(2).alignment = { horizontal: "right" };
+
+      const netArgb = netPosition >= 0 ? DARK_GREEN : DARK_RED;
+      const netBgArgb = netPosition >= 0 ? "FFD4EDDA" : "FFF8D7DA";
+      const netRow = ws1.addRow(["Net Position", currency(round2(netPosition)), netPosition >= 0 ? "We have more than we owe" : "We owe more than we have"]);
+      [1, 2, 3].forEach((col) => {
+        const cell = netRow.getCell(col);
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: netBgArgb } };
+        cell.font = { bold: true, size: 13, color: { argb: netArgb } };
+      });
+      netRow.getCell(2).alignment = { horizontal: "right" };
+      netRow.height = 22;
+
+      ws1.addRow([]);
+
+      // Category breakdown — Assets
+      addSubheader(ws1, "Assets Breakdown by Category", DARK_GREEN);
+      const assetCatMap: Record<string, number> = {};
+      for (const a of forUsAccounts) assetCatMap[a.category || "Other"] = (assetCatMap[a.category || "Other"] || 0) + a.value;
+      const catHdr = ws1.addRow(["Category", "Total (USD)", ""]);
+      catHdr.eachCell((cell: any) => { cell.font = { bold: true }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9EAD3" } }; });
+      Object.entries(assetCatMap).sort((a, b) => b[1] - a[1]).forEach(([cat, val], i) => {
+        const r = ws1.addRow([cat, currency(round2(val)), ""]);
+        if (i % 2 === 1) r.eachCell((c: any) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW } }; });
+        r.getCell(2).alignment = { horizontal: "right" };
+      });
+
+      ws1.addRow([]);
+
+      // Category breakdown — Liabilities
+      addSubheader(ws1, "Liabilities Breakdown by Category", DARK_RED);
+      const liabCatMap: Record<string, number> = {};
+      for (const a of onUsAccounts) liabCatMap[a.category || "Other"] = (liabCatMap[a.category || "Other"] || 0) + a.value;
+      const liabHdr = ws1.addRow(["Category", "Total (USD)", ""]);
+      liabHdr.eachCell((cell: any) => { cell.font = { bold: true }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF4CCCC" } }; });
+      Object.entries(liabCatMap).sort((a, b) => b[1] - a[1]).forEach(([cat, val], i) => {
+        const r = ws1.addRow([cat, currency(round2(val)), ""]);
+        if (i % 2 === 1) r.eachCell((c: any) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW } }; });
+        r.getCell(2).alignment = { horizontal: "right" };
+      });
+
+      // ── Sheet 2: What We Have (Assets) ────────────────────────────────────
+      const ws2 = wb.addWorksheet("What We Have (Assets)");
+      ws2.columns = [
+        { key: "name",     width: 40, header: "Account Name" },
+        { key: "code",     width: 18, header: "Code" },
+        { key: "category", width: 22, header: "Category" },
+        { key: "value",    width: 20, header: "Balance (USD)" },
+      ];
+      const ws2Hdr = ws2.getRow(1);
+      ws2Hdr.height = 20;
+      ws2Hdr.eachCell((cell: any) => {
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: DARK_GREEN } };
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+      });
+
+      // Title row above headers
+      ws2.spliceRows(1, 0, [`${companyName} — What We Have (Assets)  |  ${dateRange}`]);
+      ws2.mergeCells("A1:D1");
+      const ws2Title = ws2.getRow(1);
+      ws2Title.getCell(1).font = { bold: true, color: { argb: "FFFFFFFF" }, size: 13 };
+      ws2Title.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: DARK_GREEN } };
+      ws2Title.height = 24;
+
+      const sortedAssets = [...forUsAccounts].sort((a, b) => b.value - a.value);
+      sortedAssets.forEach((acc, i) => {
+        const r = ws2.addRow({ name: acc.name, code: acc.code || "", category: acc.category || "Other", value: round2(acc.value) });
+        r.getCell("value").numFmt = NUM_FMT;
+        r.getCell("value").alignment = { horizontal: "right" };
+        if (i % 2 === 1) r.eachCell((c: any) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW } }; });
+      });
+
+      // Total row
+      const assetTotalRow = ws2.addRow({ name: "TOTAL", code: "", category: "", value: round2(forUsTotal) });
+      assetTotalRow.eachCell((c: any) => { c.font = { bold: true, color: { argb: DARK_GREEN } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GREEN } }; });
+      assetTotalRow.getCell("value").numFmt = NUM_FMT;
+      assetTotalRow.getCell("value").alignment = { horizontal: "right" };
+
+      // ── Sheet 3: What We Owe (Liabilities) ───────────────────────────────
+      const ws3 = wb.addWorksheet("What We Owe (Liabilities)");
+      ws3.columns = [
+        { key: "name",     width: 40, header: "Account Name" },
+        { key: "code",     width: 18, header: "Code" },
+        { key: "category", width: 22, header: "Category" },
+        { key: "value",    width: 20, header: "Balance (USD)" },
+      ];
+      ws3.spliceRows(1, 0, [`${companyName} — What We Owe (Liabilities)  |  ${dateRange}`]);
+      ws3.mergeCells("A1:D1");
+      const ws3Title = ws3.getRow(1);
+      ws3Title.getCell(1).font = { bold: true, color: { argb: "FFFFFFFF" }, size: 13 };
+      ws3Title.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: DARK_RED } };
+      ws3Title.height = 24;
+      const ws3Hdr = ws3.getRow(2);
+      ws3Hdr.height = 20;
+      ws3Hdr.eachCell((cell: any) => {
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: DARK_RED } };
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+      });
+
+      const sortedLiabs = [...onUsAccounts].sort((a, b) => b.value - a.value);
+      sortedLiabs.forEach((acc, i) => {
+        const r = ws3.addRow({ name: acc.name, code: acc.code || "", category: acc.category || "Other", value: round2(acc.value) });
+        r.getCell("value").numFmt = NUM_FMT;
+        r.getCell("value").alignment = { horizontal: "right" };
+        if (i % 2 === 1) r.eachCell((c: any) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW } }; });
+      });
+
+      const liabTotalRow = ws3.addRow({ name: "TOTAL", code: "", category: "", value: round2(onUsTotal) });
+      liabTotalRow.eachCell((c: any) => { c.font = { bold: true, color: { argb: DARK_RED } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_RED } }; });
+      liabTotalRow.getCell("value").numFmt = NUM_FMT;
+      liabTotalRow.getCell("value").alignment = { horizontal: "right" };
+
+      // ── Send file ─────────────────────────────────────────────────────────
+      const dateTag = new Date().toISOString().slice(0, 10);
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="Net_Position_${dateTag}.xlsx"`);
+      await wb.xlsx.write(res);
+      res.end();
+    } catch (error: any) {
+      console.error("Net position Excel error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get monthly sales and profit data for Dashboard charts
   app.get("/api/stats/monthly-data", requireAuth, async (req, res) => {
     try {
