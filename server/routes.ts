@@ -23245,25 +23245,76 @@ if (asOfDate) {
         forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: stockOnFloor, category: "Inventory" });
       }
 
-      // ── 4. Payroll / employee balances ────────────────────────────────────
-      if (employeeBalances.size > 0) {
-        const { employees } = await import("../shared/schema");
-        const empList = await db.select().from(employees).where(eq(employees.companyId, companyId)).execute();
-        for (const emp of empList as any[]) {
-          const bal = employeeBalances.get(emp.id);
-          if (!bal) continue;
-          const net = bal.credit - bal.debit;
-          if (net > 0) {
-            onUsTotal += net;
-            onUsAccounts.push({ name: emp.name, code: "PAYROLL", value: net, category: "Payroll" });
-          } else if (net < 0) {
-            forUsTotal += Math.abs(net);
-            forUsAccounts.push({ name: emp.name, code: "PAYROLL", value: Math.abs(net), category: "Payroll Advance" });
-          }
+      // ── 4. Payroll / employee balances (matches /api/stats/net-profit exactly) ──
+      const companyEmployees = await db
+        .select()
+        .from(employees)
+        .where(and(eq(employees.companyId, companyId), eq(employees.active, true), isNull(employees.deletedAt)))
+        .execute();
+      let workerLiabilities = 0;
+      let workerAdvances = 0;
+      for (const emp of companyEmployees as any[]) {
+        const opening = parseFloat(emp.openingBalance || "0");
+        const openingSide = emp.openingBalanceSide === "Dr" ? 1 : -1;
+        const signedOpening = opening * openingSide;
+        const balance = employeeBalances.get(emp.id) || { debit: 0, credit: 0 };
+        const netBalance = signedOpening + balance.debit - balance.credit;
+        if (netBalance < 0) {
+          workerLiabilities += Math.abs(netBalance);
+        } else if (netBalance > 0) {
+          workerAdvances += netBalance;
         }
       }
+      if (workerLiabilities > 0) {
+        onUsTotal += workerLiabilities;
+        onUsAccounts.push({ name: "Workers/Employees Payable", code: "COMPUTED", value: workerLiabilities, category: "Workers" });
+      }
+      if (workerAdvances > 0) {
+        forUsTotal += workerAdvances;
+        forUsAccounts.push({ name: "Worker Advances (Prepaid)", code: "COMPUTED", value: workerAdvances, category: "Worker Advances" });
+      }
 
-      const netPosition = forUsTotal - onUsTotal;
+      // ── 5. Supplier balances ──────────────────────────────────────────────
+      if (shouldIncludeSuppliers) {
+        const allSuppliers = await db.select().from(suppliers).where(isNull(suppliers.deletedAt)).execute();
+        let supplierLiabilities = 0;
+        let supplierAssets = 0;
+        for (const sup of allSuppliers as any[]) {
+          const balance = supplierBalances.get(sup.id);
+          if (balance) {
+            const opening = parseFloat(sup.openingBalance || "0");
+            const netBalance = opening + balance.credit - balance.debit;
+            if (netBalance > 0) {
+              supplierLiabilities += netBalance;
+              onUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: netBalance, category: "Supplier" });
+            } else if (netBalance < 0) {
+              supplierAssets += Math.abs(netBalance);
+              forUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: Math.abs(netBalance), category: "Supplier Overpayment" });
+            }
+          }
+        }
+        if (supplierLiabilities > 0) onUsTotal += supplierLiabilities;
+        if (supplierAssets > 0) forUsTotal += supplierAssets;
+      }
+
+      // ── 6. OTW (On The Way) containers ───────────────────────────────────
+      const otwContainers = await db
+        .select()
+        .from(containers)
+        .where(and(eq(containers.companyId, companyId), eq(containers.status, "OTW")))
+        .execute();
+      let stockOtwValue = 0;
+      for (const container of otwContainers as any[]) {
+        stockOtwValue += parseFloat(container.grandTotal || container.itemsTotal || "0");
+      }
+      if (stockOtwValue > 0) {
+        forUsTotal += stockOtwValue;
+        forUsAccounts.push({ name: "Stock On The Way", code: "STOCK_OTW", value: stockOtwValue, category: "Stock OTW" });
+      }
+
+      const netPosition = round2(forUsTotal - onUsTotal);
+      forUsTotal = round2(forUsTotal);
+      onUsTotal = round2(onUsTotal);
       const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
       // ── 5. Build Excel ────────────────────────────────────────────────────
