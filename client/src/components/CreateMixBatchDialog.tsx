@@ -46,6 +46,7 @@ interface SupplierRawStock {
 }
 
 type SourceType = "supplier" | "batch";
+type DialogMode = "new" | "topup";
 
 interface SourceSelection {
   type: SourceType;
@@ -69,6 +70,8 @@ export function CreateMixBatchDialog({
   onCreated,
 }: CreateMixBatchDialogProps) {
   const { toast } = useToast();
+  const [mode, setMode] = useState<DialogMode>("new");
+  const [targetBatchId, setTargetBatchId] = useState<string>("");
   const [selectedSources, setSelectedSources] = useState<SourceSelection[]>([]);
   const [addSourceType, setAddSourceType] = useState<SourceType>("supplier");
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
@@ -102,6 +105,10 @@ export function CreateMixBatchDialog({
       !selectedSources.some((sel) => sel.type === "batch" && sel.sourceId === b.id)
     );
   });
+
+  const activeBatchesForTopup = existingBatches?.filter((b) => {
+    return b.status === "ACTIVE" || b.status === "OPEN" || b.status === "CARRY_FORWARD";
+  }) ?? [];
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -169,6 +176,55 @@ export function CreateMixBatchDialog({
           </ToastAction>
         ),
       });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const topUpMutation = useMutation({
+    mutationFn: async () => {
+      if (!targetBatchId) throw new Error("Please select a batch to add to");
+
+      const supplierSources = selectedSources
+        .filter((s) => s.type === "supplier")
+        .map((s) => ({
+          supplierId: s.sourceId,
+          weightKg: s.weightKg.toString(),
+          costPerKg: s.costPerKg.toString(),
+        }));
+
+      const batchSources = selectedSources
+        .filter((s) => s.type === "batch")
+        .map((s) => ({
+          sourceBatchId: s.sourceId,
+          weightKg: s.weightKg.toString(),
+        }));
+
+      const response = await fetch(`/api/factory/mix-batches/${targetBatchId}/top-up`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          supplierSources: supplierSources.length > 0 ? supplierSources : undefined,
+          batchSources: batchSources.length > 0 ? batchSources : undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to add to batch");
+      }
+
+      return await response.json();
+    },
+    onSuccess: (result: FactoryMixBatch) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      handleClose();
+      const batchCode = (result as any).batchCode || `#${result.id}`;
+      toast({ title: "Added to batch", description: `${formatNumber(selectedSources.reduce((s, x) => s + x.weightKg, 0))} kg added to ${batchCode}` });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -262,6 +318,8 @@ export function CreateMixBatchDialog({
 
   const handleClose = () => {
     onOpenChange(false);
+    setMode("new");
+    setTargetBatchId("");
     setSelectedSources([]);
     setSelectedSourceId("");
     setWeightInput("");
@@ -275,39 +333,91 @@ export function CreateMixBatchDialog({
   const totalCost = selectedSources.reduce((sum, s) => sum + s.totalCost, 0);
   const blendedCostPerKg = totalWeight > 0 ? totalCost / totalWeight : 0;
   const hasAnySources = selectedSources.length > 0;
+  const isPending = createMutation.isPending || topUpMutation.isPending;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create Mix Batch</DialogTitle>
+          <DialogTitle>{mode === "topup" ? "Add to Existing Batch" : "Create Mix Batch"}</DialogTitle>
           <DialogDescription>
-            Combine supplier raw stock and/or existing batches into a new batch.
-            Enter exactly how much you want from each source. The batch code will be auto-generated.
+            {mode === "topup"
+              ? "Select which batch to add stock to, then choose your sources below."
+              : "Combine supplier raw stock and/or existing batches into a new batch."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Batch Name (optional)</Label>
-              <Input
-                value={batchName}
-                onChange={(e) => setBatchName(e.target.value)}
-                placeholder="e.g. Cyprus + Spain Mix"
-                data-testid="input-batch-name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Batch Date</Label>
-              <Input
-                type="date"
-                value={batchDate}
-                onChange={(e) => setBatchDate(e.target.value)}
-                data-testid="input-batch-date"
-              />
-            </div>
+          {/* Mode toggle */}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={mode === "new" ? "default" : "outline"}
+              size="sm"
+              onClick={() => { setMode("new"); setTargetBatchId(""); }}
+              data-testid="button-mode-new"
+            >
+              New Batch
+            </Button>
+            <Button
+              type="button"
+              variant={mode === "topup" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setMode("topup")}
+              data-testid="button-mode-topup"
+            >
+              Add to Existing Batch
+            </Button>
           </div>
+
+          {/* Top-up: pick target batch */}
+          {mode === "topup" && (
+            <div className="space-y-2">
+              <Label>Select Batch to Add To</Label>
+              <Select value={targetBatchId} onValueChange={setTargetBatchId}>
+                <SelectTrigger data-testid="select-target-batch">
+                  <SelectValue placeholder="Pick a batch..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeBatchesForTopup.map((b) => {
+                    const remaining = parseFloat(b.totalWeightKg) - parseFloat(b.usedKg);
+                    return (
+                      <SelectItem key={b.id} value={b.id.toString()}>
+                        {b.name || b.batchCode} — {formatNumber(remaining)} kg remaining @ ${parseFloat(b.costPerKg).toFixed(4)}/kg
+                      </SelectItem>
+                    );
+                  })}
+                  {activeBatchesForTopup.length === 0 && (
+                    <SelectItem value="__none__" disabled>No active batches available</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* New batch: name + date */}
+          {mode === "new" && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Batch Name (optional)</Label>
+                <Input
+                  value={batchName}
+                  onChange={(e) => setBatchName(e.target.value)}
+                  placeholder="e.g. Cyprus + Spain Mix"
+                  data-testid="input-batch-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Batch Date</Label>
+                <Input
+                  type="date"
+                  value={batchDate}
+                  onChange={(e) => setBatchDate(e.target.value)}
+                  data-testid="input-batch-date"
+                />
+              </div>
+            </div>
+          )}
 
           <div className="space-y-4">
             <h3 className="font-medium">Add Sources</h3>
@@ -464,26 +574,30 @@ export function CreateMixBatchDialog({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Notes (optional)</Label>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add any notes about this batch..."
-              data-testid="input-notes"
-            />
-          </div>
+          {mode === "new" && (
+            <div className="space-y-2">
+              <Label>Notes (optional)</Label>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Add any notes about this batch..."
+                data-testid="input-notes"
+              />
+            </div>
+          )}
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={handleClose} data-testid="button-cancel">
               Cancel
             </Button>
             <Button
-              onClick={() => createMutation.mutate()}
-              disabled={createMutation.isPending || !hasAnySources}
+              onClick={() => mode === "topup" ? topUpMutation.mutate() : createMutation.mutate()}
+              disabled={isPending || !hasAnySources || (mode === "topup" && !targetBatchId)}
               data-testid="button-submit"
             >
-              {createMutation.isPending ? "Creating..." : "Create Batch"}
+              {isPending
+                ? (mode === "topup" ? "Adding..." : "Creating...")
+                : (mode === "topup" ? "Add to Batch" : "Create Batch")}
             </Button>
           </div>
         </div>

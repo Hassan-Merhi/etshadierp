@@ -9242,6 +9242,182 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // Top-up an existing mix batch with additional sources
+  app.post("/api/factory/mix-batches/:id/top-up", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid batch ID" });
+
+      const { supplierSources = [], sources = [], batchSources = [] } = req.body;
+      const hasAnySources = supplierSources.length > 0 || sources.length > 0 || batchSources.length > 0;
+      if (!hasAnySources) return res.status(400).json({ message: "At least one source is required" });
+
+      const result = await db.transaction(async (tx: any) => {
+        const [batch] = await tx
+          .select()
+          .from(factoryMixBatches)
+          .where(and(eq(factoryMixBatches.id, id), eq(factoryMixBatches.companyId, companyId)))
+          .for("update");
+
+        if (!batch) throw new Error("Batch not found");
+
+        const existingTotalKg = parseFloat(batch.totalWeightKg);
+        const existingTotalCost = parseFloat(batch.totalCost);
+        let addedWeightKg = 0;
+        let addedCost = 0;
+        const sourceRecords: any[] = [];
+
+        for (const source of supplierSources) {
+          const { supplierId, weightKg, costPerKg: srcCostPerKg } = source;
+          const weight = parseFloat(weightKg);
+
+          const supplierRawStocks = await tx
+            .select({
+              id: factoryRawStock.id,
+              receivedKg: factoryRawStock.receivedKg,
+              usedKg: factoryRawStock.usedKg,
+              costPerKg: factoryRawStock.costPerKg,
+              costPerKgUsd: factoryRawStock.costPerKgUsd,
+              offloadedAt: factoryRawStock.offloadedAt,
+            })
+            .from(factoryRawStock)
+            .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
+            .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryContainers.supplierId, supplierId)))
+            .orderBy(factoryRawStock.offloadedAt, factoryRawStock.id)
+            .for("update");
+
+          let totalAvailable = 0;
+          let weightedCostSum = 0;
+          for (const rs of supplierRawStocks) {
+            const avail = Math.max(0, parseFloat(rs.receivedKg) - parseFloat(rs.usedKg));
+            totalAvailable += avail;
+            weightedCostSum += avail * parseFloat(rs.costPerKgUsd || rs.costPerKg || "0");
+          }
+
+          if (weight > totalAvailable + 0.001) {
+            throw new Error(`Not enough stock from this supplier. Available: ${totalAvailable.toFixed(3)} kg`);
+          }
+
+          let toDeduct = weight;
+          for (const rs of supplierRawStocks) {
+            if (toDeduct <= 0.001) break;
+            const avail = Math.max(0, parseFloat(rs.receivedKg) - parseFloat(rs.usedKg));
+            if (avail <= 0) continue;
+            const take = Math.min(toDeduct, avail);
+            await tx.update(factoryRawStock)
+              .set({ usedKg: sql`${factoryRawStock.usedKg} + ${take}` })
+              .where(eq(factoryRawStock.id, rs.id));
+            toDeduct -= take;
+          }
+
+          const costUsed = srcCostPerKg
+            ? parseFloat(srcCostPerKg)
+            : (totalAvailable > 0 ? weightedCostSum / totalAvailable : 0);
+
+          addedWeightKg += weight;
+          addedCost += weight * costUsed;
+          sourceRecords.push({ supplierId, weightKg: String(weight), costPerKg: String(costUsed), totalCost: String(weight * costUsed) });
+        }
+
+        for (const source of sources) {
+          const { containerId, weightKg, costPerKg: srcCostPerKg } = source;
+          const [rawStockRow] = await tx
+            .select()
+            .from(factoryRawStock)
+            .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId)))
+            .for("update");
+
+          if (!rawStockRow) throw new Error(`Raw stock not found for container ${containerId}`);
+
+          const containerRemaining = parseFloat(rawStockRow.receivedKg) - parseFloat(rawStockRow.usedKg);
+          const weight = parseFloat(weightKg);
+          if (weight > containerRemaining + 0.001) {
+            throw new Error(`Not enough raw stock for container ${containerId}. Available: ${containerRemaining.toFixed(3)} kg`);
+          }
+
+          const costUsd = srcCostPerKg
+            ? parseFloat(srcCostPerKg)
+            : parseFloat(rawStockRow.costPerKgUsd || rawStockRow.costPerKg);
+
+          await tx.update(factoryRawStock)
+            .set({ usedKg: sql`${factoryRawStock.usedKg} + ${weight}` })
+            .where(eq(factoryRawStock.id, rawStockRow.id));
+
+          addedWeightKg += weight;
+          addedCost += weight * costUsd;
+          sourceRecords.push({ containerId, weightKg: String(weight), costPerKg: String(costUsd), totalCost: String(weight * costUsd) });
+        }
+
+        for (const bSource of batchSources) {
+          const { sourceBatchId, weightKg } = bSource;
+          const [srcBatch] = await tx
+            .select()
+            .from(factoryMixBatches)
+            .where(and(eq(factoryMixBatches.id, sourceBatchId), eq(factoryMixBatches.companyId, companyId)))
+            .for("update");
+
+          if (!srcBatch) throw new Error(`Source batch ${sourceBatchId} not found`);
+
+          const batchRemaining = parseFloat(srcBatch.totalWeightKg) - parseFloat(srcBatch.usedKg);
+          const weight = parseFloat(weightKg);
+          if (weight > batchRemaining + 0.001) {
+            throw new Error(`Not enough in batch ${srcBatch.batchCode}. Available: ${batchRemaining.toFixed(3)} kg`);
+          }
+
+          const cost = parseFloat(srcBatch.costPerKg);
+          await tx.update(factoryMixBatches)
+            .set({ usedKg: sql`${factoryMixBatches.usedKg} + ${weight}`, updatedAt: new Date() })
+            .where(eq(factoryMixBatches.id, srcBatch.id));
+
+          addedWeightKg += weight;
+          addedCost += weight * cost;
+          sourceRecords.push({ sourceBatchId, weightKg: String(weight), costPerKg: String(cost), totalCost: String(weight * cost) });
+        }
+
+        const newTotalKg = existingTotalKg + addedWeightKg;
+        const newTotalCost = existingTotalCost + addedCost;
+        const newCostPerKg = newTotalKg > 0 ? newTotalCost / newTotalKg : 0;
+
+        const [updated] = await tx
+          .update(factoryMixBatches)
+          .set({
+            totalWeightKg: String(newTotalKg),
+            totalCost: String(newTotalCost),
+            costPerKg: String(newCostPerKg),
+            status: "ACTIVE",
+            updatedAt: new Date(),
+          })
+          .where(eq(factoryMixBatches.id, id))
+          .returning();
+
+        for (const sr of sourceRecords) {
+          await tx.insert(factoryMixBatchSources).values({
+            mixBatchId: id,
+            containerId: sr.containerId || null,
+            supplierId: sr.supplierId || null,
+            sourceBatchId: sr.sourceBatchId || null,
+            sourceType: sr.sourceBatchId ? "BATCH" : sr.containerId ? "CONTAINER" : "SUPPLIER",
+            sourceId: sr.supplierId || sr.containerId || sr.sourceBatchId || null,
+            weightKg: sr.weightKg,
+            quantityKg: sr.weightKg,
+            costPerKg: sr.costPerKg,
+            totalCost: sr.totalCost,
+          });
+        }
+
+        return updated;
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error topping up mix batch:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Assign existing (unlinked) bales to a mix batch
   app.post("/api/factory/mix-batches/:id/assign-bales", requireAuth, async (req: any, res: any) => {
     try {
