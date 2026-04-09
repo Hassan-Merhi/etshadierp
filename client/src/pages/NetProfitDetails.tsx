@@ -227,11 +227,19 @@ export default function NetProfitDetails() {
   const { formatAmount } = useCurrencyContext();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
-  const [asOfDate, setAsOfDate] = useState<string>("");
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
 
-  const queryParam = asOfDate ? `?asOfDate=${asOfDate}` : "";
+  const queryParam = (() => {
+    const p = new URLSearchParams();
+    if (fromDate) p.set("fromDate", fromDate);
+    if (toDate) p.set("toDate", toDate);
+    const s = p.toString();
+    return s ? `?${s}` : "";
+  })();
+
   const { data, isLoading, error, refetch } = useQuery<NetProfitData>({
-    queryKey: ["/api/stats/net-profit", asOfDate, appMode],
+    queryKey: ["/api/stats/net-profit", fromDate, toDate, appMode],
     queryFn: async () => {
       const res = await modeApiRequest("GET", `/api/stats/net-profit${queryParam}`);
       if (!res.ok) throw new Error(await res.text());
@@ -239,7 +247,7 @@ export default function NetProfitDetails() {
     },
   });
 
-  const isFiltered = !!asOfDate;
+  const isFiltered = !!(fromDate || toDate);
 
   if (isLoading) {
     return (
@@ -285,34 +293,49 @@ export default function NetProfitDetails() {
               Net Position Details
             </h1>
             <p className="text-muted-foreground text-sm">
-              {isFiltered
-                ? `As of ${new Date(asOfDate + "T00:00:00").toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}`
+              {fromDate && toDate
+                ? `${fromDate} — ${toDate}`
+                : fromDate
+                ? `From ${fromDate} — present`
+                : toDate
+                ? `Beginning — ${toDate}`
                 : "Current balances — all time"}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Date filter */}
-          <div className="flex items-center gap-2">
+          {/* Date range filter */}
+          <div className="flex items-center gap-2 flex-wrap">
             <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-            <Label htmlFor="asOfDate" className="text-sm text-muted-foreground whitespace-nowrap">
-              As of date:
-            </Label>
-            <Input
-              id="asOfDate"
-              type="date"
-              value={asOfDate}
-              max={todayStr()}
-              onChange={(e) => setAsOfDate(e.target.value)}
-              className="w-44"
-              data-testid="input-as-of-date"
-            />
+            <div className="flex items-center gap-1.5">
+              <Label className="text-sm text-muted-foreground whitespace-nowrap">From:</Label>
+              <Input
+                type="date"
+                value={fromDate}
+                max={toDate || todayStr()}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="w-36 text-sm"
+                data-testid="input-from-date"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Label className="text-sm text-muted-foreground whitespace-nowrap">To:</Label>
+              <Input
+                type="date"
+                value={toDate}
+                min={fromDate || undefined}
+                max={todayStr()}
+                onChange={(e) => setToDate(e.target.value)}
+                className="w-36 text-sm"
+                data-testid="input-to-date"
+              />
+            </div>
             {isFiltered && (
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setAsOfDate("")}
+                onClick={() => { setFromDate(""); setToDate(""); }}
                 data-testid="button-clear-date"
                 title="Clear date filter"
               >
