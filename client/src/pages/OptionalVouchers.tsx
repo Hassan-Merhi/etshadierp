@@ -60,6 +60,11 @@ export default function OptionalVouchers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers/optional"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers/list"] });
       toast({ title: "Voucher Finalized", description: "The voucher has been posted successfully." });
       setFinalizeVoucherId(null);
     },
@@ -76,6 +81,7 @@ export default function OptionalVouchers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers/optional"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
       toast({ title: "Voucher Deleted", description: "The voucher has been deleted." });
       setDeleteVoucherId(null);
     },
