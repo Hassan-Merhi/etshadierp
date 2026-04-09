@@ -228,25 +228,29 @@ export default function NetProfitDetails() {
   const { formatAmount } = useCurrencyContext();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
-  // "As of" date — balance sheet snapshot at this point in time
-  const [asOfInput, setAsOfInput] = useState<string>("");   // local input (no API trigger)
-  const [asOfDate, setAsOfDate] = useState<string>("");     // committed (triggers API call)
+  // Local input state — updates freely as user types (no API trigger)
+  const [fromInput, setFromInput] = useState<string>("");
+  const [toInput, setToInput] = useState<string>("");
+  // Committed state — only set on blur with a valid complete date (triggers API call)
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
 
   const isValidDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
 
-  const commitAsOf = (v: string) => {
-    if (v === "" || isValidDate(v)) setAsOfDate(v);
+  const commitFrom = (v: string) => { if (v === "" || isValidDate(v)) setFromDate(v); };
+  const commitTo   = (v: string) => { if (v === "" || isValidDate(v)) setToDate(v); };
+
+  const clearDates = () => {
+    setFromInput(""); setToInput("");
+    setFromDate(""); setToDate("");
   };
 
-  const clearDate = () => {
-    setAsOfInput("");
-    setAsOfDate("");
-  };
-
-  const queryParam = asOfDate ? `?toDate=${asOfDate}` : "";
+  // Calculation is cumulative up to toDate (balance-sheet approach).
+  // fromDate is display-only — the API only receives toDate.
+  const queryParam = toDate ? `?toDate=${toDate}` : "";
 
   const { data, isLoading, error, refetch } = useQuery<NetProfitData>({
-    queryKey: ["/api/stats/net-profit", asOfDate, appMode],
+    queryKey: ["/api/stats/net-profit", toDate, appMode],
     queryFn: async () => {
       const res = await modeApiRequest("GET", `/api/stats/net-profit${queryParam}`);
       if (!res.ok) throw new Error(await res.text());
@@ -254,7 +258,7 @@ export default function NetProfitDetails() {
     },
   });
 
-  const isFiltered = !!asOfDate;
+  const isFiltered = !!(fromDate || toDate);
 
   if (isLoading) {
     return (
@@ -300,30 +304,51 @@ export default function NetProfitDetails() {
               Net Position Details
             </h1>
             <p className="text-muted-foreground text-sm">
-              {asOfDate ? `Balances as of ${asOfDate}` : "Current balances — all time"}
+              {fromDate && toDate
+                ? `${fromDate} — ${toDate} (balances as of ${toDate})`
+                : toDate
+                ? `Balances as of ${toDate}`
+                : fromDate
+                ? `From ${fromDate} — present`
+                : "Current balances — all time"}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* As of date filter */}
-          <div className="flex items-center gap-2">
+          {/* Date range filter */}
+          <div className="flex items-center gap-2 flex-wrap">
             <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-            <Label className="text-sm text-muted-foreground whitespace-nowrap">As of:</Label>
-            <Input
-              type="date"
-              value={asOfInput}
-              max={todayStr()}
-              onChange={(e) => setAsOfInput(e.target.value)}
-              onBlur={(e) => commitAsOf(e.target.value)}
-              className="w-36 text-sm"
-              data-testid="input-as-of-date"
-            />
+            <div className="flex items-center gap-1.5">
+              <Label className="text-sm text-muted-foreground whitespace-nowrap">From:</Label>
+              <Input
+                type="date"
+                value={fromInput}
+                max={toInput || todayStr()}
+                onChange={(e) => setFromInput(e.target.value)}
+                onBlur={(e) => commitFrom(e.target.value)}
+                className="w-36 text-sm"
+                data-testid="input-from-date"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Label className="text-sm text-muted-foreground whitespace-nowrap">To:</Label>
+              <Input
+                type="date"
+                value={toInput}
+                min={fromInput || undefined}
+                max={todayStr()}
+                onChange={(e) => setToInput(e.target.value)}
+                onBlur={(e) => commitTo(e.target.value)}
+                className="w-36 text-sm"
+                data-testid="input-to-date"
+              />
+            </div>
             {isFiltered && (
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={clearDate}
+                onClick={clearDates}
                 data-testid="button-clear-date"
                 title="Clear date filter"
               >
@@ -337,8 +362,8 @@ export default function NetProfitDetails() {
             size="default"
             data-testid="button-export-excel"
             onClick={() => {
-              const url = asOfDate
-                ? `/api/stats/net-position-excel?toDate=${asOfDate}`
+              const url = toDate
+                ? `/api/stats/net-position-excel?toDate=${toDate}`
                 : "/api/stats/net-position-excel";
               window.open(url, "_blank");
             }}
