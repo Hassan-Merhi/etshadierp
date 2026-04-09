@@ -179,7 +179,7 @@ export default function PendingInvoiceVerify() {
     },
     onSuccess: () => {
       toast({ title: "Order verified", description: "The order has been approved and verified" });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders"] });
+      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === "string" && (query.queryKey[0] as string).startsWith("/api/factory/customer-orders") });
       navigate("/factory/sales/pending-invoices");
     },
     onError: (error: Error) => {
@@ -194,7 +194,7 @@ export default function PendingInvoiceVerify() {
     },
     onSuccess: () => {
       toast({ title: "Returned to loading", description: "The order has been returned for further loading" });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders"] });
+      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === "string" && (query.queryKey[0] as string).startsWith("/api/factory/customer-orders") });
       navigate("/factory/sales/pending-invoices");
     },
     onError: (error: Error) => {

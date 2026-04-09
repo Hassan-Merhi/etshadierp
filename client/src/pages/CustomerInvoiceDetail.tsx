@@ -176,7 +176,7 @@ export default function CustomerInvoiceDetail() {
     },
     onSuccess: () => {
       toast({ title: "Deleted", description: "Invoice deleted successfully." });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders"] });
+      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === "string" && (query.queryKey[0] as string).startsWith("/api/factory/customer-orders") });
       navigate("/factory/invoicing?tab=invoices");
     },
     onError: (error: any) => {
