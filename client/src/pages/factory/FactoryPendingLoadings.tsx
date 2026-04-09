@@ -18,7 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, keyStartsWith } from "@/lib/queryClient";
 
 interface PendingLoad {
   id: number;
@@ -50,11 +50,7 @@ export default function FactoryPendingLoadings() {
       await apiRequest("DELETE", `/api/factory/customer-orders/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          typeof query.queryKey[0] === "string" &&
-          (query.queryKey[0] as string).startsWith("/api/factory/customer-orders"),
-      });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       toast({ title: "Loading deleted", description: "Bales have been returned to stock." });
       setDeleteTarget(null);
     },

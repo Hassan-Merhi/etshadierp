@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { Badge } from "@/components/ui/badge";
@@ -107,11 +107,7 @@ export default function FactoryProformas() {
         title: "Pending Loading Created",
         description: `Loading #${data.order.id} created — ${balesAdded} bale${balesAdded !== 1 ? "s" : ""} added from stock`,
       });
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          typeof query.queryKey[0] === "string" &&
-          (query.queryKey[0] as string).startsWith("/api/factory/customer-orders"),
-      });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       setCreateLoadingProforma(null);
       setCreateLoadingLocationId("");
       navigate("/factory/sales/loadings");

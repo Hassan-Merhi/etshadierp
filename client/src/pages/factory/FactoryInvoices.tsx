@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Eye, Trash2, RotateCcw } from "lucide-react";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -81,11 +81,7 @@ export default function FactoryInvoices() {
     },
     onSuccess: () => {
       toast({ title: "Deleted", description: "Invoice deleted successfully." });
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          typeof query.queryKey[0] === "string" &&
-          (query.queryKey[0] as string).startsWith("/api/factory/customer-orders"),
-      });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
     },
     onError: (error: any) => {
       if (error?._handledGlobally) return;
@@ -104,11 +100,7 @@ export default function FactoryInvoices() {
     },
     onSuccess: () => {
       toast({ title: "Reverted to Pending", description: "Invoice has been reverted. You can now edit and re-finalize it." });
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          typeof query.queryKey[0] === "string" &&
-          (query.queryKey[0] as string).startsWith("/api/factory/customer-orders"),
-      });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
     },
     onError: (error: any) => {

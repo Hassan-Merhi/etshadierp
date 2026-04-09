@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -180,11 +180,7 @@ export default function FactoryPendingInvoiceVerify() {
     },
     onSuccess: () => {
       toast({ title: "Order verified", description: "Now add charges and finalize the invoice" });
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          typeof query.queryKey[0] === "string" &&
-          (query.queryKey[0] as string).startsWith("/api/factory/customer-orders"),
-      });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
@@ -197,11 +193,7 @@ export default function FactoryPendingInvoiceVerify() {
       await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/return-to-loading`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          typeof query.queryKey[0] === "string" &&
-          (query.queryKey[0] as string).startsWith("/api/factory/customer-orders"),
-      });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       toast({ title: "Returned to loading", description: "The order has been returned for further loading" });
       navigate("/factory/invoicing?tab=pending");
     },
@@ -261,11 +253,7 @@ export default function FactoryPendingInvoiceVerify() {
       await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/finalize`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          typeof query.queryKey[0] === "string" &&
-          (query.queryKey[0] as string).startsWith("/api/factory/customer-orders"),
-      });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
       toast({ title: "Invoice finalized", description: "Invoice has been created successfully" });
       navigate(`/factory/sales/invoices/${orderId}`);

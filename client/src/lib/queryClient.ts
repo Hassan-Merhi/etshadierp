@@ -149,6 +149,22 @@ const globalMutationCache = new MutationCache({
   },
 });
 
+/**
+ * Returns a TanStack Query predicate that matches any query whose first key
+ * starts with the given prefix string.  Use this when the query key is a
+ * URL-with-params (e.g. "/api/factory/customer-orders?status=LOADING") because
+ * a bare prefix key like ["/api/factory/customer-orders"] does NOT match such
+ * keys in TanStack Query v5.
+ *
+ * Usage:
+ *   queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+ */
+export function keyStartsWith(prefix: string) {
+  return (query: { queryKey: readonly unknown[] }) =>
+    typeof query.queryKey[0] === "string" &&
+    (query.queryKey[0] as string).startsWith(prefix);
+}
+
 export const queryClient = new QueryClient({
   mutationCache: globalMutationCache,
   defaultOptions: {

@@ -11,7 +11,7 @@ import { ClipboardCheck, Eye, Package, Trash2, Download } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,11 +66,7 @@ export default function FactoryPendingInvoices() {
     },
     onSuccess: () => {
       toast({ title: "Deleted", description: "Invoice deleted successfully." });
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          typeof query.queryKey[0] === "string" &&
-          (query.queryKey[0] as string).startsWith("/api/factory/customer-orders"),
-      });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
     },
     onError: (error: any) => {
       if (error?._handledGlobally) return;
