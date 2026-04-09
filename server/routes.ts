@@ -22771,22 +22771,20 @@ if (asOfDate) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      // Optional date range filter — fromDate and toDate (both optional)
-      const fromDate = req.query.fromDate ? String(req.query.fromDate) : null;
+      // Balance-sheet "as of" date — cumulative approach (everything up to toDate)
+      // fromDate is accepted but intentionally ignored for balance-sheet accounts;
+      // the balance sheet is always a point-in-time snapshot (as of toDate), not a period.
       const toDate = req.query.toDate ? String(req.query.toDate) : null;
 
       // Get all ledger accounts for this company
       const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
 
-      // Get all non-optional vouchers for this company (filtered by date range if provided)
+      // Cumulative voucher filter: include ALL transactions up to toDate (balance-sheet approach)
       const voucherConditions: any[] = [
         eq(vouchers.companyId, companyId),
         eq(vouchers.optional, false),
         isNull(vouchers.deletedAt),
       ];
-      if (fromDate) {
-        voucherConditions.push(gte(vouchers.voucherDate, fromDate));
-      }
       if (toDate) {
         voucherConditions.push(lte(vouchers.voucherDate, toDate));
       }
