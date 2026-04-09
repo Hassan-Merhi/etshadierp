@@ -207,6 +207,7 @@ export default function CustomerInvoiceCreate() {
     onSuccess: () => {
       toast({ title: "Invoice finalized", description: "Invoice has been created successfully" });
       setShowFinalizeDialog(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders"] });
       navigate(`/factory/sales/invoices/${orderId}`);
     },
     onError: (error: Error) => {

@@ -763,6 +763,7 @@ export default function Payroll() {
         description: "Salary deposited successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       setDepositDialogOpen(false);
       depositForm.reset();
       setSelectedEmployee(null);
@@ -790,6 +791,7 @@ export default function Payroll() {
         description: "Bonus given successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       setBonusDialogOpen(false);
       bonusForm.reset();
       setSelectedEmployee(null);
@@ -817,6 +819,7 @@ export default function Payroll() {
         description: "Withdrawal processed successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       setWithdrawalDialogOpen(false);
       withdrawalForm.reset();
       setSelectedEmployee(null);
@@ -887,6 +890,7 @@ export default function Payroll() {
         description: "Bulk salary deposit processed successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       setBulkDepositDialogOpen(false);
       setBulkDepositSelections({});
       setBulkDepositNotes("");
@@ -927,6 +931,7 @@ export default function Payroll() {
         description: "Bulk bonus deposit processed successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       setBulkBonusDialogOpen(false);
       setBulkBonusAmounts({});
       setBulkBonusNotes("");
@@ -1012,6 +1017,7 @@ export default function Payroll() {
         description: "Bulk withdrawal processed successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       setBulkWithdrawalDialogOpen(false);
       setBulkWithdrawalAmounts({});
       setBulkWithdrawalNotes("");
@@ -1414,6 +1420,7 @@ export default function Payroll() {
       });
       toast({ title: "Bonus given", description: `${formatAmount(amount)} bonus processed` });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       setBonusDialogOpen(false);
       setSelectedEmployee(null);
     } catch (e: any) {
