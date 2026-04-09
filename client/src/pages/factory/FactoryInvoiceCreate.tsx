@@ -206,6 +206,12 @@ export default function FactoryInvoiceCreate() {
       await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/finalize`);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          (query.queryKey[0] as string).startsWith("/api/factory/customer-orders"),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
       toast({ title: "Invoice finalized", description: "Invoice has been created successfully" });
       setShowFinalizeDialog(false);
       navigate(`/factory/sales/invoices/${orderId}`);

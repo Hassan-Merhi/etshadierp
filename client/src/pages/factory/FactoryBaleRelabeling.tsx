@@ -16,6 +16,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import * as XLSX from "xlsx";
@@ -271,6 +272,8 @@ export default function FactoryBaleRelabeling() {
       return res.json();
     },
     onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales/relabel/sessions"] });
       setApplyResult(data);
       setStep("done");
       toast({ title: "Relabeling applied", description: `${data.items.length} bales recoded successfully` });

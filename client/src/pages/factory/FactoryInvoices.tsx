@@ -81,7 +81,11 @@ export default function FactoryInvoices() {
     },
     onSuccess: () => {
       toast({ title: "Deleted", description: "Invoice deleted successfully." });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders"] });
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          (query.queryKey[0] as string).startsWith("/api/factory/customer-orders"),
+      });
     },
     onError: (error: any) => {
       if (error?._handledGlobally) return;
@@ -100,7 +104,11 @@ export default function FactoryInvoices() {
     },
     onSuccess: () => {
       toast({ title: "Reverted to Pending", description: "Invoice has been reverted. You can now edit and re-finalize it." });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders"] });
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          (query.queryKey[0] as string).startsWith("/api/factory/customer-orders"),
+      });
     },
     onError: (error: any) => {
       if (error?._handledGlobally) return;

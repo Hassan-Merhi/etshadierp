@@ -50,7 +50,11 @@ export default function FactoryPendingLoadings() {
       await apiRequest("DELETE", `/api/factory/customer-orders/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders"] });
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          (query.queryKey[0] as string).startsWith("/api/factory/customer-orders"),
+      });
       toast({ title: "Loading deleted", description: "Bales have been returned to stock." });
       setDeleteTarget(null);
     },

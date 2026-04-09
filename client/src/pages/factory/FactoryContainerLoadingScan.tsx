@@ -416,6 +416,11 @@ export default function FactoryContainerLoadingScan() {
       );
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          (query.queryKey[0] as string).startsWith("/api/factory/customer-orders"),
+      });
       toast({
         title: "Loading finalized",
         description: "Loading has been sent for office verification",
