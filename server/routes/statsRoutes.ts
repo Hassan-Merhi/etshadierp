@@ -1199,7 +1199,11 @@ export function registerStatsRoutes(app: Express) {
       const { startDate, endDate, locationId, stockItemId, stockGroupId } = req.query;
 
       // Apply filters
-      const conditions = [eq(vouchers.companyId, companyId)];
+      const conditions = [
+        eq(vouchers.companyId, companyId),
+        eq(vouchers.optional, false),
+        isNull(vouchers.deletedAt),
+      ];
 
       if (startDate) {
         conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
@@ -1332,7 +1336,11 @@ export function registerStatsRoutes(app: Express) {
         const company = companyMap.get(companyId);
         
         // Apply filters
-        const conditions = [eq(vouchers.companyId, companyId)];
+        const conditions = [
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.optional, false),
+          isNull(vouchers.deletedAt),
+        ];
 
         if (startDate) {
           conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
@@ -1437,7 +1445,11 @@ export function registerStatsRoutes(app: Express) {
         const { startDate, endDate, stockItemId, locationId } = req.body;
 
         // Build conditions for finding sales items to update
-        const conditions = [eq(vouchers.companyId, companyId)];
+        const conditions = [
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.optional, false),
+          isNull(vouchers.deletedAt),
+        ];
         
         if (startDate) {
           conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
