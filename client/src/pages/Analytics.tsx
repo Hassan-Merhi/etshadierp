@@ -932,19 +932,22 @@ export default function Analytics() {
               <TableRow 
                 data-testid={`row-account-${parent.id}`}
                 className={`hover-elevate cursor-pointer font-medium`}
-                onClick={() => hasChildren ? toggleAccount(parent.accountId) : goToStatement(parent.accountId, parent.customerId, parent.type)}
+                onClick={() => goToStatement(parent.accountId, parent.customerId, parent.type)}
               >
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-2">
                     {hasChildren && (
-                      isExpanded ? 
-                        <ChevronDown className="h-4 w-4" /> : 
-                        <ChevronRight className="h-4 w-4" />
+                      <span
+                        onClick={(e) => { e.stopPropagation(); toggleAccount(parent.accountId); }}
+                        className="cursor-pointer text-muted-foreground hover:text-foreground"
+                      >
+                        {isExpanded ? 
+                          <ChevronDown className="h-4 w-4" /> : 
+                          <ChevronRight className="h-4 w-4" />
+                        }
+                      </span>
                     )}
-                    <span
-                      className="hover:underline"
-                      onClick={(e) => { e.stopPropagation(); goToStatement(parent.accountId, parent.customerId, parent.type); }}
-                    >{parent.name}</span>
+                    <span className="hover:underline">{parent.name}</span>
                   </div>
                 </TableCell>
                 <TableCell className={`text-right font-mono font-medium ${drCrClass(parent.balanceSide || "Dr")}`}>
