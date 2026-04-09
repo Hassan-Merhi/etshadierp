@@ -254,6 +254,7 @@ export default function PendingInvoiceVerify() {
     },
     onSuccess: () => {
       toast({ title: "Invoice finalized", description: "Invoice has been created successfully" });
+      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === "string" && (query.queryKey[0] as string).startsWith("/api/factory/customer-orders") });
       navigate(`/factory/sales/invoices/${orderId}`);
     },
     onError: (error: Error) => {
