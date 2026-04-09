@@ -329,6 +329,10 @@ export default function Analytics() {
   const [plStartDate, setPlStartDate] = useState("");
   const [plEndDate, setPlEndDate] = useState("");
 
+  // Account Balance sections date filter (assets, cash, liabilities, loans-banks)
+  const [balStartDate, setBalStartDate] = useState("");
+  const [balEndDate, setBalEndDate] = useState("");
+
   // Factory-specific filters
   const [factoryContainerCustomerId, setFactoryContainerCustomerId] = useState("all");
   const [factoryContainerStartDate, setFactoryContainerStartDate] = useState("");
@@ -407,9 +411,18 @@ export default function Analytics() {
     enabled: !!selectedCompany,
   });
 
-  // Fetch all accounts
+  // Fetch all accounts (with optional date filter for balance sections)
   const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
-    queryKey: ["/api/accounts/all", selectedCompany?.id],
+    queryKey: ["/api/accounts/all", selectedCompany?.id, balStartDate, balEndDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (balStartDate) params.append("startDate", balStartDate);
+      if (balEndDate) params.append("endDate", balEndDate);
+      const url = `/api/accounts/all${params.toString() ? `?${params.toString()}` : ""}`;
+      const response = await fetch(url, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch accounts");
+      return response.json();
+    },
     enabled: !!selectedCompany,
   });
 
@@ -1120,6 +1133,49 @@ export default function Analytics() {
                 </Button>
                 <span className="text-xs text-muted-foreground">
                   Showing: {plStartDate || "Beginning"} — {plEndDate || "Present"}
+                </span>
+              </>
+            )}
+          </div>
+        )}
+
+        {(activeSection === "assets" || activeSection === "liabilities" || activeSection === "cash" || activeSection === "loans-banks") && (
+          <div className="flex flex-wrap items-center gap-3 p-3 rounded-md bg-muted/40 border">
+            <span className="text-sm font-medium text-muted-foreground shrink-0">Balance Date Range:</span>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="bal-start-date" className="text-sm whitespace-nowrap">From:</Label>
+              <Input
+                id="bal-start-date"
+                type="date"
+                value={balStartDate}
+                onChange={(e) => setBalStartDate(e.target.value)}
+                className="w-36"
+                data-testid="input-bal-start-date"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="bal-end-date" className="text-sm whitespace-nowrap">To:</Label>
+              <Input
+                id="bal-end-date"
+                type="date"
+                value={balEndDate}
+                onChange={(e) => setBalEndDate(e.target.value)}
+                className="w-36"
+                data-testid="input-bal-end-date"
+              />
+            </div>
+            {(balStartDate || balEndDate) && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setBalStartDate(""); setBalEndDate(""); }}
+                  data-testid="button-bal-clear-dates"
+                >
+                  Clear
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Showing: {balStartDate || "Beginning"} — {balEndDate || "Present"}
                 </span>
               </>
             )}

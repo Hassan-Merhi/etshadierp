@@ -14440,11 +14440,23 @@ if (asOfDate) {
       const suppliers = isFactoryCompany ? [] : await storage.getAllSuppliers();
       const customers = await storage.getAllCustomers(companyId);
 
+      // Optional date range filter for account balances
+      const balStartDate = req.query.startDate as string | undefined;
+      const balEndDate = req.query.endDate as string | undefined;
+
       // Get all voucher entries for this company's vouchers (excluding optional and deleted)
+      const voucherDateConditions = [
+        eq(vouchers.companyId, companyId),
+        eq(vouchers.optional, false),
+        isNull(vouchers.deletedAt),
+        ...(balStartDate ? [gte(vouchers.voucherDate, balStartDate)] : []),
+        ...(balEndDate ? [lte(vouchers.voucherDate, balEndDate)] : []),
+      ];
+
       const companyVouchers = await db
         .select({ id: vouchers.id })
         .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
+        .where(and(...voucherDateConditions))
         .execute();
 
       const companyVoucherIds = companyVouchers.map((v) => v.id);
