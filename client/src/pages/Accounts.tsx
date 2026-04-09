@@ -1666,6 +1666,7 @@ export default function Accounts() {
                         placeholder="Search by name or type..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
+                        onKeyDown={(e) => handleListArrowScroll(e, accountListRef)}
                         className="pl-9"
                         disabled={accountsLoading || !selectedCompany}
                         data-testid="input-account-search"
@@ -2619,6 +2620,7 @@ export default function Accounts() {
                     placeholder="Search by name or type..."
                     value={editSearchTerm}
                     onChange={(e) => setEditSearchTerm(e.target.value)}
+                    onKeyDown={(e) => handleListArrowScroll(e, editAccountListRef)}
                     className="pl-9"
                     disabled={
                       accountsLoading ||
