@@ -125,7 +125,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
-      navigate("/stock-transfer");
+      navigate("/stock-transfers");
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;

@@ -73,8 +73,8 @@ export default function StockTransfers() {
   const [editingTransfer, setEditingTransfer] = useState<StockTransferRow | null>(null);
   const [editNotes, setEditNotes] = useState("");
 
-  const startDate = period.startDate ?? "";
-  const endDate   = period.endDate   ?? "";
+  const startDate = period.fromDate ?? "";
+  const endDate   = period.toDate   ?? "";
 
   const params = new URLSearchParams();
   if (startDate) params.set("startDate", startDate);
