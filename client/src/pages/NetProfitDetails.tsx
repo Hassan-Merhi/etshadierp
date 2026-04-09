@@ -228,8 +228,28 @@ export default function NetProfitDetails() {
   const { formatAmount } = useCurrencyContext();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
+  // Input state — updated on every keystroke (does NOT trigger API call)
+  const [fromDateInput, setFromDateInput] = useState<string>("");
+  const [toDateInput, setToDateInput] = useState<string>("");
+  // Committed state — only updated on blur with a valid date (triggers API call)
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
+
+  const isValidDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+  const commitFrom = (v: string) => {
+    if (v === "" || isValidDate(v)) setFromDate(v);
+  };
+  const commitTo = (v: string) => {
+    if (v === "" || isValidDate(v)) setToDate(v);
+  };
+
+  const clearDates = () => {
+    setFromDateInput("");
+    setToDateInput("");
+    setFromDate("");
+    setToDate("");
+  };
 
   const queryParam = (() => {
     const p = new URLSearchParams();
@@ -313,9 +333,10 @@ export default function NetProfitDetails() {
               <Label className="text-sm text-muted-foreground whitespace-nowrap">From:</Label>
               <Input
                 type="date"
-                value={fromDate}
-                max={toDate || todayStr()}
-                onChange={(e) => setFromDate(e.target.value)}
+                value={fromDateInput}
+                max={toDateInput || todayStr()}
+                onChange={(e) => setFromDateInput(e.target.value)}
+                onBlur={(e) => commitFrom(e.target.value)}
                 className="w-36 text-sm"
                 data-testid="input-from-date"
               />
@@ -324,10 +345,11 @@ export default function NetProfitDetails() {
               <Label className="text-sm text-muted-foreground whitespace-nowrap">To:</Label>
               <Input
                 type="date"
-                value={toDate}
-                min={fromDate || undefined}
+                value={toDateInput}
+                min={fromDateInput || undefined}
                 max={todayStr()}
-                onChange={(e) => setToDate(e.target.value)}
+                onChange={(e) => setToDateInput(e.target.value)}
+                onBlur={(e) => commitTo(e.target.value)}
                 className="w-36 text-sm"
                 data-testid="input-to-date"
               />
@@ -336,7 +358,7 @@ export default function NetProfitDetails() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => { setFromDate(""); setToDate(""); }}
+                onClick={clearDates}
                 data-testid="button-clear-date"
                 title="Clear date filter"
               >
