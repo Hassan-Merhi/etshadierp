@@ -1,0 +1,1531 @@
+  import { useState, useEffect, useRef } from "react";
+  import { useConnectivity } from "@/contexts/ConnectivityContext";
+  import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
+  import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
+  import { useForm } from "react-hook-form";
+  import { zodResolver } from "@hookform/resolvers/zod";
+  import { z } from "zod";
+  import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+  import { Button } from "@/components/ui/button";
+  import { Input } from "@/components/ui/input";
+  import { Label } from "@/components/ui/label";
+  import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+  } from "@/components/ui/dialog";
+  import { Alert, AlertDescription } from "@/components/ui/alert";
+  import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+  } from "@/components/ui/alert-dialog";
+  import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+  } from "@/components/ui/form";
+  import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  } from "@/components/ui/select";
+  import { Checkbox } from "@/components/ui/checkbox";
+  import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+  } from "@/components/ui/table";
+  import { Badge } from "@/components/ui/badge";
+  import { Skeleton } from "@/components/ui/skeleton";
+  import { Switch } from "@/components/ui/switch";
+  
+  import { useToast } from "@/hooks/use-toast";
+  import { useMutation, useQuery } from "@tanstack/react-query";
+  import { queryClient, apiRequest } from "@/lib/queryClient";
+  import { useAppMode } from "@/contexts/AppModeContext";
+  import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
+  import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers } from "lucide-react";
+import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
+  import { Link } from "wouter";
+  import { useDateFormat } from "@/contexts/DateFormatContext";
+  import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, FEATURE_PAGE_INFO, type FeatureKey } from "@shared/schema";
+  import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
+  import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
+  import { useCompany } from "@/contexts/CompanyContext";
+  import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
+  import { formatNumber } from "@/lib/formatNumber";
+  
+  const userFormSchema = insertUserSchema;
+  const companyFormSchema = insertCompanySchema;
+  const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
+    (data) => {
+      // If role is POS, assignedLocationId must be present
+      if (data.role.startsWith("POS") && !data.assignedLocationId) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: "POS roles require an assigned location",
+      path: ["assignedLocationId"],
+    }
+  );
+  
+  type UserFormData = z.infer<typeof userFormSchema>;
+  type CompanyFormData = z.infer<typeof companyFormSchema>;
+  type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
+
+
+export function DataToolsTab() {
+  const { toast } = useToast();
+  const { selectedCompany } = useCompany();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
+  
+  // Separate location selection for each import operation
+  const [costPriceLocationId, setCostPriceLocationId] = useState<string>("");
+  const [stockLocationId, setStockLocationId] = useState<string>("");
+  
+  // Cost price import state
+  const [costPriceImportOpen, setCostPriceImportOpen] = useState(false);
+  const [costPriceFile, setCostPriceFile] = useState<File | null>(null);
+  const [costPricePreview, setCostPricePreview] = useState<Array<{ barcode: string; costPrice: number }>>([]);
+  const [costPriceErrors, setCostPriceErrors] = useState<string[]>([]);
+  const [isImportingCostPrice, setIsImportingCostPrice] = useState(false);
+  const [costPriceImportComplete, setCostPriceImportComplete] = useState(false);
+
+  // Stock import state
+  const [stockImportOpen, setStockImportOpen] = useState(false);
+  const [stockFile, setStockFile] = useState<File | null>(null);
+  const [stockPreview, setStockPreview] = useState<Array<{ Item_barcode: string; stockGroupCode?: string; quantity: string; rate: string; value: string }>>([]);
+  const [stockErrors, setStockErrors] = useState<string[]>([]);
+  const [isImportingStock, setIsImportingStock] = useState(false);
+  const [stockImportComplete, setStockImportComplete] = useState(false);
+
+  // Current user (for developer-only features)
+  const { data: dtCurrentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
+
+  // Silent production / consumption state
+  const [silentProdOpen, setSilentProdOpen] = useState(false);
+  const [silentProdType, setSilentProdType] = useState<"Production" | "Consumption">("Production");
+  const [silentProdLocId, setSilentProdLocId] = useState("");
+  const [silentProdItems, setSilentProdItems] = useState<{ stockItemId: string; quantity: string; rate: string }[]>([{ stockItemId: "", quantity: "", rate: "" }]);
+  const [silentProdApplying, setSilentProdApplying] = useState(false);
+  const [silentProdDone, setSilentProdDone] = useState(0);
+
+  // Silent inventory transfer state
+  const [silentTransferOpen, setSilentTransferOpen] = useState(false);
+  const [silentSrcId, setSilentSrcId] = useState("");
+  const [silentDstId, setSilentDstId] = useState("");
+  const [silentFile, setSilentFile] = useState<File | null>(null);
+  const [silentValidItems, setSilentValidItems] = useState<any[]>([]);
+  const [silentWarnItems, setSilentWarnItems] = useState<any[]>([]);
+  const [silentErrorLines, setSilentErrorLines] = useState<any[]>([]);
+  const [silentIncludeWarnings, setSilentIncludeWarnings] = useState(false);
+  const [silentParseError, setSilentParseError] = useState("");
+  const [silentStep, setSilentStep] = useState<"setup" | "validation" | "done">("setup");
+  const [isSilentParsing, setIsSilentParsing] = useState(false);
+  const [isSilentApplying, setIsSilentApplying] = useState(false);
+  const [silentAppliedCount, setSilentAppliedCount] = useState(0);
+
+  // Merge Bale Products state
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeSearch, setMergeSearch] = useState("");
+  const [mergeSelected, setMergeSelected] = useState<Set<number>>(new Set());
+  const [mergeTargetId, setMergeTargetId] = useState<number | null>(null);
+  const [mergeStep, setMergeStep] = useState<"select" | "confirm" | "done">("select");
+  const [mergeResult, setMergeResult] = useState<{ movedBales: number; mergedProducts: number; targetName: string } | null>(null);
+
+  const { data: mergeStats = [], isLoading: mergeStatsLoading } = useQuery<any[]>({
+    queryKey: ["/api/factory/bale-products/merge-stats"],
+    enabled: mergeOpen && appMode === "factory",
+  });
+
+  const mergeMutation = useMutation({
+    mutationFn: async ({ targetId, sourceIds }: { targetId: number; sourceIds: number[] }) => {
+      const res = await factoryApiRequest("POST", "/api/factory/bale-products/merge", { targetId, sourceIds });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setMergeResult(data);
+      setMergeStep("done");
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products/merge-stats"] });
+    },
+    onError: (e: any) => { toast({ title: "Merge failed", description: e.message, variant: "destructive" }); },
+  });
+
+  // Fetch locations for the current company
+  const { data: locations = [] } = useQuery<any[]>({
+    queryKey: ["/api/locations", selectedCompany?.id],
+    enabled: !!selectedCompany,
+  });
+
+  // Fetch stock items (for silent production picker)
+  const { data: allStockItems = [] } = useQuery<any[]>({
+    queryKey: ["/api/stock-items", selectedCompany?.id],
+    enabled: !!selectedCompany && dtCurrentUser?.role === "Developer",
+  });
+
+  // Convert Bale to BL mutation
+  const updateUOMMutation = useMutation({
+    mutationFn: async () => {
+      return await modeApiRequest("POST", "/api/stock-items/bulk-update-uom", {});
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      toast({
+        title: "Success",
+        description: data.message || "UOM updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update UOM",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Fix Cost Prices mutation
+  const recalculateCostsMutation = useMutation({
+    mutationFn: async () => {
+      return modeApiRequest("POST", "/api/sales-report/recalculate-costs", {});
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Cost Prices Updated",
+        description: `Updated ${data.updatedCount} of ${data.totalChecked} sales items`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales-report"] });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Cost price import functions
+  const downloadCostPriceTemplate = async () => {
+    const template = [
+      { barcode: "ITEM001", costPrice: "125.50" },
+      { barcode: "ITEM002", costPrice: "95.75" },
+    ];
+    const ws = utils.json_to_sheet(template);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, "Cost Price Import");
+    await writeFile(wb, "cost_price_import_template.xlsx");
+    toast({
+      title: "Template Downloaded",
+      description: "Use this template to update cost prices",
+    });
+  };
+
+  const handleCostPriceFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    setCostPriceFile(selectedFile);
+    setCostPriceErrors([]);
+    setCostPricePreview([]);
+    setCostPriceImportComplete(false);
+
+    try {
+      const data = await selectedFile.arrayBuffer();
+      const workbook = await read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = utils.sheet_to_json<any>(worksheet);
+
+      if (jsonData.length === 0) {
+        toast({ title: "Empty File", description: "The Excel file is empty.", variant: "destructive" });
+        return;
+      }
+
+      const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
+      const columns = headerRow.map((h: any) => String(h || "").trim());
+      const requiredCols = ["barcode", "costPrice"];
+      const missingCols = requiredCols.filter(col => !columns.includes(col));
+      
+      if (missingCols.length > 0) {
+        toast({
+          title: "Missing Required Columns",
+          description: `Expected: ${requiredCols.join(", ")}. Download template for format.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const errors: string[] = [];
+      const rows: Array<{ barcode: string; costPrice: number }> = [];
+
+      jsonData.forEach((row: any, index: number) => {
+        const rowNumber = index + 2;
+        if (!row.barcode || String(row.barcode).trim() === "") {
+          errors.push(`Row ${rowNumber}: Barcode is required`);
+          return;
+        }
+        const costPrice = parseFloat(row.costPrice || "0");
+        if (isNaN(costPrice) || costPrice <= 0) {
+          errors.push(`Row ${rowNumber}: Cost price must be > 0`);
+          return;
+        }
+        rows.push({ barcode: String(row.barcode).trim(), costPrice });
+      });
+
+      setCostPricePreview(rows);
+      setCostPriceErrors(errors);
+    } catch (error) {
+      toast({ title: "Error Reading File", description: "Please ensure valid Excel file.", variant: "destructive" });
+    }
+  };
+
+  const handleCostPriceImport = async () => {
+    if (!costPriceLocationId) {
+      toast({ title: "No Location Selected", description: "Please select a location first", variant: "destructive" });
+      return;
+    }
+    if (costPriceErrors.length > 0) {
+      toast({ title: "Cannot Import", description: "Please fix validation errors first", variant: "destructive" });
+      return;
+    }
+
+    setIsImportingCostPrice(true);
+    try {
+      const res = await modeApiRequest("POST", `/api/locations/${costPriceLocationId}/import-cost-prices`, {
+        updates: costPricePreview,
+      });
+      const response = await res.json();
+      queryClient.invalidateQueries({ queryKey: [`/api/locations/${costPriceLocationId}/inventory`] });
+      setCostPriceImportComplete(true);
+      toast({
+        title: "Import Successful",
+        description: `Updated ${response.updated} cost prices.`,
+      });
+    } catch (error: any) {
+      toast({ title: "Import Failed", description: error.message || "Failed to import", variant: "destructive" });
+    } finally {
+      setIsImportingCostPrice(false);
+    }
+  };
+
+  const handleCostPriceDialogClose = async () => {
+    setCostPriceImportOpen(false);
+    setCostPriceFile(null);
+    setCostPricePreview([]);
+    setCostPriceErrors([]);
+    setCostPriceImportComplete(false);
+  };
+
+  // Stock import functions
+  const downloadStockTemplate = async () => {
+    const template = [
+      { Item_barcode: "ITEM-001", stockGroupCode: "GRP01", quantity: "100", rate: "50.00", value: "5000.00" },
+      { Item_barcode: "ITEM-002", stockGroupCode: "GRP02", quantity: "50", rate: "100.00", value: "5000.00" },
+    ];
+    const ws = utils.json_to_sheet(template);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, "Stock Import");
+    await writeFile(wb, "stock_import_template.xlsx");
+    toast({ title: "Template Downloaded", description: "Use this template to import stock" });
+  };
+
+  const handleStockFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    setStockFile(selectedFile);
+    setStockErrors([]);
+    setStockPreview([]);
+    setStockImportComplete(false);
+
+    try {
+      const data = await selectedFile.arrayBuffer();
+      const workbook = await read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = utils.sheet_to_json<any>(worksheet);
+
+      if (jsonData.length === 0) {
+        toast({ title: "Empty File", description: "The Excel file is empty.", variant: "destructive" });
+        return;
+      }
+
+      const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
+      const columns = headerRow.map((h: any) => String(h || "").trim());
+      const requiredCols = ["Item_barcode", "quantity", "rate", "value"];
+      const missingCols = requiredCols.filter(col => !columns.includes(col));
+      
+      if (missingCols.length > 0) {
+        toast({
+          title: "Missing Required Columns",
+          description: `Expected: ${requiredCols.join(", ")}. Download template for format.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const errors: string[] = [];
+      const rows: Array<{ Item_barcode: string; stockGroupCode?: string; quantity: string; rate: string; value: string }> = [];
+
+      jsonData.forEach((row: any, index: number) => {
+        const rowNumber = index + 2;
+        if (!row.Item_barcode || String(row.Item_barcode).trim() === "") {
+          errors.push(`Row ${rowNumber}: Item_barcode is required`);
+          return;
+        }
+        const quantity = parseFloat(row.quantity || "0");
+        const rate = parseFloat(row.rate || "0");
+        const value = parseFloat(row.value || "0");
+        if (isNaN(quantity) || quantity === 0) {
+          errors.push(`Row ${rowNumber}: Quantity must be a non-zero number (negative quantities are allowed)`);
+          return;
+        }
+        if (isNaN(rate) || rate < 0) {
+          errors.push(`Row ${rowNumber}: Rate must be >= 0`);
+          return;
+        }
+        rows.push({
+          Item_barcode: String(row.Item_barcode).trim(),
+          stockGroupCode: row.stockGroupCode ? String(row.stockGroupCode).trim() : undefined,
+          quantity: String(quantity),
+          rate: String(rate),
+          value: String(value),
+        });
+      });
+
+      setStockPreview(rows);
+      setStockErrors(errors);
+    } catch (error) {
+      toast({ title: "Error Reading File", description: "Please ensure valid Excel file.", variant: "destructive" });
+    }
+  };
+
+  const handleStockImport = async () => {
+    if (!stockLocationId) {
+      toast({ title: "No Location Selected", description: "Please select a location first", variant: "destructive" });
+      return;
+    }
+    if (stockErrors.length > 0) {
+      toast({ title: "Cannot Import", description: "Please fix validation errors first", variant: "destructive" });
+      return;
+    }
+
+    setIsImportingStock(true);
+    try {
+      const res = await modeApiRequest("POST", `/api/locations/${stockLocationId}/import-inventory`, {
+        items: stockPreview,
+      });
+      const response = await res.json();
+      queryClient.invalidateQueries({ queryKey: [`/api/locations/${stockLocationId}/inventory`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      setStockImportComplete(true);
+      toast({
+        title: "Import Successful",
+        description: `Imported ${response.imported || stockPreview.length} inventory items`,
+      });
+    } catch (error: any) {
+      toast({ title: "Import Failed", description: error.message || "Failed to import", variant: "destructive" });
+    } finally {
+      setIsImportingStock(false);
+    }
+  };
+
+  const handleStockDialogClose = async () => {
+    setStockImportOpen(false);
+    setStockFile(null);
+    setStockPreview([]);
+    setStockErrors([]);
+    setStockImportComplete(false);
+  };
+
+  if (!selectedCompany) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Database className="h-5 w-5" />
+          <h2 className="text-2xl font-semibold">Data Tools</h2>
+        </div>
+        <p className="text-muted-foreground">
+          Please select a company to access data tools.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Database className="h-5 w-5" />
+        <h2 className="text-2xl font-semibold">Data Tools</h2>
+      </div>
+      <p className="text-muted-foreground">
+        Administrative utilities for bulk data operations and maintenance tasks.
+      </p>
+
+      {appMode === "factory" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="h-4 w-4" />
+              Import Data
+            </CardTitle>
+            <CardDescription>
+              Import factory data including bales, raw stock, opening balances, and production records
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/factory/import">
+              <button
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                data-testid="button-go-to-import"
+              >
+                <Upload className="h-4 w-4" />
+                Open Import Tool
+              </button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Import Cost Prices Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="h-4 w-4" />
+              Import Cost Prices
+            </CardTitle>
+            <CardDescription>
+              Bulk update inventory cost prices from Excel file
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select Location</Label>
+              <Select value={costPriceLocationId} onValueChange={setCostPriceLocationId}>
+                <SelectTrigger data-testid="select-location-cost-price">
+                  <SelectValue placeholder="Choose location..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((loc: any) => (
+                    <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setCostPriceImportOpen(true)}
+              disabled={!costPriceLocationId}
+              data-testid="button-open-cost-price-import"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Import Cost Prices
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Import Stock Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Import Stock
+            </CardTitle>
+            <CardDescription>
+              Bulk import inventory quantities from Excel file
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select Location</Label>
+              <Select value={stockLocationId} onValueChange={setStockLocationId}>
+                <SelectTrigger data-testid="select-location-stock-import">
+                  <SelectValue placeholder="Choose location..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((loc: any) => (
+                    <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setStockImportOpen(true)}
+              disabled={!stockLocationId}
+              data-testid="button-open-stock-import"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Import Stock
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Convert Bale to BL Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Convert Bale to BL
+            </CardTitle>
+            <CardDescription>
+              Update all stock items with "Bale" UOM to "BL"
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => updateUOMMutation.mutate()}
+              disabled={updateUOMMutation.isPending}
+              data-testid="button-convert-bale-bl"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${updateUOMMutation.isPending ? "animate-spin" : ""}`} />
+              {updateUOMMutation.isPending ? "Converting..." : "Convert Bale to BL"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Fix Cost Prices Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calculator className="h-4 w-4" />
+              Fix Cost Prices
+            </CardTitle>
+            <CardDescription>
+              Recalculate sales cost prices based on inventory records
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => recalculateCostsMutation.mutate()}
+              disabled={recalculateCostsMutation.isPending}
+              data-testid="button-fix-cost-prices"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${recalculateCostsMutation.isPending ? "animate-spin" : ""}`} />
+              {recalculateCostsMutation.isPending ? "Updating..." : "Fix Cost Prices"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Silent Stock Transfer Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ArrowLeftRight className="h-4 w-4" />
+              Silent Stock Transfer
+            </CardTitle>
+            <CardDescription>
+              Move stock between locations via Excel upload — no daybook entry created
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => { setSilentStep("setup"); setSilentValidItems([]); setSilentWarnItems([]); setSilentErrorLines([]); setSilentParseError(""); setSilentFile(null); setSilentAppliedCount(0); setSilentTransferOpen(true); }}
+              data-testid="button-open-silent-transfer"
+            >
+              <ArrowLeftRight className="h-4 w-4 mr-2" />
+              Open Silent Transfer
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Silent Production / Consumption — Developer only, ERP mode only */}
+        {dtCurrentUser?.role === "Developer" && appMode !== "factory" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Silent Production / Consumption
+              </CardTitle>
+              <CardDescription>
+                Directly adjust inventory up (Production) or down (Consumption) — no daybook entry, developer only
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => { setSilentProdType("Production"); setSilentProdLocId(""); setSilentProdItems([{ stockItemId: "", quantity: "", rate: "" }]); setSilentProdDone(0); setSilentProdOpen(true); }}
+                data-testid="button-open-silent-production"
+              >
+                <Package className="h-4 w-4 mr-2" />
+                Open Silent Production / Consumption
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Merge Bale Products — factory mode, Admin/Owner/Developer */}
+        {appMode === "factory" && ["Admin", "Owner", "Developer"].includes(dtCurrentUser?.role || "") && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ArrowLeftRight className="h-4 w-4" />
+                Merge Bale Products
+              </CardTitle>
+              <CardDescription>
+                Combine duplicate bale product entries — all bales from the selected items move to the one you keep, and the duplicates are deactivated
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => { setMergeSearch(""); setMergeSelected(new Set()); setMergeTargetId(null); setMergeStep("select"); setMergeResult(null); setMergeOpen(true); }}
+                data-testid="button-open-merge-products"
+              >
+                <ArrowLeftRight className="h-4 w-4 mr-2" />
+                Open Merge Tool
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Silent Production / Consumption Dialog */}
+      {dtCurrentUser?.role === "Developer" && appMode !== "factory" && (
+        <Dialog open={silentProdOpen} onOpenChange={(o) => { if (!silentProdApplying) setSilentProdOpen(o); }}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Silent Production / Consumption</DialogTitle>
+              <DialogDescription>
+                Adjusts inventory directly without creating any accounting or daybook entries. Developer use only.
+              </DialogDescription>
+            </DialogHeader>
+
+            {silentProdDone > 0 ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <Check className="h-5 w-5" />
+                  <p className="font-semibold">Applied {silentProdDone} item(s) silently as {silentProdType}</p>
+                </div>
+                <Button variant="outline" onClick={() => setSilentProdOpen(false)} data-testid="button-silent-prod-close">Close</Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Type toggle */}
+                <div className="flex gap-2">
+                  <Button
+                    variant={silentProdType === "Production" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSilentProdType("Production")}
+                    data-testid="button-type-production"
+                  >
+                    Production (+)
+                  </Button>
+                  <Button
+                    variant={silentProdType === "Consumption" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSilentProdType("Consumption")}
+                    data-testid="button-type-consumption"
+                  >
+                    Consumption (−)
+                  </Button>
+                </div>
+
+                {/* Location */}
+                <div className="space-y-1">
+                  <Label>Location</Label>
+                  <Select value={silentProdLocId} onValueChange={setSilentProdLocId}>
+                    <SelectTrigger data-testid="select-silent-prod-location">
+                      <SelectValue placeholder="Select location..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(locations as any[]).map((loc: any) => (
+                        <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Items table */}
+                <div className="space-y-2">
+                  <Label>Items</Label>
+                  <div className="space-y-2">
+                    {silentProdItems.map((item, idx) => (
+                      <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                        <div className="col-span-5">
+                          <Select
+                            value={item.stockItemId}
+                            onValueChange={(v) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, stockItemId: v } : r))}
+                          >
+                            <SelectTrigger data-testid={`select-prod-item-${idx}`}>
+                              <SelectValue placeholder="Stock item..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(allStockItems as any[]).map((si: any) => (
+                                <SelectItem key={si.id} value={String(si.id)}>{si.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-3">
+                          <Input
+                            type="number"
+                            placeholder="Qty"
+                            value={item.quantity}
+                            onChange={(e) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, quantity: e.target.value } : r))}
+                            data-testid={`input-prod-qty-${idx}`}
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <Input
+                            type="number"
+                            placeholder={silentProdType === "Production" ? "Rate" : "Rate (opt)"}
+                            value={item.rate}
+                            onChange={(e) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, rate: e.target.value } : r))}
+                            data-testid={`input-prod-rate-${idx}`}
+                          />
+                        </div>
+                        <div className="col-span-1 flex justify-center">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setSilentProdItems(prev => prev.filter((_, i) => i !== idx))}
+                            disabled={silentProdItems.length === 1}
+                            data-testid={`button-remove-prod-row-${idx}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSilentProdItems(prev => [...prev, { stockItemId: "", quantity: "", rate: "" }])}
+                    data-testid="button-add-prod-row"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Item
+                  </Button>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setSilentProdOpen(false)} data-testid="button-silent-prod-cancel">Cancel</Button>
+                  <Button
+                    disabled={!silentProdLocId || silentProdItems.every(r => !r.stockItemId || !r.quantity) || silentProdApplying}
+                    onClick={async () => {
+                      const validItems = silentProdItems.filter(r => r.stockItemId && r.quantity);
+                      if (!silentProdLocId || validItems.length === 0) return;
+                      setSilentProdApplying(true);
+                      try {
+                        const res = await apiRequest("POST", "/api/inventory/silent-production", {
+                          locationId: silentProdLocId,
+                          type: silentProdType,
+                          items: validItems.map(r => ({ stockItemId: r.stockItemId, quantity: r.quantity, rate: r.rate || "0" })),
+                        });
+                        const data = await res.json();
+                        setSilentProdDone(data.applied || validItems.length);
+                      } catch (err: any) {
+                        console.error("Silent production error:", err);
+                      } finally {
+                        setSilentProdApplying(false);
+                      }
+                    }}
+                    data-testid="button-silent-prod-apply"
+                  >
+                    {silentProdApplying ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Applying...</> : `Apply ${silentProdType}`}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Merge Bale Products Dialog */}
+      {appMode === "factory" && (
+        <Dialog open={mergeOpen} onOpenChange={(o) => { if (!mergeMutation.isPending) setMergeOpen(o); }}>
+          <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Merge Bale Products</DialogTitle>
+              <DialogDescription>
+                Select the products to merge, then choose which one to keep as the primary. All bales from the others will move to the primary, and the duplicates will be deactivated.
+              </DialogDescription>
+            </DialogHeader>
+
+            {mergeStep === "done" && mergeResult ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <Check className="h-5 w-5" />
+                  <p className="font-semibold">Merge complete</p>
+                </div>
+                <div className="rounded-md border p-4 space-y-1 text-sm">
+                  <div><span className="text-muted-foreground">Primary product kept: </span><strong>{mergeResult.targetName}</strong></div>
+                  <div><span className="text-muted-foreground">Duplicates deactivated: </span><strong>{mergeResult.mergedProducts}</strong></div>
+                  <div><span className="text-muted-foreground">Bales reassigned: </span><strong>{mergeResult.movedBales}</strong></div>
+                </div>
+                <DialogFooter>
+                  <Button onClick={() => { setMergeOpen(false); }} data-testid="button-merge-close">Close</Button>
+                </DialogFooter>
+              </div>
+            ) : mergeStep === "confirm" ? (
+              <div className="space-y-4">
+                <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3 text-sm text-amber-800 dark:text-amber-300">
+                  This cannot be undone. All bales from the duplicate products will be moved to the primary, and the duplicates will be deactivated.
+                </div>
+                {(() => {
+                  const target = mergeStats.find((p: any) => p.id === mergeTargetId);
+                  const sources = mergeStats.filter((p: any) => mergeSelected.has(p.id) && p.id !== mergeTargetId);
+                  const totalMovingBales = sources.reduce((s: number, p: any) => s + parseInt(p.totalBales || "0"), 0);
+                  return (
+                    <div className="space-y-3 text-sm">
+                      <div className="rounded-md border p-3 space-y-1">
+                        <div className="text-xs text-muted-foreground mb-1">Keeping (primary)</div>
+                        <div className="font-semibold">{target?.name}</div>
+                        <div className="text-muted-foreground">{target?.code}{target?.articleCode ? ` · ${target.articleCode}` : ""} · {target?.inStockBales || 0} in stock, {target?.totalBales || 0} total bales</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Merging into primary ({sources.length} product{sources.length !== 1 ? "s" : ""})</div>
+                        {sources.map((p: any) => (
+                          <div key={p.id} className="rounded-md border p-2 flex items-center justify-between gap-2">
+                            <div>
+                              <span className="font-medium">{p.name}</span>
+                              <span className="text-muted-foreground text-xs ml-2">{p.code}{p.articleCode ? ` · ${p.articleCode}` : ""}</span>
+                            </div>
+                            <Badge variant="secondary">{p.inStockBales || 0} in stock</Badge>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="text-muted-foreground">{totalMovingBales} bale(s) total will move to <strong>{target?.name}</strong>.</div>
+                    </div>
+                  );
+                })()}
+                <DialogFooter className="gap-2 flex-wrap">
+                  <Button variant="outline" onClick={() => setMergeStep("select")} disabled={mergeMutation.isPending} data-testid="button-merge-back">Back</Button>
+                  <Button
+                    onClick={() => {
+                      const sourceIds = Array.from(mergeSelected).filter(id => id !== mergeTargetId);
+                      mergeMutation.mutate({ targetId: mergeTargetId!, sourceIds });
+                    }}
+                    disabled={mergeMutation.isPending}
+                    data-testid="button-merge-confirm"
+                  >
+                    {mergeMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Merging...</> : <><ArrowLeftRight className="h-4 w-4 mr-2" />Confirm Merge</>}
+                  </Button>
+                </DialogFooter>
+              </div>
+            ) : (
+              (() => {
+                // Group by normalised name → only groups with 2+ entries are duplicates
+                const groups: Record<string, any[]> = {};
+                (mergeStats as any[]).forEach((p) => {
+                  const key = p.name.trim().toLowerCase();
+                  if (!groups[key]) groups[key] = [];
+                  groups[key].push(p);
+                });
+                const duplicateGroups = Object.values(groups).filter((g) => g.length >= 2);
+                const filteredGroups = mergeSearch
+                  ? duplicateGroups.filter((g) => g[0].name.toLowerCase().includes(mergeSearch.toLowerCase()))
+                  : duplicateGroups;
+                // Which group is currently selected (all IDs in it are in mergeSelected)
+                const selectedGroup = filteredGroups.find((g) => g.some((p: any) => mergeSelected.has(p.id)));
+
+                return (
+                  <div className="space-y-4">
+                    <Input
+                      placeholder="Filter duplicates by name..."
+                      value={mergeSearch}
+                      onChange={(e) => setMergeSearch(e.target.value)}
+                      data-testid="input-merge-search"
+                    />
+
+                    {mergeStatsLoading ? (
+                      <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-20 w-full" />)}</div>
+                    ) : filteredGroups.length === 0 ? (
+                      <div className="rounded-md border p-8 text-center text-sm text-muted-foreground">
+                        {mergeSearch ? "No duplicate groups match your filter." : "No duplicate bale products found."}
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                        {filteredGroups.map((group) => {
+                          const groupKey = group[0].name.trim().toLowerCase();
+                          const isGroupSelected = group.some((p: any) => mergeSelected.has(p.id));
+
+                          return (
+                            <div
+                              key={groupKey}
+                              className={`rounded-md border transition-colors ${isGroupSelected ? "border-primary/50 bg-muted/30" : ""}`}
+                              data-testid={`group-merge-${groupKey}`}
+                            >
+                              {/* Group header */}
+                              <button
+                                className="w-full flex items-center justify-between px-4 py-2.5 text-left"
+                                onClick={() => {
+                                  if (isGroupSelected) {
+                                    setMergeSelected(new Set());
+                                    setMergeTargetId(null);
+                                  } else {
+                                    setMergeSelected(new Set(group.map((p: any) => p.id)));
+                                    setMergeTargetId(null);
+                                  }
+                                }}
+                              >
+                                <div>
+                                  <span className="font-semibold text-sm">{group[0].name}</span>
+                                  <span className="ml-2 text-xs text-muted-foreground">{group.length} duplicates</span>
+                                </div>
+                                <Badge variant={isGroupSelected ? "default" : "outline"} className="text-xs shrink-0">
+                                  {isGroupSelected ? "Selected" : "Select"}
+                                </Badge>
+                              </button>
+
+                              {/* Expanded: pick primary */}
+                              {isGroupSelected && (
+                                <div className="border-t px-4 pb-3 pt-2 space-y-1.5">
+                                  <p className="text-xs text-muted-foreground mb-2">Choose which to keep as primary:</p>
+                                  {group.map((p: any) => {
+                                    const isTarget = mergeTargetId === p.id;
+                                    return (
+                                      <button
+                                        key={p.id}
+                                        className={`w-full flex items-center gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors ${isTarget ? "border-primary bg-primary/5" : "hover-elevate"}`}
+                                        onClick={() => setMergeTargetId(p.id)}
+                                        data-testid={`radio-merge-target-${p.id}`}
+                                      >
+                                        <div className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 ${isTarget ? "border-primary bg-primary" : "border-muted-foreground"}`} />
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-medium truncate">{p.name}</div>
+                                          <div className="text-xs text-muted-foreground">{p.code}{p.articleCode ? ` · ${p.articleCode}` : ""}{!p.active ? " · inactive" : ""}</div>
+                                        </div>
+                                        <div className="text-right shrink-0 text-xs text-muted-foreground">
+                                          <div>{p.inStockBales || 0} in stock</div>
+                                          <div>{p.totalBales || 0} total</div>
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {selectedGroup && (
+                      <div className="text-xs text-muted-foreground">
+                        {selectedGroup.length} products in group
+                        {mergeTargetId ? ` · keeping: ${mergeStats.find((p: any) => p.id === mergeTargetId)?.name}` : " · pick which to keep above"}
+                      </div>
+                    )}
+
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setMergeOpen(false)} data-testid="button-merge-cancel">Cancel</Button>
+                      <Button
+                        disabled={mergeSelected.size < 2 || !mergeTargetId}
+                        onClick={() => setMergeStep("confirm")}
+                        data-testid="button-merge-next"
+                      >
+                        Next: Review &amp; Confirm
+                      </Button>
+                    </DialogFooter>
+                  </div>
+                );
+              })()
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Silent Transfer Dialog */}
+      <Dialog open={silentTransferOpen} onOpenChange={(o) => { if (!isSilentParsing && !isSilentApplying) setSilentTransferOpen(o); }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Silent Stock Transfer</DialogTitle>
+            <DialogDescription>
+              Upload an Excel file to move stock between locations without creating a daybook entry.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* STEP 1 — Setup */}
+          {silentStep === "setup" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Source Location</Label>
+                  <Select value={silentSrcId} onValueChange={setSilentSrcId}>
+                    <SelectTrigger data-testid="select-silent-source">
+                      <SelectValue placeholder="From location..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(locations as any[]).map((loc: any) => (
+                        <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Destination Location</Label>
+                  <Select value={silentDstId} onValueChange={setSilentDstId}>
+                    <SelectTrigger data-testid="select-silent-destination">
+                      <SelectValue placeholder="To location..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(locations as any[]).filter((l: any) => String(l.id) !== silentSrcId).map((loc: any) => (
+                        <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="silent-transfer-file">Excel File</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => window.open("/api/inventory/silent-transfer/template", "_blank")}
+                    data-testid="button-silent-transfer-template"
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    Download Template
+                  </Button>
+                </div>
+                <Input
+                  id="silent-transfer-file"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={(e) => setSilentFile(e.target.files?.[0] ?? null)}
+                  data-testid="input-silent-transfer-file"
+                />
+                {silentFile && <p className="text-sm text-muted-foreground">Selected: {silentFile.name}</p>}
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Template columns: <strong>Barcode</strong> (item code), <strong>Quantity</strong> — duplicate barcodes are detected automatically.
+              </p>
+
+              {silentParseError && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>{silentParseError}</AlertDescription>
+                </Alert>
+              )}
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSilentTransferOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={async () => {
+                    if (!silentSrcId || !silentDstId || !silentFile) return;
+                    setIsSilentParsing(true);
+                    setSilentParseError("");
+                    try {
+                      const formData = new FormData();
+                      formData.append("file", silentFile);
+                      formData.append("sourceLocationId", silentSrcId);
+                      formData.append("destinationLocationId", silentDstId);
+                      const res = await fetch("/api/inventory/silent-transfer/parse", {
+                        method: "POST",
+                        body: formData,
+                        credentials: "include",
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.message);
+                      setSilentValidItems(data.validItems || []);
+                      setSilentWarnItems(data.warnItems || []);
+                      setSilentErrorLines(data.errorLines || []);
+                      setSilentIncludeWarnings(false);
+                      setSilentStep("validation");
+                    } catch (err: any) {
+                      setSilentParseError(err.message);
+                    } finally {
+                      setIsSilentParsing(false);
+                    }
+                  }}
+                  disabled={!silentSrcId || !silentDstId || !silentFile || isSilentParsing}
+                  data-testid="button-silent-transfer-parse"
+                >
+                  {isSilentParsing
+                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Validating...</>
+                    : "Validate File"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {/* STEP 2 — Validation results */}
+          {silentStep === "validation" && (() => {
+            const applyItems = silentIncludeWarnings
+              ? [...silentValidItems, ...silentWarnItems]
+              : silentValidItems;
+            return (
+              <div className="space-y-4">
+                {/* Summary row */}
+                <div className="flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs font-medium px-2 py-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    {silentValidItems.length} valid
+                  </span>
+                  {silentWarnItems.length > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-xs font-medium px-2 py-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      {silentWarnItems.length} insufficient stock
+                    </span>
+                  )}
+                  {silentErrorLines.length > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 text-xs font-medium px-2 py-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      {silentErrorLines.length} error{silentErrorLines.length !== 1 ? "s" : ""} (excluded)
+                    </span>
+                  )}
+                </div>
+
+                <div className="max-h-[380px] overflow-y-auto space-y-3 pr-1">
+
+                  {/* Error rows */}
+                  {silentErrorLines.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-destructive mb-1">Errors — excluded from transfer</p>
+                      <div className="rounded-md border border-destructive/30 overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-xs py-2 w-14">Row</TableHead>
+                              <TableHead className="text-xs py-2">Barcode</TableHead>
+                              <TableHead className="text-xs py-2">Reason</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {silentErrorLines.map((e: any, i: number) => (
+                              <TableRow key={i} className="bg-red-50/60 dark:bg-red-950/20">
+                                <TableCell className="text-xs py-1.5 text-muted-foreground">{e.rowNum}</TableCell>
+                                <TableCell className="text-xs py-1.5 font-mono">{e.barcode || "—"}</TableCell>
+                                <TableCell className="text-xs py-1.5 text-destructive">{e.reason}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Warning rows — insufficient stock */}
+                  {silentWarnItems.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-400">
+                          Insufficient Stock — will go negative
+                        </p>
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={silentIncludeWarnings}
+                            onChange={(e) => setSilentIncludeWarnings(e.target.checked)}
+                            data-testid="checkbox-include-warnings"
+                            className="h-3.5 w-3.5 rounded"
+                          />
+                          <span className="text-xs text-muted-foreground">Include anyway</span>
+                        </label>
+                      </div>
+                      <div className={`rounded-md border overflow-hidden transition-opacity ${silentIncludeWarnings ? "border-yellow-300 dark:border-yellow-700/50 opacity-100" : "border-muted opacity-60"}`}>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-xs py-2">Item</TableHead>
+                              <TableHead className="text-right text-xs py-2">Qty</TableHead>
+                              <TableHead className="text-right text-xs py-2">Available</TableHead>
+                              <TableHead className="text-xs py-2">Issue</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {silentWarnItems.map((item: any, i: number) => (
+                              <TableRow key={i} className={silentIncludeWarnings ? "bg-yellow-50/60 dark:bg-yellow-950/20" : ""}>
+                                <TableCell className="py-1.5">
+                                  <div className="text-xs font-medium">{item.stockItemName}</div>
+                                  <div className="text-xs text-muted-foreground font-mono">{item.barcode}</div>
+                                </TableCell>
+                                <TableCell className="text-right text-xs py-1.5">{formatNumber(item.quantity)}</TableCell>
+                                <TableCell className="text-right text-xs py-1.5 text-destructive font-medium">{formatNumber(item.currentStock)}</TableCell>
+                                <TableCell className="text-xs py-1.5 text-yellow-700 dark:text-yellow-400">{item.warnReason}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Valid items */}
+                  {silentValidItems.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-1">
+                        Valid — ready to transfer
+                      </p>
+                      <div className="rounded-md border border-green-200 dark:border-green-800/40 overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-xs py-2">Item</TableHead>
+                              <TableHead className="text-right text-xs py-2">Qty</TableHead>
+                              <TableHead className="text-right text-xs py-2">Stock</TableHead>
+                              <TableHead className="text-right text-xs py-2">After</TableHead>
+                              <TableHead className="text-right text-xs py-2">Rate</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {silentValidItems.map((item: any, i: number) => (
+                              <TableRow key={i} className="bg-green-50/40 dark:bg-green-950/10">
+                                <TableCell className="py-1.5">
+                                  <div className="text-xs font-medium">{item.stockItemName}</div>
+                                  <div className="text-xs text-muted-foreground font-mono">{item.barcode}</div>
+                                </TableCell>
+                                <TableCell className="text-right text-xs py-1.5">{formatNumber(item.quantity)}</TableCell>
+                                <TableCell className="text-right text-xs py-1.5">{formatNumber(item.currentStock)}</TableCell>
+                                <TableCell className="text-right text-xs py-1.5 text-green-700 dark:text-green-400 font-medium">
+                                  {formatNumber(item.afterTransfer)}
+                                </TableCell>
+                                <TableCell className="text-right text-xs py-1.5 text-muted-foreground">{formatNumber(item.averageRate, 2)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  {silentValidItems.length === 0 && silentWarnItems.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      No transferable items found in the file.
+                    </p>
+                  )}
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setSilentStep("setup")} disabled={isSilentApplying}>Back</Button>
+                  <Button
+                    onClick={async () => {
+                      if (applyItems.length === 0) return;
+                      setIsSilentApplying(true);
+                      try {
+                        const res = await apiRequest("POST", "/api/inventory/silent-transfer/apply", {
+                          sourceLocationId: parseInt(silentSrcId),
+                          destinationLocationId: parseInt(silentDstId),
+                          items: applyItems,
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.message);
+                        queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
+                        queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
+                        setSilentAppliedCount(applyItems.length);
+                        setSilentStep("done");
+                      } catch (err: any) {
+                        setSilentParseError(err.message);
+                        setSilentStep("setup");
+                      } finally {
+                        setIsSilentApplying(false);
+                      }
+                    }}
+                    disabled={applyItems.length === 0 || isSilentApplying}
+                    data-testid="button-silent-transfer-apply"
+                  >
+                    {isSilentApplying
+                      ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Applying...</>
+                      : applyItems.length === 0
+                        ? "No items to transfer"
+                        : `Apply Transfer (${applyItems.length} item${applyItems.length !== 1 ? "s" : ""})`}
+                  </Button>
+                </DialogFooter>
+              </div>
+            );
+          })()}
+
+          {/* STEP 3 — Done */}
+          {silentStep === "done" && (
+            <div className="flex flex-col items-center gap-4 py-6">
+              <CheckCircle2 className="h-12 w-12 text-green-500" />
+              <div className="text-center">
+                <p className="font-semibold text-lg">Transfer Complete</p>
+                <p className="text-sm text-muted-foreground">
+                  {silentAppliedCount} item{silentAppliedCount !== 1 ? "s" : ""} moved silently. No daybook entry was created.
+                </p>
+              </div>
+              <Button
+                onClick={() => {
+                  setSilentTransferOpen(false);
+                  setSilentStep("setup");
+                  setSilentSrcId("");
+                  setSilentDstId("");
+                  setSilentFile(null);
+                  setSilentValidItems([]);
+                  setSilentWarnItems([]);
+                  setSilentErrorLines([]);
+                  setSilentParseError("");
+                  setSilentAppliedCount(0);
+                }}
+                data-testid="button-silent-transfer-close"
+              >Close</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Cost Price Import Dialog */}
+      <Dialog open={costPriceImportOpen} onOpenChange={handleCostPriceDialogClose}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import Cost Prices from Excel</DialogTitle>
+            <DialogDescription>
+              Upload an Excel file with barcode and costPrice columns
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Button variant="outline" onClick={downloadCostPriceTemplate} size="sm" data-testid="button-download-cost-price-template">
+              <Download className="h-4 w-4 mr-2" />
+              Download Template
+            </Button>
+            <div className="space-y-2">
+              <Label htmlFor="cost-price-file">Select Excel File</Label>
+              <Input
+                id="cost-price-file"
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleCostPriceFileChange}
+                disabled={isImportingCostPrice || costPriceImportComplete}
+                data-testid="input-cost-price-file"
+              />
+              {costPriceFile && <p className="text-sm text-muted-foreground">Selected: {costPriceFile.name}</p>}
+            </div>
+            {costPriceErrors.length > 0 && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="font-semibold mb-2">{costPriceErrors.length} validation error(s):</div>
+                  <ul className="list-disc list-inside space-y-1">
+                    {costPriceErrors.slice(0, 5).map((err, i) => <li key={i} className="text-sm">{err}</li>)}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
+            {costPricePreview.length > 0 && costPriceErrors.length === 0 && (
+              <Alert>
+                <Package className="h-4 w-4" />
+                <AlertDescription>{costPricePreview.length} records ready to import</AlertDescription>
+              </Alert>
+            )}
+            {costPriceImportComplete && (
+              <Alert>
+                <Package className="h-4 w-4" />
+                <AlertDescription>Cost prices imported successfully</AlertDescription>
+              </Alert>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={handleCostPriceDialogClose} disabled={isImportingCostPrice}>Close</Button>
+              <Button
+                onClick={handleCostPriceImport}
+                disabled={costPricePreview.length === 0 || costPriceErrors.length > 0 || isImportingCostPrice || costPriceImportComplete}
+                data-testid="button-submit-cost-price-import"
+              >
+                {isImportingCostPrice ? "Importing..." : "Import Cost Prices"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Stock Import Dialog */}
+      <Dialog open={stockImportOpen} onOpenChange={handleStockDialogClose}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import Stock from Excel</DialogTitle>
+            <DialogDescription>
+              Upload an Excel file with Item_barcode, quantity, rate, value columns
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Button variant="outline" onClick={downloadStockTemplate} size="sm" data-testid="button-download-stock-template">
+              <Download className="h-4 w-4 mr-2" />
+              Download Template
+            </Button>
+            <div className="space-y-2">
+              <Label htmlFor="stock-file">Select Excel File</Label>
+              <Input
+                id="stock-file"
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleStockFileChange}
+                disabled={isImportingStock || stockImportComplete}
+                data-testid="input-stock-file"
+              />
+              {stockFile && <p className="text-sm text-muted-foreground">Selected: {stockFile.name}</p>}
+            </div>
+            {stockErrors.length > 0 && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="font-semibold mb-2">{stockErrors.length} validation error(s):</div>
+                  <ul className="list-disc list-inside space-y-1">
+                    {stockErrors.slice(0, 5).map((err, i) => <li key={i} className="text-sm">{err}</li>)}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
+            {stockPreview.length > 0 && stockErrors.length === 0 && (
+              <Alert>
+                <Package className="h-4 w-4" />
+                <AlertDescription>{stockPreview.length} records ready to import</AlertDescription>
+              </Alert>
+            )}
+            {stockImportComplete && (
+              <Alert>
+                <Package className="h-4 w-4" />
+                <AlertDescription>Stock imported successfully</AlertDescription>
+              </Alert>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={handleStockDialogClose} disabled={isImportingStock}>Close</Button>
+              <Button
+                onClick={handleStockImport}
+                disabled={stockPreview.length === 0 || stockErrors.length > 0 || isImportingStock || stockImportComplete}
+                data-testid="button-submit-stock-import"
+              >
+                {isImportingStock ? "Importing..." : "Import Stock"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ── Edit Log helpers ──────────────────────────────────────────────────────────
+
