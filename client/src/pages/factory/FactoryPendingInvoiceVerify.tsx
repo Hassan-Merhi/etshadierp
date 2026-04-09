@@ -180,8 +180,11 @@ export default function FactoryPendingInvoiceVerify() {
     },
     onSuccess: () => {
       toast({ title: "Order verified", description: "Now add charges and finalize the invoice" });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId, "verification"] });
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          (query.queryKey[0] as string).startsWith("/api/factory/customer-orders"),
+      });
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
@@ -194,6 +197,11 @@ export default function FactoryPendingInvoiceVerify() {
       await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/return-to-loading`);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          (query.queryKey[0] as string).startsWith("/api/factory/customer-orders"),
+      });
       toast({ title: "Returned to loading", description: "The order has been returned for further loading" });
       navigate("/factory/invoicing?tab=pending");
     },

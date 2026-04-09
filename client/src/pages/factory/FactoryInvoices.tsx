@@ -109,6 +109,7 @@ export default function FactoryInvoices() {
           typeof query.queryKey[0] === "string" &&
           (query.queryKey[0] as string).startsWith("/api/factory/customer-orders"),
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
     },
     onError: (error: any) => {
       if (error?._handledGlobally) return;
