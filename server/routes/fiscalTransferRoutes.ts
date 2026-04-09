@@ -162,6 +162,7 @@ export function registerFiscalTransferRoutes(app: Express) {
         eq(vouchers.companyId, req.session.currentCompanyId),
         eq(vouchers.voucherType, "Sales"),
         isNull(vouchers.deletedAt),
+        eq(vouchers.optional, false),
       ];
 
       if (startDate) {
@@ -288,6 +289,7 @@ export function registerFiscalTransferRoutes(app: Express) {
           eq(vouchers.voucherType, "Sales"),
           eq(vouchers.locationId, locationId),
           isNull(vouchers.deletedAt),
+          eq(vouchers.optional, false),
         ];
 
         if (startDate) {
@@ -357,6 +359,7 @@ export function registerFiscalTransferRoutes(app: Express) {
           eq(vouchers.companyId, req.session.currentCompanyId),
           eq(vouchers.voucherType, "Sales"),
           isNull(vouchers.deletedAt),
+          eq(vouchers.optional, false),
         ];
 
         if (locationId === -1) {

@@ -308,8 +308,6 @@ export default function Analytics() {
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   const [selectedLocationForDetails, setSelectedLocationForDetails] = useState<number | null>(null);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set());
-  const [ratiosStartDate, setRatiosStartDate] = useState("");
-  const [ratiosEndDate, setRatiosEndDate] = useState("");
   
   // Report filters
   const [reportStartDate, setReportStartDate] = useState("");
