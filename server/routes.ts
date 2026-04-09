@@ -22788,21 +22788,19 @@ if (asOfDate) {
       if (toDate) {
         voucherConditions.push(lte(vouchers.voucherDate, toDate));
       }
-      const companyVouchers = await db
-        .select({ id: vouchers.id })
-        .from(vouchers)
+      // Single JOIN query — avoids the large IN-clause on voucher IDs
+      const companyEntries = await db
+        .select({
+          ledgerAccountId: voucherEntries.ledgerAccountId,
+          supplierId:      voucherEntries.supplierId,
+          employeeId:      voucherEntries.employeeId,
+          debitAmount:     voucherEntries.debitAmount,
+          creditAmount:    voucherEntries.creditAmount,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
         .where(and(...voucherConditions))
         .execute();
-      const companyVoucherIds = companyVouchers.map((v) => v.id);
-
-      // Get all voucher entries
-      const companyEntries = companyVoucherIds.length > 0
-        ? await db
-            .select()
-            .from(voucherEntries)
-            .where(inArray(voucherEntries.voucherId, companyVoucherIds))
-            .execute()
-        : [];
 
       // Calculate balances for each ledger account (debit/credit totals)
       const accountBalances = new Map<number, { debit: number; credit: number }>();
@@ -22937,10 +22935,12 @@ if (asOfDate) {
       let stockOnFloor = 0;
       if (activeLocationIds.length > 0) {
         if (toDate) {
-          // Historical: reverse-reconcile inventory back to toDate for each active location
-          for (const locId of activeLocationIds) {
-            const historicalItems = await calculateHistoricalLocationInventory(locId, companyId, toDate);
-            for (const inv of historicalItems) {
+          // Historical: reverse-reconcile all locations in parallel (not sequential)
+          const allHistorical = await Promise.all(
+            activeLocationIds.map((locId) => calculateHistoricalLocationInventory(locId, companyId, toDate))
+          );
+          for (const items of allHistorical) {
+            for (const inv of items) {
               const qty = parseFloat(inv.quantity || "0");
               const rate = parseFloat(inv.averageRate || "0");
               if (qty > 0) stockOnFloor += qty * rate;
@@ -23206,11 +23206,19 @@ if (asOfDate) {
       ];
       if (toDate) voucherConds.push(lte(vouchers.voucherDate, toDate));
 
-      const companyVouchers = await db.select({ id: vouchers.id }).from(vouchers).where(and(...voucherConds)).execute();
-      const voucherIds = companyVouchers.map((v: any) => v.id);
-      const companyEntries = voucherIds.length > 0
-        ? await db.select().from(voucherEntries).where(inArray(voucherEntries.voucherId, voucherIds)).execute()
-        : [];
+      // Single JOIN — no large IN-clause on voucher IDs
+      const companyEntries = await db
+        .select({
+          ledgerAccountId: voucherEntries.ledgerAccountId,
+          supplierId:      voucherEntries.supplierId,
+          employeeId:      voucherEntries.employeeId,
+          debitAmount:     voucherEntries.debitAmount,
+          creditAmount:    voucherEntries.creditAmount,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(and(...voucherConds))
+        .execute();
 
       const accountBalances = new Map<number, { debit: number; credit: number }>();
       const supplierBalances = new Map<number, { debit: number; credit: number }>();
@@ -23246,9 +23254,12 @@ if (asOfDate) {
       let stockOnFloor = 0;
       if (activeLocIds.length > 0) {
         if (toDate) {
-          for (const locId of activeLocIds) {
-            const historicalItems = await calculateHistoricalLocationInventory(locId, companyId, toDate);
-            for (const inv of historicalItems as any[]) {
+          // Parallelize across locations — each location is independent
+          const allHistorical = await Promise.all(
+            activeLocIds.map((locId: number) => calculateHistoricalLocationInventory(locId, companyId, toDate))
+          );
+          for (const items of allHistorical) {
+            for (const inv of items as any[]) {
               const qty = parseFloat(inv.quantity || "0");
               const rate = parseFloat(inv.averageRate || "0");
               if (qty > 0) stockOnFloor += qty * rate;
