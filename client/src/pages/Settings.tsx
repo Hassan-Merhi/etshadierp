@@ -109,6 +109,25 @@ import { LoginHistoryTab } from "./settings/LoginHistoryTab";
 import { POSReceiptSettings, IntercompanyPosTab } from "./settings/IntercompanyPosTab";
 import { OfflineSyncPanel, formatRelativeTime } from "./settings/OfflineSyncPanel";
 
+// Page access constants — single source of truth shared between Settings and BulkRenameTab
+const ALL_FACTORY_PAGES_SETTINGS = FACTORY_NAV_PAGES;
+const FACTORY_PAGE_GROUPS_SETTINGS = Array.from(new Set(ALL_FACTORY_PAGES_SETTINGS.map(p => p.group)));
+const ALL_ERP_PAGES: { key: string; label: string; group: string }[] = FEATURE_KEYS.map(key => ({
+  key,
+  label: FEATURE_PAGE_INFO[key].label,
+  group: FEATURE_PAGE_INFO[key].group,
+}));
+const ERP_PAGE_GROUPS = Array.from(new Set(ALL_ERP_PAGES.map(p => p.group)));
+const FACTORY_COST_FIELDS = [
+  { key: "inventory_avg_rate",       label: "Avg Rate Column" },
+  { key: "inventory_total_value",    label: "Total Value Column" },
+  { key: "inventory_sell_price",     label: "Sell Price Column" },
+  { key: "inventory_sell_value",     label: "Sell Value Column" },
+  { key: "bale_history_cost_per_kg", label: "Cost/KG Column" },
+  { key: "bale_history_total_cost",  label: "Total Cost Column" },
+  { key: "bales_list_cost_per_kg",   label: "Cost/kg Column" },
+];
+
   export default function Settings() {
     const { toast } = useToast();
     const { selectedCompany } = useCompany();
