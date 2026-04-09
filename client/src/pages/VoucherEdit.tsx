@@ -51,7 +51,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { CalendarIcon, ArrowLeft, Plus, Check, ChevronsUpDown, X, FileSpreadsheet } from "lucide-react";
@@ -1051,10 +1051,7 @@ export default function VoucherEdit() {
       // Invalidate factory daybook so date/amount changes are reflected immediately
       queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       // Invalidate ledger transaction queries so balances refresh in Accounts page
-      queryClient.invalidateQueries({ predicate: (query) => {
-        const key = query.queryKey[0];
-        return typeof key === 'string' && key.startsWith('/api/accounts/');
-      }});
+      queryClient.invalidateQueries({ predicate: keyStartsWith('/api/accounts/') });
       toast({
         title: "Success",
         description: "Voucher updated successfully",

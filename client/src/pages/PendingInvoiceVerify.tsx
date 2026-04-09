@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -179,7 +179,7 @@ export default function PendingInvoiceVerify() {
     },
     onSuccess: () => {
       toast({ title: "Order verified", description: "The order has been approved and verified" });
-      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === "string" && (query.queryKey[0] as string).startsWith("/api/factory/customer-orders") });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       navigate("/factory/sales/pending-invoices");
     },
     onError: (error: Error) => {
@@ -194,7 +194,7 @@ export default function PendingInvoiceVerify() {
     },
     onSuccess: () => {
       toast({ title: "Returned to loading", description: "The order has been returned for further loading" });
-      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === "string" && (query.queryKey[0] as string).startsWith("/api/factory/customer-orders") });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       navigate("/factory/sales/pending-invoices");
     },
     onError: (error: Error) => {
@@ -254,7 +254,7 @@ export default function PendingInvoiceVerify() {
     },
     onSuccess: () => {
       toast({ title: "Invoice finalized", description: "Invoice has been created successfully" });
-      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === "string" && (query.queryKey[0] as string).startsWith("/api/factory/customer-orders") });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       navigate(`/factory/sales/invoices/${orderId}`);
     },
     onError: (error: Error) => {

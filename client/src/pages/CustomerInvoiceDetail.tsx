@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation, useRoute } from "wouter";
 import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, TrendingUp, AlertTriangle } from "lucide-react";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -176,7 +176,7 @@ export default function CustomerInvoiceDetail() {
     },
     onSuccess: () => {
       toast({ title: "Deleted", description: "Invoice deleted successfully." });
-      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === "string" && (query.queryKey[0] as string).startsWith("/api/factory/customer-orders") });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       navigate("/factory/invoicing?tab=invoices");
     },
     onError: (error: any) => {

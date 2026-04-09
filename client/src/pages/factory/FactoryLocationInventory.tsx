@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -397,7 +397,7 @@ export default function FactoryLocationInventory() {
     },
     onSuccess: (result: any) => {
       setSavedProformaId(result.id);
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-proformas"] });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-proformas") });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/location-inventory"] });
     },
     onError: (error: Error) => {
@@ -413,7 +413,7 @@ export default function FactoryLocationInventory() {
     },
     onSuccess: (result: any) => {
       toast({ title: "Proforma updated", description: "Lines saved successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-proformas"] });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-proformas") });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/location-inventory"] });
       setSavedProformaId(result.id);
       setTimeout(() => navigate("/factory/invoicing?tab=proformas"), 800);
