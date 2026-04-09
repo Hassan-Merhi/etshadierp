@@ -33,7 +33,7 @@
   import { LabelPrintSettings, getPaperFormat } from "@/components/LabelPrintSettings";
   import { Label } from "@/components/ui/label";
   import * as XLSX from "xlsx";
-  import StockEntryHistory from "./StockEntryHistory";
+  import StockEntryHistory from "../StockEntryHistory";
   import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
   import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, formatLabelNum, A4_DESIGN_OPTIONS, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
   import { consumeRef } from "@/lib/refPool";

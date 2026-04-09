@@ -1,7 +1,7 @@
 import { useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BalesHistory from "./BalesHistory";
-import BarcodeLookup from "./BarcodeLookup";
+import BarcodeLookup from "../BarcodeLookup";
 import { RemoveFromStockTab } from "./BaleStockEntry";
 
 export default function FactoryBalesHub() {
