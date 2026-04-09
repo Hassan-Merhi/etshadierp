@@ -1494,17 +1494,15 @@ export function registerVoucherRoutes(app: Express) {
         }
       }
 
-      // For credit sales, resolve customer name from the voucher entries
+      // For credit sales, resolve customer name from the voucher entries.
+      // Credit sale entries store the customer receivable account via ledgerAccountId
+      // (not customerId). getVoucherEntriesByVoucher already joins ledgerAccounts and
+      // returns accountName, so we just find the debit entry and use its accountName.
       let customerName: string | null = null;
       if (voucher.isCreditSale) {
-        const creditEntry = entries.find((e: any) => e.customerId != null);
-        if (creditEntry?.customerId) {
-          const [cust] = await db
-            .select({ legalName: customers.legalName })
-            .from(customers)
-            .where(eq(customers.id, creditEntry.customerId))
-            .limit(1);
-          customerName = cust?.legalName ?? null;
+        const debitEntry = entries.find((e: any) => parseFloat(e.debitAmount || "0") > 0);
+        if (debitEntry?.accountName && debitEntry.accountName !== "Unknown Account") {
+          customerName = debitEntry.accountName;
         }
       }
 
