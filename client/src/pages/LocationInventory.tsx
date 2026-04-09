@@ -114,10 +114,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
 
-  // Debug logging
-  console.log('[LocationInventory] posUser:', posUser);
-  console.log('[LocationInventory] !posUser (query enabled):', !posUser);
-
   // Import dialog state
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -206,11 +202,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   // Use the appropriate locations list based on user type
   const locations = posUser ? posAssignedLocations : allLocations;
   const locationsLoading = posUser ? posLocationsLoading : allLocationsLoading;
-
-  // Debug: Log when asOfDate changes
-  useEffect(() => {
-    console.log('[LocationInventory] asOfDate changed to:', asOfDate);
-  }, [asOfDate]);
 
   // Fetch inventory for selected location (closing / as-of date)
   const { data: inventoryData = [], isLoading: inventoryLoading, isFetching } = useQuery<InventoryItem[]>({
@@ -908,6 +899,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-group-archives"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/locations/${selectedLocationLocal.id}/inventory`] });
 
       toast({
         title: "Stock Group Archived",
