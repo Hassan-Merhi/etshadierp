@@ -22926,7 +22926,7 @@ if (asOfDate) {
       const expensesBreakdown: { name: string; value: number }[] = [];
       const incomeBreakdown: { name: string; value: number }[] = [];
 
-      // Add Stock on Floor (current inventory value) - always positive asset
+      // Stock In Hand — historical as of toDate (or current if no date set)
       const activeLocationsData = await db
         .select({ id: locations.id })
         .from(locations)
@@ -22936,13 +22936,26 @@ if (asOfDate) {
 
       let stockOnFloor = 0;
       if (activeLocationIds.length > 0) {
-        const inventoryData = await db
-          .select({ quantity: inventory.quantity, averageRate: inventory.averageRate })
-          .from(inventory)
-          .where(inArray(inventory.locationId, activeLocationIds))
-          .execute();
-        for (const inv of inventoryData) {
-          stockOnFloor += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
+        if (toDate) {
+          // Historical: reverse-reconcile inventory back to toDate for each active location
+          for (const locId of activeLocationIds) {
+            const historicalItems = await calculateHistoricalLocationInventory(locId, companyId, toDate);
+            for (const inv of historicalItems) {
+              const qty = parseFloat(inv.quantity || "0");
+              const rate = parseFloat(inv.averageRate || "0");
+              if (qty > 0) stockOnFloor += qty * rate;
+            }
+          }
+        } else {
+          // Current: read live inventory table
+          const inventoryData = await db
+            .select({ quantity: inventory.quantity, averageRate: inventory.averageRate })
+            .from(inventory)
+            .where(inArray(inventory.locationId, activeLocationIds))
+            .execute();
+          for (const inv of inventoryData) {
+            stockOnFloor += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
+          }
         }
       }
       if (stockOnFloor > 0) {
@@ -22950,10 +22963,6 @@ if (asOfDate) {
         categoryTotals["asset_Stock In Hand"] = stockOnFloor;
         forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: stockOnFloor, category: "Inventory" });
       }
-
-      // NOTE: Stock OTW (containers pending offload) is intentionally EXCLUDED
-      // Containers in transit are not yet assets - they become assets only when offloaded
-      // At that point, they increase inventory (asset) and create supplier/agent liabilities
 
       // Add Workers/Payroll - employee balances (what we owe them)
       const companyEmployees = await db
@@ -23022,20 +23031,23 @@ if (asOfDate) {
         }
       }
 
-      // Add OTW (On The Way) inventory value as an asset
-      // Containers with OTW status represent goods we own that are in transit
-      const otwContainers = await db
-        .select()
-        .from(containers)
-        .where(and(eq(containers.companyId, companyId), eq(containers.status, "OTW")))
-        .execute();
-      
+      // Stock OTW — historical as of toDate (containers that were in transit on that date)
+      // A container was OTW on toDate if: importDate ≤ toDate AND (offloadDate IS NULL OR offloadDate > toDate)
+      const otwContainersQuery = toDate
+        ? and(
+            eq(containers.companyId, companyId),
+            lte(containers.importDate, toDate),
+            or(isNull(containers.offloadDate), sql`${containers.offloadDate} > ${toDate}`)
+          )
+        : and(eq(containers.companyId, companyId), eq(containers.status, "OTW"));
+      const otwContainers = await db.select().from(containers).where(otwContainersQuery).execute();
+
       let stockOtwValue = 0;
       for (const container of otwContainers) {
         const containerValue = parseFloat(container.grandTotal || container.itemsTotal || "0");
         stockOtwValue += containerValue;
       }
-      
+
       if (stockOtwValue > 0) {
         forUsTotal += stockOtwValue;
         categoryTotals["asset_Stock OTW"] = stockOtwValue;
@@ -23177,14 +23189,14 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const fromDate = req.query.fromDate ? String(req.query.fromDate) : null;
-      const toDate   = req.query.toDate   ? String(req.query.toDate)   : null;
+      // Cumulative "as of" date — same approach as /api/stats/net-profit
+      const toDate = req.query.toDate ? String(req.query.toDate) : null;
 
       const allCompanies = await storage.getAllCompanies();
       const company = allCompanies.find((c: any) => c.id === companyId);
       const companyName = company?.name || "Company";
 
-      // ── 1. Accounts & voucher entries (same logic as /api/stats/net-profit) ──
+      // ── 1. Accounts & voucher entries (cumulative up to toDate) ──────────
       const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
 
       const voucherConds: any[] = [
@@ -23192,8 +23204,7 @@ if (asOfDate) {
         eq(vouchers.optional, false),
         isNull(vouchers.deletedAt),
       ];
-      if (fromDate) voucherConds.push(gte(vouchers.voucherDate, fromDate));
-      if (toDate)   voucherConds.push(lte(vouchers.voucherDate, toDate));
+      if (toDate) voucherConds.push(lte(vouchers.voucherDate, toDate));
 
       const companyVouchers = await db.select({ id: vouchers.id }).from(vouchers).where(and(...voucherConds)).execute();
       const voucherIds = companyVouchers.map((v: any) => v.id);
@@ -23228,15 +23239,26 @@ if (asOfDate) {
       const forUsAccounts: any[] = [...classified.forUsAccounts];
       const onUsAccounts: any[]  = [...classified.onUsAccounts];
 
-      // ── 3. Stock on floor ─────────────────────────────────────────────────
+      // ── 3. Stock In Hand — historical as of toDate ────────────────────────
       const activeLocsData = await db.select({ id: locations.id }).from(locations)
         .where(and(eq(locations.companyId, companyId), eq(locations.active, true), isNull(locations.deletedAt))).execute();
       const activeLocIds = activeLocsData.map((l: any) => l.id);
       let stockOnFloor = 0;
       if (activeLocIds.length > 0) {
-        const invData = await db.select({ quantity: inventory.quantity, averageRate: inventory.averageRate })
-          .from(inventory).where(inArray(inventory.locationId, activeLocIds)).execute();
-        for (const inv of invData as any[]) stockOnFloor += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
+        if (toDate) {
+          for (const locId of activeLocIds) {
+            const historicalItems = await calculateHistoricalLocationInventory(locId, companyId, toDate);
+            for (const inv of historicalItems as any[]) {
+              const qty = parseFloat(inv.quantity || "0");
+              const rate = parseFloat(inv.averageRate || "0");
+              if (qty > 0) stockOnFloor += qty * rate;
+            }
+          }
+        } else {
+          const invData = await db.select({ quantity: inventory.quantity, averageRate: inventory.averageRate })
+            .from(inventory).where(inArray(inventory.locationId, activeLocIds)).execute();
+          for (const inv of invData as any[]) stockOnFloor += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
+        }
       }
       if (stockOnFloor > 0) {
         forUsTotal += stockOnFloor;
@@ -23295,12 +23317,15 @@ if (asOfDate) {
         if (supplierAssets > 0) forUsTotal += supplierAssets;
       }
 
-      // ── 6. OTW (On The Way) containers ───────────────────────────────────
-      const otwContainers = await db
-        .select()
-        .from(containers)
-        .where(and(eq(containers.companyId, companyId), eq(containers.status, "OTW")))
-        .execute();
+      // ── 6. OTW containers — historical as of toDate ───────────────────────
+      const excelOtwQuery = toDate
+        ? and(
+            eq(containers.companyId, companyId),
+            lte(containers.importDate, toDate),
+            or(isNull(containers.offloadDate), sql`${containers.offloadDate} > ${toDate}`)
+          )
+        : and(eq(containers.companyId, companyId), eq(containers.status, "OTW"));
+      const otwContainers = await db.select().from(containers).where(excelOtwQuery).execute();
       let stockOtwValue = 0;
       for (const container of otwContainers as any[]) {
         stockOtwValue += parseFloat(container.grandTotal || container.itemsTotal || "0");
