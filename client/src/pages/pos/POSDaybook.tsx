@@ -321,6 +321,10 @@ export default function POSDaybook() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${selectedVoucher?.id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      if (selectedVoucher?.locationId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/locations/${selectedVoucher.locationId}/inventory`] });
+      }
       setIsEditMode(false);
     },
     onError: (error: Error) => {

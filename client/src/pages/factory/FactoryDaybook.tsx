@@ -815,7 +815,7 @@ export default function FactoryDaybook() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts/"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       setEditEntry(null);
@@ -835,7 +835,7 @@ export default function FactoryDaybook() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts/"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });

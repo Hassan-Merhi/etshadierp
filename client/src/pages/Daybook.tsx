@@ -1118,15 +1118,14 @@ export default function Daybook({ user }: { user?: any } = {}) {
         refetchType: "all",
       });
       queryClient.invalidateQueries({
-        queryKey: ["/api/employees", selectedCompany?.id],
-        refetchType: "all",
-      });
-      queryClient.invalidateQueries({
         queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id],
         refetchType: "all",
       });
       queryClient.invalidateQueries({
         queryKey: ["/api/suppliers", selectedCompany?.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/bank-accounts", selectedCompany?.id],
       });
       if (cashAccountId) {
         queryClient.invalidateQueries({
@@ -1171,10 +1170,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
         refetchType: "all",
       });
       queryClient.invalidateQueries({
-        queryKey: ["/api/employees", selectedCompany?.id],
-        refetchType: "all",
-      });
-      queryClient.invalidateQueries({
         queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id],
         refetchType: "all",
       });
@@ -1186,6 +1181,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
       });
       queryClient.invalidateQueries({
         queryKey: ["/api/suppliers", selectedCompany?.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/bank-accounts", selectedCompany?.id],
       });
       if (cashAccountId) {
         queryClient.invalidateQueries({
