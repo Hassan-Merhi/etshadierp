@@ -2263,7 +2263,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   // Stock Transfer mutation (handles both create and update)
   const stockTransferMutation = useMutation({
     mutationFn: async (input: StockTransferMutationInput) => {
-      console.log("[StockTransfer] MUTATION STEP A: mutationFn started with input:", input);
       try {
         // Extract all data from input (not from closures)
         const { 
@@ -2276,7 +2275,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           ...data 
         } = input;
         
-        console.log("[StockTransfer] MUTATION STEP B: Extracted data, isEditMode:", !!_voucherIdToEdit);
         
         const isEditMode = !!_voucherIdToEdit;
         
@@ -2291,7 +2289,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           throw new Error("No company selected");
         }
         
-        console.log("[StockTransfer] MUTATION STEP C: Validation passed, preparing entries");
         
         // Get unique source locations for description
         const validEntries = data.entries.filter(e => e.sourceLocationId > 0 && e.stockItemId > 0);
@@ -2348,26 +2345,16 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             currency: selectedCurrency,
             exchangeRate: exchangeRate ? exchangeRate.toString() : undefined,
           };
-          console.log("[StockTransfer] MUTATION STEP D: Creating voucher with:", voucherPayload);
-          console.log("[StockTransfer] MUTATION STEP D2: Payload JSON test:", JSON.stringify(voucherPayload));
           
           let voucherRes;
           try {
-            console.log("[StockTransfer] MUTATION STEP D3: About to call apiRequest");
             voucherRes = await modeApiRequest("POST", "/api/vouchers", voucherPayload);
-            console.log("[StockTransfer] MUTATION STEP D4: apiRequest completed, response:", voucherRes);
           } catch (apiError: any) {
-            console.error("[StockTransfer] MUTATION STEP D-ERROR: apiRequest failed:", apiError);
-            console.error("[StockTransfer] Error message:", apiError?.message);
-            console.error("[StockTransfer] Error stack:", apiError?.stack);
             throw apiError;
           }
-          console.log("[StockTransfer] MUTATION STEP E: Voucher created, parsing response");
           const voucher = await voucherRes.json();
-          console.log("[StockTransfer] MUTATION STEP F: Voucher:", voucher);
 
           // Create stock transfer with items (including per-item source locations)
-          console.log("[StockTransfer] MUTATION STEP G: Creating stock transfer");
           await modeApiRequest("POST", "/api/stock-transfers", {
             voucherId: voucher.id,
             destinationLocationId: data.destinationLocationId,
@@ -2384,7 +2371,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           return voucher;
         }
       } catch (error: any) {
-        console.error("[StockTransfer] Mutation error:", error);
         throw error;
       }
     },
@@ -2435,11 +2421,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   });
 
   const onStockTransferSubmit = async (data: StockTransferFormData) => {
-    console.log("[StockTransfer] STEP 1: onStockTransferSubmit called with data:", data);
     
     // Validate destination location
     if (!data.destinationLocationId || data.destinationLocationId <= 0) {
-      console.log("[StockTransfer] VALIDATION FAILED: No destination location");
       toast({
         title: "Validation Error",
         description: "Please select a destination location",
@@ -2454,7 +2438,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     );
 
     if (validEntries.length === 0) {
-      console.log("[StockTransfer] VALIDATION FAILED: No valid entries");
       toast({
         title: "Validation Error",
         description: "Please add at least one valid entry with source location, item, and quantity",
@@ -2463,12 +2446,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       return;
     }
     
-    console.log("[StockTransfer] STEP 2: Valid entries found:", validEntries.length);
 
     // Auto-fill missing rates from inventory before proceeding
     const entriesWithMissingRates = validEntries.filter(entry => !entry.rate || entry.rate === "" || entry.rate === "0");
     if (entriesWithMissingRates.length > 0) {
-      console.log("[StockTransfer] Fetching rates for entries with missing rates:", entriesWithMissingRates.length);
       
       // Fetch rates from inventory for each entry with missing rate
       const ratePromises = entriesWithMissingRates.map(async (entry) => {
@@ -2484,7 +2465,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             };
           }
         } catch (err) {
-          console.error("[StockTransfer] Failed to fetch rate for item:", entry.stockItemId, err);
         }
         return {
           stockItemId: entry.stockItemId,
@@ -2507,17 +2487,14 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         }
       }
       
-      console.log("[StockTransfer] Rates after auto-fill:", validEntries.map(e => ({ stockItemId: e.stockItemId, rate: e.rate })));
     }
 
-    console.log("[StockTransfer] STEP 3: Checking for zero qty entries");
     // Check for zero quantity entries
     const zeroQtyEntry = data.entries.find(
       (entry) => entry.stockItemId > 0 && entry.sourceLocationId > 0 && parseFloat(entry.quantity) === 0
     );
     if (zeroQtyEntry) {
       const item = stockItems.find(s => s.id === zeroQtyEntry.stockItemId);
-      console.log("[StockTransfer] VALIDATION FAILED: Zero quantity entry");
       toast({
         title: "Validation Error",
         description: `Cannot add ${item?.name} with zero quantity`,
@@ -2529,7 +2506,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     // Validate quantities against available inventory
     // When editing, we need to add back the original transfer quantities to available stock
     const isEditMode = !!voucherIdToEdit;
-    console.log("[StockTransfer] STEP 4: isEditMode =", isEditMode, "voucherIdToEdit =", voucherIdToEdit);
 
     // IMPORTANT: in edit mode, make sure we actually have the original stock transfer loaded.
     // If it's not in cache yet (common when you only change destination and submit quickly),
@@ -2650,15 +2626,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         }));
     });
 
-    console.log("[StockTransfer] STEP 5: Starting inventory validation promises");
     const results = await Promise.all(inventoryValidationPromises);
-    console.log("[StockTransfer] STEP 6: Inventory validation results:", results);
     const failedValidation = results.find(r => !r.success && !(r as any).warning);
     const warningValidation = results.find(r => !r.success && (r as any).warning);
     
     // Hard failures (not warnings) - block the transfer
     if (failedValidation) {
-      console.log("[StockTransfer] VALIDATION FAILED: Hard failure", failedValidation);
       toast({
         title: "Validation Error",
         description: failedValidation.error,
@@ -2670,22 +2643,18 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     // Warnings - ask user to confirm
     let userConfirmedNegativeInventory = false;
     if (warningValidation) {
-      console.log("[StockTransfer] STEP 7: Warning validation, showing confirm dialog");
       const confirmProceed = window.confirm(
         `Warning: ${warningValidation.error}\n\nThis will result in negative inventory. Do you want to proceed anyway?`
       );
       if (!confirmProceed) {
-        console.log("[StockTransfer] User declined negative inventory");
         return;
       }
       userConfirmedNegativeInventory = true;
     }
 
-    console.log("[StockTransfer] STEP 8: Checking source !== destination");
     // Validate that each row's sourceLocationId !== destinationLocationId
     const invalidEntry = validEntries.find(entry => entry.sourceLocationId === data.destinationLocationId);
     if (invalidEntry) {
-      console.log("[StockTransfer] VALIDATION FAILED: Source === Destination");
       toast({
         title: "Validation Error",
         description: "Source and destination locations must be different for each item",
@@ -2694,7 +2663,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       return;
     }
 
-    console.log("[StockTransfer] STEP 9: Calling mutation.mutate()");
     // Pass all required data explicitly to avoid stale closure issues
     // Use validEntries which has auto-filled rates
     stockTransferMutation.mutate({ 

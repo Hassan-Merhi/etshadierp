@@ -307,8 +307,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   // Populate form when editing existing voucher
   useEffect(() => {
     if (editVoucher && Array.isArray(editVoucher.salesItems) && editVoucher.salesItems.length > 0) {
-      console.log('[POS Edit] Loading voucher for edit:', editVoucher);
-      console.log('[POS Edit] Sales items:', editVoucher.salesItems);
       
       // Populate rows with sales items, preserving salesItemId for edit mode
       const newRows: SaleRow[] = editVoucher.salesItems.map((item: any, index: number) => ({
@@ -335,7 +333,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       });
       
       setRows(newRows);
-      console.log('[POS Edit] Set rows to:', newRows);
 
       // Populate notes
       if (editVoucher.description) {
@@ -351,7 +348,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
       // Populate payment account and credit sale info from voucher entries
       if (editVoucher.entries && editVoucher.entries.length > 0) {
-        console.log('[POS Edit] Voucher entries:', editVoucher.entries);
         
         // Find the debit entry (the payment account)
         const debitEntry = editVoucher.entries.find((entry: any) => 
@@ -359,14 +355,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         );
         
         if (debitEntry) {
-          console.log('[POS Edit] Debit entry found:', debitEntry);
           
           // Bank account - has bankAccountId
           if (debitEntry.bankAccountId) {
             setPaymentAccountType("bank");
             setPaymentAccountId(String(debitEntry.bankAccountId));
             setIsCreditSale(false);
-            console.log('[POS Edit] Set bank account:', debitEntry.bankAccountId);
           } 
           // Ledger account - need to determine if cash or credit
           else if (debitEntry.ledgerAccountId) {
@@ -379,14 +373,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 setPaymentAccountType("cash");
                 setPaymentAccountId(String(debitEntry.ledgerAccountId));
                 setIsCreditSale(false);
-                console.log('[POS Edit] Set cash account:', debitEntry.ledgerAccountId);
               } 
               // Customer/Receivable account (Asset type for customers, or could be other types)
               else {
                 setPaymentAccountType("credit");
                 setPaymentAccountId(String(debitEntry.ledgerAccountId));
                 setIsCreditSale(true);
-                console.log('[POS Edit] Set credit sale with customer account:', debitEntry.ledgerAccountId, 'accountType:', ledgerAccount.accountType);
               }
             } else {
               // Fallback: use narration to detect if it's credit sale
@@ -399,7 +391,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 setIsCreditSale(false);
               }
               setPaymentAccountId(String(debitEntry.ledgerAccountId));
-              console.log('[POS Edit] Ledger account not found in list, using narration fallback');
             }
           }
         }

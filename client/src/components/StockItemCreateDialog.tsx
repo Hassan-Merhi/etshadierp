@@ -123,7 +123,6 @@ export function StockItemCreateDialog({
   };
 
   const onInvalid = (errors: any) => {
-    console.log("Form validation errors:", errors);
     const errorMessages = Object.values(errors)
       .map((err: any) => err.message)
       .filter(Boolean);
