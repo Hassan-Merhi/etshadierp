@@ -883,8 +883,12 @@ export default function Analytics() {
         </TableRow>
       );
     return nonZero.map(acc => (
-      <TableRow key={acc.id}>
-        <TableCell className="text-sm font-medium">{acc.name}</TableCell>
+      <TableRow
+        key={acc.id}
+        className="hover-elevate cursor-pointer"
+        onClick={() => goToStatement(acc.id, undefined, "ledger")}
+      >
+        <TableCell className="text-sm font-medium hover:underline">{acc.name}</TableCell>
         <TableCell className="text-right font-mono text-sm text-green-600 dark:text-green-400">
           {formatSmartCurrency(Number(acc.balance))}
         </TableCell>
