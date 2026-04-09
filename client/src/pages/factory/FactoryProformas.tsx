@@ -107,7 +107,11 @@ export default function FactoryProformas() {
         title: "Pending Loading Created",
         description: `Loading #${data.order.id} created — ${balesAdded} bale${balesAdded !== 1 ? "s" : ""} added from stock`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", "LOADING"] });
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          (query.queryKey[0] as string).startsWith("/api/factory/customer-orders"),
+      });
       setCreateLoadingProforma(null);
       setCreateLoadingLocationId("");
       navigate("/factory/sales/loadings");
