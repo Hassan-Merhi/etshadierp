@@ -3,14 +3,14 @@ import { Factory, Package, Boxes, Layers, Tags, Search, Container, History, BarC
 import { Skeleton } from "@/components/ui/skeleton";
 
 const ProductionRawStock = lazy(() => import("./ProductionRawStock"));
-const MixBatches = lazy(() => import("./MixBatches"));
-const ProductionBales = lazy(() => import("./ProductionBales"));
-const BaleProducts = lazy(() => import("./BaleProducts"));
-const BarcodeLookup = lazy(() => import("./BarcodeLookup"));
+const MixBatches = lazy(() => import("../MixBatches"));
+const ProductionBales = lazy(() => import("../ProductionBales"));
+const BaleProducts = lazy(() => import("../BaleProducts"));
+const BarcodeLookup = lazy(() => import("../BarcodeLookup"));
 const BalesHistory = lazy(() => import("./BalesHistory"));
 const ProductionSummary = lazy(() => import("./ProductionSummary"));
-const BaleTransfers = lazy(() => import("./BaleTransfers"));
-const PressingBales = lazy(() => import("./PressingBales"));
+const BaleTransfers = lazy(() => import("../BaleTransfers"));
+const PressingBales = lazy(() => import("../PressingBales"));
 const FactorySuppliers = lazy(() => import("./FactorySuppliers"));
 const FactoryContainers = lazy(() => import("./FactoryContainers"));
 const FactoryImport = lazy(() => import("./FactoryImport"));
