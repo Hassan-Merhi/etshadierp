@@ -14687,8 +14687,11 @@ if (asOfDate) {
             credits: 0,
           };
           const openingBalance = parseFloat(employee.openingBalance || "0");
-          const netBalance = openingBalance + movements.debits - movements.credits;
-          const balanceSide = netBalance >= 0 ? "Dr" : "Cr";
+          // Employee accounts are liability (Cr-normal): credits increase balance, debits decrease it.
+          // Positive netBalance = Cr (we owe them, the normal state).
+          // This matches the payroll page's currentBalance convention.
+          const netBalance = openingBalance + movements.credits - movements.debits;
+          const balanceSide = netBalance >= 0 ? "Cr" : "Dr";
 
           return {
             id: `employee-${employee.id}`,
@@ -15005,8 +15008,11 @@ if (asOfDate) {
             credits: 0,
           };
           const openingBalance = parseFloat(employee.openingBalance || "0");
-          const netBalance = openingBalance + movements.debits - movements.credits;
-          const balanceSide = netBalance >= 0 ? "Dr" : "Cr";
+          // Employee accounts are liability (Cr-normal): credits increase balance, debits decrease it.
+          // Positive netBalance = Cr (we owe them, the normal state).
+          // This matches the payroll page's currentBalance convention.
+          const netBalance = openingBalance + movements.credits - movements.debits;
+          const balanceSide = netBalance >= 0 ? "Cr" : "Dr";
 
           return {
             id: `employee-${employee.id}`,
