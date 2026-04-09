@@ -1,6 +1,6 @@
 import type { Express } from "express";
-import { db } from "./db";
-import { requireAuth } from "./auth";
+import { db } from "../db";
+import { requireAuth } from "../auth";
 import { eq, and, desc, sql, ilike, gte, lte, inArray, isNotNull } from "drizzle-orm";
 import multer from "multer";
 import path from "path";

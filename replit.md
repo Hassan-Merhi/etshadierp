@@ -147,6 +147,22 @@ The app has a layered offline-first foundation:
 - Safe patterns (POST/PATCH vouchers, POS sales) — unchanged
 - Used by `OfflineBanner` sheet UI and `syncEngine.processLegacyItem()`
 
+## File Structure (Apr 2026 Refactor)
+
+### Frontend Pages (`client/src/pages/`)
+- **`pages/factory/`** — All 70 factory-specific pages: all `Factory*` components plus `ProductionRawStock`, `BaleStockEntry`, `BalesHistory`, `ProductionSummary`, `WipersReEntry`, `WasteDispatch`, `ProformaAddLine`
+- **`pages/pos/`** — 7 POS-specific pages: `POS`, `POSDashboard`, `POSDaybook`, `POSCustomers`, `POSImport`, `POSPriceList`, `POSSettings`
+- **`pages/properties/`** — 11 Properties-mode pages: all `Properties*` components
+- **`pages/`** (root) — Shared ERP pages used by both ERP and factory modes (e.g. `VoucherEdit`, `Analytics`, `Settings`, `Daybook`, `Accounts`), plus `Login` and `not-found`
+
+### Backend Routes (`server/routes/`)
+- **`routes/factory/`** — 15 factory sub-domain route files (stock, bales, suppliers, containers, customers, etc.)
+- **`routes/factoryRoutes.ts`** — Factory route registry (imports from `./factory/`)
+- **`routes/factoryWorkerRoutes.ts`, `factoryWorkerPayrollRoutes.ts`** — Worker/payroll routes
+- **`routes/factoryAttendanceRoutes.ts`, `factoryPayrollRoutes.ts`, `factoryReportRoutes.ts`, `factoryIntelligenceRoutes.ts`** — Other factory-domain routes
+- **`routes/supplierProformaRoutes.ts`** — ERP supplier proforma verification
+- All other `routes/*.ts` files — ERP domain routes (auth, accounts, vouchers, pos, stock, etc.)
+
 ## External Dependencies
 
 -   **AI/ML**: Google Gemini API

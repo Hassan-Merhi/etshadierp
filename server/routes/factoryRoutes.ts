@@ -1,14 +1,14 @@
 import type { Express } from "express";
 import { eq, and } from "drizzle-orm";
 import { companies } from "@shared/schema";
-import { registerFactoryStockRoutes } from "./factoryRoutes/factoryStockRoutes";
-import { registerFactorySuppliersRoutes } from "./factoryRoutes/factorySuppliersRoutes";
-import { registerFactoryProductsRoutes } from "./factoryRoutes/factoryProductsRoutes";
-import { registerFactoryContainersRoutes } from "./factoryRoutes/factoryContainersRoutes";
-import { registerFactoryBalesRoutes } from "./factoryRoutes/factoryBalesRoutes";
-import { registerFactoryCustomersRoutes } from "./factoryRoutes/factoryCustomersRoutes";
-import { registerFactoryDocsUsersRoutes } from "./factoryRoutes/factoryDocsUsersRoutes";
-import { registerFactoryEmployeesPosRoutes } from "./factoryRoutes/factoryEmployeesPosRoutes";
+import { registerFactoryStockRoutes } from "./factory/factoryStockRoutes";
+import { registerFactorySuppliersRoutes } from "./factory/factorySuppliersRoutes";
+import { registerFactoryProductsRoutes } from "./factory/factoryProductsRoutes";
+import { registerFactoryContainersRoutes } from "./factory/factoryContainersRoutes";
+import { registerFactoryBalesRoutes } from "./factory/factoryBalesRoutes";
+import { registerFactoryCustomersRoutes } from "./factory/factoryCustomersRoutes";
+import { registerFactoryDocsUsersRoutes } from "./factory/factoryDocsUsersRoutes";
+import { registerFactoryEmployeesPosRoutes } from "./factory/factoryEmployeesPosRoutes";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 

@@ -1,5 +1,5 @@
 import { Express } from "express";
-import { db } from "./db";
+import { db } from "../db";
 import { eq, and, inArray } from "drizzle-orm";
 import ExcelJS from "exceljs";
 import {

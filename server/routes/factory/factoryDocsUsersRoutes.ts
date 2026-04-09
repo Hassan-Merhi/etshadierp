@@ -1,8 +1,8 @@
 import type { Express } from "express";
-import { db } from "../db";
-import { requireAuth } from "../auth";
-import { classifyNetPositionAccounts } from "../netPositionHelper";
-import { adjustInventory } from "../inventoryHelper";
+import { db } from "../../db";
+import { requireAuth } from "../../auth";
+import { classifyNetPositionAccounts } from "../../netPositionHelper";
+import { adjustInventory } from "../../inventoryHelper";
 import {
   writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
   isLegacySHA256Hash, verifySupervisorPassword,
