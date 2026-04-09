@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Download,
   ChevronDown,
@@ -18,7 +20,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-type Period = "today" | "this_week" | "this_month" | "this_year" | "all_time" | "specific_month";
+type Period = "today" | "this_week" | "this_month" | "this_year" | "all_time" | "specific_month" | "custom_range";
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: "today", label: "Today" },
@@ -27,6 +29,7 @@ const PERIODS: { value: Period; label: string }[] = [
   { value: "this_year", label: "This Year" },
   { value: "all_time", label: "All Time" },
   { value: "specific_month", label: "Monthly" },
+  { value: "custom_range", label: "Custom Range" },
 ];
 
 const MONTH_NAMES = [
@@ -37,7 +40,9 @@ const MONTH_NAMES = [
 function getDateRange(
   period: Period,
   specificMonth?: number,
-  specificYear?: number
+  specificYear?: number,
+  customFromDate?: string,
+  customToDate?: string
 ): { startDate: string | null; endDate: string | null } {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -67,6 +72,13 @@ function getDateRange(
     const start = `${specificYear}-${pad(specificMonth)}-01`;
     const end = `${specificYear}-${pad(specificMonth)}-${pad(lastDay)}`;
     return { startDate: start, endDate: end };
+  }
+
+  if (period === "custom_range") {
+    return {
+      startDate: customFromDate || null,
+      endDate: customToDate || null,
+    };
   }
 
   return { startDate: null, endDate: null };
@@ -193,18 +205,26 @@ export default function NetProfitReport() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("current");
   const [specificMonth, setSpecificMonth] = useState<number>(now.getMonth() + 1);
   const [specificYear, setSpecificYear] = useState<number>(now.getFullYear());
+  const [customFromDate, setCustomFromDate] = useState<string>("");
+  const [customToDate, setCustomToDate] = useState<string>("");
 
   const { startDate, endDate } = useMemo(
-    () => getDateRange(period, specificMonth, specificYear),
-    [period, specificMonth, specificYear]
+    () => getDateRange(period, specificMonth, specificYear, customFromDate, customToDate),
+    [period, specificMonth, specificYear, customFromDate, customToDate]
   );
 
   const periodLabel = useMemo(() => {
     if (period === "specific_month") {
       return `${MONTH_NAMES[specificMonth - 1]} ${specificYear}`;
     }
+    if (period === "custom_range") {
+      if (customFromDate && customToDate) return `${customFromDate} — ${customToDate}`;
+      if (customFromDate) return `From ${customFromDate}`;
+      if (customToDate) return `Until ${customToDate}`;
+      return "Custom Range";
+    }
     return PERIODS.find((p) => p.value === period)?.label || "This Month";
-  }, [period, specificMonth, specificYear]);
+  }, [period, specificMonth, specificYear, customFromDate, customToDate]);
 
   const { data: companies = [] } = useQuery<any[]>({
     queryKey: ["/api/companies"],
@@ -326,6 +346,30 @@ export default function NetProfitReport() {
                   ))}
                 </SelectContent>
               </Select>
+            </>
+          )}
+          {period === "custom_range" && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <Label className="text-sm text-muted-foreground whitespace-nowrap">From:</Label>
+                <Input
+                  type="date"
+                  value={customFromDate}
+                  onChange={(e) => setCustomFromDate(e.target.value)}
+                  className="w-36 text-sm"
+                  data-testid="input-custom-from-date"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Label className="text-sm text-muted-foreground whitespace-nowrap">To:</Label>
+                <Input
+                  type="date"
+                  value={customToDate}
+                  onChange={(e) => setCustomToDate(e.target.value)}
+                  className="w-36 text-sm"
+                  data-testid="input-custom-to-date"
+                />
+              </div>
             </>
           )}
           <Button onClick={handleExport} data-testid="button-export-excel" disabled={isLoading}>
