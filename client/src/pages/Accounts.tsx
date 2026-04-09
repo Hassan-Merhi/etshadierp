@@ -238,6 +238,18 @@ export default function Accounts() {
 
   // Print functionality
   const printRef = useRef<HTMLDivElement>(null);
+  const accountListRef = useRef<HTMLDivElement>(null);
+  const editAccountListRef = useRef<HTMLDivElement>(null);
+
+  const handleListArrowScroll = (
+    e: React.KeyboardEvent,
+    ref: React.RefObject<HTMLDivElement>,
+  ) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      ref.current?.scrollBy({ top: e.key === "ArrowDown" ? 48 : -48, behavior: "smooth" });
+    }
+  };
 
   // label that shows the chosen period on the printout
   const periodLabel = useMemo(() => {
@@ -1665,7 +1677,11 @@ export default function Accounts() {
                         <Skeleton className="h-8 w-full" />
                       </div>
                     ) : (
-                      <div className="max-h-64 overflow-y-auto border rounded-md">
+                      <div
+                        ref={accountListRef}
+                        className="max-h-64 overflow-y-auto border rounded-md"
+                        onKeyDown={(e) => handleListArrowScroll(e, accountListRef)}
+                      >
                         {filteredAccounts.length === 0 ? (
                           <div className="p-4 text-center text-sm text-muted-foreground">
                             No accounts found
@@ -2620,7 +2636,11 @@ export default function Accounts() {
                     <Skeleton className="h-8 w-full" />
                   </div>
                 ) : (
-                  <div className="max-h-64 overflow-y-auto border rounded-md">
+                  <div
+                    ref={editAccountListRef}
+                    className="max-h-64 overflow-y-auto border rounded-md"
+                    onKeyDown={(e) => handleListArrowScroll(e, editAccountListRef)}
+                  >
                     {filteredAccountsForEdit.length === 0 ? (
                       <div className="p-4 text-center text-sm text-muted-foreground">
                         No accounts found
