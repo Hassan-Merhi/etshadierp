@@ -173,7 +173,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   // Fetch drafts for current user and location
   const { data: drafts = [], refetch: refetchDrafts } = useQuery<any[]>({
-    queryKey: activeLocation ? [`/api/pos/drafts`, { locationId: activeLocation.id }] : [],
+    queryKey: activeLocation ? [`/api/pos/drafts?locationId=${activeLocation.id}`] : [],
     enabled: !!activeLocation,
   });
 

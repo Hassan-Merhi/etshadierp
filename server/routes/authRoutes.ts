@@ -723,14 +723,17 @@ export function registerAuthRoutes(app: Express) {
             id: locations.id,
             name: locations.name,
             code: locations.code,
-            active: locations.active,
+            city: locations.city,
+            state: locations.state,
+            country: locations.country,
           })
           .from(userLocations)
           .innerJoin(locations, eq(userLocations.locationId, locations.id))
           .where(
             and(
               eq(userLocations.userId, req.user.id),
-              eq(userLocations.companyId, companyId)
+              eq(userLocations.companyId, companyId),
+              eq(locations.active, true)
             )
           );
         res.json(userLocs);

@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
-import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
+import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation, canModifyDate } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory } from "./_helpers";
 import {
   inventory, stockItems, stockGroups, stockGroupArchives,
@@ -27,6 +27,7 @@ import {
   insertDashboardAccountSelectionSchema,
   creditNoteItems, pendingBarcodes, insertPendingBarcodeSchema,
   bales, baleProducts, baleProductCategories, storedFiles,
+  stockItemLocationPrices, insertCustomerSchema,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -39,7 +40,7 @@ import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositio
 
 
 export function registerPosRoutes(app: Express) {
-  app.post("/api/pos/sales", requireAuth, async (req, res) => {
+  app.post("/api/pos/sales", requireAuth, canModifyDate("voucherDate"), async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
@@ -289,6 +290,9 @@ export function registerPosRoutes(app: Express) {
       if (!location) {
         return res.status(404).json({ message: "Location not found" });
       }
+      if (location.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Location does not belong to the current company" });
+      }
 
       // STEP 1: Validate inventory availability
       const voucherNumber = `SALES-${Date.now()}`;
@@ -513,7 +517,7 @@ export function registerPosRoutes(app: Express) {
   });
 
   // Update existing sales voucher
-  app.put("/api/vouchers/:id/sales", requireAuth, async (req, res) => {
+  app.put("/api/vouchers/:id/sales", requireAuth, canModifyDate("voucherDate"), async (req, res) => {
     try {
       const voucherId = parseInt(req.params.id);
       if (isNaN(voucherId)) {
