@@ -47,7 +47,7 @@ export default function FactorySupplierScoreboard() {
   const query = useQuery<SupplierScore[]>({
     queryKey: ["/api/factory/suppliers/score", from, to],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/suppliers/score?from=${from}&to=${to}`);
+      const res = await fetch(`/api/factory/suppliers/score?from=${from}&to=${to}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load supplier scores");
       return res.json();
     },

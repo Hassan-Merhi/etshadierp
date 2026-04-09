@@ -22,6 +22,7 @@ import {
   FEATURE_KEYS, fiscalPeriodClosures,
   wasteDispatches, wasteDispatchItems, insertWasteDispatchSchema,
   bales, baleProducts, baleProductCategories, baleTransfers,
+  factoryBales, baleLabelPrints,
   insertBaleSchema, insertBaleTransferSchema,
   orphanedRecords, orphanedCharges,
   dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
