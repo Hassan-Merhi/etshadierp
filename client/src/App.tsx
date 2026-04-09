@@ -79,6 +79,7 @@ const BaleProducts = lazy(() => import("@/pages/BaleProducts"));
 const OrphanedRecords = lazy(() => import("@/pages/OrphanedRecords"));
 const DeletedItems = lazy(() => import("@/pages/DeletedItems"));
 const ChatbotSettings = lazy(() => import("@/pages/ChatbotSettings"));
+const AccountGroups = lazy(() => import("@/pages/AccountGroups"));
 const PurchaseOrderEdit = lazy(() => import("@/pages/PurchaseOrderEdit"));
 const OffloadDetail = lazy(() => import("@/pages/OffloadDetail"));
 const StockItemHistory = lazy(() => import("@/pages/StockItemHistory"));
@@ -298,6 +299,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/orphaned-records" component={OrphanedRecords} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/deleted-items" component={DeletedItems} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/chatbot-settings" component={ChatbotSettings} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/account-groups" component={AccountGroups} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/test-data-import" component={TestDataImport} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/import-cycle-diagnostics" component={ImportCycleDiagnostics} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/inventory-repair" component={InventoryRepair} />}

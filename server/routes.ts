@@ -3441,6 +3441,41 @@ if (asOfDate) {
     },
   );
 
+  // Bulk-assign parentId to multiple ledger accounts
+  app.patch(
+    "/api/ledger-accounts/bulk-assign-parent",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+        const { accountIds, parentId } = req.body;
+        if (!Array.isArray(accountIds) || accountIds.length === 0) {
+          return res.status(400).json({ message: "accountIds must be a non-empty array" });
+        }
+        const companyId = req.session.currentCompanyId;
+        const results = [];
+        for (const id of accountIds) {
+          const account = await storage.getLedgerAccountById(id);
+          if (!account || account.companyId !== companyId) continue;
+          if (parentId !== null && parentId !== undefined) {
+            const parent = await storage.getLedgerAccountById(parentId);
+            if (!parent || parent.companyId !== companyId) {
+              return res.status(400).json({ message: `Parent account ${parentId} not found` });
+            }
+          }
+          const updated = await storage.updateLedgerAccount({ id, parentId: parentId ?? null });
+          results.push(updated);
+        }
+        res.json(results);
+      } catch (error: any) {
+        res.status(400).json({ message: error.message });
+      }
+    },
+  );
+
   app.delete(
     "/api/ledger-accounts/:id",
     requireAuth,
