@@ -29,6 +29,47 @@ function getFactoryCompanyId(req: any): number | undefined {
   return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
 }
 
+/** Write a single daybook entry (factory audit log). */
+async function writeDaybookEntry(dbOrTx: any, opts: {
+  companyId: number; txDate: string; txType: string;
+  referenceId?: number; referenceTable?: string; description: string;
+  metaJson?: string; currencyCode?: string; amountCurrency?: number;
+  fxRateToUsd?: number; amountUsd?: number; createdBy?: number;
+}) {
+  const currency = opts.currencyCode || "USD";
+  const fxRate = opts.fxRateToUsd || 1;
+  const amtCurrency = opts.amountCurrency || 0;
+  const amtUsd = opts.amountUsd !== undefined ? opts.amountUsd : (currency === "USD" ? amtCurrency : amtCurrency * fxRate);
+  await dbOrTx.insert(factoryDaybookEntries).values({
+    companyId: opts.companyId, txDate: opts.txDate, txType: opts.txType,
+    referenceId: opts.referenceId || null, referenceTable: opts.referenceTable || null,
+    description: opts.description, metaJson: opts.metaJson || null,
+    currencyCode: currency, amountCurrency: String(amtCurrency),
+    fxRateToUsd: String(fxRate), amountUsd: String(amtUsd), createdBy: opts.createdBy || null,
+  });
+}
+
+/** Find or create a ledger account by name for a company. Returns the account row. */
+async function findOrCreateLedger(companyId: number, name: string, accountType: string): Promise<{ id: number }> {
+  const [existing] = await db
+    .select({ id: ledgerAccounts.id })
+    .from(ledgerAccounts)
+    .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name)));
+  if (existing) return existing;
+
+  const [maxCodeRow] = await db
+    .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+    .from(ledgerAccounts)
+    .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\d+$'`));
+  const nextCode = String((parseInt((maxCodeRow as any)?.maxCode || "0") || 0) + 1);
+
+  const [created] = await db
+    .insert(ledgerAccounts)
+    .values({ companyId, code: nextCode, name, accountType, active: true, isHidden: false })
+    .returning({ id: ledgerAccounts.id });
+  return created;
+}
+
 const workerUpload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
@@ -2241,7 +2282,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       }
 
       // Check for payroll entries
-      const payrollCheck = await db.execute(sql`SELECT COUNT(*) as cnt FROM worker_payrolls WHERE worker_id = ${id} AND company_id = ${companyId}`);
+      const payrollCheck = await db.execute(sql`SELECT COUNT(*) as cnt FROM factory_payrolls WHERE worker_id = ${id} AND company_id = ${companyId}`);
       const payrollCount = parseInt((payrollCheck.rows[0] as any)?.cnt || "0");
       if (payrollCount > 0) {
         return res.status(400).json({ message: `Cannot delete: this worker has ${payrollCount} payroll record(s).` });
