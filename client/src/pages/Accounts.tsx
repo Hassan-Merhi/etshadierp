@@ -155,8 +155,15 @@ export default function Accounts() {
   const urlYear = urlParams.get("year") || "";
 
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const fromExternalNavRef = useRef(false);
 
-  useEscapeBack(selectedAccount ? () => setSelectedAccount(null) : null);
+  useEscapeBack(selectedAccount ? () => {
+    if (fromExternalNavRef.current) {
+      window.history.back();
+    } else {
+      setSelectedAccount(null);
+    }
+  } : null);
 
   // Force refresh of account data when component mounts
   useEffect(() => {
@@ -471,12 +478,14 @@ export default function Accounts() {
           (a.type || "").toLowerCase() === (urlAccountType || "").toLowerCase(),
       );
       if (account) {
+        fromExternalNavRef.current = true;
         setSelectedAccount(account);
       }
     }
   }, [accounts, urlAccountId, urlAccountType, selectedAccount]);
 
   const handleAccountChange = (accountId: string) => {
+    fromExternalNavRef.current = false;
     const account = accounts.find((a) => a.id === accountId);
     setSelectedAccount(account || null);
     setSearchTerm("");

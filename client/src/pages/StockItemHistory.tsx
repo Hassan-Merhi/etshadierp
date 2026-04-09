@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 import { ArrowLeft, Calendar } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
@@ -74,6 +75,7 @@ export default function StockItemHistory() {
   const [selectedYear, setSelectedYear] = useState(currentYear.toString());
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_year"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
+  useEscapeBack(() => window.history.back());
   
   const { data, isLoading } = useQuery<StockItemSummary>({
     queryKey: [`/api/stock-items/${stockItemId}/monthly-summary`, { year: selectedYear, startDate: periodFilter.fromDate, endDate: periodFilter.toDate }],
@@ -119,7 +121,7 @@ export default function StockItemHistory() {
     <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/stock-items")} data-testid="button-back">
+          <Button variant="ghost" size="icon" onClick={() => window.history.back()} data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>

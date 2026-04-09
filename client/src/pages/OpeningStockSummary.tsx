@@ -77,7 +77,7 @@ export default function OpeningStockSummary() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate("/analytics")}
+          onClick={() => window.history.back()}
           data-testid="button-back"
         >
           <ArrowLeft className="h-5 w-5" />

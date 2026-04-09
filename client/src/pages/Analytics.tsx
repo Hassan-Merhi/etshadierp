@@ -1,4 +1,5 @@
 import { useState, Fragment } from "react";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 import { useQuery } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useLocation } from "wouter";
@@ -341,6 +342,7 @@ export default function Analytics() {
   const [expandedCustomerRows, setExpandedCustomerRows] = useState<Set<number>>(new Set());
   
   const [activeSection, setActiveSection] = useState("reports");
+  useEscapeBack(activeSection !== "reports" ? () => setActiveSection("reports") : null);
 
   const sidebarGroups: { label: string; items: { key: string; label: string; icon: LucideIcon }[] }[] = [
     {

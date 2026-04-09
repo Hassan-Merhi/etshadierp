@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -90,6 +91,7 @@ export default function SalesReportDetail() {
   const [plBasis, setPlBasis] = useState<PLBasis>("config");
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [expandedLocations, setExpandedLocations] = useState<Set<string>>(new Set());
+  useEscapeBack(() => window.history.back());
 
   const params = new URLSearchParams(window.location.search);
   const startDate = params.get("startDate") || "";
@@ -229,7 +231,7 @@ export default function SalesReportDetail() {
   return (
     <div className="flex flex-col gap-4 p-3 sm:p-6 w-full min-w-0">
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/sales-report")} data-testid="button-back-to-sales-report">
+        <Button variant="ghost" size="icon" onClick={() => window.history.back()} data-testid="button-back-to-sales-report">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1 min-w-0">

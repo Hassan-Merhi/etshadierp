@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useLocation, useParams } from "wouter";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +28,7 @@ export default function EditSupplier() {
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
   const supplierId = params.id ? parseInt(params.id) : null;
+  useEscapeBack(() => window.history.back());
 
   const { data: supplier, isLoading } = useQuery({
     queryKey: [`/api/suppliers/${supplierId}`],
@@ -108,7 +110,7 @@ export default function EditSupplier() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/suppliers")}
+            onClick={() => window.history.back()}
             data-testid="button-back"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -125,7 +127,7 @@ export default function EditSupplier() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate("/suppliers")}
+          onClick={() => window.history.back()}
           data-testid="button-back"
         >
           <ArrowLeft className="h-4 w-4" />

@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,7 @@ export default function PurchaseOrderEdit() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const poId = params?.id ? parseInt(params.id) : null;
+  useEscapeBack(() => window.history.back());
 
   const [poNumber, setPoNumber] = useState("");
   const [currency, setCurrency] = useState("USD");
@@ -314,7 +316,7 @@ export default function PurchaseOrderEdit() {
   return (
     <div className="p-3 sm:p-6 space-y-6">
       <div className="flex items-center gap-2 sm:gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/daybook")} data-testid="button-back">
+        <Button variant="ghost" size="icon" onClick={() => window.history.back()} data-testid="button-back">
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>

@@ -100,7 +100,7 @@ export default function LedgerMonthlySummary() {
   );
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
 
-  useEscapeBack(() => navigate("/analytics"));
+  useEscapeBack(() => window.history.back());
 
   const startDate = periodFilter.fromDate;
   const endDate = periodFilter.toDate;
@@ -146,7 +146,7 @@ export default function LedgerMonthlySummary() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate("/analytics")}
+              onClick={() => window.history.back()}
               className="text-primary-foreground hover:bg-primary/80"
               data-testid="button-back"
             >
