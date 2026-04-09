@@ -1,0 +1,2753 @@
+import type { Express } from "express";
+import { db } from "../db";
+import { storage } from "../storage";
+import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
+import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries } from "./_helpers";
+import {
+  inventory, stockItems, stockGroups, stockGroupArchives, stockItemCodeAliases,
+  stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
+  stockAdjustmentVouchers, stockAdjustmentItems,
+  containers, containerOffloads, containerOffloadItems, containerSales,
+  containerCharges, containerTrackingImportRowSchema, updateContainerTrackingSchema,
+  bankAccounts, fixedAssets, insertBankAccountSchema, insertFixedAssetSchema,
+  insertStockGroupSchema, insertStockItemSchema, insertStockItemCodeAliasSchema,
+  insertContainerSchema, offloadRequestSchema,
+  purchaseOrders, poLineItems, insertContainerSaleSchema,
+  vouchers, voucherEntries, salesItems, insertVoucherSchema, insertVoucherEntrySchema,
+  updateVoucherEntrySchema, insertSalesItemSchema,
+  suppliers, customers, customerBalances, locations, employees, userLocations,
+  auditLog, interCompanyTransfers, insertInterCompanyTransferSchema,
+  ledgerAccounts, insertLedgerAccountSchema, insertLedgerEntrySchema,
+  companies, users, userCompanyRoles, companySettings,
+  FEATURE_KEYS, fiscalPeriodClosures,
+  wasteDispatches, wasteDispatchItems, insertWasteDispatchSchema,
+  bales, baleProducts, baleProductCategories, baleTransfers,
+  insertBaleSchema, insertBaleTransferSchema,
+  orphanedRecords, orphanedCharges,
+  dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
+  insertDashboardCashAccountSchema, insertDashboardPayableAccountSchema,
+  insertDashboardAccountSelectionSchema,
+  creditNoteItems, creditNotes, insertCreditNoteSchema,
+  pendingBarcodes, insertPendingBarcodeSchema,
+  storedFiles, spreadsheets, liveSpreadsheets,
+  agentAccounts, insertAgentAccountSchema,
+  salaryAdvances, salaryAdvanceDeductions,
+  insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
+  chatSessions, chatMessages,
+  inventoryValueAdjustments,
+} from "@shared/schema";
+import {
+  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+} from "drizzle-orm";
+import { format } from "date-fns";
+import { z } from "zod";
+import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
+import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
+import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
+import { generatePDF } from "../pdfHelper";
+import path from "path";
+import fs from "fs";
+
+export function registerReportsRoutes(app: Express) {
+  app.get("/api/reports/net-profit-statement", requireAuth, async (req, res) => {
+    try {
+      const sessionCompanyId = req.session.currentCompanyId;
+      if (!sessionCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const isAdminOrDev = req.user?.role === "Admin" || req.user?.role === "Developer";
+      const requestedCompanyId = req.query.companyId ? parseInt(req.query.companyId as string) : null;
+      const companyId = (isAdminOrDev && requestedCompanyId) ? requestedCompanyId : sessionCompanyId;
+
+      // Get date range filters (optional)
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : null;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : null;
+
+      // Check if this is a factory company (uses factory_raw_stock for purchases/stock)
+      const [companyRecord] = await db
+        .select({ companyType: companies.companyType })
+        .from(companies)
+        .where(eq(companies.id, companyId))
+        .execute();
+      const isFactoryCompany = companyRecord?.companyType === "factory";
+
+      // Get all ledger accounts for this company
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
+
+      // Build voucher filter conditions
+      const voucherConditions = [
+        eq(vouchers.companyId, companyId),
+        isNull(vouchers.deletedAt),
+        eq(vouchers.optional, false)
+      ];
+      
+      // Add date filters if provided
+      if (startDate) {
+        voucherConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split('T')[0]));
+      }
+      if (endDate) {
+        voucherConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split('T')[0]));
+      }
+
+      // Get all non-optional vouchers for this company within date range
+      const companyVouchers = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(and(...voucherConditions))
+        .execute();
+      
+      const companyVoucherIds = companyVouchers.map((v) => v.id);
+
+      // Get all voucher entries
+      const companyEntries = companyVoucherIds.length > 0
+        ? await db
+            .select()
+            .from(voucherEntries)
+            .where(inArray(voucherEntries.voucherId, companyVoucherIds))
+            .execute()
+        : [];
+
+      // Calculate balances for each account (credit - debit for normal P&L view)
+      // accountBalances = period-filtered (used for P&L: purchases, sales, expenses, incomes)
+      const accountBalances = new Map<number, { debit: number; credit: number }>();
+      for (const entry of companyEntries) {
+        if (entry.ledgerAccountId) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
+          accountBalances.set(entry.ledgerAccountId, {
+            debit: current.debit + debit,
+            credit: current.credit + credit,
+          });
+        }
+      }
+
+      // allTimeAccountBalances = ALL vouchers up to endDate (used for Net Position balance sheet)
+      // This ensures Net Position reflects the true running balance of assets/liabilities
+      const allTimeVoucherConditions = [
+        eq(vouchers.companyId, companyId),
+        isNull(vouchers.deletedAt),
+        eq(vouchers.optional, false),
+      ];
+      if (endDate) {
+        allTimeVoucherConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split('T')[0]));
+      }
+      const allTimeVouchers = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(and(...allTimeVoucherConditions))
+        .execute();
+      const allTimeVoucherIds = allTimeVouchers.map((v) => v.id);
+      const allTimeEntries = allTimeVoucherIds.length > 0
+        ? await db
+            .select()
+            .from(voucherEntries)
+            .where(inArray(voucherEntries.voucherId, allTimeVoucherIds))
+            .execute()
+        : [];
+      const allTimeAccountBalances = new Map<number, { debit: number; credit: number }>();
+      for (const entry of allTimeEntries) {
+        if (entry.ledgerAccountId) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const current = allTimeAccountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
+          allTimeAccountBalances.set(entry.ledgerAccountId, {
+            debit: current.debit + debit,
+            credit: current.credit + credit,
+          });
+        }
+      }
+
+      // 1. Opening Stock - FROZEN value from stock items' opening values only
+      // This value does not change with POS sales - it represents the initial inventory setup
+      const allStockItems = await storage.getAllStockItems(companyId);
+      let openingStockValue = 0;
+      for (const item of allStockItems) {
+        openingStockValue += parseFloat(item.openingValue || "0");
+      }
+
+      // 2. Purchase Accounts - accounts with code starting with PURCHASES or related expense accounts
+      const purchaseAccounts = companyAccounts.filter(
+        (acc) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-")
+      );
+      let purchaseAccountsTotal = 0;
+      const purchaseAccountsDetails: { id: number; code: string; name: string; debit: number; credit: number; balance: number }[] = purchaseAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const netBalance = balance.debit - balance.credit; // Purchases are debits
+        purchaseAccountsTotal += netBalance;
+        return {
+          id: acc.id,
+          code: acc.code || "",
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: netBalance,
+        };
+      });
+
+      // For factory companies: calculate raw material purchases from factory_raw_stock table
+      // and raw material remaining value for closing stock adjustment
+      let factoryRawStockRemainingValue = 0;
+      if (isFactoryCompany) {
+        // Build filter for raw materials received in the period
+        const frsConditions: any[] = [eq(factoryRawStock.companyId, companyId)];
+        if (startDate) {
+          frsConditions.push(gte(factoryRawStock.offloadedAt, startDate));
+        }
+        if (endDate) {
+          frsConditions.push(lte(factoryRawStock.offloadedAt, endDate));
+        }
+        const frsInPeriod = await db
+          .select({
+            receivedKg: factoryRawStock.receivedKg,
+            costPerKg: factoryRawStock.costPerKg,
+          })
+          .from(factoryRawStock)
+          .where(and(...frsConditions))
+          .execute();
+
+        let factoryRawPurchaseCost = 0;
+        for (const row of frsInPeriod) {
+          const qty = parseFloat(row.receivedKg || "0");
+          const cost = parseFloat(row.costPerKg || "0");
+          factoryRawPurchaseCost += qty * cost;
+        }
+
+        if (factoryRawPurchaseCost > 0) {
+          purchaseAccountsTotal += factoryRawPurchaseCost;
+          purchaseAccountsDetails.push({
+            id: -1,
+            code: "FACTORY_RAW_MATERIALS",
+            name: "Factory Raw Materials",
+            debit: factoryRawPurchaseCost,
+            credit: 0,
+            balance: factoryRawPurchaseCost,
+          });
+        }
+
+        // Closing stock: sum remaining (received - used) × cost per kg across ALL factory raw stock
+        const allFrs = await db
+          .select({
+            receivedKg: factoryRawStock.receivedKg,
+            usedKg: factoryRawStock.usedKg,
+            costPerKg: factoryRawStock.costPerKg,
+          })
+          .from(factoryRawStock)
+          .where(eq(factoryRawStock.companyId, companyId))
+          .execute();
+        for (const row of allFrs) {
+          const received = parseFloat(row.receivedKg || "0");
+          const used = parseFloat(row.usedKg || "0");
+          const cost = parseFloat(row.costPerKg || "0");
+          factoryRawStockRemainingValue += (received - used) * cost;
+        }
+      }
+
+      // 3. Direct Incomes - accounts with accountType="Income" AND subType="Direct Income"
+      // EXCLUDE sales-related accounts because Sales is already counted from salesItems table
+      const directIncomeAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Income" && 
+                 acc.subType === "Direct Income" &&
+                 !acc.code?.includes("SALES") && // Exclude SALES_REV, SALES, etc.
+                 !acc.name?.toLowerCase().includes("sales") // Exclude any sales-named accounts
+      );
+      let directIncomesTotal = 0;
+      const directIncomesDetails = directIncomeAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const netBalance = balance.credit - balance.debit; // Income is credits
+        directIncomesTotal += netBalance;
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: netBalance,
+        };
+      });
+
+      // 4. Direct Expenses - include accounts that are Direct Expenses in any form:
+      // - accountType === "Direct Expense"
+      // - accountType === "Expense" AND subType === "Direct Expense"  
+      // - IMPORT_CHARGES parent and its children (import costs that reduce profit)
+      const importChargesParent = companyAccounts.find(
+        (acc) => acc.code === "IMPORT_CHARGES"
+      );
+      const importChargesAccountIds = new Set<number>();
+      if (importChargesParent) {
+        importChargesAccountIds.add(importChargesParent.id);
+        companyAccounts.forEach(acc => {
+          if (acc.parentId === importChargesParent.id) {
+            importChargesAccountIds.add(acc.id);
+          }
+        });
+      }
+      
+      const directExpenseAccounts = companyAccounts.filter(
+        (acc) => acc.code !== "PURCHASES" && !acc.code?.startsWith("PURCHASES") && (
+                   acc.accountType === "Direct Expense" || 
+                   (acc.accountType === "Expense" && acc.subType === "Direct Expense") ||
+                   importChargesAccountIds.has(acc.id)
+                 )
+      );
+      let directExpensesTotal = 0;
+      const directExpensesDetails = directExpenseAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const netBalance = balance.debit - balance.credit; // Expenses are debits
+        directExpensesTotal += netBalance;
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: netBalance,
+        };
+      });
+
+      // 5. Sales Accounts - Sum of all sales from Receipt vouchers (POS sales)
+      // NOTE: Must calculate Sales BEFORE Gross Profit for Tally-style calculation
+      const salesConditions = [
+        eq(vouchers.companyId, companyId),
+        isNull(vouchers.deletedAt),
+        eq(vouchers.optional, false)
+      ];
+      if (startDate) {
+        salesConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split('T')[0]));
+      }
+      if (endDate) {
+        salesConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split('T')[0]));
+      }
+      
+      const salesData = await db
+        .select({
+          total: sql<string>`COALESCE(SUM(${salesItems.totalSales}), 0)`,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(and(...salesConditions))
+        .execute();
+      const posSalesTotal = parseFloat(salesData[0]?.total || "0");
+
+      // For ERP companies (non-POS): income may be recorded via voucher entries crediting
+      // income-type accounts (like SALES_REV). These are excluded from directIncomes/indirectIncomes
+      // to avoid double-counting with POS salesItems, but for ERP vouchers (no salesItems),
+      // we must capture them here so they appear as Sales Revenue in the P&L.
+      //
+      // "Missed" income accounts = those NOT already counted in directIncomes or indirectIncomes:
+      //   - Income accounts with SALES in code/name (excluded by SALES filter in directIncomes)
+      //   - Income accounts with null/unrecognized subType (don't match Direct or Indirect Income)
+      const missedIncomeAccounts = companyAccounts.filter((acc) => {
+        if (acc.accountType !== "Income") return false;
+        if (acc.subType === "Indirect Income") return false; // already in indirectIncomesTotal
+        if (
+          acc.subType === "Direct Income" &&
+          !acc.code?.includes("SALES") &&
+          !acc.name?.toLowerCase().includes("sales")
+        ) return false; // already in directIncomesTotal
+        return true;
+      });
+
+      let erpSalesTotal = 0;
+      const erpSalesAccountsDetails: { id: number; code: string; name: string; debit: number; credit: number; balance: number }[] = [];
+      if (missedIncomeAccounts.length > 0 && companyVoucherIds.length > 0) {
+        // Get the set of voucherIds that already have salesItems (POS sales) — exclude these
+        const posVouchersData = await db
+          .select({ voucherId: salesItems.voucherId })
+          .from(salesItems)
+          .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+          .where(and(...salesConditions))
+          .execute();
+        const posVoucherIdSet = new Set(posVouchersData.map((r) => r.voucherId));
+
+        const nonPosVoucherIds = companyVoucherIds.filter((id) => !posVoucherIdSet.has(id));
+        if (nonPosVoucherIds.length > 0) {
+          const missedAccountIds = missedIncomeAccounts.map((a) => a.id);
+          const erpSalesEntries = await db
+            .select()
+            .from(voucherEntries)
+            .where(
+              and(
+                inArray(voucherEntries.voucherId, nonPosVoucherIds),
+                inArray(voucherEntries.ledgerAccountId, missedAccountIds)
+              )
+            )
+            .execute();
+
+          const erpSalesByAccount = new Map<number, { debit: number; credit: number }>();
+          for (const e of erpSalesEntries) {
+            const d = parseFloat(e.debitAmount || "0");
+            const c = parseFloat(e.creditAmount || "0");
+            const cur = erpSalesByAccount.get(e.ledgerAccountId!) || { debit: 0, credit: 0 };
+            erpSalesByAccount.set(e.ledgerAccountId!, { debit: cur.debit + d, credit: cur.credit + c });
+          }
+          for (const acc of missedIncomeAccounts) {
+            const bal = erpSalesByAccount.get(acc.id) || { debit: 0, credit: 0 };
+            const netBalance = bal.credit - bal.debit;
+            if (Math.abs(netBalance) > 0.001) {
+              erpSalesTotal += netBalance;
+              erpSalesAccountsDetails.push({
+                id: acc.id,
+                code: acc.code || "",
+                name: acc.name,
+                debit: bal.debit,
+                credit: bal.credit,
+                balance: netBalance,
+              });
+            }
+          }
+        }
+      }
+
+      const salesAccountsTotal = posSalesTotal + erpSalesTotal;
+
+      // 6. Closing Stock - Current inventory value (quantity × weighted average cost) across all active locations
+      const activeLocationsData = await db
+        .select({ id: locations.id })
+        .from(locations)
+        .where(
+          and(
+            eq(locations.companyId, companyId),
+            eq(locations.active, true),
+            isNull(locations.deletedAt)
+          )
+        )
+        .execute();
+      const activeLocationIds = activeLocationsData.map((l) => l.id);
+
+      let closingStockValue = 0;
+      if (activeLocationIds.length > 0) {
+        const inventoryData = await db
+          .select({
+            quantity: inventory.quantity,
+            averageRate: inventory.averageRate,
+          })
+          .from(inventory)
+          .where(inArray(inventory.locationId, activeLocationIds))
+          .execute();
+
+        for (const inv of inventoryData) {
+          const qty = parseFloat(inv.quantity || "0");
+          const rate = parseFloat(inv.averageRate || "0");
+          closingStockValue += qty * rate;
+        }
+      }
+
+      // For factory companies: add raw material remaining stock to closing stock value
+      if (isFactoryCompany) {
+        closingStockValue += factoryRawStockRemainingValue;
+      }
+
+      // 7. Gross Profit Calculation - TALLY PRIME TRADING ACCOUNT STYLE
+      // Trading Account format:
+      // - Credit side: Sales + Closing Stock + Direct Incomes
+      // - Debit side: Opening Stock + Purchases + Direct Expenses
+      // - Gross Profit = Credit side - Debit side
+      const tradingCreditSide = salesAccountsTotal + closingStockValue + directIncomesTotal;
+      const tradingDebitSide = openingStockValue + purchaseAccountsTotal + directExpensesTotal;
+      // For "All Time" (no startDate): traditional Tally format — opening on debit, closing on credit.
+      // For period-filtered (day/week/month): pure voucher-based P&L so periods are properly additive.
+      // Opening/closing stock are excluded from period P&L to avoid all-time snapshot distortion.
+      const grossProfit = startDate
+        ? salesAccountsTotal + directIncomesTotal - purchaseAccountsTotal - directExpensesTotal
+        : tradingCreditSide - tradingDebitSide;
+
+      // 8. Indirect Expenses - accounts with accountType="Indirect Expense"
+      // Exclude PRODUCTION_ADJUSTMENT and CONSUMPTION_EXPENSE — their inventory effect
+      // is already captured in stockOnFloor (closing stock), showing them would double-count.
+      // Also exclude PURCHASES accounts — those belong in the Trading Account, not Indirect Expenses.
+      const indirectExpenseAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Indirect Expense" &&
+                 acc.code !== "PRODUCTION_ADJUSTMENT" &&
+                 acc.code !== "CONSUMPTION_EXPENSE" &&
+                 acc.code !== "PURCHASES" &&
+                 !acc.code?.startsWith("PURCHASES")
+      );
+      let indirectExpensesTotal = 0;
+      const indirectExpensesDetails = indirectExpenseAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const netBalance = balance.debit - balance.credit; // Expenses are debits
+        indirectExpensesTotal += netBalance;
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: netBalance,
+        };
+      });
+
+      // 6b. Indirect Incomes - accounts with accountType="Income" AND subType="Indirect Income"
+      // Must be calculated before Net Profit so it can be included
+      const indirectIncomeAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Income" && acc.subType === "Indirect Income"
+      );
+      let indirectIncomesTotal = 0;
+      const indirectIncomesDetails = indirectIncomeAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const netBalance = balance.credit - balance.debit; // Income is credits
+        indirectIncomesTotal += netBalance;
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: netBalance,
+        };
+      });
+
+      // 9. Net Profit = Gross Profit + Indirect Incomes - Indirect Expenses
+      // This follows Tally Prime's P&L methodology where:
+      // - Gross Profit comes from Trading Account (direct expenses already included there)
+      // - Then we add indirect incomes and subtract indirect expenses
+      const netProfit = grossProfit + indirectIncomesTotal - indirectExpensesTotal;
+
+      // 10. Net Position - same calculation as dashboard (/api/stats/net-profit)
+      // Uses allTimeAccountBalances (all vouchers up to endDate) so it reflects the selected period.
+      const npRound2Stmt = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+      // Build supplier balance map from all-time entries
+      const stmtSupplierBals = new Map<number, { debit: number; credit: number }>();
+      for (const e of allTimeEntries) {
+        if (e.supplierId) {
+          const d = parseFloat(e.debitAmount || '0'), c = parseFloat(e.creditAmount || '0');
+          const cur = stmtSupplierBals.get(e.supplierId) || { debit: 0, credit: 0 };
+          stmtSupplierBals.set(e.supplierId, { debit: cur.debit + d, credit: cur.credit + c });
+        }
+      }
+
+      // Account exclusion rules matching dashboard
+      const stmtExcludedTypes = ['Income', 'Profit', 'Equity', 'EQUITY', 'Fixed Asset'];
+      const stmtExpenseTypes = ['Expense', 'Direct Expense', 'Indirect Expense'];
+      const stmtAssetTypes = ['Asset', 'Current Asset', 'Fixed Asset', 'Bank', 'Cash'];
+      const stmtStockPatterns = ['closing stock', 'opening stock', 'stock in hand', 'stock on hand', 'inventory', 'stock account', 'goods in stock', 'merchandise'];
+      const stmtStockCodes = ['CLOSING_STOCK', 'OPENING_STOCK', 'STOCK', 'INVENTORY', 'STOCK_IN_HAND'];
+      const stmtFixedAssetNames = ['rover', 'toyota', 'mercedes', 'vehicle', 'car', 'truck', 'land', 'property', 'building', 'house', 'rolex', 'watch', 'luxury', 'jewelry', 'guarantee', 'deposit', 'caution'];
+      const isExcludedFromStmtNp = (acc: typeof companyAccounts[0]) => {
+        if (stmtExcludedTypes.includes(acc.accountType || '')) return true;
+        if (acc.code === 'PRODUCTION_ADJUSTMENT' || acc.code === 'CONSUMPTION_EXPENSE') return true;
+        const nameLower = (acc.name || '').toLowerCase();
+        const codeLower = (acc.code || '').toLowerCase();
+        if (stmtAssetTypes.includes(acc.accountType || '')) {
+          if (stmtStockPatterns.some(p => nameLower.includes(p))) return true;
+          if (stmtStockCodes.some(c => codeLower === c.toLowerCase() || codeLower.startsWith(c.toLowerCase() + '_'))) return true;
+          if (stmtFixedAssetNames.some(p => nameLower.includes(p))) return true;
+        }
+        return false;
+      };
+
+      let stmtNpForUs = 0, stmtNpOnUs = 0;
+      const stmtLiabilityTypes = ['Liability', 'Duty Agent', 'Transporter Agent', 'Loan'];
+      for (const acc of companyAccounts) {
+        if (stmtExpenseTypes.includes(acc.accountType || '')) continue;
+        if (acc.accountType === 'Income') continue;
+        if (isExcludedFromStmtNp(acc)) continue;
+        const opening = parseFloat(acc.openingBalance || '0');
+        const openingSigned = acc.openingBalanceSide === 'Dr' ? opening : -opening;
+        const bal = allTimeAccountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const net = openingSigned + bal.debit - bal.credit;
+        if (net > 0) stmtNpForUs += net;
+        else if (net < 0) stmtNpOnUs += Math.abs(net);
+      }
+
+      // For All Time (no endDate): include inventory, workers, OTW — they are current values that match the dashboard.
+      // For specific periods (endDate set): skip these non-date-bounded components; rely only on
+      // ledger account balances + supplier balances which ARE properly bounded by endDate.
+      const stmtIsAllTime = !endDate;
+      if (stmtIsAllTime) {
+        // Add opening stock as an asset (entered outside ledger via stockItems.openingValue)
+        // This is NOT an expense — it is the initial cost basis of inventory brought into the system
+        if (openingStockValue > 0) {
+          stmtNpForUs += openingStockValue;
+        }
+
+        // Add stock on floor (inventory) as asset
+        stmtNpForUs += closingStockValue;
+
+        // Add worker/employee liabilities
+        const stmtEmployees = await db.select().from(employees)
+          .where(and(eq(employees.companyId, companyId), eq(employees.active, true), isNull(employees.deletedAt))).execute();
+        let stmtWorkerBal = 0;
+        for (const emp of stmtEmployees) stmtWorkerBal += parseFloat((emp as any).currentBalance || '0');
+        if (stmtWorkerBal > 0) stmtNpOnUs += stmtWorkerBal;
+        else if (stmtWorkerBal < 0) stmtNpForUs += Math.abs(stmtWorkerBal);
+
+        // Add OTW containers as assets
+        const stmtOtwContainers = await db.select().from(containers)
+          .where(and(eq(containers.companyId, companyId), eq(containers.status, 'OTW'))).execute();
+        for (const c of stmtOtwContainers) {
+          stmtNpForUs += parseFloat((c as any).grandTotal || (c as any).itemsTotal || '0');
+        }
+      }
+
+      // Add suppliers (parent company only) - always included since stmtSupplierBals is already bounded by endDate
+      const stmtParentCompanyId = await storage.getParentCompanyId();
+      const stmtShouldIncludeSuppliers = stmtParentCompanyId === null || companyId === stmtParentCompanyId;
+      let stmtSupplierTotal = 0;
+      if (stmtShouldIncludeSuppliers) {
+        const stmtAllSuppliers = await db.select().from(suppliers).where(isNull(suppliers.deletedAt)).execute();
+        for (const sup of stmtAllSuppliers) {
+          const balance = stmtSupplierBals.get(sup.id);
+          if (balance) {
+            const opening = parseFloat((sup as any).openingBalance || '0');
+            const netBalance = opening + balance.credit - balance.debit;
+            if (netBalance > 0) { stmtNpOnUs += netBalance; stmtSupplierTotal += netBalance; }
+            else if (netBalance < 0) { stmtNpForUs += Math.abs(netBalance); stmtSupplierTotal -= Math.abs(netBalance); }
+          }
+        }
+      }
+
+      // Debug: log net position components so discrepancies can be traced
+      const stmtAccountsForUs: string[] = [], stmtAccountsOnUs: string[] = [];
+      for (const acc of companyAccounts) {
+        if (stmtExpenseTypes.includes(acc.accountType || '')) continue;
+        if (acc.accountType === 'Income') continue;
+        if (isExcludedFromStmtNp(acc)) continue;
+        const opening = parseFloat(acc.openingBalance || '0');
+        const openingSigned = acc.openingBalanceSide === 'Dr' ? opening : -opening;
+        const bal = allTimeAccountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const net = openingSigned + bal.debit - bal.credit;
+        if (Math.abs(net) > 0.01) {
+          const entry = `${acc.name} (${acc.code}/${acc.accountType}): ${net > 0 ? '+' : ''}${net.toFixed(2)}`;
+          if (net > 0) stmtAccountsForUs.push(entry);
+          else stmtAccountsOnUs.push(entry);
+        }
+      }
+      const netPositionValue = npRound2Stmt(stmtNpForUs - stmtNpOnUs);
+
+      // Opening Balances Net — the net worth of the business before any voucher transactions.
+      // Computed as sum of all non-income/non-expense account opening balances (Dr positive, Cr negative).
+      // Shown in the All Time P&L so that: Opening Balances + Sum(monthly P&Ls) ≈ Net Position.
+      const skipTypesForOB = ['Income', 'Expense', 'Direct Expense', 'Indirect Expense', 'Profit'];
+      let openingBalancesNet = 0;
+      for (const acc of companyAccounts) {
+        if (skipTypesForOB.includes(acc.accountType || '')) continue;
+        if (isExcludedFromStmtNp(acc)) continue;
+        const opening = parseFloat(acc.openingBalance || '0');
+        if (opening === 0) continue;
+        const openingSigned = acc.openingBalanceSide === 'Dr' ? opening : -opening;
+        openingBalancesNet += openingSigned;
+      }
+
+      // Calculate totals for panes (Tally Trading Account format)
+      // Left pane (Debit side): Opening Stock + Purchases + Direct Expenses
+      // Right pane (Credit side): Sales + Closing Stock + Direct Incomes
+      const leftPaneTotal = tradingDebitSide; // Opening Stock + Purchases + Direct Expenses
+      const rightTradingTotal = tradingCreditSide; // Sales + Closing Stock + Direct Incomes
+
+      // === RIGHT PANE DATA ===
+      // Note: salesAccountsTotal, closingStockValue, directIncomesTotal already calculated above for Gross Profit
+      
+      // Gross Profit b/f - Same as gross profit from Trading Account
+      const grossProfitBf = grossProfit;
+
+      // Right pane total for P&L display (trading credit side + indirect incomes for balancing)
+      const rightPaneTotal = rightTradingTotal + indirectIncomesTotal;
+
+      res.json({
+        dateRange: {
+          startDate: startDate ? startDate.toISOString().split('T')[0] : null,
+          endDate: endDate ? endDate.toISOString().split('T')[0] : null,
+        },
+        netPosition: netPositionValue,
+        openingBalancesNet: startDate ? null : openingBalancesNet,
+        // TALLY PRIME TRADING ACCOUNT STRUCTURE
+        // Left pane (Debit side): Opening Stock + Purchases + Direct Expenses
+        // Right pane (Credit side): Sales + Closing Stock + Direct Incomes
+        leftPane: {
+          // Trading Account - Debit Side
+          // For period-filtered views (monthly, weekly, etc.), opening/closing stock are excluded
+          // so monthly P&Ls reflect true trading performance (no all-time stock distortion).
+          // Only "All Time" (no startDate) includes the stock adjustment.
+          openingStock: {
+            value: startDate ? 0 : openingStockValue,
+          },
+          purchaseAccounts: {
+            total: purchaseAccountsTotal,
+            accounts: purchaseAccountsDetails,
+            count: purchaseAccountsDetails.length,
+          },
+          directExpenses: {
+            total: directExpensesTotal,
+            accounts: directExpensesDetails,
+            count: directExpenseAccounts.length,
+          },
+          tradingTotal: leftPaneTotal, // Sum of debit side
+          grossProfit: grossProfit, // Balancing figure (credit - debit)
+          // P&L Section
+          indirectExpenses: {
+            total: indirectExpensesTotal,
+            accounts: indirectExpensesDetails,
+            count: indirectExpenseAccounts.length,
+          },
+          netProfit: netProfit,
+        },
+        rightPane: {
+          // Trading Account - Credit Side
+          salesAccounts: {
+            total: salesAccountsTotal,
+            posTotal: posSalesTotal,
+            ledgerTotal: erpSalesTotal,
+            accounts: erpSalesAccountsDetails,
+          },
+          directIncomes: {
+            total: directIncomesTotal,
+            accounts: directIncomesDetails,
+            count: directIncomeAccounts.length,
+          },
+          closingStock: {
+            value: startDate ? 0 : closingStockValue,
+          },
+          tradingTotal: rightTradingTotal, // Sum of credit side
+          grossProfitBf: grossProfitBf,
+          // P&L Section
+          indirectIncomes: {
+            total: indirectIncomesTotal,
+            accounts: indirectIncomesDetails,
+            count: indirectIncomeAccounts.length,
+          },
+          total: rightPaneTotal,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Closing Stock Summary - Current inventory values by stock group
+  app.get("/api/reports/closing-stock-summary", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get all stock groups for the company
+      const allStockGroups = await storage.getAllStockGroups(companyId);
+      
+      // Get all stock items for the company
+      const allStockItems = await storage.getAllStockItems(companyId);
+      
+      // Get inventory data from active locations only
+      const inventoryData = await db
+        .select({
+          stockItemId: inventory.stockItemId,
+          quantity: inventory.quantity,
+          averageRate: inventory.averageRate,
+        })
+        .from(inventory)
+        .innerJoin(locations, eq(inventory.locationId, locations.id))
+        .where(
+          and(
+            eq(inventory.companyId, companyId),
+            eq(locations.active, true),
+            isNull(locations.deletedAt)
+          )
+        )
+        .execute();
+      
+      // Aggregate inventory by stock item - calculate value dynamically as qty * rate
+      const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
+      for (const inv of inventoryData) {
+        const qty = parseFloat(inv.quantity) || 0;
+        const rate = parseFloat(inv.averageRate) || 0;
+        const val = qty * rate;
+        
+        if (inventoryByItem.has(inv.stockItemId)) {
+          const existing = inventoryByItem.get(inv.stockItemId)!;
+          existing.quantity += qty;
+          existing.totalValue += val;
+        } else {
+          inventoryByItem.set(inv.stockItemId, {
+            quantity: qty,
+            totalValue: val,
+          });
+        }
+      }
+      
+      // Build stock groups summary
+      const stockGroupSummary = allStockGroups.map((group) => {
+        const groupItems = allStockItems.filter((item) => item.stockGroupId === group.id);
+        
+        let closingQuantity = 0;
+        let closingValue = 0;
+        
+        for (const item of groupItems) {
+          const invData = inventoryByItem.get(item.id);
+          if (invData) {
+            closingQuantity += invData.quantity;
+            closingValue += invData.totalValue;
+          }
+        }
+        
+        const closingRate = closingQuantity > 0 ? closingValue / closingQuantity : 0;
+        
+        return {
+          id: group.id,
+          code: group.code,
+          name: group.name,
+          closing: {
+            quantity: closingQuantity,
+            rate: closingRate,
+            value: closingValue,
+          },
+          itemCount: groupItems.length,
+        };
+      }).filter((g) => g.closing.quantity > 0 || g.closing.value > 0);
+      
+      // Calculate grand totals
+      const grandTotal = {
+        quantity: stockGroupSummary.reduce((sum, g) => sum + g.closing.quantity, 0),
+        value: stockGroupSummary.reduce((sum, g) => sum + g.closing.value, 0),
+      };
+      
+      const grandTotalRate = grandTotal.quantity > 0 ? grandTotal.value / grandTotal.quantity : 0;
+
+      res.json({
+        stockGroups: stockGroupSummary,
+        grandTotal: {
+          quantity: grandTotal.quantity,
+          rate: grandTotalRate,
+          value: grandTotal.value,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Transfer Closing Stock to Another Company as Opening Stock
+  app.post("/api/reports/transfer-closing-stock", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const sourceCompanyId = req.session.currentCompanyId;
+      if (!sourceCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { targetCompanyId: rawTargetId } = req.body;
+      if (!rawTargetId) {
+        return res.status(400).json({ message: "Target company is required" });
+      }
+      
+      const targetCompanyId = typeof rawTargetId === 'string' ? parseInt(rawTargetId, 10) : rawTargetId;
+      if (isNaN(targetCompanyId)) {
+        return res.status(400).json({ message: "Invalid target company ID" });
+      }
+
+      if (sourceCompanyId === targetCompanyId) {
+        return res.status(400).json({ message: "Cannot transfer to the same company" });
+      }
+
+      // Verify user has access to target company
+      const userCompanies = await storage.getUserCompaniesWithRoles(req.user!.id);
+      const hasAccessToTarget = userCompanies.some(uc => uc.companyId === targetCompanyId);
+      if (!hasAccessToTarget) {
+        return res.status(403).json({ message: "You don't have access to the target company" });
+      }
+
+      // Get source company inventory from active locations
+      const sourceInventory = await db
+        .select({
+          stockItemId: inventory.stockItemId,
+          quantity: inventory.quantity,
+          averageRate: inventory.averageRate,
+        })
+        .from(inventory)
+        .innerJoin(locations, eq(inventory.locationId, locations.id))
+        .where(
+          and(
+            eq(inventory.companyId, sourceCompanyId),
+            eq(locations.active, true),
+            isNull(locations.deletedAt)
+          )
+        )
+        .execute();
+
+      if (sourceInventory.length === 0) {
+        return res.status(400).json({ message: "No inventory found in source company" });
+      }
+
+      // Aggregate by stock item (combine quantities from multiple locations)
+      const aggregatedInventory = new Map<number, { quantity: number; totalValue: number }>();
+      for (const inv of sourceInventory) {
+        const qty = parseFloat(inv.quantity) || 0;
+        const rate = parseFloat(inv.averageRate) || 0;
+        const val = qty * rate;
+        
+        if (aggregatedInventory.has(inv.stockItemId)) {
+          const existing = aggregatedInventory.get(inv.stockItemId)!;
+          existing.quantity += qty;
+          existing.totalValue += val;
+        } else {
+          aggregatedInventory.set(inv.stockItemId, { quantity: qty, totalValue: val });
+        }
+      }
+
+      // Check if target company already has inventory
+      const existingTargetInventory = await db
+        .select({ id: inventory.id })
+        .from(inventory)
+        .where(eq(inventory.companyId, targetCompanyId))
+        .limit(1);
+
+      if (existingTargetInventory.length > 0) {
+        return res.status(400).json({ message: "Target company already has inventory. Please reset it first." });
+      }
+
+      // Get the first location in target company (or create a default one)
+      let targetLocations = await storage.getAllLocations(targetCompanyId);
+      if (targetLocations.length === 0) {
+        return res.status(400).json({ message: "Target company has no locations. Please create at least one location first." });
+      }
+      const defaultLocation = targetLocations[0];
+
+      // Get stock items that exist in source - we need to ensure they exist in target
+      const sourceStockItemIds = Array.from(aggregatedInventory.keys());
+      const sourceStockItems = await db
+        .select()
+        .from(stockItems)
+        .where(inArray(stockItems.id, sourceStockItemIds));
+
+      // Map source stock item codes to target stock items
+      const stockItemMapping = new Map<number, number>();
+      for (const sourceItem of sourceStockItems) {
+        // Find matching stock item in target by code
+        const targetItem = await db
+          .select()
+          .from(stockItems)
+          .where(
+            and(
+              eq(stockItems.companyId, targetCompanyId),
+              eq(stockItems.code, sourceItem.code)
+            )
+          )
+          .limit(1);
+
+        if (targetItem.length > 0) {
+          stockItemMapping.set(sourceItem.id, targetItem[0].id);
+        } else {
+          // Stock item doesn't exist in target - return error with the missing item name
+          return res.status(400).json({ 
+            message: `Stock item "${sourceItem.name}" (code: ${sourceItem.code}) doesn't exist in target company. Please create matching stock items first.`
+          });
+        }
+      }
+
+      // Calculate total value for the opening balance voucher
+      let totalTransferValue = 0;
+      for (const [, data] of Array.from(aggregatedInventory)) {
+        totalTransferValue += data.totalValue;
+      }
+
+      // Create opening inventory records in target company
+      await db.transaction(async (tx) => {
+        for (const [sourceStockItemId, data] of Array.from(aggregatedInventory)) {
+          const targetStockItemId = stockItemMapping.get(sourceStockItemId);
+          if (!targetStockItemId) continue;
+
+          const avgRate = data.quantity > 0 ? data.totalValue / data.quantity : 0;
+
+          await adjustInventory(tx, defaultLocation.id, targetStockItemId, data.quantity, targetCompanyId, avgRate);
+        }
+      });
+
+      // Get company names for response
+      const sourceCompany = await storage.getCompanyById(sourceCompanyId);
+      const targetCompany = await storage.getCompanyById(targetCompanyId);
+
+      res.json({
+        success: true,
+        message: `Successfully transferred closing stock from ${sourceCompany?.name} to ${targetCompany?.name}`,
+        itemsTransferred: aggregatedInventory.size,
+        totalValue: totalTransferValue.toFixed(2),
+        targetLocation: defaultLocation.name,
+      });
+    } catch (error: any) {
+      console.error("Error transferring closing stock:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Carry Forward Closing Stock to Opening Stock (same company)
+  app.post("/api/reports/carryforward-closing-stock", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { asOfDate } = req.body;
+      const targetDate = asOfDate ? new Date(asOfDate) : new Date();
+      const targetDateStr = targetDate.toISOString().split('T')[0];
+
+      // Get current inventory from active locations, aggregated by stock item
+      const currentInventory = await db
+        .select({
+          stockItemId: inventory.stockItemId,
+          quantity: inventory.quantity,
+          averageRate: inventory.averageRate,
+        })
+        .from(inventory)
+        .innerJoin(locations, eq(inventory.locationId, locations.id))
+        .where(
+          and(
+            eq(inventory.companyId, companyId),
+            eq(locations.active, true),
+            isNull(locations.deletedAt)
+          )
+        )
+        .execute();
+
+      // Aggregate by stock item (combine quantities from multiple locations)
+      const aggregatedInventory = new Map<number, { quantity: number; totalValue: number }>();
+      for (const inv of currentInventory) {
+        const qty = parseFloat(inv.quantity) || 0;
+        const rate = parseFloat(inv.averageRate) || 0;
+        const val = qty * rate;
+        
+        if (aggregatedInventory.has(inv.stockItemId)) {
+          const existing = aggregatedInventory.get(inv.stockItemId)!;
+          existing.quantity += qty;
+          existing.totalValue += val;
+        } else {
+          aggregatedInventory.set(inv.stockItemId, { quantity: qty, totalValue: val });
+        }
+      }
+
+      // Get sales items from vouchers AFTER the target date and add them back
+      // (Sales reduce inventory, so we add them back to get historical inventory)
+      const salesAfterDate = await db
+        .select({
+          stockItemId: salesItems.stockItemId,
+          quantity: salesItems.quantity,
+          costPrice: salesItems.costPrice,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.optional, false),
+            sql`${vouchers.voucherDate} > ${targetDateStr}`
+          )
+        )
+        .execute();
+
+      for (const sale of salesAfterDate) {
+        const qty = parseFloat(sale.quantity) || 0;
+        const cost = parseFloat(sale.costPrice) || 0;
+        const val = qty * cost;
+        
+        if (aggregatedInventory.has(sale.stockItemId)) {
+          const existing = aggregatedInventory.get(sale.stockItemId)!;
+          existing.quantity += qty;
+          existing.totalValue += val;
+        } else {
+          aggregatedInventory.set(sale.stockItemId, { quantity: qty, totalValue: val });
+        }
+      }
+
+      // Get stock adjustments AFTER the target date and reverse them
+      // Production (positive qty) reduces historical inventory (subtract)
+      // Consumption (negative qty) increases historical inventory (add back the consumed amount)
+      const adjustmentsAfterDate = await db
+        .select({
+          stockItemId: stockAdjustmentItems.stockItemId,
+          quantity: stockAdjustmentItems.quantity,
+          rate: stockAdjustmentItems.rate,
+        })
+        .from(stockAdjustmentItems)
+        .innerJoin(stockAdjustmentVouchers, eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id))
+        .innerJoin(vouchers, eq(stockAdjustmentVouchers.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.optional, false),
+            sql`${vouchers.voucherDate} > ${targetDateStr}`
+          )
+        )
+        .execute();
+
+      for (const adj of adjustmentsAfterDate) {
+        const qty = parseFloat(adj.quantity) || 0;
+        const rate = parseFloat(adj.rate) || 0;
+        const val = Math.abs(qty) * rate;
+        
+        if (aggregatedInventory.has(adj.stockItemId)) {
+          const existing = aggregatedInventory.get(adj.stockItemId)!;
+          // Reverse the adjustment: subtract what was added (production), add back what was consumed
+          existing.quantity -= qty;
+          existing.totalValue -= (qty >= 0 ? val : -val);
+        } else {
+          // If no current inventory, create with reversed values
+          aggregatedInventory.set(adj.stockItemId, { 
+            quantity: -qty, 
+            totalValue: qty >= 0 ? -val : val 
+          });
+        }
+      }
+
+      // Get container offloads AFTER the target date and subtract them
+      // (Container offloads add inventory, so we subtract them to get historical inventory)
+      const offloadsAfterDate = await db
+        .select({
+          stockItemId: containerOffloadItems.stockItemId,
+          quantity: containerOffloadItems.quantity,
+          rate: containerOffloadItems.rate,
+        })
+        .from(containerOffloadItems)
+        .innerJoin(containerOffloads, eq(containerOffloadItems.offloadId, containerOffloads.id))
+        .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
+        .where(
+          and(
+            eq(containers.companyId, companyId),
+            sql`${containerOffloads.offloadedAt} > ${targetDate}`
+          )
+        )
+        .execute();
+
+      for (const offload of offloadsAfterDate) {
+        const qty = parseFloat(offload.quantity) || 0;
+        const rate = parseFloat(offload.rate) || 0;
+        const val = qty * rate;
+        
+        if (aggregatedInventory.has(offload.stockItemId)) {
+          const existing = aggregatedInventory.get(offload.stockItemId)!;
+          // Subtract offloaded items to reverse the inbound transaction
+          existing.quantity -= qty;
+          existing.totalValue -= val;
+        } else {
+          // If no current inventory, create with negative values (unlikely but handle it)
+          aggregatedInventory.set(offload.stockItemId, { quantity: -qty, totalValue: -val });
+        }
+      }
+
+      // Filter out items with zero or negative quantities
+      for (const [stockItemId, data] of Array.from(aggregatedInventory)) {
+        if (data.quantity <= 0) {
+          aggregatedInventory.delete(stockItemId);
+        }
+      }
+
+      if (aggregatedInventory.size === 0) {
+        return res.status(400).json({ message: "No inventory found for the selected date" });
+      }
+
+      // Get all stock items for this company to update those with zero inventory
+      const allStockItems = await db
+        .select({ id: stockItems.id })
+        .from(stockItems)
+        .where(
+          and(
+            eq(stockItems.companyId, companyId),
+            eq(stockItems.active, true),
+            isNull(stockItems.deletedAt)
+          )
+        )
+        .execute();
+
+      let itemsUpdated = 0;
+      let totalValue = 0;
+
+      // Update stock items with calculated historical inventory as new opening stock
+      await db.transaction(async (tx) => {
+        // First, reset all stock items opening to zero
+        for (const item of allStockItems) {
+          if (!aggregatedInventory.has(item.id)) {
+            await tx.update(stockItems)
+              .set({
+                openingQty: "0",
+                openingRate: "0",
+                openingValue: "0",
+              })
+              .where(eq(stockItems.id, item.id));
+          }
+        }
+
+        // Then update items that have historical inventory
+        for (const [stockItemId, data] of Array.from(aggregatedInventory)) {
+          const avgRate = data.quantity > 0 ? data.totalValue / data.quantity : 0;
+          
+          await tx.update(stockItems)
+            .set({
+              openingQty: data.quantity.toFixed(3),
+              openingRate: avgRate.toFixed(2),
+              openingValue: data.totalValue.toFixed(2),
+            })
+            .where(eq(stockItems.id, stockItemId));
+          
+          itemsUpdated++;
+          totalValue += data.totalValue;
+        }
+      });
+
+      const company = await storage.getCompanyById(companyId);
+
+      res.json({
+        success: true,
+        message: `Successfully set opening stock for ${company?.name} as of ${targetDateStr}. ${itemsUpdated} items updated with total value $${totalValue.toFixed(2)}`,
+        itemsUpdated,
+        totalValue: totalValue.toFixed(2),
+        asOfDate: targetDateStr,
+      });
+    } catch (error: any) {
+      console.error("Error carrying forward closing stock:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Closing Stock Detail - Items in a stock group
+  app.get("/api/reports/closing-stock-summary/:stockGroupId/items", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { stockGroupId } = req.params;
+
+      // Get stock items in this group
+      const groupItems = await db
+        .select()
+        .from(stockItems)
+        .where(
+          and(
+            eq(stockItems.companyId, companyId),
+            eq(stockItems.stockGroupId, parseInt(stockGroupId)),
+            eq(stockItems.active, true)
+          )
+        )
+        .execute();
+
+      // Get inventory for these items from active locations
+      const itemIds = groupItems.map((i) => i.id);
+      
+      const inventoryData = itemIds.length > 0
+        ? await db
+            .select({
+              stockItemId: inventory.stockItemId,
+              quantity: inventory.quantity,
+              averageRate: inventory.averageRate,
+            })
+            .from(inventory)
+            .innerJoin(locations, eq(inventory.locationId, locations.id))
+            .where(
+              and(
+                eq(inventory.companyId, companyId),
+                inArray(inventory.stockItemId, itemIds),
+                eq(locations.active, true),
+                isNull(locations.deletedAt)
+              )
+            )
+            .execute()
+        : [];
+
+      // Aggregate by stock item - calculate value dynamically as qty * rate
+      const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
+      for (const inv of inventoryData) {
+        const qty = parseFloat(inv.quantity) || 0;
+        const rate = parseFloat(inv.averageRate) || 0;
+        const val = qty * rate;
+        
+        if (inventoryByItem.has(inv.stockItemId)) {
+          const existing = inventoryByItem.get(inv.stockItemId)!;
+          existing.quantity += qty;
+          existing.totalValue += val;
+        } else {
+          inventoryByItem.set(inv.stockItemId, {
+            quantity: qty,
+            totalValue: val,
+          });
+        }
+      }
+
+      // Build items list
+      const items = groupItems.map((item) => {
+        const invData = inventoryByItem.get(item.id) || { quantity: 0, totalValue: 0 };
+        const rate = invData.quantity > 0 ? invData.totalValue / invData.quantity : 0;
+        return {
+          id: item.id,
+          code: item.code,
+          name: item.name,
+          closing: {
+            quantity: invData.quantity,
+            rate: rate,
+            value: invData.totalValue,
+          },
+        };
+      }).filter((i) => i.closing.quantity > 0 || i.closing.value > 0);
+
+      // Calculate totals
+      const totals = {
+        quantity: items.reduce((sum, i) => sum + i.closing.quantity, 0),
+        value: items.reduce((sum, i) => sum + i.closing.value, 0),
+      };
+      const avgRate = totals.quantity > 0 ? totals.value / totals.quantity : 0;
+
+      res.json({
+        items,
+        totals: {
+          quantity: totals.quantity,
+          rate: avgRate,
+          value: totals.value,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Net Profit Drill-down: Purchase Accounts
+  app.get("/api/reports/net-profit-statement/purchase-accounts", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
+      const purchaseAccounts = companyAccounts.filter(
+        (acc) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-")
+      );
+
+      // Get voucher entries for these accounts
+      const companyVouchers = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
+        .execute();
+      
+      const companyVoucherIds = companyVouchers.map((v) => v.id);
+      const accountIds = purchaseAccounts.map((a) => a.id);
+
+      const entries = companyVoucherIds.length > 0 && accountIds.length > 0
+        ? await db
+            .select()
+            .from(voucherEntries)
+            .where(
+              and(
+                inArray(voucherEntries.voucherId, companyVoucherIds),
+                inArray(voucherEntries.ledgerAccountId, accountIds)
+              )
+            )
+            .execute()
+        : [];
+
+      const accountBalances = new Map<number, { debit: number; credit: number }>();
+      for (const entry of entries) {
+        if (entry.ledgerAccountId) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
+          accountBalances.set(entry.ledgerAccountId, {
+            debit: current.debit + debit,
+            credit: current.credit + credit,
+          });
+        }
+      }
+
+      const accounts = purchaseAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: balance.debit - balance.credit,
+        };
+      }).filter((a) => a.debit > 0 || a.credit > 0);
+
+      const total = accounts.reduce((sum, a) => sum + a.balance, 0);
+
+      res.json({ accounts, total });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Net Profit Drill-down: Direct Incomes
+  app.get("/api/reports/net-profit-statement/direct-incomes", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
+      const directIncomeAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Income" && acc.subType === "Direct Income"
+      );
+
+      const companyVouchers = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
+        .execute();
+      
+      const companyVoucherIds = companyVouchers.map((v) => v.id);
+      const accountIds = directIncomeAccounts.map((a) => a.id);
+
+      const entries = companyVoucherIds.length > 0 && accountIds.length > 0
+        ? await db
+            .select()
+            .from(voucherEntries)
+            .where(
+              and(
+                inArray(voucherEntries.voucherId, companyVoucherIds),
+                inArray(voucherEntries.ledgerAccountId, accountIds)
+              )
+            )
+            .execute()
+        : [];
+
+      const accountBalances = new Map<number, { debit: number; credit: number }>();
+      for (const entry of entries) {
+        if (entry.ledgerAccountId) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
+          accountBalances.set(entry.ledgerAccountId, {
+            debit: current.debit + debit,
+            credit: current.credit + credit,
+          });
+        }
+      }
+
+      const accounts = directIncomeAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: balance.credit - balance.debit, // Income is credit
+        };
+      }).filter((a) => a.debit > 0 || a.credit > 0);
+
+      const total = accounts.reduce((sum, a) => sum + a.balance, 0);
+
+      res.json({ accounts, total });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Net Profit Drill-down: Direct Expenses
+  app.get("/api/reports/net-profit-statement/direct-expenses", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
+      
+      // Direct Expenses - include accounts that are Direct Expenses in any form:
+      // - accountType === "Direct Expense"
+      // - accountType === "Expense" AND subType === "Direct Expense"
+      // - IMPORT_CHARGES parent and its children (import costs that reduce profit)
+      const importChargesParent = companyAccounts.find(
+        (acc) => acc.code === "IMPORT_CHARGES"
+      );
+      const importChargesAccountIds = new Set<number>();
+      if (importChargesParent) {
+        importChargesAccountIds.add(importChargesParent.id);
+        companyAccounts.forEach(acc => {
+          if (acc.parentId === importChargesParent.id) {
+            importChargesAccountIds.add(acc.id);
+          }
+        });
+      }
+      
+      const directExpenseAccounts = companyAccounts.filter(
+        (acc) => acc.code !== "PURCHASES" && !acc.code?.startsWith("PURCHASES") && (
+                   acc.accountType === "Direct Expense" || 
+                   (acc.accountType === "Expense" && acc.subType === "Direct Expense") ||
+                   importChargesAccountIds.has(acc.id)
+                 )
+      );
+
+      const companyVouchers = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
+        .execute();
+      
+      const companyVoucherIds = companyVouchers.map((v) => v.id);
+      const accountIds = directExpenseAccounts.map((a) => a.id);
+
+      const entries = companyVoucherIds.length > 0 && accountIds.length > 0
+        ? await db
+            .select()
+            .from(voucherEntries)
+            .where(
+              and(
+                inArray(voucherEntries.voucherId, companyVoucherIds),
+                inArray(voucherEntries.ledgerAccountId, accountIds)
+              )
+            )
+            .execute()
+        : [];
+
+      const accountBalances = new Map<number, { debit: number; credit: number }>();
+      for (const entry of entries) {
+        if (entry.ledgerAccountId) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
+          accountBalances.set(entry.ledgerAccountId, {
+            debit: current.debit + debit,
+            credit: current.credit + credit,
+          });
+        }
+      }
+
+      const accounts = directExpenseAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: balance.debit - balance.credit, // Expense is debit
+        };
+      }).filter((a) => a.debit > 0 || a.credit > 0);
+
+      const total = accounts.reduce((sum, a) => sum + a.balance, 0);
+
+      res.json({ accounts, total });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Net Profit Drill-down: Indirect Expenses
+  app.get("/api/reports/net-profit-statement/indirect-expenses", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
+      const indirectExpenseAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Indirect Expense" &&
+                 acc.code !== "PRODUCTION_ADJUSTMENT" &&
+                 acc.code !== "CONSUMPTION_EXPENSE" &&
+                 acc.code !== "PURCHASES" &&
+                 !acc.code?.startsWith("PURCHASES")
+      );
+
+      const companyVouchers = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
+        .execute();
+      
+      const companyVoucherIds = companyVouchers.map((v) => v.id);
+      const accountIds = indirectExpenseAccounts.map((a) => a.id);
+
+      const entries = companyVoucherIds.length > 0 && accountIds.length > 0
+        ? await db
+            .select()
+            .from(voucherEntries)
+            .where(
+              and(
+                inArray(voucherEntries.voucherId, companyVoucherIds),
+                inArray(voucherEntries.ledgerAccountId, accountIds)
+              )
+            )
+            .execute()
+        : [];
+
+      const accountBalances = new Map<number, { debit: number; credit: number }>();
+      for (const entry of entries) {
+        if (entry.ledgerAccountId) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
+          accountBalances.set(entry.ledgerAccountId, {
+            debit: current.debit + debit,
+            credit: current.credit + credit,
+          });
+        }
+      }
+
+      const accounts = indirectExpenseAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: balance.debit - balance.credit, // Expense is debit
+        };
+      }).filter((a) => a.debit > 0 || a.credit > 0);
+
+      const total = accounts.reduce((sum, a) => sum + a.balance, 0);
+
+      res.json({ accounts, total });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Ledger Monthly Summary - monthly breakdown for a ledger account
+  app.get("/api/reports/ledger-monthly-summary/:accountId", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const accountId = parseInt(req.params.accountId);
+      const { startDate, endDate } = req.query;
+
+      // Get the ledger account
+      const account = await db
+        .select()
+        .from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, companyId)))
+        .execute()
+        .then((rows) => rows[0]);
+
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      // Parse date range
+      const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), 0, 1);
+      const end = endDate ? new Date(endDate as string) : new Date(new Date().getFullYear(), 11, 31);
+
+      // Get opening balance (entries before start date)
+      const openingEntries = await db
+        .select({
+          debit: voucherEntries.debitAmount,
+          credit: voucherEntries.creditAmount,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(voucherEntries.ledgerAccountId, accountId),
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false),
+            lt(vouchers.voucherDate, start.toISOString().split("T")[0])
+          )
+        )
+        .execute();
+
+      // Sign-adjust opening balance: use Cr-normal convention (positive = Cr balance)
+      const openingRawMonthly = parseFloat(account.openingBalance || "0");
+      const openingBalSideMonthly = (account.openingBalanceSide as string) || "Dr";
+      let openingBalance = openingBalSideMonthly === "Cr" ? openingRawMonthly : -openingRawMonthly;
+      for (const entry of openingEntries) {
+        openingBalance += parseFloat(entry.credit || "0") - parseFloat(entry.debit || "0");
+      }
+
+      // Get all voucher entries in date range grouped by month
+      const entries = await db
+        .select({
+          voucherId: vouchers.id,
+          date: vouchers.voucherDate,
+          debit: voucherEntries.debitAmount,
+          credit: voucherEntries.creditAmount,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(voucherEntries.ledgerAccountId, accountId),
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false),
+            gte(vouchers.voucherDate, start.toISOString().split("T")[0]),
+            lte(vouchers.voucherDate, end.toISOString().split("T")[0])
+          )
+        )
+        .execute();
+
+      // Group by month
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+
+      const monthlyData: { month: number; monthName: string; debit: number; credit: number; closingBalance: number }[] = [];
+      let runningBalance = openingBalance;
+
+      for (let month = 0; month < 12; month++) {
+        const monthEntries = entries.filter((e) => {
+          const d = new Date(e.date);
+          return d.getMonth() === month && d.getFullYear() === start.getFullYear();
+        });
+
+        let debit = 0;
+        let credit = 0;
+        for (const entry of monthEntries) {
+          debit += parseFloat(entry.debit || "0");
+          credit += parseFloat(entry.credit || "0");
+        }
+
+        runningBalance += credit - debit;
+
+        monthlyData.push({
+          month: month + 1,
+          monthName: monthNames[month],
+          debit,
+          credit,
+          closingBalance: runningBalance,
+        });
+      }
+
+      // Calculate grand totals
+      const grandTotal = {
+        debit: monthlyData.reduce((sum, m) => sum + m.debit, 0),
+        credit: monthlyData.reduce((sum, m) => sum + m.credit, 0),
+        closingBalance: runningBalance,
+      };
+
+      res.json({
+        account: {
+          id: account.id,
+          code: account.code,
+          name: account.name,
+        },
+        openingBalance,
+        months: monthlyData,
+        grandTotal,
+        dateRange: {
+          startDate: start.toISOString().split("T")[0],
+          endDate: end.toISOString().split("T")[0],
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Ledger Vouchers - vouchers for a specific month
+  app.get("/api/reports/ledger-vouchers/:accountId/:year/:month", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const accountId = parseInt(req.params.accountId);
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+
+      // Get the ledger account
+      const account = await db
+        .select()
+        .from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, companyId)))
+        .execute()
+        .then((rows) => rows[0]);
+
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      const monthNames = [
+        "", "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+
+      // Calculate date range for the month
+      const startOfMonth = new Date(year, month - 1, 1);
+      const endOfMonth = new Date(year, month, 0);
+
+      // Get opening balance (entries before this month)
+      const openingEntries = await db
+        .select({
+          debit: voucherEntries.debitAmount,
+          credit: voucherEntries.creditAmount,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(voucherEntries.ledgerAccountId, accountId),
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false),
+            lt(vouchers.voucherDate, startOfMonth.toISOString().split("T")[0])
+          )
+        )
+        .execute();
+
+      // Sign-adjust opening balance: use Cr-normal convention (positive = Cr balance)
+      const openingRaw = parseFloat(account.openingBalance || "0");
+      const openingBalSide = (account.openingBalanceSide as string) || "Dr";
+      let openingBalance = openingBalSide === "Cr" ? openingRaw : -openingRaw;
+      for (const entry of openingEntries) {
+        openingBalance += parseFloat(entry.credit || "0") - parseFloat(entry.debit || "0");
+      }
+
+      // Get vouchers for the month
+      const voucherEntriesData = await db
+        .select({
+          entryId: voucherEntries.id,
+          voucherId: vouchers.id,
+          voucherNumber: vouchers.voucherNumber,
+          voucherType: vouchers.voucherType,
+          date: vouchers.voucherDate,
+          debit: voucherEntries.debitAmount,
+          credit: voucherEntries.creditAmount,
+          supplierId: voucherEntries.supplierId,
+          locationId: vouchers.locationId,
+          narration: voucherEntries.narration,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(voucherEntries.ledgerAccountId, accountId),
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false),
+            gte(vouchers.voucherDate, startOfMonth.toISOString().split("T")[0]),
+            lte(vouchers.voucherDate, endOfMonth.toISOString().split("T")[0])
+          )
+        )
+        .orderBy(vouchers.voucherDate, vouchers.voucherNumber)
+        .execute();
+
+      // Enrich with party names
+      const vouchersWithDetails = await Promise.all(
+        voucherEntriesData.map(async (entry) => {
+          let particulars = "";
+          
+          if (entry.supplierId) {
+            const supplierData = await db
+              .select({ legalName: suppliers.legalName })
+              .from(suppliers)
+              .where(eq(suppliers.id, entry.supplierId))
+              .execute()
+              .then((rows) => rows[0]);
+            particulars = supplierData?.legalName || "Unknown Supplier";
+          } else if (entry.locationId) {
+            const location = await db
+              .select({ name: locations.name })
+              .from(locations)
+              .where(eq(locations.id, entry.locationId))
+              .execute()
+              .then((rows) => rows[0]);
+            particulars = location?.name || "Unknown Location";
+          } else if (entry.narration) {
+            particulars = entry.narration.substring(0, 50);
+          } else {
+            // Get contra account
+            const contraEntries = await db
+              .select({ accountName: ledgerAccounts.name })
+              .from(voucherEntries)
+              .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
+              .where(
+                and(
+                  eq(voucherEntries.voucherId, entry.voucherId),
+                  ne(voucherEntries.ledgerAccountId, accountId)
+                )
+              )
+              .execute();
+            particulars = contraEntries[0]?.accountName || "Multiple Accounts";
+          }
+
+          return {
+            id: entry.entryId,
+            voucherId: entry.voucherId,
+            date: entry.date,
+            particulars,
+            voucherType: entry.voucherType,
+            voucherNumber: entry.voucherNumber,
+            debit: parseFloat(entry.debit || "0"),
+            credit: parseFloat(entry.credit || "0"),
+          };
+        })
+      );
+
+      const totals = {
+        debit: vouchersWithDetails.reduce((sum, v) => sum + v.debit, 0),
+        credit: vouchersWithDetails.reduce((sum, v) => sum + v.credit, 0),
+      };
+
+      const closingBalance = openingBalance + totals.credit - totals.debit;
+
+      res.json({
+        account: {
+          id: account.id,
+          code: account.code,
+          name: account.name,
+        },
+        month,
+        monthName: monthNames[month],
+        year,
+        openingBalance,
+        vouchers: vouchersWithDetails,
+        totals,
+        closingBalance,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Voucher Detail - full voucher with items/entries
+  app.get("/api/voucher-detail/:voucherId", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const voucherId = parseInt(req.params.voucherId);
+
+      // Get the voucher
+      const voucher = await db
+        .select()
+        .from(vouchers)
+        .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, companyId)))
+        .execute()
+        .then((rows) => rows[0]);
+
+      if (!voucher) {
+        return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      // Get party name from voucher entries (supplier)
+      let partyName: string | null = null;
+      const supplierEntry = await db
+        .select({ supplierId: voucherEntries.supplierId })
+        .from(voucherEntries)
+        .where(and(eq(voucherEntries.voucherId, voucherId), isNotNull(voucherEntries.supplierId)))
+        .execute()
+        .then((rows) => rows[0]);
+      
+      if (supplierEntry?.supplierId) {
+        const supplier = await db
+          .select({ legalName: suppliers.legalName })
+          .from(suppliers)
+          .where(eq(suppliers.id, supplierEntry.supplierId))
+          .execute()
+          .then((rows) => rows[0]);
+        partyName = supplier?.legalName || null;
+      }
+
+      // Get location name
+      const locationName = voucher.locationName || null;
+
+      // Get purchase ledger
+      let purchaseLedger: string | null = null;
+      const purchaseEntry = await db
+        .select({ name: ledgerAccounts.name })
+        .from(voucherEntries)
+        .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
+        .where(
+          and(
+            eq(voucherEntries.voucherId, voucherId),
+            or(
+              eq(ledgerAccounts.code, "PURCHASES"),
+              sql`${ledgerAccounts.code} LIKE 'PURCHASES-%'`
+            )
+          )
+        )
+        .execute()
+        .then((rows) => rows[0]);
+      purchaseLedger = purchaseEntry?.name || null;
+
+      // Get sales items (from sales_items table for Receipt vouchers)
+      const salesItemsData = await db
+        .select({
+          id: salesItems.id,
+          stockItemId: salesItems.stockItemId,
+          quantity: salesItems.quantity,
+          rate: salesItems.sellingPrice,
+          total: salesItems.totalSales,
+        })
+        .from(salesItems)
+        .where(eq(salesItems.voucherId, voucherId))
+        .execute();
+
+      // Get purchase order line items if this is a PO-linked voucher
+      const poItemsData = await db
+        .select({
+          id: poLineItems.id,
+          stockItemId: poLineItems.stockItemId,
+          quantity: poLineItems.quantity,
+          rate: poLineItems.rate,
+          total: poLineItems.lineTotal,
+        })
+        .from(poLineItems)
+        .innerJoin(purchaseOrders, eq(poLineItems.poId, purchaseOrders.id))
+        .where(eq(purchaseOrders.voucherId, voucherId))
+        .execute();
+
+      // Combine and enrich items
+      const allItems = [...salesItemsData, ...poItemsData];
+      const items = await Promise.all(
+        allItems.map(async (item) => {
+          let stockItem = null;
+          if (item.stockItemId) {
+            stockItem = await db
+              .select({ name: stockItems.name, code: stockItems.code, uom: stockItems.uom })
+              .from(stockItems)
+              .where(eq(stockItems.id, item.stockItemId))
+              .execute()
+              .then((rows) => rows[0]);
+          }
+
+          return {
+            id: item.id,
+            stockItemId: item.stockItemId,
+            stockItemName: stockItem?.name || "Unknown Item",
+            stockItemCode: stockItem?.code || "",
+            quantity: parseFloat(item.quantity || "0"),
+            unit: stockItem?.uom || "BL",
+            rate: parseFloat(item.rate || "0"),
+            amount: parseFloat(item.total || "0"),
+          };
+        })
+      );
+
+      // Get ledger entries
+      const entriesData = await db
+        .select({
+          id: voucherEntries.id,
+          ledgerAccountId: voucherEntries.ledgerAccountId,
+          debitAmount: voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
+          narration: voucherEntries.narration,
+        })
+        .from(voucherEntries)
+        .where(eq(voucherEntries.voucherId, voucherId))
+        .execute();
+
+      const entries = await Promise.all(
+        entriesData.map(async (entry) => {
+          let ledgerName = "Unknown Account";
+          if (entry.ledgerAccountId) {
+            const ledger = await db
+              .select({ name: ledgerAccounts.name })
+              .from(ledgerAccounts)
+              .where(eq(ledgerAccounts.id, entry.ledgerAccountId))
+              .execute()
+              .then((rows) => rows[0]);
+            ledgerName = ledger?.name || "Unknown Account";
+          }
+
+          return {
+            id: entry.id,
+            ledgerAccountId: entry.ledgerAccountId || 0,
+            ledgerAccountName: ledgerName,
+            debitAmount: parseFloat(entry.debitAmount || "0"),
+            creditAmount: parseFloat(entry.creditAmount || "0"),
+            narration: entry.narration,
+          };
+        })
+      );
+
+      // Calculate totals
+      const itemsTotalQuantity = items.reduce((sum, i) => sum + i.quantity, 0);
+      const itemsTotalAmount = items.reduce((sum, i) => sum + i.amount, 0);
+      const entriesDebit = entries.reduce((sum, e) => sum + e.debitAmount, 0);
+      const entriesCredit = entries.reduce((sum, e) => sum + e.creditAmount, 0);
+
+      res.json({
+        id: voucher.id,
+        voucherNumber: voucher.voucherNumber,
+        voucherType: voucher.voucherType,
+        date: voucher.voucherDate,
+        partyName,
+        purchaseLedger,
+        locationName,
+        narration: voucher.description,
+        supplierInvoiceNo: null,
+        items,
+        entries,
+        totals: {
+          quantity: itemsTotalQuantity,
+          amount: itemsTotalAmount,
+          debit: entriesDebit,
+          credit: entriesCredit,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Dashboard Container Tracking - cross-company OTW container view
+  app.get("/api/dashboard/container-tracking", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      // Get all companies the user has access to
+      const userCompanyRoles = await storage.getUserCompaniesWithRoles(userId);
+      const companyIds = userCompanyRoles.map(r => r.companyId);
+
+      if (companyIds.length === 0) {
+        return res.json({ containers: [], byRoute: {}, byAgent: {}, byLocation: {}, byTransporter: {}, totals: { count: 0, amount: 0 } });
+      }
+
+      // Get all companies for names
+      const allCompanies = await storage.getAllCompanies();
+      const companyMap = new Map(allCompanies.map(c => [c.id, c]));
+
+      // Get all suppliers for names
+      const allSuppliers = await storage.getAllSuppliers();
+      const supplierMap = new Map(allSuppliers.map(s => [s.id, s]));
+
+      // Fetch ALL containers (OTW and Offloaded) from all accessible companies
+      const otwContainers: any[] = [];
+      const offloadedContainers: any[] = [];
+      
+      // Pre-fetch item counts for all containers
+      const containerItemCounts: Record<number, number> = {};
+      
+      for (const companyId of companyIds) {
+        const containers = await storage.getAllContainers(companyId);
+        const containerIds = containers.map(c => c.id);
+        
+        if (containerIds.length > 0) {
+          // Get PO counts per container
+          const posByContainer = await db
+            .select({ containerId: purchaseOrders.containerId, poId: purchaseOrders.id })
+            .from(purchaseOrders)
+            .where(inArray(purchaseOrders.containerId, containerIds));
+          
+          const poIds = posByContainer.map(p => p.poId);
+          if (poIds.length > 0) {
+            // Get line item counts per PO
+            const lineItemCounts = await db
+              .select({ 
+                purchaseOrderId: poLineItems.poId,
+                count: sql`count(*)`
+              })
+              .from(poLineItems)
+              .where(inArray(poLineItems.poId, poIds))
+              .groupBy(poLineItems.poId);
+            
+            // Map PO counts to containers
+            const poCountMap = new Map(lineItemCounts.filter(l => l.purchaseOrderId != null).map(l => [l.purchaseOrderId, Number(l.count)]));
+            for (const po of posByContainer) {
+              const containerId = po.containerId as number;
+              containerItemCounts[containerId] = (containerItemCounts[containerId] || 0) + (poCountMap.get(po.poId) || 0);
+            }
+          }
+        }
+        
+        containers.forEach(c => {
+          const enrichedContainer = {
+            ...c,
+            companyName: companyMap.get(c.companyId)?.name || "Unknown",
+            companyCode: companyMap.get(c.companyId)?.code || "",
+            supplierName: supplierMap.get(c.supplierId)?.legalName || "Unknown",
+            itemCount: containerItemCounts[c.id] || 0,
+          };
+          if (c.status === "OFFLOADED") {
+            offloadedContainers.push(enrichedContainer);
+          } else if (c.status === "OTW") {
+            otwContainers.push(enrichedContainer);
+          }
+          
+        });
+      }
+
+      // Fetch agent ledger account balances from all companies
+      const agentBalances: Record<string, number> = {};
+      const uniqueAgents = new Set<string>();
+      otwContainers.forEach(c => {
+        if (c.agent) uniqueAgents.add(c.agent);
+      });
+
+      // For each company, get ledger accounts and calculate balances for agents
+      for (const companyId of companyIds) {
+        const ledgerAccounts = await storage.getAllLedgerAccounts(companyId);
+        for (const agent of Array.from(uniqueAgents)) {
+          // Match agent name to ledger account (case-insensitive, partial match)
+          const agentAccount = ledgerAccounts.find(acc => 
+            (acc.name || '').toLowerCase().includes((agent || '').toLowerCase()) ||
+            (agent || '').toLowerCase().includes((acc.name || '').toLowerCase())
+          );
+          if (agentAccount) {
+            // Calculate balance from voucher entries
+            const entries = await db
+              .select({
+                debitAmount: voucherEntries.debitAmount,
+                creditAmount: voucherEntries.creditAmount,
+              })
+              .from(voucherEntries)
+              .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+              .where(
+                and(
+                  eq(voucherEntries.ledgerAccountId, agentAccount.id),
+                  eq(vouchers.companyId, companyId),
+                  eq(vouchers.optional, false)
+                )
+              );
+            
+            let balance = parseFloat(agentAccount.openingBalance || "0");
+            if (agentAccount.openingBalanceSide === "Cr") balance = -balance;
+            
+            for (const entry of entries) {
+              balance += parseFloat(entry.debitAmount || "0") - parseFloat(entry.creditAmount || "0");
+            }
+            
+            agentBalances[agent] = (agentBalances[agent] || 0) + balance;
+          }
+        }
+      }
+
+      // Group OTW containers by shopName (route)
+      const byRoute: Record<string, any[]> = {};
+      const byAgent: Record<string, { containers: any[], offloadedContainers: any[], total: number, offloadedTotal: number, balance: number }> = {};
+      const byLocation: Record<string, { count: number, total: number }> = {};
+
+      let totalAmount = 0;
+
+      // First, group offloaded containers by agent
+      for (const container of offloadedContainers) {
+        const agent = container.agent || "Unassigned";
+        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
+        byAgent[agent].offloadedContainers.push(container);
+        byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
+      }
+
+      for (const container of otwContainers) {
+        // For Statement of Accounts (byAgent), only include OTW containers with plate numbers
+        const hasPlate = container.numberPlate && container.numberPlate.trim() !== "";
+        const route = container.shopName || "Unassigned";
+        const agent = container.agent || "Unassigned";
+        const location = container.trackingLocation || "Unknown";
+        const amount = parseFloat(container.grandTotal || "0");
+
+        // Group by route
+        if (!byRoute[route]) byRoute[route] = [];
+        byRoute[route].push(container);
+
+        // Group by agent with balance - only for containers with plate numbers
+        if (hasPlate) {
+          if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
+          byAgent[agent].containers.push(container);
+          byAgent[agent].total += amount;
+        }
+
+        // Group by location
+        if (!byLocation[location]) byLocation[location] = { count: 0, total: 0 };
+        byLocation[location].count++;
+        byLocation[location].total += amount;
+
+        totalAmount += amount;
+      }
+
+      // Group by transporter (both OTW and offloaded)
+      const byTransporter: Record<string, { otw: any[], offloaded: any[], otwTotal: number, offloadedTotal: number }> = {};
+      
+      for (const container of otwContainers) {
+        // For Statement of Accounts (byAgent), only include OTW containers with plate numbers
+        const hasPlate = container.numberPlate && container.numberPlate.trim() !== "";
+        const transporter = container.transporter || "Unassigned";
+        if (!byTransporter[transporter]) {
+          byTransporter[transporter] = { otw: [], offloaded: [], otwTotal: 0, offloadedTotal: 0 };
+        }
+        byTransporter[transporter].otw.push(container);
+        byTransporter[transporter].otwTotal += parseFloat(container.transportFee || "0");
+      }
+      
+      for (const container of offloadedContainers) {
+        const transporter = container.transporter || "Unassigned";
+        if (!byTransporter[transporter]) {
+          byTransporter[transporter] = { otw: [], offloaded: [], otwTotal: 0, offloadedTotal: 0 };
+        }
+        byTransporter[transporter].offloaded.push(container);
+        byTransporter[transporter].offloadedTotal += parseFloat(container.transportFee || "0");
+      }
+
+      // Calculate total items from container itemCounts
+      const totalItems = otwContainers.reduce((sum, c) => sum + (c.itemCount || 0), 0);
+
+      res.json({
+        containers: otwContainers,
+        byRoute,
+        byAgent,
+        byLocation,
+        byTransporter,
+        totals: { count: otwContainers.length, amount: totalAmount, totalItems },
+      });
+    } catch (error: any) {
+      console.error("Dashboard container tracking error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Dashboard Cash Accounts - user-selected accounts for dashboard display
+  app.get("/api/dashboard-cash-accounts", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const accounts = await db
+        .select()
+        .from(dashboardCashAccounts)
+        .where(eq(dashboardCashAccounts.companyId, companyId))
+        .orderBy(dashboardCashAccounts.displayOrder)
+        .execute();
+
+      if (accounts.length === 0) return res.json([]);
+
+      const ledgerIds = accounts.filter(a => a.accountType === "ledger").map(a => a.accountId);
+      const bankIds   = accounts.filter(a => a.accountType === "bank").map(a => a.accountId);
+
+      // Batch-fetch all account details and aggregate entry sums in parallel (4 queries total regardless of account count)
+      const [ledgerRows, bankRows, ledgerSums, bankSums] = await Promise.all([
+        ledgerIds.length > 0 ? db.select().from(ledgerAccounts).where(inArray(ledgerAccounts.id, ledgerIds)).execute() : [],
+        bankIds.length   > 0 ? db.select().from(bankAccounts).where(inArray(bankAccounts.id, bankIds)).execute()     : [],
+        ledgerIds.length > 0
+          ? db.select({
+              accountId:   voucherEntries.ledgerAccountId,
+              totalDebit:  sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
+              totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
+            })
+            .from(voucherEntries)
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .where(and(
+              inArray(voucherEntries.ledgerAccountId, ledgerIds),
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt),
+              eq(vouchers.optional, false)
+            ))
+            .groupBy(voucherEntries.ledgerAccountId)
+            .execute()
+          : [],
+        bankIds.length > 0
+          ? db.select({
+              accountId:   voucherEntries.bankAccountId,
+              totalDebit:  sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
+              totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
+            })
+            .from(voucherEntries)
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .where(and(
+              inArray(voucherEntries.bankAccountId, bankIds),
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt),
+              eq(vouchers.optional, false)
+            ))
+            .groupBy(voucherEntries.bankAccountId)
+            .execute()
+          : [],
+      ]);
+
+      const ledgerMap    = new Map(ledgerRows.map(l => [l.id, l]));
+      const bankMap      = new Map(bankRows.map(b => [b.id, b]));
+      const ledgerBalMap = new Map(ledgerSums.map(r => [Number(r.accountId), { d: Number(r.totalDebit), c: Number(r.totalCredit) }]));
+      const bankBalMap   = new Map(bankSums.map(r => [Number(r.accountId),   { d: Number(r.totalDebit), c: Number(r.totalCredit) }]));
+
+      const calcBal = (opening: string, side: string | null, sums?: { d: number; c: number }) => {
+        let bal = parseFloat(opening || "0");
+        if (side === "Cr") bal = -bal;
+        if (sums) bal += sums.d - sums.c;
+        return bal;
+      };
+
+      const enrichedAccounts = accounts.map(account => {
+        if (account.accountType === "ledger") {
+          const ledger = ledgerMap.get(account.accountId);
+          if (!ledger) return null;
+          const balance = calcBal(ledger.openingBalance || "0", ledger.openingBalanceSide, ledgerBalMap.get(ledger.id));
+          return { id: account.id, accountType: account.accountType, accountId: account.accountId, displayOrder: account.displayOrder, account: { ...ledger, type: "Ledger", balance, currentBalance: balance } };
+        } else if (account.accountType === "bank") {
+          const bank = bankMap.get(account.accountId);
+          if (!bank) return null;
+          const balance = calcBal(bank.openingBalance || "0", bank.openingBalanceSide, bankBalMap.get(bank.id));
+          return { id: account.id, accountType: account.accountType, accountId: account.accountId, displayOrder: account.displayOrder, account: { ...bank, type: "Bank", balance, currentBalance: balance } };
+        }
+        return null;
+      });
+
+      res.json(enrichedAccounts.filter(a => a !== null));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/dashboard-cash-accounts", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
+      const data = insertDashboardCashAccountSchema.parse({
+        ...req.body,
+        companyId,
+      });
+
+      // Check for existing entry to prevent duplicates
+      const existing = await db
+        .select()
+        .from(dashboardCashAccounts)
+        .where(and(
+          eq(dashboardCashAccounts.companyId, companyId),
+          eq(dashboardCashAccounts.accountType, data.accountType),
+          eq(dashboardCashAccounts.accountId, data.accountId),
+        ))
+        .limit(1)
+        .execute();
+
+      if (existing.length > 0) {
+        return res.json(existing[0]);
+      }
+
+      const [account] = await db
+        .insert(dashboardCashAccounts)
+        .values(data)
+        .returning()
+        .execute();
+
+      res.json(account);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/dashboard-cash-accounts/:id", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const id = parseInt(req.params.id);
+
+      await db
+        .delete(dashboardCashAccounts)
+        .where(
+          and(
+            eq(dashboardCashAccounts.id, id),
+            eq(dashboardCashAccounts.companyId, companyId)
+          )
+        )
+        .execute();
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Reorder dashboard cash accounts
+  app.patch("/api/dashboard-cash-accounts/reorder", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { orderedIds } = req.body as { orderedIds: number[] };
+      if (!Array.isArray(orderedIds)) return res.status(400).json({ message: "orderedIds must be an array" });
+      await Promise.all(orderedIds.map((id, index) =>
+        db.update(dashboardCashAccounts)
+          .set({ displayOrder: index })
+          .where(and(eq(dashboardCashAccounts.id, id), eq(dashboardCashAccounts.companyId, companyId)))
+          .execute()
+      ));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Dashboard Payable Accounts - user-selected payable accounts for dashboard display
+  app.get("/api/dashboard-payable-accounts", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const accounts = await db
+        .select()
+        .from(dashboardPayableAccounts)
+        .where(eq(dashboardPayableAccounts.companyId, companyId))
+        .orderBy(dashboardPayableAccounts.displayOrder)
+        .execute();
+
+      if (accounts.length === 0) return res.json([]);
+
+      const ledgerIds = accounts.map(a => a.accountId);
+
+      // Batch-fetch account details and aggregate sums in parallel (2 queries total regardless of account count)
+      const [ledgerRows, ledgerSums] = await Promise.all([
+        db.select().from(ledgerAccounts).where(inArray(ledgerAccounts.id, ledgerIds)).execute(),
+        db.select({
+            accountId:   voucherEntries.ledgerAccountId,
+            totalDebit:  sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
+            totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(and(
+            inArray(voucherEntries.ledgerAccountId, ledgerIds),
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false)
+          ))
+          .groupBy(voucherEntries.ledgerAccountId)
+          .execute(),
+      ]);
+
+      const ledgerMap    = new Map(ledgerRows.map(l => [l.id, l]));
+      const ledgerBalMap = new Map(ledgerSums.map(r => [Number(r.accountId), { d: Number(r.totalDebit), c: Number(r.totalCredit) }]));
+
+      const enrichedAccounts = accounts.map(account => {
+        const ledger = ledgerMap.get(account.accountId);
+        if (!ledger) return null;
+        let balance = parseFloat(ledger.openingBalance || "0");
+        if (ledger.openingBalanceSide === "Cr") balance = -balance;
+        const sums = ledgerBalMap.get(ledger.id);
+        if (sums) balance += sums.d - sums.c;
+        return {
+          id: account.accountId,
+          accountId: account.accountId,
+          displayOrder: account.displayOrder,
+          code: ledger.code || "",
+          name: ledger.name || "",
+          balance,
+        };
+      });
+
+      res.json(enrichedAccounts.filter(a => a !== null));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/dashboard-payable-accounts", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
+      const data = insertDashboardPayableAccountSchema.parse({
+        ...req.body,
+        companyId,
+      });
+
+      // Check for existing entry to prevent duplicates
+      const existing = await db
+        .select()
+        .from(dashboardPayableAccounts)
+        .where(and(
+          eq(dashboardPayableAccounts.companyId, companyId),
+          eq(dashboardPayableAccounts.accountId, data.accountId),
+        ))
+        .limit(1)
+        .execute();
+
+      if (existing.length > 0) {
+        return res.json(existing[0]);
+      }
+
+      const [account] = await db
+        .insert(dashboardPayableAccounts)
+        .values(data)
+        .returning()
+        .execute();
+
+      res.json(account);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/dashboard-payable-accounts/:id", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const accountId = parseInt(req.params.id);
+
+      await db
+        .delete(dashboardPayableAccounts)
+        .where(
+          and(
+            eq(dashboardPayableAccounts.accountId, accountId),
+            eq(dashboardPayableAccounts.companyId, companyId)
+          )
+        )
+        .execute();
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Reorder dashboard payable accounts
+  app.patch("/api/dashboard-payable-accounts/reorder", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { orderedIds } = req.body as { orderedIds: number[] };
+      if (!Array.isArray(orderedIds)) return res.status(400).json({ message: "orderedIds must be an array" });
+      await Promise.all(orderedIds.map((id, index) =>
+        db.update(dashboardPayableAccounts)
+          .set({ displayOrder: index })
+          .where(and(eq(dashboardPayableAccounts.id, id), eq(dashboardPayableAccounts.companyId, companyId)))
+          .execute()
+      ));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Dashboard Account Selections - for Available Cash and Cash to Pay widgets
+  app.get("/api/dashboard-account-selections/:type", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const selectionType = req.params.type;
+      if (!["availableCash", "cashToPay"].includes(selectionType)) {
+        return res.status(400).json({ message: "Invalid selection type" });
+      }
+
+      const [selection] = await db
+        .select()
+        .from(dashboardAccountSelections)
+        .where(
+          and(
+            eq(dashboardAccountSelections.companyId, companyId),
+            eq(dashboardAccountSelections.selectionType, selectionType)
+          )
+        )
+        .execute();
+
+      if (!selection) {
+        return res.json({ accountIds: [], accounts: [] });
+      }
+
+      // Fetch account details for the selected account IDs
+      const accounts = [];
+      if (selection.accountIds && selection.accountIds.length > 0) {
+        const allLedgerAccounts = await storage.getAllLedgerAccounts(companyId);
+        
+        for (const accountId of selection.accountIds) {
+          const account = allLedgerAccounts.find(a => a.id === accountId);
+          if (account) {
+            // Calculate current balance from voucher entries (excluding optional vouchers)
+            const entries = await db
+              .select({
+                debitAmount: voucherEntries.debitAmount,
+                creditAmount: voucherEntries.creditAmount,
+              })
+              .from(voucherEntries)
+              .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+              .where(
+                and(
+                  eq(voucherEntries.ledgerAccountId, accountId),
+                  eq(vouchers.companyId, companyId),
+                  isNull(vouchers.deletedAt),
+                  or(eq(vouchers.optional, false), isNull(vouchers.optional))
+                )
+              )
+              .execute();
+
+            let totalDebits = 0;
+            let totalCredits = 0;
+            for (const entry of entries) {
+              totalDebits += parseFloat(entry.debitAmount || "0");
+              totalCredits += parseFloat(entry.creditAmount || "0");
+            }
+
+            // Add opening balance
+            const openingBalance = parseFloat(account.openingBalance || "0");
+            const openingSign = account.openingBalanceSide === "Cr" ? -1 : 1;
+            const balance = (openingBalance * openingSign) + totalDebits - totalCredits;
+
+            accounts.push({
+              id: account.id,
+              code: account.code,
+              name: account.name,
+              accountType: account.accountType,
+              balance: balance,
+            });
+          }
+        }
+      }
+
+      res.json({ accountIds: selection.accountIds || [], accounts });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/dashboard-account-selections/:type", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const selectionType = req.params.type;
+      if (!["availableCash", "cashToPay"].includes(selectionType)) {
+        return res.status(400).json({ message: "Invalid selection type" });
+      }
+
+      const { accountIds } = req.body;
+      if (!Array.isArray(accountIds)) {
+        return res.status(400).json({ message: "accountIds must be an array" });
+      }
+
+      // Upsert the selection
+      const [existing] = await db
+        .select()
+        .from(dashboardAccountSelections)
+        .where(
+          and(
+            eq(dashboardAccountSelections.companyId, companyId),
+            eq(dashboardAccountSelections.selectionType, selectionType)
+          )
+        )
+        .execute();
+
+      if (existing) {
+        await db
+          .update(dashboardAccountSelections)
+          .set({ accountIds, updatedAt: new Date() })
+          .where(eq(dashboardAccountSelections.id, existing.id))
+          .execute();
+      } else {
+        await db
+          .insert(dashboardAccountSelections)
+          .values({
+            companyId,
+            selectionType,
+            accountIds,
+          })
+          .execute();
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Bales API Routes
+}

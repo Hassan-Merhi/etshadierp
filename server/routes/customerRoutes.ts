@@ -1,0 +1,743 @@
+import type { Express } from "express";
+import { db } from "../db";
+import { storage } from "../storage";
+import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
+import {
+  upload, logAudit, getCurrentExchangeRate, syncEmployeeBalancesFromEntries,
+} from "./_helpers";
+import {
+  locations, inventory, stockItems, stockGroups, ledgerAccounts, employees,
+  employeeGroups, employeeGroupMembers, workerGroups,
+  suppliers, customers, customerBalances, customerOrders,
+  stockTransferVouchers, stockTransferItems, stockAdjustmentVouchers, stockAdjustmentItems,
+  containers, containerOffloads, containerOffloadItems, vouchers, voucherEntries, salesItems,
+  insertLocationSchema, insertLedgerAccountSchema, updateLedgerAccountSchema,
+  insertEmployeeSchema, insertEmployeeGroupSchema, insertSupplierSchema, insertCustomerSchema,
+  userLocations, userCompanyRoles, companies, bankAccounts, fixedAssets,
+  agentAccounts, auditLog, users, FEATURE_KEYS,
+} from "@shared/schema";
+import {
+  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+} from "drizzle-orm";
+import { format } from "date-fns";
+import { z } from "zod";
+
+export function registerCustomerRoutes(app: Express) {
+  app.get("/api/customers", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const customers = await storage.getAllCustomers(
+        req.session.currentCompanyId,
+      );
+      res.json(customers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get customers with calculated balances (including voucher entries)
+  app.get("/api/customers/stats", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const customers = await storage.getAllCustomers(req.session.currentCompanyId);
+
+      const customersWithBalances = await Promise.all(
+        customers.map(async (customer) => {
+          // If customer has a linked ledger account, calculate balance from voucher entries
+          if (customer.ledgerAccountId) {
+            const entries = await storage.getVoucherEntriesByLedger(customer.ledgerAccountId);
+            const openingBalance = parseFloat(customer.openingBalance || "0");
+            const openingSide = customer.openingBalanceSide || "Dr";
+
+            // For customers (Asset account - Accounts Receivable):
+            // Debit = increases amount they owe us
+            // Credit = decreases amount they owe us
+            const balance = entries.reduce((sum, entry) => {
+              const debit = parseFloat(entry.debitAmount || "0");
+              const credit = parseFloat(entry.creditAmount || "0");
+
+              if (debit > 0 && credit === 0) {
+                return sum + debit; // Increase receivable
+              } else if (credit > 0 && debit === 0) {
+                return sum - credit; // Decrease receivable
+              }
+              return sum;
+            }, openingSide === "Dr" ? openingBalance : -openingBalance);
+
+            return {
+              ...customer,
+              balance: Math.abs(balance),
+              balanceSide: balance >= 0 ? "Dr" : "Cr",
+            };
+          }
+
+          // No ledger account — use customer_id on voucher_entries (post-migration path)
+          const customerEntries = await storage.getVoucherEntriesByCustomer(customer.id);
+          const openingBalance = parseFloat(customer.openingBalance || "0");
+          const openingSide = customer.openingBalanceSide || "Dr";
+
+          const balance = customerEntries.reduce((sum, entry) => {
+            const debit = parseFloat(entry.debitAmount || "0");
+            const credit = parseFloat(entry.creditAmount || "0");
+            if (debit > 0 && credit === 0) return sum + debit;
+            if (credit > 0 && debit === 0) return sum - credit;
+            return sum;
+          }, openingSide === "Dr" ? openingBalance : -openingBalance);
+
+          return {
+            ...customer,
+            balance: Math.abs(balance),
+            balanceSide: balance >= 0 ? "Dr" : "Cr",
+          };
+        })
+      );
+
+      res.json(customersWithBalances);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get transactions for a specific customer (supports both ledger_account_id and customer_id paths)
+  app.get("/api/customers/:id/transactions", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const customerId = parseInt(req.params.id);
+      if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
+
+      const { startDate, endDate } = req.query;
+      const customer = await storage.getCustomerById(customerId);
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+      let transactions: any[] = [];
+      if (customer.ledgerAccountId) {
+        // Old path: entries stored against ledger account
+        transactions = await storage.getVoucherEntriesByLedger(
+          customer.ledgerAccountId,
+          startDate as string | undefined,
+          endDate as string | undefined
+        );
+      } else {
+        // New path (post-migration): entries stored against customer_id
+        transactions = await storage.getVoucherEntriesByCustomer(
+          customerId,
+          startDate as string | undefined,
+          endDate as string | undefined
+        );
+      }
+
+      res.json(transactions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get(
+    "/api/customers/:id",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        const customerId = parseInt(req.params.id);
+        if (isNaN(customerId)) {
+          return res.status(400).json({ message: "Invalid customer ID" });
+        }
+
+        const customer = await storage.getCustomerById(customerId);
+        if (!customer) {
+          return res.status(404).json({ message: "Customer not found" });
+        }
+
+        // Verify customer belongs to current company
+        if (
+          req.session.currentCompanyId &&
+          customer.companyId !== req.session.currentCompanyId
+        ) {
+          return res
+            .status(403)
+            .json({
+              message: "Access denied: Customer belongs to a different company",
+            });
+        }
+
+        res.json(customer);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
+  app.post("/api/customers", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Inject companyId before schema validation
+      const dataWithCompany = {
+        ...req.body,
+        companyId: req.session.currentCompanyId,
+      };
+
+      const parsed = insertCustomerSchema.parse(dataWithCompany);
+
+      // Auto-generate customer code
+      let code = "CUST001";
+      let suffix = 1;
+      const allCustomers = await storage.getAllCustomers(
+        req.session.currentCompanyId,
+      );
+
+      // Find the highest existing customer number
+      const existingCodes = allCustomers
+        .map((c) => c.code)
+        .filter((c) => c.startsWith("CUST"))
+        .map((c) => parseInt(c.replace("CUST", "")))
+        .filter((n) => !isNaN(n));
+
+      if (existingCodes.length > 0) {
+        const maxNumber = Math.max(...existingCodes);
+        suffix = maxNumber + 1;
+      }
+
+      code = `CUST${suffix.toString().padStart(3, "0")}`;
+
+      // Ensure uniqueness
+      while (
+        await storage.getCustomerByCode(code, req.session.currentCompanyId)
+      ) {
+        suffix++;
+        code = `CUST${suffix.toString().padStart(3, "0")}`;
+      }
+
+      // Create customer with auto-generated code
+      const customer = await storage.createCustomer({ ...parsed, code } as any);
+
+      // Auto-create ledger account for customer with opening balance
+      const customerAccountCode = `CUST-${customer.code}`;
+      let customerAccount =
+        await storage.getLedgerAccountByCode(customerAccountCode, req.session.currentCompanyId!);
+
+      if (!customerAccount) {
+        customerAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId,
+          code: customerAccountCode,
+          name: `${customer.legalName} - Customer Account`,
+          accountType: "Asset",
+          subType: "Accounts Receivable",
+          openingBalance: parsed.openingBalance || "0",
+          openingBalanceSide: parsed.openingBalanceSide || "Dr",
+          active: true,
+        });
+
+        // Update customer with ledger account ID
+        await storage.updateCustomer(customer.id, {
+          ledgerAccountId: customerAccount.id,
+        });
+      }
+
+      res.status(201).json(customer);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.put(
+    "/api/customers/:id",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        const customerId = parseInt(req.params.id);
+        if (isNaN(customerId)) {
+          return res.status(400).json({ message: "Invalid customer ID" });
+        }
+
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const existingCustomer = await storage.getCustomerById(customerId);
+        if (!existingCustomer) {
+          return res.status(404).json({ message: "Customer not found" });
+        }
+
+        // Verify customer belongs to current company
+        if (existingCustomer.companyId !== req.session.currentCompanyId) {
+          return res
+            .status(403)
+            .json({
+              message: "Access denied: Customer belongs to a different company",
+            });
+        }
+
+        // If code is being changed, check for duplicates
+        if (req.body.code && req.body.code !== existingCustomer.code) {
+          const duplicate = await storage.getCustomerByCode(
+            req.body.code,
+            req.session.currentCompanyId,
+          );
+          if (duplicate) {
+            return res
+              .status(400)
+              .json({
+                message: "Customer code already exists in this company",
+              });
+          }
+        }
+
+        const parsed = insertCustomerSchema.partial().parse(req.body);
+        const updatedCustomer = await storage.updateCustomer(
+          customerId,
+          parsed,
+        );
+
+        // Sync ledger account opening balance if customer has a linked ledger account
+        // and opening balance was updated
+        if (updatedCustomer.ledgerAccountId && 
+            (parsed.openingBalance !== undefined || parsed.openingBalanceSide !== undefined)) {
+          const ledgerUpdate: { openingBalance?: string; openingBalanceSide?: string } = {};
+          if (parsed.openingBalance !== undefined) {
+            ledgerUpdate.openingBalance = updatedCustomer.openingBalance ?? "0";
+          }
+          if (parsed.openingBalanceSide !== undefined) {
+            ledgerUpdate.openingBalanceSide = updatedCustomer.openingBalanceSide ?? "Dr";
+          }
+          if (Object.keys(ledgerUpdate).length > 0) {
+            await storage.updateLedgerAccount({ id: updatedCustomer.ledgerAccountId!, ...ledgerUpdate });
+          }
+        }
+
+        res.json(updatedCustomer);
+      } catch (error: any) {
+        res.status(400).json({ message: error.message });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/customers/:id",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        const customerId = parseInt(req.params.id);
+        if (isNaN(customerId)) {
+          return res.status(400).json({ message: "Invalid customer ID" });
+        }
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+        const existing = await storage.getCustomerById(customerId);
+        if (!existing) {
+          return res.status(404).json({ message: "Customer not found" });
+        }
+        if (existing.companyId !== req.session.currentCompanyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        await storage.deleteCustomer(customerId);
+        res.status(204).send();
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
+  // Container Sales
+  app.get(
+    "/api/container-sales",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+        const sales = await storage.getContainerSales(
+          req.session.currentCompanyId,
+        );
+        res.json(sales);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
+  app.get(
+    "/api/container-sales/customer/:customerId",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        const customerId = parseInt(req.params.customerId);
+        if (isNaN(customerId)) {
+          return res.status(400).json({ message: "Invalid customer ID" });
+        }
+
+        const sales = await storage.getContainerSalesByCustomer(
+          customerId,
+          req.session.currentCompanyId!
+        );
+        res.json(sales);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
+  app.post(
+    "/api/container-sales",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        // Inject companyId before schema validation
+        const dataWithCompany = {
+          ...req.body,
+          companyId: req.session.currentCompanyId,
+        };
+
+        const parsed = insertContainerSaleSchema.parse(dataWithCompany);
+
+        // Verify customer exists and belongs to current company
+        const customer = await storage.getCustomerById(parsed.customerId);
+        if (!customer) {
+          return res.status(404).json({ message: "Customer not found" });
+        }
+        if (customer.companyId !== req.session.currentCompanyId) {
+          return res
+            .status(403)
+            .json({ message: "Customer belongs to a different company" });
+        }
+
+        // Verify container exists and belongs to current company
+        const container = await storage.getContainerById(parsed.containerId);
+        if (!container) {
+          return res.status(404).json({ message: "Container not found" });
+        }
+        if (container.companyId !== req.session.currentCompanyId) {
+          return res
+            .status(403)
+            .json({ message: "Container belongs to a different company" });
+        }
+
+        // Check if container is already sold
+        const existingSale = await storage.getContainerSaleByContainerId(
+          parsed.containerId,
+          req.session.currentCompanyId
+        );
+        if (existingSale) {
+          return res
+            .status(400)
+            .json({ message: "Container has already been sold" });
+        }
+
+        // Get customer's ledger account
+        if (!customer.ledgerAccountId) {
+          return res
+            .status(400)
+            .json({ message: "Customer does not have a ledger account" });
+        }
+
+        // Determine commission account - use provided ID or default to COMMISSION_REVENUE
+        let commissionAccountId = parsed.commissionAccountId;
+        
+        if (commissionAccountId) {
+          // Verify the provided commission account exists and belongs to current company
+          const commissionAccount = await storage.getLedgerAccountById(commissionAccountId);
+          if (!commissionAccount) {
+            return res.status(404).json({ message: "Commission account not found" });
+          }
+          if (commissionAccount.companyId !== req.session.currentCompanyId) {
+            return res.status(403).json({ message: "Commission account belongs to a different company" });
+          }
+        } else {
+          // Get or create default COMMISSION_REVENUE ledger account
+          const allAccounts = await storage.getAllLedgerAccounts(
+            req.session.currentCompanyId,
+          );
+          let commissionRevenueAccount = allAccounts.find(
+            (a: any) => a.code === "COMMISSION_REVENUE",
+          );
+
+          if (!commissionRevenueAccount) {
+            commissionRevenueAccount = await storage.createLedgerAccount({
+              companyId: req.session.currentCompanyId,
+              code: "COMMISSION_REVENUE",
+              name: "Commission Revenue",
+              accountType: "Income",
+              openingBalance: "0",
+              active: true,
+            });
+          }
+          commissionAccountId = commissionRevenueAccount.id;
+        }
+
+        // Execute all operations in a single transaction for atomicity
+        const sale = await db.transaction(async (tx) => {
+          // Create voucher for the container sale
+          const voucherNumber = `CS-${Date.now()}`;
+          const [voucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId: req.session.currentCompanyId!,
+              voucherNumber,
+              voucherType: "Sales",
+              voucherDate: parsed.saleDate,
+              description:
+                parsed.notes ||
+                `Container sale - ${container.containerNumber} to ${customer.legalName}`,
+              totalAmount: parsed.totalAmount,
+            })
+            .returning();
+
+          // Create voucher entries (double-entry)
+          // Debit: Customer Account (they owe us)
+          await tx.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: customer.ledgerAccountId,
+            debitAmount: parsed.totalAmount,
+            creditAmount: "0",
+            narration: `Container sale - ${voucherNumber}`,
+          });
+
+          // Credit: Commission Revenue Account
+          await tx.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: commissionAccountId,
+            debitAmount: "0",
+            creditAmount: parsed.totalAmount,
+            narration: `Container sale commission - ${voucherNumber}`,
+          });
+
+          // Create container sale record with voucher reference
+          const [createdSale] = await tx
+            .insert(containerSales)
+            .values({
+              ...parsed,
+              commissionAccountId,
+              voucherId: voucher.id,
+            })
+            .returning();
+
+          // Update container status to SOLD
+          await tx
+            .update(containers)
+            .set({ status: "SOLD" })
+            .where(eq(containers.id, parsed.containerId));
+
+          return createdSale;
+        });
+
+        res.status(201).json(sale);
+      } catch (error: any) {
+        res.status(400).json({ message: error.message });
+      }
+    },
+  );
+
+  // Inter-Company Transfers
+  app.get(
+    "/api/inter-company-transfers",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+        // Get all transfers where current company is either sender or receiver
+        const transfers = await storage.getAllInterCompanyTransfers(
+          req.session.currentCompanyId,
+        );
+        res.json(transfers);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
+  app.post(
+    "/api/inter-company-transfers",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const parsed = insertInterCompanyTransferSchema.parse(req.body);
+
+        // Verify both companies exist
+        const fromCompany = await storage.getCompanyById(parsed.fromCompanyId);
+        if (!fromCompany) {
+          return res.status(404).json({ message: "From company not found" });
+        }
+
+        const toCompany = await storage.getCompanyById(parsed.toCompanyId);
+        if (!toCompany) {
+          return res.status(404).json({ message: "To company not found" });
+        }
+
+        // Verify user has access to both companies (optional, depending on requirements)
+        // For now, we'll allow the transfer if the user is in the current company
+
+        // Verify ledger accounts exist
+        const fromAccount = await storage.getLedgerAccountById(
+          parsed.fromLedgerAccountId,
+        );
+        if (!fromAccount || fromAccount.companyId !== parsed.fromCompanyId) {
+          return res
+            .status(404)
+            .json({
+              message:
+                "From ledger account not found or doesn't belong to from company",
+            });
+        }
+
+        const toAccount = await storage.getLedgerAccountById(
+          parsed.toLedgerAccountId,
+        );
+        if (!toAccount || toAccount.companyId !== parsed.toCompanyId) {
+          return res
+            .status(404)
+            .json({
+              message:
+                "To ledger account not found or doesn't belong to to company",
+            });
+        }
+
+        // Get or create inter-company accounts for both companies
+        const fromCompanyAccounts = await storage.getAllLedgerAccounts(
+          parsed.fromCompanyId,
+        );
+        let fromInterCompanyAccount = fromCompanyAccounts.find(
+          (a: any) => a.code === `IC-TO-${toCompany.code}`,
+        );
+
+        if (!fromInterCompanyAccount) {
+          fromInterCompanyAccount = await storage.createLedgerAccount({
+            companyId: parsed.fromCompanyId,
+            code: `IC-TO-${toCompany.code}`,
+            name: `Inter-Company - ${toCompany.name}`,
+            accountType: parsed.transferType === "Loan" ? "Asset" : "Asset",
+            openingBalance: "0",
+            active: true,
+          });
+        }
+
+        const toCompanyAccounts = await storage.getAllLedgerAccounts(
+          parsed.toCompanyId,
+        );
+        let toInterCompanyAccount = toCompanyAccounts.find(
+          (a: any) => a.code === `IC-FROM-${fromCompany.code}`,
+        );
+
+        if (!toInterCompanyAccount) {
+          toInterCompanyAccount = await storage.createLedgerAccount({
+            companyId: parsed.toCompanyId,
+            code: `IC-FROM-${fromCompany.code}`,
+            name: `Inter-Company - ${fromCompany.name}`,
+            accountType:
+              parsed.transferType === "Loan" ? "Liability" : "Liability",
+            openingBalance: "0",
+            active: true,
+          });
+        }
+
+        // Create voucher in FROM company
+        const fromVoucherNumber = `ICT-FROM-${Date.now()}`;
+        const [fromVoucher] = await db
+          .insert(vouchers)
+          .values({
+            companyId: parsed.fromCompanyId,
+            voucherNumber: fromVoucherNumber,
+            voucherType: "Payment",
+            voucherDate: parsed.transferDate,
+            description:
+              parsed.description ||
+              `Inter-company transfer to ${toCompany.name}`,
+            totalAmount: parsed.amount,
+          })
+          .returning();
+
+        // Create voucher entries for FROM company
+        // Debit: Inter-company account (asset - they owe us)
+        await db.insert(voucherEntries).values({
+          voucherId: fromVoucher.id,
+          ledgerAccountId: fromInterCompanyAccount.id,
+          debitAmount: parsed.amount,
+          creditAmount: "0",
+          narration: `Transfer to ${toCompany.name} - ${fromVoucherNumber}`,
+        });
+
+        // Credit: Source account (cash/bank)
+        await db.insert(voucherEntries).values({
+          voucherId: fromVoucher.id,
+          ledgerAccountId: parsed.fromLedgerAccountId,
+          debitAmount: "0",
+          creditAmount: parsed.amount,
+          narration: `Transfer to ${toCompany.name} - ${fromVoucherNumber}`,
+        });
+
+        // Create voucher in TO company
+        const toVoucherNumber = `ICT-TO-${Date.now()}`;
+        const [toVoucher] = await db
+          .insert(vouchers)
+          .values({
+            companyId: parsed.toCompanyId,
+            voucherNumber: toVoucherNumber,
+            voucherType: "Receipt",
+            voucherDate: parsed.transferDate,
+            description:
+              parsed.description ||
+              `Inter-company transfer from ${fromCompany.name}`,
+            totalAmount: parsed.amount,
+          })
+          .returning();
+
+        // Create voucher entries for TO company
+        // Debit: Destination account (cash/bank)
+        await db.insert(voucherEntries).values({
+          voucherId: toVoucher.id,
+          ledgerAccountId: parsed.toLedgerAccountId,
+          debitAmount: parsed.amount,
+          creditAmount: "0",
+          narration: `Transfer from ${fromCompany.name} - ${toVoucherNumber}`,
+        });
+
+        // Credit: Inter-company account (liability - we owe them)
+        await db.insert(voucherEntries).values({
+          voucherId: toVoucher.id,
+          ledgerAccountId: toInterCompanyAccount.id,
+          debitAmount: "0",
+          creditAmount: parsed.amount,
+          narration: `Transfer from ${fromCompany.name} - ${toVoucherNumber}`,
+        });
+
+        // Create inter-company transfer record
+        const transfer = await storage.createInterCompanyTransfer({
+          ...parsed,
+          fromVoucherId: fromVoucher.id,
+          toVoucherId: toVoucher.id,
+        });
+
+        res.status(201).json(transfer);
+      } catch (error: any) {
+        res.status(400).json({ message: error.message });
+      }
+    },
+  );
+
+  // ─── Intercompany POS Auto-Transfer Config ────────────────────────────────────
+
+}
