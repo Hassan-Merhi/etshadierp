@@ -1924,6 +1924,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [transferRevisionNote, setTransferRevisionNote] = useState("");
   const [isTransferSavingRevision, setIsTransferSavingRevision] = useState(false);
   const [transferRevisionsExpanded, setTransferRevisionsExpanded] = useState(false);
+  const [transferQtyDraft, setTransferQtyDraft] = useState<Record<number, string>>({});
   const [importValidationResult, setImportValidationResult] = useState<any>(null);
   const [importDestLocation, setImportDestLocation] = useState<string>("");
   const [importDate, setImportDate] = useState<string>(new Date().toISOString().split("T")[0]);
@@ -4784,22 +4785,46 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             <div className="space-y-1">
                               <label className="text-xs text-muted-foreground">Qty</label>
                               <input
-                                type="number"
-                                step="0.001"
-                                value={entry?.quantity || ""}
-                                onChange={(e) => stockTransferForm.setValue(`entries.${index}.quantity`, e.target.value)}
-                                onBlur={(e) => {
-                                  if (!voucherIdToEdit || !stockTransferToEdit?.items) return;
-                                  const val = parseFloat(e.target.value);
-                                  if (isNaN(val) || val >= 0) return;
-                                  const origItem = (stockTransferToEdit.items as any[]).find(
-                                    (item) => item.stockItemId === entry.stockItemId && item.sourceLocationId === entry.sourceLocationId
-                                  );
-                                  const origQty = origItem ? parseFloat(origItem.quantity) || 0 : 0;
-                                  const newQty = Math.max(0, origQty + val);
-                                  stockTransferForm.setValue(`entries.${index}.quantity`, newQty.toString());
+                                type="text"
+                                inputMode="decimal"
+                                value={transferQtyDraft[`m${index}`] !== undefined ? transferQtyDraft[`m${index}`] : (entry?.quantity || "")}
+                                onFocus={() => setTransferQtyDraft(prev => ({ ...prev, [`m${index}`]: entry?.quantity || "" }))}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  setTransferQtyDraft(prev => ({ ...prev, [`m${index}`]: raw }));
+                                  if (!raw.startsWith("+") && !raw.startsWith("-")) {
+                                    stockTransferForm.setValue(`entries.${index}.quantity`, raw);
+                                  }
                                 }}
-                                placeholder="0"
+                                onBlur={() => {
+                                  const raw = transferQtyDraft[`m${index}`] ?? "";
+                                  setTransferQtyDraft(prev => { const n = { ...prev }; delete n[`m${index}`]; return n; });
+                                  const resolveFromOrig = (delta: number, sign: 1 | -1) => {
+                                    if (!voucherIdToEdit || !stockTransferToEdit?.items) return null;
+                                    const origItem = (stockTransferToEdit.items as any[]).find(
+                                      (item) => item.stockItemId === entry.stockItemId && item.sourceLocationId === entry.sourceLocationId
+                                    );
+                                    const origQty = origItem ? parseFloat(origItem.quantity) || 0 : 0;
+                                    return Math.max(0, origQty + sign * Math.abs(delta)).toString();
+                                  };
+                                  if (raw.startsWith("+")) {
+                                    const delta = parseFloat(raw.slice(1));
+                                    if (!isNaN(delta)) {
+                                      const resolved = resolveFromOrig(delta, 1);
+                                      stockTransferForm.setValue(`entries.${index}.quantity`, resolved ?? delta.toString());
+                                    }
+                                  } else if (raw.startsWith("-")) {
+                                    const delta = parseFloat(raw);
+                                    if (!isNaN(delta)) {
+                                      const resolved = resolveFromOrig(Math.abs(delta), -1);
+                                      if (resolved !== null) stockTransferForm.setValue(`entries.${index}.quantity`, resolved);
+                                    }
+                                  } else {
+                                    const val = parseFloat(raw);
+                                    if (!isNaN(val)) stockTransferForm.setValue(`entries.${index}.quantity`, val.toString());
+                                  }
+                                }}
+                                placeholder={voucherIdToEdit ? "+2 / -1 / 5" : "0"}
                                 data-testid={`input-transfer-quantity-mobile-${index}`}
                                 className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring font-mono text-right"
                               />
@@ -5119,11 +5144,48 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             </div>
                             <div className="w-16 sm:w-24 border-r h-9 sm:h-10">
                               <input
-                                type="number"
-                                step="0.001"
-                                value={transferEntries[index]?.quantity || ""}
+                                type="text"
+                                inputMode="decimal"
+                                value={transferQtyDraft[index] !== undefined ? transferQtyDraft[index] : (transferEntries[index]?.quantity || "")}
+                                onFocus={() => {
+                                  setTransferQtyDraft(prev => ({ ...prev, [index]: transferEntries[index]?.quantity || "" }));
+                                }}
                                 onChange={(e) => {
-                                  stockTransferForm.setValue(`entries.${index}.quantity`, e.target.value);
+                                  const raw = e.target.value;
+                                  setTransferQtyDraft(prev => ({ ...prev, [index]: raw }));
+                                  if (!raw.startsWith("+") && !raw.startsWith("-")) {
+                                    stockTransferForm.setValue(`entries.${index}.quantity`, raw);
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  const raw = transferQtyDraft[index] ?? e.target.value;
+                                  setTransferQtyDraft(prev => { const n = { ...prev }; delete n[index]; return n; });
+                                  const resolveQty = (delta: number, sign: 1 | -1) => {
+                                    if (!voucherIdToEdit || !stockTransferToEdit?.items) return null;
+                                    const entry = stockTransferForm.getValues(`entries.${index}`);
+                                    const origItem = (stockTransferToEdit.items as any[]).find(
+                                      (item) => item.stockItemId === entry.stockItemId && item.sourceLocationId === entry.sourceLocationId
+                                    );
+                                    const origQty = origItem ? parseFloat(origItem.quantity) || 0 : 0;
+                                    return Math.max(0, origQty + sign * Math.abs(delta)).toString();
+                                  };
+                                  if (raw.startsWith("+")) {
+                                    const delta = parseFloat(raw.slice(1));
+                                    if (!isNaN(delta)) {
+                                      const resolved = resolveQty(delta, 1);
+                                      if (resolved !== null) stockTransferForm.setValue(`entries.${index}.quantity`, resolved);
+                                      else stockTransferForm.setValue(`entries.${index}.quantity`, delta.toString());
+                                    }
+                                  } else if (raw.startsWith("-")) {
+                                    const delta = parseFloat(raw);
+                                    if (!isNaN(delta)) {
+                                      const resolved = resolveQty(Math.abs(delta), -1);
+                                      if (resolved !== null) stockTransferForm.setValue(`entries.${index}.quantity`, resolved);
+                                    }
+                                  } else {
+                                    const val = parseFloat(raw);
+                                    if (!isNaN(val)) stockTransferForm.setValue(`entries.${index}.quantity`, val.toString());
+                                  }
                                 }}
                                 onKeyDown={(e) => {
                                   if (e.key === "ArrowUp") {
@@ -5188,19 +5250,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     }
                                   }
                                 }}
-                                onBlur={(e) => {
-                                  if (!voucherIdToEdit || !stockTransferToEdit?.items) return;
-                                  const val = parseFloat(e.target.value);
-                                  if (isNaN(val) || val >= 0) return;
-                                  const entry = stockTransferForm.getValues(`entries.${index}`);
-                                  const origItem = (stockTransferToEdit.items as any[]).find(
-                                    (item) => item.stockItemId === entry.stockItemId && item.sourceLocationId === entry.sourceLocationId
-                                  );
-                                  const origQty = origItem ? parseFloat(origItem.quantity) || 0 : 0;
-                                  const newQty = Math.max(0, origQty + val);
-                                  stockTransferForm.setValue(`entries.${index}.quantity`, newQty.toString());
-                                }}
-                                placeholder="0"
+                                placeholder={voucherIdToEdit ? "+2 / -1 / 5" : "0"}
                                 className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20 font-mono text-right"
                                 data-testid={`input-transfer-quantity-${index}`}
                               />
