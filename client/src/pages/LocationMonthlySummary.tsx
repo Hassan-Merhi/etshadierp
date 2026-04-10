@@ -71,7 +71,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_year"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1);
-  const [showAllMonths, setShowAllMonths] = useState(false);
+  const [showAllMonths, setShowAllMonths] = useState(true);
   const tableScrollContainer = useRef<HTMLDivElement>(null);
 
   const apiUrl = isAllLocationsMode
