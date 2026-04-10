@@ -605,12 +605,10 @@ export function registerAccountRoutes(app: Express) {
         return balance + debits - credits;
       };
 
-      // Build set of ledger account IDs that are auto-created mirrors of customers
-      // so they can be excluded from the ledger list (customers appear as type="customer")
+      // Fetch company customers — needed for the customer entries below.
+      // Customer mirror ledger accounts are intentionally NOT excluded from the ledger list
+      // because they serve as a distinct "cash" account separate from the POS balance account.
       const companyCustomers = await storage.getAllCustomers(companyId);
-      const customerLedgerIds = new Set(
-        companyCustomers.filter((c) => c.ledgerAccountId).map((c) => c.ledgerAccountId as number)
-      );
 
       // Build simplified account array for sidebar
       const accounts = [
@@ -658,9 +656,8 @@ export function registerAccountRoutes(app: Express) {
             parentId: null,
           };
         }),
-        // Ledger accounts (excluding those that are auto-created mirrors of customers)
+        // Ledger accounts — all included (customer mirror ledgers appear alongside the customer entry)
         ...ledgers
-          .filter((account) => !customerLedgerIds.has(account.id))
           .map((account) => {
           const movements = ledgerBalances.get(account.id) || { debits: 0, credits: 0 };
           const balance = calculateSignedBalance(
@@ -745,30 +742,7 @@ export function registerAccountRoutes(app: Express) {
             balance,
           };
         }),
-        // Customers — appear as type="customer" (their mirror ledger accounts are excluded above)
-        ...companyCustomers
-          .filter((c) => !c.deletedAt && c.active !== false)
-          .map((customer) => {
-            // Combine movements from direct customerId entries AND ledger mirror entries
-            const directMov = customerBalances.get(customer.id) || { debits: 0, credits: 0 };
-            const ledgerId = customer.ledgerAccountId;
-            const ledgerMov = ledgerId ? (ledgerBalances.get(ledgerId) || { debits: 0, credits: 0 }) : { debits: 0, credits: 0 };
-            const totalDebits = directMov.debits + ledgerMov.debits;
-            const totalCredits = directMov.credits + ledgerMov.credits;
-            const balance = calculateSignedBalance(
-              customer.openingBalance || "0",
-              customer.openingBalanceSide || "Dr",
-              totalDebits,
-              totalCredits,
-            );
-            return {
-              id: customer.id,
-              type: "customer" as const,
-              name: customer.legalName,
-              code: customer.code,
-              balance,
-            };
-          }),
+        // Customers appended below after async balance computation
         // Fixed Assets
         ...assets.map((asset) => {
           const movements = assetBalances.get(asset.id) || { debits: 0, credits: 0 };
@@ -789,7 +763,25 @@ export function registerAccountRoutes(app: Express) {
         }),
       ];
 
-      res.json(accounts);
+      // Build customer entries using the accurate running-balance from customerBalances table
+      const customerEntries = await Promise.all(
+        companyCustomers
+          .filter((c) => !c.deletedAt && c.active !== false)
+          .map(async (customer) => {
+            const runningBalance = await storage.getCustomerBalance(customer.id, companyId);
+            const openingBalance = parseFloat(customer.openingBalance || "0");
+            const effectiveBalance = runningBalance !== 0 ? runningBalance : openingBalance;
+            return {
+              id: customer.id,
+              type: "customer" as const,
+              name: customer.legalName,
+              code: customer.code,
+              balance: effectiveBalance,
+            };
+          })
+      );
+
+      res.json([...accounts, ...customerEntries]);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
