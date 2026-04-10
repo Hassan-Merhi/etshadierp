@@ -141,7 +141,7 @@ interface Supplier {
 interface Customer {
   id: number;
   code: string;
-  name: string;
+  legalName: string;
 }
 
 interface Employee {
@@ -511,7 +511,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       ...customers.map((c: any) => ({
         type: "customer" as const,
         id: c.id,
-        name: c.name,
+        name: c.legalName,
         code: c.code,
         openingBalance: c.openingBalance,
       })),
@@ -733,7 +733,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           accountType = "customer";
           accountId = entry.customerId;
           const customer = customers.find(c => c.id === accountId);
-          accountName = customer?.name || "";
+          accountName = customer?.legalName || "";
         }
 
         // Extract the amount from the contra entry
@@ -1601,7 +1601,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           accountType = "customer";
           accountId = entry.customerId;
           const customer = customers.find(c => c.id === accountId);
-          accountName = customer?.name || "";
+          accountName = customer?.legalName || "";
         }
 
         // Determine DR/CR and amount
