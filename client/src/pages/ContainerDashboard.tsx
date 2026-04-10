@@ -533,23 +533,23 @@ export default function ContainerDashboard() {
         </TabsList>
 
         <TabsContent value="tracking" className="mt-3">
-          <div className="flex flex-wrap gap-2 items-center mb-3">
+          <div className="flex flex-wrap gap-2 items-center mb-4">
             <Popover>
               <PopoverTrigger asChild>
                 <Button 
                   variant="outline" 
-                  className="w-full sm:w-[180px] h-8 text-xs justify-between"
+                  className="w-full sm:w-[180px] justify-between"
                   data-testid="select-filter-company"
                 >
-                  <div className="flex items-center gap-1 truncate">
-                    <Building2 className="h-3 w-3" />
+                  <div className="flex items-center gap-1.5 truncate">
+                    <Building2 className="h-4 w-4" />
                     {filterCompany.length === 0 
                       ? "All Companies" 
                       : filterCompany.length === 1 
                         ? filterCompany[0]
                         : `${filterCompany.length} Companies`}
                   </div>
-                  <ChevronDown className="h-3 w-3 opacity-50" />
+                  <ChevronDown className="h-4 w-4 opacity-50" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[220px] p-2" align="start">
@@ -591,7 +591,7 @@ export default function ContainerDashboard() {
             </Popover>
 
             <Select value={filterAgent} onValueChange={setFilterAgent}>
-              <SelectTrigger className="w-full sm:w-[120px] h-8 text-xs" data-testid="select-filter-agent">
+              <SelectTrigger className="w-full sm:w-[140px]" data-testid="select-filter-agent">
                 <SelectValue placeholder="All Agents" />
               </SelectTrigger>
               <SelectContent>
@@ -603,7 +603,7 @@ export default function ContainerDashboard() {
             </Select>
 
             <Select value={filterTransporter} onValueChange={setFilterTransporter}>
-              <SelectTrigger className="w-full sm:w-[140px] h-8 text-xs" data-testid="select-filter-transporter">
+              <SelectTrigger className="w-full sm:w-[160px]" data-testid="select-filter-transporter">
                 <SelectValue placeholder="All Transporters" />
               </SelectTrigger>
               <SelectContent>
@@ -617,8 +617,6 @@ export default function ContainerDashboard() {
             {(filterAgent !== "all" || filterCompany.length > 0 || filterTransporter !== "all") && (
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-8 text-xs"
                 onClick={() => {
                   setFilterAgent("all");
                   setFilterCompany([]);
@@ -631,100 +629,86 @@ export default function ContainerDashboard() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-2">
-            <div className="space-y-2 min-w-0">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-3">
+            <div className="space-y-3 min-w-0">
+              {/* Stats bar */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Card>
-                  <CardContent className="py-1 px-2">
-                    <div className="flex items-center gap-1">
-                      <Package className="h-3 w-3 text-muted-foreground" />
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Total OTW</p>
-                        <p className="text-sm font-bold">{filteredData?.totals.count || 0}</p>
-                      </div>
-                    </div>
+                  <CardContent className="py-3 px-4">
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><Package className="h-3.5 w-3.5" />OTW Containers</p>
+                    <p className="text-2xl font-bold">{filteredData?.totals.count || 0}</p>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="py-1 px-2">
-                    <div className="flex items-center gap-1">
-                      <DollarSign className="h-3 w-3 text-muted-foreground" />
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Total Value</p>
-                        <p className="text-sm font-bold">{formatAmount(filteredData?.totals.amount || 0)}</p>
-                      </div>
-                    </div>
+                  <CardContent className="py-3 px-4">
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><DollarSign className="h-3.5 w-3.5" />Total Value</p>
+                    <p className="text-2xl font-bold">{formatAmount(filteredData?.totals.amount || 0)}</p>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="py-1 px-2">
-                    <div className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3 text-muted-foreground" />
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Routes</p>
-                        <p className="text-sm font-bold">{Object.keys(filteredData?.byRoute || {}).length}</p>
-                      </div>
-                    </div>
+                  <CardContent className="py-3 px-4">
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><FileCheck className="h-3.5 w-3.5" />Docs Received</p>
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {filteredData?.containers.filter(c => c.docReceived).length || 0}
+                      <span className="text-sm font-normal text-muted-foreground ml-1">/ {filteredData?.totals.count || 0}</span>
+                    </p>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="py-1 px-2">
-                    <div className="flex items-center gap-1">
-                      <Users className="h-3 w-3 text-muted-foreground" />
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Agents</p>
-                        <p className="text-sm font-bold">{Object.keys(filteredData?.byAgent || {}).filter(a => a !== "Unassigned").length}</p>
-                      </div>
-                    </div>
+                  <CardContent className="py-3 px-4">
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />Routes</p>
+                    <p className="text-2xl font-bold">{Object.keys(filteredData?.byRoute || {}).length}</p>
                   </CardContent>
                 </Card>
               </div>
 
-              <ScrollArea className="h-[calc(100vh-280px)]">
-                <div className="space-y-2">
+              <ScrollArea className="h-[calc(100vh-310px)]">
+                <div className="space-y-3">
                   {filteredData && Object.entries(filteredData.byRoute)
                     .sort(([a], [b]) => (a || '').localeCompare(b || ''))
                     .map(([route, containers]) => {
                       const routeTotal = containers.reduce((sum, c) => sum + parseFloat(c.grandTotal || "0"), 0);
                       const isExpanded = expandedRoutes.has(route);
+                      const docsOk = containers.filter(c => c.docReceived).length;
 
                       return (
                         <Card key={route}>
                           <Collapsible open={isExpanded} onOpenChange={() => toggleRoute(route)}>
                             <CollapsibleTrigger asChild>
-                              <CardHeader className="cursor-pointer hover-elevate py-2 px-3">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                              <CardHeader className="cursor-pointer hover-elevate py-3 px-4">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2.5">
+                                    {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                                     <CardTitle className="text-sm font-semibold">
                                       {route === "Unassigned" ? "Unassigned Route" : route}
                                     </CardTitle>
-                                    <Badge variant="secondary" className="text-xs">{containers.length}</Badge>
+                                    <Badge variant="secondary">{containers.length} container{containers.length !== 1 ? "s" : ""}</Badge>
+                                    {docsOk > 0 && <Badge variant="outline" className="text-green-600 border-green-300 dark:border-green-700">{docsOk} docs ready</Badge>}
                                   </div>
-                                  <span className="text-xs font-medium">{formatAmount(routeTotal)}</span>
+                                  <span className="text-sm font-semibold tabular-nums">{formatAmount(routeTotal)}</span>
                                 </div>
                               </CardHeader>
                             </CollapsibleTrigger>
                             <CollapsibleContent>
                               <CardContent className="p-0">
                                 <div className="hidden md:block overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
-                                  <table className="w-full text-[11px]">
+                                  <table className="w-full text-xs">
                                   <thead className="bg-muted/50 sticky top-0 z-10">
                                     <tr>
-                                      <th className="text-left py-0.5 px-0.5 font-medium w-5">#</th>
-                                      <th className="text-left py-0.5 px-0.5 font-medium">Container</th>
-                                      <th className="text-right py-0.5 px-0.5 font-medium">Amount</th>
-                                      <th className="text-left py-0.5 px-0.5 font-medium">Supplier</th>
-                                      <th className="text-left py-0.5 px-0.5 font-medium">ETA</th>
-                                      <th className="text-left py-0.5 px-0.5 font-medium">Plate</th>
-                                      <th className="text-left py-0.5 px-0.5 font-medium">Location</th>
-                                      <th className="text-left py-0.5 px-0.5 font-medium">Border</th>
-                                      <th className="text-left py-0.5 px-0.5 font-medium">Offload</th>
-                                      <th className="text-center py-0.5 px-0.5 font-medium w-6">Doc</th>
-                                      <th className="text-left py-0.5 px-0.5 font-medium">Transporter</th>
-                                      <th className="text-center py-0.5 px-2 font-medium min-w-[80px]">Fee</th>
-                                      <th className="text-left py-0.5 px-2 font-medium min-w-[90px]">Agent</th>
-                                      <th className="text-right py-0.5 px-0.5 font-medium">Duty</th>
+                                      <th className="text-left py-2 px-2 font-semibold text-muted-foreground w-7">#</th>
+                                      <th className="text-left py-2 px-2 font-semibold text-muted-foreground">Container</th>
+                                      <th className="text-right py-2 px-2 font-semibold text-muted-foreground">Amount</th>
+                                      <th className="text-left py-2 px-2 font-semibold text-muted-foreground">Supplier</th>
+                                      <th className="text-left py-2 px-2 font-semibold text-muted-foreground">ETA</th>
+                                      <th className="text-left py-2 px-2 font-semibold text-muted-foreground">Plate</th>
+                                      <th className="text-left py-2 px-2 font-semibold text-muted-foreground">Location</th>
+                                      <th className="text-left py-2 px-2 font-semibold text-muted-foreground">Border</th>
+                                      <th className="text-left py-2 px-2 font-semibold text-muted-foreground">Offload</th>
+                                      <th className="text-center py-2 px-2 font-semibold text-muted-foreground w-8">Doc</th>
+                                      <th className="text-left py-2 px-2 font-semibold text-muted-foreground">Transporter</th>
+                                      <th className="text-right py-2 px-2 font-semibold text-muted-foreground">Fee</th>
+                                      <th className="text-left py-2 px-2 font-semibold text-muted-foreground">Agent</th>
+                                      <th className="text-right py-2 px-2 font-semibold text-muted-foreground">Duty</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -739,34 +723,34 @@ export default function ContainerDashboard() {
                                         onClick={() => handleContainerClick(container.companyId)}
                                         data-testid={`row-container-${container.id}`}
                                       >
-                                        <td className="py-0.5 px-0.5 w-5">{idx + 1}</td>
+                                        <td className="py-2 px-2 text-muted-foreground">{idx + 1}</td>
                                         <td
-                                          className="py-0.5 px-0.5 font-mono text-[10px] text-primary underline cursor-pointer hover:text-primary/80"
+                                          className="py-2 px-2 font-mono text-primary underline cursor-pointer"
                                           onClick={(e) => handleContainerNumberClick(e, container.id)}
                                           data-testid={`link-container-${container.id}`}
                                         >
                                           {container.containerNumber}
                                         </td>
-                                        <td className="py-0.5 px-0.5 text-right">{formatAmount(parseFloat(container.grandTotal || "0"))}</td>
-                                        <td className="py-0.5 px-0.5">{container.supplierName || "-"}</td>
-                                        <td className={cn("py-0.5 px-0.5", isOverdue(container.eta) && "text-yellow-600 dark:text-yellow-400")}>
+                                        <td className="py-2 px-2 text-right font-medium tabular-nums">{formatAmount(parseFloat(container.grandTotal || "0"))}</td>
+                                        <td className="py-2 px-2">{container.supplierName || "-"}</td>
+                                        <td className={cn("py-2 px-2 tabular-nums", isOverdue(container.eta) && "text-yellow-600 dark:text-yellow-400 font-medium")}>
                                           {formatDate(container.eta)}
                                         </td>
-                                        <td className="py-0.5 px-0.5">{container.numberPlate || "-"}</td>
-                                        <td className="py-0.5 px-0.5">{container.trackingLocation || "-"}</td>
-                                        <td className="py-0.5 px-0.5">{formatDate(container.borderDate)}</td>
-                                        <td className="py-0.5 px-0.5">{formatDate(container.offloadDate)}</td>
-                                        <td className="py-0.5 px-0.5 text-center w-6">
+                                        <td className="py-2 px-2">{container.numberPlate || "-"}</td>
+                                        <td className="py-2 px-2">{container.trackingLocation || "-"}</td>
+                                        <td className="py-2 px-2 tabular-nums">{formatDate(container.borderDate)}</td>
+                                        <td className="py-2 px-2 tabular-nums">{formatDate(container.offloadDate)}</td>
+                                        <td className="py-2 px-2 text-center">
                                           {container.docReceived ? (
-                                            <FileCheck className="h-3 w-3 text-green-600 mx-auto" />
+                                            <FileCheck className="h-3.5 w-3.5 text-green-600 mx-auto" />
                                           ) : (
-                                            <AlertTriangle className="h-3 w-3 text-yellow-500 mx-auto" />
+                                            <AlertTriangle className="h-3.5 w-3.5 text-yellow-500 mx-auto" />
                                           )}
                                         </td>
-                                        <td className="py-0.5 px-0.5">{container.transporter || "-"}</td>
-                                        <td className="py-0.5 px-2 text-center min-w-[80px]">{container.transportFee ? formatAmount(parseFloat(container.transportFee)) : "-"}</td>
-                                        <td className="py-0.5 px-2 min-w-[90px]">{container.agent || "-"}</td>
-                                        <td className="py-0.5 px-0.5 text-right">{container.dutyFee ? formatAmount(parseFloat(container.dutyFee)) : "-"}</td>
+                                        <td className="py-2 px-2">{container.transporter || "-"}</td>
+                                        <td className="py-2 px-2 text-right tabular-nums">{container.transportFee ? formatAmount(parseFloat(container.transportFee)) : "-"}</td>
+                                        <td className="py-2 px-2">{container.agent || "-"}</td>
+                                        <td className="py-2 px-2 text-right tabular-nums">{container.dutyFee ? formatAmount(parseFloat(container.dutyFee)) : "-"}</td>
                                       </tr>
                                     ))}
                                   </tbody>
@@ -825,101 +809,103 @@ export default function ContainerDashboard() {
               </ScrollArea>
             </div>
 
-            <div className="w-full lg:w-[200px] shrink-0">
-              <ScrollArea className="h-[calc(100vh-220px)]">
-                <div className="space-y-2 pr-2">
-                  <Card>
-                    <CardHeader className="py-2 px-3">
-                      <CardTitle className="text-xs font-medium flex items-center gap-1">
-                        <Users className="h-3 w-3" />
-                        By Agent
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-1 py-1 px-3">
-                      {filteredData && Object.entries(filteredData.byAgent)
-                        .filter(([agent]) => agent !== "Unassigned")
-                        .sort(([, a], [, b]) => Math.abs(b.balance) - Math.abs(a.balance))
-                        .map(([agent, agentData]) => (
-                          <div
-                            key={agent}
-                            className="flex items-center gap-1 py-1 px-1 rounded hover-elevate cursor-pointer text-xs"
-                            onClick={() => setFilterAgent(filterAgent === agent ? "all" : agent)}
-                            data-testid={`card-agent-${agent}`}
-                          >
-                            <span className="font-medium">{agent}</span>
-                            <Badge variant="secondary" className="text-[10px] py-0 px-1">{agentData.containers.length}</Badge>
-                          </div>
-                        ))}
-                      {filteredData?.byAgent["Unassigned"] && (
-                        <div className="flex items-center gap-1 py-1 rounded text-muted-foreground text-xs">
-                          <span>Unassigned</span>
-                          <Badge variant="outline" className="text-[10px] py-0 px-1">{filteredData.byAgent["Unassigned"].containers.length}</Badge>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="py-2 px-3">
-                      <CardTitle className="text-xs font-medium flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        By Location
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-1 py-1 px-3">
-                      {filteredData && Object.entries(filteredData.byLocation)
-                        .sort(([, a], [, b]) => b.count - a.count)
-                        .map(([location, locationData]) => (
-                          <div
-                            key={location}
-                            className="flex items-center justify-between py-1 rounded text-xs"
-                            data-testid={`card-location-${location}`}
-                          >
-                            <span>{location}</span>
-                            <Badge variant="secondary" className="text-[10px] py-0 px-1">{locationData.count}</Badge>
-                          </div>
-                        ))}
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="py-2 px-3">
-                      <CardTitle className="text-xs font-medium flex items-center gap-1">
-                        <Truck className="h-3 w-3" />
-                        Summary
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="py-1 px-3">
-                      <div className="space-y-1 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Total Containers</span>
-                          <span className="font-bold">{filteredData?.totals.count || 0}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Total Value</span>
-                          <span className="font-bold">{formatAmount(filteredData?.totals.amount || 0)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Total Items</span>
-                          <span className="font-bold">{formatNumber(filteredData?.totals.totalItems || 0)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Docs Received</span>
-                          <span className="font-bold text-green-600">
-                            {filteredData?.containers.filter(c => c.docReceived).length || 0}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Pending Docs</span>
-                          <span className="font-bold text-yellow-600">
-                            {filteredData?.containers.filter(c => !c.docReceived).length || 0}
-                          </span>
-                        </div>
+            <div className="w-full lg:w-[240px] shrink-0 space-y-3">
+              {/* Agents panel */}
+              <Card>
+                <CardHeader className="py-3 px-4">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    Agents
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-3 pt-0 space-y-0.5">
+                  {filteredData && Object.entries(filteredData.byAgent)
+                    .filter(([agent]) => agent !== "Unassigned")
+                    .sort(([, a], [, b]) => Math.abs(b.balance) - Math.abs(a.balance))
+                    .map(([agent, agentData]) => (
+                      <div
+                        key={agent}
+                        className={cn(
+                          "flex items-center justify-between py-1.5 px-2 rounded-md hover-elevate cursor-pointer text-sm",
+                          filterAgent === agent && "bg-accent"
+                        )}
+                        onClick={() => setFilterAgent(filterAgent === agent ? "all" : agent)}
+                        data-testid={`card-agent-${agent}`}
+                      >
+                        <span className="font-medium truncate">{agent}</span>
+                        <Badge variant="secondary">{agentData.containers.length}</Badge>
                       </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </ScrollArea>
+                    ))}
+                  {filteredData?.byAgent["Unassigned"] && (
+                    <div className="flex items-center justify-between py-1.5 px-2 rounded-md text-muted-foreground text-sm">
+                      <span>Unassigned</span>
+                      <Badge variant="outline">{filteredData.byAgent["Unassigned"].containers.length}</Badge>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Locations panel */}
+              <Card>
+                <CardHeader className="py-3 px-4">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    Locations
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-3 pt-0 space-y-0.5">
+                  {filteredData && Object.entries(filteredData.byLocation)
+                    .sort(([, a], [, b]) => b.count - a.count)
+                    .map(([location, locationData]) => (
+                      <div
+                        key={location}
+                        className="flex items-center justify-between py-1.5 px-2 rounded-md text-sm"
+                        data-testid={`card-location-${location}`}
+                      >
+                        <span className="truncate">{location}</span>
+                        <Badge variant="secondary">{locationData.count}</Badge>
+                      </div>
+                    ))}
+                </CardContent>
+              </Card>
+
+              {/* Quick totals */}
+              <Card>
+                <CardHeader className="py-3 px-4">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-muted-foreground" />
+                    Totals
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-3 pt-0">
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Containers</span>
+                      <span className="font-semibold">{filteredData?.totals.count || 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Total Value</span>
+                      <span className="font-semibold tabular-nums">{formatAmount(filteredData?.totals.amount || 0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Total Items</span>
+                      <span className="font-semibold">{formatNumber(filteredData?.totals.totalItems || 0)}</span>
+                    </div>
+                    <div className="border-t pt-2 flex justify-between">
+                      <span className="text-muted-foreground">Docs Ready</span>
+                      <span className="font-semibold text-green-600 dark:text-green-400">
+                        {filteredData?.containers.filter(c => c.docReceived).length || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Pending Docs</span>
+                      <span className="font-semibold text-yellow-600 dark:text-yellow-400">
+                        {filteredData?.containers.filter(c => !c.docReceived).length || 0}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </TabsContent>
