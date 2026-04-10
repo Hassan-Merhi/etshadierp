@@ -1013,7 +1013,12 @@ const FACTORY_COST_FIELDS = [
         try {
           const res = await fetch(`/api/user-locations/${role.userId}/${role.companyId}`);
           const locs = await res.json();
-          setSelectedLocationIds(locs.map((l: any) => l.locationId));
+          if (Array.isArray(locs) && locs.length > 0) {
+            setSelectedLocationIds(locs.map((l: any) => l.locationId));
+          } else {
+            // Fallback to legacy single assignedLocationId if userLocations is empty
+            setSelectedLocationIds(role.assignedLocationId ? [role.assignedLocationId] : []);
+          }
         } catch {
           setSelectedLocationIds(role.assignedLocationId ? [role.assignedLocationId] : []);
         }

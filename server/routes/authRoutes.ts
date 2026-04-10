@@ -11,6 +11,7 @@ import {
   insertExchangeRateSchema,
   insertUserCompanyRoleSchema,
   insertUserSchema,
+  locations,
   loginHistory,
   updatePresenceSchema,
   userCompanyRoles,
@@ -736,6 +737,60 @@ export function registerAuthRoutes(app: Express) {
               eq(locations.active, true)
             )
           );
+
+        // Fallback: if userLocations table has no entry for this user+company,
+        // check userCompanyRoles.assignedLocationId (legacy single-location field).
+        // Auto-populate userLocations so future lookups work correctly.
+        if (userLocs.length === 0) {
+          const role = await db
+            .select({ assignedLocationId: userCompanyRoles.assignedLocationId })
+            .from(userCompanyRoles)
+            .where(
+              and(
+                eq(userCompanyRoles.userId, req.user.id),
+                eq(userCompanyRoles.companyId, companyId)
+              )
+            )
+            .limit(1);
+
+          const fallbackLocId = role[0]?.assignedLocationId;
+          if (fallbackLocId) {
+            const loc = await db
+              .select({
+                id: locations.id,
+                name: locations.name,
+                code: locations.code,
+                city: locations.city,
+                state: locations.state,
+                country: locations.country,
+              })
+              .from(locations)
+              .where(and(eq(locations.id, fallbackLocId), eq(locations.active, true)))
+              .limit(1);
+
+            if (loc.length > 0) {
+              // Heal the userLocations table so this fallback isn't needed again
+              const existing = await db
+                .select({ id: userLocations.id })
+                .from(userLocations)
+                .where(
+                  and(
+                    eq(userLocations.userId, req.user.id),
+                    eq(userLocations.companyId, companyId),
+                    eq(userLocations.locationId, fallbackLocId)
+                  )
+                )
+                .limit(1);
+              if (existing.length === 0) {
+                await db
+                  .insert(userLocations)
+                  .values({ userId: req.user.id, companyId, locationId: fallbackLocId });
+              }
+              return res.json(loc);
+            }
+          }
+        }
+
         res.json(userLocs);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
