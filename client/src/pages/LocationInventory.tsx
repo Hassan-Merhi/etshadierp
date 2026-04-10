@@ -442,8 +442,11 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     (group.groupCode ?? "").toLowerCase().includes(groupSearchTerm.toLowerCase())
   );
 
-  // Filter and sort stock items alphabetically (A-Z) by name
-  const filteredStockItems = (selectedGroup?.items || [])
+  // Filter and sort stock items alphabetically (A-Z) by name.
+  // Derive from the live `inventory` array (which respects showZeroStock) so the
+  // zero-stock toggle works when the user has drilled into a specific group.
+  const filteredStockItems = inventory
+    .filter((item) => selectedGroup && item.stockGroupId === selectedGroup.groupId)
     .sort((a, b) => (a.stockItemName ?? "").localeCompare(b.stockItemName ?? ""))
     .filter((item) =>
       (item.stockItemName ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
@@ -1955,17 +1958,28 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             <h1 className="text-xl md:text-3xl font-bold">
               {selectedGroup.groupName} - Stock Items
             </h1>
-            {!posUser && (
+            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
               <Button
-                variant="outline"
-                onClick={() => setArchiveDialogOpen(true)}
-                data-testid="button-archive-stock-group"
-                className="w-full sm:w-auto"
+                onClick={() => setShowZeroStock(v => !v)}
+                data-testid="button-show-zero-stock-items"
+                variant={showZeroStock ? "default" : "outline"}
+                className="gap-2 flex-1 sm:flex-none"
               >
-                <Archive className="h-4 w-4 mr-2" />
-                Archive Stock Group
+                <Eye className="w-4 h-4" />
+                <span>{showZeroStock ? "Hide zero stock" : "Show zero stock"}</span>
               </Button>
-            )}
+              {!posUser && (
+                <Button
+                  variant="outline"
+                  onClick={() => setArchiveDialogOpen(true)}
+                  data-testid="button-archive-stock-group"
+                  className="gap-2 flex-1 sm:flex-none"
+                >
+                  <Archive className="h-4 w-4 mr-2" />
+                  Archive Stock Group
+                </Button>
+              )}
+            </div>
           </div>
 
           <Card className="p-3 md:p-4 w-full">
@@ -2222,7 +2236,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </div>
             {filteredStockItems.length > 0 && (
               <div className="mt-4 text-sm text-muted-foreground">
-                Showing {filteredStockItems.length} of {selectedGroup.items.length} items
+                Showing {filteredStockItems.length} of {inventory.filter(i => i.stockGroupId === selectedGroup.groupId).length} items
               </div>
             )}
           </Card>
@@ -2237,6 +2251,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               {selectedLocationLocal.name} - All Stock Items
             </h1>
             <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+              <Button
+                onClick={() => setShowZeroStock(v => !v)}
+                data-testid="button-show-zero-stock-all-items"
+                variant={showZeroStock ? "default" : "outline"}
+                className="gap-2 flex-1 sm:flex-none"
+              >
+                <Eye className="w-4 h-4" />
+                <span>{showZeroStock ? "Hide zero stock" : "Show zero stock"}</span>
+              </Button>
               <Button
                 onClick={handleExportInventory}
                 data-testid="button-export-all-stock-excel"
