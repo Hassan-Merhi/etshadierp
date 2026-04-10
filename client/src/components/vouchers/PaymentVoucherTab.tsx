@@ -26,7 +26,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { AccountAutocomplete } from "@/components/AccountAutocomplete";
@@ -209,60 +208,55 @@ export function PaymentVoucherTab({
                     )}
                   />
 
-                  {/* Single Actions dropdown (Print + Export) */}
+                  {/* Print + Export actions */}
                   <div className="flex flex-col gap-1 lg:items-end">
-                    {/* spacer to align with other labeled controls */}
-                    <div className="text-sm font-medium text-transparent select-none">
-                      Actions
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="default"
-                          className="h-10"
-                          disabled={!canRunActions}
-                          data-testid="button-actions"
-                        >
-                          <Printer className="h-4 w-4 mr-2" />
-                          Actions
-                          <ChevronDown className="h-4 w-4 ml-2" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={handlePrint}
-                          disabled={!canPrint}
-                          data-testid="action-print"
-                        >
-                          <Printer className="h-4 w-4 mr-2" />
-                          Print
-                        </DropdownMenuItem>
-
-                        {hasExport && (
-                          <>
-                            <DropdownMenuSeparator />
+                    <div className="text-sm font-medium text-transparent select-none">Actions</div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="default"
+                        disabled={!canPrint}
+                        onClick={handlePrint}
+                        data-testid="button-print"
+                      >
+                        <Printer className="h-4 w-4 mr-2" />
+                        Print
+                      </Button>
+                      {hasExport && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="default"
+                              disabled={!canExport}
+                              data-testid="button-export"
+                            >
+                              <FileDown className="h-4 w-4 mr-2" />
+                              Export
+                              <ChevronDown className="h-4 w-4 ml-2" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
                             <DropdownMenuItem
                               onClick={() => handleExportVoucher?.(false)}
-                              disabled={!canExport}
                               data-testid="export-summary"
                             >
                               <FileDown className="h-4 w-4 mr-2" />
-                              Export (Summary)
+                              Summary
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleExportVoucher?.(true)}
-                              disabled={!canExport}
                               data-testid="export-detailed"
                             >
                               <FileDown className="h-4 w-4 mr-2" />
-                              Export (Detailed)
+                              Detailed
                             </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
                   </div>
                 </div>
 

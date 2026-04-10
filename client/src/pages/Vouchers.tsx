@@ -3516,7 +3516,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     <div className="space-y-4 md:space-y-6">
       <PageHeader 
         title={isPOS ? "Stock Transfer" : "Vouchers"}
-        subtitle={isPOS ? "Transfer stock between locations" : "Create payment and receipt vouchers"}
+        subtitle={isPOS ? "Transfer stock between locations" : "Manage payments, receipts, journals and inventory transactions"}
       />
 
       {/* Hidden print template */}
@@ -3537,61 +3537,65 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         </div>
       )}
 
-      {/* Mobile tab selector — visible on small screens only */}
+      {/* Mobile tab selector — scrollable pills, visible on small screens only */}
       {!isPOS && (
-        <div className="sm:hidden">
-          <Select value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-            <SelectTrigger className="w-full" data-testid="select-voucher-tab-mobile">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {sidebarGroups.map((group) => (
-                <SelectGroup key={group.label}>
-                  <SelectLabel>{group.label}</SelectLabel>
-                  {group.items.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <SelectItem key={item.key} value={item.key}>
-                        <span className="flex items-center gap-2">
-                          <Icon className="h-4 w-4" />
-                          {item.label}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="sm:hidden -mx-4 px-4 overflow-x-auto">
+          <div className="flex gap-2 pb-1 w-max">
+            {sidebarGroups.flatMap((group) =>
+              group.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.key;
+                return (
+                  <Button
+                    key={item.key}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActiveTab(item.key as typeof activeTab)}
+                    data-testid={`tab-mobile-${item.key}`}
+                    className={cn(
+                      "shrink-0 gap-1.5",
+                      isActive && "bg-primary text-primary-foreground border-primary hover:bg-primary/90"
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {item.label}
+                  </Button>
+                );
+              })
+            )}
+          </div>
         </div>
       )}
 
       <div className="flex gap-6">
         {!isPOS && (
-          <nav className="hidden sm:block w-56 shrink-0 space-y-4">
+          <nav className="hidden sm:block w-52 shrink-0 space-y-4">
             {sidebarGroups.map((group) => (
               <div key={group.label}>
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-2">
                   {group.label}
                 </h3>
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   {group.items.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeTab === item.key;
                     return (
-                      <button
+                      <Button
                         key={item.key}
+                        type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setActiveTab(item.key as typeof activeTab)}
                         data-testid={`tab-${item.key}`}
-                        className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${
-                          isActive
-                            ? "bg-background shadow-sm font-medium"
-                            : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                        }`}
+                        className={cn(
+                          "w-full justify-start gap-2.5 font-normal",
+                          isActive && "toggle-elevate toggle-elevated font-medium"
+                        )}
                       >
-                        <Icon className="h-4 w-4" />
+                        <Icon className="h-4 w-4 shrink-0" />
                         {item.label}
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -4174,11 +4178,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 <Button
                                   type="button"
                                   variant="ghost"
-                                  size="sm"
+                                  size="icon"
                                   onClick={() => removeJournal(index)}
                                   data-testid={`button-journal-remove-${index}`}
                                 >
-                                  ×
+                                  <X className="h-4 w-4 text-muted-foreground" />
                                 </Button>
                               )}
                             </td>

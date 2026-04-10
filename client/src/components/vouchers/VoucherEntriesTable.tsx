@@ -5,6 +5,7 @@ import { FormControl, FormField, FormItem, FormMessage } from "@/components/ui/f
 import { Plus, X } from "lucide-react";
 import type { Account } from "@/components/AccountSidebar";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { cn } from "@/lib/utils";
 
 export interface VoucherEntry {
   accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "factorySupplier";
@@ -177,8 +178,10 @@ export function VoucherEntriesTable({
             </tr>
           </thead>
           <tbody>
-            {fields.map((field, index) => (
-              <tr key={field.id} className="border-t hover-elevate">
+            {fields.map((field, index) => {
+              const isEmpty = !entries[index]?.accountId || entries[index].accountId === 0;
+              return (
+              <tr key={field.id} className={cn("border-t hover-elevate", isEmpty && "bg-muted/20")}>
                 <td className="p-2">
                   <FormField
                     control={form.control}
@@ -235,16 +238,17 @@ export function VoucherEntriesTable({
                     <Button
                       type="button"
                       variant="ghost"
-                      size="sm"
+                      size="icon"
                       onClick={() => remove(index)}
                       data-testid={`button-remove-${index}`}
                     >
-                      ×
+                      <X className="h-4 w-4 text-muted-foreground" />
                     </Button>
                   )}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
           <tfoot className="bg-muted/30 border-t-2">
             <tr>
