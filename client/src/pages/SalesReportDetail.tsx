@@ -36,6 +36,9 @@ interface SalesReportItem {
   configuredProfit: number;
   configuredProfitPercentage: number;
   createdAt: string;
+  companyId?: number;
+  companyCode?: string;
+  companyName?: string;
 }
 
 interface LocationSummary {
@@ -102,6 +105,8 @@ export default function SalesReportDetail() {
   const stockGroupId = params.get("stockGroupId") || "";
   const searchTerm = params.get("searchTerm") || "";
   const grouping = params.get("grouping") || "daily";
+  const allCompanies = params.get("allCompanies") === "true";
+  const companyFilter = params.get("companyFilter") || "";
 
   const queryParams = new URLSearchParams();
   if (startDate) queryParams.append("startDate", startDate);
@@ -109,10 +114,14 @@ export default function SalesReportDetail() {
   if (locationId && locationId !== "all") queryParams.append("locationId", locationId);
   if (stockItemId && stockItemId !== "all") queryParams.append("stockItemId", stockItemId);
   if (stockGroupId && stockGroupId !== "all") queryParams.append("stockGroupId", stockGroupId);
+  if (allCompanies && companyFilter) queryParams.append("companyFilter", companyFilter);
   const queryString = queryParams.toString();
 
+  const apiBase = allCompanies ? "/api/dashboard/sales-report-all" : "/api/sales-report";
+  const apiUrl = queryString ? `${apiBase}?${queryString}` : apiBase;
+
   const { data: items = [], isLoading } = useQuery<SalesReportItem[]>({
-    queryKey: [`/api/sales-report?${queryString}`],
+    queryKey: [apiUrl],
     enabled: !!startDate,
   });
 
@@ -159,13 +168,19 @@ export default function SalesReportDetail() {
     g.configuredProfit += item.configuredProfit || 0;
 
     // Also track per-location breakdown within this item group
-    const locKey = String(item.locationId ?? "no-location");
+    // In all-companies mode, use composite key so same-named locations across companies are separate
+    const locKey = allCompanies
+      ? `${item.companyId ?? "?"}-${item.locationId ?? "no-location"}`
+      : String(item.locationId ?? "no-location");
+    const locDisplayName = allCompanies && item.companyCode
+      ? `${item.companyCode} · ${item.locationName || "No Location"}`
+      : (item.locationName || "No Location");
     let locSummary = g.locationBreakdown.find((l) => l.locationKey === locKey);
     if (!locSummary) {
       locSummary = {
         locationKey: locKey,
         locationId: item.locationId,
-        locationName: item.locationName || "No Location",
+        locationName: locDisplayName,
         totalQty: 0,
         totalSales: 0,
         totalCost: 0,
@@ -195,7 +210,9 @@ export default function SalesReportDetail() {
   });
 
   // Build a stable color map for all unique locations (all companies view or multiple locations)
-  const allLocKeys = Array.from(new Set(filteredItems.map((i) => String(i.locationId ?? "no-location"))));
+  const allLocKeys = Array.from(new Set(filteredItems.map((i) =>
+    allCompanies ? `${i.companyId ?? "?"}-${i.locationId ?? "no-location"}` : String(i.locationId ?? "no-location")
+  )));
   const locationColorMap = new Map<string, typeof LOCATION_PALETTE[0]>();
   allLocKeys.forEach((key, idx) => {
     locationColorMap.set(key, LOCATION_PALETTE[idx % LOCATION_PALETTE.length]);

@@ -380,6 +380,10 @@ export default function SalesReport() {
     if (selectedStockItem && selectedStockItem !== "all") params.set("stockItemId", selectedStockItem);
     if (selectedStockGroup && selectedStockGroup !== "all") params.set("stockGroupId", selectedStockGroup);
     if (searchTerm) params.set("searchTerm", searchTerm);
+    if (isMultiCompanyMode) {
+      params.set("allCompanies", "true");
+      if (selectedCompanies.length > 0) params.set("companyFilter", selectedCompanies.join(","));
+    }
     navigate(`/sales-report/detail?${params.toString()}`);
   };
 
