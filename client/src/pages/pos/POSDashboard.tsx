@@ -136,12 +136,11 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
   // Calculate today's sales from vouchers
   const todaySales = (() => {
     const salesVouchers = todayVouchers?.filter((v: any) => v.voucherType === "Sales") || [];
+    const totalRaw = salesVouchers.reduce((sum: number, v: any) => sum + parseFloat(v.totalAmount || "0"), 0);
     return {
       count: salesVouchers.length,
-      total: salesVouchers.reduce((sum: number, v: any) => sum + parseFloat(v.totalAmount || "0"), 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 }),
-      average: salesVouchers.length > 0 
-        ? (salesVouchers.reduce((sum: number, v: any) => sum + parseFloat(v.totalAmount || "0"), 0) / salesVouchers.length).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-        : "0",
+      total: totalRaw,
+      average: salesVouchers.length > 0 ? totalRaw / salesVouchers.length : 0,
     };
   })();
 
@@ -163,7 +162,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/pos/shifts/current"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pos/shifts/current", { locationId }] });
       setOpenShiftDialog(false);
       setOpeningCash("");
       toast({
@@ -192,8 +191,8 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
       return await res.json();
     },
     onSuccess: (data: PosShift) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/pos/shifts/current"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/pos/shifts/history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pos/shifts/current", { locationId }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pos/shifts/history", { locationId }] });
       setCloseShiftDialog(false);
       setClosingCash("");
       setCloseNotes("");
@@ -343,7 +342,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             ) : (
               <>
                 <div className="text-2xl font-semibold" data-testid="text-today-revenue">
-                  {formatAmount(parseFloat(todaySales?.total || "0"))}
+                  {formatAmount(todaySales?.total || 0)}
                 </div>
                 <p className="text-xs text-muted-foreground">total revenue</p>
               </>
@@ -362,7 +361,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             ) : (
               <>
                 <div className="text-2xl font-semibold" data-testid="text-average-sale">
-                  {formatAmount(parseFloat(todaySales?.average || "0"))}
+                  {formatAmount(todaySales?.average || 0)}
                 </div>
                 <p className="text-xs text-muted-foreground">per transaction</p>
               </>

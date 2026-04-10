@@ -399,6 +399,10 @@ export default function POSDaybook() {
   };
 
   const handleRemoveItem = (index: number) => {
+    if (editedItems.length <= 1) {
+      toast({ title: "Cannot remove", description: "A sale must have at least one item.", variant: "destructive" });
+      return;
+    }
     const newItems = editedItems.filter((_, i) => i !== index);
     setEditedItems(newItems);
   };
