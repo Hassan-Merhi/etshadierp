@@ -101,7 +101,7 @@ export default function Agents() {
   const { toast } = useToast();
 
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("last_1_month"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   const [agentSearch, setAgentSearch] = useState("");
   const [addDialogOpen, setAddDialogOpen] = useState(false);

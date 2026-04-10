@@ -104,7 +104,7 @@ const formatSmartNumber = (value: string | number) => {
 };
 
 export default function SalesReport() {
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("last_1_month"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [selectedStockItem, setSelectedStockItem] = useState<string>("");
@@ -311,7 +311,7 @@ export default function SalesReport() {
   );
 
   const handleClearFilters = () => {
-    setPeriodFilter(getDefaultPeriodValue("this_month"));
+    setPeriodFilter(getDefaultPeriodValue("last_1_month"));
     setSelectedLocation("");
     setSelectedStockItem("");
     setSelectedStockGroup("");
