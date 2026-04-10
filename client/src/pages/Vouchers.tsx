@@ -83,7 +83,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useFormDraft } from "@/hooks/useFormDraft";
 import { DraftRestorePrompt } from "@/components/DraftRestorePrompt";
-import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, FileDown, Loader2, ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight, SlidersHorizontal, FileText, LayoutGrid, ClipboardList } from "lucide-react";
+import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, ChevronUp, FileDown, Loader2, ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight, SlidersHorizontal, FileText, LayoutGrid, ClipboardList, GitBranch } from "lucide-react";
 import { utils, writeFile } from "@/lib/excelHelper";
 import {
   DropdownMenu,
@@ -94,10 +94,13 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -445,6 +448,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const data = await res.json();
       return Array.isArray(data) ? data[0] : data;
     },
+  });
+
+  // Fetch revisions for stock transfer being edited
+  const { data: transferRevisions = [] } = useQuery<any[]>({
+    queryKey: ["/api/stock-transfers", stockTransferToEdit?.id, "revisions"],
+    queryFn: async () => {
+      const res = await fetch(`/api/stock-transfers/${stockTransferToEdit!.id}/revisions`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch revisions");
+      return res.json();
+    },
+    enabled: !!stockTransferToEdit?.id,
   });
 
   // Fetch stock adjustment data for editing if voucherIdToEdit is present
@@ -1906,6 +1920,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importPreview, setImportPreview] = useState<any>(null);
+  const [transferRevisionDialogOpen, setTransferRevisionDialogOpen] = useState(false);
+  const [transferRevisionNote, setTransferRevisionNote] = useState("");
+  const [isTransferSavingRevision, setIsTransferSavingRevision] = useState(false);
+  const [transferRevisionsExpanded, setTransferRevisionsExpanded] = useState(false);
   const [importValidationResult, setImportValidationResult] = useState<any>(null);
   const [importDestLocation, setImportDestLocation] = useState<string>("");
   const [importDate, setImportDate] = useState<string>(new Date().toISOString().split("T")[0]);
@@ -2423,6 +2441,88 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       });
     },
   });
+
+  const computeTransferRevisionItems = () => {
+    if (!stockTransferToEdit?.items) return [];
+    type RevKey = string;
+    const originalMap = new Map<RevKey, { qty: number; stockItemId: number; stockItemName: string; sourceLocationId: number; sourceLocationName: string }>();
+    for (const item of stockTransferToEdit.items) {
+      const key: RevKey = `${item.stockItemId}-${item.sourceLocationId ?? "null"}`;
+      const si = stockItems.find((s: any) => s.id === item.stockItemId);
+      const sl = locations.find((l: any) => l.id === item.sourceLocationId);
+      originalMap.set(key, {
+        qty: parseFloat(item.quantity) || 0,
+        stockItemId: item.stockItemId,
+        stockItemName: si?.name || "",
+        sourceLocationId: item.sourceLocationId ?? null,
+        sourceLocationName: sl?.name || "",
+      });
+    }
+    const currentEntries = stockTransferForm.getValues("entries");
+    const currentMap = new Map<RevKey, (typeof currentEntries)[0]>();
+    for (const entry of currentEntries) {
+      if (!entry.stockItemId || entry.stockItemId <= 0) continue;
+      const key: RevKey = `${entry.stockItemId}-${entry.sourceLocationId ?? "null"}`;
+      currentMap.set(key, entry);
+    }
+    const allKeys = new Set([...originalMap.keys(), ...currentMap.keys()]);
+    const result: Array<{
+      stockItemId: number; stockItemName: string;
+      sourceLocationId: number | null; sourceLocationName: string;
+      originalQuantity: number; delta: number; newQuantity: number;
+    }> = [];
+    for (const key of allKeys) {
+      const orig = originalMap.get(key);
+      const cur = currentMap.get(key);
+      const origQty = orig?.qty ?? 0;
+      const curQty = parseFloat(cur?.quantity || "0");
+      const delta = curQty - origQty;
+      if (Math.abs(delta) < 0.001) continue;
+      result.push({
+        stockItemId: cur?.stockItemId ?? orig?.stockItemId ?? 0,
+        stockItemName: cur?.stockItemName || orig?.stockItemName || "",
+        sourceLocationId: cur?.sourceLocationId ?? orig?.sourceLocationId ?? null,
+        sourceLocationName: cur?.sourceLocationName || orig?.sourceLocationName || "",
+        originalQuantity: origQty,
+        delta,
+        newQuantity: curQty,
+      });
+    }
+    return result;
+  };
+
+  const handleTransferSaveAsRevision = () => {
+    if (!voucherIdToEdit || !stockTransferToEdit?.id) return;
+    setTransferRevisionDialogOpen(true);
+  };
+
+  const confirmTransferSaveAsRevision = async () => {
+    const revisionItems = computeTransferRevisionItems();
+    if (revisionItems.length === 0) {
+      toast({ title: "No Changes", description: "No differences found compared to the saved order", variant: "destructive" });
+      setTransferRevisionDialogOpen(false);
+      return;
+    }
+    setIsTransferSavingRevision(true);
+    try {
+      await stockTransferForm.handleSubmit(async (data) => {
+        await onStockTransferSubmit(data);
+      })();
+      await modeApiRequest("POST", `/api/stock-transfers/${stockTransferToEdit!.id}/revisions`, {
+        note: transferRevisionNote.trim() || null,
+        items: revisionItems,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", stockTransferToEdit!.id, "revisions"] });
+      setTransferRevisionNote("");
+      setTransferRevisionDialogOpen(false);
+      const nextRevNum = transferRevisions.length + 1;
+      toast({ title: "Revision Saved", description: `Rev ${nextRevNum} recorded and transfer updated` });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to save revision", variant: "destructive" });
+    } finally {
+      setIsTransferSavingRevision(false);
+    }
+  };
 
   const onStockTransferSubmit = async (data: StockTransferFormData) => {
     
@@ -5477,9 +5577,104 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 >
                   {stockTransferMutation.isPending ? "Saving..." : "Save Transfer"}
                 </Button>
+                {voucherIdToEdit && stockTransferToEdit?.id && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isTransferSavingRevision || transferEntries.filter(e => e.stockItemId > 0).length === 0}
+                    onClick={handleTransferSaveAsRevision}
+                    data-testid="button-save-transfer-revision"
+                  >
+                    <GitBranch className="h-4 w-4 mr-1" />
+                    Save as Revision
+                  </Button>
+                )}
               </div>
             </form>
           </Form>
+
+          {/* ── Transfer Revision History Panel ── */}
+          {voucherIdToEdit && stockTransferToEdit?.id && (
+            <Card className="mt-4">
+              <CardHeader
+                className="p-4 cursor-pointer select-none"
+                onClick={() => setTransferRevisionsExpanded(v => !v)}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <GitBranch className="h-4 w-4 text-muted-foreground" />
+                    <CardTitle className="text-base">Revision History</CardTitle>
+                    {transferRevisions.length > 0 && (
+                      <Badge variant="secondary" className="ml-1">{transferRevisions.length}</Badge>
+                    )}
+                  </div>
+                  {transferRevisionsExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                </div>
+              </CardHeader>
+              {transferRevisionsExpanded && (
+                <CardContent className="pt-0 space-y-4">
+                  {transferRevisions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">No revisions yet. Use "Save as Revision" to record tracked changes.</p>
+                  ) : (
+                    transferRevisions.map((rev: any) => (
+                      <div key={rev.id} className="border rounded-md overflow-hidden">
+                        <div className="flex items-center justify-between gap-3 p-3 bg-muted/40 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant={rev.optional ? "secondary" : "default"}>Rev {rev.revisionNumber}</Badge>
+                            {rev.optional && <Badge variant="outline" className="text-xs">Reference Only</Badge>}
+                            <span className="text-xs text-muted-foreground">{rev.revisionDate ? new Date(rev.revisionDate).toLocaleDateString() : ""}</span>
+                            {rev.note && <span className="text-xs italic text-muted-foreground">"{rev.note}"</span>}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="text-muted-foreground">Reference only:</span>
+                            <Switch
+                              checked={rev.optional}
+                              onCheckedChange={async (checked) => {
+                                await modeApiRequest("PATCH", `/api/stock-transfer-revisions/${rev.id}/optional`, { optional: checked });
+                                queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", stockTransferToEdit.id, "revisions"] });
+                              }}
+                              data-testid={`switch-transfer-revision-optional-${rev.id}`}
+                            />
+                          </div>
+                        </div>
+                        {rev.items && rev.items.length > 0 && (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead className="bg-muted/30">
+                                <tr>
+                                  <th className="text-left p-2 font-medium">Item</th>
+                                  <th className="text-left p-2 font-medium hidden sm:table-cell">From</th>
+                                  <th className="text-right p-2 font-medium">Was</th>
+                                  <th className="text-right p-2 font-medium">Change</th>
+                                  <th className="text-right p-2 font-medium">Now</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {rev.items.map((item: any, idx: number) => {
+                                  const delta = parseFloat(item.delta);
+                                  return (
+                                    <tr key={idx} className="border-t">
+                                      <td className="p-2 font-medium">{item.stockItemName}</td>
+                                      <td className="p-2 text-muted-foreground hidden sm:table-cell">{item.sourceLocationName || "—"}</td>
+                                      <td className="p-2 text-right font-mono text-muted-foreground">{formatNumber(parseFloat(item.originalQuantity), 0)}</td>
+                                      <td className={`p-2 text-right font-mono font-semibold ${delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                                        {delta > 0 ? "+" : ""}{formatNumber(delta, 0)}
+                                      </td>
+                                      <td className="p-2 text-right font-mono font-semibold">{formatNumber(parseFloat(item.newQuantity), 0)}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              )}
+            </Card>
+          )}
           </div>
         )}
 
@@ -6196,6 +6391,80 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           }
         }}
       />
+
+      {/* Transfer Revision Note Dialog */}
+      <Dialog open={transferRevisionDialogOpen} onOpenChange={setTransferRevisionDialogOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitBranch className="h-4 w-4" />
+              Save as Revision
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This will update the transfer <strong>and</strong> record the changes as{" "}
+              <strong>Rev {transferRevisions.length + 1}</strong>.
+            </p>
+            {(() => {
+              const items = computeTransferRevisionItems();
+              return items.length === 0 ? (
+                <p className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-md px-3 py-2">
+                  No differences detected compared to the saved transfer.
+                </p>
+              ) : (
+                <div className="border rounded-md overflow-hidden text-sm">
+                  <table className="w-full">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left p-2 font-medium">Item</th>
+                        <th className="text-right p-2 font-medium">Was</th>
+                        <th className="text-right p-2 font-medium">Change</th>
+                        <th className="text-right p-2 font-medium">Now</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((item, idx) => (
+                        <tr key={idx} className="border-t">
+                          <td className="p-2 font-medium truncate max-w-[120px]">{item.stockItemName}</td>
+                          <td className="p-2 text-right font-mono text-muted-foreground">{formatNumber(item.originalQuantity, 0)}</td>
+                          <td className={`p-2 text-right font-mono font-semibold ${item.delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                            {item.delta > 0 ? "+" : ""}{formatNumber(item.delta, 0)}
+                          </td>
+                          <td className="p-2 text-right font-mono">{formatNumber(item.newQuantity, 0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+            <div className="space-y-1.5">
+              <Label htmlFor="transfer-revision-note">Note (optional)</Label>
+              <Textarea
+                id="transfer-revision-note"
+                placeholder="Why was this revised? e.g. Shop sold 10 bales"
+                value={transferRevisionNote}
+                onChange={(e) => setTransferRevisionNote(e.target.value)}
+                rows={2}
+                data-testid="input-transfer-revision-note"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTransferRevisionDialogOpen(false)} disabled={isTransferSavingRevision}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmTransferSaveAsRevision}
+              disabled={isTransferSavingRevision || computeTransferRevisionItems().length === 0}
+              data-testid="button-confirm-transfer-revision"
+            >
+              {isTransferSavingRevision ? "Saving..." : "Save Revision"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Stock Transfer Import Dialog */}
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
