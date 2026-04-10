@@ -504,10 +504,10 @@ export default function StockTransferOrder() {
   const handleAddToOrder = async () => {
     const qty = parseFloat(pickerQuantity);
     
-    if (isNaN(qty) || qty <= 0) {
+    if (isNaN(qty) || qty === 0) {
       toast({
         title: "Invalid Quantity",
-        description: "Please enter a valid quantity greater than 0",
+        description: "Please enter a non-zero quantity",
         variant: "destructive",
       });
       return;
@@ -524,7 +524,16 @@ export default function StockTransferOrder() {
     const currentAllocated = existingIdx >= 0 ? orderItems[existingIdx].quantity : 0;
     const totalAfterAdd = currentAllocated + qty;
 
-    if (totalAfterAdd > availableQty) {
+    if (totalAfterAdd < 0) {
+      toast({
+        title: "Invalid Quantity",
+        description: `Cannot reduce below 0. Current order quantity is ${formatNumber(currentAllocated, 0)}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (qty > 0 && totalAfterAdd > availableQty) {
       toast({
         title: "Exceeds Available Stock",
         description: `You can only add up to ${formatNumber(availableQty - currentAllocated, 0)} more units. Available: ${formatNumber(availableQty, 0)}, Already in order: ${formatNumber(currentAllocated, 0)}`,
@@ -1622,17 +1631,17 @@ export default function StockTransferOrder() {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="picker-quantity">Quantity to transfer</Label>
+              <Label htmlFor="picker-quantity">
+                Quantity{editVoucherId ? <span className="text-muted-foreground font-normal ml-1 text-xs">(negative = reduce, e.g. -1)</span> : ""}
+              </Label>
               <Input
                 id="picker-quantity"
                 ref={quantityInputRef}
                 type="number"
-                min="0.001"
                 step="0.001"
-                max={quantityPicker.availableQty}
                 value={pickerQuantity}
                 onChange={(e) => setPickerQuantity(e.target.value)}
-                placeholder="Enter quantity"
+                placeholder={editVoucherId ? "e.g. -1 to reduce" : "Enter quantity"}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     handleAddToOrder();
@@ -1640,7 +1649,7 @@ export default function StockTransferOrder() {
                 }}
                 data-testid="input-picker-quantity"
               />
-              {parseFloat(pickerQuantity) > quantityPicker.availableQty && (
+              {parseFloat(pickerQuantity) > quantityPicker.availableQty && parseFloat(pickerQuantity) > 0 && (
                 <p className="text-sm text-destructive flex items-center gap-1">
                   <AlertCircle className="h-3 w-3" />
                   Exceeds available stock
@@ -1659,12 +1668,13 @@ export default function StockTransferOrder() {
               onClick={handleAddToOrder}
               disabled={
                 !pickerQuantity ||
-                parseFloat(pickerQuantity) <= 0 ||
-                parseFloat(pickerQuantity) > quantityPicker.availableQty
+                parseFloat(pickerQuantity) === 0 ||
+                isNaN(parseFloat(pickerQuantity)) ||
+                (parseFloat(pickerQuantity) > 0 && parseFloat(pickerQuantity) > quantityPicker.availableQty)
               }
               data-testid="button-confirm-add"
             >
-              Add to Order
+              {parseFloat(pickerQuantity) < 0 ? "Reduce Qty" : "Add to Order"}
             </Button>
           </DialogFooter>
         </DialogContent>

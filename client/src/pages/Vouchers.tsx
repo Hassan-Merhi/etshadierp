@@ -4788,6 +4788,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 step="0.001"
                                 value={entry?.quantity || ""}
                                 onChange={(e) => stockTransferForm.setValue(`entries.${index}.quantity`, e.target.value)}
+                                onBlur={(e) => {
+                                  if (!voucherIdToEdit || !stockTransferToEdit?.items) return;
+                                  const val = parseFloat(e.target.value);
+                                  if (isNaN(val) || val >= 0) return;
+                                  const origItem = (stockTransferToEdit.items as any[]).find(
+                                    (item) => item.stockItemId === entry.stockItemId && item.sourceLocationId === entry.sourceLocationId
+                                  );
+                                  const origQty = origItem ? parseFloat(origItem.quantity) || 0 : 0;
+                                  const newQty = Math.max(0, origQty + val);
+                                  stockTransferForm.setValue(`entries.${index}.quantity`, newQty.toString());
+                                }}
                                 placeholder="0"
                                 data-testid={`input-transfer-quantity-mobile-${index}`}
                                 className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring font-mono text-right"
@@ -5176,6 +5187,18 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                       }, 100);
                                     }
                                   }
+                                }}
+                                onBlur={(e) => {
+                                  if (!voucherIdToEdit || !stockTransferToEdit?.items) return;
+                                  const val = parseFloat(e.target.value);
+                                  if (isNaN(val) || val >= 0) return;
+                                  const entry = stockTransferForm.getValues(`entries.${index}`);
+                                  const origItem = (stockTransferToEdit.items as any[]).find(
+                                    (item) => item.stockItemId === entry.stockItemId && item.sourceLocationId === entry.sourceLocationId
+                                  );
+                                  const origQty = origItem ? parseFloat(origItem.quantity) || 0 : 0;
+                                  const newQty = Math.max(0, origQty + val);
+                                  stockTransferForm.setValue(`entries.${index}.quantity`, newQty.toString());
                                 }}
                                 placeholder="0"
                                 className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20 font-mono text-right"
