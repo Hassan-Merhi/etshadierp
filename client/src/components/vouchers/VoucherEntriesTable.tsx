@@ -18,7 +18,7 @@ const ENTRY_TYPE_BADGE: Record<string, { label: string; cls: string }> = {
 };
 
 export interface VoucherEntry {
-  accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "factorySupplier";
+  accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer" | "factorySupplier";
   accountId: number;
   accountName: string;
   amount: string;
