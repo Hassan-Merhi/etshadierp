@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
-import { ArrowLeft, MapPin } from "lucide-react";
+import { ArrowLeft, MapPin, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -37,31 +37,29 @@ interface Transaction {
 }
 
 interface LocationVouchersData {
-  stockItem: {
-    id: number;
-    code: string;
-    name: string;
-    uom: string;
-  };
-  location: {
-    id: number;
-    code: string;
-    name: string;
-  };
+  stockItem: { id: number; code: string; name: string; uom: string; };
+  location: { id: number; code: string; name: string; };
   year: number;
   month: number;
   monthName: string;
   transactions: Transaction[];
   totals: {
-    inwardQty: number;
-    inwardRate: number;
-    inwardValue: number;
-    outwardQty: number;
-    outwardRate: number;
-    outwardValue: number;
-    closingQty: number;
-    closingRate: number;
-    closingValue: number;
+    inwardQty: number; inwardRate: number; inwardValue: number;
+    outwardQty: number; outwardRate: number; outwardValue: number;
+    closingQty: number; closingRate: number; closingValue: number;
+  };
+}
+
+interface RangeVouchersData {
+  stockItem: { id: number; code: string; name: string; uom: string; };
+  location: { id: number; code: string; name: string; };
+  startDate: string;
+  endDate: string;
+  transactions: Transaction[];
+  totals: {
+    inwardQty: number; inwardRate: number; inwardValue: number;
+    outwardQty: number; outwardRate: number; outwardValue: number;
+    closingQty: number; closingRate: number; closingValue: number;
   };
 }
 
@@ -80,120 +78,118 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   const [showStockTransfers, setShowStockTransfers] = useState(false);
-  
-  const { data, isLoading } = useQuery<LocationVouchersData>({
+  const [showAllMonths, setShowAllMonths] = useState(false);
+
+  // Single-month query
+  const { data: monthData, isLoading: monthLoading } = useQuery<LocationVouchersData>({
     queryKey: [`/api/locations/${locationId}/stock-items/${stockItemId}/vouchers/${year}/${month}`, periodFilter.fromDate, periodFilter.toDate],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (periodFilter.fromDate) params.set("startDate", periodFilter.fromDate);
-      if (periodFilter.toDate) params.set("endDate", periodFilter.toDate);
-      const url = `/api/locations/${locationId}/stock-items/${stockItemId}/vouchers/${year}/${month}?${params.toString()}`;
+      const p = new URLSearchParams();
+      if (periodFilter.fromDate) p.set("startDate", periodFilter.fromDate);
+      if (periodFilter.toDate) p.set("endDate", periodFilter.toDate);
+      const url = `/api/locations/${locationId}/stock-items/${stockItemId}/vouchers/${year}/${month}?${p.toString()}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch vouchers");
       return res.json();
     },
-    enabled: locationId > 0 && stockItemId > 0 && year > 0 && month > 0,
+    enabled: locationId > 0 && stockItemId > 0 && year > 0 && month > 0 && !showAllMonths,
   });
-  
+
+  // All-months (date range) query
+  const allMonthsStart = `${year}-01-01`;
+  const allMonthsEnd = `${year}-12-31`;
+  const { data: rangeData, isLoading: rangeLoading } = useQuery<RangeVouchersData>({
+    queryKey: [`/api/locations/${locationId}/stock-items/${stockItemId}/transactions`, allMonthsStart, allMonthsEnd],
+    queryFn: async () => {
+      const url = `/api/locations/${locationId}/stock-items/${stockItemId}/transactions?startDate=${allMonthsStart}&endDate=${allMonthsEnd}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch transactions");
+      return res.json();
+    },
+    enabled: locationId > 0 && stockItemId > 0 && year > 0 && showAllMonths,
+  });
+
+  const isLoading = showAllMonths ? rangeLoading : monthLoading;
+  const data = showAllMonths ? rangeData : monthData;
+  const totals = data?.totals;
+
   const formatNumber = (num: number, decimals = 2) => {
     if (num === 0) return "";
     return num.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   };
-  
+
   const formatDate = (dateStr: string) => {
-    try {
-      return formatDisplayDate(new Date(dateStr));
-    } catch {
-      return dateStr;
-    }
+    try { return formatDisplayDate(new Date(dateStr)); } catch { return dateStr; }
   };
 
-  // Helper to check if a transaction is a stock transfer
   const isStockTransfer = (vchType: string) => {
-    const type = (vchType || "").toLowerCase();
-    return type === "stock transfer" || type === "stocktransfer" || type === "st";
+    const t = (vchType || "").toLowerCase();
+    return t === "stock transfer" || t === "stocktransfer" || t === "st";
   };
 
-  // Filter transactions based on showStockTransfers toggle
+  const allTransactions: Transaction[] = data?.transactions || [];
+
   const filteredTransactions = useMemo(() => {
-    if (!data?.transactions) return [];
-    
-    return data.transactions.filter((txn) => {
-      // Always keep opening balance row
+    return allTransactions.filter((txn) => {
       if (txn.isOpeningBalance) return true;
-      // Filter out stock transfers if toggle is off
       if (!showStockTransfers && isStockTransfer(txn.vchType)) return false;
       return true;
     });
-  }, [data?.transactions, showStockTransfers]);
+  }, [allTransactions, showStockTransfers]);
 
-  // Recalculate totals based on filtered transactions (excluding opening balance)
+  // When showing all months, build rows with month separator rows injected
+  const displayRows = useMemo(() => {
+    if (!showAllMonths) return filteredTransactions;
+    const monthNames = ['January','February','March','April','May','June',
+                        'July','August','September','October','November','December'];
+    const rows: (Transaction & { _isSeparator?: boolean; _separatorLabel?: string })[] = [];
+    let lastMonth = -1;
+    for (const txn of filteredTransactions) {
+      if (!txn.isOpeningBalance) {
+        const d = new Date(txn.date);
+        const m = d.getMonth(); // 0-indexed
+        if (m !== lastMonth) {
+          lastMonth = m;
+          rows.push({ ...txn, _isSeparator: true, _separatorLabel: monthNames[m] + ' ' + year });
+        }
+      }
+      rows.push(txn);
+    }
+    return rows;
+  }, [filteredTransactions, showAllMonths, year]);
+
   const calculatedTotals = useMemo(() => {
-    const nonOpeningTxns = filteredTransactions.filter(t => !t.isOpeningBalance);
-    
-    const inwardQty = nonOpeningTxns.reduce((sum, t) => sum + (t.inwardQty || 0), 0);
-    const inwardValue = nonOpeningTxns.reduce((sum, t) => sum + (t.inwardValue || 0), 0);
-    const outwardQty = nonOpeningTxns.reduce((sum, t) => sum + (t.outwardQty || 0), 0);
-    const outwardValue = nonOpeningTxns.reduce((sum, t) => sum + (t.outwardValue || 0), 0);
-    
-    // Use the overall closing values from original data (not filtered) for accuracy
-    const originalLastTxn = data?.transactions?.[data.transactions.length - 1];
-    const closingQty = originalLastTxn?.closingQty || 0;
-    const closingRate = originalLastTxn?.closingRate || 0;
-    const closingValue = originalLastTxn?.closingValue || 0;
-
+    const nonOpening = filteredTransactions.filter(t => !t.isOpeningBalance);
+    const inwardQty = nonOpening.reduce((s, t) => s + (t.inwardQty || 0), 0);
+    const inwardValue = nonOpening.reduce((s, t) => s + (t.inwardValue || 0), 0);
+    const outwardQty = nonOpening.reduce((s, t) => s + (t.outwardQty || 0), 0);
+    const outwardValue = nonOpening.reduce((s, t) => s + (t.outwardValue || 0), 0);
+    const originalLastTxn = allTransactions[allTransactions.length - 1];
     return {
-      inwardQty,
-      inwardRate: inwardQty > 0 ? inwardValue / inwardQty : 0,
-      inwardValue,
-      outwardQty,
-      outwardRate: outwardQty > 0 ? outwardValue / outwardQty : 0,
-      outwardValue,
-      closingQty,
-      closingRate,
-      closingValue,
+      inwardQty, inwardRate: inwardQty > 0 ? inwardValue / inwardQty : 0, inwardValue,
+      outwardQty, outwardRate: outwardQty > 0 ? outwardValue / outwardQty : 0, outwardValue,
+      closingQty: originalLastTxn?.closingQty || 0,
+      closingRate: originalLastTxn?.closingRate || 0,
+      closingValue: originalLastTxn?.closingValue || 0,
     };
-  }, [filteredTransactions, data?.transactions]);
-  
+  }, [filteredTransactions, allTransactions]);
+
   const getTransactionEditUrl = (txn: Transaction): string | null => {
     if (txn.isOpeningBalance) return null;
-    
     const vchType = (txn.vchType || "").toLowerCase();
-    
-    if (vchType === 'production' || vchType === 'consumption') {
-      return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
-    }
-    
-    if (vchType === 'pos') {
-      return txn.voucherId ? `/pos/edit/${txn.voucherId}` : null;
-    }
-    
-    if (vchType === 'stock transfer') {
-      return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
-    }
-    
-    if (vchType === 'po offload') {
-      return txn.poId ? `/purchase-orders/${txn.poId}` : null;
-    }
-    
+    if (vchType === 'production' || vchType === 'consumption') return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
+    if (vchType === 'pos') return txn.voucherId ? `/pos/edit/${txn.voucherId}` : null;
+    if (vchType === 'stock transfer') return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
+    if (vchType === 'po offload') return txn.poId ? `/purchase-orders/${txn.poId}` : null;
     return null;
   };
-  
+
   const handleParticularsClick = (txn: Transaction) => {
     const url = getTransactionEditUrl(txn);
-    if (url) {
-      navigate(url);
-    }
+    if (url) navigate(url);
   };
 
-  // Get navigable rows (excluding opening balance) from filtered transactions
-  const navigableRows = useMemo(() => {
-    return filteredTransactions.filter(t => !t.isOpeningBalance);
-  }, [filteredTransactions]);
-
-  const getNavigableRows = () => {
-    return navigableRows;
-  };
+  const navigableRows = useMemo(() => filteredTransactions.filter(t => !t.isOpeningBalance), [filteredTransactions]);
 
   const handleTableKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Escape") {
@@ -202,29 +198,20 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
       navigate(`/locations/${locationId}/stock-items/${stockItemId}/history`);
       return;
     }
-    
     if (hasAnyOpenDialog()) return;
-    const rows = getNavigableRows();
-    if (rows.length === 0) return;
-    
+    if (navigableRows.length === 0) return;
     if (e.key === "ArrowUp") {
       e.preventDefault();
       setSelectedRowIndex(prev => Math.max(-1, prev - 1));
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
-      if (selectedRowIndex === -1) {
-        setSelectedRowIndex(0);
-      } else if (selectedRowIndex < rows.length - 1) {
-        setSelectedRowIndex(prev => prev + 1);
-      }
+      if (selectedRowIndex === -1) setSelectedRowIndex(0);
+      else if (selectedRowIndex < navigableRows.length - 1) setSelectedRowIndex(prev => prev + 1);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (selectedRowIndex >= 0 && selectedRowIndex < rows.length) {
-        const txn = rows[selectedRowIndex];
-        const url = getTransactionEditUrl(txn);
-        if (url) {
-          navigate(url);
-        }
+      if (selectedRowIndex >= 0 && selectedRowIndex < navigableRows.length) {
+        const url = getTransactionEditUrl(navigableRows[selectedRowIndex]);
+        if (url) navigate(url);
       }
     }
   };
@@ -237,20 +224,17 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
   useEffect(() => {
     if (selectedRowIndex < 0 || !tableScrollContainer.current) return;
     const rowElement = tableScrollContainer.current.querySelector(`[data-row-index="${selectedRowIndex}"]`);
-    if (rowElement) {
-      rowElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    }
+    if (rowElement) rowElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [selectedRowIndex]);
 
   useEffect(() => {
-    const rows = navigableRows;
     registerCursorNav({
       canNavigateUp: selectedRowIndex > -1,
-      canNavigateDown: rows.length > 0 && (selectedRowIndex === -1 || selectedRowIndex < rows.length - 1),
+      canNavigateDown: navigableRows.length > 0 && (selectedRowIndex === -1 || selectedRowIndex < navigableRows.length - 1),
       onUp: () => setSelectedRowIndex(prev => Math.max(-1, prev - 1)),
       onDown: () => setSelectedRowIndex(prev => {
         if (prev === -1) return 0;
-        if (prev < rows.length - 1) return prev + 1;
+        if (prev < navigableRows.length - 1) return prev + 1;
         return prev;
       }),
     });
@@ -265,23 +249,22 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
       </div>
     );
   }
-  
+
+  const colSpanFull = posUser ? 6 : 12;
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => navigate(`/locations/${locationId}/stock-items/${stockItemId}/history`)} 
+          <Button
+            variant="ghost" size="icon"
+            onClick={() => navigate(`/locations/${locationId}/stock-items/${stockItemId}/history`)}
             data-testid="button-back"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">
-              Location Vouchers
-            </h1>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">Location Vouchers</h1>
             {data?.stockItem && data?.location && (
               <div className="flex items-center gap-2 text-muted-foreground" data-testid="text-item-location">
                 <span>{data.stockItem.name} ({data.stockItem.code})</span>
@@ -289,12 +272,21 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
                 <MapPin className="h-4 w-4" />
                 <span>{data.location.name}</span>
                 <span>•</span>
-                <span>{data.monthName} {data.year}</span>
+                <span>{showAllMonths ? String(year) : `${'monthName' in (data as any) ? (data as any).monthName : ''} ${year}`}</span>
               </div>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button
+            variant={showAllMonths ? "default" : "outline"}
+            size="sm"
+            onClick={() => { setShowAllMonths(v => !v); setSelectedRowIndex(-1); }}
+            data-testid="button-show-all-months"
+          >
+            <Eye className="h-4 w-4 mr-1.5" />
+            {showAllMonths ? "This month only" : "Show all months"}
+          </Button>
           <div className="flex items-center gap-2">
             <Checkbox
               id="show-stock-transfers"
@@ -302,22 +294,20 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
               onCheckedChange={(checked) => setShowStockTransfers(checked === true)}
               data-testid="checkbox-show-stock-transfers"
             />
-            <Label htmlFor="show-stock-transfers" className="text-sm cursor-pointer">
-              Show Stock Transfers
-            </Label>
+            <Label htmlFor="show-stock-transfers" className="text-sm cursor-pointer">Show Stock Transfers</Label>
           </div>
-          <PeriodFilter
-            value={periodFilter}
-            onChange={setPeriodFilter}
-            data-testid="period-filter"
-          />
+          {!showAllMonths && (
+            <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
+          )}
         </div>
       </div>
-      
+
       <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 250px)' }}>
         <CardHeader className="pb-2 flex-shrink-0">
           <CardTitle className="text-lg">
-            Transactions - {data?.monthName} {data?.year}
+            {showAllMonths
+              ? `All Transactions — ${year}`
+              : `Transactions — ${'monthName' in ((data as any) ?? {}) ? (data as any).monthName : ''} ${year}`}
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-auto flex-1 p-0" ref={tableScrollContainer}>
@@ -344,14 +334,26 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
               </tr>
             </thead>
             <tbody>
-                {filteredTransactions.map((txn, idx) => {
-                  // Find this transaction's index in the navigable rows array
-                  const navIndex = txn.isOpeningBalance ? -1 : navigableRows.indexOf(txn);
-                  const isSelected = navIndex >= 0 && selectedRowIndex === navIndex;
-                  
+              {displayRows.map((txn: any, idx: number) => {
+                // Month separator row
+                if (txn._isSeparator) {
                   return (
-                  <tr 
-                    key={idx} 
+                    <tr key={`sep-${idx}`} className="bg-primary/10 border-b border-t">
+                      <td colSpan={colSpanFull} className="px-4 py-1.5">
+                        <span className="text-xs font-bold uppercase tracking-wider text-primary">
+                          {txn._separatorLabel}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                }
+
+                const navIndex = txn.isOpeningBalance ? -1 : navigableRows.indexOf(txn);
+                const isSelected = navIndex >= 0 && selectedRowIndex === navIndex;
+
+                return (
+                  <tr
+                    key={idx}
                     data-testid={`row-txn-${idx}`}
                     className={`border-b ${txn.isOpeningBalance ? "bg-muted/30 font-medium" : isSelected ? "ring-2 ring-primary bg-blue-200 dark:bg-blue-900" : ""}`}
                     data-row-index={navIndex >= 0 ? navIndex : undefined}
@@ -368,9 +370,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
                         >
                           {txn.particulars}
                         </button>
-                      ) : (
-                        txn.particulars
-                      )}
+                      ) : txn.particulars}
                     </td>
                     <td className="px-4 py-3 border-r text-xs">{txn.vchType}</td>
                     <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(txn.inwardQty, 0)}</td>
@@ -391,33 +391,33 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
                     {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(txn.closingRate)}</td>}
                     {!posUser && <td className="text-right px-2 py-3 tabular-nums font-medium">{formatAmount(txn.closingValue)}</td>}
                   </tr>
-                  );
-                })}
-                
-                {filteredTransactions.length === 0 && (
-                  <tr>
-                    <td colSpan={posUser ? 6 : 12} className="text-center text-muted-foreground py-8">
-                      No transactions found for this month
-                    </td>
-                  </tr>
-                )}
-                
-                {filteredTransactions.length > 0 && (
-                  <tr className="bg-muted/50 font-bold border-t">
-                    <td colSpan={3} className="px-4 py-3 border-r">Totals</td>
-                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(calculatedTotals.inwardQty, 0)}</td>
-                    {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.inwardRate)}</td>}
-                    {!posUser && <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(calculatedTotals.inwardValue)}</td>}
-                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(calculatedTotals.outwardQty, 0)}</td>
-                    {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.outwardRate)}</td>}
-                    {!posUser && <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(calculatedTotals.outwardValue)}</td>}
-                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(calculatedTotals.closingQty, 0)}</td>
-                    {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.closingRate)}</td>}
-                    {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.closingValue)}</td>}
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                );
+              })}
+
+              {displayRows.filter((r: any) => !r._isSeparator).length === 0 && (
+                <tr>
+                  <td colSpan={colSpanFull} className="text-center text-muted-foreground py-8">
+                    No transactions found
+                  </td>
+                </tr>
+              )}
+
+              {filteredTransactions.length > 0 && (
+                <tr className="bg-muted/50 font-bold border-t">
+                  <td colSpan={3} className="px-4 py-3 border-r">Totals</td>
+                  <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(calculatedTotals.inwardQty, 0)}</td>
+                  {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.inwardRate)}</td>}
+                  {!posUser && <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(calculatedTotals.inwardValue)}</td>}
+                  <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(calculatedTotals.outwardQty, 0)}</td>
+                  {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.outwardRate)}</td>}
+                  {!posUser && <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(calculatedTotals.outwardValue)}</td>}
+                  <td className="text-right px-2 py-3 tabular-nums">{formatNumber(calculatedTotals.closingQty, 0)}</td>
+                  {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.closingRate)}</td>}
+                  {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.closingValue)}</td>}
+                </tr>
+              )}
+            </tbody>
+          </table>
         </CardContent>
       </Card>
     </div>
