@@ -507,6 +507,10 @@ export default function SalesReport() {
               if (next) {
                 setSelectedLocation("");
                 setSelectedStockItem("");
+                // If still on "this_month" default, switch to last 30 days so cross-company data is visible
+                if (periodFilter.preset === "this_month") {
+                  setPeriodFilter(getDefaultPeriodValue("last_1_month"));
+                }
               }
             }}
             className="gap-2"
