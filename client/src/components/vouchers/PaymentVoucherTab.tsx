@@ -12,15 +12,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarIcon, Printer, FileDown, ChevronDown } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Printer, FileDown, ChevronDown, ArrowUpCircle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -114,10 +108,11 @@ export function PaymentVoucherTab({
       {/* Left column: Form */}
       <div className="flex-1 min-w-0">
         <Card>
-          <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="text-base sm:text-lg">
-              Payment Voucher
-            </CardTitle>
+          <CardHeader className="p-4 sm:p-5 bg-amber-50/60 dark:bg-amber-950/15 rounded-t-lg flex flex-row items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <ArrowUpCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <CardTitle className="text-base sm:text-lg">Payment Voucher</CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -209,8 +204,7 @@ export function PaymentVoucherTab({
                   />
 
                   {/* Print + Export actions */}
-                  <div className="flex flex-col gap-1 lg:items-end">
-                    <div className="text-sm font-medium text-transparent select-none">Actions</div>
+                  <div className="flex flex-col gap-1 lg:items-end lg:pt-[22px]">
                     <div className="flex items-center gap-2">
                       <Button
                         type="button"
@@ -312,35 +306,34 @@ export function PaymentVoucherTab({
                   )}
                 />
 
-                {/* Optional checkbox */}
-                <FormField
-                  control={form.control}
-                  name="optional"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="checkbox-optional"
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Mark as Optional</FormLabel>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-
-                {/* Submit button */}
-                <div className="flex justify-end pt-2">
+                {/* Optional toggle + submit */}
+                <div className="flex items-center justify-between gap-4 pt-1 flex-wrap">
+                  <FormField
+                    control={form.control}
+                    name="optional"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center gap-3 space-y-0">
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="checkbox-optional"
+                          />
+                        </FormControl>
+                        <div className="space-y-0.5 leading-none">
+                          <FormLabel className="cursor-pointer">Mark as Optional</FormLabel>
+                          <p className="text-xs text-muted-foreground">Excluded from required balance checks</p>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
                   <Button
                     type="submit"
                     size="default"
                     disabled={paymentAccountId === 0 || total === 0}
                     data-testid="button-save-voucher"
                   >
-                    Save Voucher
+                    {total > 0 ? `Save Voucher · ${formatAmount(total)}` : "Save Voucher"}
                   </Button>
                 </div>
               </form>

@@ -7,6 +7,16 @@ import type { Account } from "@/components/AccountSidebar";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { cn } from "@/lib/utils";
 
+const ENTRY_TYPE_BADGE: Record<string, { label: string; cls: string }> = {
+  bank:            { label: "Bank",     cls: "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300" },
+  ledger:          { label: "Ledger",   cls: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" },
+  supplier:        { label: "Supplier", cls: "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300" },
+  employee:        { label: "Staff",    cls: "bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300" },
+  fixedAsset:      { label: "Asset",    cls: "bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300" },
+  customer:        { label: "Customer", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300" },
+  factorySupplier: { label: "F.Supp",  cls: "bg-teal-100 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300" },
+};
+
 export interface VoucherEntry {
   accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "factorySupplier";
   accountId: number;
@@ -172,16 +182,22 @@ export function VoucherEntriesTable({
         <table className="w-full">
           <thead className="bg-muted/50 sticky top-0 z-10">
             <tr>
-              <th className="text-left p-3 font-medium w-[60%]">Account</th>
-              <th className="text-right p-3 font-medium w-[35%]">Amount</th>
-              <th className="w-[5%]"></th>
+              <th className="text-center p-3 font-medium w-8 text-muted-foreground">#</th>
+              <th className="text-left p-3 font-medium">Account</th>
+              <th className="text-right p-3 font-medium w-[32%]">Amount</th>
+              <th className="w-10"></th>
             </tr>
           </thead>
           <tbody>
             {fields.map((field, index) => {
-              const isEmpty = !entries[index]?.accountId || entries[index].accountId === 0;
+              const entry = entries[index];
+              const isEmpty = !entry?.accountId || entry.accountId === 0;
+              const typeBadge = entry?.accountType ? ENTRY_TYPE_BADGE[entry.accountType] : null;
               return (
               <tr key={field.id} className={cn("border-t hover-elevate", isEmpty && "bg-muted/20")}>
+                <td className="px-2 py-3 text-center text-xs font-medium text-muted-foreground tabular-nums">
+                  {index + 1}
+                </td>
                 <td className="p-2">
                   <FormField
                     control={form.control}
@@ -203,6 +219,11 @@ export function VoucherEntriesTable({
                             onBlur={() => setTimeout(() => onRowBlur(), 200)}
                           />
                         </FormControl>
+                        {!isEmpty && typeBadge && (
+                          <span className={`inline-block text-[10px] font-medium px-1.5 py-0 rounded mt-0.5 ${typeBadge.cls}`}>
+                            {typeBadge.label}
+                          </span>
+                        )}
                         {renderBalanceLine(index)}
                         <FormMessage />
                       </FormItem>
@@ -250,9 +271,10 @@ export function VoucherEntriesTable({
               );
             })}
           </tbody>
-          <tfoot className="bg-muted/30 border-t-2">
+          <tfoot className="bg-muted/40 border-t-2">
             <tr>
-              <td colSpan={1} className="p-3">
+              <td></td>
+              <td className="p-3">
                 <Button
                   type="button"
                   variant="outline"
@@ -264,12 +286,13 @@ export function VoucherEntriesTable({
                   Add Row
                 </Button>
               </td>
-              <td className="p-3">
-                <div className="text-right font-bold font-mono">
+              <td className="p-3 text-right">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Total</div>
+                <div className={cn("text-base font-bold font-mono", total > 0 ? "text-foreground" : "text-muted-foreground")}>
                   {formatAmount(total)}
                 </div>
               </td>
-              <td colSpan={1}></td>
+              <td></td>
             </tr>
           </tfoot>
         </table>
