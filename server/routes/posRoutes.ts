@@ -310,8 +310,16 @@ export function registerPosRoutes(app: Express) {
 
       for (const item of items) {
         const [inventoryRecord] = await db
-          .select()
+          .select({
+            id: inventory.id,
+            locationId: inventory.locationId,
+            stockItemId: inventory.stockItemId,
+            quantity: inventory.quantity,
+            averageRate: inventory.averageRate,
+            itemName: stockItems.name,
+          })
           .from(inventory)
+          .leftJoin(stockItems, eq(stockItems.id, inventory.stockItemId))
           .where(
             and(
               eq(inventory.locationId, locationId),
@@ -327,13 +335,14 @@ export function registerPosRoutes(app: Express) {
 
         const currentQty = parseFloat(inventoryRecord.quantity);
         const saleQty = parseFloat(item.quantity);
+        const itemDisplayName = inventoryRecord.itemName || `item ${item.stockItemId}`;
 
         // Check if user can sell negative stock
         const canSellNegativeStock = req.user?.canSellNegativeStock || false;
 
         if (currentQty < saleQty && !canSellNegativeStock) {
           throw new Error(
-            `Insufficient stock for item ${item.stockItemId}. Available: ${currentQty}, Requested: ${saleQty}`,
+            `"${itemDisplayName}" quantity requested (${saleQty}) is more than available stock (${currentQty})`,
           );
         }
 

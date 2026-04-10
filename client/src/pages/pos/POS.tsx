@@ -1406,6 +1406,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   const total = rows.reduce((sum, row) => sum + (row.amount || 0), 0);
   const totalQty = rows.reduce((sum, row) => sum + (parseFloat(String(row.quantity)) || 0), 0);
+  const hasValidItems = rows.some(r => r.stockItemId && r.quantity > 0 && r.rate > 0);
   const filteredItems = getFilteredInventory();
 
   return (
@@ -1474,7 +1475,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           <Button 
             onClick={handleSaveSale}
             size="sm"
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || !hasValidItems}
             className="gap-1 sm:gap-2"
             data-testid="button-complete-sale"
           >
@@ -2140,7 +2141,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         </div>
         <Button
           onClick={handleSaveSale}
-          disabled={saveMutation.isPending}
+          disabled={saveMutation.isPending || !hasValidItems}
           className="shrink-0 h-10 px-5"
           data-testid="button-mobile-sticky-save"
         >
