@@ -124,7 +124,7 @@ interface VouchersProps {
   posUser?: any;
 }
 
-function parseDateLocal(dateStr: string): Date {
+export function parseDateLocal(dateStr: string): Date {
   const parts = dateStr.split("-");
   if (parts.length === 3) {
     return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
