@@ -4797,34 +4797,21 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   }
                                 }}
                                 onBlur={() => {
-                                  const raw = transferQtyDraft[`m${index}`] ?? "";
+                                  const raw = (transferQtyDraft[`m${index}`] ?? "").trim();
                                   setTransferQtyDraft(prev => { const n = { ...prev }; delete n[`m${index}`]; return n; });
-                                  const resolveFromOrig = (delta: number, sign: 1 | -1) => {
-                                    if (!voucherIdToEdit || !stockTransferToEdit?.items) return null;
+                                  const delta = parseFloat(raw.startsWith("+") ? raw.slice(1) : raw);
+                                  if (isNaN(delta)) return;
+                                  if (voucherIdToEdit && stockTransferToEdit?.items) {
                                     const origItem = (stockTransferToEdit.items as any[]).find(
                                       (item) => item.stockItemId === entry.stockItemId && item.sourceLocationId === entry.sourceLocationId
                                     );
                                     const origQty = origItem ? parseFloat(origItem.quantity) || 0 : 0;
-                                    return Math.max(0, origQty + sign * Math.abs(delta)).toString();
-                                  };
-                                  if (raw.startsWith("+")) {
-                                    const delta = parseFloat(raw.slice(1));
-                                    if (!isNaN(delta)) {
-                                      const resolved = resolveFromOrig(delta, 1);
-                                      stockTransferForm.setValue(`entries.${index}.quantity`, resolved ?? delta.toString());
-                                    }
-                                  } else if (raw.startsWith("-")) {
-                                    const delta = parseFloat(raw);
-                                    if (!isNaN(delta)) {
-                                      const resolved = resolveFromOrig(Math.abs(delta), -1);
-                                      if (resolved !== null) stockTransferForm.setValue(`entries.${index}.quantity`, resolved);
-                                    }
+                                    stockTransferForm.setValue(`entries.${index}.quantity`, Math.max(0, origQty + delta).toString());
                                   } else {
-                                    const val = parseFloat(raw);
-                                    if (!isNaN(val)) stockTransferForm.setValue(`entries.${index}.quantity`, val.toString());
+                                    stockTransferForm.setValue(`entries.${index}.quantity`, Math.max(0, delta).toString());
                                   }
                                 }}
-                                placeholder={voucherIdToEdit ? "+2 / -1 / 5" : "0"}
+                                placeholder={voucherIdToEdit ? "-1 to reduce, 2 to add" : "0"}
                                 data-testid={`input-transfer-quantity-mobile-${index}`}
                                 className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring font-mono text-right"
                               />
@@ -5158,33 +5145,20 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   }
                                 }}
                                 onBlur={(e) => {
-                                  const raw = transferQtyDraft[index] ?? e.target.value;
+                                  const raw = (transferQtyDraft[index] ?? e.target.value).trim();
                                   setTransferQtyDraft(prev => { const n = { ...prev }; delete n[index]; return n; });
-                                  const resolveQty = (delta: number, sign: 1 | -1) => {
-                                    if (!voucherIdToEdit || !stockTransferToEdit?.items) return null;
+                                  const delta = parseFloat(raw.startsWith("+") ? raw.slice(1) : raw);
+                                  if (isNaN(delta)) return;
+                                  if (voucherIdToEdit && stockTransferToEdit?.items) {
                                     const entry = stockTransferForm.getValues(`entries.${index}`);
                                     const origItem = (stockTransferToEdit.items as any[]).find(
                                       (item) => item.stockItemId === entry.stockItemId && item.sourceLocationId === entry.sourceLocationId
                                     );
                                     const origQty = origItem ? parseFloat(origItem.quantity) || 0 : 0;
-                                    return Math.max(0, origQty + sign * Math.abs(delta)).toString();
-                                  };
-                                  if (raw.startsWith("+")) {
-                                    const delta = parseFloat(raw.slice(1));
-                                    if (!isNaN(delta)) {
-                                      const resolved = resolveQty(delta, 1);
-                                      if (resolved !== null) stockTransferForm.setValue(`entries.${index}.quantity`, resolved);
-                                      else stockTransferForm.setValue(`entries.${index}.quantity`, delta.toString());
-                                    }
-                                  } else if (raw.startsWith("-")) {
-                                    const delta = parseFloat(raw);
-                                    if (!isNaN(delta)) {
-                                      const resolved = resolveQty(Math.abs(delta), -1);
-                                      if (resolved !== null) stockTransferForm.setValue(`entries.${index}.quantity`, resolved);
-                                    }
+                                    const newQty = Math.max(0, origQty + delta);
+                                    stockTransferForm.setValue(`entries.${index}.quantity`, newQty.toString());
                                   } else {
-                                    const val = parseFloat(raw);
-                                    if (!isNaN(val)) stockTransferForm.setValue(`entries.${index}.quantity`, val.toString());
+                                    stockTransferForm.setValue(`entries.${index}.quantity`, Math.max(0, delta).toString());
                                   }
                                 }}
                                 onKeyDown={(e) => {
@@ -5250,7 +5224,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     }
                                   }
                                 }}
-                                placeholder={voucherIdToEdit ? "+2 / -1 / 5" : "0"}
+                                placeholder={voucherIdToEdit ? "-1 to reduce, 2 to add" : "0"}
                                 className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20 font-mono text-right"
                                 data-testid={`input-transfer-quantity-${index}`}
                               />
