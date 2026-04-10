@@ -37,6 +37,7 @@ import {
   Scale,
   Layers,
   ChevronRight,
+  ChevronDown,
   DollarSign,
   GripVertical,
   ReceiptText,
@@ -45,7 +46,15 @@ import {
   Boxes,
   Factory,
   CheckCircle2,
+  Zap,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -187,7 +196,7 @@ export default function Dashboard() {
     enabled: !!selectedCompany,
   });
 
-  const { data: importCycleData } = useQuery<ImportCycleBalanceData>({
+  const { data: importCycleData, isError: importCycleIsError, isLoading: importCycleIsLoading } = useQuery<ImportCycleBalanceData>({
     queryKey: ["/api/stats/import-cycle-balance", selectedCompany?.id, appMode],
     queryFn: async () => {
       const response = await modeApiRequest("GET", "/api/stats/import-cycle-balance");
@@ -195,6 +204,7 @@ export default function Dashboard() {
       return await response.json();
     },
     enabled: !!selectedCompany,
+    retry: 1,
   });
 
   const { data: factoryKPIs } = useQuery<FactoryDashboardKPIs>({
@@ -426,49 +436,61 @@ export default function Dashboard() {
         showHomeButton={false}
       />
 
-      {/* ── Quick Actions ── */}
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {!isFactoryMode ? (
-          <>
-            <Button size="sm" variant="outline" onClick={() => setLocation("/vouchers?type=payment")} data-testid="quick-action-payment">
-              <ReceiptText className="h-3.5 w-3.5 mr-1.5" />
-              New Payment
+      {/* ── Quick Actions dropdown ── */}
+      <div className="flex gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="outline" data-testid="button-quick-actions">
+              <Zap className="h-3.5 w-3.5 mr-1.5" />
+              Quick Actions
+              <ChevronDown className="h-3.5 w-3.5 ml-1.5" />
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setLocation("/vouchers?type=receipt")} data-testid="quick-action-receipt">
-              <ArrowDownLeft className="h-3.5 w-3.5 mr-1.5" />
-              New Receipt
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setLocation("/vouchers?type=journal")} data-testid="quick-action-journal">
-              <BookOpen className="h-3.5 w-3.5 mr-1.5" />
-              New Journal
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setLocation("/reports")} data-testid="quick-action-reports">
-              <BarChart2 className="h-3.5 w-3.5 mr-1.5" />
-              Reports
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setLocation("/inventory")} data-testid="quick-action-inventory">
-              <Boxes className="h-3.5 w-3.5 mr-1.5" />
-              Inventory
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button size="sm" variant="outline" onClick={() => setLocation("/factory/press-bale")} data-testid="quick-action-press-bale">
-              <Factory className="h-3.5 w-3.5 mr-1.5" />
-              Press Bale
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setLocation("/factory/stock-adjustment")} data-testid="quick-action-stock-adj">
-              <Scale className="h-3.5 w-3.5 mr-1.5" />
-              Stock Adjustment
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setLocation("/factory/reports")} data-testid="quick-action-factory-reports">
-              <BarChart2 className="h-3.5 w-3.5 mr-1.5" />
-              Production Report
-            </Button>
-          </>
-        )}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {!isFactoryMode ? (
+              <>
+                <DropdownMenuItem onClick={() => setLocation("/vouchers?type=payment")} data-testid="quick-action-payment">
+                  <ReceiptText className="h-4 w-4 mr-2" />
+                  New Payment
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLocation("/vouchers?type=receipt")} data-testid="quick-action-receipt">
+                  <ArrowDownLeft className="h-4 w-4 mr-2" />
+                  New Receipt
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLocation("/vouchers?type=journal")} data-testid="quick-action-journal">
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  New Journal
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setLocation("/sales-report")} data-testid="quick-action-reports">
+                  <BarChart2 className="h-4 w-4 mr-2" />
+                  Sales Report
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLocation("/location-inventory")} data-testid="quick-action-inventory">
+                  <Boxes className="h-4 w-4 mr-2" />
+                  Inventory
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <>
+                <DropdownMenuItem onClick={() => setLocation("/factory/press-bale")} data-testid="quick-action-press-bale">
+                  <Factory className="h-4 w-4 mr-2" />
+                  Press Bale
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLocation("/factory/stock-adjustment")} data-testid="quick-action-stock-adj">
+                  <Scale className="h-4 w-4 mr-2" />
+                  Stock Adjustment
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setLocation("/factory/location-inventory")} data-testid="quick-action-factory-inventory">
+                  <Boxes className="h-4 w-4 mr-2" />
+                  Inventory
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-
       {/* ── Top KPI row ── */}
       <div className={cn("grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4", !isFactoryMode ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
         {!isFactoryMode && (
@@ -478,7 +500,7 @@ export default function Dashboard() {
             change="All income accounts combined"
             changeType="positive"
             icon={DollarSign}
-            onClick={() => setLocation("/reports")}
+            onClick={() => setLocation("/sales-report")}
             data-testid="kpi-total-income"
           />
         )}
@@ -494,22 +516,26 @@ export default function Dashboard() {
         <KPICard
           title="Import Cycle Balance"
           value={
-            importCycleBalance === null
+            importCycleIsError
+              ? "Unavailable"
+              : importCycleIsLoading
               ? "Loading..."
               : isImportCycleBalanced
               ? "Balanced"
-              : formatAmount(Math.abs(importCycleBalance))
+              : formatAmount(Math.abs(importCycleBalance!))
           }
           change={
-            importCycleBalance === null
+            importCycleIsError
+              ? "Could not load cycle data"
+              : importCycleIsLoading
               ? ""
               : isImportCycleBalanced
               ? "All accounts net to zero"
               : "Should be $0 when balanced"
           }
-          changeType={isImportCycleBalanced ? "positive" : "negative"}
-          icon={isImportCycleBalanced ? CheckCircle2 : Truck}
-          onClick={!isImportCycleBalanced ? () => setImportCycleExpanded((v) => !v) : undefined}
+          changeType={importCycleIsError ? "neutral" : isImportCycleBalanced ? "positive" : "negative"}
+          icon={importCycleIsError ? Truck : isImportCycleBalanced ? CheckCircle2 : Truck}
+          onClick={!importCycleIsError && !isImportCycleBalanced && !importCycleIsLoading ? () => setImportCycleExpanded((v) => !v) : undefined}
           data-testid="kpi-import-cycle-balance"
         />
       </div>
@@ -696,19 +722,19 @@ export default function Dashboard() {
             <div className="grid grid-cols-3 divide-x border-b">
               <div className="p-4 sm:p-5 text-center">
                 <p className="text-xs text-muted-foreground mb-1">Available</p>
-                <p className="text-2xl sm:text-3xl font-bold font-mono text-chart-2" data-testid="text-total-available">
+                <p className="text-xl sm:text-2xl font-bold font-mono text-chart-2" data-testid="text-total-available">
                   {formatAmount(totalAvailable)}
                 </p>
               </div>
               <div className="p-4 sm:p-5 text-center">
                 <p className="text-xs text-muted-foreground mb-1">To Pay</p>
-                <p className="text-2xl sm:text-3xl font-bold font-mono text-destructive" data-testid="text-total-payable">
+                <p className="text-xl sm:text-2xl font-bold font-mono text-destructive" data-testid="text-total-payable">
                   {formatAmount(totalPayable)}
                 </p>
               </div>
               <div className="p-4 sm:p-5 text-center">
                 <p className="text-xs text-muted-foreground mb-1">Net</p>
-                <p className={cn("text-2xl sm:text-3xl font-bold font-mono", netCashPosition >= 0 ? "text-chart-2" : "text-destructive")} data-testid="text-net-position">
+                <p className={cn("text-xl sm:text-2xl font-bold font-mono", netCashPosition >= 0 ? "text-chart-2" : "text-destructive")} data-testid="text-net-position">
                   {formatAmount(netCashPosition)}
                 </p>
               </div>

@@ -27,7 +27,7 @@ export function KPICard({ title, value, change, changeType, icon: Icon, onClick,
             {title}
           </span>
           <span
-            className="text-2xl sm:text-4xl font-bold font-mono truncate"
+            className="text-xl sm:text-3xl font-bold font-mono truncate"
             data-testid={`text-kpi-value-${title.toLowerCase().replace(/\s+/g, '-')}`}
           >
             {value}
