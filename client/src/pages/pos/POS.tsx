@@ -205,6 +205,15 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   // Fetch customer accounts (Asset-type ledger accounts for receivables)
   const customerAccounts = (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc: any) => acc.accountType === "Asset");
 
+  // Fetch POS customers to show balance on credit sales
+  const { data: posCustomers = [] } = useQuery<any[]>({
+    queryKey: ["/api/pos/customers"],
+    enabled: isCreditSale,
+  });
+  const selectedCustomer = isCreditSale && selectedCustomerId
+    ? posCustomers.find((c: any) => String(c.id) === selectedCustomerId)
+    : null;
+
   // Fetch voucher details if in edit mode
   const { data: editVoucher, isLoading: editVoucherLoading } = useQuery<any>({
     queryKey: editVoucherId ? [`/api/vouchers/${editVoucherId}`] : [],
@@ -252,6 +261,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const [mobileRowEditOpen, setMobileRowEditOpen] = useState(false);
   const [mobileRowEditIndex, setMobileRowEditIndex] = useState<number | null>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
+  const [saleJustCompleted, setSaleJustCompleted] = useState(false);
 
   // Reset sale state when POS user switches location
   const prevLocationRef = useRef<number | null>(null);
@@ -479,9 +489,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       });
       
       if (!editVoucherId) {
-        // Clear the form for new sales
-        setRows([{ id: "1", itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 }]);
-        setNotes("");
+        setSaleJustCompleted(true);
       }
       
       // Auto-show print dialog for both new and edit
@@ -836,6 +844,25 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       </div>
     );
   }
+
+  const handleNewSale = () => {
+    setRows([{ id: "1", itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 }]);
+    setNotes("");
+    setSaleJustCompleted(false);
+    setSavedSale(null);
+    setCurrentDraftId(null);
+    setShowPrintDialog(false);
+  };
+
+  const getStockWarning = (row: SaleRow): string | null => {
+    if (!row.stockItemId || !row.quantity) return null;
+    const canSellZeroStock = posUser?.canSellNegativeStock || authUser?.canSellNegativeStock;
+    if (canSellZeroStock) return null;
+    const inventoryItem = inventory.find(i => i.stockItemId === row.stockItemId);
+    if (!inventoryItem) return null;
+    if (row.quantity > inventoryItem.stock) return `Only ${inventoryItem.stock} available`;
+    return null;
+  };
 
   // Format amount with currency prefix (no conversion - amount is already in display currency)
   const formatDisplayAmount = (amount: number): string => {
@@ -1472,16 +1499,29 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button 
-            onClick={handleSaveSale}
-            size="sm"
-            disabled={saveMutation.isPending || !hasValidItems}
-            className="gap-1 sm:gap-2"
-            data-testid="button-complete-sale"
-          >
-            {saveMutation.isPending ? "..." : <><span className="hidden sm:inline">{editVoucherId ? "Update" : "Save"}</span><span className="sm:hidden">Save</span></>}
-            {!saveMutation.isPending && <Check className="h-4 w-4" />}
-          </Button>
+          {saleJustCompleted && !editVoucherId ? (
+            <Button
+              size="sm"
+              onClick={handleNewSale}
+              className="gap-1 sm:gap-2"
+              data-testid="button-new-sale"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">New Sale</span>
+              <span className="sm:hidden">New</span>
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSaveSale}
+              size="sm"
+              disabled={saveMutation.isPending || !hasValidItems}
+              className="gap-1 sm:gap-2"
+              data-testid="button-complete-sale"
+            >
+              {saveMutation.isPending ? "..." : <><span className="hidden sm:inline">{editVoucherId ? "Update" : "Save"}</span><span className="sm:hidden">Save</span></>}
+              {!saveMutation.isPending && <Check className="h-4 w-4" />}
+            </Button>
+          )}
         </div>
       </PageHeader>
 
@@ -1610,20 +1650,30 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
         {/* Customer Selector (shown when credit sale is enabled) */}
         {isCreditSale && (
-          <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
-            <User className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
-            <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-              <SelectTrigger className="w-full sm:w-44" data-testid="select-customer">
-                <SelectValue placeholder="Customer" />
-              </SelectTrigger>
-              <SelectContent>
-                {customerAccounts.map((acc: any) => (
-                  <SelectItem key={acc.id} value={String(acc.id)}>
-                    {acc.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col gap-1 col-span-2 sm:col-span-1">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
+              <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
+                <SelectTrigger className="w-full sm:w-44" data-testid="select-customer">
+                  <SelectValue placeholder="Customer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {customerAccounts.map((acc: any) => (
+                    <SelectItem key={acc.id} value={String(acc.id)}>
+                      {acc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {selectedCustomer && (
+              <p className="text-xs text-muted-foreground pl-0 sm:pl-6" data-testid="text-customer-balance">
+                Balance:{" "}
+                <span className={selectedCustomer.balanceSide === "Dr" ? "text-destructive font-medium" : "text-green-600 dark:text-green-400 font-medium"}>
+                  {formatDisplayAmount(Math.abs(selectedCustomer.balance))} {selectedCustomer.balanceSide === "Dr" ? "owed" : "credit"}
+                </span>
+              </p>
+            )}
           </div>
         )}
 
@@ -1822,7 +1872,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                                 col.key === "quantity" || col.key === "rate" || col.key === "amount"
                                   ? "font-mono text-right"
                                   : ""
-                              } ${col.key === "amount" ? "cursor-not-allowed" : ""}`}
+                              } ${col.key === "amount" ? "cursor-not-allowed" : ""} ${
+                                col.key === "quantity" && getStockWarning(row) ? "text-destructive font-bold" : ""
+                              }`}
                               placeholder={
                                 col.key === "itemName"
                                   ? "Type to search..."
@@ -1962,7 +2014,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       <Sheet open={mobileItemSearchOpen} onOpenChange={(open) => { setMobileItemSearchOpen(open); if (!open) setMobileItemSearchTerm(""); }}>
         <SheetContent side="bottom" className="h-[90vh] flex flex-col p-0">
           <SheetHeader className="px-4 pt-4 pb-2 border-b shrink-0">
-            <SheetTitle className="text-base">Select Item</SheetTitle>
+            <div className="flex items-center justify-between">
+              <SheetTitle className="text-base">Select Item</SheetTitle>
+              {total > 0 && (
+                <span className="text-sm font-semibold font-mono" data-testid="text-mobile-sheet-total">
+                  {formatDisplayAmount(total)}
+                </span>
+              )}
+            </div>
             <div className="relative mt-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -2139,14 +2198,25 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             {formatDisplayAmount(total)}
           </div>
         </div>
-        <Button
-          onClick={handleSaveSale}
-          disabled={saveMutation.isPending || !hasValidItems}
-          className="shrink-0 h-10 px-5"
-          data-testid="button-mobile-sticky-save"
-        >
-          {saveMutation.isPending ? "..." : <><Check className="h-4 w-4 mr-1.5" />{editVoucherId ? "Update" : "Save"}</>}
-        </Button>
+        {saleJustCompleted && !editVoucherId ? (
+          <Button
+            onClick={handleNewSale}
+            className="shrink-0 h-10 px-5"
+            data-testid="button-mobile-sticky-new-sale"
+          >
+            <Plus className="h-4 w-4 mr-1.5" />
+            New Sale
+          </Button>
+        ) : (
+          <Button
+            onClick={handleSaveSale}
+            disabled={saveMutation.isPending || !hasValidItems}
+            className="shrink-0 h-10 px-5"
+            data-testid="button-mobile-sticky-save"
+          >
+            {saveMutation.isPending ? "..." : <><Check className="h-4 w-4 mr-1.5" />{editVoucherId ? "Update" : "Save"}</>}
+          </Button>
+        )}
       </div>
 
       {/* Zero Stock Alert Dialog */}
@@ -2308,6 +2378,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             <Button variant="outline" onClick={() => { setShowPrintDialog(false); if (editVoucherId) navigate("/pos-daybook"); }} data-testid="button-cancel-print">
               Close
             </Button>
+            {!editVoucherId && (
+              <Button variant="outline" onClick={handleNewSale} className="gap-2" data-testid="button-new-sale-print">
+                <Plus className="h-4 w-4" />
+                New Sale
+              </Button>
+            )}
             <Button onClick={handlePrint} className="gap-2" data-testid="button-print-invoice">
               <Printer className="h-4 w-4" />
               Print Invoice

@@ -97,6 +97,8 @@ export default function POSDaybook() {
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const reprintRef = useRef<HTMLDivElement>(null);
+  const reprintRowRef = useRef<HTMLDivElement>(null);
+  const [reprintRowVoucherId, setReprintRowVoucherId] = useState<number | null>(null);
 
   // Check for date and voucherId in URL query parameters (from stock item voucher history)
   const urlParams = new URLSearchParams(window.location.search);
@@ -353,6 +355,24 @@ export default function POSDaybook() {
     contentRef: reprintRef,
   });
 
+  const handleReprintRow = useReactToPrint({
+    contentRef: reprintRowRef,
+    onAfterPrint: () => setReprintRowVoucherId(null),
+  });
+
+  // Fetch voucher details for row-level reprint
+  const { data: reprintRowDetails, isLoading: reprintRowLoading } = useQuery<VoucherWithItems>({
+    queryKey: reprintRowVoucherId ? [`/api/vouchers/${reprintRowVoucherId}`] : [],
+    enabled: !!reprintRowVoucherId,
+  });
+
+  // Auto-trigger print once details load
+  useEffect(() => {
+    if (reprintRowDetails && reprintRowVoucherId && !reprintRowLoading) {
+      setTimeout(() => handleReprintRow(), 100);
+    }
+  }, [reprintRowDetails, reprintRowVoucherId, reprintRowLoading]);
+
   const handleCancelEdit = () => {
     setIsEditMode(false);
     setEditedItems([]);
@@ -569,15 +589,29 @@ export default function POSDaybook() {
                         {voucher.description || "-"}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedVoucher(voucher as VoucherWithItems)}
-                          data-testid={`button-view-${voucher.id}`}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Details
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          {voucher.voucherType === "Sales" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setReprintRowVoucherId(voucher.id)}
+                              disabled={reprintRowVoucherId === voucher.id}
+                              data-testid={`button-reprint-row-${voucher.id}`}
+                              title="Reprint invoice"
+                            >
+                              <Printer className={`h-4 w-4 ${reprintRowVoucherId === voucher.id ? "animate-pulse" : ""}`} />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedVoucher(voucher as VoucherWithItems)}
+                            data-testid={`button-view-${voucher.id}`}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -587,6 +621,84 @@ export default function POSDaybook() {
           )}
         </CardContent>
       </Card>
+
+      {/* Hidden row-level reprint template (outside dialog, always in DOM) */}
+      <div className="hidden">
+        <div ref={reprintRowRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '11pt', padding: '12px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: 'normal', fontVariantNumeric: 'tabular-nums' }}>
+          <style dangerouslySetInnerHTML={{ __html: `@media print { body { font-family: Arial, Helvetica, sans-serif !important; } * { font-family: Arial, Helvetica, sans-serif !important; font-variant-numeric: tabular-nums !important; } }` }} />
+          <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '18pt', letterSpacing: '2px', marginBottom: '6px' }}>POS INVOICE</div>
+          <div style={{ fontSize: '11pt', fontWeight: '700', display: 'flex', justifyContent: 'space-between', borderTop: '2px solid black', borderBottom: '2px solid black', padding: '5px 0', marginBottom: '6px' }}>
+            <span>Date: {reprintRowDetails?.voucherDate}</span>
+            <span>User: {currentUser?.fullName || currentUser?.name || currentUser?.username || currentUser?.email}</span>
+          </div>
+          {isMaliCompany && reprintRowDetails?.exchangeRate && (
+            <div style={{ fontSize: '11pt', fontWeight: '700', marginBottom: '6px', padding: '4px', border: '2px solid black', textAlign: 'center' }}>
+              <span style={{ fontWeight: '900' }}>Daily Rate:</span> $1 = {formatNumber(parseFloat(String(reprintRowDetails.exchangeRate)))} CFA
+            </div>
+          )}
+          {reprintRowDetails?.isCreditSale && (
+            <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '6px', padding: '4px', border: '2px solid black' }}>
+              <div style={{ fontWeight: '900' }}>CREDIT SALE</div>
+              {reprintRowDetails.customerName && <div>Customer: {reprintRowDetails.customerName}</div>}
+            </div>
+          )}
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11pt', marginBottom: '0', fontVariantNumeric: 'tabular-nums', border: '1px solid #999' }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left', padding: '4px 7px', width: '30%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Description</th>
+                <th style={{ textAlign: 'center', padding: '4px 7px', width: '6%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Qty</th>
+                <th style={{ textAlign: 'center', padding: '4px 7px', width: '9%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Rate</th>
+                <th style={{ textAlign: 'center', padding: '4px 7px', width: '10%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Amt</th>
+                <th style={{ textAlign: 'center', padding: '4px 7px', width: '10%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Config</th>
+                <th style={{ textAlign: 'center', padding: '4px 7px', width: '12%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>P/L Bale</th>
+                <th style={{ textAlign: 'center', padding: '4px 7px', width: '13%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Total P/L</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(reprintRowDetails?.salesItems ?? []).map((item: any, idx: number) => {
+                const rate = parseFloat(item.sellingPrice || "0");
+                const qty = parseFloat(item.quantity || "0");
+                const configPrice = parseFloat(item.configuredPrice || "0");
+                const plPerBale = rate - configPrice;
+                const totalPL = plPerBale * qty;
+                const rowBg = idx % 2 === 0 ? '#ffffff' : '#f5f5f5';
+                return (
+                  <tr key={idx} style={{ backgroundColor: rowBg }}>
+                    <td style={{ padding: '4px 7px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600', lineHeight: '1.3', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{item.stockItemName}</td>
+                    <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{fmtPrint(qty)}</td>
+                    <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{fmtPrint(rate, "$")}</td>
+                    <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{fmtPrint(qty * rate, "$")}</td>
+                    <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{fmtPrint(configPrice, "$")}</td>
+                    <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8', color: plPerBale > 0 ? '#0a7e1f' : plPerBale < 0 ? '#c2272d' : undefined }}>{fmtPrint(plPerBale, "$")}</td>
+                    <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8', color: totalPL > 0 ? '#0a7e1f' : totalPL < 0 ? '#c2272d' : undefined }}>{fmtPrint(totalPL, "$")}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td style={{ padding: '4px 7px', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>TOTAL</td>
+                <td style={{ textAlign: 'center', padding: '4px 7px', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>{fmtPrint((reprintRowDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0"), 0))}</td>
+                <td style={{ padding: '4px 7px', border: '1px solid #999', backgroundColor: '#eeeeee' }}></td>
+                <td style={{ textAlign: 'center', padding: '4px 7px', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>{fmtPrint((reprintRowDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"), 0), "$")}</td>
+                <td colSpan={3} style={{ padding: '4px 7px', border: '1px solid #999', backgroundColor: '#eeeeee' }}></td>
+              </tr>
+            </tfoot>
+          </table>
+          <div style={{ fontSize: '14pt', fontWeight: '900', marginTop: '8px', paddingTop: '8px', borderTop: '1.5px solid #333', display: 'flex', justifyContent: 'space-between' }}>
+            <span>TOTAL PAID:</span>
+            <span>{fmtPrint((reprintRowDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"), 0), "$")}</span>
+          </div>
+          {reprintRowDetails?.description && (
+            <div style={{ fontSize: '9pt', fontWeight: '600', marginTop: '8px', padding: '4px', border: '2px solid black' }}>
+              <span style={{ fontWeight: '900' }}>Note:</span> {reprintRowDetails.description}
+            </div>
+          )}
+          <div style={{ textAlign: 'center', fontSize: '9pt', fontWeight: '700', marginTop: '10px', paddingTop: '5px', borderTop: '2px solid black' }}>
+            <div>Thank you for your business!</div>
+          </div>
+        </div>
+      </div>
 
       {/* Transaction Details Dialog */}
       <Dialog open={!!selectedVoucher} onOpenChange={() => setSelectedVoucher(null)}>
