@@ -6,6 +6,7 @@ import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationIn
 import {
   inventory, stockItems, stockGroups, stockGroupArchives, stockItemCodeAliases,
   stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
+  stockTransferRevisions, stockTransferRevisionItems,
   stockAdjustmentVouchers, stockAdjustmentItems,
   containers, containerOffloads, containerOffloadItems, containerSales,
   containerCharges, containerTrackingImportRowSchema, updateContainerTrackingSchema,
@@ -840,6 +841,100 @@ export function registerFiscalTransferRoutes(app: Express) {
         .set({ notes: notes ?? null })
         .where(eq(stockTransferVouchers.id, id))
         .execute();
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Transfer Revisions - GET
+  app.get("/api/stock-transfers/:transferId/revisions", requireAuth, async (req, res) => {
+    try {
+      const transferId = parseInt(req.params.transferId);
+      if (!transferId) return res.status(400).json({ message: "Transfer ID required" });
+
+      const revisionRows = await db
+        .select()
+        .from(stockTransferRevisions)
+        .where(eq(stockTransferRevisions.transferId, transferId))
+        .orderBy(asc(stockTransferRevisions.revisionNumber));
+
+      const result = await Promise.all(
+        revisionRows.map(async (rev) => {
+          const items = await db
+            .select()
+            .from(stockTransferRevisionItems)
+            .where(eq(stockTransferRevisionItems.revisionId, rev.id));
+          return { ...rev, items };
+        })
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Transfer Revisions - POST (create)
+  app.post("/api/stock-transfers/:transferId/revisions", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const transferId = parseInt(req.params.transferId);
+      if (!transferId) return res.status(400).json({ message: "Transfer ID required" });
+
+      const { note, items } = req.body;
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "At least one changed item is required" });
+      }
+
+      const existing = await db
+        .select({ revisionNumber: stockTransferRevisions.revisionNumber })
+        .from(stockTransferRevisions)
+        .where(eq(stockTransferRevisions.transferId, transferId))
+        .orderBy(desc(stockTransferRevisions.revisionNumber))
+        .limit(1);
+
+      const nextNum = existing.length > 0 ? existing[0].revisionNumber + 1 : 1;
+
+      const [revision] = await db
+        .insert(stockTransferRevisions)
+        .values({ transferId, revisionNumber: nextNum, note: note?.trim() || null, optional: false })
+        .returning();
+
+      await db.insert(stockTransferRevisionItems).values(
+        items.map((item: any) => ({
+          revisionId: revision.id,
+          stockItemId: item.stockItemId,
+          stockItemName: item.stockItemName,
+          sourceLocationId: item.sourceLocationId ?? null,
+          sourceLocationName: item.sourceLocationName ?? null,
+          originalQuantity: String(item.originalQuantity),
+          delta: String(item.delta),
+          newQuantity: String(item.newQuantity),
+        }))
+      );
+
+      const savedItems = await db
+        .select()
+        .from(stockTransferRevisionItems)
+        .where(eq(stockTransferRevisionItems.revisionId, revision.id));
+
+      res.json({ ...revision, items: savedItems });
+    } catch (error: any) {
+      console.error("[Revision POST] Error:", error.message);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Transfer Revisions - PATCH optional flag
+  app.patch("/api/stock-transfer-revisions/:id/optional", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!id) return res.status(400).json({ message: "Revision ID required" });
+      const { optional } = req.body;
+      await db
+        .update(stockTransferRevisions)
+        .set({ optional: !!optional })
+        .where(eq(stockTransferRevisions.id, id));
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

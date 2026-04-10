@@ -956,6 +956,31 @@ export const insertStockAdjustmentItemSchema = createInsertSchema(stockAdjustmen
 export type InsertStockAdjustmentItem = z.infer<typeof insertStockAdjustmentItemSchema>;
 export type StockAdjustmentItem = typeof stockAdjustmentItems.$inferSelect;
 
+// Transfer Order Revisions
+export const stockTransferRevisions = pgTable("stock_transfer_revisions", {
+  id: serial("id").primaryKey(),
+  transferId: integer("transfer_id").notNull(),
+  revisionNumber: integer("revision_number").notNull(),
+  note: text("note"),
+  optional: boolean("optional").default(false).notNull(),
+  revisionDate: timestamp("revision_date").notNull().defaultNow(),
+});
+
+export const stockTransferRevisionItems = pgTable("stock_transfer_revision_items", {
+  id: serial("id").primaryKey(),
+  revisionId: integer("revision_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull(),
+  stockItemName: text("stock_item_name").notNull(),
+  sourceLocationId: integer("source_location_id"),
+  sourceLocationName: text("source_location_name"),
+  originalQuantity: decimal("original_quantity", { precision: 15, scale: 3 }).notNull(),
+  delta: decimal("delta", { precision: 15, scale: 3 }).notNull(),
+  newQuantity: decimal("new_quantity", { precision: 15, scale: 3 }).notNull(),
+});
+
+export type StockTransferRevision = typeof stockTransferRevisions.$inferSelect;
+export type StockTransferRevisionItem = typeof stockTransferRevisionItems.$inferSelect;
+
 // Update schemas for stock transfers and adjustments
 export const updateStockTransferItemSchema = z.object({
   sourceLocationId: z.coerce.number().int().positive("Source location must be a positive integer"),

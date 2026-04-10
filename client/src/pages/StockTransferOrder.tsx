@@ -39,7 +39,8 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, ChevronRight, MapPin, Package, Trash2, Check, AlertCircle, ArrowRight, Settings2, CalendarIcon, FileDown, List } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, MapPin, Package, Trash2, Check, AlertCircle, ArrowRight, Settings2, CalendarIcon, FileDown, List, GitBranch } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -176,6 +177,12 @@ export default function StockTransferOrder() {
   const [hasDraft, setHasDraft] = useState<boolean>(false);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Revision state
+  const [revisionDialogOpen, setRevisionDialogOpen] = useState(false);
+  const [revisionNote, setRevisionNote] = useState("");
+  const [isSavingRevision, setIsSavingRevision] = useState(false);
+  const [revisionsExpanded, setRevisionsExpanded] = useState(false);
+
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
   });
@@ -203,6 +210,16 @@ export default function StockTransferOrder() {
   const { data: stockItems = [] } = useQuery<Array<{ id: number; name: string; code: string; uom: string }>>({
     queryKey: ["/api/stock-items"],
     enabled: !!editVoucherId,
+  });
+
+  const { data: revisions = [] } = useQuery<any[]>({
+    queryKey: ["/api/stock-transfers", existingTransfer?.id, "revisions"],
+    queryFn: async () => {
+      const res = await fetch(`/api/stock-transfers/${existingTransfer!.id}/revisions`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch revisions");
+      return res.json();
+    },
+    enabled: !!existingTransfer?.id,
   });
 
   const { data: summaryData, isLoading } = useQuery<LocationSummaryResponse>({
@@ -863,6 +880,109 @@ export default function StockTransferOrder() {
     },
   });
 
+  const computeRevisionItems = () => {
+    if (!existingTransfer?.items) return [];
+    type RevKey = string;
+    const originalMap = new Map<RevKey, { qty: number; name: string; srcName: string; stockItemId: number; sourceLocationId: number | null }>();
+    for (const item of existingTransfer.items) {
+      const key: RevKey = `${item.stockItemId}-${item.sourceLocationId ?? "null"}`;
+      const si = stockItems.find((s) => s.id === item.stockItemId);
+      const sl = locations.find((l) => l.id === item.sourceLocationId);
+      originalMap.set(key, {
+        qty: parseFloat(item.quantity) || 0,
+        name: si?.name || "",
+        srcName: sl?.name || "",
+        stockItemId: item.stockItemId,
+        sourceLocationId: item.sourceLocationId ?? null,
+      });
+    }
+    const currentMap = new Map<RevKey, OrderItem>();
+    for (const item of orderItems) {
+      const key: RevKey = `${item.stockItemId}-${item.sourceLocationId ?? "null"}`;
+      currentMap.set(key, item);
+    }
+    const allKeys = new Set([...originalMap.keys(), ...currentMap.keys()]);
+    const result: Array<{
+      stockItemId: number; stockItemName: string;
+      sourceLocationId: number | null; sourceLocationName: string;
+      originalQuantity: number; delta: number; newQuantity: number;
+    }> = [];
+    for (const key of allKeys) {
+      const orig = originalMap.get(key);
+      const cur = currentMap.get(key);
+      const origQty = orig?.qty ?? 0;
+      const curQty = cur?.quantity ?? 0;
+      const delta = curQty - origQty;
+      if (Math.abs(delta) < 0.001) continue;
+      result.push({
+        stockItemId: cur?.stockItemId ?? orig?.stockItemId ?? 0,
+        stockItemName: cur?.stockItemName || orig?.name || "",
+        sourceLocationId: cur?.sourceLocationId ?? orig?.sourceLocationId ?? null,
+        sourceLocationName: cur?.sourceLocationName || orig?.srcName || "",
+        originalQuantity: origQty,
+        delta,
+        newQuantity: curQty,
+      });
+    }
+    return result;
+  };
+
+  const handleSaveAsRevision = async () => {
+    const errors = validateOrder();
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      toast({ title: "Cannot Save", description: "Please fix validation errors first", variant: "destructive" });
+      return;
+    }
+    setRevisionDialogOpen(true);
+  };
+
+  const confirmSaveAsRevision = async () => {
+    const revisionItems = computeRevisionItems();
+    if (revisionItems.length === 0) {
+      toast({ title: "No Changes", description: "No differences found compared to the saved order", variant: "destructive" });
+      setRevisionDialogOpen(false);
+      return;
+    }
+    if (!destinationLocationId || !existingTransfer?.id) return;
+
+    setIsSavingRevision(true);
+    try {
+      await apiRequest("PATCH", `/api/vouchers/${editVoucherId}`, {
+        voucherDate: format(transferDate, "yyyy-MM-dd"),
+        optional: isOptional,
+      });
+      await apiRequest("PUT", `/api/stock-transfers/${existingTransfer.id}`, {
+        destinationLocationId,
+        notes: `Stock Transfer Order - ${orderItems.length} items`,
+        items: orderItems.map((item) => ({
+          stockItemId: item.stockItemId,
+          sourceLocationId: item.sourceLocationId,
+          quantity: item.quantity,
+          rate: item.rate,
+        })),
+      });
+      await apiRequest("POST", `/api/stock-transfers/${existingTransfer.id}/revisions`, {
+        note: revisionNote.trim() || null,
+        items: revisionItems,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", editVoucherId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", existingTransfer.id, "revisions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
+      setRevisionNote("");
+      setRevisionDialogOpen(false);
+      const nextRevNum = revisions.length + 1;
+      toast({ title: "Revision Saved", description: `Rev ${nextRevNum} recorded and order updated` });
+      navigate("/daybook");
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to save revision", variant: "destructive" });
+    } finally {
+      setIsSavingRevision(false);
+    }
+  };
+
   const handleProcessOrder = async () => {
     const errors = validateOrder();
     if (errors.length > 0) {
@@ -1299,6 +1419,19 @@ export default function StockTransferOrder() {
                         {isProcessing ? (editVoucherId ? "Updating..." : "Processing...") : (editVoucherId ? "Update Order" : "Process")}
                       </Button>
                     </div>
+                    {editVoucherId && existingTransfer?.id && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleSaveAsRevision}
+                        disabled={isSavingRevision || !destinationLocationId}
+                        className="w-full"
+                        data-testid="button-save-as-revision"
+                      >
+                        <GitBranch className="h-4 w-4 mr-1" />
+                        Save as Revision
+                      </Button>
+                    )}
                   </div>
                 </>
               )}
@@ -1306,6 +1439,167 @@ export default function StockTransferOrder() {
           </Card>
         </div>
       </div>
+
+      {/* ── Revision History Panel (edit mode only) ── */}
+      {editVoucherId && existingTransfer?.id && (
+        <Card>
+          <CardHeader
+            className="p-4 sm:p-5 cursor-pointer select-none"
+            onClick={() => setRevisionsExpanded((v) => !v)}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <GitBranch className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-base">Revision History</CardTitle>
+                {revisions.length > 0 && (
+                  <Badge variant="secondary" className="ml-1">{revisions.length}</Badge>
+                )}
+              </div>
+              {revisionsExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+            </div>
+          </CardHeader>
+          {revisionsExpanded && (
+            <CardContent className="pt-0 space-y-4">
+              {revisions.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No revisions yet. Use "Save as Revision" to record tracked changes.</p>
+              ) : (
+                revisions.map((rev: any) => (
+                  <div key={rev.id} className="border rounded-md overflow-hidden">
+                    <div className="flex items-center justify-between gap-3 p-3 bg-muted/40 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant={rev.optional ? "secondary" : "default"}>
+                          Rev {rev.revisionNumber}
+                        </Badge>
+                        {rev.optional && <Badge variant="outline" className="text-xs">Reference Only</Badge>}
+                        <span className="text-xs text-muted-foreground">
+                          {rev.revisionDate ? new Date(rev.revisionDate).toLocaleDateString() : ""}
+                        </span>
+                        {rev.note && <span className="text-xs italic text-muted-foreground">"{rev.note}"</span>}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">Reference only:</span>
+                        <Switch
+                          checked={rev.optional}
+                          onCheckedChange={async (checked) => {
+                            await apiRequest("PATCH", `/api/stock-transfer-revisions/${rev.id}/optional`, { optional: checked });
+                            queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", existingTransfer.id, "revisions"] });
+                          }}
+                          data-testid={`switch-revision-optional-${rev.id}`}
+                        />
+                      </div>
+                    </div>
+                    {rev.items && rev.items.length > 0 && (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/30">
+                            <tr>
+                              <th className="text-left p-2 font-medium">Item</th>
+                              <th className="text-left p-2 font-medium hidden sm:table-cell">From</th>
+                              <th className="text-right p-2 font-medium">Was</th>
+                              <th className="text-right p-2 font-medium">Change</th>
+                              <th className="text-right p-2 font-medium">Now</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rev.items.map((item: any, idx: number) => {
+                              const delta = parseFloat(item.delta);
+                              return (
+                                <tr key={idx} className="border-t">
+                                  <td className="p-2 font-medium">{item.stockItemName}</td>
+                                  <td className="p-2 text-muted-foreground hidden sm:table-cell">{item.sourceLocationName || "—"}</td>
+                                  <td className="p-2 text-right font-mono text-muted-foreground">{formatNumber(parseFloat(item.originalQuantity), 0)}</td>
+                                  <td className={`p-2 text-right font-mono font-semibold ${delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                                    {delta > 0 ? "+" : ""}{formatNumber(delta, 0)}
+                                  </td>
+                                  <td className="p-2 text-right font-mono font-semibold">{formatNumber(parseFloat(item.newQuantity), 0)}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </CardContent>
+          )}
+        </Card>
+      )}
+
+      {/* ── Revision Note Dialog ── */}
+      <Dialog open={revisionDialogOpen} onOpenChange={setRevisionDialogOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitBranch className="h-4 w-4" />
+              Save as Revision
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This will update the order <strong>and</strong> record the changes as{" "}
+              <strong>Rev {revisions.length + 1}</strong>.
+            </p>
+            {(() => {
+              const items = computeRevisionItems();
+              return items.length === 0 ? (
+                <p className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-md px-3 py-2">
+                  No differences detected compared to the saved order.
+                </p>
+              ) : (
+                <div className="border rounded-md overflow-hidden text-sm">
+                  <table className="w-full">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left p-2 font-medium">Item</th>
+                        <th className="text-right p-2 font-medium">Was</th>
+                        <th className="text-right p-2 font-medium">Change</th>
+                        <th className="text-right p-2 font-medium">Now</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((item, idx) => (
+                        <tr key={idx} className="border-t">
+                          <td className="p-2 font-medium truncate max-w-[120px]">{item.stockItemName}</td>
+                          <td className="p-2 text-right font-mono text-muted-foreground">{formatNumber(item.originalQuantity, 0)}</td>
+                          <td className={`p-2 text-right font-mono font-semibold ${item.delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                            {item.delta > 0 ? "+" : ""}{formatNumber(item.delta, 0)}
+                          </td>
+                          <td className="p-2 text-right font-mono">{formatNumber(item.newQuantity, 0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+            <div className="space-y-1.5">
+              <Label htmlFor="revision-note">Note (optional)</Label>
+              <Textarea
+                id="revision-note"
+                placeholder="Why was this revised? e.g. Shop sold 10 bales of fabric"
+                value={revisionNote}
+                onChange={(e) => setRevisionNote(e.target.value)}
+                rows={2}
+                data-testid="input-revision-note"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRevisionDialogOpen(false)} disabled={isSavingRevision}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmSaveAsRevision}
+              disabled={isSavingRevision || computeRevisionItems().length === 0}
+              data-testid="button-confirm-revision"
+            >
+              {isSavingRevision ? "Saving..." : "Save Revision"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={quantityPicker.open}
