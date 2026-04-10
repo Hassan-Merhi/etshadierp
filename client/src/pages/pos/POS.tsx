@@ -205,6 +205,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   // Fetch customer accounts (Asset-type ledger accounts for receivables)
   const customerAccounts = (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc: any) => acc.accountType === "Asset");
 
+  const [isCreditSale, setIsCreditSale] = useState(false);
+
   // Fetch POS customers to show balance on credit sales
   const { data: posCustomers = [] } = useQuery<any[]>({
     queryKey: ["/api/pos/customers"],
@@ -236,7 +238,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   });
   const [paymentAccountType, setPaymentAccountType] = useState<"bank" | "cash" | "credit">("cash");
   const [paymentAccountId, setPaymentAccountId] = useState("");
-  const [isCreditSale, setIsCreditSale] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [notes, setNotes] = useState("");
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
