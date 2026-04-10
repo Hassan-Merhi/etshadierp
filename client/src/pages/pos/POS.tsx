@@ -209,6 +209,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const { data: posCustomers = [] } = useQuery<any[]>({
     queryKey: ["/api/pos/customers"],
     enabled: isCreditSale,
+    retry: false,
   });
   const selectedCustomer = isCreditSale && selectedCustomerId
     ? posCustomers.find((c: any) => String(c.id) === selectedCustomerId)
@@ -1670,7 +1671,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               <p className="text-xs text-muted-foreground pl-0 sm:pl-6" data-testid="text-customer-balance">
                 Balance:{" "}
                 <span className={selectedCustomer.balanceSide === "Dr" ? "text-destructive font-medium" : "text-green-600 dark:text-green-400 font-medium"}>
-                  {formatDisplayAmount(Math.abs(selectedCustomer.balance))} {selectedCustomer.balanceSide === "Dr" ? "owed" : "credit"}
+                  {formatAmount(selectedCustomer.balance)} {selectedCustomer.balanceSide === "Dr" ? "owed" : "credit"}
                 </span>
               </p>
             )}

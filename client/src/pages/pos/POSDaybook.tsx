@@ -98,6 +98,7 @@ export default function POSDaybook() {
   const { toast } = useToast();
   const reprintRef = useRef<HTMLDivElement>(null);
   const reprintRowRef = useRef<HTMLDivElement>(null);
+  const reprintPrintingRef = useRef(false);
   const [reprintRowVoucherId, setReprintRowVoucherId] = useState<number | null>(null);
 
   // Check for date and voucherId in URL query parameters (from stock item voucher history)
@@ -357,18 +358,23 @@ export default function POSDaybook() {
 
   const handleReprintRow = useReactToPrint({
     contentRef: reprintRowRef,
-    onAfterPrint: () => setReprintRowVoucherId(null),
+    onAfterPrint: () => {
+      reprintPrintingRef.current = false;
+      setReprintRowVoucherId(null);
+    },
   });
 
   // Fetch voucher details for row-level reprint
   const { data: reprintRowDetails, isLoading: reprintRowLoading } = useQuery<VoucherWithItems>({
     queryKey: reprintRowVoucherId ? [`/api/vouchers/${reprintRowVoucherId}`] : [],
     enabled: !!reprintRowVoucherId,
+    retry: false,
   });
 
-  // Auto-trigger print once details load
+  // Auto-trigger print once details load — guard prevents double-trigger
   useEffect(() => {
-    if (reprintRowDetails && reprintRowVoucherId && !reprintRowLoading) {
+    if (reprintRowDetails && reprintRowVoucherId && !reprintRowLoading && !reprintPrintingRef.current) {
+      reprintPrintingRef.current = true;
       setTimeout(() => handleReprintRow(), 100);
     }
   }, [reprintRowDetails, reprintRowVoucherId, reprintRowLoading]);
