@@ -46,7 +46,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { utils, writeFile } from "@/lib/excelHelper";
+import { writeFile, ExcelJS } from "@/lib/excelHelper";
+import { useCompany } from "@/contexts/CompanyContext";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -113,6 +114,7 @@ const DRAFT_KEY = "stockTransferOrder_autosave_draft";
 export default function StockTransferOrder() {
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
+  const { selectedCompany } = useCompany();
 
   const editVoucherId = (() => {
     const params = new URLSearchParams(window.location.search);
@@ -592,7 +594,7 @@ export default function StockTransferOrder() {
     }
   };
 
-  const handleExportOrder = async (detailed: boolean) => {
+  const handleExportOrder = async (includeCost: boolean) => {
     if (orderItems.length === 0) {
       toast({
         title: "No data to export",
@@ -601,56 +603,206 @@ export default function StockTransferOrder() {
       });
       return;
     }
-    
+
     const destLocation = locations.find(l => l.id === destinationLocationId);
-    const exportDate = format(transferDate, "yyyy-MM-dd");
-    
-    if (detailed) {
-      const exportData = orderItems.map((item) => ({
-        "Date": exportDate,
-        "Source Location": item.sourceLocationName,
-        "Destination Location": destLocation?.name || "",
-        "Stock Item Code": item.stockItemCode,
-        "Stock Item Name": item.stockItemName,
-        "UOM": item.uom,
-        "Quantity": item.quantity,
-        "Available Qty": item.availableQty,
-        "Rate": item.rate.toFixed(2),
-        "Amount": (item.quantity * item.rate).toFixed(2),
-      }));
-      
-      const worksheet = utils.json_to_sheet(exportData);
-      const workbook = utils.book_new();
-      utils.book_append_sheet(workbook, worksheet, "Transfer Order Detailed");
-      const fileName = `Stock_Transfer_Order_Detailed_${exportDate}.xlsx`;
-      await writeFile(workbook, fileName);
-      
-      toast({
-        title: "Export successful",
-        description: `Downloaded ${fileName} with ${orderItems.length} items.`,
-      });
-    } else {
-      const totalAmount = orderItems.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
-      const exportData = [{
-        "Date": exportDate,
-        "Destination Location": destLocation?.name || "",
-        "Total Items": orderItems.length,
-        "Total Quantity": totalBales,
-        "Total Amount": totalAmount.toFixed(2),
-        "Optional": isOptional ? "Yes" : "No",
-      }];
-      
-      const worksheet = utils.json_to_sheet(exportData);
-      const workbook = utils.book_new();
-      utils.book_append_sheet(workbook, worksheet, "Transfer Order Summary");
-      const fileName = `Stock_Transfer_Order_Summary_${exportDate}.xlsx`;
-      await writeFile(workbook, fileName);
-      
-      toast({
-        title: "Export successful",
-        description: `Downloaded ${fileName}.`,
-      });
+    const exportDate = format(transferDate, "M/d/yy");
+    const companyName = selectedCompany?.name || "ETS";
+    const destName = destLocation?.name || "";
+
+    // Group order items by source location (preserve insertion order)
+    const locationGroupMap = new Map<number, { locationName: string; items: typeof orderItems }>();
+    for (const item of orderItems) {
+      if (!locationGroupMap.has(item.sourceLocationId)) {
+        locationGroupMap.set(item.sourceLocationId, { locationName: item.sourceLocationName, items: [] });
+      }
+      locationGroupMap.get(item.sourceLocationId)!.items.push(item);
     }
+    const locationGroups = Array.from(locationGroupMap.entries()).map(([id, g]) => ({ locationId: id, ...g }));
+
+    const numCols = includeCost ? 5 : 3;
+    const lastColLetter = includeCost ? "E" : "C";
+
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet("Truck Trip");
+
+    // Column widths
+    ws.columns = [
+      { width: 42 },
+      { width: 20 },
+      { width: 12 },
+      ...(includeCost ? [{ width: 13 }, { width: 15 }] : []),
+    ];
+
+    // Color palette
+    const OLIVE_BG   = "FF6B7A2C";
+    const COL_HDR_BG = "FFD4E89E";
+    const SUB_BG     = "FFC6EFCE";
+    const WHITE      = "FFFFFFFF";
+    const BLACK      = "FF000000";
+    const RED        = "FFCC0000";
+
+    const thinBorder: Partial<ExcelJS.Borders> = {
+      top:    { style: "thin", color: { argb: "FFB0B0B0" } },
+      left:   { style: "thin", color: { argb: "FFB0B0B0" } },
+      bottom: { style: "thin", color: { argb: "FFB0B0B0" } },
+      right:  { style: "thin", color: { argb: "FFB0B0B0" } },
+    };
+
+    const applyBorder = (row: ExcelJS.Row, cols: number) => {
+      for (let c = 1; c <= cols; c++) row.getCell(c).border = thinBorder;
+    };
+
+    // ── Row 1: Company name banner ──────────────────────────────────────────
+    const row1 = ws.addRow([companyName, ...Array(numCols - 1).fill("")]);
+    row1.height = 32;
+    ws.mergeCells(`A1:${lastColLetter}1`);
+    const r1c1 = row1.getCell(1);
+    r1c1.value = companyName;
+    r1c1.font = { bold: true, size: 16, color: { argb: WHITE } };
+    r1c1.fill = { type: "pattern", pattern: "solid", fgColor: { argb: OLIVE_BG } };
+    r1c1.alignment = { horizontal: "center", vertical: "middle" };
+    r1c1.border = thinBorder;
+
+    // ── Row 2: TRUCK TRIP | DESTINATION: | destName ─────────────────────────
+    const row2 = ws.addRow(["TRUCK TRIP", "DESTINATION:", destName, ...(includeCost ? ["", ""] : [])]);
+    row2.height = 20;
+    if (numCols > 3) ws.mergeCells(`A2:A3`);   // TRUCK TRIP spans rows 2+3
+    const r2c1 = row2.getCell(1);
+    r2c1.font = { bold: true, size: 13 };
+    r2c1.alignment = { horizontal: "center", vertical: "middle" };
+    r2c1.border = thinBorder;
+    const r2c2 = row2.getCell(2);
+    r2c2.font = { bold: true, size: 10 };
+    r2c2.alignment = { horizontal: "right", vertical: "middle" };
+    r2c2.border = thinBorder;
+    const r2c3 = row2.getCell(3);
+    r2c3.font = { bold: true, size: 10 };
+    r2c3.alignment = { horizontal: "center", vertical: "middle" };
+    r2c3.border = thinBorder;
+    if (includeCost) {
+      row2.getCell(4).border = thinBorder;
+      row2.getCell(5).border = thinBorder;
+    }
+
+    // ── Row 3: (blank) | DATE: | date ───────────────────────────────────────
+    const row3 = ws.addRow(["", "DATE :", exportDate, ...(includeCost ? ["", ""] : [])]);
+    row3.height = 18;
+    if (numCols === 3) {
+      row3.getCell(1).border = thinBorder;
+    }
+    const r3c2 = row3.getCell(2);
+    r3c2.font = { bold: true, size: 10 };
+    r3c2.alignment = { horizontal: "right", vertical: "middle" };
+    r3c2.border = thinBorder;
+    const r3c3 = row3.getCell(3);
+    r3c3.font = { bold: true, size: 10 };
+    r3c3.alignment = { horizontal: "center", vertical: "middle" };
+    r3c3.border = thinBorder;
+    if (includeCost) {
+      row3.getCell(4).border = thinBorder;
+      row3.getCell(5).border = thinBorder;
+    }
+
+    // When 3 cols: merge A2:A3 so TRUCK TRIP spans both header rows
+    if (numCols === 3) ws.mergeCells("A2:A3");
+
+    // ── Row 4: Column headers ────────────────────────────────────────────────
+    const colHeaders = [
+      "ITEM  NAME",
+      "LOCATION",
+      "Quantity",
+      ...(includeCost ? ["Rate", "Amount"] : []),
+    ];
+    const row4 = ws.addRow(colHeaders);
+    row4.height = 18;
+    for (let c = 1; c <= numCols; c++) {
+      const cell = row4.getCell(c);
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COL_HDR_BG } };
+      cell.font = { bold: true, size: 10, color: { argb: BLACK } };
+      cell.alignment = { horizontal: c === 1 ? "left" : "center", vertical: "middle" };
+      cell.border = thinBorder;
+    }
+
+    // ── Data rows grouped by location ───────────────────────────────────────
+    for (const group of locationGroups) {
+      for (const item of group.items) {
+        const vals: (string | number)[] = [
+          item.stockItemName,
+          item.sourceLocationName,
+          item.quantity,
+          ...(includeCost ? [item.rate, item.quantity * item.rate] : []),
+        ];
+        const dataRow = ws.addRow(vals);
+        dataRow.height = 15;
+        dataRow.getCell(1).alignment = { horizontal: "left", vertical: "middle" };
+        dataRow.getCell(2).alignment = { horizontal: "center", vertical: "middle" };
+        dataRow.getCell(3).alignment = { horizontal: "center", vertical: "middle" };
+        if (includeCost) {
+          dataRow.getCell(4).numFmt = "#,##0.00";
+          dataRow.getCell(4).alignment = { horizontal: "right", vertical: "middle" };
+          dataRow.getCell(5).numFmt = "#,##0.00";
+          dataRow.getCell(5).alignment = { horizontal: "right", vertical: "middle" };
+        }
+        applyBorder(dataRow, numCols);
+      }
+
+      // Subtotal row for this group
+      const groupQty = group.items.reduce((s, i) => s + i.quantity, 0);
+      const groupAmt = group.items.reduce((s, i) => s + i.quantity * i.rate, 0);
+      const subtotalVals: (string | number)[] = [
+        `TOTAL ${group.locationName.toUpperCase()}`,
+        "",
+        groupQty,
+        ...(includeCost ? ["", groupAmt] : []),
+      ];
+      const subRow = ws.addRow(subtotalVals);
+      subRow.height = 16;
+      ws.mergeCells(`A${subRow.number}:B${subRow.number}`);
+      for (let c = 1; c <= numCols; c++) {
+        const cell = subRow.getCell(c);
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: SUB_BG } };
+        cell.font = { bold: true, size: 10, color: { argb: BLACK } };
+        cell.border = thinBorder;
+      }
+      subRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+      subRow.getCell(3).alignment = { horizontal: "center", vertical: "middle" };
+      if (includeCost) {
+        subRow.getCell(5).numFmt = "#,##0.00";
+        subRow.getCell(5).alignment = { horizontal: "right", vertical: "middle" };
+      }
+    }
+
+    // ── Grand total row ──────────────────────────────────────────────────────
+    const grandQty = orderItems.reduce((s, i) => s + i.quantity, 0);
+    const grandAmt = orderItems.reduce((s, i) => s + i.quantity * i.rate, 0);
+    const grandVals: (string | number)[] = [
+      "TOTAL",
+      "",
+      grandQty,
+      ...(includeCost ? ["", grandAmt] : []),
+    ];
+    const grandRow = ws.addRow(grandVals);
+    grandRow.height = 20;
+    ws.mergeCells(`A${grandRow.number}:B${grandRow.number}`);
+    for (let c = 1; c <= numCols; c++) {
+      const cell = grandRow.getCell(c);
+      cell.font = { bold: true, size: 12, color: { argb: RED } };
+      cell.border = thinBorder;
+    }
+    grandRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+    grandRow.getCell(3).alignment = { horizontal: "center", vertical: "middle" };
+    if (includeCost) {
+      grandRow.getCell(5).numFmt = "#,##0.00";
+      grandRow.getCell(5).alignment = { horizontal: "right", vertical: "middle" };
+    }
+
+    const safeDestName = destName.replace(/[/\\?%*:|"<>]/g, "_");
+    const fileName = `Truck_Trip_${safeDestName}_${format(transferDate, "yyyy-MM-dd")}.xlsx`;
+    await writeFile(workbook, fileName);
+    toast({
+      title: "Export successful",
+      description: `Downloaded ${fileName} with ${orderItems.length} items.`,
+    });
   };
 
   const processOrderMutation = useMutation({
@@ -889,11 +1041,11 @@ export default function StockTransferOrder() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleExportOrder(false)} data-testid="export-order-summary">
-                Summary Export
+              <DropdownMenuItem onClick={() => handleExportOrder(false)} data-testid="export-order-no-cost">
+                Export without Cost
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportOrder(true)} data-testid="export-order-detailed">
-                Detailed Export
+              <DropdownMenuItem onClick={() => handleExportOrder(true)} data-testid="export-order-with-cost">
+                Export with Cost
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
