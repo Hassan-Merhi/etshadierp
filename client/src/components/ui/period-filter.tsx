@@ -1,8 +1,5 @@
-import { useState } from "react";
 import { CalendarIcon, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -83,8 +80,6 @@ export function PeriodFilter({
   "data-testid": testId,
 }: PeriodFilterProps) {
   const { formatDisplayDate } = useDateFormat();
-  const [showFromCalendar, setShowFromCalendar] = useState(false);
-  const [showToCalendar, setShowToCalendar] = useState(false);
 
   const handlePresetChange = (preset: PeriodPreset) => {
     if (preset === "custom") {
@@ -92,28 +87,6 @@ export function PeriodFilter({
     } else {
       const dates = getPresetDates(preset);
       onChange({ ...dates, preset });
-    }
-  };
-
-  const handleFromDateChange = (date: Date | undefined) => {
-    if (date) {
-      onChange({
-        ...value,
-        fromDate: format(date, "yyyy-MM-dd"),
-        preset: "custom",
-      });
-      setShowFromCalendar(false);
-    }
-  };
-
-  const handleToDateChange = (date: Date | undefined) => {
-    if (date) {
-      onChange({
-        ...value,
-        toDate: format(date, "yyyy-MM-dd"),
-        preset: "custom",
-      });
-      setShowToCalendar(false);
     }
   };
 
@@ -198,50 +171,6 @@ export function PeriodFilter({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Custom date pickers — always visible so user can adjust dates directly */}
-      <div className="flex items-center gap-1">
-        <Popover open={showFromCalendar} onOpenChange={setShowFromCalendar}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-[110px] justify-start text-left font-normal"
-              data-testid="period-from-date"
-            >
-              {fromDateObj ? formatDisplayDate(fromDateObj) : "From"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={fromDateObj}
-              onSelect={handleFromDateChange}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
-        <span className="text-muted-foreground text-sm">–</span>
-        <Popover open={showToCalendar} onOpenChange={setShowToCalendar}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-[110px] justify-start text-left font-normal"
-              data-testid="period-to-date"
-            >
-              {toDateObj ? formatDisplayDate(toDateObj) : "To"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
-            <Calendar
-              mode="single"
-              selected={toDateObj}
-              onSelect={handleToDateChange}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
-      </div>
     </div>
   );
 }
