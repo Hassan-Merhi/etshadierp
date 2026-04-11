@@ -858,6 +858,17 @@ let migrationsDone = false;
      )
      WHERE c.status = 'OFFLOADED'
        AND c.offload_date IS NULL`,
+    // Financial Snapshot pinned accounts per company/card (Apr 2026)
+    `CREATE TABLE IF NOT EXISTS snapshot_pinned_accounts (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      card_key varchar(50) NOT NULL,
+      account_id varchar(50) NOT NULL,
+      account_type varchar(50) NOT NULL,
+      account_name varchar(300) NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now(),
+      CONSTRAINT snapshot_pinned_accounts_unique UNIQUE (company_id, card_key, account_id)
+    )`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
