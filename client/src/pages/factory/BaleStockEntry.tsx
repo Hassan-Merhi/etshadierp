@@ -55,7 +55,7 @@
     const [showDropdown, setShowDropdown] = useState(false);
     const [selectedLocationId, setSelectedLocationId] = useState<string>("");
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-    const [entryDate, setEntryDate] = useState<string>(new Date().toISOString().split("T")[0]);
+    const [entryDate, setEntryDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
     const scanRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
     const appMode = useAppMode();
@@ -403,7 +403,7 @@
         if (error?._handledGlobally) return;
         if ((error as any).name === "OfflineQueued") {
           // Offline: use pre-allocated pool refs (scannable) or fall back to OFFL-xxx
-          const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+          const today = new Date().toLocaleDateString('en-CA').replace(/-/g, "");
           let globalIdx = 0;
           const syntheticLabels: LabelData[] = [];
           const pooledBales: Array<{ referenceNumber: string; articleCode: string; pieces: number; approxWeightKg: string; productId: number }> = [];
@@ -758,14 +758,14 @@
                   <Input
                     type="date"
                     value={entryDate}
-                    onChange={(e) => setEntryDate(e.target.value || new Date().toISOString().split("T")[0])}
+                    onChange={(e) => setEntryDate(e.target.value || new Date().toLocaleDateString('en-CA'))}
                     className="w-full text-sm"
                     data-testid="input-entry-date"
                   />
-                  {entryDate !== new Date().toISOString().split("T")[0] && (
+                  {entryDate !== new Date().toLocaleDateString('en-CA') && (
                     <button
                       className="text-xs text-muted-foreground underline mt-1 hover:text-foreground"
-                      onClick={() => setEntryDate(new Date().toISOString().split("T")[0])}
+                      onClick={() => setEntryDate(new Date().toLocaleDateString('en-CA'))}
                       data-testid="button-reset-entry-date"
                     >
                       Reset to today
@@ -796,7 +796,7 @@
               </DialogDescription>
             </DialogHeader>
             <div className="text-sm space-y-3">
-              {entryDate !== new Date().toISOString().split("T")[0] && (
+              {entryDate !== new Date().toLocaleDateString('en-CA') && (
                 <div className="flex items-center gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-amber-800 dark:text-amber-200 text-xs">
                   <CalendarDays className="h-3.5 w-3.5 shrink-0" />
                   <span>Backdated entry — will be recorded on <strong>{entryDate}</strong></span>
@@ -1167,7 +1167,7 @@
 
     const filteredBales = inStockBales?.filter((bale: any) => {
       if (!dateFilter) return true;
-      const baleDate = bale.finalizedAt ? new Date(bale.finalizedAt).toISOString().split("T")[0] : null;
+      const baleDate = bale.finalizedAt ? new Date(bale.finalizedAt).toLocaleDateString('en-CA') : null;
       return baleDate === dateFilter;
     });
 
@@ -1330,7 +1330,7 @@
               variant="outline"
               size="sm"
               onClick={() => {
-                const exportDate = dateFilter || new Date().toISOString().split("T")[0];
+                const exportDate = dateFilter || new Date().toLocaleDateString('en-CA');
                 window.open(`/api/factory/bales/export-full.xlsx?date=${exportDate}`, "_blank");
               }}
               data-testid="button-export-bales-full"
@@ -1957,7 +1957,7 @@
   }
 
   function DailyStockSummary() {
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = new Date().toLocaleDateString('en-CA');
     const [selectedDate, setSelectedDate] = useState<string>(todayStr);
 
     const { data: balesData } = useQuery<any[]>({
@@ -1981,7 +1981,7 @@
     const dayInStock = (balesData || []).filter((row: any) => {
       const bale = row.bale;
       if (bale.status !== "IN_STOCK") return false;
-      const baleDate = bale.createdAt ? new Date(bale.createdAt).toISOString().split("T")[0] : null;
+      const baleDate = bale.createdAt ? new Date(bale.createdAt).toLocaleDateString('en-CA') : null;
       return baleDate === selectedDate;
     });
 

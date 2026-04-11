@@ -72,7 +72,7 @@ export default function ContainerLoadingScan() {
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
-  const [orderDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [orderDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [orderId, setOrderId] = useState<number | null>(null);
   const [isResuming, setIsResuming] = useState(false);
   const [scanCode, setScanCode] = useState("");

@@ -431,15 +431,15 @@ export default function Analytics() {
   const getDateRange = () => {
     const today = new Date();
     let startDate = "";
-    let endDate = today.toISOString().split("T")[0];
+    let endDate = today.toLocaleDateString('en-CA');
     if (selectedPeriod === "today") {
       startDate = endDate;
     } else if (selectedPeriod === "month") {
       const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      startDate = firstDayOfMonth.toISOString().split("T")[0];
+      startDate = firstDayOfMonth.toLocaleDateString('en-CA');
     } else if (selectedPeriod === "year") {
       const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
-      startDate = firstDayOfYear.toISOString().split("T")[0];
+      startDate = firstDayOfYear.toLocaleDateString('en-CA');
     }
     return selectedPeriod === "all" ? {} : { startDate, endDate };
   };
@@ -462,15 +462,15 @@ export default function Analytics() {
   const getDetailsDateRange = () => {
     const today = new Date();
     let startDate = "";
-    let endDate = today.toISOString().split("T")[0];
+    let endDate = today.toLocaleDateString('en-CA');
     if (detailsPeriod === "today") {
       startDate = endDate;
     } else if (detailsPeriod === "month") {
       const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      startDate = firstDayOfMonth.toISOString().split("T")[0];
+      startDate = firstDayOfMonth.toLocaleDateString('en-CA');
     } else if (detailsPeriod === "year") {
       const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
-      startDate = firstDayOfYear.toISOString().split("T")[0];
+      startDate = firstDayOfYear.toLocaleDateString('en-CA');
     }
     return detailsPeriod === "all" ? {} : { startDate, endDate };
   };

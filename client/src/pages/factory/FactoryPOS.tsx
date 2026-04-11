@@ -114,7 +114,7 @@ export default function FactoryPOS() {
   const [paymentType, setPaymentType]   = useState<"CASH" | "CREDIT">("CASH");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [notes, setNotes]               = useState("");
-  const [txDate, setTxDate]             = useState(new Date().toISOString().split("T")[0]);
+  const [txDate, setTxDate]             = useState(new Date().toLocaleDateString('en-CA'));
   const [currencyCode, setCurrencyCode] = useState("USD");
   const [cashAccountId, setCashAccountId] = useState<string>("");
   const [rows, setRows]                 = useState<CartRow[]>([emptyRow("1")]);
@@ -178,7 +178,7 @@ export default function FactoryPOS() {
     setPaymentType((editSaleData.paymentType as "CASH" | "CREDIT") || "CASH");
     setSelectedCustomerId(editSaleData.customerId ? String(editSaleData.customerId) : "");
     setNotes(editSaleData.notes || "");
-    setTxDate(editSaleData.txDate || new Date().toISOString().split("T")[0]);
+    setTxDate(editSaleData.txDate || new Date().toLocaleDateString('en-CA'));
     setCurrencyCode(editSaleData.currencyCode || "USD");
     setCashAccountId(editSaleData.cashAccountId ? String(editSaleData.cashAccountId) : "");
     if (editSaleData.items && editSaleData.items.length > 0) {

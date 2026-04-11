@@ -107,18 +107,18 @@ export default function FactoryEmployeeDetail() {
   // Deposit form
   const [depositOpen, setDepositOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
-  const [depositDate, setDepositDate] = useState(new Date().toISOString().split("T")[0]);
+  const [depositDate, setDepositDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [depositNotes, setDepositNotes] = useState("");
 
   // Withdrawal form
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [withdrawDate, setWithdrawDate] = useState(new Date().toISOString().split("T")[0]);
+  const [withdrawDate, setWithdrawDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [withdrawNotes, setWithdrawNotes] = useState("");
   const [withdrawCashAccountId, setWithdrawCashAccountId] = useState("");
 
   // Payroll (bulk) state
-  const [payrollDate, setPayrollDate] = useState(new Date().toISOString().split("T")[0]);
+  const [payrollDate, setPayrollDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [payrollNotes, setPayrollNotes] = useState("");
 
   // All employees for payroll tab

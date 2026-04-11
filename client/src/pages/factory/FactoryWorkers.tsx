@@ -74,7 +74,7 @@ export default function FactoryWorkers() {
   const [endContractWorker, setEndContractWorker] = useState<FactoryWorker | null>(null);
   const [endStep, setEndStep] = useState<1 | 2>(1);
   const [endStart, setEndStart] = useState("");
-  const [endEnd, setEndEnd] = useState(new Date().toISOString().split("T")[0]);
+  const [endEnd, setEndEnd] = useState(new Date().toLocaleDateString('en-CA'));
   const [endCalculating, setEndCalculating] = useState(false);
   const [endResult, setEndResult] = useState<{ earned: string; paid: string; advances: string; balance: string } | null>(null);
   const [endCashAccountId, setEndCashAccountId] = useState("");
@@ -285,7 +285,7 @@ export default function FactoryWorkers() {
     setEndStep(1);
     setEndResult(null);
     setEndCashAccountId("");
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toLocaleDateString('en-CA');
     const firstOfMonth = today.slice(0, 7) + "-01";
     setEndStart(w.contractStartDate || w.dateJoined || firstOfMonth);
     setEndEnd(today);
@@ -428,7 +428,7 @@ export default function FactoryWorkers() {
     });
     totalRow.height = 22;
 
-    const date = new Date().toISOString().slice(0, 10);
+    const date = new Date().toLocaleDateString('en-CA');
     await writeFile(wb, `workers-salaries-${date}.xlsx`);
   };
 

@@ -103,7 +103,7 @@ export default function BaleTransfers() {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [sourceLocationId, setSourceLocationId] = useState("");
   const [destLocationId, setDestLocationId] = useState("");
-  const [transferDate, setTransferDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [transferDate, setTransferDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [notes, setNotes] = useState("");
   const [selectedBaleIds, setSelectedBaleIds] = useState<number[]>([]);
   const { toast } = useToast();
@@ -202,7 +202,7 @@ export default function BaleTransfers() {
     setDialogOpen(false);
     setSourceLocationId("");
     setDestLocationId("");
-    setTransferDate(new Date().toISOString().split("T")[0]);
+    setTransferDate(new Date().toLocaleDateString('en-CA'));
     setNotes("");
     setSelectedBaleIds([]);
   };

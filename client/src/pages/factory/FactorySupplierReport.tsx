@@ -17,8 +17,8 @@ import {
 
 export default function FactorySupplierReport() {
   const { toast } = useToast();
-  const today = new Date().toISOString().split("T")[0];
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString('en-CA');
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA');
 
   const [companyId, setCompanyId] = useState<number | null>(null);
   const [startDate, setStartDate] = useState(thirtyDaysAgo);

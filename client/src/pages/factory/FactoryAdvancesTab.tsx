@@ -102,7 +102,7 @@ function AdvancesView() {
 
   const [form, setForm] = useState({
     workerId: "",
-    advanceDate: new Date().toISOString().split("T")[0],
+    advanceDate: new Date().toLocaleDateString('en-CA'),
     amount: "",
     cashAccountId: "",
     notes: "",
@@ -111,7 +111,7 @@ function AdvancesView() {
 
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkForm, setBulkForm] = useState({
-    advanceDate: new Date().toISOString().split("T")[0],
+    advanceDate: new Date().toLocaleDateString('en-CA'),
     cashAccountId: "",
     repaymentType: "salary_deduction" as string,
     notes: "",
@@ -207,7 +207,7 @@ function AdvancesView() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/advances/unvouchered"] });
       toast({ title: "Advance recorded" });
       setAddOpen(false);
-      setForm({ workerId: "", advanceDate: new Date().toISOString().split("T")[0], amount: "", cashAccountId: "", notes: "", repaymentType: "salary_deduction" });
+      setForm({ workerId: "", advanceDate: new Date().toLocaleDateString('en-CA'), amount: "", cashAccountId: "", notes: "", repaymentType: "salary_deduction" });
     },
     onError: (err: Error) => {
       if (err?._handledGlobally) return;
@@ -275,7 +275,7 @@ function AdvancesView() {
       setBulkOpen(false);
       setBulkAmounts({});
       setBulkSelected(new Set());
-      setBulkForm({ advanceDate: new Date().toISOString().split("T")[0], cashAccountId: "", repaymentType: "salary_deduction", notes: "" });
+      setBulkForm({ advanceDate: new Date().toLocaleDateString('en-CA'), cashAccountId: "", repaymentType: "salary_deduction", notes: "" });
     },
     onError: (err: Error) => {
       if (err?._handledGlobally) return;

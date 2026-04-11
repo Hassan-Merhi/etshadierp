@@ -29,8 +29,8 @@ function getDefaultDateRange() {
   const from = new Date();
   from.setDate(from.getDate() - 30);
   return {
-    from: from.toISOString().split("T")[0],
-    to: to.toISOString().split("T")[0],
+    from: from.toLocaleDateString('en-CA'),
+    to: to.toLocaleDateString('en-CA'),
   };
 }
 
@@ -42,7 +42,7 @@ export default function FactoryWaste() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
-  const [formDate, setFormDate] = useState(new Date().toISOString().split("T")[0]);
+  const [formDate, setFormDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [formKg, setFormKg] = useState("");
   const [formWasteType, setFormWasteType] = useState("");
   const [formReason, setFormReason] = useState("");
@@ -110,7 +110,7 @@ export default function FactoryWaste() {
   });
 
   function resetForm() {
-    setFormDate(new Date().toISOString().split("T")[0]);
+    setFormDate(new Date().toLocaleDateString('en-CA'));
     setFormKg("");
     setFormWasteType("");
     setFormReason("");

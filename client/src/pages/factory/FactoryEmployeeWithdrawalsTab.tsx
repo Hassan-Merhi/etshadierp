@@ -36,7 +36,7 @@ function fmt(v: string | number | null | undefined) {
   return isNaN(n) ? "0.00" : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-const today = () => new Date().toISOString().split("T")[0];
+const today = () => new Date().toLocaleDateString('en-CA');
 
 export default function FactoryEmployeeWithdrawalsTab() {
   const { toast } = useToast();

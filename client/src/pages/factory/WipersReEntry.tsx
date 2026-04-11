@@ -70,7 +70,7 @@ export default function WipersReEntry() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
 
-  const [entryDate, setEntryDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [entryDate, setEntryDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchInput, setSearchInput] = useState("");

@@ -240,7 +240,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const [paymentAccountId, setPaymentAccountId] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [notes, setNotes] = useState("");
-  const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
+  const [saleDate, setSaleDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [searchTerm, setSearchTerm] = useState("");
   const [activeRow, setActiveRow] = useState<number | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -575,7 +575,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   // Print handler
   const handlePrint = useReactToPrint({
     contentRef: printRef,
-    documentTitle: `${(activeLocation?.name || "POS").replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}`,
+    documentTitle: `${(activeLocation?.name || "POS").replace(/\s+/g, "_")}_${new Date().toLocaleDateString('en-CA')}`,
     onAfterPrint: () => {
       setShowPrintDialog(false);
       if (editVoucherId) {
@@ -1284,7 +1284,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       return;
     }
     
-    const exportDate = saleDate || new Date().toISOString().split('T')[0];
+    const exportDate = saleDate || new Date().toLocaleDateString('en-CA');
     const locationName = activeLocation?.name || "";
     
     if (detailed) {

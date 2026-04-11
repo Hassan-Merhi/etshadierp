@@ -55,7 +55,7 @@ export default function POSImport() {
   const [selectedCashAccount, setSelectedCashAccount] = useState<string>("");
   const [selectedCustomer, setSelectedCustomer] = useState<string>("");
   const [isCreditSale, setIsCreditSale] = useState(false);
-  const [saleDate, setSaleDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [saleDate, setSaleDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   const [saleCurrency, setSaleCurrency] = useState<"USD" | "CFA">("USD");
   const [showPrintDialog, setShowPrintDialog] = useState(false);
@@ -166,7 +166,7 @@ export default function POSImport() {
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
-    documentTitle: `${(importedSale?.location?.name || "POS").replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}`,
+    documentTitle: `${(importedSale?.location?.name || "POS").replace(/\s+/g, "_")}_${new Date().toLocaleDateString('en-CA')}`,
     onAfterPrint: () => {
       setShowPrintDialog(false);
       navigate("/vouchers");

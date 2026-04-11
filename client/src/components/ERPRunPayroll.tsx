@@ -131,7 +131,7 @@ export default function ERPRunPayroll() {
   // ── Step 2: preview / draft ───────────────────────────────────────────────
   const [step, setStep] = useState<1 | 2>(1);
   const [previewItems, setPreviewItems] = useState<PreviewItem[]>([]);
-  const [previewDate, setPreviewDate] = useState(new Date().toISOString().split("T")[0]);
+  const [previewDate, setPreviewDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [previewNotes, setPreviewNotes] = useState("");
 
   // ── History: pay dialog ───────────────────────────────────────────────────

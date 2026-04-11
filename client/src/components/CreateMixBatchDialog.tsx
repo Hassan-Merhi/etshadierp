@@ -78,7 +78,7 @@ export function CreateMixBatchDialog({
   const [weightInput, setWeightInput] = useState<string>("");
   const [batchName, setBatchName] = useState("");
   const [notes, setNotes] = useState("");
-  const [batchDate, setBatchDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [batchDate, setBatchDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
 
   const { data: supplierStock } = useQuery<SupplierRawStock[]>({
     queryKey: ["/api/factory/raw-stock"],
@@ -325,7 +325,7 @@ export function CreateMixBatchDialog({
     setWeightInput("");
     setBatchName("");
     setNotes("");
-    setBatchDate(new Date().toISOString().split("T")[0]);
+    setBatchDate(new Date().toLocaleDateString('en-CA'));
     setAddSourceType("supplier");
   };
 

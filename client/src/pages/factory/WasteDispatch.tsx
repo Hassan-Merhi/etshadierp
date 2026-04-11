@@ -50,7 +50,7 @@ function fmtKg(n: number) {
 }
 
 function today() {
-  return new Date().toISOString().split("T")[0];
+  return new Date().toLocaleDateString('en-CA');
 }
 
 interface Bale {

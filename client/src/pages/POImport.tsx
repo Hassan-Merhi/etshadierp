@@ -105,7 +105,7 @@ export default function POImport() {
   const [validationResult, setValidationResult] = useState<any>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<string>("");
   const [containerNumber, setContainerNumber] = useState<string>("");
-  const [importDate, setImportDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [importDate, setImportDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
 

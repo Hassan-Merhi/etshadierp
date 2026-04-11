@@ -293,7 +293,7 @@ function AdjustmentsHistoryCard({ onDeleteRequest }: {
 export default function ProductionRawStock() {
   const { formatDisplayDate } = useDateFormat();
   const [offloadDialogOpen, setOffloadDialogOpen] = useState(false);
-  const [offloadDate, setOffloadDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [offloadDate, setOffloadDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
   const [selectedContainerId, setSelectedContainerId] = useState("");
   const [actualReceivedKg, setActualReceivedKg] = useState("");
   const [costPerKg, setCostPerKg] = useState("");
@@ -354,7 +354,7 @@ export default function ProductionRawStock() {
   const [adjCostPerKg, setAdjCostPerKg] = useState("");
   const [adjCurrency, setAdjCurrency] = useState("USD");
   const [adjNotes, setAdjNotes] = useState("");
-  const [adjDate, setAdjDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [adjDate, setAdjDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [adjMaterialLabel, setAdjMaterialLabel] = useState("");
   const [adjIsNewMaterial, setAdjIsNewMaterial] = useState(false);
   const [adjSupplierId, setAdjSupplierId] = useState<string>("");
@@ -834,7 +834,7 @@ export default function ProductionRawStock() {
 
   const handleCloseDialog = () => {
     setOffloadDialogOpen(false);
-    setOffloadDate(new Date().toISOString().slice(0, 10));
+    setOffloadDate(new Date().toLocaleDateString('en-CA'));
     setSelectedContainerId("");
     setActualReceivedKg("");
     setCostPerKg("");
@@ -1052,7 +1052,7 @@ export default function ProductionRawStock() {
                 setAdjNotes("");
                 setAdjMaterialLabel("");
                 setAdjSupplierId("");
-                setAdjDate(new Date().toISOString().split("T")[0]);
+                setAdjDate(new Date().toLocaleDateString('en-CA'));
                 setAdjustDialogOpen(true);
               }}
               data-testid="button-add-manual-material"
@@ -1131,7 +1131,7 @@ export default function ProductionRawStock() {
                             setAdjCurrency(row.currencyCode || "USD");
                             setAdjNotes("");
                             setAdjMaterialLabel("");
-                            setAdjDate(new Date().toISOString().split("T")[0]);
+                            setAdjDate(new Date().toLocaleDateString('en-CA'));
                             setAdjustDialogOpen(true);
                           }}
                         >

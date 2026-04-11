@@ -117,7 +117,7 @@ export function ERPWorkerDetail({ worker, onBack, onEdit }: Props) {
 
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
   const [advanceAmount, setAdvanceAmount] = useState("");
-  const [advanceDate, setAdvanceDate] = useState(new Date().toISOString().slice(0, 10));
+  const [advanceDate, setAdvanceDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [advanceNotes, setAdvanceNotes] = useState("");
   const [editAdvance, setEditAdvance] = useState<SalaryAdvance | null>(null);
 
@@ -564,7 +564,7 @@ export function ERPWorkerDetail({ worker, onBack, onEdit }: Props) {
                   <h3 className="text-sm font-semibold">Salary Advances</h3>
                   <p className="text-xs text-muted-foreground">ERP advances for this worker only</p>
                 </div>
-                <Button size="sm" onClick={() => { setEditAdvance(null); setAdvanceAmount(""); setAdvanceDate(new Date().toISOString().slice(0, 10)); setAdvanceNotes(""); setAdvanceDialogOpen(true); }} data-testid="button-add-advance">
+                <Button size="sm" onClick={() => { setEditAdvance(null); setAdvanceAmount(""); setAdvanceDate(new Date().toLocaleDateString('en-CA')); setAdvanceNotes(""); setAdvanceDialogOpen(true); }} data-testid="button-add-advance">
                   <Plus className="h-4 w-4 mr-1" /> Add Advance
                 </Button>
               </div>

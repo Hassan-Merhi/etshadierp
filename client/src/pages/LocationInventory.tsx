@@ -149,7 +149,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   // Print handler
   const handlePrint = useReactToPrint({
     contentRef: printRef,
-    documentTitle: `${(selectedLocationLocal?.name || "Stock").replace(/\s+/g, "_")}_STK_${new Date().toISOString().slice(0, 10)}`,
+    documentTitle: `${(selectedLocationLocal?.name || "Stock").replace(/\s+/g, "_")}_STK_${new Date().toLocaleDateString('en-CA')}`,
   });
 
   // Helper: set cost visibility then print
@@ -956,7 +956,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${selectedLocationLocal.name}_inventory_${new Date().toISOString().split('T')[0]}.xlsx`;
+      a.download = `${selectedLocationLocal.name}_inventory_${new Date().toLocaleDateString('en-CA')}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

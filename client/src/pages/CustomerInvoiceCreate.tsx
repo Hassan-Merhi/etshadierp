@@ -85,7 +85,7 @@ export default function CustomerInvoiceCreate() {
   const modeApiRequest = getApiRequest(appMode);
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
-  const [orderDate, setOrderDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [orderDate, setOrderDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [orderId, setOrderId] = useState<number | null>(null);
   const [scanCode, setScanCode] = useState("");

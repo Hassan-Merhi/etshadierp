@@ -50,7 +50,7 @@ function getInitials(name: string) {
 
 const emptyForm = {
   firstName: "", lastName: "", code: "", department: "", phone: "",
-  monthlySalary: "", joinDate: new Date().toISOString().split("T")[0],
+  monthlySalary: "", joinDate: new Date().toLocaleDateString('en-CA'),
 };
 
 export default function FactoryEmployees() {

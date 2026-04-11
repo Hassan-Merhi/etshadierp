@@ -190,7 +190,7 @@ export function OffloadDialog({
   const [_location, setLocation] = useLocation();
   const { toast } = useToast();
   const [locationId, setLocationId] = useState<number | null>(null);
-  const [offloadDate, setOffloadDate] = useState(new Date().toISOString().split('T')[0]);
+  const [offloadDate, setOffloadDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [duties, setDuties] = useState("0");
   const [dutiesAccountId, setDutiesAccountId] = useState("");
   const [officeCharges, setOfficeCharges] = useState("0");

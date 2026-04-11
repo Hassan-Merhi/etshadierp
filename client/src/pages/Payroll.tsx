@@ -107,7 +107,7 @@ export default function Payroll() {
   const [bonusSalesPreview, setBonusSalesPreview] = useState<{ totalSalesAmount: string; totalQuantity: string; locationName: string } | null>(null);
   const [bonusSalesLoading, setBonusSalesLoading] = useState(false);
   const [bonusSalesCustomPct, setBonusSalesCustomPct] = useState<string>("");
-  const [bonusDate, setBonusDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [bonusDate, setBonusDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
   const [bonusNotes, setBonusNotes] = useState<string>("");
   const [balesRows, setBalesRows] = useState<Array<{ locationId: string; qty: string; rate: string; preview: string | null; loading: boolean }>>([{ locationId: "", qty: "", rate: "", preview: null, loading: false }]);
   const [balesPeriod, setBalesPeriod] = useState<"thisMonth" | "custom">("thisMonth");
@@ -243,7 +243,7 @@ export default function Payroll() {
   // Bulk Deposit state
   const [bulkDepositSelections, setBulkDepositSelections] = useState<Record<number, boolean>>({});
   const [bulkDepositDialogOpen, setBulkDepositDialogOpen] = useState(false);
-  const [bulkDepositDate, setBulkDepositDate] = useState(new Date().toISOString().split('T')[0]);
+  const [bulkDepositDate, setBulkDepositDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [bulkDepositNotes, setBulkDepositNotes] = useState("");
 
   // Edit employee bale rates state
@@ -258,7 +258,7 @@ export default function Payroll() {
 
   // Bulk Bonus state
   const [bulkBonusDialogOpen, setBulkBonusDialogOpen] = useState(false);
-  const [bulkBonusDate, setBulkBonusDate] = useState(new Date().toISOString().split('T')[0]);
+  const [bulkBonusDate, setBulkBonusDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [bulkBonusNotes, setBulkBonusNotes] = useState("");
   const [bulkBonusAmounts, setBulkBonusAmounts] = useState<Record<number, string>>({});
   const [bulkBonusStep, setBulkBonusStep] = useState<"edit" | "preview">("edit");
@@ -267,7 +267,7 @@ export default function Payroll() {
 
   // Bulk Withdrawal state
   const [bulkWithdrawalDialogOpen, setBulkWithdrawalDialogOpen] = useState(false);
-  const [bulkWithdrawalDate, setBulkWithdrawalDate] = useState(new Date().toISOString().split('T')[0]);
+  const [bulkWithdrawalDate, setBulkWithdrawalDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [bulkWithdrawalNotes, setBulkWithdrawalNotes] = useState("");
   const [bulkWithdrawalAmounts, setBulkWithdrawalAmounts] = useState<Record<number, string>>({});
   const [bulkWithdrawalAccountType, setBulkWithdrawalAccountType] = useState<"bank" | "cash">("cash");
@@ -658,7 +658,7 @@ export default function Payroll() {
     resolver: zodResolver(depositSchema),
     defaultValues: {
       amount: "",
-      date: new Date().toISOString().split("T")[0],
+      date: new Date().toLocaleDateString('en-CA'),
       notes: "",
     },
   });
@@ -667,7 +667,7 @@ export default function Payroll() {
     resolver: zodResolver(bonusSchema),
     defaultValues: {
       amount: "",
-      date: new Date().toISOString().split("T")[0],
+      date: new Date().toLocaleDateString('en-CA'),
       notes: "",
     },
   });
@@ -678,7 +678,7 @@ export default function Payroll() {
       amount: "",
       paymentAccountType: "bank",
       paymentAccountId: "",
-      date: new Date().toISOString().split("T")[0],
+      date: new Date().toLocaleDateString('en-CA'),
       notes: "",
     },
   });
@@ -688,7 +688,7 @@ export default function Payroll() {
     defaultValues: {
       paymentAccountType: "bank",
       paymentAccountId: "",
-      date: new Date().toISOString().split("T")[0],
+      date: new Date().toLocaleDateString('en-CA'),
       notes: "",
     },
   });
@@ -721,7 +721,7 @@ export default function Payroll() {
       code: "",
       monthlySalary: "0",
       department: "",
-      joinDate: new Date().toISOString().split('T')[0],
+      joinDate: new Date().toLocaleDateString('en-CA'),
       openingBalance: "",
       active: true,
       salesBonusPct: "",
@@ -737,7 +737,7 @@ export default function Payroll() {
       code: "",
       monthlySalary: "0",
       department: "",
-      joinDate: new Date().toISOString().split('T')[0],
+      joinDate: new Date().toLocaleDateString('en-CA'),
       active: true,
       salesBonusPct: "",
       balesBonusRate: "",
@@ -1108,7 +1108,7 @@ export default function Payroll() {
         ...data,
         employeeType: "Worker",
         companyId: selectedCompany?.id,
-        joinDate: new Date().toISOString().split("T")[0],
+        joinDate: new Date().toLocaleDateString('en-CA'),
       });
     },
     onSuccess: () => {
@@ -1271,7 +1271,7 @@ export default function Payroll() {
         code: editingEmployee.code || "",
         monthlySalary: editingEmployee.monthlySalary || "0",
         department: editingEmployee.department || "",
-        joinDate: editingEmployee.joinDate || new Date().toISOString().split('T')[0],
+        joinDate: editingEmployee.joinDate || new Date().toLocaleDateString('en-CA'),
         active: editingEmployee.active,
         employeeGroupId: (editingEmployee as any).employeeGroupId?.toString() || "",
         salesBonusPct: editingEmployee.salesBonusPct != null ? String(editingEmployee.salesBonusPct) : "",
@@ -1327,7 +1327,7 @@ export default function Payroll() {
     setSelectedEmployee(employee);
     depositForm.reset({
       amount: employee.monthlySalary || "",
-      date: new Date().toISOString().split("T")[0],
+      date: new Date().toLocaleDateString('en-CA'),
       notes: "",
     });
     setDepositDialogOpen(true);
@@ -1348,7 +1348,7 @@ export default function Payroll() {
     setBonusSalesEnd(range.end);
     setBonusSalesPreview(null);
     setBonusSalesCustomPct(employee.salesBonusPct != null ? String(employee.salesBonusPct) : "");
-    setBonusDate(new Date().toISOString().split("T")[0]);
+    setBonusDate(new Date().toLocaleDateString('en-CA'));
     setBonusNotes("");
     setBalesRows([{ locationId: "", qty: "", rate: employee.balesBonusRate != null ? String(employee.balesBonusRate) : "", preview: null, loading: false }]);
     setBalesPeriod("thisMonth");

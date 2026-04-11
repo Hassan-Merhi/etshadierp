@@ -64,7 +64,7 @@ export function AddContainerDialog({
       containerNumber: "",
       supplierId: 0,
       status: "AVAILABLE",
-      importDate: new Date().toISOString().split("T")[0],
+      importDate: new Date().toLocaleDateString('en-CA'),
       itemName: "",
       ratePerKg: 0,
       totalKg: 0,

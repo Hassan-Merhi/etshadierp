@@ -80,7 +80,7 @@ export default function Bales() {
       grade: "A",
       origin: "EU",
       weight: "",
-      datePressed: new Date().toISOString().split("T")[0],
+      datePressed: new Date().toLocaleDateString('en-CA'),
       price: "",
       currency: "USD",
       status: "AVAILABLE",
@@ -194,7 +194,7 @@ export default function Bales() {
           grade: pendingBarcode?.grade || "A",
           origin: pendingBarcode?.origin || "EU",
           weight: "1",
-          datePressed: new Date().toISOString().split("T")[0],
+          datePressed: new Date().toLocaleDateString('en-CA'),
         };
         createBale.mutate(newBale);
         setBarcodeInput("");

@@ -44,7 +44,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
     isPOS && posUser?.assignedLocationId ? posUser.assignedLocationId.toString() : ""
   );
   const [selectedDestLocation, setSelectedDestLocation] = useState<string>("");
-  const [transferDate, setTransferDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [transferDate, setTransferDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
   const [notes, setNotes] = useState<string>("");
 
   const { data: locations = [] } = useQuery<Location[]>({
@@ -284,7 +284,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
       setPreview(null);
       setValidationResult(null);
       setSelectedDestLocation("");
-      setTransferDate(new Date().toISOString().split("T")[0]);
+      setTransferDate(new Date().toLocaleDateString('en-CA'));
       setNotes("");
       // Show informational message
       toast({

@@ -222,7 +222,7 @@ export default function FactoryWorkerDetail() {
   const [endStep, setEndStep] = useState<1 | 2>(1);
   const [endOpen, setEndOpen] = useState(false);
   const [endStart, setEndStart] = useState("");
-  const [endEnd, setEndEnd] = useState(new Date().toISOString().split("T")[0]);
+  const [endEnd, setEndEnd] = useState(new Date().toLocaleDateString('en-CA'));
   const [endCalculating, setEndCalculating] = useState(false);
   const [endResult, setEndResult] = useState<{ earned: string; paid: string; advances: string; balance: string } | null>(null);
   const [endCashAccountId, setEndCashAccountId] = useState("");
@@ -241,7 +241,7 @@ export default function FactoryWorkerDetail() {
 
   const [editOpen, setEditOpen] = useState(false);
 
-  const [advanceDate, setAdvanceDate] = useState(new Date().toISOString().split("T")[0]);
+  const [advanceDate, setAdvanceDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [advanceAmount, setAdvanceAmount] = useState("");
   const [advanceNotes, setAdvanceNotes] = useState("");
   const [advanceRepaymentType, setAdvanceRepaymentType] = useState("salary_deduction");
@@ -249,7 +249,7 @@ export default function FactoryWorkerDetail() {
   const [showAdvanceForm, setShowAdvanceForm] = useState(false);
 
   const [repayAdvanceId, setRepayAdvanceId] = useState<number | null>(null);
-  const [repayDate, setRepayDate] = useState(new Date().toISOString().split("T")[0]);
+  const [repayDate, setRepayDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [repayAmount, setRepayAmount] = useState("");
   const [repayCashAccountId, setRepayCashAccountId] = useState("");
   const [repayNotes, setRepayNotes] = useState("");
@@ -474,7 +474,7 @@ export default function FactoryWorkerDetail() {
     setEndStep(1);
     setEndResult(null);
     setEndCashAccountId("");
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toLocaleDateString('en-CA');
     const firstOfMonth = today.slice(0, 7) + "-01";
     setEndStart(worker.contractStartDate || worker.dateJoined || firstOfMonth);
     setEndEnd(today);
@@ -528,7 +528,7 @@ export default function FactoryWorkerDetail() {
     if (!navigator.onLine) { toast({ title: "Not available offline", description: "Requires a connection", variant: "destructive" }); return; }
     setEndSubmitting(true);
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date().toLocaleDateString('en-CA');
       const res = await factoryApiRequest("POST", `/api/factory/workers/${workerId}/settle-and-end`, {
         companyId: worker.companyId, endDate: endEnd || today, skipSettlement: true,
       });
@@ -1165,7 +1165,7 @@ export default function FactoryWorkerDetail() {
                                 onToggleExpand={() => setExpandedAdvanceId(isExpanded ? null : adv.id)}
                                 onRepay={() => {
                                   setRepayAdvanceId(adv.id);
-                                  setRepayDate(new Date().toISOString().split("T")[0]);
+                                  setRepayDate(new Date().toLocaleDateString('en-CA'));
                                   setRepayAmount("");
                                   setRepayCashAccountId("");
                                   setRepayNotes("");

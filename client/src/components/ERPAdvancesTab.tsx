@@ -112,13 +112,13 @@ function AdvancesView() {
   const [bulkAmounts, setBulkAmounts] = useState<Record<number, string>>({});
   const [bulkSelected, setBulkSelected] = useState<Set<number>>(new Set());
   const [bulkForm, setBulkForm] = useState({
-    advanceDate: new Date().toISOString().split("T")[0],
+    advanceDate: new Date().toLocaleDateString('en-CA'),
     notes: "",
     cashAccountId: "",
   });
   const [form, setForm] = useState({
     employeeId: "",
-    advanceDate: new Date().toISOString().split("T")[0],
+    advanceDate: new Date().toLocaleDateString('en-CA'),
     amount: "",
     notes: "",
     cashAccountId: "",
@@ -201,7 +201,7 @@ function AdvancesView() {
       queryClient.invalidateQueries({ queryKey: ["/api/salary-advances"] });
       toast({ title: "Advance recorded" });
       setAddOpen(false);
-      setForm({ employeeId: "", advanceDate: new Date().toISOString().split("T")[0], amount: "", notes: "", cashAccountId: "" });
+      setForm({ employeeId: "", advanceDate: new Date().toLocaleDateString('en-CA'), amount: "", notes: "", cashAccountId: "" });
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
@@ -250,7 +250,7 @@ function AdvancesView() {
       setBulkOpen(false);
       setBulkAmounts({});
       setBulkSelected(new Set());
-      setBulkForm({ advanceDate: new Date().toISOString().split("T")[0], notes: "", cashAccountId: "" });
+      setBulkForm({ advanceDate: new Date().toLocaleDateString('en-CA'), notes: "", cashAccountId: "" });
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });

@@ -502,7 +502,7 @@ export default function FactoryContainers() {
     ws["!cols"] = [20,20,20,12,10,10,8,8,8,12,12,30,12,10,30,12,10,12].map(w => ({ wch: w }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Containers");
-    XLSX.writeFile(wb, `factory_containers_export_${new Date().toISOString().split("T")[0]}.xlsx`);
+    XLSX.writeFile(wb, `factory_containers_export_${new Date().toLocaleDateString('en-CA')}.xlsx`);
   };
 
   const downloadTemplate = async () => {

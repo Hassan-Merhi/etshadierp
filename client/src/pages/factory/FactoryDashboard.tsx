@@ -71,7 +71,7 @@ function CollapsiblePane({ open, children }: { open: boolean; children: React.Re
 }
 
 export default function FactoryDashboard() {
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString('en-CA');
   const [date, setDate] = useState(today);
   const [showBalesPane, setShowBalesPane] = useState(false);
 

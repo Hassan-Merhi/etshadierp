@@ -246,7 +246,7 @@ export default function FactorySuppliers() {
   });
 
   // Payment state
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString('en-CA');
   const [paymentDialogSupplier, setPaymentDialogSupplier] = useState<SupplierWithBalance | null>(null);
   const [paymentForm, setPaymentForm] = useState({
     supplierId: 0,
@@ -1854,7 +1854,7 @@ export default function FactorySuppliers() {
                       const fxRate = parseFloat(oc.fxRateToUsd || "1");
                       return {
                         key: `oac-${oc.id}`,
-                        date: oc.createdAt ? new Date(oc.createdAt).toISOString().split("T")[0] : null,
+                        date: oc.createdAt ? new Date(oc.createdAt).toLocaleDateString('en-CA') : null,
                         type: "other_charge" as RowType,
                         ref: "Other Charge",
                         detail: oc.description || "",

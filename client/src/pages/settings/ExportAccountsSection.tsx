@@ -239,7 +239,7 @@ export function ExportAccountsSection() {
       const dlUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = dlUrl;
-      a.download = `Account_Export_${new Date().toISOString().split("T")[0]}.xlsx`;
+      a.download = `Account_Export_${new Date().toLocaleDateString('en-CA')}.xlsx`;
       a.click();
       URL.revokeObjectURL(dlUrl);
       toast({ title: "Export complete", description: `${selectedIds.size} account${selectedIds.size !== 1 ? "s" : ""} exported successfully.` });

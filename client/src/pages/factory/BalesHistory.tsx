@@ -56,7 +56,7 @@ export default function BalesHistory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [batchFilter, setBatchFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState(() => new Date().toISOString().split("T")[0]);
+  const [dateFilter, setDateFilter] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("");
@@ -282,7 +282,7 @@ export default function BalesHistory() {
     if (statusFilter !== "all" && bale.status !== statusFilter) return false;
 
     if (dateFilter) {
-      const baleDate = bale.createdAt ? new Date(bale.createdAt).toISOString().split("T")[0] : null;
+      const baleDate = bale.createdAt ? new Date(bale.createdAt).toLocaleDateString('en-CA') : null;
       if (baleDate !== dateFilter) return false;
     }
 
@@ -306,12 +306,12 @@ export default function BalesHistory() {
   const totalWeight = filtered.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
   const totalBales = filtered.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = new Date().toLocaleDateString('en-CA');
   const summaryDate = dateFilter || todayStr;
   const todayInStock = (balesData || []).filter((row: any) => {
     const bale = row.bale;
     if (bale.status !== "IN_STOCK") return false;
-    const baleDate = bale.createdAt ? new Date(bale.createdAt).toISOString().split("T")[0] : null;
+    const baleDate = bale.createdAt ? new Date(bale.createdAt).toLocaleDateString('en-CA') : null;
     return baleDate === summaryDate;
   });
 

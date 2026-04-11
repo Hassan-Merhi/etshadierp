@@ -192,7 +192,7 @@ export default function ContainerDetail() {
   });
 
   const paymentForm = useForm({
-    defaultValues: { paymentDate: new Date().toISOString().split("T")[0], amount: "", method: "", reference: "" },
+    defaultValues: { paymentDate: new Date().toLocaleDateString('en-CA'), amount: "", method: "", reference: "" },
   });
 
   const addPaymentMutation = useMutation({
@@ -203,7 +203,7 @@ export default function ContainerDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers", containerId, "freight"] });
       setShowPaymentDialog(null);
-      paymentForm.reset({ paymentDate: new Date().toISOString().split("T")[0], amount: "", method: "", reference: "" });
+      paymentForm.reset({ paymentDate: new Date().toLocaleDateString('en-CA'), amount: "", method: "", reference: "" });
       toast({ title: "Payment recorded" });
     },
     onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Failed", description: e.message, variant: "destructive" }); },
@@ -262,7 +262,7 @@ export default function ContainerDetail() {
       customerId: "",
       commission: "0.00",
       commissionAccountId: "",
-      saleDate: new Date().toISOString().split('T')[0],
+      saleDate: new Date().toLocaleDateString('en-CA'),
     },
   });
 

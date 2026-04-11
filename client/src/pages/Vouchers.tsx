@@ -1975,7 +1975,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [transferQtyDraft, setTransferQtyDraft] = useState<Record<number, string>>({});
   const [importValidationResult, setImportValidationResult] = useState<any>(null);
   const [importDestLocation, setImportDestLocation] = useState<string>("");
-  const [importDate, setImportDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [importDate, setImportDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
   const [importNotes, setImportNotes] = useState<string>("");
 
   // Import mutations
@@ -2162,7 +2162,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       setImportPreview(null);
       setImportValidationResult(null);
       setImportDestLocation("");
-      setImportDate(new Date().toISOString().split("T")[0]);
+      setImportDate(new Date().toLocaleDateString('en-CA'));
       setImportNotes("");
       // Show informational message
       toast({

@@ -97,7 +97,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
 
     setBatchName(batch.name || "");
     setNotes((batch as any).notes || "");
-    setBatchDate((batch as any).batchDate || new Date().toISOString().split("T")[0]);
+    setBatchDate((batch as any).batchDate || new Date().toLocaleDateString('en-CA'));
 
     // Aggregate supplier sources by supplierId
     const supplierMap = new Map<number, { weightKg: number; costPerKg: number; label: string; availableKg: number }>();

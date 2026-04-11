@@ -378,7 +378,7 @@ export default function Containers() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `containers_full_export_${new Date().toISOString().split("T")[0]}.xlsx`;
+      a.download = `containers_full_export_${new Date().toLocaleDateString('en-CA')}.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
