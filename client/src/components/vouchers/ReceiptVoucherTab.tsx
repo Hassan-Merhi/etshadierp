@@ -37,6 +37,7 @@ interface ReceiptVoucherTabProps {
   paymentAccountType: string;
   paymentAccountName: string;
   accountBalance: number;
+  accountCurrencyBalances?: { currency: string; balance: number }[] | null;
   allAccounts: CombinedAccount[];
   sidebarAccounts: Account[];
   filteredSidebarAccounts: Account[];
@@ -71,6 +72,7 @@ export function ReceiptVoucherTab({
   paymentAccountType,
   paymentAccountName,
   accountBalance,
+  accountCurrencyBalances,
   allAccounts,
   sidebarAccounts,
   filteredSidebarAccounts,
@@ -152,16 +154,35 @@ export function ReceiptVoucherTab({
                             />
                           </div>
                         </FormControl>
-                        {paymentAccountId > 0 && (
-                          <p className={cn("text-sm mt-1.5 font-mono", (() => {
-                            const live = isEditMode ? accountBalance : (total > 0 ? accountBalance + total : accountBalance);
-                            if (live < 0) return "text-red-600 dark:text-red-400";
-                            if (live > 0) return "text-emerald-600 dark:text-emerald-400";
-                            return "text-muted-foreground";
-                          })())}>
-                            Balance: {formatAmount(isEditMode ? accountBalance : (total > 0 ? accountBalance + total : accountBalance))}
-                          </p>
-                        )}
+                        {paymentAccountId > 0 && (() => {
+                          const balColor = (v: number) => v < 0 ? "text-red-600 dark:text-red-400" : v > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground";
+                          const fmtCurr = (n: number, curr: string) =>
+                            curr !== "USD"
+                              ? `${curr} ${Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                              : formatAmount(Math.abs(n));
+
+                          if (accountCurrencyBalances && accountCurrencyBalances.length > 0) {
+                            return (
+                              <div className="flex flex-col gap-0.5 mt-1.5">
+                                {accountCurrencyBalances.map(({ currency, balance }) => (
+                                  <div key={currency} className="flex items-center gap-1.5 text-sm font-mono">
+                                    <span className="text-muted-foreground text-xs">Bal:</span>
+                                    <span className={cn(balColor(balance))}>
+                                      {fmtCurr(balance, currency)} {balance > 0 ? "CR" : balance < 0 ? "DR" : ""}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          }
+
+                          const live = isEditMode ? accountBalance : (total > 0 ? accountBalance + total : accountBalance);
+                          return (
+                            <p className={cn("text-sm mt-1.5 font-mono", balColor(live))}>
+                              Balance: {formatAmount(live)}
+                            </p>
+                          );
+                        })()}
                         <FormMessage />
                       </FormItem>
                     )}

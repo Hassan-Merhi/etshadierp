@@ -37,6 +37,7 @@ interface PaymentVoucherTabProps {
   paymentAccountType: string;
   paymentAccountName: string;
   accountBalance: number;
+  accountCurrencyBalances?: { currency: string; balance: number }[] | null;
   allAccounts: CombinedAccount[];
   sidebarAccounts: Account[];
   filteredSidebarAccounts: Account[];
@@ -71,6 +72,7 @@ export function PaymentVoucherTab({
   paymentAccountType,
   paymentAccountName,
   accountBalance,
+  accountCurrencyBalances,
   allAccounts,
   sidebarAccounts,
   filteredSidebarAccounts,
@@ -160,10 +162,30 @@ export function PaymentVoucherTab({
                           </div>
                         </FormControl>
                         {paymentAccountId > 0 && (() => {
+                          const balColor = (v: number) => v < 0 ? "text-red-600 dark:text-red-400" : v > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground";
+                          const fmtCurr = (n: number, curr: string) =>
+                            curr !== "USD"
+                              ? `${curr} ${Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                              : formatAmount(Math.abs(n));
+
+                          if (accountCurrencyBalances && accountCurrencyBalances.length > 0) {
+                            return (
+                              <div className="flex flex-col gap-0.5 mt-1.5">
+                                {accountCurrencyBalances.map(({ currency, balance }) => (
+                                  <div key={currency} className="flex items-center gap-1.5 text-sm font-mono">
+                                    <span className="text-muted-foreground text-xs">Bal:</span>
+                                    <span className={cn(balColor(balance))}>
+                                      {fmtCurr(balance, currency)} {balance > 0 ? "CR" : balance < 0 ? "DR" : ""}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          }
+
                           const projected = isEditMode
                             ? accountBalance + originalTotal - total
                             : accountBalance - total;
-                          const balColor = (v: number) => v < 0 ? "text-red-600 dark:text-red-400" : v > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground";
                           return (
                             <div className="flex items-center gap-1.5 flex-wrap text-sm mt-1.5 font-mono">
                               <span className="text-muted-foreground text-xs">Bal:</span>

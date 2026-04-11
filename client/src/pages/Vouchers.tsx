@@ -956,6 +956,54 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     },
   });
 
+  // Per-currency balance breakdown for supplier and factorySupplier accounts
+  const { data: accountCurrencyBalances } = useQuery<{ currency: string; balance: number }[] | null>({
+    queryKey: ["/api/accounts", paymentAccountType, paymentAccountId, "currencyBalances"],
+    enabled: paymentAccountId > 0 && (paymentAccountType === "supplier" || paymentAccountType === "factorySupplier"),
+    queryFn: async () => {
+      if (paymentAccountType === "supplier") {
+        const [supplierRes, transRes] = await Promise.all([
+          fetch(`/api/suppliers/${paymentAccountId}`, { credentials: "include" }),
+          fetch(`/api/accounts/supplier/${paymentAccountId}/transactions`, { credentials: "include" }),
+        ]);
+        const supplier = await supplierRes.json();
+        const transactions: any[] = await transRes.json();
+        const openingBalance = parseFloat(supplier.openingBalance || "0");
+
+        const currMap = new Map<string, number>();
+        transactions.forEach((t) => {
+          const curr = t.currency || "USD";
+          const credit = parseFloat(t.creditAmount || "0");
+          const debit = parseFloat(t.debitAmount || "0");
+          currMap.set(curr, (currMap.get(curr) ?? 0) + credit - debit);
+        });
+        // Opening balance is in USD
+        currMap.set("USD", (currMap.get("USD") ?? 0) + openingBalance);
+
+        const result = Array.from(currMap.entries())
+          .map(([currency, balance]) => ({ currency, balance }))
+          .filter((r) => Math.abs(r.balance) >= 0.005);
+
+        // Only return multi-currency array if there are non-USD currencies
+        const hasNonUsd = result.some((r) => r.currency !== "USD");
+        return hasNonUsd ? result : null;
+      } else if (paymentAccountType === "factorySupplier") {
+        const res = await fetch(`/api/factory/suppliers/${paymentAccountId}/broker-statement`, { credentials: "include" });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const ledgers: any[] = data.currencyLedgers || [];
+        if (ledgers.length <= 1) return null;
+        return ledgers
+          .map((section: any) => ({
+            currency: section.currencyCode,
+            balance: parseFloat(section.netBalance || "0"),
+          }))
+          .filter((r) => Math.abs(r.balance) >= 0.005);
+      }
+      return null;
+    },
+  });
+
   // Save mutation (handles both create and update) - OPTIMIZED to use batch endpoint
   const saveMutation = useMutation({
     mutationFn: async (formData: VoucherFormData) => {
@@ -3742,6 +3790,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               paymentAccountType={paymentAccountType}
               paymentAccountName={paymentAccountName}
               accountBalance={accountBalance}
+              accountCurrencyBalances={accountCurrencyBalances}
               allAccounts={allAccounts}
               sidebarAccounts={sidebarAccounts}
               isEditMode={!!voucherIdToEdit}
@@ -3804,6 +3853,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               paymentAccountType={paymentAccountType}
               paymentAccountName={paymentAccountName}
               accountBalance={accountBalance}
+              accountCurrencyBalances={accountCurrencyBalances}
               allAccounts={allAccounts}
               sidebarAccounts={sidebarAccounts}
               isEditMode={!!voucherIdToEdit}

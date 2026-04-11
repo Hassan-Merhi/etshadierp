@@ -130,6 +130,7 @@ interface GroupedVoucher {
   totalDebit: number;
   totalCredit: number;
   runningBalance?: number;
+  runningBalanceCurrency?: string;
   currency?: string;
 }
 
@@ -700,24 +701,31 @@ export default function Accounts() {
 
   const openingBalance = getOpeningBalance();
 
-  // Calculate running balance for grouped vouchers
-  const calculateGroupedRunningBalance = (): GroupedVoucher[] => {
-    let runningBalance = openingBalance;
+  // Calculate running balance for grouped vouchers, tracking per-currency sub-balances
+  const calculateGroupedRunningBalance = (): { vouchers: GroupedVoucher[]; finalRunningBalances: Map<string, number> } => {
+    const runningBalances = new Map<string, number>();
+    const baseCurrency = "USD";
+    runningBalances.set(baseCurrency, openingBalance);
+    const isSupplierAcc = selectedAccount?.type === "supplier";
 
-    return groupedVouchers.map((voucher) => {
-      if (selectedAccount?.type === "supplier") {
-        runningBalance += voucher.totalCredit - voucher.totalDebit;
-      } else {
-        runningBalance += voucher.totalDebit - voucher.totalCredit;
-      }
+    const vouchers = groupedVouchers.map((voucher) => {
+      const curr = voucher.currency || baseCurrency;
+      const existing = runningBalances.get(curr) ?? 0;
+      const newBalance = isSupplierAcc
+        ? existing + voucher.totalCredit - voucher.totalDebit
+        : existing + voucher.totalDebit - voucher.totalCredit;
+      runningBalances.set(curr, newBalance);
       return {
         ...voucher,
-        runningBalance,
+        runningBalance: newBalance,
+        runningBalanceCurrency: curr !== baseCurrency ? curr : undefined,
       };
     });
+
+    return { vouchers, finalRunningBalances: new Map(runningBalances) };
   };
 
-  const vouchersWithBalance = calculateGroupedRunningBalance();
+  const { vouchers: vouchersWithBalance, finalRunningBalances } = calculateGroupedRunningBalance();
 
   const transactionTotals = vouchersWithBalance.reduce(
     (acc, v) => ({
@@ -727,11 +735,8 @@ export default function Accounts() {
     { totalDebit: 0, totalCredit: 0 },
   );
 
-  const closingBalance =
-    vouchersWithBalance.length > 0
-      ? (vouchersWithBalance[vouchersWithBalance.length - 1].runningBalance ??
-        openingBalance)
-      : openingBalance;
+  // Closing balance = final USD running balance (includes opening balance + all USD-currency vouchers)
+  const closingBalance = finalRunningBalances.get("USD") ?? openingBalance;
 
   const handleExportStatementToExcel = async () => {
     if (!selectedAccount || vouchersWithBalance.length === 0) {
@@ -2443,16 +2448,17 @@ export default function Accounts() {
                                       : "-"}
                                   </TableCell>}
                                   {!hideBalances && <TableCell className="text-right font-mono font-medium py-2">
-                                    {formatAmount(
-                                      Math.abs(voucher.runningBalance ?? 0),
-                                    )}{" "}
-                                    {selectedAccount?.type === "supplier"
-                                      ? (voucher.runningBalance ?? 0) > 0
-                                        ? "Cr"
-                                        : "Dr"
-                                      : (voucher.runningBalance ?? 0) >= 0
-                                        ? "Dr"
-                                        : "Cr"}
+                                    {(() => {
+                                      const rb = voucher.runningBalance ?? 0;
+                                      const rbCurr = voucher.runningBalanceCurrency;
+                                      const sideText = selectedAccount?.type === "supplier"
+                                        ? rb > 0 ? "Cr" : "Dr"
+                                        : rb >= 0 ? "Dr" : "Cr";
+                                      if (rbCurr) {
+                                        return `${rbCurr} ${Math.abs(rb).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${sideText}`;
+                                      }
+                                      return `${formatAmount(Math.abs(rb))} ${sideText}`;
+                                    })()}
                                   </TableCell>}
                                 </TableRow>
                               ))
@@ -2560,10 +2566,17 @@ export default function Accounts() {
                                   <div className="text-right">
                                     <span className="text-muted-foreground block">Balance</span>
                                     <span className="font-mono font-medium">
-                                      {formatAmount(Math.abs(voucher.runningBalance ?? 0))}{" "}
-                                      {selectedAccount?.type === "supplier"
-                                        ? (voucher.runningBalance ?? 0) > 0 ? "Cr" : "Dr"
-                                        : (voucher.runningBalance ?? 0) >= 0 ? "Dr" : "Cr"}
+                                      {(() => {
+                                        const rb = voucher.runningBalance ?? 0;
+                                        const rbCurr = voucher.runningBalanceCurrency;
+                                        const sideText = selectedAccount?.type === "supplier"
+                                          ? rb > 0 ? "Cr" : "Dr"
+                                          : rb >= 0 ? "Dr" : "Cr";
+                                        if (rbCurr) {
+                                          return `${rbCurr} ${Math.abs(rb).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${sideText}`;
+                                        }
+                                        return `${formatAmount(Math.abs(rb))} ${sideText}`;
+                                      })()}
                                     </span>
                                   </div>
                                 </div>}
