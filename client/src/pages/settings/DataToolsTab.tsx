@@ -64,7 +64,7 @@
   import { useAppMode } from "@/contexts/AppModeContext";
   import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
   import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, TrendingDown, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, FileSpreadsheet, FileDown } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -75,6 +75,18 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
   import { formatNumber } from "@/lib/formatNumber";
   
+interface SilentImportRow {
+  rawCode: string;
+  rawName: string;
+  stockItemId: number | null;
+  stockItemName: string;
+  currentQty: number;
+  change: number;
+  newQty: number;
+  rate: number;
+  status: 'ok' | 'not_found' | 'to_zero';
+}
+
   const userFormSchema = insertUserSchema;
   const companyFormSchema = insertCompanySchema;
   const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
@@ -133,6 +145,12 @@ export function DataToolsTab() {
   const [silentProdApplying, setSilentProdApplying] = useState(false);
   const [silentProdDone, setSilentProdDone] = useState(0);
 
+  // Silent prod — Excel import state
+  const [silentImportMode, setSilentImportMode] = useState(false);
+  const [silentImportPreview, setSilentImportPreview] = useState<SilentImportRow[]>([]);
+  const [silentImportLoading, setSilentImportLoading] = useState(false);
+  const silentImportFileRef = useRef<HTMLInputElement>(null);
+
   // Silent inventory transfer state
   const [silentTransferOpen, setSilentTransferOpen] = useState(false);
   const [silentSrcId, setSilentSrcId] = useState("");
@@ -186,6 +204,17 @@ export function DataToolsTab() {
   const { data: allStockItems = [] } = useQuery<any[]>({
     queryKey: ["/api/stock-items", selectedCompany?.id],
     enabled: !!selectedCompany && dtCurrentUser?.role === "Developer",
+  });
+
+  // Fetch location inventory for silent prod import preview
+  const { data: silentLocSummary } = useQuery<any>({
+    queryKey: ["/api/location-summary", silentProdLocId],
+    queryFn: async () => {
+      const res = await fetch(`/api/location-summary?locationIds=${silentProdLocId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!silentProdLocId && silentProdOpen && silentImportMode,
   });
 
   // Convert Bale to BL mutation
@@ -464,6 +493,135 @@ export function DataToolsTab() {
     setStockImportComplete(false);
   };
 
+  // Silent prod — Excel import helpers
+  const downloadSilentTemplate = async () => {
+    const wb = utils.book_new();
+    const ws = wb.addWorksheet("Silent Adjustment");
+    ws.addRow(["Code", "Name", "Qty Change", "Rate"]);
+    ws.getRow(1).font = { bold: true };
+    ws.getColumn(1).width = 16;
+    ws.getColumn(2).width = 36;
+    ws.getColumn(3).width = 14;
+    ws.getColumn(4).width = 12;
+    ws.addRow(["ABC123", "Example Item A", 50, 10.5]);
+    ws.addRow(["XYZ456", "Example Item B", -20, ""]);
+    ws.getRow(2).font = { italic: true, color: { argb: "FF999999" } };
+    ws.getRow(3).font = { italic: true, color: { argb: "FF999999" } };
+    await writeFile(wb, "silent_adjustment_template.xlsx");
+    toast({ title: "Template Downloaded" });
+  };
+
+  const getCurrentQty = (stockItemId: number): number => {
+    if (!silentLocSummary?.stockGroups) return 0;
+    const locId = parseInt(silentProdLocId);
+    for (const group of silentLocSummary.stockGroups) {
+      const item = group.items?.find((i: any) => i.id === stockItemId);
+      if (item?.locationData?.[locId]) return item.locationData[locId].quantity || 0;
+    }
+    return 0;
+  };
+
+  const handleSilentImportFile = async (file: File) => {
+    setSilentImportLoading(true);
+    try {
+      const wb = await readFile(file);
+      const ws = wb.getWorksheet(1);
+      if (!ws) { toast({ title: "Error", description: "Could not read worksheet", variant: "destructive" }); return; }
+      const rows = utils.sheet_to_json<{ Code?: any; Name?: any; "Qty Change"?: any; "Item Name"?: any; Change?: any; Rate?: any }>(ws);
+
+      const preview: SilentImportRow[] = rows
+        .filter(row => row.Code !== undefined || row.Name !== undefined || row["Item Name"] !== undefined)
+        .map(row => {
+          const code = String(row.Code ?? "").trim();
+          const name = String(row.Name ?? row["Item Name"] ?? "").trim();
+          const change = parseFloat(String(row["Qty Change"] ?? row.Change ?? "0")) || 0;
+          const rate = parseFloat(String(row.Rate ?? "0")) || 0;
+
+          let matched: any = code ? (allStockItems as any[]).find((s: any) => s.code?.toLowerCase() === code.toLowerCase()) : undefined;
+          if (!matched && name) matched = (allStockItems as any[]).find((s: any) => s.name.toLowerCase() === name.toLowerCase());
+
+          if (!matched) {
+            return { rawCode: code, rawName: name, stockItemId: null, stockItemName: name || code || "Unknown", currentQty: 0, change, newQty: Math.max(0, change), rate, status: "not_found" as const };
+          }
+
+          const currentQty = getCurrentQty(matched.id);
+          const newQty = currentQty + change;
+          const status: SilentImportRow["status"] = newQty <= 0 ? "to_zero" : "ok";
+          return { rawCode: code, rawName: name, stockItemId: matched.id, stockItemName: matched.name, currentQty, change, newQty: Math.max(0, newQty), rate, status };
+        });
+
+      setSilentImportPreview(preview);
+    } catch (err: any) {
+      toast({ title: "Parse Error", description: err.message || "Failed to read file", variant: "destructive" });
+    } finally {
+      setSilentImportLoading(false);
+    }
+  };
+
+  const exportSilentExcel = async () => {
+    const wb = utils.book_new();
+    const ws = wb.addWorksheet("Adjustment");
+    ws.addRow(["Item Name", "Qty"]);
+    ws.getRow(1).font = { bold: true };
+    for (const row of silentImportPreview.filter(r => r.status !== "not_found")) {
+      ws.addRow([row.stockItemName, row.newQty]);
+    }
+    ws.getColumn(1).width = 36;
+    ws.getColumn(2).width = 12;
+    await writeFile(wb, "silent_adjustment_preview.xlsx");
+  };
+
+  const exportSilentPDF = async () => {
+    const { jsPDF } = await import("jspdf");
+    const autoTable = (await import("jspdf-autotable")).default;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    doc.setFontSize(14);
+    doc.text("Silent Adjustment Preview", 14, 18);
+    doc.setFontSize(10);
+    doc.text(`Location: ${(locations as any[]).find((l: any) => String(l.id) === silentProdLocId)?.name || ""}   Date: ${new Date().toLocaleDateString()}`, 14, 25);
+    const rows = silentImportPreview.filter(r => r.status !== "not_found").map((r, i) => [i + 1, r.stockItemName, r.newQty]);
+    autoTable(doc, { startY: 30, head: [["#", "Item Name", "New Qty"]], body: rows, styles: { fontSize: 9 }, headStyles: { fillColor: [30, 30, 30] }, columnStyles: { 0: { cellWidth: 12 }, 2: { cellWidth: 22, halign: "right" } } });
+    doc.save("silent_adjustment_preview.pdf");
+  };
+
+  const applySilentImport = async () => {
+    const valid = silentImportPreview.filter(r => r.stockItemId !== null && r.status !== "not_found");
+    const productions = valid.filter(r => r.change > 0);
+    const consumptions = valid.filter(r => r.change < 0);
+    if (valid.length === 0) return;
+    setSilentProdApplying(true);
+    try {
+      let totalApplied = 0;
+      if (productions.length > 0) {
+        const res = await apiRequest("POST", "/api/inventory/silent-production", {
+          locationId: silentProdLocId,
+          type: "Production",
+          items: productions.map(r => ({ stockItemId: String(r.stockItemId), quantity: String(Math.abs(r.change)), rate: String(r.rate) })),
+        });
+        const d = await res.json();
+        totalApplied += d.applied || productions.length;
+      }
+      if (consumptions.length > 0) {
+        const res = await apiRequest("POST", "/api/inventory/silent-production", {
+          locationId: silentProdLocId,
+          type: "Consumption",
+          items: consumptions.map(r => ({ stockItemId: String(r.stockItemId), quantity: String(Math.abs(r.change)), rate: "0" })),
+        });
+        const d = await res.json();
+        totalApplied += d.applied || consumptions.length;
+      }
+      setSilentProdDone(totalApplied);
+      setSilentImportPreview([]);
+      setSilentImportMode(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSilentProdApplying(false);
+    }
+  };
+
   if (!selectedCompany) {
     return (
       <div className="space-y-4">
@@ -680,7 +838,7 @@ export function DataToolsTab() {
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => { setSilentProdType("Production"); setSilentProdLocId(""); setSilentProdItems([{ stockItemId: "", quantity: "", rate: "" }]); setSilentProdDone(0); setSilentProdOpen(true); }}
+                onClick={() => { setSilentProdType("Production"); setSilentProdLocId(""); setSilentProdItems([{ stockItemId: "", quantity: "", rate: "" }]); setSilentProdDone(0); setSilentImportMode(false); setSilentImportPreview([]); setSilentProdOpen(true); }}
                 data-testid="button-open-silent-production"
               >
                 <Package className="h-4 w-4 mr-2" />
@@ -732,33 +890,34 @@ export function DataToolsTab() {
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                   <Check className="h-5 w-5" />
-                  <p className="font-semibold">Applied {silentProdDone} item(s) silently as {silentProdType}</p>
+                  <p className="font-semibold">Applied {silentProdDone} item(s) silently</p>
                 </div>
                 <Button variant="outline" onClick={() => setSilentProdOpen(false)} data-testid="button-silent-prod-close">Close</Button>
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Type toggle */}
-                <div className="flex gap-2">
+                {/* Mode toggle */}
+                <div className="flex gap-2 border-b pb-3">
                   <Button
-                    variant={silentProdType === "Production" ? "default" : "outline"}
+                    variant={!silentImportMode ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setSilentProdType("Production")}
-                    data-testid="button-type-production"
+                    onClick={() => { setSilentImportMode(false); setSilentImportPreview([]); }}
+                    data-testid="button-mode-manual"
                   >
-                    Production (+)
+                    Manual Entry
                   </Button>
                   <Button
-                    variant={silentProdType === "Consumption" ? "default" : "outline"}
+                    variant={silentImportMode ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setSilentProdType("Consumption")}
-                    data-testid="button-type-consumption"
+                    onClick={() => { setSilentImportMode(true); }}
+                    data-testid="button-mode-import"
                   >
-                    Consumption (−)
+                    <FileSpreadsheet className="h-3.5 w-3.5 mr-1" />
+                    Import from Excel
                   </Button>
                 </div>
 
-                {/* Location */}
+                {/* Location (shared between modes) */}
                 <div className="space-y-1">
                   <Label>Location</Label>
                   <Select value={silentProdLocId} onValueChange={setSilentProdLocId}>
@@ -773,97 +932,154 @@ export function DataToolsTab() {
                   </Select>
                 </div>
 
-                {/* Items table */}
-                <div className="space-y-2">
-                  <Label>Items</Label>
-                  <div className="space-y-2">
-                    {silentProdItems.map((item, idx) => (
-                      <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                        <div className="col-span-5">
-                          <Select
-                            value={item.stockItemId}
-                            onValueChange={(v) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, stockItemId: v } : r))}
-                          >
-                            <SelectTrigger data-testid={`select-prod-item-${idx}`}>
-                              <SelectValue placeholder="Stock item..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(allStockItems as any[]).map((si: any) => (
-                                <SelectItem key={si.id} value={String(si.id)}>{si.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                {!silentImportMode ? (
+                  <>
+                    {/* Type toggle — manual mode only */}
+                    <div className="flex gap-2">
+                      <Button variant={silentProdType === "Production" ? "default" : "outline"} size="sm" onClick={() => setSilentProdType("Production")} data-testid="button-type-production">Production (+)</Button>
+                      <Button variant={silentProdType === "Consumption" ? "default" : "outline"} size="sm" onClick={() => setSilentProdType("Consumption")} data-testid="button-type-consumption">Consumption (−)</Button>
+                    </div>
+
+                    {/* Items table */}
+                    <div className="space-y-2">
+                      <Label>Items</Label>
+                      <div className="space-y-2">
+                        {silentProdItems.map((item, idx) => (
+                          <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                            <div className="col-span-5">
+                              <Select value={item.stockItemId} onValueChange={(v) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, stockItemId: v } : r))}>
+                                <SelectTrigger data-testid={`select-prod-item-${idx}`}><SelectValue placeholder="Stock item..." /></SelectTrigger>
+                                <SelectContent>
+                                  {(allStockItems as any[]).map((si: any) => <SelectItem key={si.id} value={String(si.id)}>{si.name}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="col-span-3">
+                              <Input type="number" placeholder="Qty" value={item.quantity} onChange={(e) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, quantity: e.target.value } : r))} data-testid={`input-prod-qty-${idx}`} />
+                            </div>
+                            <div className="col-span-3">
+                              <Input type="number" placeholder={silentProdType === "Production" ? "Rate" : "Rate (opt)"} value={item.rate} onChange={(e) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, rate: e.target.value } : r))} data-testid={`input-prod-rate-${idx}`} />
+                            </div>
+                            <div className="col-span-1 flex justify-center">
+                              <Button size="icon" variant="ghost" onClick={() => setSilentProdItems(prev => prev.filter((_, i) => i !== idx))} disabled={silentProdItems.length === 1} data-testid={`button-remove-prod-row-${idx}`}><X className="h-4 w-4" /></Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => setSilentProdItems(prev => [...prev, { stockItemId: "", quantity: "", rate: "" }])} data-testid="button-add-prod-row">
+                        <Plus className="h-4 w-4 mr-1" />Add Item
+                      </Button>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => setSilentProdOpen(false)} data-testid="button-silent-prod-cancel">Cancel</Button>
+                      <Button
+                        disabled={!silentProdLocId || silentProdItems.every(r => !r.stockItemId || !r.quantity) || silentProdApplying}
+                        onClick={async () => {
+                          const validItems = silentProdItems.filter(r => r.stockItemId && r.quantity);
+                          if (!silentProdLocId || validItems.length === 0) return;
+                          setSilentProdApplying(true);
+                          try {
+                            const res = await apiRequest("POST", "/api/inventory/silent-production", { locationId: silentProdLocId, type: silentProdType, items: validItems.map(r => ({ stockItemId: r.stockItemId, quantity: r.quantity, rate: r.rate || "0" })) });
+                            const data = await res.json();
+                            setSilentProdDone(data.applied || validItems.length);
+                          } catch (err: any) { console.error("Silent production error:", err); } finally { setSilentProdApplying(false); }
+                        }}
+                        data-testid="button-silent-prod-apply"
+                      >
+                        {silentProdApplying ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Applying...</> : `Apply ${silentProdType}`}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  /* Import from Excel mode */
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Upload an Excel file with <strong>Code</strong>, <strong>Name</strong>, <strong>Qty Change</strong>, <strong>Rate</strong> columns.
+                      Positive qty = Production (+), Negative qty = Consumption (−). Both can be in the same file.
+                    </p>
+
+                    {silentImportPreview.length === 0 ? (
+                      <div className="space-y-3">
+                        <Button variant="outline" size="sm" onClick={downloadSilentTemplate} data-testid="button-download-silent-template">
+                          <FileDown className="h-4 w-4 mr-1" />Download Template
+                        </Button>
+                        <label
+                          className="flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md p-8 cursor-pointer hover-elevate text-muted-foreground"
+                          data-testid="label-silent-import-dropzone"
+                          onDragOver={e => e.preventDefault()}
+                          onDrop={e => { e.preventDefault(); if (!silentProdLocId) { toast({ title: "Select a location first", variant: "destructive" }); return; } const f = e.dataTransfer.files[0]; if (f) handleSilentImportFile(f); }}
+                        >
+                          <input ref={silentImportFileRef} type="file" accept=".xlsx,.xls" className="hidden" data-testid="input-silent-import-file"
+                            onChange={e => { if (!silentProdLocId) { toast({ title: "Select a location first", variant: "destructive" }); return; } const f = e.target.files?.[0]; if (f) handleSilentImportFile(f); e.target.value = ""; }} />
+                          <Upload className="h-8 w-8 opacity-40" />
+                          <span className="text-sm font-medium">{silentImportLoading ? "Parsing…" : "Click or drag & drop Excel file"}</span>
+                          <span className="text-xs">.xlsx / .xls — select a location first</span>
+                        </label>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex gap-3 text-xs font-medium">
+                            <span className="text-emerald-600 dark:text-emerald-400">{silentImportPreview.filter(r => r.change > 0 && r.status !== 'not_found').length} production</span>
+                            <span className="text-destructive">{silentImportPreview.filter(r => r.change < 0 && r.status !== 'not_found').length} consumption</span>
+                            {silentImportPreview.filter(r => r.status === 'not_found').length > 0 && <span className="text-muted-foreground">{silentImportPreview.filter(r => r.status === 'not_found').length} unmatched</span>}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={exportSilentExcel} data-testid="button-export-silent-excel"><FileDown className="h-3 w-3 mr-1" />Excel</Button>
+                            <Button variant="outline" size="sm" onClick={exportSilentPDF} data-testid="button-export-silent-pdf"><FileDown className="h-3 w-3 mr-1" />PDF</Button>
+                            <Button variant="ghost" size="sm" onClick={() => { setSilentImportPreview([]); if (silentImportFileRef.current) silentImportFileRef.current.value = ""; }} data-testid="button-clear-silent-import">Clear</Button>
+                          </div>
                         </div>
-                        <div className="col-span-3">
-                          <Input
-                            type="number"
-                            placeholder="Qty"
-                            value={item.quantity}
-                            onChange={(e) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, quantity: e.target.value } : r))}
-                            data-testid={`input-prod-qty-${idx}`}
-                          />
+
+                        <div className="border rounded-md overflow-hidden text-sm">
+                          <div className="max-h-[280px] overflow-y-auto">
+                            <table className="w-full">
+                              <thead className="bg-muted/50 sticky top-0">
+                                <tr>
+                                  <th className="text-left p-2 font-medium">Item</th>
+                                  <th className="text-right p-2 font-medium">Current</th>
+                                  <th className="text-right p-2 font-medium">Change</th>
+                                  <th className="text-right p-2 font-medium">New Qty</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {silentImportPreview.map((row, idx) => (
+                                  <tr key={idx} className={`border-t ${row.status === 'not_found' ? 'opacity-50' : ''}`}>
+                                    <td className="p-2">
+                                      <p className="font-medium truncate max-w-[220px]">{row.stockItemName}</p>
+                                      {row.status === 'not_found' && <p className="text-xs text-destructive">Not found — skipped</p>}
+                                      {row.status === 'to_zero' && <p className="text-xs text-amber-600 dark:text-amber-400">Will reach 0</p>}
+                                    </td>
+                                    <td className="p-2 text-right font-mono text-muted-foreground">{formatNumber(row.currentQty, 0)}</td>
+                                    <td className={`p-2 text-right font-mono font-semibold ${row.change > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
+                                      <span className="inline-flex items-center gap-0.5 justify-end">
+                                        {row.change > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                                        {row.change > 0 ? "+" : ""}{formatNumber(row.change, 0)}
+                                      </span>
+                                    </td>
+                                    <td className="p-2 text-right font-mono font-semibold">{row.status !== 'not_found' ? formatNumber(row.newQty, 0) : "—"}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
-                        <div className="col-span-3">
-                          <Input
-                            type="number"
-                            placeholder={silentProdType === "Production" ? "Rate" : "Rate (opt)"}
-                            value={item.rate}
-                            onChange={(e) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, rate: e.target.value } : r))}
-                            data-testid={`input-prod-rate-${idx}`}
-                          />
-                        </div>
-                        <div className="col-span-1 flex justify-center">
+
+                        <div className="flex gap-2">
+                          <Button variant="outline" onClick={() => setSilentProdOpen(false)} data-testid="button-silent-import-cancel">Cancel</Button>
                           <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => setSilentProdItems(prev => prev.filter((_, i) => i !== idx))}
-                            disabled={silentProdItems.length === 1}
-                            data-testid={`button-remove-prod-row-${idx}`}
+                            onClick={applySilentImport}
+                            disabled={silentProdApplying || silentImportPreview.every(r => r.status === 'not_found') || !silentProdLocId}
+                            data-testid="button-silent-import-apply"
                           >
-                            <X className="h-4 w-4" />
+                            {silentProdApplying ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Applying…</> : "Apply Adjustments"}
                           </Button>
                         </div>
                       </div>
-                    ))}
+                    )}
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSilentProdItems(prev => [...prev, { stockItemId: "", quantity: "", rate: "" }])}
-                    data-testid="button-add-prod-row"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Item
-                  </Button>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setSilentProdOpen(false)} data-testid="button-silent-prod-cancel">Cancel</Button>
-                  <Button
-                    disabled={!silentProdLocId || silentProdItems.every(r => !r.stockItemId || !r.quantity) || silentProdApplying}
-                    onClick={async () => {
-                      const validItems = silentProdItems.filter(r => r.stockItemId && r.quantity);
-                      if (!silentProdLocId || validItems.length === 0) return;
-                      setSilentProdApplying(true);
-                      try {
-                        const res = await apiRequest("POST", "/api/inventory/silent-production", {
-                          locationId: silentProdLocId,
-                          type: silentProdType,
-                          items: validItems.map(r => ({ stockItemId: r.stockItemId, quantity: r.quantity, rate: r.rate || "0" })),
-                        });
-                        const data = await res.json();
-                        setSilentProdDone(data.applied || validItems.length);
-                      } catch (err: any) {
-                        console.error("Silent production error:", err);
-                      } finally {
-                        setSilentProdApplying(false);
-                      }
-                    }}
-                    data-testid="button-silent-prod-apply"
-                  >
-                    {silentProdApplying ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Applying...</> : `Apply ${silentProdType}`}
-                  </Button>
-                </div>
+                )}
               </div>
             )}
           </DialogContent>
