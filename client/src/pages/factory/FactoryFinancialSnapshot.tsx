@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,9 @@ import {
   HardHat,
   BarChart3,
   AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
 } from "lucide-react";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 
@@ -153,6 +157,8 @@ function SectionHeader({ title, count, color }: { title: string; count?: number;
 
 export default function FactoryFinancialSnapshot() {
   useEscapeBack();
+  const [, navigate] = useLocation();
+  const [cashBankExpanded, setCashBankExpanded] = useState(false);
 
   const { data: snapshot, isLoading: loadingSnapshot, refetch: refetchSnapshot, dataUpdatedAt: snapUpdated } =
     useQuery<SnapshotData>({ queryKey: ["/api/factory/financial-snapshot"] });
@@ -202,9 +208,10 @@ export default function FactoryFinancialSnapshot() {
     const cashBankAccounts = allAccounts.filter(a =>
       a.category === "Cash" || a.category === "Bank"
     );
-    const cashBankTotal = cashBankAccounts
-      .filter(a => a.side === "forUs")
-      .reduce((sum, a) => sum + a.value, 0);
+    // Use signed total: forUs = positive (asset), onUs = negative (overdraft)
+    const cashBankTotal = cashBankAccounts.reduce(
+      (sum, a) => sum + (a.side === "forUs" ? a.value : -a.value), 0
+    );
 
     const freightAccounts = allAccounts.filter(a =>
       nameMatch(a.name, "freight", "embassy", "shipping", "clearance", "customs", "وكالة")
@@ -233,9 +240,20 @@ export default function FactoryFinancialSnapshot() {
       return sum;
     }, 0);
 
+    // Build sorted account list for expandable view with signed balances
+    const cashBankList = cashBankAccounts
+      .map(a => ({
+        id: (a as any).id as number,
+        name: a.name,
+        code: a.code,
+        signedBalance: a.side === "forUs" ? a.value : -a.value,
+      }))
+      .sort((x, y) => Math.abs(y.signedBalance) - Math.abs(x.signedBalance));
+
     return {
       cashBankTotal,
       cashBankCount: cashBankAccounts.length,
+      cashBankList,
       freightNet,
       freightCount: freightAccounts.length,
       agentNet,
@@ -350,14 +368,65 @@ export default function FactoryFinancialSnapshot() {
         <div>
           <SectionHeader title="Accounts & Finance" color="#6366f1" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <KpiCard
-              icon={Wallet}
-              title="Cash & Bank"
-              value={computed ? usd(computed.cashBankTotal) : "—"}
-              sub={computed ? `${computed.cashBankCount} account${computed.cashBankCount !== 1 ? "s" : ""}` : undefined}
-              color="green"
-              loading={allLoading}
-            />
+            {/* ── Expandable Cash & Bank card ── */}
+            {allLoading ? (
+              <KpiCard icon={Wallet} title="Cash & Bank" value="—" color="green" loading />
+            ) : (
+              <Card data-testid="kpi-card-cash-bank">
+                <CardContent className="p-4">
+                  <button
+                    className="w-full text-left"
+                    onClick={() => setCashBankExpanded(v => !v)}
+                    data-testid="button-expand-cash-bank"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`mt-0.5 p-2 rounded-md bg-muted shrink-0 ${computed && computed.cashBankTotal >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                        <Wallet className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground font-medium">Cash & Bank</p>
+                        <p className={`text-lg font-semibold font-mono mt-0.5 ${computed && computed.cashBankTotal >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+                          data-testid="value-cash-bank">
+                          {computed ? usd(computed.cashBankTotal) : "—"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {computed ? `${computed.cashBankCount} account${computed.cashBankCount !== 1 ? "s" : ""}` : ""}
+                        </p>
+                      </div>
+                      <div className="mt-1 text-muted-foreground shrink-0">
+                        {cashBankExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </div>
+                    </div>
+                  </button>
+
+                  {cashBankExpanded && computed && computed.cashBankList.length > 0 && (
+                    <div className="mt-3 pt-3 border-t space-y-1">
+                      {computed.cashBankList.map((acct, i) => (
+                        <button
+                          key={acct.id ?? i}
+                          className="w-full flex items-center justify-between gap-2 py-1.5 px-2 rounded-md hover-elevate text-left group"
+                          onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger`)}
+                          data-testid={`button-cash-account-${acct.id}`}
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <span className="text-sm text-foreground truncate">{acct.name}</span>
+                            {acct.code && <span className="text-xs text-muted-foreground shrink-0">{acct.code}</span>}
+                          </div>
+                          <span className={`text-sm font-mono font-medium shrink-0 ${acct.signedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                            {usd(acct.signedBalance)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {cashBankExpanded && computed && computed.cashBankList.length === 0 && (
+                    <p className="mt-3 pt-3 border-t text-xs text-muted-foreground text-center">No cash or bank accounts found</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
             <KpiCard
               icon={ShoppingBag}
               title="Sales Cash"

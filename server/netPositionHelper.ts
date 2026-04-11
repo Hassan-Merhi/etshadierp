@@ -25,6 +25,7 @@ export interface AccountBalance {
 }
 
 export interface NetPositionAccount {
+  id: number;
   name: string;
   code: string;
   value: number;
@@ -198,12 +199,12 @@ export function classifyNetPositionAccounts(
         forUsTotal += netBalance;
         categoryTotals[`asset_${category} Deposits`] =
           (categoryTotals[`asset_${category} Deposits`] || 0) + netBalance;
-        forUsAccounts.push({ name: acc.name, code: acc.code || "", value: round2(netBalance), category: `${category} Deposits` });
+        forUsAccounts.push({ id: acc.id, name: acc.name, code: acc.code || "", value: round2(netBalance), category: `${category} Deposits` });
       } else {
         onUsTotal += Math.abs(netBalance);
         categoryTotals[`liability_${category}`] =
           (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
-        onUsAccounts.push({ name: acc.name, code: acc.code || "", value: round2(Math.abs(netBalance)), category });
+        onUsAccounts.push({ id: acc.id, name: acc.name, code: acc.code || "", value: round2(Math.abs(netBalance)), category });
       }
     } else {
       // Asset-type (and other) accounts: positive = asset, negative = liability (overdraft)
@@ -211,12 +212,12 @@ export function classifyNetPositionAccounts(
         forUsTotal += netBalance;
         categoryTotals[`asset_${category}`] =
           (categoryTotals[`asset_${category}`] || 0) + netBalance;
-        forUsAccounts.push({ name: acc.name, code: acc.code || "", value: round2(netBalance), category });
+        forUsAccounts.push({ id: acc.id, name: acc.name, code: acc.code || "", value: round2(netBalance), category });
       } else {
         onUsTotal += Math.abs(netBalance);
         categoryTotals[`liability_${category}`] =
           (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
-        onUsAccounts.push({ name: acc.name, code: acc.code || "", value: round2(Math.abs(netBalance)), category });
+        onUsAccounts.push({ id: acc.id, name: acc.name, code: acc.code || "", value: round2(Math.abs(netBalance)), category });
       }
     }
   }
