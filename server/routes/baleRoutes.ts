@@ -24,6 +24,7 @@ import {
   bales, baleProducts, baleProductCategories, baleTransfers,
   factoryBales, baleLabelPrints,
   factoryPressingBatches, factoryMixBatches, factoryMixBatchSources, factoryContainers, factorySuppliers,
+  customerOrders, customerOrderBales,
   insertBaleSchema, insertBaleTransferSchema,
   orphanedRecords, orphanedCharges,
   dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
@@ -942,6 +943,42 @@ export function registerBaleRoutes(app: Express) {
         }
       }
 
+      // ── Check if this bale was loaded onto an outbound customer order ──
+      let loadedOnOrder: any = null;
+      const [orderBaleRow] = await db
+        .select()
+        .from(customerOrderBales)
+        .where(eq(customerOrderBales.baleReference, referenceNumber))
+        .limit(1);
+
+      if (orderBaleRow) {
+        const [order] = await db
+          .select()
+          .from(customerOrders)
+          .leftJoin(customers, eq(customerOrders.customerId, customers.id))
+          .where(eq(customerOrders.id, orderBaleRow.orderId))
+          .limit(1);
+
+        if (order) {
+          loadedOnOrder = {
+            orderId: order.customer_orders.id,
+            invoiceNumber: order.customer_orders.invoiceNumber,
+            orderDate: order.customer_orders.orderDate,
+            status: order.customer_orders.status,
+            containerNumber: order.customer_orders.containerNumber,
+            shippingCompany: order.customer_orders.shippingCompany,
+            containerNotes: order.customer_orders.containerNotes,
+            loadingStartedAt: order.customer_orders.loadingStartedAt,
+            loadingFinalizedAt: order.customer_orders.loadingFinalizedAt,
+            grandTotal: order.customer_orders.grandTotal,
+            totalQtyBales: order.customer_orders.totalQtyBales,
+            customerName: order.customers?.legalName || null,
+            priceUsed: orderBaleRow.priceUsed,
+            baleWeight: orderBaleRow.weight,
+          };
+        }
+      }
+
       res.json({
         labelPrint: { ...labelPrint, printedByName, scannedByName },
         product: product || null,
@@ -950,6 +987,7 @@ export function registerBaleRoutes(app: Express) {
         pressingBatch,
         mixBatch,
         containers_used,
+        loadedOnOrder,
       });
     } catch (error: any) {
       console.error("Error looking up reference:", error);

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Search, Package, Tag, Clock, User, Scale, Hash, MapPin, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX } from "lucide-react";
+import { Search, Package, Tag, Clock, User, Scale, Hash, MapPin, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX, Ship, FileText, User2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -106,6 +106,22 @@ export default function BarcodeLookup() {
       currencyCode: string;
       ratePerKg: string | null;
     }>;
+    loadedOnOrder: {
+      orderId: number;
+      invoiceNumber: string | null;
+      orderDate: string;
+      status: string;
+      containerNumber: string | null;
+      shippingCompany: string | null;
+      containerNotes: string | null;
+      loadingStartedAt: string | null;
+      loadingFinalizedAt: string | null;
+      grandTotal: string;
+      totalQtyBales: number;
+      customerName: string | null;
+      priceUsed: string;
+      baleWeight: string;
+    } | null;
   } | null>(null);
 
   const articleLookup = useMutation({
@@ -449,7 +465,65 @@ export default function BarcodeLookup() {
                 </Card>
               )}
 
-              {/* Containers */}
+              {/* Loaded onto outbound container / customer order */}
+              {referenceResult.loadedOnOrder && (() => {
+                const o = referenceResult.loadedOnOrder!;
+                const statusColors: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
+                  FINALIZED: "default",
+                  VERIFIED: "default",
+                  PENDING_VERIFICATION: "secondary",
+                  LOADING: "secondary",
+                  DRAFT: "outline",
+                  CANCELLED: "destructive",
+                };
+                return (
+                  <Card data-testid="card-loaded-on-order">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 flex-wrap">
+                        <Ship className="h-5 w-5" />
+                        Loaded onto Outbound Container
+                        <Badge variant={statusColors[o.status] ?? "outline"}>{o.status.replace("_", " ")}</Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {o.containerNumber && (
+                          <div className="col-span-2 md:col-span-1">
+                            <p className="text-sm text-muted-foreground flex items-center gap-1"><Truck className="h-3.5 w-3.5" /> Container No.</p>
+                            <p className="font-mono font-semibold text-base" data-testid="text-loaded-container">{o.containerNumber}</p>
+                          </div>
+                        )}
+                        {o.customerName && (
+                          <InfoRow label="Customer" value={<span className="flex items-center gap-1"><User2 className="h-3.5 w-3.5 text-muted-foreground" />{o.customerName}</span>} />
+                        )}
+                        {o.invoiceNumber && (
+                          <InfoRow label="Invoice No." value={<span className="flex items-center gap-1"><FileText className="h-3.5 w-3.5 text-muted-foreground" /><span className="font-mono">{o.invoiceNumber}</span></span>} />
+                        )}
+                        <InfoRow label="Order Date" value={formatDateOnly(o.orderDate)} />
+                        {o.shippingCompany && (
+                          <InfoRow label="Shipping Company" value={o.shippingCompany} />
+                        )}
+                        <InfoRow label="Total Bales in Order" value={o.totalQtyBales.toLocaleString()} />
+                        <InfoRow label="This Bale — Price Used" value={parseFloat(o.priceUsed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} />
+                        <InfoRow label="This Bale — Weight" value={`${parseFloat(o.baleWeight).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} KG`} />
+                        {o.loadingStartedAt && (
+                          <InfoRow label="Loading Started" value={formatDate(o.loadingStartedAt)} />
+                        )}
+                        {o.loadingFinalizedAt && (
+                          <InfoRow label="Loading Finalized" value={formatDate(o.loadingFinalizedAt)} />
+                        )}
+                        {o.containerNotes && (
+                          <div className="col-span-2 md:col-span-3">
+                            <InfoRow label="Notes" value={o.containerNotes} />
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+
+              {/* Source Containers */}
               {referenceResult.containers_used && referenceResult.containers_used.length > 0 && (
                 <Card>
                   <CardHeader>
