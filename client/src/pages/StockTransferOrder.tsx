@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, ChevronRight, ChevronUp, MapPin, Package, Trash2, Check, AlertCircle, ArrowRight, Settings2, CalendarIcon, FileDown, List, GitBranch } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, MapPin, Package, Trash2, Check, AlertCircle, ArrowRight, Settings2, CalendarIcon, FileDown, List, GitBranch, Upload, FileSpreadsheet, TrendingUp, TrendingDown } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
@@ -47,7 +47,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { writeFile, ExcelJS } from "@/lib/excelHelper";
+import { writeFile, readFile, utils, ExcelJS } from "@/lib/excelHelper";
 import { useCompany } from "@/contexts/CompanyContext";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -106,6 +106,19 @@ interface QuantityPickerState {
   locationId: number;
   locationName: string;
   availableQty: number;
+}
+
+interface ImportPreviewRow {
+  rawCode: string;
+  rawName: string;
+  stockItemId: number | null;
+  stockItemName: string;
+  currentQty: number;
+  change: number;
+  newQty: number;
+  sourceLocationId: number | null;
+  sourceLocationName: string;
+  status: 'ok' | 'not_found' | 'remove' | 'new_item';
 }
 
 const STORAGE_KEY = "stockTransferOrder_selectedLocations";
@@ -183,6 +196,12 @@ export default function StockTransferOrder() {
   const [isSavingRevision, setIsSavingRevision] = useState(false);
   const [revisionsExpanded, setRevisionsExpanded] = useState(false);
 
+  // Import state
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importPreview, setImportPreview] = useState<ImportPreviewRow[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const importFileRef = useRef<HTMLInputElement>(null);
+
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
   });
@@ -209,7 +228,6 @@ export default function StockTransferOrder() {
 
   const { data: stockItems = [] } = useQuery<Array<{ id: number; name: string; code: string; uom: string }>>({
     queryKey: ["/api/stock-items"],
-    enabled: !!editVoucherId,
   });
 
   const { data: revisions = [] } = useQuery<any[]>({
@@ -936,6 +954,133 @@ export default function StockTransferOrder() {
     return result;
   };
 
+  const downloadImportTemplate = async () => {
+    const wb = utils.book_new();
+    const ws = wb.addWorksheet("Transfer Import");
+    ws.addRow(["Code", "Name", "Qty Change"]);
+    ws.getRow(1).font = { bold: true };
+    ws.getColumn(1).width = 16;
+    ws.getColumn(2).width = 36;
+    ws.getColumn(3).width = 14;
+    ws.addRow(["ABC123", "Example Item", 10]);
+    ws.addRow(["XYZ456", "Another Item", -5]);
+    ws.getRow(2).font = { italic: true, color: { argb: "FF999999" } };
+    ws.getRow(3).font = { italic: true, color: { argb: "FF999999" } };
+    await writeFile(wb, "transfer_import_template.xlsx");
+  };
+
+  const handleImportFile = async (file: File) => {
+    setImportLoading(true);
+    try {
+      const wb = await readFile(file);
+      const ws = wb.getWorksheet(1);
+      if (!ws) { toast({ title: "Error", description: "Could not read worksheet", variant: "destructive" }); return; }
+      const rows = utils.sheet_to_json<{ Code?: any; Name?: any; "Qty Change"?: any; "Item Name"?: any; Change?: any; Qty?: any }>(ws);
+
+      const preview: ImportPreviewRow[] = rows
+        .filter(row => row.Code !== undefined || row.Name !== undefined || row["Item Name"] !== undefined)
+        .map(row => {
+          const code = String(row.Code ?? "").trim();
+          const name = String(row.Name ?? row["Item Name"] ?? "").trim();
+          const change = parseFloat(String(row["Qty Change"] ?? row.Change ?? row.Qty ?? "0")) || 0;
+
+          let matched = code ? stockItems.find(s => s.code?.toLowerCase() === code.toLowerCase()) : undefined;
+          if (!matched && name) matched = stockItems.find(s => s.name.toLowerCase() === name.toLowerCase());
+
+          if (!matched) {
+            return { rawCode: code, rawName: name, stockItemId: null, stockItemName: name || code || "Unknown", currentQty: 0, change, newQty: Math.max(0, change), sourceLocationId: null, sourceLocationName: "", status: "not_found" as const };
+          }
+
+          const currentQty = orderItems.filter(i => i.stockItemId === matched!.id).reduce((s, i) => s + i.quantity, 0);
+          const newQty = currentQty + change;
+
+          let srcLocId: number | null = null;
+          let srcLocName = "";
+          const existingOrderItem = orderItems.find(i => i.stockItemId === matched!.id);
+          if (existingOrderItem) {
+            srcLocId = existingOrderItem.sourceLocationId;
+            srcLocName = existingOrderItem.sourceLocationName;
+          } else if (summaryData) {
+            let bestQty = 0;
+            for (const group of summaryData.stockGroups) {
+              const si = group.items.find(i => i.id === matched!.id);
+              if (si) {
+                for (const [locIdStr, locData] of Object.entries(si.locationData)) {
+                  if (locData.quantity > bestQty) {
+                    bestQty = locData.quantity;
+                    srcLocId = parseInt(locIdStr);
+                    srcLocName = locations.find(l => l.id === srcLocId)?.name || "";
+                  }
+                }
+              }
+            }
+          }
+
+          const status: ImportPreviewRow["status"] = newQty <= 0 ? "remove" : currentQty === 0 ? "new_item" : "ok";
+          return { rawCode: code, rawName: name, stockItemId: matched.id, stockItemName: matched.name, currentQty, change, newQty: Math.max(0, newQty), sourceLocationId: srcLocId, sourceLocationName: srcLocName, status };
+        });
+
+      setImportPreview(preview);
+    } catch (err: any) {
+      toast({ title: "Parse Error", description: err.message || "Failed to read file", variant: "destructive" });
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const applyImport = () => {
+    const updated = [...orderItems];
+    for (const row of importPreview) {
+      if (row.status === "not_found") continue;
+      const idx = updated.findIndex(i => i.stockItemId === row.stockItemId);
+      if (idx >= 0) {
+        const newQty = updated[idx].quantity + row.change;
+        if (newQty <= 0) updated.splice(idx, 1);
+        else updated[idx] = { ...updated[idx], quantity: newQty };
+      } else if (row.stockItemId && row.newQty > 0 && row.sourceLocationId) {
+        const si = stockItems.find(s => s.id === row.stockItemId)!;
+        let availableQty = 0;
+        if (summaryData) {
+          for (const group of summaryData.stockGroups) {
+            const sitem = group.items.find(i => i.id === row.stockItemId);
+            if (sitem && sitem.locationData[row.sourceLocationId!]) availableQty = sitem.locationData[row.sourceLocationId!].quantity;
+          }
+        }
+        updated.push({ stockItemId: row.stockItemId, stockItemName: row.stockItemName, stockItemCode: si?.code || "", uom: si?.uom || "", sourceLocationId: row.sourceLocationId, sourceLocationName: row.sourceLocationName, quantity: row.newQty, availableQty, rate: 0 });
+      }
+    }
+    setOrderItems(updated);
+    setImportDialogOpen(false);
+    setImportPreview([]);
+    toast({ title: "Import Applied", description: `${importPreview.filter(r => r.status !== "not_found").length} items updated` });
+  };
+
+  const exportPreviewExcel = async () => {
+    const wb = utils.book_new();
+    const ws = wb.addWorksheet("Transfer Order");
+    ws.addRow(["Item Name", "Qty"]);
+    ws.getRow(1).font = { bold: true };
+    for (const row of importPreview.filter(r => r.newQty > 0 && r.status !== "not_found")) {
+      ws.addRow([row.stockItemName, row.newQty]);
+    }
+    ws.getColumn(1).width = 36;
+    ws.getColumn(2).width = 12;
+    await writeFile(wb, "transfer_order_preview.xlsx");
+  };
+
+  const exportPreviewPDF = async () => {
+    const { jsPDF } = await import("jspdf");
+    const autoTable = (await import("jspdf-autotable")).default;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    doc.setFontSize(14);
+    doc.text("Transfer Order Preview", 14, 18);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 25);
+    const rows = importPreview.filter(r => r.newQty > 0 && r.status !== "not_found").map((r, i) => [i + 1, r.stockItemName, r.newQty]);
+    autoTable(doc, { startY: 30, head: [["#", "Item Name", "Qty"]], body: rows, styles: { fontSize: 9 }, headStyles: { fillColor: [30, 30, 30] }, columnStyles: { 0: { cellWidth: 12 }, 2: { cellWidth: 20, halign: "right" } } });
+    doc.save("transfer_order_preview.pdf");
+  };
+
   const handleSaveAsRevision = async () => {
     const errors = validateOrder();
     if (errors.length > 0) {
@@ -1365,6 +1510,15 @@ export default function StockTransferOrder() {
                   <Badge variant="default" className="font-mono">
                     {formatNumber(totalBales, 0)} bales
                   </Badge>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => { setImportPreview([]); setImportDialogOpen(true); }}
+                    data-testid="button-open-import"
+                    title="Import from Excel"
+                  >
+                    <Upload className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -1613,6 +1767,134 @@ export default function StockTransferOrder() {
             >
               {isSavingRevision ? "Saving..." : "Save Revision"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Excel Import Dialog ── */}
+      <Dialog open={importDialogOpen} onOpenChange={(o) => { setImportDialogOpen(o); if (!o) setImportPreview([]); }}>
+        <DialogContent className="sm:max-w-[680px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-4 w-4" />
+              Import from Excel
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {importPreview.length === 0 ? (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Upload an Excel file with columns: <strong>Code</strong>, <strong>Name</strong>, <strong>Qty Change</strong>.
+                  Use positive values to add and negative to reduce.
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={downloadImportTemplate} data-testid="button-download-template">
+                    <FileDown className="h-4 w-4 mr-1" />
+                    Download Template
+                  </Button>
+                </div>
+                <label
+                  className="flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md p-8 cursor-pointer hover-elevate text-muted-foreground"
+                  data-testid="label-import-dropzone"
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImportFile(f); }}
+                >
+                  <input
+                    ref={importFileRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    data-testid="input-import-file"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.target.value = ""; }}
+                  />
+                  <Upload className="h-8 w-8 opacity-40" />
+                  <span className="text-sm font-medium">{importLoading ? "Parsing..." : "Click or drag & drop Excel file"}</span>
+                  <span className="text-xs">.xlsx / .xls supported</span>
+                </label>
+                {importLoading && <p className="text-sm text-center text-muted-foreground">Reading file…</p>}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex gap-2 text-xs">
+                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">{importPreview.filter(r => r.status === 'ok' || r.status === 'new_item').length} to update</span>
+                    {importPreview.filter(r => r.status === 'remove').length > 0 && <span className="text-destructive font-medium">{importPreview.filter(r => r.status === 'remove').length} to remove</span>}
+                    {importPreview.filter(r => r.status === 'not_found').length > 0 && <span className="text-muted-foreground">{importPreview.filter(r => r.status === 'not_found').length} unmatched</span>}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={exportPreviewExcel} data-testid="button-export-preview-excel">
+                      <FileDown className="h-3 w-3 mr-1" />
+                      Excel
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={exportPreviewPDF} data-testid="button-export-preview-pdf">
+                      <FileDown className="h-3 w-3 mr-1" />
+                      PDF
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setImportPreview([]); if (importFileRef.current) importFileRef.current.value = ""; }} data-testid="button-clear-import">
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="border rounded-md overflow-hidden text-sm">
+                  <div className="max-h-[340px] overflow-y-auto">
+                    <table className="w-full">
+                      <thead className="bg-muted/50 sticky top-0">
+                        <tr>
+                          <th className="text-left p-2 font-medium">Item</th>
+                          <th className="text-right p-2 font-medium">Current</th>
+                          <th className="text-right p-2 font-medium">Change</th>
+                          <th className="text-right p-2 font-medium">New Qty</th>
+                          <th className="p-2"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importPreview.map((row, idx) => (
+                          <tr key={idx} className={cn("border-t", row.status === 'not_found' && "opacity-50")}>
+                            <td className="p-2">
+                              <p className="font-medium truncate max-w-[220px]">{row.stockItemName}</p>
+                              {row.status === 'new_item' && <p className="text-xs text-emerald-600 dark:text-emerald-400">New — from {row.sourceLocationName || "?"}</p>}
+                              {row.status === 'not_found' && <p className="text-xs text-destructive">Not found — skipped</p>}
+                              {row.status === 'remove' && <p className="text-xs text-destructive">Will be removed from order</p>}
+                            </td>
+                            <td className="p-2 text-right font-mono text-muted-foreground">{formatNumber(row.currentQty, 0)}</td>
+                            <td className={cn("p-2 text-right font-mono font-semibold", row.change > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive")}>
+                              <span className="inline-flex items-center gap-0.5">
+                                {row.change > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                                {row.change > 0 ? "+" : ""}{formatNumber(row.change, 0)}
+                              </span>
+                            </td>
+                            <td className="p-2 text-right font-mono font-semibold">{row.status !== 'not_found' ? formatNumber(row.newQty, 0) : "—"}</td>
+                            <td className="p-2 text-center">
+                              {row.status === 'ok' && <Check className="h-4 w-4 text-emerald-500 mx-auto" />}
+                              {row.status === 'new_item' && <span className="text-xs bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full">+New</span>}
+                              {row.status === 'remove' && <AlertCircle className="h-4 w-4 text-destructive mx-auto" />}
+                              {row.status === 'not_found' && <AlertCircle className="h-4 w-4 text-muted-foreground mx-auto" />}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setImportDialogOpen(false); setImportPreview([]); }} data-testid="button-cancel-import">
+              Cancel
+            </Button>
+            {importPreview.length > 0 && (
+              <Button
+                onClick={applyImport}
+                disabled={importPreview.every(r => r.status === 'not_found')}
+                data-testid="button-apply-import"
+              >
+                Apply to Order
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
