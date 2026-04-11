@@ -4129,6 +4129,22 @@ export const insertAgentAccountSchema = createInsertSchema(agentAccounts).omit({
 export type InsertAgentAccount = z.infer<typeof insertAgentAccountSchema>;
 export type AgentAccount = typeof agentAccounts.$inferSelect;
 
+// Freight / Embassy / Shipping accounts manually pinned to the Financial Snapshot freight card
+export const freightAccounts = pgTable("freight_accounts", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  accountId: varchar("account_id", { length: 50 }).notNull(),
+  accountType: varchar("account_type", { length: 50 }).notNull(),
+  accountName: varchar("account_name", { length: 300 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniq: uniqueIndex("freight_accounts_company_account_unique").on(t.companyId, t.accountId),
+}));
+
+export const insertFreightAccountSchema = createInsertSchema(freightAccounts).omit({ id: true, createdAt: true });
+export type InsertFreightAccount = z.infer<typeof insertFreightAccountSchema>;
+export type FreightAccount = typeof freightAccounts.$inferSelect;
+
 // Proforma Stock Reservations — tracks which proforma+articleCode combos are toggled as "reserved"
 export const proformaStockReservations = pgTable("proforma_stock_reservations", {
   id: serial("id").primaryKey(),

@@ -31,6 +31,7 @@ import {
   pendingBarcodes, insertPendingBarcodeSchema,
   storedFiles, spreadsheets, liveSpreadsheets,
   agentAccounts, insertAgentAccountSchema,
+  freightAccounts,
   salaryAdvances, salaryAdvanceDeductions,
   insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
   chatSessions, chatMessages,
@@ -3717,6 +3718,46 @@ export function registerAdminRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const accountId = decodeURIComponent(req.params.accountId);
       await db.delete(agentAccounts).where(and(eq(agentAccounts.companyId, companyId), eq(agentAccounts.accountId, accountId)));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── FREIGHT ACCOUNTS (Financial Snapshot) ─────────────────────────────────
+  app.get("/api/freight-accounts", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const rows = await db.select().from(freightAccounts).where(eq(freightAccounts.companyId, companyId));
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/freight-accounts", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { accountId, accountType, accountName } = req.body;
+      if (!accountId || !accountType || !accountName) return res.status(400).json({ message: "accountId, accountType, and accountName are required" });
+      const [row] = await db.insert(freightAccounts)
+        .values({ companyId, accountId, accountType, accountName })
+        .onConflictDoUpdate({ target: [freightAccounts.companyId, freightAccounts.accountId], set: { accountName, accountType } })
+        .returning();
+      res.json(row);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/freight-accounts/:accountId", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const accountId = decodeURIComponent(req.params.accountId);
+      await db.delete(freightAccounts).where(and(eq(freightAccounts.companyId, companyId), eq(freightAccounts.accountId, accountId)));
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

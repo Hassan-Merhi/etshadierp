@@ -1,11 +1,20 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Package,
   Layers,
@@ -25,8 +34,12 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
+  Plus,
+  X,
+  Search,
 } from "lucide-react";
 import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useToast } from "@/hooks/use-toast";
 
 interface SnapshotData {
   rawMaterialValue: number;
@@ -156,7 +169,15 @@ function SectionHeader({ title, count, color }: { title: string; count?: number;
 export default function FactoryFinancialSnapshot() {
   useEscapeBack();
   const [, navigate] = useLocation();
+  const { toast } = useToast();
+
   const [cashBankExpanded, setCashBankExpanded] = useState(false);
+  const [agentExpanded, setAgentExpanded] = useState(false);
+  const [freightExpanded, setFreightExpanded] = useState(false);
+
+  // picker state: which card is open, and the search term
+  const [pickerFor, setPickerFor] = useState<"agent" | "freight" | null>(null);
+  const [pickerSearch, setPickerSearch] = useState("");
 
   const { data: snapshot, isLoading: loadingSnapshot, refetch: refetchSnapshot, dataUpdatedAt: snapUpdated } =
     useQuery<SnapshotData>({ queryKey: ["/api/factory/financial-snapshot"] });
@@ -170,7 +191,30 @@ export default function FactoryFinancialSnapshot() {
   const { data: agentAccounts, isLoading: loadingAgents, refetch: refetchAgents } =
     useQuery<AgentAccount[]>({ queryKey: ["/api/agent-accounts"] });
 
-  const isLoading = loadingSnapshot || loadingNP || loadingCustomers || loadingAgents;
+  const { data: freightAccountRows, isLoading: loadingFreight } =
+    useQuery<{ id: number; accountId: string; accountType: string; accountName: string }[]>({
+      queryKey: ["/api/freight-accounts"],
+    });
+
+  const addAccountMutation = useMutation({
+    mutationFn: ({ type, body }: { type: "agent" | "freight"; body: { accountId: string; accountType: string; accountName: string } }) =>
+      apiRequest("POST", type === "agent" ? "/api/agent-accounts" : "/api/freight-accounts", body),
+    onSuccess: (_data, { type }) => {
+      queryClient.invalidateQueries({ queryKey: [type === "agent" ? "/api/agent-accounts" : "/api/freight-accounts"] });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const removeAccountMutation = useMutation({
+    mutationFn: ({ type, accountId }: { type: "agent" | "freight"; accountId: string }) =>
+      apiRequest("DELETE", `${type === "agent" ? "/api/agent-accounts" : "/api/freight-accounts"}/${encodeURIComponent(accountId)}`),
+    onSuccess: (_data, { type }) => {
+      queryClient.invalidateQueries({ queryKey: [type === "agent" ? "/api/agent-accounts" : "/api/freight-accounts"] });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const isLoading = loadingSnapshot || loadingNP || loadingCustomers || loadingAgents || loadingFreight;
 
   const handleRefresh = () => {
     refetchSnapshot();
@@ -195,6 +239,7 @@ export default function FactoryFinancialSnapshot() {
     const nameMatch = (name: string, ...keywords: string[]) =>
       keywords.some(k => name.toLowerCase().includes(k.toLowerCase()));
 
+    // ── Agent accounts (ID-based from DB) ──
     const agentNames = new Set(agentAccounts.map(a => a.accountName.toLowerCase().trim()));
     const agentIds = new Set(
       agentAccounts.map(a => {
@@ -202,6 +247,15 @@ export default function FactoryFinancialSnapshot() {
         return parseInt(parts[parts.length - 1] || "0");
       }).filter(Boolean)
     );
+
+    // ── Freight accounts (ID-based from DB) ──
+    const freightIds = new Set(
+      (freightAccountRows || []).map(a => {
+        const parts = a.accountId.split("-");
+        return parseInt(parts[parts.length - 1] || "0");
+      }).filter(Boolean)
+    );
+    const freightNames = new Set((freightAccountRows || []).map(a => a.accountName.toLowerCase().trim()));
 
     const cashBankAccounts = allAccounts.filter(a =>
       a.category === "Cash" || a.category === "Bank"
@@ -211,10 +265,12 @@ export default function FactoryFinancialSnapshot() {
       (sum, a) => sum + (a.side === "forUs" ? a.value : -a.value), 0
     );
 
-    const freightAccounts = allAccounts.filter(a =>
-      nameMatch(a.name, "freight", "embassy", "shipping", "clearance", "customs", "وكالة")
-    );
-    const freightNet = freightAccounts.reduce((sum, a) => sum + signedValue(a), 0);
+    const freightAccountItems = freightAccountRows && freightAccountRows.length > 0
+      ? allAccounts.filter(a =>
+          freightNames.has(a.name.toLowerCase().trim()) || freightIds.has(Number((a as any).id))
+        )
+      : [];
+    const freightNet = freightAccountItems.reduce((sum, a) => sum + signedValue(a), 0);
 
     const agentAccountItems = allAccounts.filter(a =>
       agentNames.has(a.name.toLowerCase().trim()) || agentIds.has(Number((a as any).id))
@@ -242,23 +298,47 @@ export default function FactoryFinancialSnapshot() {
       }))
       .sort((x, y) => Math.abs(y.signedBalance) - Math.abs(x.signedBalance));
 
+    const agentList = agentAccountItems
+      .map(a => ({
+        id: (a as any).id as number,
+        compositeId: `ledger-${(a as any).id}`,
+        name: a.name,
+        code: a.code,
+        signedBalance: signedValue(a),
+      }))
+      .sort((x, y) => Math.abs(y.signedBalance) - Math.abs(x.signedBalance));
+
+    const freightList = freightAccountItems
+      .map(a => ({
+        id: (a as any).id as number,
+        compositeId: `ledger-${(a as any).id}`,
+        name: a.name,
+        code: a.code,
+        signedBalance: signedValue(a),
+      }))
+      .sort((x, y) => Math.abs(y.signedBalance) - Math.abs(x.signedBalance));
+
     return {
       cashBankTotal,
       cashBankCount: cashBankAccounts.length,
       cashBankList,
       freightNet,
-      freightCount: freightAccounts.length,
+      freightCount: freightAccountItems.length,
+      freightList,
       agentNet,
       agentCount: agentAccountItems.length,
+      agentList,
       rentalNet,
       rentalCount: rentalAccounts.length,
       customerCredit,
+      allAccounts,
     };
-  }, [netPosition, customers, agentAccounts]);
+  }, [netPosition, customers, agentAccounts, freightAccountRows]);
 
   const allLoading = isLoading || !computed;
 
   return (
+    <>
     <div className="flex flex-col h-full">
       <div className="sticky top-0 z-50 bg-background border-b">
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
@@ -417,22 +497,161 @@ export default function FactoryFinancialSnapshot() {
                 </CardContent>
               </Card>
             )}
-            <KpiCard
-              icon={UserRound}
-              title="Agent Accounts"
-              value={computed ? (computed.agentCount === 0 ? "No agents configured" : usd(Math.abs(computed.agentNet))) : "—"}
-              sub={computed && computed.agentCount > 0 ? `${computed.agentCount} agent${computed.agentCount !== 1 ? "s" : ""} · ${computed.agentNet >= 0 ? "Net receivable" : "Net payable"}` : "Configure in Agents settings"}
-              color={computed && computed.agentNet >= 0 ? "green" : "amber"}
-              loading={allLoading}
-            />
-            <KpiCard
-              icon={Truck}
-              title="Freight / Embassy / Shipping"
-              value={computed ? (computed.freightCount === 0 ? "No matching accounts" : usd(Math.abs(computed.freightNet))) : "—"}
-              sub={computed && computed.freightCount > 0 ? `${computed.freightCount} account${computed.freightCount !== 1 ? "s" : ""} · ${computed.freightNet >= 0 ? "Net asset" : "Net payable"}` : "Accounts matching freight/embassy/shipping"}
-              color={computed && computed.freightNet >= 0 ? "green" : "amber"}
-              loading={allLoading}
-            />
+            {/* ── Expandable Agent Accounts card ── */}
+            {allLoading ? (
+              <KpiCard icon={UserRound} title="Agent Accounts" value="—" color="amber" loading />
+            ) : (
+              <Card data-testid="kpi-card-agents">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <button
+                      className="flex-1 flex items-start gap-3 text-left min-w-0"
+                      onClick={() => setAgentExpanded(v => !v)}
+                      data-testid="button-expand-agents"
+                    >
+                      <div className={`mt-0.5 p-2 rounded-md bg-muted shrink-0 ${computed && computed.agentNet >= 0 ? "text-emerald-500" : "text-amber-500"}`}>
+                        <UserRound className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground font-medium">Agent Accounts</p>
+                        <p className={`text-lg font-semibold font-mono mt-0.5 ${computed && computed.agentNet >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                          {computed && computed.agentCount === 0 ? <span className="text-sm font-normal text-muted-foreground">No accounts selected</span> : usd(Math.abs(computed?.agentNet ?? 0))}
+                        </p>
+                        {computed && computed.agentCount > 0 && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{computed.agentCount} account{computed.agentCount !== 1 ? "s" : ""} · {computed.agentNet >= 0 ? "Net receivable" : "Net payable"}</p>
+                        )}
+                      </div>
+                      <div className="mt-1 text-muted-foreground shrink-0">
+                        {agentExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </div>
+                    </button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="shrink-0 mt-0.5"
+                      onClick={() => { setPickerFor("agent"); setPickerSearch(""); }}
+                      data-testid="button-add-agent-account"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {agentExpanded && computed && computed.agentList.length > 0 && (
+                    <div className="mt-3 pt-3 border-t space-y-1">
+                      {computed.agentList.map((acct, i) => (
+                        <div key={acct.id ?? i} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md group">
+                          <button
+                            className="flex items-center gap-1.5 min-w-0 text-left hover-elevate rounded flex-1 py-0.5 px-1"
+                            onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger`)}
+                            data-testid={`button-agent-account-${acct.id}`}
+                          >
+                            <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <span className="text-sm text-foreground truncate">{acct.name}</span>
+                            {acct.code && <span className="text-xs text-muted-foreground shrink-0">{acct.code}</span>}
+                          </button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className={`text-sm font-mono font-medium ${acct.signedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                              {usd(acct.signedBalance)}
+                            </span>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => removeAccountMutation.mutate({ type: "agent", accountId: acct.compositeId })}
+                              data-testid={`button-remove-agent-${acct.id}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {agentExpanded && computed && computed.agentList.length === 0 && (
+                    <p className="mt-3 pt-3 border-t text-xs text-muted-foreground text-center">Click + to add agent accounts</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ── Expandable Freight card ── */}
+            {allLoading ? (
+              <KpiCard icon={Truck} title="Freight / Embassy / Shipping" value="—" color="amber" loading />
+            ) : (
+              <Card data-testid="kpi-card-freight">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <button
+                      className="flex-1 flex items-start gap-3 text-left min-w-0"
+                      onClick={() => setFreightExpanded(v => !v)}
+                      data-testid="button-expand-freight"
+                    >
+                      <div className={`mt-0.5 p-2 rounded-md bg-muted shrink-0 ${computed && computed.freightNet >= 0 ? "text-emerald-500" : "text-amber-500"}`}>
+                        <Truck className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground font-medium">Freight / Embassy / Shipping</p>
+                        <p className={`text-lg font-semibold font-mono mt-0.5 ${computed && computed.freightNet >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                          {computed && computed.freightCount === 0 ? <span className="text-sm font-normal text-muted-foreground">No accounts selected</span> : usd(Math.abs(computed?.freightNet ?? 0))}
+                        </p>
+                        {computed && computed.freightCount > 0 && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{computed.freightCount} account{computed.freightCount !== 1 ? "s" : ""} · {computed.freightNet >= 0 ? "Net asset" : "Net payable"}</p>
+                        )}
+                      </div>
+                      <div className="mt-1 text-muted-foreground shrink-0">
+                        {freightExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </div>
+                    </button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="shrink-0 mt-0.5"
+                      onClick={() => { setPickerFor("freight"); setPickerSearch(""); }}
+                      data-testid="button-add-freight-account"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {freightExpanded && computed && computed.freightList.length > 0 && (
+                    <div className="mt-3 pt-3 border-t space-y-1">
+                      {computed.freightList.map((acct, i) => (
+                        <div key={acct.id ?? i} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md group">
+                          <button
+                            className="flex items-center gap-1.5 min-w-0 text-left hover-elevate rounded flex-1 py-0.5 px-1"
+                            onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger`)}
+                            data-testid={`button-freight-account-${acct.id}`}
+                          >
+                            <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <span className="text-sm text-foreground truncate">{acct.name}</span>
+                            {acct.code && <span className="text-xs text-muted-foreground shrink-0">{acct.code}</span>}
+                          </button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className={`text-sm font-mono font-medium ${acct.signedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                              {usd(acct.signedBalance)}
+                            </span>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => removeAccountMutation.mutate({ type: "freight", accountId: acct.compositeId })}
+                              data-testid={`button-remove-freight-${acct.id}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {freightExpanded && computed && computed.freightList.length === 0 && (
+                    <p className="mt-3 pt-3 border-t text-xs text-muted-foreground text-center">Click + to add freight/embassy accounts</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
             {(!computed || computed.rentalNet < 0) && (
               <KpiCard
                 icon={Building2}
@@ -461,12 +680,88 @@ export default function FactoryFinancialSnapshot() {
           <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
           <span>
             Values are computed from live data. Raw material value uses USD cost per kg where available.
-            Bale weight shows all-time production. Freight/Embassy/Shipping matches account names.
-            Agent accounts are cross-referenced from your configured agent list.
+            Bale weight shows all-time production. Agent and Freight accounts are manually configured using the + button.
           </span>
         </div>
 
       </div>
     </div>
+
+    {/* ── Account Picker Dialog ─────────────────────────────────────── */}
+    {(() => {
+      const selectedIds = new Set(
+        pickerFor === "agent"
+          ? (agentAccounts || []).map(a => a.accountId)
+          : (freightAccountRows || []).map(a => a.accountId)
+      );
+      const pickerAccounts = (computed?.allAccounts || [])
+        .filter(a => {
+          const compositeId = `ledger-${(a as any).id}`;
+          if (selectedIds.has(compositeId)) return false;
+          if (!pickerSearch.trim()) return true;
+          return a.name.toLowerCase().includes(pickerSearch.toLowerCase()) ||
+                 (a.code || "").toLowerCase().includes(pickerSearch.toLowerCase());
+        })
+        .slice(0, 80);
+      return (
+        <Dialog open={pickerFor !== null} onOpenChange={(open) => { if (!open) setPickerFor(null); }}>
+          <DialogContent className="max-w-md max-h-[80vh] flex flex-col gap-0 p-0">
+            <DialogHeader className="p-4 pb-3 border-b shrink-0">
+              <DialogTitle>
+                Add {pickerFor === "agent" ? "Agent" : "Freight / Embassy"} Account
+              </DialogTitle>
+            </DialogHeader>
+            <div className="p-3 border-b shrink-0">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  className="pl-8 h-8 text-sm"
+                  placeholder="Search accounts..."
+                  value={pickerSearch}
+                  onChange={e => setPickerSearch(e.target.value)}
+                  autoFocus
+                  data-testid="input-picker-search"
+                />
+              </div>
+            </div>
+            <div className="overflow-y-auto flex-1 p-2">
+              {pickerAccounts.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-6">
+                  {pickerSearch ? "No accounts match your search" : "All accounts already selected"}
+                </p>
+              )}
+              {pickerAccounts.map((acct, i) => {
+                const acctId = (acct as any).id as number;
+                const compositeId = `ledger-${acctId}`;
+                return (
+                  <button
+                    key={acctId ?? i}
+                    className="w-full flex items-center justify-between gap-3 py-2 px-3 rounded-md hover-elevate text-left"
+                    onClick={() => {
+                      if (!pickerFor) return;
+                      addAccountMutation.mutate({
+                        type: pickerFor,
+                        body: { accountId: compositeId, accountType: "ledger", accountName: acct.name },
+                      });
+                      setPickerFor(null);
+                    }}
+                    data-testid={`button-pick-account-${acctId}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm text-foreground truncate">{acct.name}</p>
+                      {acct.code && <p className="text-xs text-muted-foreground">{acct.code}</p>}
+                    </div>
+                    <span className={`text-sm font-mono shrink-0 ${acct.side === "forUs" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                      {usd(acct.value)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </DialogContent>
+        </Dialog>
+      );
+    })()}
+    </>
   );
 }
