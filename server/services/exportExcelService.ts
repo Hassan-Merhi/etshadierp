@@ -425,6 +425,7 @@ export async function buildCompanyWorkbook(data: CompanyExportData): Promise<Buf
   addSheet(wb, "Proforma Reservations", data.proformaStockReservations);
 
   // ── Containers ────────────────────────────────────────────────────────────
+  addSheet(wb, "Containers Detail", data.containersDetail);
   addSheet(wb, "Containers", data.containers);
   addSheet(wb, "Container Charges", data.containerCharges);
   addSheet(wb, "Container Offloads", data.containerOffloads);

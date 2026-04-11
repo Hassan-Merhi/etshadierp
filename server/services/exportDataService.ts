@@ -128,6 +128,7 @@ export interface CompanyExportData {
   stockAdjustmentItems: any[];
   proformaStockReservations: any[];
   // Containers
+  containersDetail: any[];
   containers: any[];
   containerCharges: any[];
   containerOffloads: any[];
@@ -292,6 +293,7 @@ export async function fetchCompanyExportData(
     stockAdjustments,
     stockAdjustmentItems,
     proformaStockReservations,
+    containersDetail,
     containers,
     containerCharges,
     containerOffloads,
@@ -455,6 +457,103 @@ export async function fetchCompanyExportData(
     q(`SELECT * FROM proforma_stock_reservations WHERE company_id = ${cid} ORDER BY id`),
 
     // ── Containers ────────────────────────────────────────────────────────────
+    q(`
+      SELECT
+        c.container_number,
+        c.status,
+        c.import_date,
+        c.eta,
+        c.eta_source,
+        c.border_date,
+        c.offload_date,
+        c.item_name,
+        c.total_kg,
+        c.rate_per_kg,
+        c.items_total,
+        c.charges_total,
+        c.grand_total,
+        c.transport_fee,
+        c.duty_fee,
+        c.agent,
+        c.transporter,
+        c.number_plate,
+        c.shop_name,
+        c.tracking_location,
+        c.tracking_description,
+        c.doc_received,
+        s.name                                    AS supplier_name,
+        s.phone                                   AS supplier_phone,
+
+        COALESCE(ch.total_charges, 0)             AS total_other_charges,
+        COALESCE(ch.charge_breakdown, '')         AS charge_breakdown,
+
+        COALESCE(fr.freight_amount_usd, 0)        AS freight_usd,
+        COALESCE(fr.freight_amount_local, 0)      AS freight_local,
+
+        COALESCE(off.total_bales, 0)              AS offloaded_bales,
+        COALESCE(off.duties, 0)                   AS offload_duties,
+        COALESCE(off.office_charges, 0)           AS offload_office_charges,
+        COALESCE(off.transfer_charges, 0)         AS offload_transfer_charges,
+        COALESCE(off.transport_fees, 0)           AS offload_transport_fees,
+        COALESCE(off.total_charges, 0)            AS offload_total_charges,
+
+        COALESCE(sa.total_sale_amount, 0)         AS total_sale_amount,
+        COALESCE(sa.total_paid, 0)                AS total_paid,
+        COALESCE(sa.total_commission, 0)          AS total_commission,
+        COALESCE(sa.sale_count, 0)                AS sale_count,
+
+        COALESCE(oi.offload_qty, 0)               AS offload_qty_items,
+        COALESCE(oi.offload_value, 0)             AS offload_value
+
+      FROM containers c
+      LEFT JOIN suppliers s ON s.id = c.supplier_id
+
+      LEFT JOIN LATERAL (
+        SELECT
+          SUM(cc.amount) AS total_charges,
+          STRING_AGG(cc.charge_name || ': ' || cc.amount::text, ' | ' ORDER BY cc.id) AS charge_breakdown
+        FROM container_charges cc WHERE cc.container_id = c.id
+      ) ch ON true
+
+      LEFT JOIN LATERAL (
+        SELECT
+          SUM(CASE WHEN cf.currency = 'USD' THEN cf.freight_amount ELSE 0 END) AS freight_amount_usd,
+          SUM(CASE WHEN cf.currency != 'USD' THEN cf.freight_amount ELSE 0 END) AS freight_amount_local
+        FROM container_freight cf WHERE cf.container_id = c.id
+      ) fr ON true
+
+      LEFT JOIN LATERAL (
+        SELECT
+          SUM(co.total_bales) AS total_bales,
+          SUM(co.duties)        AS duties,
+          SUM(co.office_charges) AS office_charges,
+          SUM(co.transfer_charges) AS transfer_charges,
+          SUM(co.transport_fees) AS transport_fees,
+          SUM(co.total_charges) AS total_charges
+        FROM container_offloads co WHERE co.container_id = c.id
+      ) off ON true
+
+      LEFT JOIN LATERAL (
+        SELECT
+          SUM(cs.total_amount) AS total_sale_amount,
+          SUM(cs.paid_amount)  AS total_paid,
+          SUM(cs.commission)   AS total_commission,
+          COUNT(cs.id)         AS sale_count
+        FROM container_sales cs WHERE cs.container_id = c.id
+      ) sa ON true
+
+      LEFT JOIN LATERAL (
+        SELECT
+          SUM(coi.quantity)    AS offload_qty,
+          SUM(coi.total_value) AS offload_value
+        FROM container_offload_items coi
+        INNER JOIN container_offloads co ON co.id = coi.offload_id
+        WHERE co.container_id = c.id
+      ) oi ON true
+
+      WHERE c.company_id = ${cid}
+      ORDER BY c.import_date DESC NULLS LAST, c.id DESC
+    `),
     q(`SELECT * FROM containers WHERE company_id = ${cid} ${df("import_date")} ORDER BY import_date DESC, id`),
     q(`SELECT cc.* FROM container_charges cc INNER JOIN containers c ON c.id = cc.container_id WHERE c.company_id = ${cid} ORDER BY cc.id`),
     q(`SELECT co.* FROM container_offloads co INNER JOIN containers c ON c.id = co.container_id WHERE c.company_id = ${cid} ORDER BY co.id`),
@@ -598,6 +697,7 @@ export async function fetchCompanyExportData(
     stockAdjustments,
     stockAdjustmentItems,
     proformaStockReservations,
+    containersDetail,
     containers,
     containerCharges,
     containerOffloads,
