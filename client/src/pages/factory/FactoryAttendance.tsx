@@ -17,6 +17,13 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Command,
@@ -43,6 +50,7 @@ import {
   Languages,
   ChevronsUpDown,
   Check,
+  ChevronDown,
 } from "lucide-react";
 
 type AttendanceStatus = "Present" | "Absent" | "Late" | "Half Day" | "Leave";
@@ -343,77 +351,72 @@ export default function FactoryAttendance() {
                   />
                 </div>
 
-                <div className="flex flex-wrap gap-2 ml-auto items-center">
-                  <Button
-                    variant="outline"
-                    size="default"
-                    data-testid="button-mark-all-present"
-                    onClick={() => markAll("Present")}
-                    disabled={!workers.length}
-                  >
-                    <UserCheck className="h-4 w-4 mr-1" />
-                    Mark All Present
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="default"
-                    data-testid="button-mark-all-absent"
-                    onClick={() => markAll("Absent")}
-                    disabled={!workers.length}
-                  >
-                    <UserX className="h-4 w-4 mr-1" />
-                    Mark All Absent
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="default"
-                    data-testid="button-reset"
-                    onClick={reset}
-                    disabled={!workers.length}
-                  >
-                    <RotateCcw className="h-4 w-4 mr-1" />
-                    Reset
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="default"
-                    data-testid="button-print-blank"
-                    onClick={() => setPrintDialog("blank")}
-                    disabled={!workers.length}
-                  >
-                    <Printer className="h-4 w-4 mr-1" />
-                    Print Blank Sheet
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="default"
-                    data-testid="button-export-excel-blank"
-                    onClick={() => setPrintDialog("excel-blank")}
-                    disabled={!workers.length}
-                  >
-                    <FileDown className="h-4 w-4 mr-1" />
-                    Blank Excel
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="default"
-                    data-testid="button-export-pdf"
-                    onClick={() => setPrintDialog("results")}
-                    disabled={!workers.length}
-                  >
-                    <Printer className="h-4 w-4 mr-1" />
-                    Export PDF
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="default"
-                    data-testid="button-export-excel-results"
-                    onClick={() => setPrintDialog("excel-results")}
-                    disabled={!workers.length}
-                  >
-                    <FileDown className="h-4 w-4 mr-1" />
-                    Export Excel
-                  </Button>
+                <div className="flex gap-2 ml-auto items-center">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="default"
+                        data-testid="button-actions-dropdown"
+                        disabled={!workers.length}
+                      >
+                        Actions
+                        <ChevronDown className="h-4 w-4 ml-1" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52">
+                      <DropdownMenuItem
+                        data-testid="menu-mark-all-present"
+                        onClick={() => markAll("Present")}
+                      >
+                        <UserCheck className="h-4 w-4 mr-2" />
+                        Mark All Present
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        data-testid="menu-mark-all-absent"
+                        onClick={() => markAll("Absent")}
+                      >
+                        <UserX className="h-4 w-4 mr-2" />
+                        Mark All Absent
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        data-testid="menu-reset"
+                        onClick={reset}
+                      >
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        Reset
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        data-testid="menu-print-blank"
+                        onClick={() => setPrintDialog("blank")}
+                      >
+                        <Printer className="h-4 w-4 mr-2" />
+                        Print Blank Sheet
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        data-testid="menu-export-excel-blank"
+                        onClick={() => setPrintDialog("excel-blank")}
+                      >
+                        <FileDown className="h-4 w-4 mr-2" />
+                        Blank Excel
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        data-testid="menu-export-pdf"
+                        onClick={() => setPrintDialog("results")}
+                      >
+                        <Printer className="h-4 w-4 mr-2" />
+                        Export PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        data-testid="menu-export-excel"
+                        onClick={() => setPrintDialog("excel-results")}
+                      >
+                        <FileDown className="h-4 w-4 mr-2" />
+                        Export Excel
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button
                     size="default"
                     data-testid="button-save-attendance"
