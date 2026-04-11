@@ -445,6 +445,21 @@ export default function Accounts() {
     enabled: !!selectedAccount && isBrokerSupplier,
   });
 
+  // Per-currency balance breakdown for ledger accounts (all-time, no period filter)
+  const isLedgerAccount = selectedAccount?.type === "ledger";
+  const { data: ledgerCurrencyBalances } = useQuery<{ currency: string; totalDebit: number; totalCredit: number }[]>({
+    queryKey: selectedAccount && isLedgerAccount
+      ? [`/api/accounts/ledger/${selectedAccount.accountId}/currency-balances`]
+      : [],
+    queryFn: async () => {
+      if (!selectedAccount || !isLedgerAccount) return [];
+      const res = await fetch(`/api/accounts/ledger/${selectedAccount.accountId}/currency-balances`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedAccount && isLedgerAccount,
+  });
+
   const prePeriodAccountType = selectedAccount
     ? (selectedAccount.type || "").toLowerCase().replace(" ", "-")
     : null;
@@ -1797,29 +1812,100 @@ export default function Accounts() {
                         <p className="text-xs text-muted-foreground mb-1">
                           Current Balance
                         </p>
-                        <div className="flex items-center gap-2">
-                          {(() => {
-                            const bal = selectedAccount?.balance ?? 0;
-                            const side = selectedAccount?.balanceSide ?? "Dr";
-                            const isSupplier = selectedAccount?.type === "supplier";
-                            const isNegative = isSupplier ? side === "Cr" : side === "Cr";
+                        {(() => {
+                          // Broker account: show per-currency breakdown from broker statement
+                          if (isBrokerSupplier && brokerStatementData?.currencyLedgers?.length > 0) {
                             return (
-                              <>
-                                {isNegative ? (
-                                  <TrendingDown className="w-4 h-4 text-red-600" />
-                                ) : (
-                                  <TrendingUp className="w-4 h-4 text-green-600" />
-                                )}
-                                <span
-                                  className="font-mono font-semibold"
-                                  data-testid="text-account-balance"
-                                >
-                                  {formatAmount(Math.abs(bal))} {side}
-                                </span>
-                              </>
+                              <div className="flex flex-col gap-0.5" data-testid="text-account-balance">
+                                {brokerStatementData.currencyLedgers.map((section: any) => {
+                                  const net = parseFloat(section.netBalance || "0");
+                                  const side = net > 0 ? "CR" : net < 0 ? "DR" : "";
+                                  const isNeg = net > 0;
+                                  const fmt2 = (n: number) => Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                  return (
+                                    <div key={section.currencyCode} className="flex items-center gap-1.5">
+                                      {isNeg ? (
+                                        <TrendingDown className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                                      ) : (
+                                        <TrendingUp className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                                      )}
+                                      <span className="font-mono font-semibold text-sm">
+                                        {section.currencyCode} {fmt2(net)} {side}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             );
-                          })()}
-                        </div>
+                          }
+
+                          // Ledger account with multi-currency data
+                          if (isLedgerAccount && ledgerCurrencyBalances && ledgerCurrencyBalances.length > 0) {
+                            const openingBalance = parseFloat(String(selectedAccount?.openingBalance ?? "0")) || 0;
+                            const openingSide = selectedAccount?.openingBalanceSide ?? "Dr";
+                            const signedOb = openingSide === "Dr" ? openingBalance : -openingBalance;
+                            const baseCurr = "USD";
+
+                            const rows = ledgerCurrencyBalances.map((row) => {
+                              let net = row.totalDebit - row.totalCredit;
+                              if (row.currency === baseCurr) net += signedOb;
+                              return { currency: row.currency, net };
+                            });
+
+                            // If opening balance is in USD but there's no USD transaction row, add it
+                            if (signedOb !== 0 && !rows.find((r) => r.currency === baseCurr)) {
+                              rows.push({ currency: baseCurr, net: signedOb });
+                            }
+
+                            const nonZeroRows = rows.filter((r) => Math.abs(r.net) >= 0.005);
+
+                            if (nonZeroRows.length <= 1) {
+                              // Single currency — fall through to default display
+                            } else {
+                              return (
+                                <div className="flex flex-col gap-0.5" data-testid="text-account-balance">
+                                  {nonZeroRows.map((row) => {
+                                    const side = row.net >= 0 ? "Dr" : "Cr";
+                                    const isNeg = row.net < 0;
+                                    const fmt2 = (n: number) => Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                    return (
+                                      <div key={row.currency} className="flex items-center gap-1.5">
+                                        {isNeg ? (
+                                          <TrendingDown className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                                        ) : (
+                                          <TrendingUp className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                                        )}
+                                        <span className="font-mono font-semibold text-sm">
+                                          {row.currency} {fmt2(row.net)} {side}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            }
+                          }
+
+                          // Default: single balance display
+                          const bal = selectedAccount?.balance ?? 0;
+                          const side = selectedAccount?.balanceSide ?? "Dr";
+                          const isNegative = side === "Cr";
+                          return (
+                            <div className="flex items-center gap-2">
+                              {isNegative ? (
+                                <TrendingDown className="w-4 h-4 text-red-600" />
+                              ) : (
+                                <TrendingUp className="w-4 h-4 text-green-600" />
+                              )}
+                              <span
+                                className="font-mono font-semibold"
+                                data-testid="text-account-balance"
+                              >
+                                {formatAmount(Math.abs(bal))} {side}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div className="md:col-span-2 flex justify-end gap-2 flex-wrap">
                         <DropdownMenu>

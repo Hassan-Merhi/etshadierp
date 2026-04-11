@@ -819,6 +819,43 @@ export function registerAccountRoutes(app: Express) {
     }
   });
 
+  // Get per-currency balance breakdown for a ledger account (all-time, no date filter)
+  app.get("/api/accounts/ledger/:id/currency-balances", async (req, res) => {
+    try {
+      const ledgerAccountId = parseInt(req.params.id);
+      if (isNaN(ledgerAccountId)) {
+        return res.status(400).json({ message: "Invalid ledger account ID" });
+      }
+
+      const rows = await db
+        .select({
+          currency: vouchers.currency,
+          totalDebit: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric)), 0)`,
+          totalCredit: sql<string>`COALESCE(SUM(CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
+        })
+        .from(voucherEntries)
+        .leftJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(voucherEntries.ledgerAccountId, ledgerAccountId),
+            eq(vouchers.optional, false),
+            isNull(vouchers.deletedAt),
+          ),
+        )
+        .groupBy(vouchers.currency);
+
+      const result = rows.map((r: any) => ({
+        currency: r.currency || "USD",
+        totalDebit: parseFloat(r.totalDebit || "0"),
+        totalCredit: parseFloat(r.totalCredit || "0"),
+      }));
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get transactions for a specific ledger account with optional date filtering
   app.get("/api/accounts/ledger/:id/transactions", async (req, res) => {
     try {
