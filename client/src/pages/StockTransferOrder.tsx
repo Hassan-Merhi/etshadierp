@@ -961,10 +961,17 @@ export default function StockTransferOrder() {
         voucherDate: format(transferDate, "yyyy-MM-dd"),
         optional: isOptional,
       });
+      const nonZeroItems = orderItems.filter((item) => item.quantity > 0);
+      if (nonZeroItems.length === 0) {
+        toast({ title: "Cannot Save", description: "All items have been removed — cannot save an empty transfer as a revision", variant: "destructive" });
+        setRevisionDialogOpen(false);
+        setIsSavingRevision(false);
+        return;
+      }
       await apiRequest("PUT", `/api/stock-transfers/${existingTransfer.id}`, {
         destinationLocationId,
-        notes: `Stock Transfer Order - ${orderItems.length} items`,
-        items: orderItems.map((item) => ({
+        notes: `Stock Transfer Order - ${nonZeroItems.length} items`,
+        items: nonZeroItems.map((item) => ({
           stockItemId: item.stockItemId,
           sourceLocationId: item.sourceLocationId,
           quantity: item.quantity,

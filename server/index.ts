@@ -869,6 +869,25 @@ let migrationsDone = false;
       created_at timestamp NOT NULL DEFAULT now(),
       CONSTRAINT snapshot_pinned_accounts_unique UNIQUE (company_id, card_key, account_id)
     )`,
+    `CREATE TABLE IF NOT EXISTS stock_transfer_revisions (
+      id serial PRIMARY KEY,
+      transfer_id integer NOT NULL,
+      revision_number integer NOT NULL,
+      note text,
+      optional boolean NOT NULL DEFAULT false,
+      revision_date timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE TABLE IF NOT EXISTS stock_transfer_revision_items (
+      id serial PRIMARY KEY,
+      revision_id integer NOT NULL,
+      stock_item_id integer NOT NULL,
+      stock_item_name text NOT NULL,
+      source_location_id integer,
+      source_location_name text,
+      original_quantity decimal(15,3) NOT NULL,
+      delta decimal(15,3) NOT NULL,
+      new_quantity decimal(15,3) NOT NULL
+    )`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
