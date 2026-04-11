@@ -145,7 +145,11 @@ export function ExportAccountsSection() {
     });
   };
 
-  const selectAll = () => setSelectedIds(new Set(filtered.map((a: any) => a.accountId)));
+  const selectAll = () => setSelectedIds(new Set(
+    filtered
+      .filter((a: any) => a.type !== "customer" && parseFloat(a.balance ?? "0") !== 0)
+      .map((a: any) => a.accountId)
+  ));
   const clearAll = () => setSelectedIds(new Set());
 
   const getTransactionUrl = (acc: any): string => {
@@ -158,6 +162,65 @@ export function ExportAccountsSection() {
     }
     const accountType = (acc.type || "").toLowerCase().replace(/ /g, "-");
     return `/api/accounts/${accountType}/${acc.accountId}/transactions${qs}`;
+  };
+
+  const MAX_ROWS_PER_SHEET = 60000;
+
+  const addSheetForChunk = (wb: ExcelJS.Workbook, baseName: string, part: number, totalParts: number, txnsChunk: any[], startBalance: number) => {
+    const suffix = totalParts > 1 ? ` ${part}` : "";
+    const rawName = `${baseName}${suffix}`;
+    const sheetName = rawName.replace(/[\\\/\?\*\[\]:]/g, "").substring(0, 31);
+    const ws = wb.addWorksheet(sheetName);
+
+    ws.columns = [
+      { header: "Date", key: "date", width: 14 },
+      { header: "Voucher No.", key: "voucherNo", width: 16 },
+      { header: "Type", key: "type", width: 16 },
+      { header: "Description", key: "description", width: 40 },
+      { header: "Debit", key: "debit", width: 14 },
+      { header: "Credit", key: "credit", width: 14 },
+      { header: "Balance", key: "balance", width: 14 },
+    ];
+
+    const headerRow = ws.getRow(1);
+    headerRow.font = { bold: true, size: 11 };
+    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8EAF6" } };
+    headerRow.alignment = { horizontal: "center" };
+
+    let runningBalance = startBalance;
+    for (const txn of txnsChunk) {
+      const debit = parseFloat(txn.debitAmount || "0");
+      const credit = parseFloat(txn.creditAmount || "0");
+      runningBalance += debit - credit;
+      const row = ws.addRow({
+        date: txn.voucherDate ? new Date(txn.voucherDate).toLocaleDateString("en-GB") : "",
+        voucherNo: txn.voucherNumber || "",
+        type: txn.voucherType || "",
+        description: txn.narration || txn.voucherDescription || "",
+        debit: debit > 0 ? debit : null,
+        credit: credit > 0 ? credit : null,
+        balance: runningBalance,
+      });
+      row.getCell("balance").font = { color: { argb: runningBalance >= 0 ? "FF1B5E20" : "FFB71C1C" } };
+    }
+
+    if (txnsChunk.length > 0) {
+      const totalRow = ws.addRow({
+        date: "", voucherNo: "", type: "", description: "TOTAL",
+        debit: { formula: `SUM(E2:E${txnsChunk.length + 1})` },
+        credit: { formula: `SUM(F2:F${txnsChunk.length + 1})` },
+        balance: "",
+      });
+      totalRow.font = { bold: true };
+      totalRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5F5F5" } };
+    }
+
+    ["debit", "credit", "balance"].forEach(key => {
+      ws.getColumn(key).numFmt = '#,##0.00';
+      ws.getColumn(key).alignment = { horizontal: "right" };
+    });
+
+    return runningBalance;
   };
 
   const handleExport = async () => {
@@ -181,57 +244,18 @@ export function ExportAccountsSection() {
           if (res.ok) txns = await res.json();
         } catch {}
 
-        const sheetName = acc.name.replace(/[\\\/\?\*\[\]:]/g, "").substring(0, 31) || `Acct_${accId}`;
-        const ws = wb.addWorksheet(sheetName);
+        const baseName = acc.name.replace(/[\\\/\?\*\[\]:]/g, "").substring(0, 28) || `Acct_${accId}`;
 
-        ws.columns = [
-          { header: "Date", key: "date", width: 14 },
-          { header: "Voucher No.", key: "voucherNo", width: 16 },
-          { header: "Type", key: "type", width: 16 },
-          { header: "Description", key: "description", width: 40 },
-          { header: "Debit", key: "debit", width: 14 },
-          { header: "Credit", key: "credit", width: 14 },
-          { header: "Balance", key: "balance", width: 14 },
-        ];
-
-        const headerRow = ws.getRow(1);
-        headerRow.font = { bold: true, size: 11 };
-        headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8EAF6" } };
-        headerRow.alignment = { horizontal: "center" };
-
-        let runningBalance = 0;
-        for (const txn of txns) {
-          const debit = parseFloat(txn.debitAmount || "0");
-          const credit = parseFloat(txn.creditAmount || "0");
-          runningBalance += debit - credit;
-          const row = ws.addRow({
-            date: txn.voucherDate ? new Date(txn.voucherDate).toLocaleDateString("en-GB") : "",
-            voucherNo: txn.voucherNumber || "",
-            type: txn.voucherType || "",
-            description: txn.narration || txn.voucherDescription || "",
-            debit: debit > 0 ? debit : null,
-            credit: credit > 0 ? credit : null,
-            balance: runningBalance,
-          });
-          const balanceCell = row.getCell("balance");
-          balanceCell.font = { color: { argb: runningBalance >= 0 ? "FF1B5E20" : "FFB71C1C" } };
+        if (txns.length <= MAX_ROWS_PER_SHEET) {
+          addSheetForChunk(wb, baseName, 1, 1, txns, 0);
+        } else {
+          const totalParts = Math.ceil(txns.length / MAX_ROWS_PER_SHEET);
+          let carryBalance = 0;
+          for (let part = 1; part <= totalParts; part++) {
+            const chunk = txns.slice((part - 1) * MAX_ROWS_PER_SHEET, part * MAX_ROWS_PER_SHEET);
+            carryBalance = addSheetForChunk(wb, baseName, part, totalParts, chunk, carryBalance);
+          }
         }
-
-        if (txns.length > 0) {
-          const totalRow = ws.addRow({
-            date: "", voucherNo: "", type: "", description: "TOTAL",
-            debit: { formula: `SUM(E2:E${txns.length + 1})` },
-            credit: { formula: `SUM(F2:F${txns.length + 1})` },
-            balance: "",
-          });
-          totalRow.font = { bold: true };
-          totalRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5F5F5" } };
-        }
-
-        ["debit", "credit", "balance"].forEach(key => {
-          ws.getColumn(key).numFmt = '#,##0.00';
-          ws.getColumn(key).alignment = { horizontal: "right" };
-        });
       }
 
       const buf = await wb.xlsx.writeBuffer();
