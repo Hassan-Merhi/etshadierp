@@ -141,6 +141,52 @@ export function registerFactoryAttendanceRoutes(
     }
   });
 
+  // GET /api/factory/attendance/range?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+  // Returns all workers + all attendance records for a date range (for range export)
+  app.get("/api/factory/attendance/range", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company" });
+
+      const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+      if (!startDate || !endDate) return res.status(400).json({ message: "startDate and endDate are required" });
+
+      const workers = await db
+        .select({
+          id: factoryWorkers.id,
+          fullName: factoryWorkers.fullName,
+          employeeCode: factoryWorkers.employeeCode,
+          department: factoryWorkers.department,
+          position: factoryWorkers.position,
+          shiftType: factoryWorkers.shiftType,
+        })
+        .from(factoryWorkers)
+        .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)))
+        .orderBy(factoryWorkers.fullName);
+
+      if (workers.length === 0) return res.json({ workers: [], attendance: [] });
+
+      const workerIds = workers.map((w: any) => w.id);
+
+      const attendance = await db
+        .select()
+        .from(factoryAttendance)
+        .where(
+          and(
+            eq(factoryAttendance.companyId, companyId),
+            gte(factoryAttendance.attendanceDate, startDate),
+            lte(factoryAttendance.attendanceDate, endDate),
+            inArray(factoryAttendance.workerId, workerIds)
+          )
+        )
+        .orderBy(factoryAttendance.attendanceDate);
+
+      res.json({ workers, attendance });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // GET /api/factory/attendance/pdf?date=YYYY-MM-DD&shift=
   app.get("/api/factory/attendance/pdf", requireAuth, async (req: any, res: any) => {
     try {

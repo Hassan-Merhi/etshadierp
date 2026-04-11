@@ -135,6 +135,12 @@ export default function FactoryAttendance() {
   // ── Daily view state ──────────────────────────────────────────
   const [selectedDate, setSelectedDate] = useState<string>(todayStr());
   const [shift, setShift] = useState<string>("");
+
+  // ── Range export state ────────────────────────────────────────
+  const [rangeStart, setRangeStart] = useState<string>(currentMonthStart());
+  const [rangeEnd, setRangeEnd] = useState<string>(currentMonthEnd());
+  const [isExportingRange, setIsExportingRange] = useState(false);
+  const [rangePrintDialog, setRangePrintDialog] = useState<"excel" | "print" | null>(null);
   const [attendanceMap, setAttendanceMap] = useState<Record<number, AttendanceStatus>>({});
   const [notesMap, setNotesMap] = useState<Record<number, string>>({});
 
@@ -203,6 +209,31 @@ export default function FactoryAttendance() {
 
   const setNotes = (workerId: number, notes: string) => {
     setNotesMap((prev) => ({ ...prev, [workerId]: notes }));
+  };
+
+  const handleRangeExport = async (lang: "en" | "ar", mode: "excel" | "print") => {
+    if (!rangeStart || !rangeEnd) return;
+    setIsExportingRange(true);
+    setRangePrintDialog(null);
+    try {
+      const res = await fetch(
+        `/api/factory/attendance/range?startDate=${rangeStart}&endDate=${rangeEnd}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) throw new Error("Failed to fetch range data");
+      const { workers: rangeWorkers, attendance: rangeAttendance } = await res.json();
+      const dates = generateDateRange(rangeStart, rangeEnd);
+      if (mode === "excel") {
+        exportRangeExcel(rangeWorkers, rangeAttendance, dates, rangeStart, rangeEnd, lang);
+      } else {
+        const html = generateRangePrintHtml(rangeWorkers, rangeAttendance, dates, rangeStart, rangeEnd, lang);
+        openPrintWindow(html);
+      }
+    } catch (err: any) {
+      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsExportingRange(false);
+    }
   };
 
   const [printDialog, setPrintDialog] = useState<"blank" | "results" | "excel-blank" | "excel-results" | null>(null);
@@ -397,6 +428,61 @@ export default function FactoryAttendance() {
             </CardContent>
           </Card>
 
+          {/* Range Export Card */}
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex flex-wrap gap-3 items-end">
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground font-medium">Range Export</Label>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex flex-col gap-1">
+                      <Label className="text-xs text-muted-foreground">From</Label>
+                      <Input
+                        type="date"
+                        data-testid="input-range-start"
+                        value={rangeStart}
+                        onChange={(e) => setRangeStart(e.target.value)}
+                        className="w-40"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <Label className="text-xs text-muted-foreground">To</Label>
+                      <Input
+                        type="date"
+                        data-testid="input-range-end"
+                        value={rangeEnd}
+                        onChange={(e) => setRangeEnd(e.target.value)}
+                        className="w-40"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2 items-center flex-wrap ml-auto">
+                  <Button
+                    variant="outline"
+                    size="default"
+                    data-testid="button-range-export-excel"
+                    onClick={() => setRangePrintDialog("excel")}
+                    disabled={!rangeStart || !rangeEnd || isExportingRange}
+                  >
+                    <FileDown className="h-4 w-4 mr-1" />
+                    {isExportingRange ? "Exporting…" : "Export Range Excel"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="default"
+                    data-testid="button-range-print"
+                    onClick={() => setRangePrintDialog("print")}
+                    disabled={!rangeStart || !rangeEnd || isExportingRange}
+                  >
+                    <Printer className="h-4 w-4 mr-1" />
+                    Print Range
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Summary Cards */}
           {workers.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -573,6 +659,33 @@ export default function FactoryAttendance() {
               variant="outline"
               onClick={() => handlePrintWithLang("ar")}
               data-testid="button-print-arabic"
+              dir="rtl"
+            >
+              العربية
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={rangePrintDialog !== null} onOpenChange={(open) => { if (!open) setRangePrintDialog(null); }}>
+        <DialogContent className="max-w-xs" data-testid="dialog-range-language">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Languages className="h-4 w-4" />
+              {rangePrintDialog === "excel" ? "Choose Export Language" : "Choose Print Language"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 pt-2">
+            <Button
+              onClick={() => handleRangeExport("en", rangePrintDialog!)}
+              data-testid="button-range-english"
+            >
+              English
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleRangeExport("ar", rangePrintDialog!)}
+              data-testid="button-range-arabic"
               dir="rtl"
             >
               العربية
@@ -1292,6 +1405,188 @@ function exportWeeklyExcel(
 
   const weekRange = weekLabel(weekDays).replace(/[^a-z0-9]/gi, "-");
   XLSX.writeFile(wb, `attendance-${type}-${weekRange}.xlsx`);
+}
+
+function exportRangeExcel(
+  workers: WorkerRow[],
+  attendance: AttendanceRecord[],
+  dates: string[],
+  startDate: string,
+  endDate: string,
+  lang: PrintLang
+) {
+  const L = LABELS[lang];
+  const wb = XLSX.utils.book_new();
+
+  // Build lookup: workerId -> date -> status
+  const lookup = new Map<number, Map<string, string>>();
+  for (const r of attendance) {
+    if (!lookup.has(r.workerId)) lookup.set(r.workerId, new Map());
+    lookup.get(r.workerId)!.set(r.attendanceDate, r.status);
+  }
+
+  // Date column headers (day number + abbreviated weekday)
+  const dateHeaders = dates.map((d) => {
+    const dt = new Date(d + "T00:00:00");
+    const day = dt.getDate();
+    const weekday = dt.toLocaleDateString(lang === "ar" ? "ar" : "en-US", { weekday: "short" });
+    return `${day}\n${weekday}`;
+  });
+
+  const titleLabel = lang === "ar" ? "كشف الحضور" : "Attendance Sheet";
+  const workerLabel = lang === "ar" ? "اسم العامل" : "Worker Name";
+  const totalPLabel = lang === "ar" ? "الحضور" : "Present";
+  const totalALabel = lang === "ar" ? "الغياب" : "Absent";
+  const rangeLabel = `${startDate}  →  ${endDate}`;
+
+  const headers = ["#", workerLabel, ...dateHeaders, totalPLabel, totalALabel];
+
+  const dataRows = workers.map((w, i) => {
+    const wMap = lookup.get(w.id) ?? new Map();
+    let presentCount = 0;
+    let absentCount = 0;
+    const dayCells = dates.map((d) => {
+      const status = wMap.get(d) ?? "Present"; // no record = Present by default
+      const mark = STATUS_MARKS[status] ?? status.charAt(0);
+      if (status === "Absent") absentCount++;
+      else presentCount++;
+      return mark;
+    });
+    return [i + 1, w.fullName, ...dayCells, presentCount, absentCount];
+  });
+
+  const totalCols = 2 + dates.length + 2;
+  const allRows = [
+    [titleLabel],
+    [rangeLabel],
+    headers,
+    ...dataRows,
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(allRows);
+  ws["!cols"] = [
+    { wch: 4 },
+    { wch: 28 },
+    ...dates.map(() => ({ wch: 6 })),
+    { wch: 9 },
+    { wch: 9 },
+  ];
+  ws["!merges"] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } },
+  ];
+
+  const sheetName = titleLabel.substring(0, 31);
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, `attendance-range-${startDate}-to-${endDate}.xlsx`);
+}
+
+function generateRangePrintHtml(
+  workers: WorkerRow[],
+  attendance: AttendanceRecord[],
+  dates: string[],
+  startDate: string,
+  endDate: string,
+  lang: PrintLang
+) {
+  const lookup = new Map<number, Map<string, string>>();
+  for (const r of attendance) {
+    if (!lookup.has(r.workerId)) lookup.set(r.workerId, new Map());
+    lookup.get(r.workerId)!.set(r.attendanceDate, r.status);
+  }
+
+  const titleLabel = lang === "ar" ? "كشف الحضور" : "Attendance Sheet";
+  const workerLabel = lang === "ar" ? "اسم العامل" : "Worker Name";
+  const totalPLabel = lang === "ar" ? "حضور" : "P";
+  const totalALabel = lang === "ar" ? "غياب" : "A";
+
+  const dateHeaders = dates.map((d) => {
+    const dt = new Date(d + "T00:00:00");
+    const day = dt.getDate();
+    const weekday = dt.toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US", { weekday: "short" });
+    const isFri = dt.getDay() === 5;
+    const isSat = dt.getDay() === 6;
+    const bg = (isFri || isSat) ? ' style="background:#f0f0f0"' : '';
+    return `<th${bg}>${day}<br/><span style="font-size:6pt;color:#777">${weekday}</span></th>`;
+  }).join("");
+
+  const rows = workers.map((w, i) => {
+    const wMap = lookup.get(w.id) ?? new Map();
+    let presentCount = 0, absentCount = 0;
+    const dayCells = dates.map((d) => {
+      const dt = new Date(d + "T00:00:00");
+      const isFri = dt.getDay() === 5;
+      const isSat = dt.getDay() === 6;
+      const status = wMap.get(d) ?? "Present";
+      const mark = STATUS_MARKS[status] ?? status.charAt(0);
+      const color = STATUS_PRINT_COLORS[status] ?? "#374151";
+      if (status === "Absent") absentCount++; else presentCount++;
+      const bgStyle = (isFri || isSat) ? "background:#f7f7f7;" : "";
+      return `<td class="day" style="${bgStyle}color:${color};font-weight:600">${mark}</td>`;
+    }).join("");
+    return `<tr>
+      <td class="num">${i + 1}</td>
+      <td class="name" dir="auto">${escHtml(w.fullName)}</td>
+      ${dayCells}
+      <td class="day" style="color:#15803d;font-weight:700">${presentCount}</td>
+      <td class="day" style="color:#b91c1c;font-weight:700">${absentCount}</td>
+    </tr>`;
+  }).join("");
+
+  const htmlLang = lang === "ar" ? "ar" : "en";
+  const colCount = 2 + dates.length + 2;
+  const dateColWidth = Math.max(3, Math.floor(70 / dates.length));
+
+  return `<!DOCTYPE html>
+<html lang="${htmlLang}" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <title>${titleLabel}</title>
+  <style>
+    @page { size: A4 landscape; margin: 8mm 10mm; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Arial, 'Noto Sans Arabic', sans-serif; font-size: 7pt; color: #111; margin: 0; }
+    h1 { font-size: 12pt; text-align: center; margin: 0 0 2px; }
+    .subtitle { text-align: center; font-size: 8pt; color: #555; margin-bottom: 6px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 4px; table-layout: fixed; }
+    th { background: #e8e8e8; border: 1px solid #aaa; padding: 2px 1px; font-size: 6.5pt; text-align: center; white-space: nowrap; overflow: hidden; }
+    th.name-col { text-align: left; width: 18%; }
+    th.num-col { width: 3%; }
+    th.total-col { width: ${dateColWidth + 2}%; background: #dde8f0; }
+    td { border: 1px solid #ccc; padding: 1px 2px; vertical-align: middle; height: 15px; }
+    td.num { text-align: center; color: #888; width: 3%; }
+    td.name { text-align: left; unicode-bidi: plaintext; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 18%; }
+    td.day { text-align: center; width: ${dateColWidth}%; }
+    tr:nth-child(even) td { background: #f9f9f9; }
+    .legend { margin-top: 5px; font-size: 6.5pt; color: #555; text-align: center; }
+    .legend span { margin: 0 8px; }
+    @media print { button { display: none; } }
+  </style>
+</head>
+<body>
+  <h1>${titleLabel}</h1>
+  <div class="subtitle">${startDate} &ndash; ${endDate} &nbsp;|&nbsp; ${workers.length} ${lang === "ar" ? "عامل" : "workers"}</div>
+  <table>
+    <thead>
+      <tr>
+        <th class="num-col">#</th>
+        <th class="name-col">${workerLabel}</th>
+        ${dateHeaders}
+        <th class="total-col">${totalPLabel}</th>
+        <th class="total-col">${totalALabel}</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="legend">
+    <span><strong>&#10003;</strong> = ${lang === "ar" ? "حاضر" : "Present"}</span>
+    <span><strong>&#10007;</strong> = ${lang === "ar" ? "غائب" : "Absent"}</span>
+    <span><strong>L</strong> = ${lang === "ar" ? "متأخر" : "Late"}</span>
+    <span><strong>&frac12;</strong> = ${lang === "ar" ? "نصف يوم" : "Half Day"}</span>
+    <span><strong>&mdash;</strong> = ${lang === "ar" ? "إجازة" : "Leave"}</span>
+  </div>
+</body>
+</html>`;
 }
 
 function escHtml(str: string) {
