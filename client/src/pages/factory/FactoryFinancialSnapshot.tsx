@@ -176,8 +176,13 @@ export default function FactoryFinancialSnapshot() {
   const [freightExpanded, setFreightExpanded] = useState(false);
 
   // picker state: which card is open, and the search term
-  const [pickerFor, setPickerFor] = useState<"agent" | "freight" | null>(null);
+  type CardKey = "agent" | "freight" | "supplier" | "customer" | "advance";
+  const [pickerFor, setPickerFor] = useState<CardKey | null>(null);
   const [pickerSearch, setPickerSearch] = useState("");
+
+  const [supplierExpanded, setSupplierExpanded] = useState(false);
+  const [customerExpanded, setCustomerExpanded] = useState(false);
+  const [advanceExpanded, setAdvanceExpanded] = useState(false);
 
   const { data: snapshot, isLoading: loadingSnapshot, refetch: refetchSnapshot, dataUpdatedAt: snapUpdated } =
     useQuery<SnapshotData>({ queryKey: ["/api/factory/financial-snapshot"] });
@@ -191,30 +196,50 @@ export default function FactoryFinancialSnapshot() {
   const { data: agentAccounts, isLoading: loadingAgents, refetch: refetchAgents } =
     useQuery<AgentAccount[]>({ queryKey: ["/api/agent-accounts"] });
 
+  type PinnedRow = { id: number; accountId: string; accountType: string; accountName: string };
+
   const { data: freightAccountRows, isLoading: loadingFreight } =
-    useQuery<{ id: number; accountId: string; accountType: string; accountName: string }[]>({
-      queryKey: ["/api/freight-accounts"],
-    });
+    useQuery<PinnedRow[]>({ queryKey: ["/api/freight-accounts"] });
+
+  const { data: supplierPinned, isLoading: loadingSupplierPinned } =
+    useQuery<PinnedRow[]>({ queryKey: ["/api/snapshot-pinned-accounts/supplier"] });
+
+  const { data: customerPinned, isLoading: loadingCustomerPinned } =
+    useQuery<PinnedRow[]>({ queryKey: ["/api/snapshot-pinned-accounts/customer"] });
+
+  const { data: advancePinned, isLoading: loadingAdvancePinned } =
+    useQuery<PinnedRow[]>({ queryKey: ["/api/snapshot-pinned-accounts/advance"] });
 
   const addAccountMutation = useMutation({
-    mutationFn: ({ type, body }: { type: "agent" | "freight"; body: { accountId: string; accountType: string; accountName: string } }) =>
-      apiRequest("POST", type === "agent" ? "/api/agent-accounts" : "/api/freight-accounts", body),
+    mutationFn: ({ type, body }: { type: CardKey; body: { accountId: string; accountType: string; accountName: string } }) => {
+      if (type === "agent") return apiRequest("POST", "/api/agent-accounts", body);
+      if (type === "freight") return apiRequest("POST", "/api/freight-accounts", body);
+      return apiRequest("POST", `/api/snapshot-pinned-accounts/${type}`, body);
+    },
     onSuccess: (_data, { type }) => {
-      queryClient.invalidateQueries({ queryKey: [type === "agent" ? "/api/agent-accounts" : "/api/freight-accounts"] });
+      if (type === "agent") queryClient.invalidateQueries({ queryKey: ["/api/agent-accounts"] });
+      else if (type === "freight") queryClient.invalidateQueries({ queryKey: ["/api/freight-accounts"] });
+      else queryClient.invalidateQueries({ queryKey: [`/api/snapshot-pinned-accounts/${type}`] });
     },
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const removeAccountMutation = useMutation({
-    mutationFn: ({ type, accountId }: { type: "agent" | "freight"; accountId: string }) =>
-      apiRequest("DELETE", `${type === "agent" ? "/api/agent-accounts" : "/api/freight-accounts"}/${encodeURIComponent(accountId)}`),
+    mutationFn: ({ type, accountId }: { type: CardKey; accountId: string }) => {
+      if (type === "agent") return apiRequest("DELETE", `/api/agent-accounts/${encodeURIComponent(accountId)}`);
+      if (type === "freight") return apiRequest("DELETE", `/api/freight-accounts/${encodeURIComponent(accountId)}`);
+      return apiRequest("DELETE", `/api/snapshot-pinned-accounts/${type}/${encodeURIComponent(accountId)}`);
+    },
     onSuccess: (_data, { type }) => {
-      queryClient.invalidateQueries({ queryKey: [type === "agent" ? "/api/agent-accounts" : "/api/freight-accounts"] });
+      if (type === "agent") queryClient.invalidateQueries({ queryKey: ["/api/agent-accounts"] });
+      else if (type === "freight") queryClient.invalidateQueries({ queryKey: ["/api/freight-accounts"] });
+      else queryClient.invalidateQueries({ queryKey: [`/api/snapshot-pinned-accounts/${type}`] });
     },
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
-  const isLoading = loadingSnapshot || loadingNP || loadingCustomers || loadingAgents || loadingFreight;
+  const isLoading = loadingSnapshot || loadingNP || loadingCustomers || loadingAgents || loadingFreight
+    || loadingSupplierPinned || loadingCustomerPinned || loadingAdvancePinned;
 
   const handleRefresh = () => {
     refetchSnapshot();
@@ -318,6 +343,32 @@ export default function FactoryFinancialSnapshot() {
       }))
       .sort((x, y) => Math.abs(y.signedBalance) - Math.abs(x.signedBalance));
 
+    // ── Helper: build a pinned list from a pinned rows array ──
+    const buildPinnedList = (pinned: PinnedRow[] | undefined) => {
+      if (!pinned || pinned.length === 0) return { items: [], net: 0 };
+      const pinnedIds = new Set(pinned.map(p => {
+        const parts = p.accountId.split("-");
+        return parseInt(parts[parts.length - 1] || "0");
+      }).filter(Boolean));
+      const pinnedNames = new Set(pinned.map(p => p.accountName.toLowerCase().trim()));
+      const items = allAccounts.filter(a =>
+        pinnedNames.has(a.name.toLowerCase().trim()) || pinnedIds.has(Number((a as any).id))
+      );
+      const net = items.reduce((sum, a) => sum + signedValue(a), 0);
+      const list = items.map(a => ({
+        id: (a as any).id as number,
+        compositeId: `ledger-${(a as any).id}`,
+        name: a.name,
+        code: a.code,
+        signedBalance: signedValue(a),
+      })).sort((x, y) => Math.abs(y.signedBalance) - Math.abs(x.signedBalance));
+      return { items, net, list };
+    };
+
+    const supplierData = buildPinnedList(supplierPinned);
+    const customerData = buildPinnedList(customerPinned);
+    const advanceData = buildPinnedList(advancePinned);
+
     return {
       cashBankTotal,
       cashBankCount: cashBankAccounts.length,
@@ -328,12 +379,21 @@ export default function FactoryFinancialSnapshot() {
       agentNet,
       agentCount: agentAccountItems.length,
       agentList,
+      supplierNet: supplierData.net,
+      supplierCount: supplierData.items.length,
+      supplierList: supplierData.list ?? [],
+      customerNet: customerData.net,
+      customerCount: customerData.items.length,
+      customerList: customerData.list ?? [],
+      advanceNet: advanceData.net,
+      advanceCount: advanceData.items.length,
+      advanceList: advanceData.list ?? [],
       rentalNet,
       rentalCount: rentalAccounts.length,
       customerCredit,
       allAccounts,
     };
-  }, [netPosition, customers, agentAccounts, freightAccountRows]);
+  }, [netPosition, customers, agentAccounts, freightAccountRows, supplierPinned, customerPinned, advancePinned]);
 
   const allLoading = isLoading || !computed;
 
@@ -405,30 +465,133 @@ export default function FactoryFinancialSnapshot() {
         <div>
           <SectionHeader title="Balances & Credit" color="#f59e0b" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <KpiCard
-              icon={TrendingDown}
-              title="Supplier Balances"
-              value={netPosition ? usd(netPosition.supplierLiabilities) : "—"}
-              sub="Total owed to suppliers"
-              color="red"
-              loading={loadingNP}
-            />
-            <KpiCard
-              icon={TrendingUp}
-              title="Customer Credit"
-              value={computed ? usd(computed.customerCredit) : "—"}
-              sub={customers ? `${(customers as any[]).filter((c: any) => c.balanceSide === "Dr" && parseFloat(c.balance || "0") > 0).length} customers with Dr balance` : undefined}
-              color="green"
-              loading={loadingCustomers || !computed}
-            />
-            <KpiCard
-              icon={HardHat}
-              title="Worker Advances Outstanding"
-              value={snapshot ? usd(snapshot.outstandingAdvances) : "—"}
-              sub={snapshot ? `${snapshot.advanceCount} open advance${snapshot.advanceCount !== 1 ? "s" : ""} · ${snapshot.activeWorkerCount} active workers` : undefined}
-              color="amber"
-              loading={loadingSnapshot}
-            />
+
+            {/* ── Supplier Balances ── */}
+            {allLoading ? (
+              <KpiCard icon={TrendingDown} title="Supplier Balances" value="—" color="red" loading />
+            ) : (
+              <Card data-testid="kpi-card-supplier">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <button className="flex-1 flex items-start gap-3 text-left min-w-0" onClick={() => setSupplierExpanded(v => !v)} data-testid="button-expand-supplier">
+                      <div className={`mt-0.5 p-2 rounded-md bg-muted shrink-0 text-red-500`}><TrendingDown className="h-4 w-4" /></div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground font-medium">Supplier Balances</p>
+                        <p className="text-lg font-semibold font-mono mt-0.5 text-red-600 dark:text-red-400" data-testid="value-supplier">
+                          {computed && computed.supplierCount === 0 ? <span className="text-sm font-normal text-muted-foreground">No accounts selected</span> : usd(Math.abs(computed?.supplierNet ?? 0))}
+                        </p>
+                        {computed && computed.supplierCount > 0 && <p className="text-xs text-muted-foreground mt-0.5">{computed.supplierCount} account{computed.supplierCount !== 1 ? "s" : ""} · Total owed to suppliers</p>}
+                      </div>
+                      <div className="mt-1 text-muted-foreground shrink-0">{supplierExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</div>
+                    </button>
+                    <Button size="icon" variant="ghost" className="shrink-0 mt-0.5" onClick={() => { setPickerFor("supplier"); setPickerSearch(""); }} data-testid="button-add-supplier-account"><Plus className="h-4 w-4" /></Button>
+                  </div>
+                  {supplierExpanded && computed && computed.supplierList.length > 0 && (
+                    <div className="mt-3 pt-3 border-t space-y-1">
+                      {computed.supplierList.map((acct, i) => (
+                        <div key={acct.id ?? i} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md group">
+                          <button className="flex items-center gap-1.5 min-w-0 text-left hover-elevate rounded flex-1 py-0.5 px-1" onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger`)} data-testid={`button-supplier-account-${acct.id}`}>
+                            <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <span className="text-sm text-foreground truncate">{acct.name}</span>
+                            {acct.code && <span className="text-xs text-muted-foreground shrink-0">{acct.code}</span>}
+                          </button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-sm font-mono font-medium text-red-600 dark:text-red-400">{usd(acct.signedBalance)}</span>
+                            <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeAccountMutation.mutate({ type: "supplier", accountId: acct.compositeId })} data-testid={`button-remove-supplier-${acct.id}`}><X className="h-3 w-3" /></Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {supplierExpanded && computed && computed.supplierList.length === 0 && <p className="mt-3 pt-3 border-t text-xs text-muted-foreground text-center">Click + to add supplier accounts</p>}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ── Customer Credit ── */}
+            {allLoading ? (
+              <KpiCard icon={TrendingUp} title="Customer Credit" value="—" color="green" loading />
+            ) : (
+              <Card data-testid="kpi-card-customer">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <button className="flex-1 flex items-start gap-3 text-left min-w-0" onClick={() => setCustomerExpanded(v => !v)} data-testid="button-expand-customer">
+                      <div className="mt-0.5 p-2 rounded-md bg-muted shrink-0 text-emerald-500"><TrendingUp className="h-4 w-4" /></div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground font-medium">Customer Credit</p>
+                        <p className="text-lg font-semibold font-mono mt-0.5 text-emerald-600 dark:text-emerald-400" data-testid="value-customer">
+                          {computed && computed.customerCount === 0 ? <span className="text-sm font-normal text-muted-foreground">No accounts selected</span> : usd(Math.abs(computed?.customerNet ?? 0))}
+                        </p>
+                        {computed && computed.customerCount > 0 && <p className="text-xs text-muted-foreground mt-0.5">{computed.customerCount} account{computed.customerCount !== 1 ? "s" : ""} · Net customer receivable</p>}
+                      </div>
+                      <div className="mt-1 text-muted-foreground shrink-0">{customerExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</div>
+                    </button>
+                    <Button size="icon" variant="ghost" className="shrink-0 mt-0.5" onClick={() => { setPickerFor("customer"); setPickerSearch(""); }} data-testid="button-add-customer-account"><Plus className="h-4 w-4" /></Button>
+                  </div>
+                  {customerExpanded && computed && computed.customerList.length > 0 && (
+                    <div className="mt-3 pt-3 border-t space-y-1">
+                      {computed.customerList.map((acct, i) => (
+                        <div key={acct.id ?? i} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md group">
+                          <button className="flex items-center gap-1.5 min-w-0 text-left hover-elevate rounded flex-1 py-0.5 px-1" onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger`)} data-testid={`button-customer-account-${acct.id}`}>
+                            <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <span className="text-sm text-foreground truncate">{acct.name}</span>
+                            {acct.code && <span className="text-xs text-muted-foreground shrink-0">{acct.code}</span>}
+                          </button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className={`text-sm font-mono font-medium ${acct.signedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>{usd(acct.signedBalance)}</span>
+                            <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeAccountMutation.mutate({ type: "customer", accountId: acct.compositeId })} data-testid={`button-remove-customer-${acct.id}`}><X className="h-3 w-3" /></Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {customerExpanded && computed && computed.customerList.length === 0 && <p className="mt-3 pt-3 border-t text-xs text-muted-foreground text-center">Click + to add customer accounts</p>}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ── Worker Advances Outstanding ── */}
+            {allLoading ? (
+              <KpiCard icon={HardHat} title="Worker Advances Outstanding" value="—" color="amber" loading />
+            ) : (
+              <Card data-testid="kpi-card-advance">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <button className="flex-1 flex items-start gap-3 text-left min-w-0" onClick={() => setAdvanceExpanded(v => !v)} data-testid="button-expand-advance">
+                      <div className="mt-0.5 p-2 rounded-md bg-muted shrink-0 text-amber-500"><HardHat className="h-4 w-4" /></div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground font-medium">Worker Advances Outstanding</p>
+                        <p className="text-lg font-semibold font-mono mt-0.5 text-amber-600 dark:text-amber-400" data-testid="value-advance">
+                          {computed && computed.advanceCount === 0 ? <span className="text-sm font-normal text-muted-foreground">No accounts selected</span> : usd(Math.abs(computed?.advanceNet ?? 0))}
+                        </p>
+                        {computed && computed.advanceCount > 0 && <p className="text-xs text-muted-foreground mt-0.5">{computed.advanceCount} account{computed.advanceCount !== 1 ? "s" : ""} · Outstanding advances</p>}
+                      </div>
+                      <div className="mt-1 text-muted-foreground shrink-0">{advanceExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</div>
+                    </button>
+                    <Button size="icon" variant="ghost" className="shrink-0 mt-0.5" onClick={() => { setPickerFor("advance"); setPickerSearch(""); }} data-testid="button-add-advance-account"><Plus className="h-4 w-4" /></Button>
+                  </div>
+                  {advanceExpanded && computed && computed.advanceList.length > 0 && (
+                    <div className="mt-3 pt-3 border-t space-y-1">
+                      {computed.advanceList.map((acct, i) => (
+                        <div key={acct.id ?? i} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md group">
+                          <button className="flex items-center gap-1.5 min-w-0 text-left hover-elevate rounded flex-1 py-0.5 px-1" onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger`)} data-testid={`button-advance-account-${acct.id}`}>
+                            <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <span className="text-sm text-foreground truncate">{acct.name}</span>
+                            {acct.code && <span className="text-xs text-muted-foreground shrink-0">{acct.code}</span>}
+                          </button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-sm font-mono font-medium text-amber-600 dark:text-amber-400">{usd(acct.signedBalance)}</span>
+                            <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeAccountMutation.mutate({ type: "advance", accountId: acct.compositeId })} data-testid={`button-remove-advance-${acct.id}`}><X className="h-3 w-3" /></Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {advanceExpanded && computed && computed.advanceList.length === 0 && <p className="mt-3 pt-3 border-t text-xs text-muted-foreground text-center">Click + to add advance accounts</p>}
+                </CardContent>
+              </Card>
+            )}
+
           </div>
         </div>
 
@@ -689,11 +852,13 @@ export default function FactoryFinancialSnapshot() {
 
     {/* ── Account Picker Dialog ─────────────────────────────────────── */}
     {(() => {
-      const selectedIds = new Set(
-        pickerFor === "agent"
-          ? (agentAccounts || []).map(a => a.accountId)
-          : (freightAccountRows || []).map(a => a.accountId)
-      );
+      const pinnedRowsForCard =
+        pickerFor === "agent" ? (agentAccounts || []) :
+        pickerFor === "freight" ? (freightAccountRows || []) :
+        pickerFor === "supplier" ? (supplierPinned || []) :
+        pickerFor === "customer" ? (customerPinned || []) :
+        pickerFor === "advance" ? (advancePinned || []) : [];
+      const selectedIds = new Set(pinnedRowsForCard.map(a => a.accountId));
       const pickerAccounts = (computed?.allAccounts || [])
         .filter(a => {
           const compositeId = `ledger-${(a as any).id}`;
@@ -703,12 +868,18 @@ export default function FactoryFinancialSnapshot() {
                  (a.code || "").toLowerCase().includes(pickerSearch.toLowerCase());
         })
         .slice(0, 80);
+      const cardLabel =
+        pickerFor === "agent" ? "Agent" :
+        pickerFor === "freight" ? "Freight / Embassy" :
+        pickerFor === "supplier" ? "Supplier" :
+        pickerFor === "customer" ? "Customer" :
+        pickerFor === "advance" ? "Advance" : "";
       return (
         <Dialog open={pickerFor !== null} onOpenChange={(open) => { if (!open) setPickerFor(null); }}>
           <DialogContent className="max-w-md max-h-[80vh] flex flex-col gap-0 p-0">
             <DialogHeader className="p-4 pb-3 border-b shrink-0">
               <DialogTitle>
-                Add {pickerFor === "agent" ? "Agent" : "Freight / Embassy"} Account
+                Add {cardLabel} Account
               </DialogTitle>
             </DialogHeader>
             <div className="p-3 border-b shrink-0">

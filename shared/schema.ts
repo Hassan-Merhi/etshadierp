@@ -4145,6 +4145,23 @@ export const insertFreightAccountSchema = createInsertSchema(freightAccounts).om
 export type InsertFreightAccount = z.infer<typeof insertFreightAccountSchema>;
 export type FreightAccount = typeof freightAccounts.$inferSelect;
 
+// Generic pinned accounts for Financial Snapshot KPI cards (supplier, customer, advance, etc.)
+export const snapshotPinnedAccounts = pgTable("snapshot_pinned_accounts", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  cardKey: varchar("card_key", { length: 50 }).notNull(), // e.g. "supplier", "customer", "advance"
+  accountId: varchar("account_id", { length: 50 }).notNull(),
+  accountType: varchar("account_type", { length: 50 }).notNull(),
+  accountName: varchar("account_name", { length: 300 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniq: uniqueIndex("snapshot_pinned_accounts_unique").on(t.companyId, t.cardKey, t.accountId),
+}));
+
+export const insertSnapshotPinnedAccountSchema = createInsertSchema(snapshotPinnedAccounts).omit({ id: true, createdAt: true });
+export type InsertSnapshotPinnedAccount = z.infer<typeof insertSnapshotPinnedAccountSchema>;
+export type SnapshotPinnedAccount = typeof snapshotPinnedAccounts.$inferSelect;
+
 // Proforma Stock Reservations — tracks which proforma+articleCode combos are toggled as "reserved"
 export const proformaStockReservations = pgTable("proforma_stock_reservations", {
   id: serial("id").primaryKey(),
