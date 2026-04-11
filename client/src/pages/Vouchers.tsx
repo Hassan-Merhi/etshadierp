@@ -2642,19 +2642,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       
     }
 
-    // Check for zero quantity entries
-    const zeroQtyEntry = data.entries.find(
-      (entry) => entry.stockItemId > 0 && entry.sourceLocationId > 0 && parseFloat(entry.quantity) === 0
+    // Silently remove zero-quantity entries instead of blocking
+    data.entries = data.entries.filter(
+      (entry) => !(entry.stockItemId > 0 && entry.sourceLocationId > 0 && parseFloat(entry.quantity) === 0)
     );
-    if (zeroQtyEntry) {
-      const item = stockItems.find(s => s.id === zeroQtyEntry.stockItemId);
-      toast({
-        title: "Validation Error",
-        description: `Cannot add ${item?.name} with zero quantity`,
-        variant: "destructive",
-      });
-      return;
-    }
 
     // Validate quantities against available inventory
     // When editing, we need to add back the original transfer quantities to available stock
