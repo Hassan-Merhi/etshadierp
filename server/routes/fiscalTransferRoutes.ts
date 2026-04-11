@@ -941,6 +941,19 @@ export function registerFiscalTransferRoutes(app: Express) {
     }
   });
 
+  // Revisions - DELETE
+  app.delete("/api/stock-transfer-revisions/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!id) return res.status(400).json({ message: "Revision ID required" });
+      await db.delete(stockTransferRevisionItems).where(eq(stockTransferRevisionItems.revisionId, id));
+      await db.delete(stockTransferRevisions).where(eq(stockTransferRevisions.id, id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Stock Transfers - PUT endpoint (update)
   app.put(
     "/api/stock-transfers/:id",

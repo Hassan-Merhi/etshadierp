@@ -1646,16 +1646,31 @@ export default function StockTransferOrder() {
                         </span>
                         {rev.note && <span className="text-xs italic text-muted-foreground">"{rev.note}"</span>}
                       </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-muted-foreground">Reference only:</span>
-                        <Switch
-                          checked={rev.optional}
-                          onCheckedChange={async (checked) => {
-                            await apiRequest("PATCH", `/api/stock-transfer-revisions/${rev.id}/optional`, { optional: checked });
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-muted-foreground">Reference only:</span>
+                          <Switch
+                            checked={rev.optional}
+                            onCheckedChange={async (checked) => {
+                              await apiRequest("PATCH", `/api/stock-transfer-revisions/${rev.id}/optional`, { optional: checked });
+                              queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", existingTransfer.id, "revisions"] });
+                            }}
+                            data-testid={`switch-revision-optional-${rev.id}`}
+                          />
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          onClick={async () => {
+                            if (!window.confirm(`Delete Rev ${rev.revisionNumber}? This cannot be undone.`)) return;
+                            await apiRequest("DELETE", `/api/stock-transfer-revisions/${rev.id}`);
                             queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", existingTransfer.id, "revisions"] });
                           }}
-                          data-testid={`switch-revision-optional-${rev.id}`}
-                        />
+                          data-testid={`button-delete-revision-${rev.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                     {rev.items && rev.items.length > 0 && (
