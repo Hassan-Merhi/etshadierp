@@ -2,12 +2,18 @@ import { CloudOff, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
+import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
 
 interface PendingSyncIndicatorProps {
   className?: string;
 }
 
 export function PendingSyncIndicator({ className = "" }: PendingSyncIndicatorProps) {
+  if (!OFFLINE_MODE_ENABLED) return null;
+  return <PendingSyncIndicatorInner className={className} />;
+}
+
+function PendingSyncIndicatorInner({ className = "" }: PendingSyncIndicatorProps) {
   const { isOnline, isSyncing, pendingCount, failedCount, conflictCount } = useConnectivity();
 
   const hasNothing = pendingCount === 0 && failedCount === 0 && conflictCount === 0;

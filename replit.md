@@ -66,6 +66,11 @@ Key features include:
 
 The system employs shared schemas (`shared/schema.ts`) for type safety across the stack, path aliases for clean imports, and a clear separation of concerns with code organized into `/client`, `/server`, and `/shared`. It supports distinct development and production build targets and uses a comprehensive design system for UI consistency.
 
+## Developer Feature Flags (`client/src/lib/featureFlags.ts`)
+
+Single file controlling system-wide features for all users:
+- **`OFFLINE_MODE_ENABLED`** (currently `false`) — When `false`, the entire offline/sync system is completely disabled: no background server pings, no IndexedDB polling, no OfflineBanner, no PendingSyncIndicator. Set to `true` to re-enable all offline features.
+
 ## Offline-First Architecture (Mar 2026)
 
 The app has a layered offline-first foundation:

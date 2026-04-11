@@ -7,15 +7,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import {
-  appendSyncLog,
-  getGlobalSyncState,
-  upsertGlobalSyncState,
-  getSyncQueueCount,
-  getConflictCount,
-} from "@/lib/db";
-import { getQueue } from "@/lib/offlineQueue";
-import { queryClient } from "@/lib/queryClient";
+import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
 
 export type ConnectivityStatus = "online" | "offline" | "syncing" | "error";
 
@@ -68,7 +60,30 @@ interface Props {
   children: ReactNode;
 }
 
-export function ConnectivityProvider({ children }: Props) {
+// ── Stub provider (offline mode disabled) ─────────────────────────────────────
+// Returns a static "always online" context with zero background work.
+function StubConnectivityProvider({ children }: Props) {
+  return (
+    <ConnectivityContext.Provider
+      value={{
+        status: "online",
+        isOnline: true,
+        isSyncing: false,
+        lastSyncedAt: null,
+        pendingCount: 0,
+        failedCount: 0,
+        conflictCount: 0,
+        triggerSync: () => {},
+        refreshCounts: async () => {},
+      }}
+    >
+      {children}
+    </ConnectivityContext.Provider>
+  );
+}
+
+// ── Full provider (offline mode enabled) ──────────────────────────────────────
+function FullConnectivityProvider({ children }: Props) {
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
@@ -77,122 +92,105 @@ export function ConnectivityProvider({ children }: Props) {
   const [conflictCount, setConflictCount] = useState(0);
   const isMountedRef = useRef(true);
 
-  // Load last sync time from IndexedDB on mount; prime label ref pool if online
   useEffect(() => {
     isMountedRef.current = true;
-    getGlobalSyncState()
-      .then((state) => {
-        if (isMountedRef.current && state?.lastSyncedAt) {
-          setLastSyncedAt(state.lastSyncedAt);
-        }
-      })
-      .catch(() => {});
+    import("@/lib/db").then(({ getGlobalSyncState }) =>
+      getGlobalSyncState()
+        .then((state: any) => {
+          if (isMountedRef.current && state?.lastSyncedAt) {
+            setLastSyncedAt(state.lastSyncedAt);
+          }
+        })
+        .catch(() => {})
+    );
     if (navigator.onLine) {
       import("@/lib/refPool")
         .then(({ ensurePoolReady }) => ensurePoolReady())
         .catch(() => {});
     }
-    return () => {
-      isMountedRef.current = false;
-    };
+    return () => { isMountedRef.current = false; };
   }, []);
 
   const refreshCounts = useCallback(async () => {
     try {
+      const { getSyncQueueCount, getConflictCount } = await import("@/lib/db");
+      const { getQueue } = await import("@/lib/offlineQueue");
       const [{ pending: idbPending, failed: idbFailed }, conflicts] = await Promise.all([
         getSyncQueueCount(),
         getConflictCount(),
       ]);
       const legacyQueue = getQueue();
-      const legacyPending = legacyQueue.filter(i => i.status === "pending").length;
-      const legacyFailed = legacyQueue.filter(i => i.status === "failed").length;
+      const legacyPending = legacyQueue.filter((i: any) => i.status === "pending").length;
+      const legacyFailed = legacyQueue.filter((i: any) => i.status === "failed").length;
       if (isMountedRef.current) {
         setPendingCount(idbPending + legacyPending);
         setFailedCount(idbFailed + legacyFailed);
         setConflictCount(conflicts);
       }
-    } catch {
-      // Non-critical
-    }
+    } catch { /* Non-critical */ }
   }, []);
 
   const triggerSync = useCallback(() => {
-    import("@/lib/syncEngine")
-      .then(({ runSync }) => runSync())
-      .catch(() => {});
+    import("@/lib/syncEngine").then(({ runSync }) => runSync()).catch(() => {});
   }, []);
 
-  // Browser online/offline events + periodic server ping
   useEffect(() => {
+    let mounted = true;
     const handleOnline = async () => {
       const alive = await pingServer();
-      if (!isMountedRef.current) return;
+      if (!mounted) return;
       setIsOnline(alive);
       if (alive) {
-        void appendSyncLog("online", "Connection restored");
+        import("@/lib/db").then(({ appendSyncLog }) => appendSyncLog("online", "Connection restored"));
         triggerSync();
-        import("@/lib/refPool")
-          .then(({ ensurePoolReady }) => ensurePoolReady())
-          .catch(() => {});
+        import("@/lib/refPool").then(({ ensurePoolReady }) => ensurePoolReady()).catch(() => {});
       }
     };
-
     const handleOffline = () => {
-      if (!isMountedRef.current) return;
+      if (!mounted) return;
       setIsOnline(false);
-      void appendSyncLog("offline", "Connection lost");
+      import("@/lib/db").then(({ appendSyncLog }) => appendSyncLog("offline", "Connection lost"));
     };
-
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
-
     const pingInterval = setInterval(async () => {
-      if (!isMountedRef.current) return;
+      if (!mounted) return;
       const alive = await pingServer();
-      if (alive !== isOnline && isMountedRef.current) {
+      if (alive !== isOnline && mounted) {
         setIsOnline(alive);
         if (alive) {
-          void appendSyncLog("online", "Connection verified by ping");
+          import("@/lib/db").then(({ appendSyncLog }) => appendSyncLog("online", "Connection verified by ping"));
           triggerSync();
-          import("@/lib/refPool")
-            .then(({ ensurePoolReady }) => ensurePoolReady())
-            .catch(() => {});
+          import("@/lib/refPool").then(({ ensurePoolReady }) => ensurePoolReady()).catch(() => {});
         } else {
-          void appendSyncLog("offline", "Connection lost (ping failed)");
+          import("@/lib/db").then(({ appendSyncLog }) => appendSyncLog("offline", "Connection lost (ping failed)"));
         }
       }
     }, 30_000);
-
     return () => {
+      mounted = false;
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
       clearInterval(pingInterval);
     };
   }, [isOnline, triggerSync]);
 
-  // Refresh counts periodically
   useEffect(() => {
     void refreshCounts();
     const t = setInterval(() => void refreshCounts(), 15_000);
     return () => clearInterval(t);
   }, [refreshCounts]);
 
-  // Listen to sync engine events
   useEffect(() => {
-    const handler = (e: Event) => {
-      const evt = e as CustomEvent<{
-        syncing?: boolean;
-        lastSyncedAt?: number;
-        error?: string;
-        conflictDetected?: boolean;
-      }>;
+    const handler = async (e: Event) => {
+      const evt = e as CustomEvent<{ syncing?: boolean; lastSyncedAt?: number; error?: string; conflictDetected?: boolean }>;
       if (!isMountedRef.current) return;
       if (evt.detail.syncing !== undefined) setIsSyncing(evt.detail.syncing);
       if (evt.detail.lastSyncedAt) {
         setLastSyncedAt(evt.detail.lastSyncedAt);
+        const { upsertGlobalSyncState } = await import("@/lib/db");
+        const { queryClient } = await import("@/lib/queryClient");
         void upsertGlobalSyncState({ lastSyncedAt: evt.detail.lastSyncedAt });
-        // Invalidate all data queries so the UI reflects server state after sync
-        // (covers company switches and any mutations applied while offline)
         void queryClient.invalidateQueries();
       }
       void refreshCounts();
@@ -201,27 +199,17 @@ export function ConnectivityProvider({ children }: Props) {
     return () => window.removeEventListener("erp:sync", handler);
   }, [refreshCounts]);
 
-  const status: ConnectivityStatus = !isOnline
-    ? "offline"
-    : isSyncing
-    ? "syncing"
-    : "online";
+  const status: ConnectivityStatus = !isOnline ? "offline" : isSyncing ? "syncing" : "online";
 
   return (
-    <ConnectivityContext.Provider
-      value={{
-        status,
-        isOnline,
-        isSyncing,
-        lastSyncedAt,
-        pendingCount,
-        failedCount,
-        conflictCount,
-        triggerSync,
-        refreshCounts,
-      }}
-    >
+    <ConnectivityContext.Provider value={{ status, isOnline, isSyncing, lastSyncedAt, pendingCount, failedCount, conflictCount, triggerSync, refreshCounts }}>
       {children}
     </ConnectivityContext.Provider>
   );
+}
+
+// ── Public export — switches between stub and full based on feature flag ───────
+export function ConnectivityProvider({ children }: Props) {
+  if (!OFFLINE_MODE_ENABLED) return <StubConnectivityProvider>{children}</StubConnectivityProvider>;
+  return <FullConnectivityProvider>{children}</FullConnectivityProvider>;
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
 import { WifiOff, RefreshCw, Trash2, RotateCcw, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,11 @@ function formatRelativeTime(ts: number): string {
 }
 
 export function OfflineBanner() {
+  if (!OFFLINE_MODE_ENABLED) return null;
+  return <OfflineBannerInner />;
+}
+
+function OfflineBannerInner() {
   const { isOnline, isSyncing: globalSyncing, lastSyncedAt, refreshCounts } = useConnectivity();
 
   const [localSyncing, setLocalSyncing] = useState(false);
