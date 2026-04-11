@@ -2,51 +2,160 @@ import { pool } from "../db";
 
 export interface CompanyExportData {
   company: any;
+  companySettings: any[];
   locations: any[];
+  // Ledger / Finance
   ledgerAccounts: any[];
+  bankAccounts: any[];
+  fixedAssets: any[];
+  exchangeRates: any[];
+  fiscalPeriodClosures: any[];
+  referenceSequences: any[];
+  agentAccounts: any[];
+  // Vouchers
   vouchers: any[];
   voucherEntries: any[];
+  // Suppliers
   suppliers: any[];
   supplierTransactions: any[];
+  supplierProformas: any[];
+  supplierProformaLines: any[];
+  supplierContainers: any[];
+  supplierContainerLoadedItems: any[];
+  // Customers
   customers: any[];
   customerTransactions: any[];
+  customerBalances: any[];
+  customerOrders: any[];
+  customerOrderLines: any[];
+  customerOrderBales: any[];
+  customerOrderCharges: any[];
+  customerProformas: any[];
+  customerProformaLines: any[];
+  creditNoteItems: any[];
+  // Employees
   employees: any[];
   employeePayrolls: any[];
+  employeePayrollItems: any[];
   employeeAdvances: any[];
+  salaryAdvances: any[];
+  salaryAdvanceDeductions: any[];
+  employeeAdvanceRepayments: any[];
+  employeeAttendance: any[];
+  employeeBonuses: any[];
+  employeeGroups: any[];
+  employeeGroupMembers: any[];
+  employeeBaleRates: any[];
+  employeeBalePercentRates: any[];
+  workerDocs: any[];
+  // Factory Workers
   factoryWorkers: any[];
+  factoryWorkerCategories: any[];
+  factoryWorkerDocuments: any[];
+  factoryWorkerAdvances: any[];
+  factoryAdvanceRepayments: any[];
   factoryPayrolls: any[];
   factoryAttendance: any[];
+  workerBonuses: any[];
+  // Factory Operations
+  factorySettings: any[];
+  factoryCategories: any[];
   factoryDaybook: any[];
-  stockItems: any[];
-  inventory: any[];
+  factoryDaybookEdits: any[];
+  factoryDailyKpiSnapshots: any[];
+  factoryDailyUsages: any[];
+  factoryAlerts: any[];
+  factoryDutyAuditLog: any[];
+  // Factory Raw / Production
+  factoryRawStock: any[];
+  factoryRawMaterialAdjustments: any[];
+  factoryPressingBatches: any[];
+  pressingBatches: any[];
+  factoryMixBatches: any[];
+  factoryMixBatchSources: any[];
+  mixBatches: any[];
+  mixBatchSources: any[];
+  productionBales: any[];
+  productionRawStock: any[];
+  // Factory Bales
+  factoryBaleProducts: any[];
+  factoryBales: any[];
+  factoryBaleSequences: any[];
+  factoryBaleCostSnapshots: any[];
+  factoryBaleWasteDispatches: any[];
+  factoryWasteEntries: any[];
+  // Factory Containers
+  factoryContainers: any[];
+  factoryContainerCommissions: any[];
+  factoryContainerOtherCharges: any[];
+  factoryContainerProfitSnapshots: any[];
+  factoryOffloadAdditionalCharges: any[];
+  // Factory Suppliers
+  factorySuppliers: any[];
+  factorySupplierPayments: any[];
+  factorySupplierFxTransfers: any[];
+  factorySupplierScoreSnapshots: any[];
+  // Factory FX
+  factoryFxRates: any[];
+  factoryFxAllocations: any[];
+  // Factory POS
+  factoryPosSales: any[];
+  factoryPosSaleItems: any[];
+  // Bales (Sorting)
+  bales: any[];
+  baleProducts: any[];
+  baleProductCategories: any[];
+  baleSequences: any[];
+  baleLabelPrints: any[];
+  baleTransfers: any[];
+  baleTransferItems: any[];
+  baleRecodeSessions: any[];
+  baleRecodeItems: any[];
+  // Stock
   stockGroups: any[];
+  stockItems: any[];
+  stockItemCodeAliases: any[];
+  stockItemLocationPrices: any[];
+  inventory: any[];
+  inventoryNegativeLayers: any[];
+  stockGroupLocationArchives: any[];
+  stockGroupLocationArchiveItems: any[];
   stockTransfers: any[];
   stockTransferItems: any[];
   stockTransferRevisions: any[];
   stockTransferRevisionItems: any[];
   stockAdjustments: any[];
   stockAdjustmentItems: any[];
-  purchaseOrders: any[];
-  poLineItems: any[];
+  proformaStockReservations: any[];
+  // Containers
   containers: any[];
   containerCharges: any[];
   containerOffloads: any[];
   containerOffloadItems: any[];
-  bales: any[];
-  factoryBaleProducts: any[];
-  factoryBales: any[];
-  factoryContainers: any[];
-  bankAccounts: any[];
-  fixedAssets: any[];
-  exchangeRates: any[];
+  containerFreight: any[];
+  containerFreightPayments: any[];
+  containerDocuments: any[];
+  containerSales: any[];
+  // Purchase Orders
+  purchaseOrders: any[];
+  poLineItems: any[];
+  // POS
   posShifts: any[];
   salesItems: any[];
+  // Waste
+  wasteDispatches: any[];
+  wasteDispatchItems: any[];
+  // Spreadsheets
+  spreadsheets: any[];
+  // Import Logs
+  importLogs: any[];
+  // Audit
   auditLog: any[];
 }
 
-async function q(sql: string): Promise<any[]> {
+async function q(sql: string, params?: any[]): Promise<any[]> {
   try {
-    const result = await pool.query(sql);
+    const result = params ? await pool.query(sql, params) : await pool.query(sql);
     return result.rows;
   } catch (err: any) {
     console.warn(`[ExportData] Query warning: ${err.message}`);
@@ -64,140 +173,447 @@ export async function fetchCompanyExportData(
   toDate?: string
 ): Promise<CompanyExportData> {
   const cid = Number(companyId);
-  const dateFilter = (col: string) => {
-    const parts: string[] = [];
-    if (fromDate) parts.push(`AND ${col} >= '${fromDate}'`);
-    if (toDate) parts.push(`AND ${col} <= '${toDate}'`);
-    return parts.join(" ");
+  const df = (col: string) => {
+    const p: string[] = [];
+    if (fromDate) p.push(`AND ${col} >= '${fromDate}'`);
+    if (toDate) p.push(`AND ${col} <= '${toDate}'`);
+    return p.join(" ");
   };
 
   const [
     companiesRows,
+    companySettings,
     locations,
     ledgerAccounts,
+    bankAccounts,
+    fixedAssets,
+    exchangeRates,
+    fiscalPeriodClosures,
+    referenceSequences,
+    agentAccounts,
     vouchers,
     voucherEntries,
     suppliers,
     supplierTransactions,
+    supplierProformas,
+    supplierProformaLines,
+    supplierContainers,
+    supplierContainerLoadedItems,
     customers,
     customerTransactions,
+    customerBalances,
+    customerOrders,
+    customerOrderLines,
+    customerOrderBales,
+    customerOrderCharges,
+    customerProformas,
+    customerProformaLines,
+    creditNoteItems,
     employees,
-    employeePayrolls,
+    employeePayrollRuns,
+    employeePayrollItems,
     employeeAdvances,
+    salaryAdvances,
+    salaryAdvanceDeductions,
+    employeeAdvanceRepayments,
+    employeeAttendance,
+    employeeBonuses,
+    employeeGroups,
+    employeeGroupMembers,
+    employeeBaleRates,
+    employeeBalePercentRates,
+    workerDocs,
     factoryWorkers,
+    factoryWorkerCategories,
+    factoryWorkerDocuments,
+    factoryWorkerAdvances,
+    factoryAdvanceRepayments,
     factoryPayrolls,
     factoryAttendance,
+    workerBonuses,
+    factorySettings,
+    factoryCategories,
     factoryDaybook,
-    stockItems,
-    inventory,
+    factoryDaybookEdits,
+    factoryDailyKpiSnapshots,
+    factoryDailyUsages,
+    factoryAlerts,
+    factoryDutyAuditLog,
+    factoryRawStock,
+    factoryRawMaterialAdjustments,
+    factoryPressingBatches,
+    pressingBatches,
+    factoryMixBatches,
+    factoryMixBatchSources,
+    mixBatches,
+    mixBatchSources,
+    productionBales,
+    productionRawStock,
+    factoryBaleProducts,
+    factoryBales,
+    factoryBaleSequences,
+    factoryBaleCostSnapshots,
+    factoryBaleWasteDispatches,
+    factoryWasteEntries,
+    factoryContainers,
+    factoryContainerCommissions,
+    factoryContainerOtherCharges,
+    factoryContainerProfitSnapshots,
+    factoryOffloadAdditionalCharges,
+    factorySuppliers,
+    factorySupplierPayments,
+    factorySupplierFxTransfers,
+    factorySupplierScoreSnapshots,
+    factoryFxRates,
+    factoryFxAllocations,
+    factoryPosSales,
+    factoryPosSaleItems,
+    bales,
+    baleProducts,
+    baleProductCategories,
+    baleSequences,
+    baleLabelPrints,
+    baleTransfers,
+    baleTransferItems,
+    baleRecodeSessions,
+    baleRecodeItems,
     stockGroups,
+    stockItems,
+    stockItemCodeAliases,
+    stockItemLocationPrices,
+    inventory,
+    inventoryNegativeLayers,
+    stockGroupLocationArchives,
+    stockGroupLocationArchiveItems,
     stockTransfers,
     stockTransferItems,
     stockTransferRevisions,
     stockTransferRevisionItems,
     stockAdjustments,
     stockAdjustmentItems,
-    purchaseOrders,
-    poLineItems,
+    proformaStockReservations,
     containers,
     containerCharges,
     containerOffloads,
     containerOffloadItems,
-    bales,
-    factoryBaleProducts,
-    factoryBales,
-    factoryContainers,
-    bankAccounts,
-    fixedAssets,
-    exchangeRates,
+    containerFreight,
+    containerFreightPayments,
+    containerDocuments,
+    containerSales,
+    purchaseOrders,
+    poLineItems,
     posShifts,
     salesItems,
+    wasteDispatches,
+    wasteDispatchItems,
+    spreadsheets,
+    importLogs,
     auditLog,
   ] = await Promise.all([
+
+    // ── Company ───────────────────────────────────────────────────────────────
     q(`SELECT * FROM companies WHERE id = ${cid}`),
+    q(`SELECT * FROM company_settings WHERE company_id = ${cid}`),
     q(`SELECT * FROM locations WHERE company_id = ${cid} AND deleted_at IS NULL ORDER BY name`),
+
+    // ── Ledger / Finance ──────────────────────────────────────────────────────
     q(`SELECT * FROM ledger_accounts WHERE company_id = ${cid} AND deleted_at IS NULL ORDER BY code`),
-    q(`SELECT * FROM vouchers WHERE company_id = ${cid} ${dateFilter("voucher_date")} ORDER BY voucher_date, id`),
-    q(`SELECT ve.* FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = ${cid} ${dateFilter("v.voucher_date")} ORDER BY ve.id`),
+    q(`SELECT ba.* FROM bank_accounts ba INNER JOIN ledger_accounts la ON la.id = ba.ledger_account_id WHERE la.company_id = ${cid} ORDER BY ba.id`),
+    q(`SELECT fa.* FROM fixed_assets fa INNER JOIN ledger_accounts la ON la.id = fa.ledger_account_id WHERE la.company_id = ${cid} ORDER BY fa.id`),
+    q(`SELECT * FROM exchange_rates WHERE company_id = ${cid} ${df("effective_date")} ORDER BY effective_date DESC, id`),
+    q(`SELECT * FROM fiscal_period_closures WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT * FROM reference_sequences WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT * FROM agent_accounts WHERE company_id = ${cid} ORDER BY id`),
+
+    // ── Vouchers ──────────────────────────────────────────────────────────────
+    q(`SELECT * FROM vouchers WHERE company_id = ${cid} ${df("voucher_date")} ORDER BY voucher_date, id`),
+    q(`SELECT ve.* FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = ${cid} ${df("v.voucher_date")} ORDER BY ve.id`),
+
+    // ── Suppliers ─────────────────────────────────────────────────────────────
     q(`SELECT * FROM suppliers WHERE company_id = ${cid} AND deleted_at IS NULL ORDER BY legal_name`),
-    q(`SELECT ve.*, v.voucher_number, v.voucher_type, v.voucher_date, v.narration as voucher_narration FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = ${cid} AND ve.supplier_id IS NOT NULL ${dateFilter("v.voucher_date")} ORDER BY v.voucher_date, ve.id`),
+    q(`SELECT ve.*, v.voucher_number, v.voucher_type, v.voucher_date, v.narration AS voucher_narration FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = ${cid} AND ve.supplier_id IS NOT NULL ${df("v.voucher_date")} ORDER BY v.voucher_date, ve.id`),
+    q(`SELECT * FROM supplier_proformas WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT spl.* FROM supplier_proforma_lines spl INNER JOIN supplier_proformas sp ON sp.id = spl.proforma_id WHERE sp.company_id = ${cid} ORDER BY spl.id`),
+    q(`SELECT sc.* FROM supplier_containers sc INNER JOIN suppliers s ON s.id = sc.supplier_id WHERE s.company_id = ${cid} ORDER BY sc.id DESC`),
+    q(`SELECT scl.* FROM supplier_container_loaded_items scl INNER JOIN supplier_containers sc ON sc.id = scl.container_id INNER JOIN suppliers s ON s.id = sc.supplier_id WHERE s.company_id = ${cid} ORDER BY scl.id`),
+
+    // ── Customers ─────────────────────────────────────────────────────────────
     q(`SELECT * FROM customers WHERE company_id = ${cid} AND deleted_at IS NULL ORDER BY name`),
-    q(`SELECT ve.*, v.voucher_number, v.voucher_type, v.voucher_date, v.narration as voucher_narration FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = ${cid} AND ve.customer_id IS NOT NULL ${dateFilter("v.voucher_date")} ORDER BY v.voucher_date, ve.id`),
+    q(`SELECT ve.*, v.voucher_number, v.voucher_type, v.voucher_date, v.narration AS voucher_narration FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = ${cid} AND ve.customer_id IS NOT NULL ${df("v.voucher_date")} ORDER BY v.voucher_date, ve.id`),
+    q(`SELECT * FROM customer_balances WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT * FROM customer_orders WHERE company_id = ${cid} ${df("order_date")} ORDER BY order_date DESC, id`),
+    q(`SELECT col.* FROM customer_order_lines col INNER JOIN customer_orders co ON co.id = col.order_id WHERE co.company_id = ${cid} ORDER BY col.id`),
+    q(`SELECT cob.* FROM customer_order_bales cob INNER JOIN customer_orders co ON co.id = cob.order_id WHERE co.company_id = ${cid} ORDER BY cob.id`),
+    q(`SELECT coc.* FROM customer_order_charges coc INNER JOIN customer_orders co ON co.id = coc.order_id WHERE co.company_id = ${cid} ORDER BY coc.id`),
+    q(`SELECT * FROM customer_proformas WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT cpl.* FROM customer_proforma_lines cpl INNER JOIN customer_proformas cp ON cp.id = cpl.proforma_id WHERE cp.company_id = ${cid} ORDER BY cpl.id`),
+    q(`SELECT cni.* FROM credit_note_items cni INNER JOIN vouchers v ON v.id = cni.voucher_id WHERE v.company_id = ${cid} ORDER BY cni.id`),
+
+    // ── Employees ─────────────────────────────────────────────────────────────
     q(`SELECT * FROM employees WHERE company_id = ${cid} AND deleted_at IS NULL ORDER BY first_name, last_name`),
-    q(`SELECT p.* FROM erp_payroll_run_items p INNER JOIN erp_payroll_runs r ON r.id = p.payroll_run_id WHERE r.company_id = ${cid} ${dateFilter("r.pay_date")} ORDER BY r.pay_date, p.id`),
-    q(`SELECT * FROM salary_advances WHERE company_id = ${cid} ${dateFilter("advance_date")} ORDER BY advance_date, id`),
+    q(`SELECT * FROM erp_payroll_runs WHERE company_id = ${cid} ${df("pay_date")} ORDER BY pay_date, id`),
+    q(`SELECT p.* FROM erp_payroll_run_items p INNER JOIN erp_payroll_runs r ON r.id = p.payroll_run_id WHERE r.company_id = ${cid} ${df("r.pay_date")} ORDER BY r.pay_date, p.id`),
+    q(`SELECT * FROM employee_advances WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT * FROM salary_advances WHERE company_id = ${cid} ${df("advance_date")} ORDER BY advance_date, id`),
+    q(`SELECT sad.* FROM salary_advance_deductions sad INNER JOIN salary_advances sa ON sa.id = sad.advance_id WHERE sa.company_id = ${cid} ORDER BY sad.id`),
+    q(`SELECT * FROM employee_advance_repayments WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT * FROM employee_attendance WHERE company_id = ${cid} ${df("attendance_date")} ORDER BY attendance_date, id`),
+    q(`SELECT * FROM employee_bonuses WHERE company_id = ${cid} ${df("bonus_date")} ORDER BY bonus_date, id`),
+    q(`SELECT * FROM employee_groups WHERE company_id = ${cid} ORDER BY name`),
+    q(`SELECT egm.* FROM employee_group_members egm INNER JOIN employee_groups eg ON eg.id = egm.group_id WHERE eg.company_id = ${cid} ORDER BY egm.id`),
+    q(`SELECT * FROM employee_bale_rates WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT * FROM employee_bale_pct_rates WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT * FROM erp_worker_docs WHERE company_id = ${cid} ORDER BY id`),
+
+    // ── Factory Workers ───────────────────────────────────────────────────────
     q(`SELECT * FROM factory_workers WHERE company_id = ${cid} ORDER BY name`),
-    q(`SELECT * FROM factory_payrolls WHERE company_id = ${cid} ${dateFilter("period_start")} ORDER BY period_start, id`),
-    q(`SELECT * FROM factory_attendance WHERE company_id = ${cid} ${dateFilter("attendance_date")} ORDER BY attendance_date, id`),
-    q(`SELECT * FROM factory_daybook_entries WHERE company_id = ${cid} ${dateFilter("entry_date")} ORDER BY entry_date, id`),
-    q(`SELECT * FROM stock_items WHERE company_id = ${cid} ORDER BY code`),
-    q(`SELECT i.*, si.code as item_code, si.name as item_name, l.name as location_name FROM inventory i INNER JOIN stock_items si ON si.id = i.stock_item_id INNER JOIN locations l ON l.id = i.location_id WHERE si.company_id = ${cid} ORDER BY l.name, si.code`),
+    q(`SELECT * FROM factory_worker_categories WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT * FROM factory_worker_documents WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT * FROM factory_worker_advances WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT * FROM factory_advance_repayments WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT * FROM factory_payrolls WHERE company_id = ${cid} ${df("period_start")} ORDER BY period_start, id`),
+    q(`SELECT * FROM factory_attendance WHERE company_id = ${cid} ${df("attendance_date")} ORDER BY attendance_date, id`),
+    q(`SELECT * FROM worker_bonuses WHERE company_id = ${cid} ORDER BY id`),
+
+    // ── Factory Operations ────────────────────────────────────────────────────
+    q(`SELECT * FROM factory_settings WHERE company_id = ${cid}`),
+    q(`SELECT * FROM factory_categories WHERE company_id = ${cid} ORDER BY name`),
+    q(`SELECT * FROM factory_daybook_entries WHERE company_id = ${cid} ${df("entry_date")} ORDER BY entry_date, id`),
+    q(`SELECT fde.* FROM factory_daybook_entry_edits fde INNER JOIN factory_daybook_entries fdb ON fdb.id = fde.entry_id WHERE fdb.company_id = ${cid} ORDER BY fde.id`),
+    q(`SELECT * FROM factory_daily_kpi_snapshots WHERE company_id = ${cid} ${df("snapshot_date")} ORDER BY snapshot_date DESC`),
+    q(`SELECT * FROM factory_daily_usages WHERE company_id = ${cid} ${df("usage_date")} ORDER BY usage_date DESC`),
+    q(`SELECT * FROM factory_alerts WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT * FROM factory_duty_audit_log WHERE company_id = ${cid} ORDER BY id DESC`),
+
+    // ── Factory Raw / Production ──────────────────────────────────────────────
+    q(`SELECT * FROM factory_raw_stock WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT * FROM factory_raw_material_adjustments WHERE company_id = ${cid} ${df("adjustment_date")} ORDER BY adjustment_date DESC, id`),
+    q(`SELECT * FROM factory_pressing_batches WHERE company_id = ${cid} ${df("press_date")} ORDER BY press_date DESC, id`),
+    q(`SELECT * FROM pressing_batches WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT * FROM factory_mix_batches WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT fms.* FROM factory_mix_batch_sources fms INNER JOIN factory_mix_batches fmb ON fmb.id = fms.batch_id WHERE fmb.company_id = ${cid} ORDER BY fms.id`),
+    q(`SELECT * FROM mix_batches WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT mbs.* FROM mix_batch_sources mbs INNER JOIN mix_batches mb ON mb.id = mbs.batch_id WHERE mb.company_id = ${cid} ORDER BY mbs.id`),
+    q(`SELECT * FROM production_bales WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT * FROM production_raw_stock WHERE company_id = ${cid} ORDER BY id`),
+
+    // ── Factory Bales ─────────────────────────────────────────────────────────
+    q(`SELECT * FROM factory_bale_products WHERE company_id = ${cid} ORDER BY name`),
+    q(`SELECT * FROM factory_bales WHERE company_id = ${cid} ${df("pressed_date")} ORDER BY pressed_date DESC, id`),
+    q(`SELECT * FROM factory_bale_sequences WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT * FROM factory_bale_cost_snapshots WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT * FROM factory_bale_waste_dispatches WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT * FROM factory_waste_entries WHERE company_id = ${cid} ${df("entry_date")} ORDER BY entry_date DESC, id`),
+
+    // ── Factory Containers ────────────────────────────────────────────────────
+    q(`SELECT * FROM factory_containers WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT * FROM factory_container_commissions WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT * FROM factory_container_other_charges WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT * FROM factory_container_profit_snapshots WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT * FROM factory_offload_additional_charges WHERE company_id = ${cid} ORDER BY id`),
+
+    // ── Factory Suppliers ─────────────────────────────────────────────────────
+    q(`SELECT * FROM factory_suppliers WHERE company_id = ${cid} ORDER BY name`),
+    q(`SELECT * FROM factory_supplier_payments WHERE company_id = ${cid} ${df("payment_date")} ORDER BY payment_date DESC, id`),
+    q(`SELECT * FROM factory_supplier_fx_transfers WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT * FROM factory_supplier_score_snapshots WHERE company_id = ${cid} ORDER BY id DESC`),
+
+    // ── Factory FX ────────────────────────────────────────────────────────────
+    q(`SELECT * FROM factory_fx_rates WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT * FROM factory_fx_allocations WHERE company_id = ${cid} ORDER BY id DESC`),
+
+    // ── Factory POS ───────────────────────────────────────────────────────────
+    q(`SELECT * FROM factory_pos_sales WHERE company_id = ${cid} ${df("sale_date")} ORDER BY sale_date DESC, id`),
+    q(`SELECT fps.* FROM factory_pos_sale_items fps INNER JOIN factory_pos_sales fp ON fp.id = fps.sale_id WHERE fp.company_id = ${cid} ORDER BY fps.id`),
+
+    // ── Bales (Sorting) ───────────────────────────────────────────────────────
+    q(`SELECT * FROM bales WHERE company_id = ${cid} ${df("date_pressed")} ORDER BY date_pressed DESC, id`),
+    q(`SELECT * FROM bale_products WHERE company_id = ${cid} ORDER BY name`),
+    q(`SELECT * FROM bale_product_categories WHERE company_id = ${cid} ORDER BY name`),
+    q(`SELECT * FROM bale_sequences WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT * FROM bale_label_prints WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT * FROM bale_transfers WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT bti.* FROM bale_transfer_items bti INNER JOIN bale_transfers bt ON bt.id = bti.transfer_id WHERE bt.company_id = ${cid} ORDER BY bti.id`),
+    q(`SELECT * FROM bale_recode_sessions WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT bri.* FROM bale_recode_items bri INNER JOIN bale_recode_sessions brs ON brs.id = bri.session_id WHERE brs.company_id = ${cid} ORDER BY bri.id`),
+
+    // ── Stock ─────────────────────────────────────────────────────────────────
     q(`SELECT * FROM stock_groups WHERE company_id = ${cid} ORDER BY name`),
-    q(`SELECT stv.*, l1.name as from_location_name, l2.name as to_location_name FROM stock_transfer_vouchers stv LEFT JOIN locations l1 ON l1.id = stv.from_location_id LEFT JOIN locations l2 ON l2.id = stv.to_location_id WHERE stv.company_id = ${cid} ${dateFilter("stv.transfer_date")} ORDER BY stv.transfer_date, stv.id`),
+    q(`SELECT * FROM stock_items WHERE company_id = ${cid} ORDER BY code`),
+    q(`SELECT * FROM stock_item_code_aliases WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT silp.* FROM stock_item_location_prices silp INNER JOIN stock_items si ON si.id = silp.stock_item_id WHERE si.company_id = ${cid} ORDER BY silp.id`),
+    q(`SELECT i.*, si.code AS item_code, si.name AS item_name, l.name AS location_name FROM inventory i INNER JOIN stock_items si ON si.id = i.stock_item_id INNER JOIN locations l ON l.id = i.location_id WHERE si.company_id = ${cid} ORDER BY l.name, si.code`),
+    q(`SELECT * FROM inventory_negative_layers WHERE company_id = ${cid} ORDER BY id`),
+    q(`SELECT * FROM stock_group_location_archives WHERE company_id = ${cid} AND deleted_at IS NULL ORDER BY id`),
+    q(`SELECT sglai.* FROM stock_group_location_archive_items sglai INNER JOIN stock_group_location_archives sgla ON sgla.id = sglai.archive_id WHERE sgla.company_id = ${cid} ORDER BY sglai.id`),
+    q(`SELECT stv.*, l1.name AS from_location_name, l2.name AS to_location_name FROM stock_transfer_vouchers stv LEFT JOIN locations l1 ON l1.id = stv.from_location_id LEFT JOIN locations l2 ON l2.id = stv.to_location_id WHERE stv.company_id = ${cid} ${df("stv.transfer_date")} ORDER BY stv.transfer_date, stv.id`),
     q(`SELECT sti.* FROM stock_transfer_items sti INNER JOIN stock_transfer_vouchers stv ON stv.id = sti.transfer_voucher_id WHERE stv.company_id = ${cid} ORDER BY sti.id`),
     q(`SELECT r.* FROM stock_transfer_revisions r INNER JOIN stock_transfer_vouchers stv ON stv.id = r.transfer_id WHERE stv.company_id = ${cid} ORDER BY r.id`),
     q(`SELECT ri.* FROM stock_transfer_revision_items ri INNER JOIN stock_transfer_revisions r ON r.id = ri.revision_id INNER JOIN stock_transfer_vouchers stv ON stv.id = r.transfer_id WHERE stv.company_id = ${cid} ORDER BY ri.id`),
-    q(`SELECT * FROM stock_adjustment_vouchers WHERE company_id = ${cid} ${dateFilter("adjustment_date")} ORDER BY adjustment_date, id`),
+    q(`SELECT * FROM stock_adjustment_vouchers WHERE company_id = ${cid} ${df("adjustment_date")} ORDER BY adjustment_date, id`),
     q(`SELECT ai.* FROM stock_adjustment_items ai INNER JOIN stock_adjustment_vouchers av ON av.id = ai.adjustment_voucher_id WHERE av.company_id = ${cid} ORDER BY ai.id`),
-    q(`SELECT po.* FROM purchase_orders po WHERE po.company_id = ${cid} ${dateFilter("po.po_date")} ORDER BY po.po_date, po.id`),
-    q(`SELECT pli.* FROM po_line_items pli INNER JOIN purchase_orders po ON po.id = pli.po_id WHERE po.company_id = ${cid} ORDER BY pli.id`),
-    q(`SELECT * FROM containers WHERE company_id = ${cid} ${dateFilter("import_date")} ORDER BY import_date DESC, id`),
+    q(`SELECT * FROM proforma_stock_reservations WHERE company_id = ${cid} ORDER BY id`),
+
+    // ── Containers ────────────────────────────────────────────────────────────
+    q(`SELECT * FROM containers WHERE company_id = ${cid} ${df("import_date")} ORDER BY import_date DESC, id`),
     q(`SELECT cc.* FROM container_charges cc INNER JOIN containers c ON c.id = cc.container_id WHERE c.company_id = ${cid} ORDER BY cc.id`),
     q(`SELECT co.* FROM container_offloads co INNER JOIN containers c ON c.id = co.container_id WHERE c.company_id = ${cid} ORDER BY co.id`),
     q(`SELECT coi.* FROM container_offload_items coi INNER JOIN container_offloads co ON co.id = coi.offload_id INNER JOIN containers c ON c.id = co.container_id WHERE c.company_id = ${cid} ORDER BY coi.id`),
-    q(`SELECT * FROM bales WHERE company_id = ${cid} ${dateFilter("date_pressed")} ORDER BY date_pressed DESC, id`),
-    q(`SELECT * FROM factory_bale_products WHERE company_id = ${cid} ORDER BY name`),
-    q(`SELECT * FROM factory_bales WHERE company_id = ${cid} ${dateFilter("pressed_date")} ORDER BY pressed_date DESC, id`),
-    q(`SELECT * FROM factory_containers WHERE company_id = ${cid} ORDER BY id DESC`),
-    q(`SELECT ba.* FROM bank_accounts ba INNER JOIN ledger_accounts la ON la.id = ba.ledger_account_id WHERE la.company_id = ${cid} ORDER BY ba.id`),
-    q(`SELECT fa.* FROM fixed_assets fa INNER JOIN ledger_accounts la ON la.id = fa.ledger_account_id WHERE la.company_id = ${cid} ORDER BY fa.id`),
-    q(`SELECT * FROM exchange_rates WHERE company_id = ${cid} ${dateFilter("effective_date")} ORDER BY effective_date DESC, id`),
-    q(`SELECT * FROM pos_shifts WHERE company_id = ${cid} ${dateFilter("opened_at::date")} ORDER BY opened_at DESC`),
-    q(`SELECT si.*, v.voucher_number, v.voucher_date FROM sales_items si INNER JOIN vouchers v ON v.id = si.voucher_id WHERE v.company_id = ${cid} ${dateFilter("v.voucher_date")} ORDER BY v.voucher_date, si.id`),
-    q(`SELECT * FROM audit_log WHERE company_id = ${cid} ${dateFilter("created_at::date")} ORDER BY created_at DESC LIMIT 100000`),
+    q(`SELECT * FROM container_freight WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT * FROM container_freight_payments WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT * FROM container_documents WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT * FROM container_sales WHERE company_id = ${cid} ORDER BY id DESC`),
+
+    // ── Purchase Orders ───────────────────────────────────────────────────────
+    q(`SELECT po.* FROM purchase_orders po WHERE po.company_id = ${cid} ${df("po.po_date")} ORDER BY po.po_date, po.id`),
+    q(`SELECT pli.* FROM po_line_items pli INNER JOIN purchase_orders po ON po.id = pli.po_id WHERE po.company_id = ${cid} ORDER BY pli.id`),
+
+    // ── POS ───────────────────────────────────────────────────────────────────
+    q(`SELECT * FROM pos_shifts WHERE company_id = ${cid} ${df("opened_at::date")} ORDER BY opened_at DESC`),
+    q(`SELECT si.*, v.voucher_number, v.voucher_date FROM sales_items si INNER JOIN vouchers v ON v.id = si.voucher_id WHERE v.company_id = ${cid} ${df("v.voucher_date")} ORDER BY v.voucher_date, si.id`),
+
+    // ── Waste ─────────────────────────────────────────────────────────────────
+    q(`SELECT * FROM waste_dispatches WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT wdi.* FROM waste_dispatch_items wdi INNER JOIN waste_dispatches wd ON wd.id = wdi.dispatch_id WHERE wd.company_id = ${cid} ORDER BY wdi.id`),
+
+    // ── Spreadsheets ──────────────────────────────────────────────────────────
+    q(`SELECT id, name, created_at, updated_at FROM spreadsheets WHERE company_id = ${cid} ORDER BY name`),
+
+    // ── Import Logs ───────────────────────────────────────────────────────────
+    q(`SELECT * FROM import_logs WHERE company_id = ${cid} ORDER BY id DESC LIMIT 10000`),
+
+    // ── Audit ─────────────────────────────────────────────────────────────────
+    q(`SELECT * FROM audit_log WHERE company_id = ${cid} ${df("created_at::date")} ORDER BY created_at DESC LIMIT 100000`),
   ]);
 
   return {
     company: companiesRows[0] || {},
+    companySettings,
     locations,
     ledgerAccounts,
+    bankAccounts,
+    fixedAssets,
+    exchangeRates,
+    fiscalPeriodClosures,
+    referenceSequences,
+    agentAccounts,
     vouchers,
     voucherEntries,
     suppliers,
     supplierTransactions,
+    supplierProformas,
+    supplierProformaLines,
+    supplierContainers,
+    supplierContainerLoadedItems,
     customers,
     customerTransactions,
+    customerBalances,
+    customerOrders,
+    customerOrderLines,
+    customerOrderBales,
+    customerOrderCharges,
+    customerProformas,
+    customerProformaLines,
+    creditNoteItems,
     employees,
-    employeePayrolls,
+    employeePayrolls: employeePayrollRuns,
+    employeePayrollItems,
     employeeAdvances,
+    salaryAdvances,
+    salaryAdvanceDeductions,
+    employeeAdvanceRepayments,
+    employeeAttendance,
+    employeeBonuses,
+    employeeGroups,
+    employeeGroupMembers,
+    employeeBaleRates,
+    employeeBalePercentRates,
+    workerDocs,
     factoryWorkers,
+    factoryWorkerCategories,
+    factoryWorkerDocuments,
+    factoryWorkerAdvances,
+    factoryAdvanceRepayments,
     factoryPayrolls,
     factoryAttendance,
+    workerBonuses,
+    factorySettings,
+    factoryCategories,
     factoryDaybook,
-    stockItems,
-    inventory,
+    factoryDaybookEdits,
+    factoryDailyKpiSnapshots,
+    factoryDailyUsages,
+    factoryAlerts,
+    factoryDutyAuditLog,
+    factoryRawStock,
+    factoryRawMaterialAdjustments,
+    factoryPressingBatches,
+    pressingBatches,
+    factoryMixBatches,
+    factoryMixBatchSources,
+    mixBatches,
+    mixBatchSources,
+    productionBales,
+    productionRawStock,
+    factoryBaleProducts,
+    factoryBales,
+    factoryBaleSequences,
+    factoryBaleCostSnapshots,
+    factoryBaleWasteDispatches,
+    factoryWasteEntries,
+    factoryContainers,
+    factoryContainerCommissions,
+    factoryContainerOtherCharges,
+    factoryContainerProfitSnapshots,
+    factoryOffloadAdditionalCharges,
+    factorySuppliers,
+    factorySupplierPayments,
+    factorySupplierFxTransfers,
+    factorySupplierScoreSnapshots,
+    factoryFxRates,
+    factoryFxAllocations,
+    factoryPosSales,
+    factoryPosSaleItems,
+    bales,
+    baleProducts,
+    baleProductCategories,
+    baleSequences,
+    baleLabelPrints,
+    baleTransfers,
+    baleTransferItems,
+    baleRecodeSessions,
+    baleRecodeItems,
     stockGroups,
+    stockItems,
+    stockItemCodeAliases,
+    stockItemLocationPrices,
+    inventory,
+    inventoryNegativeLayers,
+    stockGroupLocationArchives,
+    stockGroupLocationArchiveItems,
     stockTransfers,
     stockTransferItems,
     stockTransferRevisions,
     stockTransferRevisionItems,
     stockAdjustments,
     stockAdjustmentItems,
-    purchaseOrders,
-    poLineItems,
+    proformaStockReservations,
     containers,
     containerCharges,
     containerOffloads,
     containerOffloadItems,
-    bales,
-    factoryBaleProducts,
-    factoryBales,
-    factoryContainers,
-    bankAccounts,
-    fixedAssets,
-    exchangeRates,
+    containerFreight,
+    containerFreightPayments,
+    containerDocuments,
+    containerSales,
+    purchaseOrders,
+    poLineItems,
     posShifts,
     salesItems,
+    wasteDispatches,
+    wasteDispatchItems,
+    spreadsheets,
+    importLogs,
     auditLog,
   };
 }
