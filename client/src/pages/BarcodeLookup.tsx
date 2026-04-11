@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Search, Package, Tag, Clock, User, Scale, Hash } from "lucide-react";
+import { Search, Package, Tag, Clock, User, Scale, Hash, MapPin, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -21,6 +22,33 @@ import type { BaleProduct, BaleLabelPrint } from "@shared/schema";
 
 type LookupTab = "article" | "reference";
 
+function BaleStatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: any }> = {
+    IN_STOCK:         { label: "In Stock",         variant: "default",     icon: CheckCircle2 },
+    SOLD:             { label: "Sold",              variant: "secondary",   icon: ArchiveX },
+    FINALIZED:        { label: "Finalized",         variant: "secondary",   icon: CheckCircle2 },
+    REMOVED:          { label: "Removed",           variant: "destructive", icon: XCircle },
+    PENDING_PRESSING: { label: "Pending Pressing",  variant: "outline",     icon: AlertCircle },
+  };
+  const info = map[status] || { label: status, variant: "outline" as const, icon: AlertCircle };
+  const Icon = info.icon;
+  return (
+    <Badge variant={info.variant} className="gap-1" data-testid="badge-bale-status">
+      <Icon className="h-3 w-3" />
+      {info.label}
+    </Badge>
+  );
+}
+
+function InfoRow({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  return (
+    <div>
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className={`font-medium ${mono ? "font-mono" : ""}`}>{value ?? <span className="text-muted-foreground">N/A</span>}</p>
+    </div>
+  );
+}
+
 export default function BarcodeLookup() {
   const [activeTab, setActiveTab] = useState<LookupTab>("article");
   const [searchValue, setSearchValue] = useState("");
@@ -36,6 +64,48 @@ export default function BarcodeLookup() {
   const [referenceResult, setReferenceResult] = useState<{
     labelPrint: BaleLabelPrint | null;
     product: BaleProduct | null;
+    baleInfo: {
+      id: number;
+      baleCode: string;
+      status: string;
+      weightKg: string;
+      costPerKg: string;
+      totalCost: string;
+      grade: string | null;
+      stockEntryDate: string | null;
+      pressedAt: string | null;
+      finalizedAt: string | null;
+    } | null;
+    locationInfo: { id: number; name: string; city: string | null; state: string | null } | null;
+    pressingBatch: {
+      id: number;
+      status: string;
+      expectedCount: number;
+      finalizedAt: string | null;
+      notes: string | null;
+    } | null;
+    mixBatch: {
+      id: number;
+      batchCode: string;
+      batchNumber: string | null;
+      name: string | null;
+      batchDate: string | null;
+      totalWeightKg: string;
+      costPerKg: string;
+      status: string;
+      operatorUser: string | null;
+    } | null;
+    containers_used: Array<{
+      id: number;
+      containerNumber: string;
+      origin: string | null;
+      arrivalDate: string | null;
+      status: string;
+      supplierName: string | null;
+      weightKgUsed: string | null;
+      currencyCode: string;
+      ratePerKg: string | null;
+    }>;
   } | null>(null);
 
   const articleLookup = useMutation({
@@ -53,11 +123,7 @@ export default function BarcodeLookup() {
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
-      toast({
-        title: "Not Found",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Not Found", description: error.message, variant: "destructive" });
       setArticleResult(null);
     },
   });
@@ -77,11 +143,7 @@ export default function BarcodeLookup() {
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
-      toast({
-        title: "Not Found",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Not Found", description: error.message, variant: "destructive" });
       setReferenceResult(null);
     },
   });
@@ -127,9 +189,7 @@ export default function BarcodeLookup() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSearch();
-    }
+    if (e.key === "Enter") handleSearch();
   };
 
   const handleTabChange = (tab: LookupTab) => {
@@ -140,14 +200,19 @@ export default function BarcodeLookup() {
   };
 
   const formatDate = (dateStr: string | null | undefined) => {
-    if (!dateStr) return "N/A";
+    if (!dateStr) return null;
     return new Date(dateStr).toLocaleString();
+  };
+
+  const formatDateOnly = (dateStr: string | null | undefined) => {
+    if (!dateStr) return null;
+    return new Date(dateStr).toLocaleDateString();
   };
 
   const isLoading = articleLookup.isPending || referenceLookup.isPending;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-4">
       <div className="flex items-center gap-2 border-b pb-3">
         <Button
           variant={activeTab === "article" ? "default" : "ghost"}
@@ -192,6 +257,7 @@ export default function BarcodeLookup() {
         </div>
       )}
 
+      {/* ── ARTICLE LOOKUP ── */}
       {activeTab === "article" && articleResult && (
         <div className="space-y-4">
           {articleResult.product ? (
@@ -204,24 +270,17 @@ export default function BarcodeLookup() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Article Code</p>
-                    <p className="font-medium" data-testid="text-article-code">{articleResult.product.articleCode || articleResult.product.code}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Product Name</p>
-                    <p className="font-medium" data-testid="text-product-name">{articleResult.product.name}</p>
-                  </div>
+                  <InfoRow label="Article Code" value={<span className="font-mono" data-testid="text-article-code">{(articleResult.product as any).articleCode || (articleResult.product as any).code}</span>} />
+                  <InfoRow label="Product Name" value={<span data-testid="text-product-name">{(articleResult.product as any).name}</span>} />
                   <div>
                     <p className="text-sm text-muted-foreground">Status</p>
-                    <Badge variant={articleResult.product.active ? "default" : "secondary"} data-testid="badge-product-status">
-                      {articleResult.product.active ? "Active" : "Inactive"}
+                    <Badge variant={(articleResult.product as any).active ? "default" : "secondary"} data-testid="badge-product-status">
+                      {(articleResult.product as any).active ? "Active" : "Inactive"}
                     </Badge>
                   </div>
-                  {articleResult.product.description && (
+                  {(articleResult.product as any).description && (
                     <div className="col-span-2">
-                      <p className="text-sm text-muted-foreground">Description</p>
-                      <p className="font-medium">{articleResult.product.description}</p>
+                      <InfoRow label="Description" value={(articleResult.product as any).description} />
                     </div>
                   )}
                 </div>
@@ -278,103 +337,256 @@ export default function BarcodeLookup() {
         </div>
       )}
 
+      {/* ── REFERENCE LOOKUP ── */}
       {activeTab === "reference" && referenceResult && (
         <div className="space-y-4">
           {referenceResult.labelPrint ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 flex-wrap">
-                  <Hash className="h-5 w-5" />
-                  Label Print Record
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Reference Number</p>
-                    <p className="font-mono font-medium text-lg" data-testid="text-reference-number">{referenceResult.labelPrint.referenceNumber}</p>
+            <>
+              {/* Label Print Record */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 flex-wrap">
+                    <Hash className="h-5 w-5" />
+                    Label Print Record
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <InfoRow
+                      label="Reference Number"
+                      value={<span className="font-mono text-lg" data-testid="text-reference-number">{referenceResult.labelPrint.referenceNumber}</span>}
+                    />
+                    <InfoRow label="Article Code" value={<span data-testid="text-ref-article-code">{referenceResult.labelPrint.articleCode}</span>} />
+                    <InfoRow label="Pieces" value={<span data-testid="text-ref-pieces">{referenceResult.labelPrint.pieces}</span>} />
+                    <InfoRow label="Approx Weight" value={<span data-testid="text-ref-weight">{referenceResult.labelPrint.approxWeightKg} KGS</span>} />
+                    <div>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> Printed At</p>
+                      <p className="font-medium" data-testid="text-ref-printed-at">{formatDate(referenceResult.labelPrint.printedAt as any) ?? "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1"><User className="h-3 w-3" /> Printed By</p>
+                      <p className="font-medium" data-testid="text-ref-printed-by">{(referenceResult.labelPrint as any).printedByName || referenceResult.labelPrint.printedByUserId || "Unknown"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> Scanned At</p>
+                      <p className="font-medium" data-testid="text-ref-scanned-at">
+                        {referenceResult.labelPrint.scannedAt
+                          ? formatDate(referenceResult.labelPrint.scannedAt as any)
+                          : <Badge variant="outline">Not scanned yet</Badge>}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1"><User className="h-3 w-3" /> Scanned By</p>
+                      <p className="font-medium" data-testid="text-ref-scanned-by">
+                        {(referenceResult.labelPrint as any).scannedByName || referenceResult.labelPrint.scannedByUserId || "N/A"}
+                      </p>
+                      {!referenceResult.labelPrint.scannedAt && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-2"
+                          disabled={markScanned.isPending}
+                          onClick={() => markScanned.mutate(referenceResult.labelPrint!.referenceNumber)}
+                          data-testid="button-mark-scanned"
+                        >
+                          {markScanned.isPending ? "Scanning..." : "Mark as Scanned"}
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Article Code</p>
-                    <p className="font-medium" data-testid="text-ref-article-code">{referenceResult.labelPrint.articleCode}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Pieces</p>
-                    <p className="font-medium" data-testid="text-ref-pieces">{referenceResult.labelPrint.pieces}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Approx Weight</p>
-                    <p className="font-medium" data-testid="text-ref-weight">{referenceResult.labelPrint.approxWeightKg} KGS</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> Printed At</p>
-                    <p className="font-medium" data-testid="text-ref-printed-at">{formatDate(referenceResult.labelPrint.printedAt as any)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1 flex-wrap"><User className="h-3 w-3" /> Printed By</p>
-                    <p className="font-medium" data-testid="text-ref-printed-by">{referenceResult.labelPrint.printedByName || referenceResult.labelPrint.printedByUserId || "Unknown"}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> Scanned At</p>
-                    <p className="font-medium" data-testid="text-ref-scanned-at">
-                      {referenceResult.labelPrint.scannedAt
-                        ? formatDate(referenceResult.labelPrint.scannedAt as any)
-                        : <Badge variant="outline">Not scanned yet</Badge>
-                      }
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1 flex-wrap"><User className="h-3 w-3" /> Scanned By</p>
-                    <p className="font-medium" data-testid="text-ref-scanned-by">{referenceResult.labelPrint.scannedByName || referenceResult.labelPrint.scannedByUserId || "N/A"}</p>
-                    {!referenceResult.labelPrint.scannedAt && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="mt-2"
-                        disabled={markScanned.isPending}
-                        onClick={() => markScanned.mutate(referenceResult.labelPrint!.referenceNumber)}
-                        data-testid="button-mark-scanned"
-                      >
-                        {markScanned.isPending ? "Scanning..." : "Mark as Scanned"}
-                      </Button>
+                </CardContent>
+              </Card>
+
+              {/* Bale Info + Location */}
+              {referenceResult.baleInfo && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 flex-wrap">
+                      <Box className="h-5 w-5" />
+                      Bale Details
+                      <BaleStatusBadge status={referenceResult.baleInfo.status} />
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <InfoRow label="Bale Code" value={<span className="font-mono">{referenceResult.baleInfo.baleCode}</span>} />
+                      {referenceResult.baleInfo.grade && (
+                        <InfoRow label="Grade" value={referenceResult.baleInfo.grade} />
+                      )}
+                      <InfoRow label="Weight" value={`${parseFloat(referenceResult.baleInfo.weightKg).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} KG`} />
+                      <InfoRow label="Cost / KG" value={referenceResult.baleInfo.costPerKg ? parseFloat(referenceResult.baleInfo.costPerKg).toFixed(4) : null} />
+                      <InfoRow label="Total Cost" value={referenceResult.baleInfo.totalCost ? parseFloat(referenceResult.baleInfo.totalCost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null} />
+                      {referenceResult.baleInfo.stockEntryDate && (
+                        <InfoRow label="Stock Entry Date" value={formatDateOnly(referenceResult.baleInfo.stockEntryDate)} />
+                      )}
+                      {referenceResult.baleInfo.pressedAt && (
+                        <InfoRow label="Pressed At" value={formatDate(referenceResult.baleInfo.pressedAt)} />
+                      )}
+                      {referenceResult.baleInfo.finalizedAt && (
+                        <InfoRow label="Finalized At" value={formatDate(referenceResult.baleInfo.finalizedAt)} />
+                      )}
+                    </div>
+
+                    {referenceResult.locationInfo && (
+                      <>
+                        <Separator />
+                        <div>
+                          <p className="text-sm text-muted-foreground flex items-center gap-1 mb-1">
+                            <MapPin className="h-3.5 w-3.5" /> Current Location
+                          </p>
+                          <p className="font-medium text-base" data-testid="text-bale-location">
+                            {referenceResult.locationInfo.name}
+                            {(referenceResult.locationInfo.city || referenceResult.locationInfo.state) && (
+                              <span className="text-muted-foreground font-normal text-sm ml-2">
+                                ({[referenceResult.locationInfo.city, referenceResult.locationInfo.state].filter(Boolean).join(", ")})
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </>
                     )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Containers */}
+              {referenceResult.containers_used && referenceResult.containers_used.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 flex-wrap">
+                      <Container className="h-5 w-5" />
+                      Source Container{referenceResult.containers_used.length > 1 ? "s" : ""}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {referenceResult.containers_used.map((c, i) => (
+                        <div key={c.id} className={`rounded-md border p-3 ${i > 0 ? "mt-3" : ""}`} data-testid={`card-container-${c.id}`}>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            <div className="col-span-2 md:col-span-1">
+                              <p className="text-sm text-muted-foreground flex items-center gap-1"><Truck className="h-3.5 w-3.5" /> Container No.</p>
+                              <p className="font-mono font-semibold text-base" data-testid={`text-container-number-${c.id}`}>{c.containerNumber}</p>
+                            </div>
+                            {c.supplierName && (
+                              <InfoRow label="Supplier" value={c.supplierName} />
+                            )}
+                            {c.origin && (
+                              <InfoRow label="Origin" value={c.origin} />
+                            )}
+                            {c.arrivalDate && (
+                              <InfoRow label="Arrival Date" value={formatDateOnly(c.arrivalDate)} />
+                            )}
+                            <div>
+                              <p className="text-sm text-muted-foreground">Status</p>
+                              <Badge variant="outline">{c.status}</Badge>
+                            </div>
+                            {c.weightKgUsed && (
+                              <InfoRow label="KG Used from This Container" value={`${parseFloat(c.weightKgUsed).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} KG`} />
+                            )}
+                            {c.ratePerKg && (
+                              <InfoRow label="Rate / KG" value={`${c.currencyCode} ${parseFloat(c.ratePerKg).toFixed(4)}`} />
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Mix Batch */}
+              {referenceResult.mixBatch && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 flex-wrap">
+                      <FlaskConical className="h-5 w-5" />
+                      Mix Batch
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <InfoRow label="Batch Code" value={<span className="font-mono">{referenceResult.mixBatch.batchCode}</span>} />
+                      {referenceResult.mixBatch.batchNumber && (
+                        <InfoRow label="Batch Number" value={referenceResult.mixBatch.batchNumber} />
+                      )}
+                      {referenceResult.mixBatch.name && (
+                        <InfoRow label="Name" value={referenceResult.mixBatch.name} />
+                      )}
+                      {referenceResult.mixBatch.batchDate && (
+                        <InfoRow label="Batch Date" value={formatDateOnly(referenceResult.mixBatch.batchDate)} />
+                      )}
+                      <InfoRow label="Total Weight" value={`${parseFloat(referenceResult.mixBatch.totalWeightKg).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} KG`} />
+                      <InfoRow label="Cost / KG" value={parseFloat(referenceResult.mixBatch.costPerKg).toFixed(4)} />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Status</p>
+                        <Badge variant="outline">{referenceResult.mixBatch.status}</Badge>
+                      </div>
+                      {referenceResult.mixBatch.operatorUser && (
+                        <InfoRow label="Operator" value={referenceResult.mixBatch.operatorUser} />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Pressing Batch */}
+              {referenceResult.pressingBatch && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 flex-wrap">
+                      <Layers className="h-5 w-5" />
+                      Pressing Batch
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <InfoRow label="Batch ID" value={<span className="font-mono">#{referenceResult.pressingBatch.id}</span>} />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Status</p>
+                        <Badge variant="outline">{referenceResult.pressingBatch.status}</Badge>
+                      </div>
+                      <InfoRow label="Expected Bale Count" value={referenceResult.pressingBatch.expectedCount} />
+                      {referenceResult.pressingBatch.finalizedAt && (
+                        <InfoRow label="Finalized At" value={formatDate(referenceResult.pressingBatch.finalizedAt)} />
+                      )}
+                      {referenceResult.pressingBatch.notes && (
+                        <div className="col-span-2 md:col-span-3">
+                          <InfoRow label="Notes" value={referenceResult.pressingBatch.notes} />
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Linked Product */}
+              {referenceResult.product && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 flex-wrap">
+                      <Package className="h-5 w-5" />
+                      Linked Product
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4">
+                      <InfoRow label="Article Code" value={(referenceResult.product as any).articleCode || (referenceResult.product as any).code} />
+                      <InfoRow label="Product Name" value={(referenceResult.product as any).name} />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Status</p>
+                        <Badge variant={(referenceResult.product as any).active ? "default" : "secondary"}>
+                          {(referenceResult.product as any).active ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           ) : (
             <Card>
               <CardContent className="py-6">
                 <p className="text-center text-muted-foreground">No record found for reference "{searchValue}"</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {referenceResult.product && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 flex-wrap">
-                  <Package className="h-5 w-5" />
-                  Linked Product
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Article Code</p>
-                    <p className="font-medium">{referenceResult.product.articleCode || referenceResult.product.code}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Product Name</p>
-                    <p className="font-medium">{referenceResult.product.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Status</p>
-                    <Badge variant={referenceResult.product.active ? "default" : "secondary"}>
-                      {referenceResult.product.active ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           )}

@@ -23,6 +23,7 @@ import {
   wasteDispatches, wasteDispatchItems, insertWasteDispatchSchema,
   bales, baleProducts, baleProductCategories, baleTransfers,
   factoryBales, baleLabelPrints,
+  factoryPressingBatches, factoryMixBatches, factoryMixBatchSources, factoryContainers, factorySuppliers,
   insertBaleSchema, insertBaleTransferSchema,
   orphanedRecords, orphanedCharges,
   dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
@@ -828,9 +829,127 @@ export function registerBaleRoutes(app: Express) {
         product = await storage.getBaleProductByArticleCode(labelPrint.articleCode, companyId);
       }
 
+      // ── Enrich with factory_bales data (matched by referenceNumber) ──
+      let baleInfo: any = null;
+      let locationInfo: any = null;
+      let pressingBatch: any = null;
+      let mixBatch: any = null;
+      let containers_used: any[] = [];
+
+      const [factoryBale] = await db
+        .select()
+        .from(factoryBales)
+        .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)))
+        .limit(1);
+
+      if (factoryBale) {
+        baleInfo = {
+          id: factoryBale.id,
+          baleCode: factoryBale.baleCode,
+          status: factoryBale.status,
+          weightKg: factoryBale.weightKg,
+          costPerKg: factoryBale.costPerKg,
+          totalCost: factoryBale.totalCost,
+          grade: factoryBale.grade,
+          stockEntryDate: factoryBale.stockEntryDate,
+          pressedAt: factoryBale.pressedAt,
+          finalizedAt: factoryBale.finalizedAt,
+        };
+
+        // Get location
+        if (factoryBale.erpLocationId) {
+          const [loc] = await db
+            .select({ id: locations.id, name: locations.name, city: locations.city, state: locations.state })
+            .from(locations)
+            .where(eq(locations.id, factoryBale.erpLocationId))
+            .limit(1);
+          if (loc) locationInfo = loc;
+        }
+
+        // Get pressing batch
+        if (factoryBale.pressingBatchId) {
+          const [pb] = await db
+            .select()
+            .from(factoryPressingBatches)
+            .where(eq(factoryPressingBatches.id, factoryBale.pressingBatchId))
+            .limit(1);
+          if (pb) {
+            pressingBatch = {
+              id: pb.id,
+              status: pb.status,
+              expectedCount: pb.expectedCount,
+              finalizedAt: pb.finalizedAt,
+              notes: pb.notes,
+            };
+
+            // Get mix batch
+            if (pb.mixBatchId) {
+              const [mb] = await db
+                .select()
+                .from(factoryMixBatches)
+                .where(eq(factoryMixBatches.id, pb.mixBatchId))
+                .limit(1);
+              if (mb) {
+                mixBatch = {
+                  id: mb.id,
+                  batchCode: mb.batchCode,
+                  batchNumber: mb.batchNumber,
+                  name: mb.name,
+                  batchDate: mb.batchDate,
+                  totalWeightKg: mb.totalWeightKg,
+                  costPerKg: mb.costPerKg,
+                  status: mb.status,
+                  operatorUser: mb.operatorUser,
+                };
+
+                // Get container sources for this mix batch
+                const sources = await db
+                  .select()
+                  .from(factoryMixBatchSources)
+                  .where(eq(factoryMixBatchSources.mixBatchId, mb.id));
+
+                const containerIds = [...new Set(sources.filter((s) => s.containerId).map((s) => s.containerId!))];
+                if (containerIds.length > 0) {
+                  const containerRows = await db
+                    .select()
+                    .from(factoryContainers)
+                    .where(inArray(factoryContainers.id, containerIds));
+
+                  const supplierIds = [...new Set(containerRows.filter((c) => c.supplierId).map((c) => c.supplierId!))];
+                  const supplierRows = supplierIds.length > 0
+                    ? await db.select().from(factorySuppliers).where(inArray(factorySuppliers.id, supplierIds))
+                    : [];
+                  const supplierMap = new Map(supplierRows.map((s) => [s.id, s.name]));
+
+                  containers_used = containerRows.map((c) => {
+                    const src = sources.find((s) => s.containerId === c.id);
+                    return {
+                      id: c.id,
+                      containerNumber: c.containerNumber,
+                      origin: c.origin,
+                      arrivalDate: c.arrivalDate,
+                      status: c.status,
+                      supplierName: c.supplierId ? (supplierMap.get(c.supplierId) || null) : null,
+                      weightKgUsed: src?.weightKg || null,
+                      currencyCode: c.currencyCode,
+                      ratePerKg: c.ratePerKg,
+                    };
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+
       res.json({
         labelPrint: { ...labelPrint, printedByName, scannedByName },
         product: product || null,
+        baleInfo,
+        locationInfo,
+        pressingBatch,
+        mixBatch,
+        containers_used,
       });
     } catch (error: any) {
       console.error("Error looking up reference:", error);
