@@ -14,13 +14,11 @@ import {
   TrendingDown,
   Users,
   Wallet,
-  Landmark,
   DollarSign,
   Truck,
   UserRound,
   RefreshCw,
   Building2,
-  ShoppingBag,
   HardHat,
   BarChart3,
   AlertCircle,
@@ -223,12 +221,6 @@ export default function FactoryFinancialSnapshot() {
     );
     const agentNet = agentAccountItems.reduce((sum, a) => sum + signedValue(a), 0);
 
-    const salesCashAccounts = allAccounts.filter(a =>
-      nameMatch(a.name, "sales cash", "cash sales", "sale cash", "نقدية مبيعات", "مبيعات نقدية") &&
-      (a.category === "Cash" || a.category === "Bank" || a.side === "forUs")
-    );
-    const salesCashNet = salesCashAccounts.reduce((sum, a) => sum + signedValue(a), 0);
-
     const rentalAccounts = allAccounts.filter(a =>
       nameMatch(a.name, "rent", "rental", "إيجار")
     );
@@ -258,8 +250,6 @@ export default function FactoryFinancialSnapshot() {
       freightCount: freightAccounts.length,
       agentNet,
       agentCount: agentAccountItems.length,
-      salesCashNet,
-      salesCashCount: salesCashAccounts.length,
       rentalNet,
       rentalCount: rentalAccounts.length,
       customerCredit,
@@ -427,22 +417,6 @@ export default function FactoryFinancialSnapshot() {
                 </CardContent>
               </Card>
             )}
-            <KpiCard
-              icon={ShoppingBag}
-              title="Sales Cash"
-              value={computed ? (computed.salesCashCount === 0 ? "No matching accounts" : usd(computed.salesCashNet)) : "—"}
-              sub={computed && computed.salesCashCount > 0 ? `${computed.salesCashCount} account${computed.salesCashCount !== 1 ? "s" : ""}` : "Accounts named 'Sales Cash'"}
-              color={computed && computed.salesCashNet >= 0 ? "green" : "red"}
-              loading={allLoading}
-            />
-            <KpiCard
-              icon={Landmark}
-              title="Capital / Equity"
-              value={snapshot ? usd(Math.abs(snapshot.capitalTotal)) : "—"}
-              sub={snapshot ? `${snapshot.capitalTotal < 0 ? "Credit balance (normal)" : "Debit balance"}` : undefined}
-              color="blue"
-              loading={loadingSnapshot}
-            />
             <KpiCard
               icon={UserRound}
               title="Agent Accounts"
