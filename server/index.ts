@@ -6,6 +6,7 @@ import path from "path";
 import fs from "fs";
 import { registerRoutes } from "./routes";
 import { setupWS } from "./wsServer";
+import { startScheduler } from "./services/schedulerService";
 import { setupVite, log } from "./vite";
 import type { User } from "@shared/schema";
 import { db, pool } from "./db";
@@ -892,6 +893,21 @@ let migrationsDone = false;
     `ALTER TABLE factory_workers ADD COLUMN IF NOT EXISTS transport_allowance decimal(20,2) DEFAULT 0`,
     // Transport column on payroll records
     `ALTER TABLE factory_payrolls ADD COLUMN IF NOT EXISTS transport decimal(20,2) DEFAULT 0`,
+    // Daily export recipients list
+    `CREATE TABLE IF NOT EXISTS export_recipients (
+      id serial PRIMARY KEY,
+      email varchar(255) NOT NULL UNIQUE,
+      active boolean NOT NULL DEFAULT true,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    // Daily export settings (singleton row id=1)
+    `CREATE TABLE IF NOT EXISTS export_settings (
+      id integer PRIMARY KEY,
+      gmail_user varchar(255) NOT NULL DEFAULT '',
+      gmail_app_password text NOT NULL DEFAULT '',
+      schedule_enabled boolean NOT NULL DEFAULT false,
+      last_run_at timestamp
+    )`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
@@ -909,6 +925,7 @@ let migrationsDone = false;
 
   const server = await registerRoutes(app);
   setupWS(server);
+  startScheduler();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

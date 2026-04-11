@@ -103,6 +103,7 @@ import { DataToolsTab } from "./settings/DataToolsTab";
 import { fmtDate, fieldLabel, fmtValue, getRecordLabel, getChangesSummary, tableShortName, AuditLogDialog, EditLogTable } from "./settings/AuditLog";
 import { PosSettingsTab } from "./settings/PosSettingsTab";
 import { ExportAccountsSection } from "./settings/ExportAccountsSection";
+import { DailyExportSection } from "./settings/DailyExportSection";
 import { FileStorageTab } from "./settings/FileStorageTab";
 import { BulkRenameTab } from "./settings/BulkRenameTab";
 import { LoginHistoryTab } from "./settings/LoginHistoryTab";
@@ -1089,6 +1090,7 @@ const FACTORY_COST_FIELDS = [
           { key: "edit-log", label: "Edit Log", icon: History },
           { key: "files", label: "File Storage", icon: Upload },
           { key: "export-accounts", label: "Export Accounts", icon: Download },
+          { key: "daily-export", label: "Daily Export", icon: Download },
         ],
       },
       {
@@ -1893,6 +1895,10 @@ const FACTORY_COST_FIELDS = [
 
           {activeSection === "export-accounts" && (
             <ExportAccountsSection />
+          )}
+
+          {activeSection === "daily-export" && (
+            <DailyExportSection />
           )}
 
           {activeSection === "fiscal" && (
