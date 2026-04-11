@@ -770,6 +770,7 @@ export default function FactoryWorkerDetail() {
                   <CardContent className="px-4 pb-4">
                     {infoRow("Salary Type", worker.salaryType, "text-detail-salary-type")}
                     {infoRow("Base Salary", fmt(worker.baseSalary), "text-detail-base-salary")}
+                    {infoRow("Transport Allowance", fmt((worker as any).transportAllowance), "text-detail-transport-allowance")}
                     {infoRow("Per Bale Rate", fmt(worker.perBaleRate), "text-detail-bale-rate")}
                     {infoRow("Per KG Rate", fmt(worker.perKgRate), "text-detail-kg-rate")}
                     {infoRow("Overtime Rate", fmt(worker.overtimeRate), "text-detail-overtime-rate")}
@@ -842,8 +843,8 @@ export default function FactoryWorkerDetail() {
                           <TableRow>
                             <TableHead>Period</TableHead>
                             <TableHead className="text-right">Base</TableHead>
+                            <TableHead className="text-right">Transport</TableHead>
                             <TableHead className="text-right">Bonus</TableHead>
-                            <TableHead className="text-right">Deductions</TableHead>
                             <TableHead className="text-right">Advances</TableHead>
                             <TableHead className="text-right">Net</TableHead>
                             <TableHead>Status</TableHead>
@@ -860,8 +861,8 @@ export default function FactoryWorkerDetail() {
                                   {p.periodStart?.slice(0, 10)} – {p.periodEnd?.slice(0, 10)}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-sm">${fmtNum(p.baseSalary)}</TableCell>
+                                <TableCell className="text-right font-mono text-sm">${fmtNum((p as any).transport || "0")}</TableCell>
                                 <TableCell className="text-right font-mono text-sm">${fmtNum(p.bonuses)}</TableCell>
-                                <TableCell className="text-right font-mono text-sm">${fmtNum(p.deductions)}</TableCell>
                                 <TableCell className="text-right font-mono text-sm">${fmtNum(p.advances)}</TableCell>
                                 <TableCell className="text-right font-mono text-sm font-semibold">${fmtNum(p.netSalary)}</TableCell>
                                 <TableCell>

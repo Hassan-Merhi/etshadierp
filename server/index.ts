@@ -888,6 +888,10 @@ let migrationsDone = false;
       delta decimal(15,3) NOT NULL,
       new_quantity decimal(15,3) NOT NULL
     )`,
+    // Transport allowance on worker profile
+    `ALTER TABLE factory_workers ADD COLUMN IF NOT EXISTS transport_allowance decimal(20,2) DEFAULT 0`,
+    // Transport column on payroll records
+    `ALTER TABLE factory_payrolls ADD COLUMN IF NOT EXISTS transport decimal(20,2) DEFAULT 0`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

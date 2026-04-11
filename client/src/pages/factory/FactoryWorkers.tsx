@@ -36,7 +36,7 @@ const emptyForm = {
   dateJoined: "", contractStartDate: "", contractEndDate: "",
   salaryType: "Monthly", baseSalary: "", perBaleRate: "", perKgRate: "",
   overtimeRate: "", shiftType: "", payFrequency: "Monthly", hourlyRate: "",
-  weeklySalary: "", biWeeklySalary: "", visaNumber: "", visaExpiry: "",
+  weeklySalary: "", biWeeklySalary: "", transportAllowance: "", visaNumber: "", visaExpiry: "",
   workPermitNumber: "", workPermitExpiry: "", residentialPermit: "",
   residentialPermitExpiry: "", bankName: "", bankAccountNumber: "",
   paymentMethod: "Cash", notes: "",
@@ -259,7 +259,7 @@ export default function FactoryWorkers() {
       perKgRate: w.perKgRate || "", overtimeRate: w.overtimeRate || "",
       shiftType: w.shiftType || "", payFrequency: (w as any).payFrequency || "Monthly",
       hourlyRate: (w as any).hourlyRate || "", weeklySalary: (w as any).weeklySalary || "",
-      biWeeklySalary: (w as any).biWeeklySalary || "", visaNumber: (w as any).visaNumber || "",
+      biWeeklySalary: (w as any).biWeeklySalary || "", transportAllowance: (w as any).transportAllowance || "", visaNumber: (w as any).visaNumber || "",
       visaExpiry: (w as any).visaExpiry || "", workPermitNumber: (w as any).workPermitNumber || "",
       workPermitExpiry: (w as any).workPermitExpiry || "",
       residentialPermit: (w as any).residentialPermit || "",
@@ -483,6 +483,7 @@ export default function FactoryWorkers() {
             </Select>
           </div>
           <div className="space-y-1"><Label className="text-xs">Base Salary</Label><Input type="number" step="0.01" value={formData.baseSalary} onChange={(e) => updateField("baseSalary", e.target.value)} data-testid="input-baseSalary" /></div>
+          <div className="space-y-1"><Label className="text-xs">Transport Allowance (monthly)</Label><Input type="number" step="0.01" value={(formData as any).transportAllowance} onChange={(e) => updateField("transportAllowance", e.target.value)} data-testid="input-transportAllowance" /></div>
           <div className="space-y-1"><Label className="text-xs">Per Bale Rate</Label><Input type="number" step="0.0001" value={formData.perBaleRate} onChange={(e) => updateField("perBaleRate", e.target.value)} data-testid="input-perBaleRate" /></div>
           <div className="space-y-1"><Label className="text-xs">Per KG Rate</Label><Input type="number" step="0.0001" value={formData.perKgRate} onChange={(e) => updateField("perKgRate", e.target.value)} data-testid="input-perKgRate" /></div>
           <div className="space-y-1"><Label className="text-xs">Pay Frequency</Label>

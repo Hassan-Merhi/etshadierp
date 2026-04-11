@@ -182,7 +182,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const { workerIds, periodStart, periodEnd, daysCount, bonusPerWorker } = req.body;
+      const { workerIds, periodStart, periodEnd, daysCount, bonusPerWorker, transportOverrides } = req.body;
       if (!periodStart || !periodEnd) return res.status(400).json({ message: "Period dates required" });
 
       const days = daysCount
@@ -262,25 +262,15 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
           }
         }
 
-        const totalAdvanceBalance = advanceByWorker[worker.id] || 0;
-        const advanceDeduction = Math.min(totalAdvanceBalance, base + bonus);
-        const net = base + bonus - advanceDeduction;
-        const pendingAdvances = (advanceListByWorker[worker.id] || []).map((a) => ({
-          id: a.id,
-          advanceDate: a.advanceDate,
-          amount: a.amount,
-          remainingBalance: a.remainingBalance,
-          notes: a.notes,
-        }));
-
-        const workerAtt = attendanceByWorker.get(worker.id) || [];
+        // Transport allowance — prorated by attendance
+        const workerAttRecs = attendanceByWorker.get(worker.id) || [];
         let presentDays = 0;
         let absentDays = 0;
         const presentDates: { date: string; status: string }[] = [];
         const absentDates: { date: string; status: string }[] = [];
         const halfDayDates: { date: string; status: string }[] = [];
 
-        for (const att of workerAtt) {
+        for (const att of workerAttRecs) {
           const entry = { date: att.attendanceDate, status: att.status };
           if (att.status === "Present" || att.status === "Late" || att.status === "Leave") {
             presentDays += 1;
@@ -295,10 +285,33 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
           }
         }
 
-        // Sort dates ascending
         presentDates.sort((a, b) => a.date.localeCompare(b.date));
         absentDates.sort((a, b) => a.date.localeCompare(b.date));
         halfDayDates.sort((a, b) => a.date.localeCompare(b.date));
+
+        const workerTransportDefault = parseFloat((worker as any).transportAllowance || "0");
+        const transportOverrideAmt = transportOverrides ? parseFloat(transportOverrides[String(worker.id)] ?? "-1") : -1;
+        const transportMonthly = transportOverrideAmt >= 0 ? transportOverrideAmt : workerTransportDefault;
+
+        let transport = 0;
+        if (transportMonthly > 0) {
+          if (workerAttRecs.length > 0 && totalWorkingDays > 0) {
+            transport = (presentDays / totalWorkingDays) * transportMonthly;
+          } else {
+            transport = transportMonthly;
+          }
+        }
+
+        const totalAdvanceBalance = advanceByWorker[worker.id] || 0;
+        const advanceDeduction = Math.min(totalAdvanceBalance, base + bonus + transport);
+        const net = base + bonus + transport - advanceDeduction;
+        const pendingAdvances = (advanceListByWorker[worker.id] || []).map((a) => ({
+          id: a.id,
+          advanceDate: a.advanceDate,
+          amount: a.amount,
+          remainingBalance: a.remainingBalance,
+          notes: a.notes,
+        }));
 
         return {
           id: worker.id,
@@ -306,6 +319,8 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
           position: worker.position || null,
           base,
           bonus,
+          transport,
+          transportMonthly,
           advanceDeduction,
           totalAdvanceBalance,
           pendingAdvances,
@@ -330,7 +345,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const { workerIds, periodStart, periodEnd, daysCount, bonusPerWorker, cashAccountId, notes, advanceOverrides } = req.body;
+      const { workerIds, periodStart, periodEnd, daysCount, bonusPerWorker, cashAccountId, notes, advanceOverrides, transportOverrides } = req.body;
       if (!periodStart || !periodEnd) return res.status(400).json({ message: "Period dates required" });
       // advanceOverrides: { [workerId: string]: number } — user-approved deduction per worker
 
@@ -397,16 +412,47 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
               base = computeMonthlyPayFromAttendance(baseSal, periodStart, workerAttRecords);
             }
           }
+          // Transport allowance — prorated by attendance
+          const workerAttRecs2 = attendanceByWorker.get(worker.id) || [];
+          let presentDays2 = 0;
+          for (const att of workerAttRecs2) {
+            if (att.status === "Present" || att.status === "Late" || att.status === "Leave") presentDays2 += 1;
+            else if (att.status === "Half Day") presentDays2 += 0.5;
+          }
+
+          // Count working days in period for transport proration
+          let workingDays2 = 0;
+          const cur2 = new Date(periodStart + "T00:00:00");
+          const endDate2 = new Date(periodEnd + "T00:00:00");
+          while (cur2 <= endDate2) {
+            const dow = cur2.getDay();
+            if (dow !== 0 && dow !== 6) workingDays2++;
+            cur2.setDate(cur2.getDate() + 1);
+          }
+
+          const workerTransportDefault2 = parseFloat((worker as any).transportAllowance || "0");
+          const transportOverrideAmt2 = transportOverrides ? parseFloat(transportOverrides[String(worker.id)] ?? "-1") : -1;
+          const transportMonthly2 = transportOverrideAmt2 >= 0 ? transportOverrideAmt2 : workerTransportDefault2;
+          let transport = 0;
+          if (transportMonthly2 > 0) {
+            if (workerAttRecs2.length > 0 && workingDays2 > 0) {
+              transport = (presentDays2 / workingDays2) * transportMonthly2;
+            } else {
+              transport = transportMonthly2;
+            }
+          }
+
           const workerAdvanceBalance = advanceByWorker[worker.id] || 0;
           // Use user-approved override if provided, otherwise auto-deduct full balance
           const overrideAmt = advanceOverrides ? parseFloat(advanceOverrides[String(worker.id)] ?? "-1") : -1;
           const advanceDeduction = overrideAmt >= 0
-            ? Math.min(overrideAmt, base + bonus, workerAdvanceBalance)
-            : Math.min(workerAdvanceBalance, base + bonus);
-          const net = base + bonus - advanceDeduction;
+            ? Math.min(overrideAmt, base + bonus + transport, workerAdvanceBalance)
+            : Math.min(workerAdvanceBalance, base + bonus + transport);
+          const net = base + bonus + transport - advanceDeduction;
           await tx.insert(factoryPayrolls).values({
             companyId, workerId: worker.id, periodStart, periodEnd,
             baseSalary: base.toFixed(2), bonuses: bonus.toFixed(2),
+            transport: transport.toFixed(2),
             baleEarnings: "0", kgEarnings: "0", overtimePay: "0", deductions: "0",
             advances: advanceDeduction.toFixed(2),
             netSalary: net.toFixed(2), balesCount: 0, kgProcessed: "0", overtimeHours: "0",

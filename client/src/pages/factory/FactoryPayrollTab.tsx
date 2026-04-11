@@ -48,6 +48,8 @@ interface PreviewWorkerRow {
   position: string | null;
   base: number;
   bonus: number;
+  transport: number;
+  transportMonthly: number;
   advanceDeduction: number;
   totalAdvanceBalance: number;
   pendingAdvances: PendingAdvance[];
@@ -280,6 +282,7 @@ export default function FactoryPayrollTab() {
   const [previewRows, setPreviewRows] = useState<PreviewWorkerRow[]>([]);
   // advanceOverrides: workerId → approved deduction amount (string for input binding)
   const [advanceOverrides, setAdvanceOverrides] = useState<Record<number, string>>({});
+  const [transportOverrides, setTransportOverrides] = useState<Record<number, string>>({});
   const [expandedAdvanceWorkers, setExpandedAdvanceWorkers] = useState<Set<number>>(new Set());
   const [attendanceDetail, setAttendanceDetail] = useState<{
     name: string;
@@ -353,10 +356,13 @@ export default function FactoryPayrollTab() {
       setPreviewRows(data);
       // Initialize overrides: default to full advance balance for each worker
       const overrides: Record<number, string> = {};
+      const tOverrides: Record<number, string> = {};
       for (const row of data) {
         overrides[row.id] = row.totalAdvanceBalance.toFixed(2);
+        tOverrides[row.id] = row.transportMonthly.toFixed(2);
       }
       setAdvanceOverrides(overrides);
+      setTransportOverrides(tOverrides);
       setExpandedAdvanceWorkers(new Set());
       setPreviewOpen(true);
     },
@@ -373,11 +379,16 @@ export default function FactoryPayrollTab() {
       for (const [wid, amt] of Object.entries(advanceOverrides)) {
         numericOverrides[wid] = parseFloat(amt) || 0;
       }
+      const numericTransportOverrides: Record<string, number> = {};
+      for (const [wid, amt] of Object.entries(transportOverrides)) {
+        numericTransportOverrides[wid] = parseFloat(amt) || 0;
+      }
       const body: any = {
         periodStart: runForm.periodStart, periodEnd: runForm.periodEnd,
         bonusPerWorker: runForm.bonusPerWorker, notes: runForm.notes,
         cashAccountId: runForm.cashAccountId || undefined,
         advanceOverrides: numericOverrides,
+        transportOverrides: numericTransportOverrides,
       };
       if (!runForm.targetAll) body.workerIds = runForm.pickedWorkerIds;
       if (runForm.daysCount) body.daysCount = runForm.daysCount;
@@ -761,14 +772,15 @@ export default function FactoryPayrollTab() {
           <DialogHeader>
             <DialogTitle>Payroll Preview</DialogTitle>
             <DialogDescription>
-              {previewRows.length} workers · {runForm.periodStart} to {runForm.periodEnd} · Net Total: ${previewRows.reduce((s, r) => s + r.base + r.bonus - parseFloat(advanceOverrides[r.id] || "0"), 0).toFixed(2)}
+              {previewRows.length} workers · {runForm.periodStart} to {runForm.periodEnd} · Net Total: ${previewRows.reduce((s, r) => s + r.base + r.bonus + parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2)) - parseFloat(advanceOverrides[r.id] || "0"), 0).toFixed(2)}
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto space-y-2">
             {previewRows.map((r) => {
               const hasAtt = r.presentDates.length > 0 || r.absentDates.length > 0 || r.halfDayDates.length > 0;
               const deductAmt = parseFloat(advanceOverrides[r.id] || "0");
-              const computedNet = r.base + r.bonus - deductAmt;
+              const transportAmt = parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2));
+              const computedNet = r.base + r.bonus + transportAmt - deductAmt;
               const isExpanded = expandedAdvanceWorkers.has(r.id);
               return (
                 <div key={r.id} className="border rounded-md" data-testid={`row-preview-${r.id}`}>
@@ -800,9 +812,23 @@ export default function FactoryPayrollTab() {
                       )}
                     </div>
                     {/* Salary breakdown */}
-                    <div className="flex items-center gap-3 text-sm font-mono ml-auto">
+                    <div className="flex flex-wrap items-center gap-3 text-sm font-mono ml-auto">
                       <span className="text-muted-foreground">Base: ${r.base.toFixed(2)}</span>
                       {r.bonus > 0 && <span className="text-muted-foreground">Bonus: ${r.bonus.toFixed(2)}</span>}
+                      {r.transportMonthly > 0 && (
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          Transport:
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={transportOverrides[r.id] ?? r.transportMonthly.toFixed(2)}
+                            onChange={(e) => setTransportOverrides((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                            className="w-24 h-6 text-xs font-mono px-1"
+                            data-testid={`input-transport-${r.id}`}
+                          />
+                        </span>
+                      )}
                       <span className="font-semibold">Net: ${computedNet.toFixed(2)}</span>
                     </div>
                   </div>
