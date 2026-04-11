@@ -1,3 +1,4 @@
+import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -306,7 +307,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         eq(factoryDaybookEntries.txType, "MIX_BATCH_CREATED"),
         eq(factoryDaybookEntries.referenceId, id)
       ));
-      const mbTxDate = batchDate || result.batchDate || new Date().toISOString().split('T')[0];
+      const mbTxDate = batchDate || result.batchDate || getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: mbTxDate,
@@ -715,7 +716,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         return mixBatch;
       });
 
-      const mbToday = new Date().toISOString().split('T')[0];
+      const mbToday = getClientDate(req);
       const mbTxDate = batchDate || mbToday;
       await writeDaybookEntry(db, {
         companyId,

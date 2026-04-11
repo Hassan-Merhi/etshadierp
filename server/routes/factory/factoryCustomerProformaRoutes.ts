@@ -1,3 +1,4 @@
+import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -226,7 +227,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         customerId: proforma.customerId,
         proformaIdUsed: proformaId,
         locationId: parseInt(locationId),
-        orderDate: orderDate || new Date().toISOString().split('T')[0],
+        orderDate: orderDate || getClientDate(req),
         status: "LOADING",
         loadingStartedAt: new Date(),
       }).returning();
@@ -290,7 +291,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         .from(customers).where(eq(customers.id, proforma.customerId));
       await writeDaybookEntry(db, {
         companyId,
-        txDate: orderDate || new Date().toISOString().split('T')[0],
+        txDate: orderDate || getClientDate(req),
         txType: "LOADING_CREATED",
         referenceId: order.id,
         description: `Loading created from proforma "${proforma.name}" for ${loadingCustomer?.legalName || "customer"} — ${totalBalesAdded} bale(s) added`,

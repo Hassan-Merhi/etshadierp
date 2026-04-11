@@ -1,3 +1,4 @@
+import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { eq, and, sql, asc, gte, lte, desc, inArray, isNull } from "drizzle-orm";
 import PDFDocument from "pdfkit";
@@ -252,7 +253,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         payrollRecords.push(record);
       }
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
       const totalNet = payrollRecords.reduce((sum: number, r: any) => sum + parseFloat(r.netSalary || "0"), 0);
       await writeDaybookEntry(db, {
         companyId,
@@ -360,7 +361,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         .returning();
 
       if (status && status !== existing.status) {
-        const entryDate = (status === "PAID" && paymentDate) ? paymentDate : new Date().toISOString().split("T")[0];
+        const entryDate = (status === "PAID" && paymentDate) ? paymentDate : getClientDate(req);
 
         if (status === "PAID") {
           const source = paymentSource || "Cash";
@@ -515,7 +516,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
       await writeDaybookEntry(db, {
         companyId,
-        txDate: new Date().toISOString().split("T")[0],
+        txDate: getClientDate(req),
         txType: "PAYROLL_DELETED",
         referenceId: id,
         referenceTable: "factory_payrolls",

@@ -1,3 +1,4 @@
+import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -127,7 +128,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         return { pressingBatchId: pressingBatch.id, bales };
       });
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
@@ -225,7 +226,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         return { pressingBatchId: pressingBatch.id, bales };
       });
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
@@ -647,7 +648,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         };
       });
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = getClientDate(req);
       const [finalizeLocation] = await db.select({ name: locations.name }).from(locations).where(eq(locations.id, erpLocationId));
       await writeDaybookEntry(db, {
         companyId,
@@ -1089,7 +1090,7 @@ export function registerFactoryBalesRoutes(app: Express) {
           return { count: createdBales.length, totalWeight };
         });
 
-        const today = new Date().toISOString().split("T")[0];
+        const today = getClientDate(req);
         await writeDaybookEntry(db, {
           companyId,
           txDate: today,
@@ -1517,7 +1518,7 @@ export function registerFactoryBalesRoutes(app: Express) {
 
       const { startDate, endDate, workerId, productId, locationId, status, search, includeUnassigned } = req.query as Record<string, string>;
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
       const effectiveStart = startDate || today;
       const effectiveEnd = endDate || today;
 
@@ -1588,7 +1589,7 @@ export function registerFactoryBalesRoutes(app: Express) {
 
       const { startDate, endDate, workerId, productId, locationId, status, search, includeUnassigned } = req.query as Record<string, string>;
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
       const effectiveStart = startDate || today;
       const effectiveEnd = endDate || today;
 
@@ -2521,7 +2522,7 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const currency = req.params.currencyCode.toUpperCase();
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
       try {
         const rate = await getOrFetchFxRateToUsd(companyId, currency, today);
         res.json({ rate, effectiveDate: today });

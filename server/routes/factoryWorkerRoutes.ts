@@ -1,3 +1,4 @@
+import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { eq, and, desc, sql, ilike, gte, lte, inArray, isNotNull } from "drizzle-orm";
 import multer from "multer";
@@ -338,7 +339,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         }
       }
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
       await writeDaybookEntry(db, {
         companyId, txDate: today, txType: "WORKER_IMPORT",
         description: `Worker import: ${created} created, ${updated} updated, ${skipped} skipped`,
@@ -423,7 +424,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         Object.assign(worker, updated);
       }
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
@@ -491,7 +492,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
 
       if (!updated) return res.status(404).json({ message: "Worker not found" });
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
@@ -516,7 +517,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
 
       const [updated] = await db
         .update(factoryWorkers)
@@ -550,7 +551,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
 
       const [updated] = await db
         .update(factoryWorkers)
@@ -596,7 +597,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
 
       if (!updated) return res.status(404).json({ message: "Worker not found" });
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
@@ -761,7 +762,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
 
       // Skip-settlement: just deactivate the worker immediately, no payroll record created
       if (skipSettlement) {
-        const today = new Date().toISOString().split("T")[0];
+        const today = getClientDate(req);
         const endEffective = endDate || today;
         await db.update(factoryWorkers).set({ active: false, contractEndDate: endEffective, updatedAt: new Date() }).where(eq(factoryWorkers.id, id));
         await writeDaybookEntry(db, {
@@ -919,7 +920,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       }
 
       // Deactivate worker
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
       await db.update(factoryWorkers).set({ active: false, contractEndDate: endDate, updatedAt: new Date() }).where(eq(factoryWorkers.id, id));
 
       await writeDaybookEntry(db, {

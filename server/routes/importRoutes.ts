@@ -1,3 +1,4 @@
+import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -2319,7 +2320,7 @@ export function registerImportRoutes(app: Express) {
             companyId: req.session.currentCompanyId!,
             voucherType: "Stock Transfer",
             voucherNumber,
-            voucherDate: transferDate || new Date().toISOString().split("T")[0],
+            voucherDate: transferDate || getClientDate(req),
             description: notes || `Multi-source Stock Transfer Import (${processedItems.length} items)`,
             totalAmount: totalValue.toString(),
             locationId: destinationLocationId,

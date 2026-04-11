@@ -1,3 +1,4 @@
+import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -360,7 +361,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
       if (payment) {
         await writeDaybookEntry(db, {
           companyId,
-          txDate: new Date().toISOString().split("T")[0],
+          txDate: getClientDate(req),
           txType: "SUPPLIER_PAYMENT_DELETE",
           description: `Supplier payment deleted: ${spDelSupplier?.name || "Unknown"} – ${parseFloat(payment.amount).toFixed(2)} ${payment.currencyCode} (dated ${payment.date})`,
         });
@@ -614,7 +615,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
 
       await writeDaybookEntry(db, {
         companyId,
-        txDate: new Date().toISOString().split("T")[0],
+        txDate: getClientDate(req),
         txType: "SUPPLIER_FX_TRANSFER_DELETE",
         description: `FX Transfer deleted: ${transfer.fromCurrencyCode} ${parseFloat(transfer.fromAmount).toFixed(2)} → USD ${parseFloat(transfer.toAmountUsd).toFixed(2)} (dated ${transfer.date})`,
       });
@@ -898,7 +899,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
       }
 
       // Create FX transfers and allocation rows in a transaction
-      const settlementDate = date || new Date().toISOString().split("T")[0];
+      const settlementDate = date || getClientDate(req);
       const results = await db.transaction(async (tx: any) => {
         const created: any[] = [];
         for (const alloc of allocations) {
@@ -2640,7 +2641,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
       ];
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="broker-statement-${(data.supplier as any).name?.replace(/\s+/g, "-") || brokerId}-${new Date().toISOString().split("T")[0]}.xlsx"`);
+      res.setHeader("Content-Disposition", `attachment; filename="broker-statement-${(data.supplier as any).name?.replace(/\s+/g, "-") || brokerId}-${getClientDate(req)}.xlsx"`);
       await wb.xlsx.write(res);
       res.end();
     } catch (err: any) {

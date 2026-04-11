@@ -1,3 +1,4 @@
+import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -1048,7 +1049,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const { cashAccountId, paidDate } = req.body;
       if (!cashAccountId) return res.status(400).json({ message: "cashAccountId required" });
       await db.execute(sql`
-        UPDATE worker_bonuses SET status = 'paid', cash_account_id = ${parseInt(cashAccountId)}, paid_date = ${paidDate || new Date().toISOString().split("T")[0]}
+        UPDATE worker_bonuses SET status = 'paid', cash_account_id = ${parseInt(cashAccountId)}, paid_date = ${paidDate || getClientDate(req)}
         WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId} AND status = 'pending'
       `);
       res.json({ message: "Bonus marked as paid" });
@@ -1559,7 +1560,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         const [sale] = await tx.insert(factoryPosSales).values({
           companyId,
           saleNumber,
-          txDate: txDate || new Date().toISOString().split("T")[0],
+          txDate: txDate || getClientDate(req),
           locationId: locationId || null,
           customerName: customerName || null,
           customerId: parsedCustomerId,
@@ -1615,7 +1616,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         // 4. Create daybook entry for the sale
         await tx.insert(factoryDaybookEntries).values({
           companyId,
-          txDate: txDate || new Date().toISOString().split("T")[0],
+          txDate: txDate || getClientDate(req),
           txType: "BALE_SALE",
           referenceId: sale.id,
           referenceTable: "factory_pos_sales",
@@ -1631,7 +1632,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         for (const exp of expenseRows) {
           await tx.insert(factoryDaybookEntries).values({
             companyId,
-            txDate: txDate || new Date().toISOString().split("T")[0],
+            txDate: txDate || getClientDate(req),
             txType: "POS_EXPENSE",
             referenceId: sale.id,
             referenceTable: "factory_pos_sales",
@@ -1658,7 +1659,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           await tx.insert(customerBalances).values({
             companyId,
             customerId: parsedCustomerId,
-            transactionDate: txDate || new Date().toISOString().split("T")[0],
+            transactionDate: txDate || getClientDate(req),
             transactionType: "SALE",
             referenceId: sale.id,
             referenceType: "FACTORY_POS_SALE",
@@ -1675,7 +1676,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
             await tx.insert(customerBalances).values({
               companyId,
               customerId: parsedCustomerId,
-              transactionDate: txDate || new Date().toISOString().split("T")[0],
+              transactionDate: txDate || getClientDate(req),
               transactionType: "PAYMENT",
               referenceId: sale.id,
               referenceType: "FACTORY_POS_DEPOSIT",
@@ -1697,7 +1698,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
             companyId,
             voucherType: "Receipt",
             voucherNumber: voucherNum,
-            voucherDate: txDate || new Date().toISOString().split("T")[0],
+            voucherDate: txDate || getClientDate(req),
             description: `Factory POS Sale ${saleNumber}${customerName ? ` – ${customerName}` : ""}`,
             totalAmount: voucherCashAmt.toFixed(2),
             currency: currencyCode || "USD",

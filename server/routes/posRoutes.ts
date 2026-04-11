@@ -1,3 +1,4 @@
+import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -296,7 +297,7 @@ export function registerPosRoutes(app: Express) {
 
       // STEP 1: Validate inventory availability
       const voucherNumber = `SALES-${Date.now()}`;
-      const voucherDate = providedVoucherDate || new Date().toISOString().split("T")[0];
+      const voucherDate = providedVoucherDate || getClientDate(req);
 
       // STEP 1a: Validate inventory rows
       const inventoryValidation: Array<{

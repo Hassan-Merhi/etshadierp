@@ -1,3 +1,4 @@
+import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -65,7 +66,7 @@ export function registerFactoryStockRoutes(app: Express) {
 
       // Parse optional backdated entry date; default to today so history is always populated
       let effectiveEntryDate: Date | null = null;
-      let effectiveDateStr: string = new Date().toISOString().split("T")[0];
+      let effectiveDateStr: string = getClientDate(req);
       if (entryDate && typeof entryDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(entryDate)) {
         effectiveEntryDate = new Date(entryDate + "T00:00:00.000Z");
         effectiveDateStr = entryDate;
@@ -267,7 +268,7 @@ export function registerFactoryStockRoutes(app: Express) {
         return { bales, totalWeight };
       });
 
-      const today = effectiveDateStr || new Date().toISOString().split('T')[0];
+      const today = effectiveDateStr || getClientDate(req);
       // Build a meaningful description with product names and reference codes
       const productGroups = new Map<string, string[]>();
       for (const bale of result.bales) {
@@ -472,7 +473,7 @@ export function registerFactoryStockRoutes(app: Express) {
         return { bales: createdBales, totalWeight, count: createdBales.length };
       });
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
@@ -590,7 +591,7 @@ export function registerFactoryStockRoutes(app: Express) {
         return { removed: removedBales };
       });
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = getClientDate(req);
       const removalMetaJson = JSON.stringify({
         bales: result.removed.map((b: any) => ({
           id: b.id,
@@ -691,7 +692,7 @@ export function registerFactoryStockRoutes(app: Express) {
         return { removed: removedBales };
       });
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = getClientDate(req);
       const baleMetaJson = JSON.stringify({
         bales: result.removed.map((b: any) => ({
           id: b.id,
@@ -1129,7 +1130,7 @@ export function registerFactoryStockRoutes(app: Express) {
       baleSheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: baleCols.length } };
       baleSheet.views = [{ state: "frozen", ySplit: 1 }];
 
-      const dateStr = new Date().toISOString().split("T")[0];
+      const dateStr = getClientDate(req);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="inventory_location_${locationId}_${dateStr}.xlsx"`);
       await workbook.xlsx.write(res);
@@ -1396,7 +1397,7 @@ export function registerFactoryStockRoutes(app: Express) {
       baleSheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: baleCols.length } };
       baleSheet.views = [{ state: "frozen", ySplit: 1 }];
 
-      const dateStr = new Date().toISOString().split("T")[0];
+      const dateStr = getClientDate(req);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="inventory_all_locations_${dateStr}.xlsx"`);
       await workbook.xlsx.write(res);

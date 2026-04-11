@@ -1,3 +1,4 @@
+import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { eq, and, desc, sql, between, gte, lte, sum, count, avg } from "drizzle-orm";
 import multer from "multer";
@@ -151,7 +152,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const dateStr = (req.query.date as string) || new Date().toISOString().split("T")[0];
+      const dateStr = (req.query.date as string) || getClientDate(req);
 
       // Waste entries for the selected date
       const wasteOnDate = await db
@@ -704,7 +705,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       let newAlertCount = 0;
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
 
       const existingAlerts = await db
         .select()

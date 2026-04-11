@@ -1,3 +1,4 @@
+import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -1337,7 +1338,7 @@ export function registerFactoryProductsRoutes(app: Express) {
           });
 
           if (totalBalesCreated > 0) {
-            const excelImportToday = new Date().toISOString().split("T")[0];
+            const excelImportToday = getClientDate(req);
             await writeDaybookEntry(db, {
               companyId,
               txDate: excelImportToday,

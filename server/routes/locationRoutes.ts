@@ -1,3 +1,4 @@
+import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -404,7 +405,7 @@ if (asOfDate) {
         );
         res.setHeader(
           "Content-Disposition",
-          `attachment; filename="${location.name}_inventory_${new Date().toISOString().split("T")[0]}.xlsx"`
+          `attachment; filename="${location.name}_inventory_${getClientDate(req)}.xlsx"`
         );
         res.send(excelBuffer);
       } catch (error: any) {

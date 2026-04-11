@@ -1,3 +1,4 @@
+import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -821,7 +822,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         }).where(eq(customerOrders.id, orderId));
 
         const grandTotal = parseFloat(recalcOrder.grandTotal || "0");
-        const today = new Date().toISOString().split('T')[0];
+        const today = getClientDate(req);
 
         await tx.insert(customerBalances).values({
           companyId,
@@ -908,7 +909,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         return { ...finalOrder, lines: finalLines, bales: finalBales, charges: finalCharges };
       });
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
@@ -1293,7 +1294,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         charges.forEach((c: any) => chargeSheet.addRow({ description: c.description, amount: parseFloat(c.amount || "0") }));
       }
 
-      const dateStr = new Date().toISOString().split("T")[0];
+      const dateStr = getClientDate(req);
       const fileName = `order_${orderId}_${order.invoiceNumber || "draft"}_${dateStr}.xlsx`;
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
@@ -1372,7 +1373,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         // Daybook entry
         const [unfCustomer] = await tx.select({ legalName: customers.legalName })
           .from(customers).where(eq(customers.id, order.customerId));
-        const unfToday = new Date().toISOString().split("T")[0];
+        const unfToday = getClientDate(req);
         await writeDaybookEntry(tx, {
           companyId,
           txDate: unfToday,
@@ -1412,7 +1413,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       const [cancelCustomer] = await db.select({ legalName: customers.legalName })
         .from(customers).where(eq(customers.id, order.customerId));
-      const cancelToday = new Date().toISOString().split("T")[0];
+      const cancelToday = getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: cancelToday,
@@ -1446,13 +1447,13 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         customerId: parseInt(customerId),
         proformaIdUsed: proformaIdUsed ? parseInt(proformaIdUsed) : null,
         locationId: parseInt(locationId),
-        orderDate: orderDate || new Date().toISOString().split('T')[0],
+        orderDate: orderDate || getClientDate(req),
         status: "LOADING",
         loadingStartedAt: new Date(),
       }).returning();
 
       const [loadingCustomer] = await db.select({ legalName: customers.legalName }).from(customers).where(eq(customers.id, parseInt(customerId)));
-      const loadingToday = new Date().toISOString().split('T')[0];
+      const loadingToday = getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: loadingToday,
@@ -1489,7 +1490,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       }).where(eq(customerOrders.id, orderId)).returning();
 
       const [lsCustomer] = await db.select({ legalName: customers.legalName }).from(customers).where(eq(customers.id, order.customerId));
-      const lsToday = new Date().toISOString().split('T')[0];
+      const lsToday = getClientDate(req);
       const lsTotalValue = bales.reduce((s: number, b: any) => s + parseFloat(b.priceUsed || "0"), 0);
       await writeDaybookEntry(db, {
         companyId,
@@ -1621,7 +1622,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         const [verifyCustomer] = await db.select({ legalName: customers.legalName }).from(customers).where(eq(customers.id, order.customerId));
         const verifyBales = await db.select({ priceUsed: customerOrderBales.priceUsed }).from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
         const verifyTotalValue = verifyBales.reduce((s: number, b: any) => s + parseFloat(b.priceUsed || "0"), 0);
-        const verifyToday = new Date().toISOString().split('T')[0];
+        const verifyToday = getClientDate(req);
         await writeDaybookEntry(db, {
           companyId,
           txDate: verifyToday,

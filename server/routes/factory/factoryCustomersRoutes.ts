@@ -1,3 +1,4 @@
+import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -603,7 +604,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
       doc.rect(40, 96, 515, 40).fill("#1F3864");
       doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(13)
         .text("Account Statement", 44, 102, { width: 350 });
-      const printDate = fmtDate(new Date().toISOString().split("T")[0]);
+      const printDate = fmtDate(getClientDate(req));
       doc.font("Helvetica").fontSize(8).text(`Printed: ${printDate}`, 420, 116, { width: 135, align: "right" });
 
       // ── Customer info block ──
@@ -637,7 +638,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
       if (openingBalance > 0) {
         doc.rect(40, y, 515, 13).fill("#EFF3FB");
         doc.fillColor("#000000");
-        doc.text(fmtDate(new Date().toISOString().split("T")[0]), colX[0] + 2, y + 3, { width: colW[0] - 4 });
+        doc.text(fmtDate(getClientDate(req)), colX[0] + 2, y + 3, { width: colW[0] - 4 });
         doc.text("Opening Bal.", colX[1] + 2, y + 3, { width: colW[1] - 4 });
         doc.text("Opening Balance", colX[2] + 2, y + 3, { width: colW[2] - 4 });
         if (openingSide === "Dr") {

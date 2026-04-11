@@ -1,3 +1,4 @@
+import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -239,7 +240,7 @@ export function registerAdminRoutes(app: Express) {
     try {
       const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : req.session.currentCompanyId;
       const locationIds = req.query.locationIds ? (req.query.locationIds as string).split(',').map(id => parseInt(id)) : [];
-      const asOfDate = req.query.asOfDate as string || new Date().toISOString().split('T')[0];
+      const asOfDate = req.query.asOfDate as string || getClientDate(req);
       
       if (!companyId) {
         return res.status(400).json({ message: "Company ID is required" });
@@ -2010,7 +2011,7 @@ export function registerAdminRoutes(app: Express) {
             
             const voucherDate = offloadRecord?.offloadedAt 
               ? new Date(offloadRecord.offloadedAt).toISOString().split('T')[0]
-              : new Date().toISOString().split('T')[0];
+              : getClientDate(req);
             
             // ============================================================
             // SUBSIDIARY VOUCHER - Transfer liability from Supplier to Parent Credit

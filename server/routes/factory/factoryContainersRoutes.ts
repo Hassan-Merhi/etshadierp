@@ -1,3 +1,4 @@
+import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -161,7 +162,7 @@ export function registerFactoryContainersRoutes(app: Express) {
       const parsed = insertFactoryContainerSchema.parse({ ...req.body, companyId });
       const currencyCode = parsed.currencyCode || "USD";
       const fxRateSource = parsed.fxRateSource || "auto";
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
       const importDate = parsed.arrivalDate || today;
 
       let fxRate: string;
@@ -356,7 +357,7 @@ export function registerFactoryContainersRoutes(app: Express) {
 
         const currencyCode = updateData.currencyCode || existing.currencyCode || "USD";
         const fxRateSource = updateData.fxRateSource || existing.fxRateSource || "auto";
-        const importDate = updateData.arrivalDate || existing.arrivalDate || new Date().toISOString().split("T")[0];
+        const importDate = updateData.arrivalDate || existing.arrivalDate || getClientDate(req);
 
         if (fxRateSource === "auto") {
           try {
@@ -565,7 +566,7 @@ export function registerFactoryContainersRoutes(app: Express) {
           .limit(1);
         if (existing.length > 0) { skipped++; continue; }
 
-        const today = new Date().toISOString().split("T")[0];
+        const today = getClientDate(req);
         const importCostAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_IMPORT_COST", "Factory Import Cost");
         const importVoucherNum = `FACTORY-IMPORT-${container.id}-${Date.now()}`;
         const [importVoucher] = await db.insert(vouchers).values({
@@ -678,7 +679,7 @@ export function registerFactoryContainersRoutes(app: Express) {
           .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
 
         if (container) {
-          const today = new Date().toISOString().split("T")[0];
+          const today = getClientDate(req);
           const voucherDate = container.arrivalDate || today;
           for (const charge of newCharges) {
             const chargeAmt = parseFloat(charge.amount || "0");
@@ -893,7 +894,7 @@ export function registerFactoryContainersRoutes(app: Express) {
             .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
 
           if (container) {
-            const today = new Date().toISOString().split("T")[0];
+            const today = getClientDate(req);
             const voucherDate = container.arrivalDate || today;
             const payableAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
             for (const charge of tableCharges) {
@@ -983,7 +984,7 @@ export function registerFactoryContainersRoutes(app: Express) {
           }
 
           const fxSource = (row.fxSource || "").toUpperCase() === "MANUAL" ? "manual" : "auto";
-          const today = new Date().toISOString().split("T")[0];
+          const today = getClientDate(req);
           const importDate = row.arrivalDate || today;
 
           let fxRate: number;

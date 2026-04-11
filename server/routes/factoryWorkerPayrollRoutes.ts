@@ -1,3 +1,4 @@
+import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../db";
 import { requireAuth } from "../auth";
@@ -475,7 +476,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
         const [prWorker] = await tx.select({ fullName: factoryWorkers.fullName })
           .from(factoryWorkers).where(eq(factoryWorkers.id, payroll.workerId));
         const workerName = prWorker?.fullName?.trim() || `Worker #${payroll.workerId}`;
-        const prToday = new Date().toISOString().split("T")[0];
+        const prToday = getClientDate(req);
 
         if (cashAccountId) {
           // Accounting: Dr Payroll Payable / Cr Cash (settling the liability created at run time)
@@ -559,7 +560,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       const workerName = prWorker?.fullName?.trim() || `Worker #${payroll.workerId}`;
       const paidDate = payroll.paidAt
         ? new Date(payroll.paidAt).toISOString().split("T")[0]
-        : new Date().toISOString().split("T")[0];
+        : getClientDate(req);
 
       const netAmt = parseFloat(payroll.netSalary || "0");
       const narration = `Payroll payment (backdated): ${workerName} (${payroll.periodStart} – ${payroll.periodEnd})`;
@@ -648,7 +649,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
           .set({ status: "PAID", paidAt: new Date(), cashAccountId: cashId } as any)
           .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, payrollIds)));
 
-        const bulkPrToday = new Date().toISOString().split("T")[0];
+        const bulkPrToday = getClientDate(req);
 
         // Accounting: Dr Payroll Payable / Cr Cash (settling liability created at run time)
         const payableAcc = payableAccBulk;
@@ -1014,7 +1015,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
         .from(factoryWorkers).where(and(eq(factoryWorkers.id, workerId), eq(factoryWorkers.companyId, companyId)));
       if (!worker) return res.status(404).json({ message: "Worker not found" });
 
-      const advanceDate = req.body.advanceDate || new Date().toISOString().split("T")[0];
+      const advanceDate = req.body.advanceDate || getClientDate(req);
       const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
 
       if (cashAccountId) {
@@ -1129,7 +1130,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
         return res.status(400).json({ message: "No items provided" });
       }
 
-      const advDate = advanceDate || new Date().toISOString().split("T")[0];
+      const advDate = advanceDate || getClientDate(req);
       const cashAccountId = rawCashAccountId ? parseInt(rawCashAccountId) : null;
       const repaymentType = rawRepaymentType === "manual_repayment" ? "manual_repayment" : "salary_deduction";
 
@@ -1351,7 +1352,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       const [worker] = await db.select({ fullName: factoryWorkers.fullName })
         .from(factoryWorkers).where(eq(factoryWorkers.id, advance.workerId));
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
 
       await db.transaction(async (tx: any) => {
         const repayments = await tx.select().from(factoryAdvanceRepayments)
@@ -1402,7 +1403,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       const [worker] = await db.select({ fullName: factoryWorkers.fullName })
         .from(factoryWorkers).where(eq(factoryWorkers.id, advance.workerId));
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
 
       await db.transaction(async (tx: any) => {
         // Delete all repayment records for this advance
@@ -1684,7 +1685,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       }
       const effectiveAmount = Math.min(amount, bal);
 
-      const repaymentDate = req.body.repaymentDate || new Date().toISOString().split("T")[0];
+      const repaymentDate = req.body.repaymentDate || getClientDate(req);
       const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
 
       if (cashAccountId) {
@@ -1826,7 +1827,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
         .from(factoryWorkers).where(eq(factoryWorkers.id, repayment.workerId));
 
       await writeDaybookEntry(db, {
-        companyId, txDate: new Date().toISOString().split("T")[0],
+        companyId, txDate: getClientDate(req),
         txType: "ADVANCE_REPAYMENT_DELETED",
         referenceId: repaymentId,
         referenceTable: "factory_advance_repayments",
@@ -1939,7 +1940,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
           const payrollAcctId = payrollAccountCache.get(pr.companyId)!;
           const workerName = ((workerMap.get(pr.workerId) as string) || "").trim() || `Worker #${pr.workerId}`;
           const narration = `Payroll backfill: ${workerName} (${pr.periodStart} – ${pr.periodEnd})`;
-          const voucherDate = pr.paidAt ? new Date(pr.paidAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0];
+          const voucherDate = pr.paidAt ? new Date(pr.paidAt).toISOString().split("T")[0] : getClientDate(req);
 
           const [pVoucher] = await tx.insert(vouchers).values({
             companyId: pr.companyId,

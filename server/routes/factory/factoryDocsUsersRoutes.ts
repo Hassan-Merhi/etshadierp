@@ -1,3 +1,4 @@
+import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -130,7 +131,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
           await writeDaybookEntry(db, {
             companyId,
-            txDate: new Date().toISOString().split("T")[0],
+            txDate: getClientDate(req),
             txType: "DOC_UPLOAD",
             referenceId: containerId,
             referenceTable: "containers",
@@ -175,7 +176,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       await writeDaybookEntry(db, {
         companyId: companyId || deleted.companyId,
-        txDate: new Date().toISOString().split("T")[0],
+        txDate: getClientDate(req),
         txType: "DOC_DELETE",
         referenceId: containerId,
         referenceTable: "containers",
@@ -249,7 +250,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       await writeDaybookEntry(db, {
         companyId,
-        txDate: new Date().toISOString().split("T")[0],
+        txDate: getClientDate(req),
         txType: "FREIGHT_ADD",
         referenceId: containerId,
         referenceTable: "containers",
@@ -280,7 +281,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       await writeDaybookEntry(db, {
         companyId: companyId || deleted.companyId,
-        txDate: new Date().toISOString().split("T")[0],
+        txDate: getClientDate(req),
         txType: "FREIGHT_DELETE",
         referenceId: containerId,
         referenceTable: "containers",
@@ -323,7 +324,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       await writeDaybookEntry(db, {
         companyId,
-        txDate: req.body.paymentDate || new Date().toISOString().split("T")[0],
+        txDate: req.body.paymentDate || getClientDate(req),
         txType: "FREIGHT_PAYMENT",
         referenceId: fr.containerId,
         referenceTable: "containers",
@@ -362,7 +363,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       await writeDaybookEntry(db, {
         companyId: companyId || deleted.companyId,
-        txDate: new Date().toISOString().split("T")[0],
+        txDate: getClientDate(req),
         txType: "FREIGHT_PAYMENT_DELETE",
         referenceId: fr?.containerId,
         referenceTable: "containers",
@@ -566,7 +567,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const vNum = voucher.voucherNumber || "";
       const voucherTxTypeMap: Record<string, string> = { Payment: "PAYMENT", Receipt: "RECEIPT", Journal: "JOURNAL" };
       const txTypeVal = voucherTxTypeMap[voucher.voucherType] || "JOURNAL";
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
 
       await db.transaction(async (tx: any) => {
         // 0. Read employee-linked entries BEFORE deletion so we can reverse balances

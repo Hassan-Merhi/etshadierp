@@ -1,3 +1,4 @@
+import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -686,7 +687,7 @@ export function registerContainerRoutes(app: Express) {
       const buffer = await writeWorkbook(workbook);
       
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="containers_export_${new Date().toISOString().split("T")[0]}.xlsx"`);
+      res.setHeader("Content-Disposition", `attachment; filename="containers_export_${getClientDate(req)}.xlsx"`);
       res.send(buffer);
     } catch (error: any) {
       console.error("Container export-all error:", error);
@@ -725,7 +726,7 @@ export function registerContainerRoutes(app: Express) {
       if (hasManualCostData) {
         try {
           const totalAmount = ratePerKg * totalKg;
-          const voucherDate = data.importDate || new Date().toISOString().split('T')[0];
+          const voucherDate = data.importDate || getClientDate(req);
 
           // Get or create PURCHASES ledger account
           let purchasesAccount = await storage.getLedgerAccountByCode(

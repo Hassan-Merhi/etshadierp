@@ -57,7 +57,10 @@ export async function apiRequest(
     
     const res = await fetch(url, {
       method,
-      headers: data ? { "Content-Type": "application/json" } : {},
+      headers: {
+        ...(data ? { "Content-Type": "application/json" } : {}),
+        "X-Client-Date": new Date().toLocaleDateString('en-CA'),
+      },
       body,
       credentials: "include",
       signal: controller.signal,
@@ -112,6 +115,7 @@ export const getQueryFn: <T>(options: {
       const res = await fetch(url, {
         credentials: "include",
         signal: controller.signal,
+        headers: { "X-Client-Date": new Date().toLocaleDateString('en-CA') },
       });
 
       clearTimeout(timeoutId);

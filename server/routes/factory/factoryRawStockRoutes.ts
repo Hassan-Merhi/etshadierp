@@ -1,3 +1,4 @@
+import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -567,7 +568,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
       if (existing) return res.status(400).json({ message: "This container has already been offloaded" });
 
       const currencyCode = reqCurrencyCode || container.currencyCode || "USD";
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
       const offloadDate = reqOffloadDate || today;
       const mixBatchAllocationsArr = Array.isArray(reqMixBatchAllocations) ? reqMixBatchAllocations : [];
 
@@ -1194,7 +1195,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
             companyId,
             voucherType: "Journal",
             voucherNumber: restoredFreightVoucherNum,
-            voucherDate: container.arrivalDate || new Date().toISOString().split("T")[0],
+            voucherDate: container.arrivalDate || getClientDate(req),
             description: `Freight on container ${container.containerNumber}`,
             totalAmount: String(restoredFreightAmt),
             currency: restoredFreightCurrencyCode,
@@ -1392,7 +1393,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
         }
       }
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
@@ -1585,7 +1586,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
           })
           .returning();
 
-        const today = new Date().toISOString().split('T')[0];
+        const today = getClientDate(req);
         await writeDaybookEntry(tx, {
           companyId,
           txDate: today,

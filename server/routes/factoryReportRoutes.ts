@@ -1,3 +1,4 @@
+import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import PDFDocument from "pdfkit";
 import ExcelJS from "exceljs";
@@ -288,7 +289,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
         await generateExcel(res, company.name, startDate, endDate, supplierSummaries, baleBreakdown, allMixSources, containerMap, supplierMap);
       }
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,

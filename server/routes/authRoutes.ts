@@ -1,3 +1,4 @@
+import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -1015,7 +1016,7 @@ export function registerAuthRoutes(app: Express) {
         return res.json({ hasRate: false });
       }
       
-      const today = new Date().toISOString().split("T")[0];
+      const today = getClientDate(req);
       const rateDate = new Date(latestRate.effectiveDate).toISOString().split("T")[0];
       const hasRate = rateDate === today;
       
