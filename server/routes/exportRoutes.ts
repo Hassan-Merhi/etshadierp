@@ -5,7 +5,9 @@ import { requireAuth, requireRole } from "../auth";
 import { fetchAllCompanies, fetchCompanyExportData } from "../services/exportDataService";
 import { buildCompanyWorkbook } from "../services/exportExcelService";
 import { sendExportEmail } from "../services/emailService";
-import { buildZipBuffer } from "../services/schedulerService";
+import {
+  createJob, getJob, addStep, finishJob, failJob,
+} from "../services/exportJobManager";
 
 const ALLOWED_ROLES = ["Admin", "Owner", "Developer"];
 
@@ -76,7 +78,6 @@ export function registerExportRoutes(app: Express) {
     const { gmailUser, gmailAppPassword, scheduleEnabled } = req.body;
     try {
       const existing = await pool.query(`SELECT id FROM export_settings WHERE id = 1`);
-
       if (!existing.rows || existing.rows.length === 0) {
         await pool.query(
           `INSERT INTO export_settings (id, gmail_user, gmail_app_password, schedule_enabled) VALUES (1, $1, $2, $3)`,
@@ -105,54 +106,122 @@ export function registerExportRoutes(app: Express) {
     }
   });
 
-  // ── Manual export run ──────────────────────────────────────────────────────
+  // ── Async export job: start ────────────────────────────────────────────────
 
-  app.post("/api/export/run", guard, async (req: Request, res: Response) => {
-    const { mode, fromDate, toDate, companyIds } = req.body;
-
-    try {
-      const allCompanies = await fetchAllCompanies();
-      const companies = companyIds && Array.isArray(companyIds) && companyIds.length > 0
-        ? allCompanies.filter((c: any) => companyIds.includes(c.id))
-        : allCompanies;
-
-      if (!companies || companies.length === 0) {
-        return res.status(404).json({ message: "No companies found" });
-      }
-
-      if (mode === "email") {
-        const { zip, names } = await buildZipBuffer(companies);
-        const dateLabel = new Date().toISOString().substring(0, 10);
-        const result = await sendExportEmail(zip, dateLabel, names);
-        return res.json(result);
-      }
-
-      // mode === "download" — stream zip to client
-      const dateLabel = new Date().toISOString().substring(0, 10);
-      res.setHeader("Content-Type", "application/zip");
-      res.setHeader("Content-Disposition", `attachment; filename="DailyExport_${dateLabel}.zip"`);
-
-      const arc = archiver("zip", { zlib: { level: 6 } });
-      arc.pipe(res);
-
-      for (const company of companies) {
-        try {
-          const data = await fetchCompanyExportData(company.id, fromDate, toDate);
-          const xlsxBuf = await buildCompanyWorkbook(data);
-          const safeName = (company.name as string).replace(/[^a-zA-Z0-9_\- ]/g, "").trim();
-          arc.append(xlsxBuf as any, { name: `${safeName}_Export_${dateLabel}.xlsx` });
-        } catch (err: any) {
-          console.error(`[Export] Company ${company.id} failed:`, err.message);
-        }
-      }
-
-      await arc.finalize();
-    } catch (err: any) {
-      if (!res.headersSent) res.status(500).json({ message: err.message });
+  app.post("/api/export/start", guard, async (req: Request, res: Response) => {
+    const { mode, fromDate, toDate } = req.body;
+    if (mode !== "download" && mode !== "email") {
+      return res.status(400).json({ message: "mode must be 'download' or 'email'" });
     }
+
+    const job = createJob(mode);
+    res.json({ jobId: job.id });
+
+    // Run async without blocking the response
+    (async () => {
+      try {
+        addStep(job, "Fetching company list...", "info");
+        const companies = await fetchAllCompanies();
+        if (!companies || companies.length === 0) {
+          failJob(job, "No companies found");
+          return;
+        }
+        addStep(job, `Found ${companies.length} company/companies to export`, "success");
+
+        const xlsxBuffers: { name: string; buf: Buffer }[] = [];
+
+        for (const company of companies) {
+          try {
+            addStep(job, `[${company.name}] Querying all data...`, "info");
+            const data = await fetchCompanyExportData(company.id, fromDate, toDate);
+
+            const totalRecords = [
+              data.vouchers.length, data.voucherEntries.length,
+              data.suppliers.length, data.customers.length,
+              data.employees.length, data.factoryWorkers.length,
+              data.stockItems.length, data.inventory.length,
+              data.containers.length, data.bales.length,
+              data.factoryBales.length, data.purchaseOrders.length,
+              data.auditLog.length,
+            ].reduce((a, b) => a + b, 0);
+
+            addStep(job, `[${company.name}] ${totalRecords.toLocaleString()} records fetched — building Excel workbook...`, "info");
+            const buf = await buildCompanyWorkbook(data);
+            const safeName = company.name.replace(/[^a-zA-Z0-9_\- ]/g, "").trim();
+            xlsxBuffers.push({ name: safeName, buf });
+            addStep(job, `[${company.name}] Excel workbook ready (${(buf.length / 1024 / 1024).toFixed(1)} MB)`, "success");
+          } catch (err: any) {
+            addStep(job, `[${company.name}] Failed: ${err.message}`, "error");
+          }
+        }
+
+        addStep(job, "Building ZIP archive...", "info");
+
+        const zipBuf = await new Promise<Buffer>((resolve, reject) => {
+          const chunks: Buffer[] = [];
+          const arc = archiver("zip", { zlib: { level: 6 } });
+          arc.on("data", (c: Buffer) => chunks.push(c));
+          arc.on("end", () => resolve(Buffer.concat(chunks)));
+          arc.on("error", reject);
+          const dateLabel = new Date().toISOString().substring(0, 10);
+          for (const { name, buf } of xlsxBuffers) {
+            arc.append(buf as any, { name: `${name}_Export_${dateLabel}.xlsx` });
+          }
+          arc.finalize();
+        });
+
+        const sizeMB = (zipBuf.length / 1024 / 1024).toFixed(1);
+        addStep(job, `ZIP archive ready — ${sizeMB} MB total`, "success");
+
+        if (mode === "email") {
+          addStep(job, "Sending email to recipients...", "info");
+          const dateLabel = new Date().toISOString().substring(0, 10);
+          const result = await sendExportEmail(zipBuf, dateLabel, companies.map((c: any) => c.name));
+          if (result.success) {
+            addStep(job, "Email sent successfully to all recipients", "success");
+            finishJob(job);
+          } else {
+            failJob(job, result.error || "Email send failed");
+          }
+        } else {
+          finishJob(job, zipBuf);
+          addStep(job, "Ready to download — starting download now", "success");
+        }
+      } catch (err: any) {
+        failJob(job, err.message || "Unexpected error");
+      }
+    })();
+  });
+
+  // ── Async export job: poll status ──────────────────────────────────────────
+
+  app.get("/api/export/job/:jobId", guard, (req: Request, res: Response) => {
+    const job = getJob(req.params.jobId);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+    res.json({
+      status: job.status,
+      steps: job.steps,
+      error: job.error,
+      hasZip: !!job.zipBuffer,
+    });
+  });
+
+  // ── Async export job: download zip ─────────────────────────────────────────
+
+  app.get("/api/export/download/:jobId", guard, (req: Request, res: Response) => {
+    const job = getJob(req.params.jobId);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+    if (!job.zipBuffer) return res.status(400).json({ message: "ZIP not ready" });
+    const dateLabel = new Date().toISOString().substring(0, 10);
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="DailyExport_${dateLabel}.zip"`);
+    res.send(job.zipBuffer);
+    // Free memory after download
+    job.zipBuffer = undefined;
   });
 
   // ── Companies list for UI ───────────────────────────────────────────────────
+
   app.get("/api/export/companies", guard, async (_req: Request, res: Response) => {
     try {
       const companies = await fetchAllCompanies();
