@@ -136,6 +136,7 @@ const FactoryEmployeesHub = lazy(() => import("@/pages/factory/FactoryEmployeesH
 const FactoryEmployeeDetail = lazy(() => import("@/pages/factory/FactoryEmployeeDetail"));
 const FactorySupplierReport = lazy(() => import("@/pages/factory/FactorySupplierReport"));
 const FactorySupplierStatement = lazy(() => import("@/pages/factory/FactorySupplierStatement"));
+const FactoryBrokerVisualStatement = lazy(() => import("@/pages/factory/FactoryBrokerVisualStatement"));
 const FactoryCustomers = lazy(() => import("@/pages/factory/FactoryCustomers"));
 const FactoryCustomerStatement = lazy(() => import("@/pages/factory/FactoryCustomerStatement"));
 const FactoryInvoicing = lazy(() => import("@/pages/factory/FactoryInvoicing"));
@@ -805,6 +806,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/worker-payroll"><Redirect to="/factory/workers?tab=payroll" /></Route>
                     <Route path="/factory/supplier-report" component={FactorySupplierReport} />
                     <Route path="/factory/supplier-statement" component={FactorySupplierStatement} />
+                    <Route path="/factory/broker-visual-statement" component={FactoryBrokerVisualStatement} />
                     <Route path="/factory/barcode-lookup" component={BarcodeLookup} />
                     <Route path="/factory/import" component={FactoryImport} />
                     <Route path="/factory/bale-relabeling" component={FactoryBaleRelabeling} />
