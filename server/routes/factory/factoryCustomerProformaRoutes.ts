@@ -515,14 +515,6 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)))
         .returning();
 
-      // Also move any proforma stock reservations to the new customer
-      await db.update(proformaStockReservations)
-        .set({ customerId: newCustomerId })
-        .where(and(
-          eq(proformaStockReservations.proformaId, id),
-          eq(proformaStockReservations.companyId, companyId),
-        ));
-
       const [fromCustomer] = await db.select({ legalName: customers.legalName })
         .from(customers).where(eq(customers.id, proforma.customerId));
 
