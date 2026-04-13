@@ -24,7 +24,7 @@ import {
 import { format } from "date-fns";
 import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
-import { adjustInventory } from "../inventoryHelper";
+import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 
 export function registerContainerRoutes(app: Express) {
   app.get("/api/containers", requireAuth, requireNonPOS, async (req, res) => {
