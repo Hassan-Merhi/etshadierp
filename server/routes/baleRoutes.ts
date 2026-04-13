@@ -844,10 +844,21 @@ export function registerBaleRoutes(app: Express) {
         .limit(1);
 
       if (factoryBale) {
+        // Prefer live name from the product table (denormalized productName can be stale)
+        let resolvedProductName = factoryBale.productName;
+        if (factoryBale.productId) {
+          const [liveProduct] = await db
+            .select({ name: factoryBaleProducts.name })
+            .from(factoryBaleProducts)
+            .where(eq(factoryBaleProducts.id, factoryBale.productId))
+            .limit(1);
+          if (liveProduct?.name) resolvedProductName = liveProduct.name;
+        }
+
         baleInfo = {
           id: factoryBale.id,
           baleCode: factoryBale.baleCode,
-          productName: factoryBale.productName,
+          productName: resolvedProductName,
           status: factoryBale.status,
           weightKg: factoryBale.weightKg,
           costPerKg: factoryBale.costPerKg,
