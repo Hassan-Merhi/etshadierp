@@ -844,36 +844,8 @@ export function registerBaleRoutes(app: Express) {
         .limit(1);
 
       if (factoryBale) {
-        // Resolve live product name the same way the bale history does:
-        // primary source = pressing batch's productId (authoritative FK),
-        // fallback = bale's own productId, last resort = denormalized productName string.
-        let resolvedProductName = factoryBale.productName;
-
-        if (factoryBale.pressingBatchId) {
-          const [pb] = await db
-            .select({ productId: factoryPressingBatches.productId })
-            .from(factoryPressingBatches)
-            .where(eq(factoryPressingBatches.id, factoryBale.pressingBatchId))
-            .limit(1);
-          if (pb?.productId) {
-            const [liveProduct] = await db
-              .select({ name: factoryBaleProducts.name })
-              .from(factoryBaleProducts)
-              .where(eq(factoryBaleProducts.id, pb.productId))
-              .limit(1);
-            if (liveProduct?.name) resolvedProductName = liveProduct.name;
-          }
-        }
-
-        // If pressing batch didn't resolve it, try the bale's own productId
-        if (resolvedProductName === factoryBale.productName && factoryBale.productId) {
-          const [liveProduct] = await db
-            .select({ name: factoryBaleProducts.name })
-            .from(factoryBaleProducts)
-            .where(eq(factoryBaleProducts.id, factoryBale.productId))
-            .limit(1);
-          if (liveProduct?.name) resolvedProductName = liveProduct.name;
-        }
+        // Use the name stored on the bale row directly — this matches what the bale history page shows.
+        const resolvedProductName = factoryBale.productName;
 
         baleInfo = {
           id: factoryBale.id,
@@ -1011,7 +983,6 @@ export function registerBaleRoutes(app: Express) {
         }
       }
 
-      console.log(`[BARCODE-LOOKUP] ref=${referenceNumber} factoryBaleId=${factoryBale?.id} baleProductId=${factoryBale?.productId} pressingBatchId=${factoryBale?.pressingBatchId} resolvedName=${baleInfo?.productName} labelProductId=${labelPrint?.productId} labelArticle=${labelPrint?.articleCode}`);
       res.json({
         labelPrint: { ...labelPrint, printedByName, scannedByName },
         product: product || null,
