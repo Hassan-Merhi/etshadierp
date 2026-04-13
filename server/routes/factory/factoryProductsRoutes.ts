@@ -201,6 +201,35 @@ export function registerFactoryProductsRoutes(app: Express) {
     }
   });
 
+  // GET /api/factory/bale-products/merge-stats — must be before /:id to avoid interception
+  app.get("/api/factory/bale-products/merge-stats", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rows = await db.execute(sql`
+        SELECT
+          fbp.id,
+          fbp.code,
+          fbp.article_code AS "articleCode",
+          fbp.name,
+          fbp.active,
+          fbp.category_id AS "categoryId",
+          COUNT(fb.id) FILTER (WHERE fb.status NOT IN ('REMOVED')) AS "totalBales",
+          COUNT(fb.id) FILTER (WHERE fb.status IN ('IN_STOCK','FINALIZED')) AS "inStockBales"
+        FROM factory_bale_products fbp
+        LEFT JOIN factory_bales fb ON fb.product_id = fbp.id AND fb.company_id = ${companyId}
+        WHERE fbp.company_id = ${companyId}
+        GROUP BY fbp.id, fbp.code, fbp.article_code, fbp.name, fbp.active, fbp.category_id
+        ORDER BY fbp.name ASC
+      `);
+
+      res.json(rows.rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/factory/bale-products/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -874,35 +903,6 @@ export function registerFactoryProductsRoutes(app: Express) {
       res.json({ updated });
     } catch (error: any) {
       console.error("Error applying bulk rename:", error);
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // GET /api/factory/bale-products/merge-stats — returns all bale products with bale counts
-  app.get("/api/factory/bale-products/merge-stats", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-
-      const rows = await db.execute(sql`
-        SELECT
-          fbp.id,
-          fbp.code,
-          fbp.article_code AS "articleCode",
-          fbp.name,
-          fbp.active,
-          fbp.category_id AS "categoryId",
-          COUNT(fb.id) FILTER (WHERE fb.status NOT IN ('REMOVED')) AS "totalBales",
-          COUNT(fb.id) FILTER (WHERE fb.status IN ('IN_STOCK','FINALIZED')) AS "inStockBales"
-        FROM factory_bale_products fbp
-        LEFT JOIN factory_bales fb ON fb.product_id = fbp.id AND fb.company_id = ${companyId}
-        WHERE fbp.company_id = ${companyId}
-        GROUP BY fbp.id, fbp.code, fbp.article_code, fbp.name, fbp.active, fbp.category_id
-        ORDER BY fbp.name ASC
-      `);
-
-      res.json(rows.rows);
-    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
