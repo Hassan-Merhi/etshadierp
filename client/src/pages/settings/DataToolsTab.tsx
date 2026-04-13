@@ -166,33 +166,6 @@ export function DataToolsTab() {
   const [isSilentApplying, setIsSilentApplying] = useState(false);
   const [silentAppliedCount, setSilentAppliedCount] = useState(0);
 
-  // Merge Bale Products state
-  const [mergeOpen, setMergeOpen] = useState(false);
-  const [mergeSearch, setMergeSearch] = useState("");
-  const [mergeSelected, setMergeSelected] = useState<Set<number>>(new Set());
-  const [mergeTargetId, setMergeTargetId] = useState<number | null>(null);
-  const [mergeStep, setMergeStep] = useState<"select" | "confirm" | "done">("select");
-  const [mergeResult, setMergeResult] = useState<{ movedBales: number; mergedProducts: number; targetName: string } | null>(null);
-
-  const { data: mergeStats = [], isLoading: mergeStatsLoading } = useQuery<any[]>({
-    queryKey: ["/api/factory/bale-products/merge-stats"],
-    enabled: mergeOpen && appMode === "factory",
-  });
-
-  const mergeMutation = useMutation({
-    mutationFn: async ({ targetId, sourceIds }: { targetId: number; sourceIds: number[] }) => {
-      const res = await factoryApiRequest("POST", "/api/factory/bale-products/merge", { targetId, sourceIds });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
-      return res.json();
-    },
-    onSuccess: (data) => {
-      setMergeResult(data);
-      setMergeStep("done");
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products/merge-stats"] });
-    },
-    onError: (e: any) => { toast({ title: "Merge failed", description: e.message, variant: "destructive" }); },
-  });
 
   // Fetch locations for the current company
   const { data: locations = [] } = useQuery<any[]>({
@@ -861,15 +834,12 @@ export function DataToolsTab() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => { setMergeSearch(""); setMergeSelected(new Set()); setMergeTargetId(null); setMergeStep("select"); setMergeResult(null); setMergeOpen(true); }}
-                data-testid="button-open-merge-products"
-              >
-                <ArrowLeftRight className="h-4 w-4 mr-2" />
-                Open Merge Tool
-              </Button>
+              <Link href="/factory/merge-bale-products">
+                <Button variant="outline" className="w-full" data-testid="button-open-merge-products">
+                  <ArrowLeftRight className="h-4 w-4 mr-2" />
+                  Open Merge Tool
+                </Button>
+              </Link>
             </CardContent>
           </Card>
         )}
@@ -1081,202 +1051,6 @@ export function DataToolsTab() {
                   </div>
                 )}
               </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Merge Bale Products Dialog */}
-      {appMode === "factory" && (
-        <Dialog open={mergeOpen} onOpenChange={(o) => { if (!mergeMutation.isPending) { setMergeOpen(o); if (!o) { setMergeSearch(""); setMergeSelected(new Set()); setMergeTargetId(null); setMergeStep("select"); setMergeResult(null); } } }}>
-          <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Merge Bale Products</DialogTitle>
-              <DialogDescription>
-                Select the products to merge, then choose which one to keep as the primary. All bales from the others will move to the primary, and the duplicates will be deactivated.
-              </DialogDescription>
-            </DialogHeader>
-
-            {mergeStep === "done" && mergeResult ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                  <Check className="h-5 w-5" />
-                  <p className="font-semibold">Merge complete</p>
-                </div>
-                <div className="rounded-md border p-4 space-y-1 text-sm">
-                  <div><span className="text-muted-foreground">Primary product kept: </span><strong>{mergeResult.targetName}</strong></div>
-                  <div><span className="text-muted-foreground">Duplicates deactivated: </span><strong>{mergeResult.mergedProducts}</strong></div>
-                  <div><span className="text-muted-foreground">Bales reassigned: </span><strong>{mergeResult.movedBales}</strong></div>
-                </div>
-                <DialogFooter>
-                  <Button onClick={() => { setMergeOpen(false); }} data-testid="button-merge-close">Close</Button>
-                </DialogFooter>
-              </div>
-            ) : mergeStep === "confirm" ? (
-              <div className="space-y-4">
-                <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3 text-sm text-amber-800 dark:text-amber-300">
-                  This cannot be undone. All bales from the duplicate products will be moved to the primary, and the duplicates will be deactivated.
-                </div>
-                {(() => {
-                  const target = mergeStats.find((p: any) => p.id === mergeTargetId);
-                  const sources = mergeStats.filter((p: any) => mergeSelected.has(p.id) && p.id !== mergeTargetId);
-                  const totalMovingBales = sources.reduce((s: number, p: any) => s + parseInt(p.totalBales || "0"), 0);
-                  return (
-                    <div className="space-y-3 text-sm">
-                      <div className="rounded-md border p-3 space-y-1">
-                        <div className="text-xs text-muted-foreground mb-1">Keeping (primary)</div>
-                        <div className="font-semibold">{target?.name}</div>
-                        <div className="text-muted-foreground">{target?.code}{target?.articleCode ? ` · ${target.articleCode}` : ""} · {target?.inStockBales || 0} in stock, {target?.totalBales || 0} total bales</div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-xs text-muted-foreground">Merging into primary ({sources.length} product{sources.length !== 1 ? "s" : ""})</div>
-                        {sources.map((p: any) => (
-                          <div key={p.id} className="rounded-md border p-2 flex items-center justify-between gap-2">
-                            <div>
-                              <span className="font-medium">{p.name}</span>
-                              <span className="text-muted-foreground text-xs ml-2">{p.code}{p.articleCode ? ` · ${p.articleCode}` : ""}</span>
-                            </div>
-                            <Badge variant="secondary">{p.inStockBales || 0} in stock</Badge>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="text-muted-foreground">{totalMovingBales} bale(s) total will move to <strong>{target?.name}</strong>.</div>
-                    </div>
-                  );
-                })()}
-                <DialogFooter className="gap-2 flex-wrap">
-                  <Button variant="outline" onClick={() => setMergeStep("select")} disabled={mergeMutation.isPending} data-testid="button-merge-back">Back</Button>
-                  <Button
-                    onClick={() => {
-                      const sourceIds = Array.from(mergeSelected).filter(id => id !== mergeTargetId);
-                      mergeMutation.mutate({ targetId: mergeTargetId!, sourceIds });
-                    }}
-                    disabled={mergeMutation.isPending}
-                    data-testid="button-merge-confirm"
-                  >
-                    {mergeMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Merging...</> : <><ArrowLeftRight className="h-4 w-4 mr-2" />Confirm Merge</>}
-                  </Button>
-                </DialogFooter>
-              </div>
-            ) : (
-              (() => {
-                const q = mergeSearch.trim().toLowerCase();
-                const filteredProducts = q
-                  ? (mergeStats as any[]).filter((p: any) =>
-                      p.name.toLowerCase().includes(q) ||
-                      (p.code || "").toLowerCase().includes(q) ||
-                      (p.articleCode || "").toLowerCase().includes(q)
-                    )
-                  : (mergeStats as any[]);
-
-                const selectedProducts = (mergeStats as any[]).filter((p: any) => mergeSelected.has(p.id));
-                const canProceed = mergeSelected.size >= 2 && mergeTargetId !== null;
-
-                return (
-                  <div className="space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      Check any products you want to combine, then choose which one to keep as the primary.
-                    </p>
-                    <Input
-                      placeholder="Search by name, code, or article code..."
-                      value={mergeSearch}
-                      onChange={(e) => setMergeSearch(e.target.value)}
-                      data-testid="input-merge-search"
-                    />
-
-                    {/* Full product list with checkboxes */}
-                    {mergeStatsLoading ? (
-                      <div className="space-y-2">{[1,2,3,4].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
-                    ) : filteredProducts.length === 0 ? (
-                      <div className="rounded-md border p-6 text-center text-sm text-muted-foreground">
-                        No products match your search.
-                      </div>
-                    ) : (
-                      <div className="rounded-md border divide-y max-h-[38vh] overflow-y-auto">
-                        {filteredProducts.map((p: any) => {
-                          const isChecked = mergeSelected.has(p.id);
-                          return (
-                            <label
-                              key={p.id}
-                              className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover-elevate ${isChecked ? "bg-muted/40" : ""}`}
-                              data-testid={`checkbox-merge-${p.id}`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => {
-                                  const next = new Set(mergeSelected);
-                                  if (isChecked) {
-                                    next.delete(p.id);
-                                    if (mergeTargetId === p.id) setMergeTargetId(null);
-                                  } else {
-                                    next.add(p.id);
-                                  }
-                                  setMergeSelected(next);
-                                }}
-                                className="h-4 w-4 shrink-0 accent-primary"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <span className="text-sm font-medium">{p.name}</span>
-                                {!p.active && <span className="ml-1.5 text-xs text-muted-foreground">(inactive)</span>}
-                                <div className="text-xs text-muted-foreground">{p.code}{p.articleCode ? ` · ${p.articleCode}` : ""}</div>
-                              </div>
-                              <div className="text-right shrink-0 text-xs text-muted-foreground">
-                                <div>{p.inStockBales || 0} in stock</div>
-                                <div>{p.totalBales || 0} total</div>
-                              </div>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Pick primary from selected */}
-                    {selectedProducts.length >= 2 && (
-                      <div className="space-y-1.5">
-                        <p className="text-xs text-muted-foreground font-medium">Choose which to keep as primary ({selectedProducts.length} selected):</p>
-                        {selectedProducts.map((p: any) => {
-                          const isTarget = mergeTargetId === p.id;
-                          return (
-                            <button
-                              key={p.id}
-                              className={`w-full flex items-center gap-3 rounded-md border px-3 py-2 text-left text-sm ${isTarget ? "border-primary bg-primary/5" : "hover-elevate"}`}
-                              onClick={() => setMergeTargetId(p.id)}
-                              data-testid={`radio-merge-target-${p.id}`}
-                            >
-                              <div className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 ${isTarget ? "border-primary bg-primary" : "border-muted-foreground"}`} />
-                              <div className="flex-1 min-w-0">
-                                <span className="font-medium">{p.name}</span>
-                                {!p.active && <span className="ml-1.5 text-xs text-muted-foreground">(inactive)</span>}
-                                <div className="text-xs text-muted-foreground">{p.code}{p.articleCode ? ` · ${p.articleCode}` : ""}</div>
-                              </div>
-                              <div className="text-right shrink-0 text-xs text-muted-foreground">
-                                <div>{p.inStockBales || 0} in stock</div>
-                                <div>{p.totalBales || 0} total</div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {mergeSelected.size >= 2 && !mergeTargetId && (
-                      <p className="text-xs text-muted-foreground">Pick which product to keep as primary above.</p>
-                    )}
-
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setMergeOpen(false)} data-testid="button-merge-cancel">Cancel</Button>
-                      <Button
-                        disabled={!canProceed}
-                        onClick={() => setMergeStep("confirm")}
-                        data-testid="button-merge-next"
-                      >
-                        Next: Review &amp; Confirm
-                      </Button>
-                    </DialogFooter>
-                  </div>
-                );
-              })()
             )}
           </DialogContent>
         </Dialog>
