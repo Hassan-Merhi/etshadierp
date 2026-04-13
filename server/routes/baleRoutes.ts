@@ -844,19 +844,12 @@ export function registerBaleRoutes(app: Express) {
         .limit(1);
 
       if (factoryBale) {
-        // Prefer live name from the product table (denormalized productName can be stale)
+        // Resolve live product name the same way the bale history does:
+        // primary source = pressing batch's productId (authoritative FK),
+        // fallback = bale's own productId, last resort = denormalized productName string.
         let resolvedProductName = factoryBale.productName;
-        // Try bale's own productId first
-        const baleProductId = factoryBale.productId;
-        if (baleProductId) {
-          const [liveProduct] = await db
-            .select({ name: factoryBaleProducts.name })
-            .from(factoryBaleProducts)
-            .where(eq(factoryBaleProducts.id, baleProductId))
-            .limit(1);
-          if (liveProduct?.name) resolvedProductName = liveProduct.name;
-        } else if (factoryBale.pressingBatchId) {
-          // Fallback: resolve via the pressing batch's productId
+
+        if (factoryBale.pressingBatchId) {
           const [pb] = await db
             .select({ productId: factoryPressingBatches.productId })
             .from(factoryPressingBatches)
@@ -870,6 +863,16 @@ export function registerBaleRoutes(app: Express) {
               .limit(1);
             if (liveProduct?.name) resolvedProductName = liveProduct.name;
           }
+        }
+
+        // If pressing batch didn't resolve it, try the bale's own productId
+        if (resolvedProductName === factoryBale.productName && factoryBale.productId) {
+          const [liveProduct] = await db
+            .select({ name: factoryBaleProducts.name })
+            .from(factoryBaleProducts)
+            .where(eq(factoryBaleProducts.id, factoryBale.productId))
+            .limit(1);
+          if (liveProduct?.name) resolvedProductName = liveProduct.name;
         }
 
         baleInfo = {
