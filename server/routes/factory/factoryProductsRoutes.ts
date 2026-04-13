@@ -940,6 +940,8 @@ export function registerFactoryProductsRoutes(app: Express) {
       }
 
       // In a transaction: reroute all referencing rows then deactivate sources
+      // sourceIds are pre-validated integers — safe to inline via sql.raw
+      const sourceIdsLiteral = sql.raw(`ARRAY[${sourceIds.join(",")}]::int[]`);
       let movedBales = 0;
       await db.transaction(async (tx) => {
         // Update factory_bales: reassign product + fix inline article_code and product_name
@@ -948,7 +950,7 @@ export function registerFactoryProductsRoutes(app: Express) {
           SET product_id = ${targetId},
               article_code = ${target.articleCode || null},
               product_name = ${target.name}
-          WHERE product_id = ANY(${sourceIds}::int[])
+          WHERE product_id = ANY(${sourceIdsLiteral})
             AND company_id = ${companyId}
         `);
         movedBales = (updateResult as any).rowCount ?? 0;
@@ -957,7 +959,7 @@ export function registerFactoryProductsRoutes(app: Express) {
         await tx.execute(sql`
           UPDATE factory_pressing_batches
           SET product_id = ${targetId}
-          WHERE product_id = ANY(${sourceIds}::int[])
+          WHERE product_id = ANY(${sourceIdsLiteral})
             AND company_id = ${companyId}
         `);
 
@@ -967,7 +969,7 @@ export function registerFactoryProductsRoutes(app: Express) {
           SET product_id = ${targetId},
               product_name = ${target.name},
               article_code = ${target.articleCode || null}
-          WHERE product_id = ANY(${sourceIds}::int[])
+          WHERE product_id = ANY(${sourceIdsLiteral})
             AND company_id = ${companyId}
         `);
 
@@ -975,7 +977,7 @@ export function registerFactoryProductsRoutes(app: Express) {
         await tx.execute(sql`
           UPDATE factory_bale_products
           SET active = false, updated_at = NOW()
-          WHERE id = ANY(${sourceIds}::int[])
+          WHERE id = ANY(${sourceIdsLiteral})
             AND company_id = ${companyId}
         `);
       });
