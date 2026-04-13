@@ -2167,7 +2167,7 @@ export function registerFactoryBalesRoutes(app: Express) {
           const referenceNumber = `REF${nextRef}`;
           nextRef++;
 
-          const status = bale.status || "FINALIZED";
+          const status = bale.status || "IN_STOCK";
           const costPerKg = bale.costPerKg || "0";
           const weight = parseFloat(bale.weightKg);
           const cost = parseFloat(costPerKg);
