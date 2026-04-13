@@ -1011,6 +1011,7 @@ export function registerBaleRoutes(app: Express) {
         }
       }
 
+      console.log(`[BARCODE-LOOKUP] ref=${referenceNumber} factoryBaleId=${factoryBale?.id} baleProductId=${factoryBale?.productId} pressingBatchId=${factoryBale?.pressingBatchId} resolvedName=${baleInfo?.productName} labelProductId=${labelPrint?.productId} labelArticle=${labelPrint?.articleCode}`);
       res.json({
         labelPrint: { ...labelPrint, printedByName, scannedByName },
         product: product || null,
