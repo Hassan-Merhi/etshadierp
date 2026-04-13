@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, FlaskConical, FileSpreadsheet, FileText, SlidersHorizontal, PlusCircle } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, FlaskConical, FileSpreadsheet, FileText, SlidersHorizontal, PlusCircle, MinusCircle } from "lucide-react";
 import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
 import { EditMixBatchDialog } from "@/components/EditMixBatchDialog";
 import type { FactoryMixBatch } from "@shared/schema";
@@ -358,6 +358,11 @@ export default function ProductionRawStock() {
   const [adjMaterialLabel, setAdjMaterialLabel] = useState("");
   const [adjIsNewMaterial, setAdjIsNewMaterial] = useState(false);
   const [adjSupplierId, setAdjSupplierId] = useState<string>("");
+  // Deduct from received dialog
+  const [deductDialogOpen, setDeductDialogOpen] = useState(false);
+  const [deductingRow, setDeductingRow] = useState<{ supplierId: number; supplierName: string; receivedKg: string } | null>(null);
+  const [deductKg, setDeductKg] = useState("");
+  const [deductNotes, setDeductNotes] = useState("");
   // Add-to-batch quick dialog state
   const [addToBatchOpen, setAddToBatchOpen] = useState(false);
   const [addToBatchSource, setAddToBatchSource] = useState<{ supplierId: number; supplierName: string; costPerKg: string; remainingKg: string } | null>(null);
@@ -526,6 +531,29 @@ export default function ProductionRawStock() {
       setAdjMaterialLabel("");
       setAdjSupplierId("");
       toast({ title: "Saved", description: "Stock adjustment recorded successfully." });
+    },
+    onError: (err: any) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deductReceivedMutation = useMutation({
+    mutationFn: async (payload: { supplierId: number; kg: string; notes?: string }) => {
+      const res = await modeApiRequest("POST", "/api/factory/raw-stock/deduct-received", payload);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to deduct");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/by-container"] });
+      setDeductDialogOpen(false);
+      setDeductKg("");
+      setDeductNotes("");
+      toast({ title: "Deducted", description: `${data.deducted} kg removed from received stock.` });
     },
     onError: (err: any) => {
       if (err?._handledGlobally) return;
@@ -1138,6 +1166,22 @@ export default function ProductionRawStock() {
                           <SlidersHorizontal className="h-3 w-3 mr-1" />
                           Adjust
                         </Button>
+                        {row.supplierId && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            data-testid={`button-deduct-received-${row.supplierId}`}
+                            onClick={() => {
+                              setDeductingRow({ supplierId: row.supplierId!, supplierName: row.supplierName, receivedKg: row.receivedKg });
+                              setDeductKg("");
+                              setDeductNotes("");
+                              setDeductDialogOpen(true);
+                            }}
+                          >
+                            <MinusCircle className="h-3 w-3 mr-1" />
+                            Deduct
+                          </Button>
+                        )}
                         {row.supplierId && parseFloat(row.freeKg || "0") > 0.001 && (
                           <Button
                             size="sm"
@@ -2944,6 +2988,61 @@ export default function ProductionRawStock() {
               data-testid="button-adj-confirm"
             >
               {createAdjustmentMutation.isPending ? "Saving..." : "Save Adjustment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Deduct from Received Dialog ── */}
+      <Dialog open={deductDialogOpen} onOpenChange={(open) => { setDeductDialogOpen(open); if (!open) { setDeductingRow(null); setDeductKg(""); setDeductNotes(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MinusCircle className="h-4 w-4 text-destructive" />
+              Deduct from Received — {deductingRow?.supplierName}
+            </DialogTitle>
+            <DialogDescription>
+              Directly reduces the received kg on the raw stock record. Free kg auto-adjusts.
+              Current received: <strong>{parseFloat(deductingRow?.receivedKg || "0").toLocaleString(undefined, { maximumFractionDigits: 3 })} kg</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label>Amount to deduct (kg)</Label>
+              <Input
+                type="number"
+                min="0.001"
+                step="0.001"
+                placeholder="e.g. 500"
+                value={deductKg}
+                onChange={(e) => setDeductKg(e.target.value)}
+                data-testid="input-deduct-kg"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Notes (optional)</Label>
+              <Input
+                placeholder="Reason for deduction…"
+                value={deductNotes}
+                onChange={(e) => setDeductNotes(e.target.value)}
+                data-testid="input-deduct-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeductDialogOpen(false)} data-testid="button-deduct-cancel">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deductReceivedMutation.isPending || !deductKg || parseFloat(deductKg) <= 0}
+              onClick={() => {
+                if (!deductingRow || !deductKg || parseFloat(deductKg) <= 0) return;
+                deductReceivedMutation.mutate({ supplierId: deductingRow.supplierId, kg: deductKg, notes: deductNotes || undefined });
+              }}
+              data-testid="button-deduct-confirm"
+            >
+              {deductReceivedMutation.isPending ? "Deducting…" : "Confirm Deduct"}
             </Button>
           </DialogFooter>
         </DialogContent>

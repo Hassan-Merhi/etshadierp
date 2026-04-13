@@ -270,6 +270,76 @@ export function registerFactoryRawStockRoutes(app: Express) {
     }
   });
 
+  // POST deduct from received_kg directly on factory_raw_stock rows for a supplier
+  app.post("/api/factory/raw-stock/deduct-received", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { supplierId, kg, notes } = req.body;
+      if (!supplierId) return res.status(400).json({ message: "supplierId is required" });
+      if (!kg || parseFloat(kg) <= 0) return res.status(400).json({ message: "kg must be > 0" });
+
+      const deductKg = parseFloat(kg);
+
+      // Find all raw_stock rows for this supplier, ordered newest first
+      const rows = await db
+        .select({
+          id: factoryRawStock.id,
+          receivedKg: factoryRawStock.receivedKg,
+          usedKg: factoryRawStock.usedKg,
+        })
+        .from(factoryRawStock)
+        .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
+        .where(and(
+          eq(factoryRawStock.companyId, companyId),
+          eq(factoryContainers.supplierId, Number(supplierId)),
+          sql`${factoryContainers.status} != 'DELETED'`
+        ))
+        .orderBy(desc(factoryRawStock.offloadedAt));
+
+      if (rows.length === 0) return res.status(404).json({ message: "No raw stock rows found for this supplier" });
+
+      // Validate: total free (received - used) across all rows must cover the deduction
+      const totalFree = rows.reduce((sum, r) => sum + parseFloat(r.receivedKg as string) - parseFloat(r.usedKg as string), 0);
+      if (deductKg > parseFloat(rows.reduce((sum, r) => sum + parseFloat(r.receivedKg as string), 0).toFixed(3))) {
+        return res.status(400).json({ message: `Cannot deduct ${deductKg} kg — total received is only ${rows.reduce((sum, r) => sum + parseFloat(r.receivedKg as string), 0).toFixed(3)} kg` });
+      }
+
+      // Deduct from rows newest-first, respecting that received can't go below used
+      let remaining = deductKg;
+      const updates: { id: number; newReceived: number }[] = [];
+      for (const row of rows) {
+        if (remaining <= 0) break;
+        const received = parseFloat(row.receivedKg as string);
+        const used = parseFloat(row.usedKg as string);
+        const canDeduct = received - used; // can't go below used
+        const take = Math.min(remaining, canDeduct);
+        if (take > 0) {
+          updates.push({ id: row.id, newReceived: received - take });
+          remaining -= take;
+        }
+      }
+
+      if (remaining > 0.001) {
+        return res.status(400).json({ message: `Can only deduct up to ${(deductKg - remaining).toFixed(3)} kg — the rest is already used in batches` });
+      }
+
+      await db.transaction(async (tx) => {
+        for (const u of updates) {
+          await tx.update(factoryRawStock)
+            .set({ receivedKg: String(u.newReceived.toFixed(3)) })
+            .where(eq(factoryRawStock.id, u.id));
+        }
+      });
+
+      res.json({ deducted: deductKg, rowsUpdated: updates.length });
+    } catch (error: any) {
+      console.error("Error deducting received kg:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // GET all adjustments for display/audit
   app.get("/api/factory/raw-stock/adjustments", requireAuth, async (req: any, res: any) => {
     try {
