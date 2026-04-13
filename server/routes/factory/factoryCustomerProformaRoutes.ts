@@ -472,6 +472,69 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
     }
   });
 
+  // Transfer a proforma to a different customer
+  app.patch("/api/factory/customer-proformas/:id/transfer", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const { targetCustomerId } = req.body;
+      if (!targetCustomerId) return res.status(400).json({ message: "targetCustomerId is required" });
+
+      const [proforma] = await db.select().from(customerProformas)
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
+      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+
+      const newCustomerId = parseInt(targetCustomerId);
+      if (newCustomerId === proforma.customerId) {
+        return res.status(400).json({ message: "Target customer is the same as the current customer" });
+      }
+
+      // Verify target customer belongs to this company
+      const [targetCustomer] = await db.select({ id: customers.id, legalName: customers.legalName })
+        .from(customers)
+        .where(and(eq(customers.id, newCustomerId), eq(customers.companyId, companyId)));
+      if (!targetCustomer) return res.status(404).json({ message: "Target customer not found" });
+
+      // Check for name conflict on target customer
+      const [conflict] = await db.select({ id: customerProformas.id }).from(customerProformas)
+        .where(and(
+          eq(customerProformas.companyId, companyId),
+          eq(customerProformas.customerId, newCustomerId),
+          eq(customerProformas.name, proforma.name),
+        ));
+      if (conflict) {
+        return res.status(409).json({
+          message: `Customer "${targetCustomer.legalName}" already has a proforma named "${proforma.name}". Rename it first before transferring.`,
+        });
+      }
+
+      const [updated] = await db.update(customerProformas)
+        .set({ customerId: newCustomerId, updatedAt: new Date() })
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)))
+        .returning();
+
+      // Also move any proforma stock reservations to the new customer
+      await db.update(proformaStockReservations)
+        .set({ customerId: newCustomerId })
+        .where(and(
+          eq(proformaStockReservations.proformaId, id),
+          eq(proformaStockReservations.companyId, companyId),
+        ));
+
+      const [fromCustomer] = await db.select({ legalName: customers.legalName })
+        .from(customers).where(eq(customers.id, proforma.customerId));
+
+      console.log(`[PROFORMA TRANSFER] id=${id} name="${proforma.name}" from customer ${proforma.customerId} ("${fromCustomer?.legalName}") → ${newCustomerId} ("${targetCustomer.legalName}")`);
+
+      res.json({ ...updated, targetCustomerName: targetCustomer.legalName });
+    } catch (error: any) {
+      console.error("Error transferring proforma:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Toggle price_fixed flag on a proforma line
   app.patch("/api/factory/customer-proforma-lines/:lineId/toggle-fixed", requireAuth, async (req: any, res: any) => {
     try {

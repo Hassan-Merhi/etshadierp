@@ -13,7 +13,7 @@ import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Star, Pencil, FileText, Check, LayoutGrid, Download, RefreshCw, Search, BookOpen, PenLine, Truck } from "lucide-react";
+import { Plus, Trash2, Star, Pencil, FileText, Check, LayoutGrid, Download, RefreshCw, Search, BookOpen, PenLine, Truck, ArrowRightLeft } from "lucide-react";
 import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -73,6 +73,8 @@ export default function FactoryProformas() {
   const [catalogSelectedItem, setCatalogSelectedItem] = useState<any | null>(null);
   const [createLoadingProforma, setCreateLoadingProforma] = useState<Proforma | null>(null);
   const [createLoadingLocationId, setCreateLoadingLocationId] = useState<string>("");
+  const [transferProforma, setTransferProforma] = useState<Proforma | null>(null);
+  const [transferTargetCustomerId, setTransferTargetCustomerId] = useState<string>("");
 
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId) : null;
 
@@ -175,6 +177,22 @@ export default function FactoryProformas() {
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const transferProformaMutation = useMutation({
+    mutationFn: async ({ id, targetCustomerId }: { id: number; targetCustomerId: number }) => {
+      return await modeApiRequest("PATCH", `/api/factory/customer-proformas/${id}/transfer`, { targetCustomerId });
+    },
+    onSuccess: (data: any) => {
+      toast({ title: "Proforma transferred", description: `Proforma moved to ${data.targetCustomerName}` });
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      setTransferProforma(null);
+      setTransferTargetCustomerId("");
+    },
+    onError: (error: Error) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "Transfer failed", description: error.message, variant: "destructive" });
     },
   });
 
@@ -423,6 +441,18 @@ export default function FactoryProformas() {
                         title="Rename proforma"
                       >
                         <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setTransferProforma(proforma);
+                          setTransferTargetCustomerId("");
+                        }}
+                        data-testid={`button-transfer-proforma-${proforma.id}`}
+                        title="Transfer to another customer"
+                      >
+                        <ArrowRightLeft className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -691,6 +721,65 @@ export default function FactoryProformas() {
                 data-testid="button-submit-rename"
               >
                 {renameProformaMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Transfer Proforma Dialog ────────────────────────────────────── */}
+      <Dialog open={!!transferProforma} onOpenChange={(open) => { if (!open) { setTransferProforma(null); setTransferTargetCustomerId(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Transfer Proforma</DialogTitle>
+            <DialogDescription>
+              Move <strong>{transferProforma?.name}</strong> to a different customer. All lines and reservations will be moved with it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Current Customer</label>
+              <p className="text-sm text-muted-foreground">
+                {customers.find((c: Customer) => c.id === transferProforma?.customerId)?.legalName ?? "—"}
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Transfer To</label>
+              <Select
+                value={transferTargetCustomerId}
+                onValueChange={setTransferTargetCustomerId}
+              >
+                <SelectTrigger data-testid="select-transfer-customer">
+                  <SelectValue placeholder="Select customer..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers
+                    .filter((c: Customer) => c.id !== transferProforma?.customerId)
+                    .map((c: Customer) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.legalName}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => { setTransferProforma(null); setTransferTargetCustomerId(""); }}
+                data-testid="button-cancel-transfer"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!transferProforma || !transferTargetCustomerId) return;
+                  transferProformaMutation.mutate({ id: transferProforma.id, targetCustomerId: parseInt(transferTargetCustomerId) });
+                }}
+                disabled={!transferTargetCustomerId || transferProformaMutation.isPending}
+                data-testid="button-confirm-transfer"
+              >
+                {transferProformaMutation.isPending ? "Transferring..." : "Transfer"}
               </Button>
             </div>
           </div>
