@@ -45,26 +45,13 @@ function ccySymbol(cc: string) {
 export default function FactoryBrokerVisualStatement() {
   const { formatDisplayDate } = useDateFormat();
 
-  const [companyId, setCompanyId] = useState<number | null>(null);
   const [brokerId, setBrokerId] = useState<string>("");
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
 
-  // Companies
-  const { data: companies = [] } = useQuery<any[]>({ queryKey: ["/api/user/companies"] });
-  const { data: me } = useQuery<any>({ queryKey: ["/api/auth/me"] });
-
-  // When company selected, auto-use factory company id
-  const selectedCompany = (companies as any[]).find((c: any) => c.id === companyId);
-
-  // Suppliers for the selected company (to list brokers = those with children)
+  // Suppliers for the current factory company (server reads company from session)
   const { data: suppliers = [] } = useQuery<any[]>({
-    queryKey: ["/api/factory/suppliers", companyId],
-    queryFn: async () => {
-      const res = await factoryApiRequest("GET", `/api/factory/suppliers?companyId=${companyId}`);
-      return res.json();
-    },
-    enabled: !!companyId,
+    queryKey: ["/api/factory/suppliers"],
   });
 
   // Brokers = suppliers that have children OR have parentId = null and are linked
@@ -162,32 +149,15 @@ export default function FactoryBrokerVisualStatement() {
       <Card>
         <CardContent className="pt-4 pb-4">
           <div className="flex flex-wrap gap-4 items-end">
-            <div className="space-y-1 min-w-[200px]">
-              <Label>Company</Label>
-              <Select
-                value={companyId ? String(companyId) : ""}
-                onValueChange={(v) => { setCompanyId(Number(v)); setBrokerId(""); }}
-              >
-                <SelectTrigger data-testid="select-company">
-                  <SelectValue placeholder="Select company…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(companies as any[]).map((c: any) => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="space-y-1 min-w-[220px]">
               <Label>Broker</Label>
               <Select
                 value={brokerId}
                 onValueChange={setBrokerId}
-                disabled={!companyId || brokers.length === 0}
+                disabled={brokers.length === 0}
               >
                 <SelectTrigger data-testid="select-broker">
-                  <SelectValue placeholder={companyId ? (brokers.length === 0 ? "No brokers found" : "Select broker…") : "Select company first"} />
+                  <SelectValue placeholder={brokers.length === 0 ? "No brokers found" : "Select broker…"} />
                 </SelectTrigger>
                 <SelectContent>
                   {brokers.map((b: any) => (
@@ -229,7 +199,7 @@ export default function FactoryBrokerVisualStatement() {
       </Card>
 
       {!brokerId && (
-        <p className="text-sm text-muted-foreground">Select a company and broker to view the statement.</p>
+        <p className="text-sm text-muted-foreground">Select a broker to view the statement.</p>
       )}
 
       {brokerId && isLoading && (
