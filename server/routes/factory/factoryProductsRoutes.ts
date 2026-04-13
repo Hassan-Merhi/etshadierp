@@ -207,6 +207,7 @@ export function registerFactoryProductsRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(404).json({ message: "Product not found" });
       const [product] = await db
         .select()
         .from(factoryBaleProducts)
