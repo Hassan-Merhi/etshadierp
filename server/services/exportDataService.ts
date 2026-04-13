@@ -152,6 +152,18 @@ export interface CompanyExportData {
   importLogs: any[];
   // Audit
   auditLog: any[];
+  // ── Enriched / Detail Views ────────────────────────────────────────────────
+  voucherLinesDetail: any[];
+  poDetail: any[];
+  stockTransferDetail: any[];
+  supplierBalances: any[];
+  supplierTxnDetail: any[];
+  customerBalancesDetail: any[];
+  customerOrderDetail: any[];
+  creditNoteDetail: any[];
+  salaryAdvancesDetail: any[];
+  employeeTxnDetail: any[];
+  locationStockDetail: any[];
 }
 
 async function q(sql: string, params?: any[]): Promise<any[]> {
@@ -311,6 +323,17 @@ export async function fetchCompanyExportData(
     spreadsheets,
     importLogs,
     auditLog,
+    voucherLinesDetail,
+    poDetail,
+    stockTransferDetail,
+    supplierBalances,
+    supplierTxnDetail,
+    customerBalancesDetail,
+    customerOrderDetail,
+    creditNoteDetail,
+    salaryAdvancesDetail,
+    employeeTxnDetail,
+    locationStockDetail,
   ] = await Promise.all([
 
     // ── Company ───────────────────────────────────────────────────────────────
@@ -320,8 +343,8 @@ export async function fetchCompanyExportData(
 
     // ── Ledger / Finance ──────────────────────────────────────────────────────
     q(`SELECT * FROM ledger_accounts WHERE company_id = ${cid} AND deleted_at IS NULL ORDER BY code`),
-    q(`SELECT ba.* FROM bank_accounts ba INNER JOIN ledger_accounts la ON la.id = ba.ledger_account_id WHERE la.company_id = ${cid} ORDER BY ba.id`),
-    q(`SELECT fa.* FROM fixed_assets fa INNER JOIN ledger_accounts la ON la.id = fa.ledger_account_id WHERE la.company_id = ${cid} ORDER BY fa.id`),
+    q(`SELECT * FROM bank_accounts WHERE company_id = ${cid} AND deleted_at IS NULL ORDER BY name`),
+    q(`SELECT * FROM fixed_assets WHERE company_id = ${cid} ORDER BY name`),
     q(`SELECT * FROM exchange_rates WHERE company_id = ${cid} ${df("effective_date")} ORDER BY effective_date DESC, id`),
     q(`SELECT * FROM fiscal_period_closures WHERE company_id = ${cid} ORDER BY id`),
     q(`SELECT * FROM reference_sequences WHERE company_id = ${cid} ORDER BY id`),
@@ -332,7 +355,7 @@ export async function fetchCompanyExportData(
     q(`SELECT ve.* FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = ${cid} ${df("v.voucher_date")} ORDER BY ve.id`),
 
     // ── Suppliers ─────────────────────────────────────────────────────────────
-    q(`SELECT * FROM suppliers WHERE company_id = ${cid} AND deleted_at IS NULL ORDER BY legal_name`),
+    q(`SELECT s.* FROM suppliers s INNER JOIN ledger_accounts la ON la.id = s.ledger_account_id WHERE la.company_id = ${cid} AND s.deleted_at IS NULL ORDER BY s.legal_name`),
     q(`SELECT ve.*, v.voucher_number, v.voucher_type, v.voucher_date, v.narration AS voucher_narration FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = ${cid} AND ve.supplier_id IS NOT NULL ${df("v.voucher_date")} ORDER BY v.voucher_date, ve.id`),
     q(`SELECT * FROM supplier_proformas WHERE company_id = ${cid} ORDER BY id DESC`),
     q(`SELECT spl.* FROM supplier_proforma_lines spl INNER JOIN supplier_proformas sp ON sp.id = spl.proforma_id WHERE sp.company_id = ${cid} ORDER BY spl.id`),
@@ -340,7 +363,7 @@ export async function fetchCompanyExportData(
     q(`SELECT scl.* FROM supplier_container_loaded_items scl INNER JOIN supplier_containers sc ON sc.id = scl.container_id INNER JOIN suppliers s ON s.id = sc.supplier_id WHERE s.company_id = ${cid} ORDER BY scl.id`),
 
     // ── Customers ─────────────────────────────────────────────────────────────
-    q(`SELECT * FROM customers WHERE company_id = ${cid} AND deleted_at IS NULL ORDER BY name`),
+    q(`SELECT * FROM customers WHERE company_id = ${cid} AND deleted_at IS NULL ORDER BY legal_name`),
     q(`SELECT ve.*, v.voucher_number, v.voucher_type, v.voucher_date, v.narration AS voucher_narration FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = ${cid} AND ve.customer_id IS NOT NULL ${df("v.voucher_date")} ORDER BY v.voucher_date, ve.id`),
     q(`SELECT * FROM customer_balances WHERE company_id = ${cid} ORDER BY id`),
     q(`SELECT * FROM customer_orders WHERE company_id = ${cid} ${df("order_date")} ORDER BY order_date DESC, id`),
@@ -583,6 +606,19 @@ export async function fetchCompanyExportData(
 
     // ── Audit ─────────────────────────────────────────────────────────────────
     q(`SELECT * FROM audit_log WHERE company_id = ${cid} ${df("created_at::date")} ORDER BY created_at DESC LIMIT 100000`),
+
+    // ── Enriched Detail Views ─────────────────────────────────────────────────
+    q(`SELECT v.voucher_number, v.voucher_type, v.voucher_date, v.description AS voucher_narration, v.currency, v.exchange_rate, v.location_name, la.code AS account_code, la.name AS account_name, la.account_type, CASE WHEN COALESCE(ve.debit_amount,0) > 0 THEN 'DR' ELSE 'CR' END AS dr_cr, COALESCE(ve.debit_amount,0) AS debit_amount, COALESCE(ve.credit_amount,0) AS credit_amount, ve.narration AS entry_narration, TRIM(COALESCE(e.first_name,'') || ' ' || COALESCE(e.last_name,'')) AS employee_name, c.legal_name AS customer_name, s.legal_name AS supplier_name FROM vouchers v LEFT JOIN voucher_entries ve ON ve.voucher_id = v.id LEFT JOIN ledger_accounts la ON la.id = ve.ledger_account_id LEFT JOIN employees e ON e.id = ve.employee_id LEFT JOIN customers c ON c.id = ve.customer_id LEFT JOIN suppliers s ON s.id = ve.supplier_id WHERE v.company_id = ${cid} ${df("v.voucher_date")} ORDER BY v.voucher_date, v.id, ve.id`),
+    q(`SELECT po.po_number, po.status, po.currency, po.created_at AS po_date, s.legal_name AS supplier_name, COALESCE(si.code,'') AS item_code, pol.item_name, pol.quantity, pol.rate, pol.line_total, po.freight, po.other_charges, po.surcharge, po.fumigation, po.document_charges, po.discount, po.items_total FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id LEFT JOIN po_line_items pol ON pol.po_id = po.id LEFT JOIN stock_items si ON si.id = pol.stock_item_id WHERE po.company_id = ${cid} ORDER BY po.created_at DESC, po.id, pol.id`),
+    q(`SELECT v.voucher_number, v.voucher_date, v.description AS notes, l1.name AS from_location, l2.name AS to_location, si.code AS item_code, si.name AS item_name, sti.quantity, sti.rate, sti.total_amount FROM stock_transfer_vouchers stv INNER JOIN vouchers v ON v.id = stv.voucher_id LEFT JOIN locations l1 ON l1.id = stv.source_location_id LEFT JOIN locations l2 ON l2.id = stv.destination_location_id LEFT JOIN stock_transfer_items sti ON sti.transfer_id = stv.id LEFT JOIN stock_items si ON si.id = sti.stock_item_id WHERE v.company_id = ${cid} ${df("v.voucher_date")} ORDER BY v.voucher_date DESC, stv.id, sti.id`),
+    q(`SELECT s.code AS supplier_code, s.legal_name AS supplier_name, s.phone, s.email, s.payment_terms, COALESCE(s.opening_balance,0) AS opening_balance, COALESCE(SUM(ve.debit_amount),0) AS total_debits, COALESCE(SUM(ve.credit_amount),0) AS total_credits FROM suppliers s INNER JOIN ledger_accounts la ON la.id = s.ledger_account_id LEFT JOIN voucher_entries ve ON ve.supplier_id = s.id WHERE la.company_id = ${cid} AND s.deleted_at IS NULL GROUP BY s.id, s.code, s.legal_name, s.phone, s.email, s.payment_terms, s.opening_balance ORDER BY s.legal_name`),
+    q(`SELECT s.legal_name AS supplier_name, s.code AS supplier_code, v.voucher_number, v.voucher_type, v.voucher_date, la.code AS account_code, la.name AS account_name, CASE WHEN COALESCE(ve.debit_amount,0) > 0 THEN 'DR' ELSE 'CR' END AS dr_cr, COALESCE(ve.debit_amount,0) AS debit_amount, COALESCE(ve.credit_amount,0) AS credit_amount, ve.narration, v.description AS voucher_narration FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id INNER JOIN suppliers s ON s.id = ve.supplier_id LEFT JOIN ledger_accounts la ON la.id = ve.ledger_account_id WHERE v.company_id = ${cid} ${df("v.voucher_date")} ORDER BY s.legal_name, v.voucher_date, ve.id`),
+    q(`SELECT c.legal_name AS customer_name, c.code AS customer_code, cb.transaction_date, cb.transaction_type, cb.reference_type, cb.debit_amount, cb.credit_amount, cb.balance, cb.currency, cb.description, cb.side FROM customer_balances cb INNER JOIN customers c ON c.id = cb.customer_id WHERE cb.company_id = ${cid} ${df("cb.transaction_date")} ORDER BY c.legal_name, cb.transaction_date, cb.id`),
+    q(`SELECT c.legal_name AS customer_name, c.code AS customer_code, co.invoice_number, co.order_date, co.status, co.container_number, co.shipping_company, col.article_code, col.bale_name AS item_name, col.qty, col.weight_per_bale, col.total_weight, col.price_per_bale AS rate, col.total_price, co.freight_amount, co.other_charges_total, co.grand_total FROM customer_orders co INNER JOIN customers c ON c.id = co.customer_id LEFT JOIN customer_order_lines col ON col.order_id = co.id WHERE co.company_id = ${cid} ${df("co.order_date")} ORDER BY co.order_date DESC, co.id, col.id`),
+    q(`SELECT v.voucher_number, v.voucher_type, v.voucher_date, v.description AS narration, c.legal_name AS customer_name, si.code AS item_code, si.name AS item_name, l.name AS location_name, cni.quantity, cni.rate, cni.total_value, cni.inventory_cost FROM credit_note_items cni INNER JOIN vouchers v ON v.id = cni.voucher_id LEFT JOIN stock_items si ON si.id = cni.stock_item_id LEFT JOIN locations l ON l.id = cni.location_id LEFT JOIN LATERAL (SELECT ve2.customer_id FROM voucher_entries ve2 WHERE ve2.voucher_id = v.id AND ve2.customer_id IS NOT NULL LIMIT 1) ve ON true LEFT JOIN customers c ON c.id = ve.customer_id WHERE v.company_id = ${cid} ${df("v.voucher_date")} ORDER BY v.voucher_date DESC, v.id, cni.id`),
+    q(`SELECT sa.advance_date, sa.amount, sa.remaining_balance, sa.notes, sa.fully_paid, sa.is_opening_balance, TRIM(COALESCE(e.first_name,'') || ' ' || COALESCE(e.last_name,'')) AS employee_name, e.code AS employee_code, e.department FROM salary_advances sa INNER JOIN employees e ON e.id = sa.employee_id WHERE sa.company_id = ${cid} ${df("sa.advance_date")} ORDER BY sa.advance_date, sa.id`),
+    q(`SELECT TRIM(COALESCE(e.first_name,'') || ' ' || COALESCE(e.last_name,'')) AS employee_name, e.code AS employee_code, e.department, v.voucher_number, v.voucher_type, v.voucher_date, la.code AS account_code, la.name AS account_name, CASE WHEN COALESCE(ve.debit_amount,0) > 0 THEN 'DR' ELSE 'CR' END AS dr_cr, COALESCE(ve.debit_amount,0) AS debit_amount, COALESCE(ve.credit_amount,0) AS credit_amount, ve.narration, v.description AS voucher_narration FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id INNER JOIN employees e ON e.id = ve.employee_id LEFT JOIN ledger_accounts la ON la.id = ve.ledger_account_id WHERE v.company_id = ${cid} ${df("v.voucher_date")} ORDER BY e.first_name, v.voucher_date, ve.id`),
+    q(`SELECT l.name AS location_name, sg.name AS stock_group, si.code AS item_code, si.name AS item_name, si.uom, i.quantity, i.average_rate AS rate, i.total_value, i.last_updated FROM inventory i INNER JOIN stock_items si ON si.id = i.stock_item_id INNER JOIN locations l ON l.id = i.location_id LEFT JOIN stock_groups sg ON sg.id = si.stock_group_id WHERE i.company_id = ${cid} AND i.quantity != 0 ORDER BY l.name, sg.name, si.code`),
   ]);
 
   return {
@@ -715,5 +751,16 @@ export async function fetchCompanyExportData(
     spreadsheets,
     importLogs,
     auditLog,
+    voucherLinesDetail,
+    poDetail,
+    stockTransferDetail,
+    supplierBalances,
+    supplierTxnDetail,
+    customerBalancesDetail,
+    customerOrderDetail,
+    creditNoteDetail,
+    salaryAdvancesDetail,
+    employeeTxnDetail,
+    locationStockDetail,
   };
 }

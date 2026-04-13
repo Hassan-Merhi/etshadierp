@@ -66,11 +66,13 @@ function styleHeaderRow(ws: ExcelJS.Worksheet, colCount: number) {
 }
 
 // Auto-detect all columns from data rows and export every field
+// Empty sheets are created as hidden so they can be unhidden manually in Excel
 function addSheet(wb: ExcelJS.Workbook, name: string, rows: any[]) {
   const sheetBase = name.substring(0, 31);
 
   if (!rows || rows.length === 0) {
-    wb.addWorksheet(sheetBase);
+    const ws = wb.addWorksheet(sheetBase);
+    ws.state = "hidden";
     return;
   }
 
@@ -259,6 +261,18 @@ function addSummarySheet(wb: ExcelJS.Workbook, data: CompanyExportData) {
     ["Spreadsheets", data.spreadsheets.length],
     ["Import Logs", data.importLogs.length],
     ["Audit Log", data.auditLog.length],
+    ["— ENRICHED VIEWS —", 0],
+    ["Voucher Lines Detail", data.voucherLinesDetail.length],
+    ["PO Detail (flat)", data.poDetail.length],
+    ["Stock Transfer Detail", data.stockTransferDetail.length],
+    ["Supplier Balances", data.supplierBalances.length],
+    ["Supplier Txn Detail", data.supplierTxnDetail.length],
+    ["Customer Balances Detail", data.customerBalancesDetail.length],
+    ["Customer Order Detail", data.customerOrderDetail.length],
+    ["Credit-Debit Note Detail", data.creditNoteDetail.length],
+    ["Salary Advances Detail", data.salaryAdvancesDetail.length],
+    ["Employee Txn Detail", data.employeeTxnDetail.length],
+    ["Location Stock Detail", data.locationStockDetail.length],
   ];
 
   const total = counts.reduce((s, [, n]) => s + n, 0);
@@ -453,6 +467,19 @@ export async function buildCompanyWorkbook(data: CompanyExportData): Promise<Buf
 
   // ── Audit ─────────────────────────────────────────────────────────────────
   addSheet(wb, "Audit Log", data.auditLog);
+
+  // ── Enriched Detail Views ─────────────────────────────────────────────────
+  addSheet(wb, "Voucher Lines Detail", data.voucherLinesDetail);
+  addSheet(wb, "PO Detail", data.poDetail);
+  addSheet(wb, "Stock Transfer Detail", data.stockTransferDetail);
+  addSheet(wb, "Supplier Balances", data.supplierBalances);
+  addSheet(wb, "Supplier Txn Detail", data.supplierTxnDetail);
+  addSheet(wb, "Customer Balances Detail", data.customerBalancesDetail);
+  addSheet(wb, "Customer Order Detail", data.customerOrderDetail);
+  addSheet(wb, "Credit-Debit Note Detail", data.creditNoteDetail);
+  addSheet(wb, "Salary Advances Detail", data.salaryAdvancesDetail);
+  addSheet(wb, "Employee Txn Detail", data.employeeTxnDetail);
+  addSheet(wb, "Location Stock Detail", data.locationStockDetail);
 
   const buf = await wb.xlsx.writeBuffer();
   return buf as Buffer;
