@@ -73,13 +73,9 @@ async function runDailyExport(retryCount = 0): Promise<void> {
 
 export async function isScheduleEnabled(): Promise<boolean> {
   try {
-    const res = await (db as any).execute({
-      sql: `SELECT schedule_enabled FROM export_settings WHERE id = 1`,
-      params: [],
-    });
-    const rows = res.rows ?? res;
-    if (!rows || rows.length === 0) return false;
-    return rows[0].schedule_enabled === true;
+    const res = await pool.query(`SELECT schedule_enabled FROM export_settings WHERE id = 1`);
+    if (!res.rows || res.rows.length === 0) return false;
+    return res.rows[0].schedule_enabled === true;
   } catch {
     return false;
   }
