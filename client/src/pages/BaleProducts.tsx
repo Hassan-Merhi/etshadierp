@@ -726,7 +726,6 @@ export default function BaleProducts() {
                     <TableHead>Name</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead className="text-right">Wt/Bale (kg)</TableHead>
-                    {!hideAvgRate && <TableHead className="text-right">Prod. Price</TableHead>}
                     {!hideAvgRate && !hideSellingPriceBP && <TableHead className="text-right">Sell Price</TableHead>}
                     <TableHead className="text-right">Count</TableHead>
                     <TableHead className="w-[60px]">Actions</TableHead>
@@ -759,7 +758,6 @@ export default function BaleProducts() {
                         <TableCell className="text-muted-foreground">
                           {group.items[0]?.categoryId ? categoryMap.get(group.items[0].categoryId) || "-" : "-"}
                         </TableCell>
-                        {!hideAvgRate && <TableCell></TableCell>}
                         {!hideAvgRate && !hideSellingPriceBP && <TableCell></TableCell>}
                         <TableCell className="text-right">
                           <Badge variant="secondary">{group.count}</Badge>
@@ -786,11 +784,6 @@ export default function BaleProducts() {
                             <TableCell className="text-right text-sm text-muted-foreground">
                               {product.weightPerBaleKg ? `${product.weightPerBaleKg} kg` : "-"}
                             </TableCell>
-                            {!hideAvgRate && (
-                              <TableCell className="text-right text-sm font-mono text-muted-foreground">
-                                {product.productionPrice && parseFloat(product.productionPrice) > 0 ? parseFloat(product.productionPrice).toLocaleString() : "—"}
-                              </TableCell>
-                            )}
                             {!hideAvgRate && !hideSellingPriceBP && (
                               <TableCell className="text-right text-sm font-mono text-muted-foreground">
                                 {product.sellingPrice && parseFloat(product.sellingPrice) > 0 ? parseFloat(product.sellingPrice).toLocaleString() : "—"}
@@ -831,9 +824,7 @@ export default function BaleProducts() {
                   <TableHead>Name</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead className="text-right">Weight/Bale (kg)</TableHead>
-                  {!hideAvgRate && <TableHead className="text-right">Prod. Price</TableHead>}
                   {!hideAvgRate && !hideSellingPriceBP && <TableHead className="text-right">Sell Price</TableHead>}
-                  <TableHead>Description</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[60px]">Actions</TableHead>
                 </TableRow>
@@ -854,17 +845,11 @@ export default function BaleProducts() {
                       {product.categoryId ? categoryMap.get(product.categoryId) || "Uncategorized" : "Uncategorized"}
                     </TableCell>
                     <TableCell className="text-right font-mono">{product.weightPerBaleKg || "-"}</TableCell>
-                    {!hideAvgRate && (
-                      <TableCell className="text-right font-mono">
-                        {product.productionPrice && parseFloat(product.productionPrice) > 0 ? parseFloat(product.productionPrice).toLocaleString() : "—"}
-                      </TableCell>
-                    )}
                     {!hideAvgRate && !hideSellingPriceBP && (
                       <TableCell className="text-right font-mono">
                         {product.sellingPrice && parseFloat(product.sellingPrice) > 0 ? parseFloat(product.sellingPrice).toLocaleString() : "—"}
                       </TableCell>
                     )}
-                    <TableCell className="text-muted-foreground">{product.description || "-"}</TableCell>
                     <TableCell>
                       <Badge variant={product.active ? "secondary" : "outline"}>
                         {product.active ? "Active" : "Inactive"}
