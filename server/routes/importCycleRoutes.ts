@@ -152,18 +152,27 @@ export function registerImportCycleRoutes(app: Express) {
           )
         );
       
-      // Include supplier opening balances only for suppliers with activity in this company
-      const allSuppliersNP = await storage.getAllSuppliers();
-      const supplierIdsWithActivity = new Set(supplierEntries.map(e => e.supplierId).filter(Boolean));
-      // Also check containers for supplier activity
-      const companyContainers = await db.select({ supplierId: containers.supplierId }).from(containers).where(eq(containers.companyId, companyId));
-      for (const c of companyContainers) {
-        if (c.supplierId) supplierIdsWithActivity.add(c.supplierId);
+      // Include supplier opening balances only for the primary (parent) company.
+      // Sub-companies start from zero — they must not inherit the parent's historical debt.
+      const allCompaniesNP = await storage.getAllCompanies();
+      const primaryCompanyIdNP = allCompaniesNP.length > 0
+        ? Math.min(...allCompaniesNP.map((c: any) => c.id))
+        : null;
+      const isParentContextNP = companyId === primaryCompanyIdNP;
+
+      let supplierOpeningTotal = 0;
+      if (isParentContextNP) {
+        const allSuppliersNP = await storage.getAllSuppliers();
+        const supplierIdsWithActivity = new Set(supplierEntries.map(e => e.supplierId).filter(Boolean));
+        const companyContainers = await db.select({ supplierId: containers.supplierId }).from(containers).where(eq(containers.companyId, companyId));
+        for (const c of companyContainers) {
+          if (c.supplierId) supplierIdsWithActivity.add(c.supplierId);
+        }
+        supplierOpeningTotal = allSuppliersNP
+          .filter(s => supplierIdsWithActivity.has(s.id))
+          .reduce((sum, s) => sum + parseFloat(s.openingBalance || "0"), 0);
       }
-      const supplierOpeningTotal = allSuppliersNP
-        .filter(s => supplierIdsWithActivity.has(s.id))
-        .reduce((sum, s) => sum + parseFloat(s.openingBalance || "0"), 0);
-      
+
       // Supplier is a liability: Credits increase (we owe more), Debits decrease (we paid)
       const supplierBalance = supplierEntries.reduce((sum, entry) => {
         const credit = parseFloat(entry.creditAmount || "0");

@@ -493,23 +493,33 @@ export function registerDebugRoutes(app: Express) {
           )
         );
       
-      // Include supplier opening balances only for suppliers with activity in this company
-      const allSuppliersBS = await storage.getAllSuppliers();
-      const bsSupplierIdsWithActivity = new Set(
-        (await db.select({ supplierId: voucherEntries.supplierId })
-          .from(voucherEntries)
-          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-          .where(and(isNotNull(voucherEntries.supplierId), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false))))
-          .map(e => e.supplierId).filter(Boolean)
-      );
-      const bsCompanyContainers = await db.select({ supplierId: containers.supplierId }).from(containers).where(eq(containers.companyId, companyId));
-      for (const c of bsCompanyContainers) {
-        if (c.supplierId) bsSupplierIdsWithActivity.add(c.supplierId);
+      // Include supplier opening balances only for the primary (parent) company.
+      // Sub-companies start from zero — they must not inherit the parent's historical debt.
+      const allCompaniesBS = await storage.getAllCompanies();
+      const primaryCompanyIdBS = allCompaniesBS.length > 0
+        ? Math.min(...allCompaniesBS.map((c: any) => c.id))
+        : null;
+      const isParentContextBS = companyId === primaryCompanyIdBS;
+
+      let supplierOpeningTotalBS = 0;
+      if (isParentContextBS) {
+        const allSuppliersBS = await storage.getAllSuppliers();
+        const bsSupplierIdsWithActivity = new Set(
+          (await db.select({ supplierId: voucherEntries.supplierId })
+            .from(voucherEntries)
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .where(and(isNotNull(voucherEntries.supplierId), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false))))
+            .map(e => e.supplierId).filter(Boolean)
+        );
+        const bsCompanyContainers = await db.select({ supplierId: containers.supplierId }).from(containers).where(eq(containers.companyId, companyId));
+        for (const c of bsCompanyContainers) {
+          if (c.supplierId) bsSupplierIdsWithActivity.add(c.supplierId);
+        }
+        supplierOpeningTotalBS = allSuppliersBS
+          .filter(s => bsSupplierIdsWithActivity.has(s.id))
+          .reduce((sum, s) => sum + parseFloat(s.openingBalance || "0"), 0);
       }
-      const supplierOpeningTotalBS = allSuppliersBS
-        .filter(s => bsSupplierIdsWithActivity.has(s.id))
-        .reduce((sum, s) => sum + parseFloat(s.openingBalance || "0"), 0);
-      
+
       const supplierBalance = supplierEntries.reduce((sum, entry) => {
         return sum + parseFloat(entry.creditAmount || "0") - parseFloat(entry.debitAmount || "0");
       }, supplierOpeningTotalBS);
