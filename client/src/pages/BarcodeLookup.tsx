@@ -425,6 +425,9 @@ export default function BarcodeLookup() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {referenceResult.baleInfo.productName && (
+                        <InfoRow label="Product Name" value={<span className="font-semibold">{referenceResult.baleInfo.productName}</span>} />
+                      )}
                       <InfoRow label="Bale Code" value={<span className="font-mono">{referenceResult.baleInfo.baleCode}</span>} />
                       {referenceResult.baleInfo.grade && (
                         <InfoRow label="Grade" value={referenceResult.baleInfo.grade} />

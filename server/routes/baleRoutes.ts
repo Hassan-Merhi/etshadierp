@@ -847,6 +847,7 @@ export function registerBaleRoutes(app: Express) {
         baleInfo = {
           id: factoryBale.id,
           baleCode: factoryBale.baleCode,
+          productName: factoryBale.productName,
           status: factoryBale.status,
           weightKg: factoryBale.weightKg,
           costPerKg: factoryBale.costPerKg,
