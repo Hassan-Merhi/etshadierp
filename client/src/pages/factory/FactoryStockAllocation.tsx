@@ -1,12 +1,9 @@
 import { useState, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, RefreshCw, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -32,12 +29,6 @@ interface InStockCount {
   count: number;
 }
 
-interface Reservation {
-  id: number;
-  proformaId: number;
-  articleCode: string;
-}
-
 interface ActiveOrderBale {
   articleCode: string;
   count: number;
@@ -53,7 +44,7 @@ interface ActiveOrder {
 interface AllocationData {
   proformas: Proforma[];
   inStockCounts: InStockCount[];
-  reservations: Reservation[];
+  reservations: any[];
   activeOrders: ActiveOrder[];
 }
 
@@ -70,9 +61,6 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function FactoryStockAllocation() {
-  const { toast } = useToast();
-  const [toggling, setToggling] = useState<string | null>(null);
-  // Set of proforma IDs that are toggled ON (visible as columns)
   const [visibleProformaIds, setVisibleProformaIds] = useState<Set<number>>(new Set());
 
   const { data, isLoading, isError, error, refetch } = useQuery<AllocationData>({
@@ -85,30 +73,6 @@ export default function FactoryStockAllocation() {
     retry: 1,
   });
 
-  const toggleMutation = useMutation({
-    mutationFn: async ({ proformaId, articleCode }: { proformaId: number; articleCode: string }) => {
-      const res = await apiRequest("POST", "/api/factory/stock-allocation/reservations/toggle", { proformaId, articleCode });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || "Failed");
-      return json;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/stock-allocation"] });
-    },
-    onError: (err: Error) => {
-      if ((err as any)?._handledGlobally) return;
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    },
-    onSettled: () => setToggling(null),
-  });
-
-  const handleToggle = (proformaId: number, articleCode: string) => {
-    const key = `${proformaId}:${articleCode}`;
-    if (toggling) return;
-    setToggling(key);
-    toggleMutation.mutate({ proformaId, articleCode });
-  };
-
   const toggleProformaVisible = (id: number) => {
     setVisibleProformaIds(prev => {
       const next = new Set(prev);
@@ -118,34 +82,27 @@ export default function FactoryStockAllocation() {
     });
   };
 
-  // Derive the matrix data
-  const { articleRows, allProformas, visibleProformas, reservationSet, pendingByProformaArticle } = useMemo(() => {
+  const { articleRows, allProformas, visibleProformas, pendingByProformaArticle, productNameByCode } = useMemo(() => {
     if (!data) return {
       articleRows: [],
       allProformas: [],
       visibleProformas: [],
-      reservationSet: new Set<string>(),
       pendingByProformaArticle: new Map<string, number>(),
+      productNameByCode: new Map<string, string>(),
     };
 
     const allProformas = data.proformas;
     const visibleProformas = allProformas.filter(p => visibleProformaIds.has(p.id));
 
-    // All article codes that appear in any visible proforma line OR have IN_STOCK bales
-    const articleCodeSet = new Set<string>();
-    // Always include articles from visible proformas
-    visibleProformas.forEach(p => p.lines.forEach(l => articleCodeSet.add(l.articleCode)));
-    // Always include articles with in-stock bales
-    data.inStockCounts.forEach(s => articleCodeSet.add(s.articleCode));
-    // Also include articles from all proformas (for product name lookup)
-    // but only add to rows if they have stock or are in visible proformas
-
     const inStockMap = new Map(data.inStockCounts.map(s => [s.articleCode, s.count]));
 
-    // Build reservation set: "proformaId:articleCode"
-    const reservationSet = new Set(data.reservations.map(r => `${r.proformaId}:${r.articleCode}`));
+    // Build product name lookup from all proforma lines
+    const productNameByCode = new Map<string, string>();
+    allProformas.forEach(p => p.lines.forEach(l => {
+      if (l.productName) productNameByCode.set(l.articleCode, l.productName);
+    }));
 
-    // Build pending loading map: "proformaId:articleCode" → count
+    // Pending map: "proformaId:articleCode" → bale count
     const pendingByProformaArticle = new Map<string, number>();
     data.activeOrders.forEach(order => {
       if (!order.proformaIdUsed) return;
@@ -155,34 +112,26 @@ export default function FactoryStockAllocation() {
       });
     });
 
-    // Build article rows sorted alphabetically
+    // All article codes from any proforma + in-stock bales
+    const articleCodeSet = new Set<string>();
+    allProformas.forEach(p => p.lines.forEach(l => articleCodeSet.add(l.articleCode)));
+    data.inStockCounts.forEach(s => articleCodeSet.add(s.articleCode));
+
     const articleRows = Array.from(articleCodeSet).sort().map(articleCode => {
       const inStock = inStockMap.get(articleCode) || 0;
 
-      // Pending: sum across ALL proformas (active loadings for this article code)
+      // Pending across ALL proformas for this article
       let pendingLoading = 0;
       allProformas.forEach(p => {
         pendingLoading += pendingByProformaArticle.get(`${p.id}:${articleCode}`) || 0;
       });
 
-      // Available = In Stock − Pending
       const available = inStock - pendingLoading;
-
       return { articleCode, inStock, pendingLoading, available };
     });
 
-    return { articleRows, allProformas, visibleProformas, reservationSet, pendingByProformaArticle };
+    return { articleRows, allProformas, visibleProformas, pendingByProformaArticle, productNameByCode };
   }, [data, visibleProformaIds]);
-
-  // Find the product name for an article code
-  const getProductName = (articleCode: string) => {
-    if (!data) return articleCode;
-    for (const p of data.proformas) {
-      const line = p.lines.find(l => l.articleCode === articleCode);
-      if (line) return line.productName;
-    }
-    return articleCode;
-  };
 
   if (isLoading) {
     return (
@@ -207,17 +156,16 @@ export default function FactoryStockAllocation() {
 
   return (
     <div className="p-4 flex flex-col gap-4 h-full">
-      {/* Header row */}
+
+      {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div>
-          <h1 className="text-xl font-semibold">Stock Allocation</h1>
-        </div>
+        <h1 className="text-xl font-semibold">Stock Allocation</h1>
         <Button variant="outline" size="default" onClick={() => refetch()} data-testid="button-refresh-allocation">
           <RefreshCw className="h-4 w-4 mr-2" />Refresh
         </Button>
       </div>
 
-      {/* Proforma selector toolbar */}
+      {/* Proforma selector */}
       {allProformas.length > 0 && (
         <div className="flex flex-col gap-2">
           <p className="text-xs text-muted-foreground font-medium">Show proforma columns:</p>
@@ -251,22 +199,10 @@ export default function FactoryStockAllocation() {
 
       {/* Legend */}
       <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
-        {visibleProformas.length > 0 && (
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-primary/20 border border-primary/40" />
-            <span>Reserved (toggled ON)</span>
-          </div>
-        )}
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-sm bg-amber-200 dark:bg-amber-800/60 border border-amber-400/60" />
           <span>Pending / Loading</span>
         </div>
-        {visibleProformas.length > 0 && (
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-muted border border-border" />
-            <span>Not in proforma</span>
-          </div>
-        )}
       </div>
 
       {allProformas.length === 0 ? (
@@ -286,8 +222,8 @@ export default function FactoryStockAllocation() {
           <table className="w-full text-sm border-collapse min-w-max">
             <thead>
               <tr className="bg-muted/50 sticky top-0 z-10">
-                <th className="text-left px-3 py-2.5 font-medium border-b border-r whitespace-nowrap sticky left-0 bg-muted/80 backdrop-blur-sm z-20 min-w-[160px]">
-                  Article Code
+                <th className="text-left px-3 py-2.5 font-medium border-b border-r whitespace-nowrap sticky left-0 bg-muted/80 backdrop-blur-sm z-20 min-w-[180px]">
+                  Product
                 </th>
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[90px]">
                   In Stock
@@ -299,131 +235,103 @@ export default function FactoryStockAllocation() {
                       <TooltipTrigger asChild>
                         <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                       </TooltipTrigger>
-                      <TooltipContent>Bales currently in active loadings (LOADING / VERIFIED)</TooltipContent>
+                      <TooltipContent>Bales currently in active loadings (Loading / Verified)</TooltipContent>
                     </Tooltip>
                   </div>
                 </th>
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[90px] text-green-700 dark:text-green-400">
                   Available
                 </th>
-                {/* Visible proforma columns */}
                 {visibleProformas.map(p => (
                   <th key={p.id} className="px-2 py-1.5 font-medium border-b border-r text-center min-w-[130px]">
                     <div className="flex flex-col items-center gap-0.5">
                       <span className="text-xs font-semibold truncate max-w-[120px]" title={p.customerName}>{p.customerName}</span>
                       <span className="text-xs text-muted-foreground truncate max-w-[120px]" title={p.name}>{p.name}</span>
-                      {!p.isActive && (
-                        <Badge variant="outline" className="text-[10px] px-1">Inactive</Badge>
-                      )}
+                      {!p.isActive && <Badge variant="outline" className="text-[10px] px-1">Inactive</Badge>}
                     </div>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {articleRows.map((row, idx) => (
-                <tr
-                  key={row.articleCode}
-                  className={cn(
-                    "border-b transition-colors",
-                    idx % 2 === 0 ? "bg-background" : "bg-muted/20",
-                  )}
-                  data-testid={`row-article-${row.articleCode}`}
-                >
-                  {/* Article code */}
-                  <td className="px-3 py-2 border-r sticky left-0 bg-inherit z-10">
-                    <div className="font-medium">{row.articleCode}</div>
-                    <div className="text-xs text-muted-foreground truncate max-w-[140px]">{getProductName(row.articleCode)}</div>
-                  </td>
-                  {/* In Stock */}
-                  <td className="px-3 py-2 text-right border-r font-mono tabular-nums">
-                    {row.inStock}
-                  </td>
-                  {/* Pending */}
-                  <td className="px-3 py-2 text-right border-r font-mono tabular-nums">
-                    {row.pendingLoading > 0 ? (
-                      <span className="text-amber-700 dark:text-amber-400 font-medium">{row.pendingLoading}</span>
-                    ) : "—"}
-                  </td>
-                  {/* Available */}
-                  <td className={cn(
-                    "px-3 py-2 text-right border-r font-mono tabular-nums font-semibold",
-                    row.available > 0 ? "text-green-700 dark:text-green-400" : row.available === 0 ? "text-muted-foreground" : "text-destructive",
-                  )}>
-                    {row.available}
-                  </td>
+              {articleRows.map((row, idx) => {
+                const displayName = productNameByCode.get(row.articleCode) || row.articleCode;
+                return (
+                  <tr
+                    key={row.articleCode}
+                    className={cn("border-b transition-colors", idx % 2 === 0 ? "bg-background" : "bg-muted/20")}
+                    data-testid={`row-article-${row.articleCode}`}
+                  >
+                    {/* Product name */}
+                    <td className="px-3 py-2 border-r sticky left-0 bg-inherit z-10">
+                      <div className="font-medium truncate max-w-[200px]" title={displayName}>{displayName}</div>
+                    </td>
 
-                  {/* Per-proforma cells (only visible proformas) */}
-                  {visibleProformas.map(p => {
-                    const line = p.lines.find(l => l.articleCode === row.articleCode);
-                    const reservationKey = `${p.id}:${row.articleCode}`;
-                    const isReserved = reservationSet.has(reservationKey);
-                    const isPending = (pendingByProformaArticle.get(reservationKey) || 0) > 0;
-                    const pendingQty = pendingByProformaArticle.get(reservationKey) || 0;
-                    const isTogglingThis = toggling === reservationKey;
+                    {/* In Stock */}
+                    <td className="px-3 py-2 text-right border-r font-mono tabular-nums">
+                      {row.inStock}
+                    </td>
 
-                    if (!line) {
+                    {/* Pending */}
+                    <td className="px-3 py-2 text-right border-r font-mono tabular-nums">
+                      {row.pendingLoading > 0
+                        ? <span className="text-amber-700 dark:text-amber-400 font-medium">{row.pendingLoading}</span>
+                        : <span className="text-muted-foreground/50">—</span>}
+                    </td>
+
+                    {/* Available */}
+                    <td className={cn(
+                      "px-3 py-2 text-right border-r font-mono tabular-nums font-semibold",
+                      row.available > 0 ? "text-green-700 dark:text-green-400"
+                        : row.available === 0 ? "text-muted-foreground"
+                        : "text-destructive",
+                    )}>
+                      {row.available}
+                    </td>
+
+                    {/* Per-proforma quantity cells (read-only) */}
+                    {visibleProformas.map(p => {
+                      const line = p.lines.find(l => l.articleCode === row.articleCode);
+                      const pendingKey = `${p.id}:${row.articleCode}`;
+                      const pendingQty = pendingByProformaArticle.get(pendingKey) || 0;
+                      const isPending = pendingQty > 0;
+
+                      if (!line) {
+                        return (
+                          <td key={p.id} className="px-2 py-2 text-center border-r bg-muted/30">
+                            <span className="text-muted-foreground/40 text-xs">—</span>
+                          </td>
+                        );
+                      }
+
+                      if (isPending) {
+                        const orderStatus = data.activeOrders.find(o => o.proformaIdUsed === p.id)?.status || "LOADING";
+                        return (
+                          <td key={p.id} className="px-2 py-2 text-center border-r bg-amber-50 dark:bg-amber-900/20">
+                            <div className="flex flex-col items-center gap-0.5">
+                              <Badge className={cn("text-xs font-semibold", STATUS_COLOR[orderStatus])}>
+                                {pendingQty} bales
+                              </Badge>
+                              <span className="text-[10px] text-amber-700 dark:text-amber-400">
+                                {STATUS_LABEL[orderStatus] || "Loading"}
+                              </span>
+                            </div>
+                          </td>
+                        );
+                      }
+
                       return (
-                        <td key={p.id} className="px-2 py-2 text-center border-r bg-muted/30">
-                          <span className="text-muted-foreground/40 text-xs">—</span>
+                        <td key={p.id} className="px-2 py-2 text-center border-r">
+                          <span className="font-semibold font-mono tabular-nums text-foreground">
+                            {line.quantity}
+                          </span>
+                          <div className="text-[10px] text-muted-foreground/60">bales</div>
                         </td>
                       );
-                    }
-
-                    if (isPending) {
-                      return (
-                        <td key={p.id} className="px-2 py-2 text-center border-r bg-amber-50 dark:bg-amber-900/20">
-                          <div className="flex flex-col items-center gap-0.5">
-                            <Badge className={cn("text-xs font-semibold", STATUS_COLOR[data.activeOrders.find(o => o.proformaIdUsed === p.id)?.status || "LOADING"] || STATUS_COLOR.LOADING)}>
-                              {pendingQty} bales
-                            </Badge>
-                            <span className="text-[10px] text-amber-700 dark:text-amber-400">
-                              {STATUS_LABEL[data.activeOrders.find(o => o.proformaIdUsed === p.id)?.status || "LOADING"] || "Loading"}
-                            </span>
-                          </div>
-                        </td>
-                      );
-                    }
-
-                    return (
-                      <td
-                        key={p.id}
-                        className={cn(
-                          "px-2 py-2 text-center border-r cursor-pointer transition-colors select-none",
-                          isReserved
-                            ? "bg-primary/10 hover-elevate"
-                            : "hover-elevate",
-                          isTogglingThis && "opacity-50 pointer-events-none",
-                        )}
-                        onClick={() => handleToggle(p.id, row.articleCode)}
-                        data-testid={`cell-reserve-${p.id}-${row.articleCode}`}
-                        title={isReserved ? `Click to un-reserve ${line.quantity} bales` : `Click to reserve ${line.quantity} bales`}
-                      >
-                        <div className="flex flex-col items-center gap-0.5">
-                          {isTogglingThis ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                          ) : (
-                            <>
-                              <span className={cn(
-                                "font-semibold font-mono tabular-nums",
-                                isReserved ? "text-primary" : "text-muted-foreground",
-                              )}>
-                                {line.quantity}
-                              </span>
-                              <span className={cn(
-                                "text-[10px]",
-                                isReserved ? "text-primary/70" : "text-muted-foreground/60",
-                              )}>
-                                {isReserved ? "reserved" : "not reserved"}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
