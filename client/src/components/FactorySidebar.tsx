@@ -35,6 +35,7 @@ import {
   Boxes,
   ChevronDown,
   LayoutGrid,
+  Scale,
 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
 import { useLocation } from "wouter";
@@ -106,9 +107,10 @@ const navSections: NavSection[] = [
     label: "Finance",
     color: "#10b981",
     items: [
-      { title: "Workers",   url: "/factory/workers",   icon: HardHat   },
-      { title: "Employees", url: "/factory/employees", icon: Users     },
-      { title: "Suppliers", url: "/factory/suppliers", icon: UserRound },
+      { title: "Workers",          url: "/factory/workers",                   icon: HardHat        },
+      { title: "Employees",        url: "/factory/employees",                 icon: Users          },
+      { title: "Suppliers",        url: "/factory/suppliers",                 icon: UserRound      },
+      { title: "Broker Statement", url: "/factory/broker-visual-statement",   icon: Scale          },
     ],
   },
   {
