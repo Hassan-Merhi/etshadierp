@@ -6,7 +6,7 @@ import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
 import {
   writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword,
+  isLegacySHA256Hash, verifySupervisorPassword, recalculateOrderTotals,
 } from "./_helpers";
 import {
   factorySuppliers, factoryCategories, factoryBaleProducts,

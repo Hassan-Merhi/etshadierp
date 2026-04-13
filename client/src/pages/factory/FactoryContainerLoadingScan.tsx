@@ -894,13 +894,12 @@ export default function FactoryContainerLoadingScan() {
                                 data-testid={`row-bale-${bale.id}`}
                               >
                                 <TableCell
-                                  className="font-mono text-sm"
                                   data-testid={`text-bale-ref-${bale.id}`}
                                 >
-                                  {bale.baleReference}
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                  {bale.baleName}
+                                  <div className="font-mono text-sm">{bale.baleReference}</div>
+                                  {bale.baleName && (
+                                    <div className="text-xs text-muted-foreground mt-0.5">{bale.baleName}</div>
+                                  )}
                                 </TableCell>
                                 <TableCell className="text-right text-sm text-muted-foreground">
                                   {parseFloat(bale.weight || "0").toFixed(2)} kg

@@ -4,6 +4,10 @@ import {
   factoryDaybookEntries,
   ledgerAccounts,
   companies,
+  customerOrderBales,
+  customerOrderLines,
+  customerOrderCharges,
+  customerOrders,
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -123,4 +127,49 @@ export async function verifySupervisorPassword(password: string, hash: string): 
     return CryptoJS.SHA256(password).toString().toLowerCase() === hash.toLowerCase();
   }
   return bcrypt.compare(password, hash);
+}
+
+export async function recalculateOrderTotals(dbConn: any, orderId: number) {
+  const bales = await dbConn.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+
+  await dbConn.delete(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
+
+  const grouped: Record<string, { articleCode: string; baleName: string; qty: number; totalWeight: number; totalPrice: number }> = {};
+  for (const b of bales) {
+    const key = b.articleCode || 'UNKNOWN';
+    if (!grouped[key]) {
+      grouped[key] = { articleCode: key, baleName: b.baleName || key, qty: 0, totalWeight: 0, totalPrice: 0 };
+    }
+    grouped[key].qty += 1;
+    grouped[key].totalWeight += parseFloat(b.weight);
+    grouped[key].totalPrice += parseFloat(b.priceUsed);
+  }
+
+  for (const line of Object.values(grouped)) {
+    await dbConn.insert(customerOrderLines).values({
+      orderId,
+      articleCode: line.articleCode,
+      baleName: line.baleName,
+      qty: line.qty,
+      weightPerBale: String(line.qty > 0 ? line.totalWeight / line.qty : 0),
+      totalWeight: String(line.totalWeight),
+      pricePerBale: String(line.qty > 0 ? line.totalPrice / line.qty : 0),
+      totalPrice: String(line.totalPrice),
+    });
+  }
+
+  const charges = await dbConn.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+  const freightAmount = charges.filter((c: any) => c.chargeType === 'FREIGHT').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
+  const otherChargesTotal = charges.filter((c: any) => c.chargeType === 'OTHER').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
+  const subtotalBales = bales.reduce((sum: number, b: any) => sum + parseFloat(b.priceUsed), 0);
+  const grandTotal = subtotalBales + freightAmount + otherChargesTotal;
+
+  await dbConn.update(customerOrders).set({
+    subtotalBales: String(subtotalBales),
+    freightAmount: String(freightAmount),
+    otherChargesTotal: String(otherChargesTotal),
+    grandTotal: String(grandTotal),
+    totalQtyBales: bales.length,
+    updatedAt: new Date(),
+  }).where(eq(customerOrders.id, orderId));
 }
