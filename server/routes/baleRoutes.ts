@@ -846,13 +846,30 @@ export function registerBaleRoutes(app: Express) {
       if (factoryBale) {
         // Prefer live name from the product table (denormalized productName can be stale)
         let resolvedProductName = factoryBale.productName;
-        if (factoryBale.productId) {
+        // Try bale's own productId first
+        const baleProductId = factoryBale.productId;
+        if (baleProductId) {
           const [liveProduct] = await db
             .select({ name: factoryBaleProducts.name })
             .from(factoryBaleProducts)
-            .where(eq(factoryBaleProducts.id, factoryBale.productId))
+            .where(eq(factoryBaleProducts.id, baleProductId))
             .limit(1);
           if (liveProduct?.name) resolvedProductName = liveProduct.name;
+        } else if (factoryBale.pressingBatchId) {
+          // Fallback: resolve via the pressing batch's productId
+          const [pb] = await db
+            .select({ productId: factoryPressingBatches.productId })
+            .from(factoryPressingBatches)
+            .where(eq(factoryPressingBatches.id, factoryBale.pressingBatchId))
+            .limit(1);
+          if (pb?.productId) {
+            const [liveProduct] = await db
+              .select({ name: factoryBaleProducts.name })
+              .from(factoryBaleProducts)
+              .where(eq(factoryBaleProducts.id, pb.productId))
+              .limit(1);
+            if (liveProduct?.name) resolvedProductName = liveProduct.name;
+          }
         }
 
         baleInfo = {
