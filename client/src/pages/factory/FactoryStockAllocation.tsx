@@ -72,6 +72,8 @@ const STATUS_COLOR: Record<string, string> = {
 export default function FactoryStockAllocation() {
   const { toast } = useToast();
   const [toggling, setToggling] = useState<string | null>(null);
+  // Set of proforma IDs that are toggled ON (visible as columns)
+  const [visibleProformaIds, setVisibleProformaIds] = useState<Set<number>>(new Set());
 
   const { data, isLoading, isError, error, refetch } = useQuery<AllocationData>({
     queryKey: ["/api/factory/stock-allocation"],
@@ -107,16 +109,36 @@ export default function FactoryStockAllocation() {
     toggleMutation.mutate({ proformaId, articleCode });
   };
 
+  const toggleProformaVisible = (id: number) => {
+    setVisibleProformaIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   // Derive the matrix data
-  const { articleRows, proformas, reservationSet, pendingByProformaArticle } = useMemo(() => {
-    if (!data) return { articleRows: [], proformas: [], reservationSet: new Set<string>(), pendingByProformaArticle: new Map<string, number>() };
+  const { articleRows, allProformas, visibleProformas, reservationSet, pendingByProformaArticle } = useMemo(() => {
+    if (!data) return {
+      articleRows: [],
+      allProformas: [],
+      visibleProformas: [],
+      reservationSet: new Set<string>(),
+      pendingByProformaArticle: new Map<string, number>(),
+    };
 
-    const proformas = data.proformas;
+    const allProformas = data.proformas;
+    const visibleProformas = allProformas.filter(p => visibleProformaIds.has(p.id));
 
-    // All article codes that appear in any proforma line OR have IN_STOCK bales
+    // All article codes that appear in any visible proforma line OR have IN_STOCK bales
     const articleCodeSet = new Set<string>();
-    proformas.forEach(p => p.lines.forEach(l => articleCodeSet.add(l.articleCode)));
+    // Always include articles from visible proformas
+    visibleProformas.forEach(p => p.lines.forEach(l => articleCodeSet.add(l.articleCode)));
+    // Always include articles with in-stock bales
     data.inStockCounts.forEach(s => articleCodeSet.add(s.articleCode));
+    // Also include articles from all proformas (for product name lookup)
+    // but only add to rows if they have stock or are in visible proformas
 
     const inStockMap = new Map(data.inStockCounts.map(s => [s.articleCode, s.count]));
 
@@ -124,7 +146,6 @@ export default function FactoryStockAllocation() {
     const reservationSet = new Set(data.reservations.map(r => `${r.proformaId}:${r.articleCode}`));
 
     // Build pending loading map: "proformaId:articleCode" → count
-    // pending = any LOADING/PENDING_VERIFICATION/VERIFIED order linked to a proforma
     const pendingByProformaArticle = new Map<string, number>();
     data.activeOrders.forEach(order => {
       if (!order.proformaIdUsed) return;
@@ -138,29 +159,20 @@ export default function FactoryStockAllocation() {
     const articleRows = Array.from(articleCodeSet).sort().map(articleCode => {
       const inStock = inStockMap.get(articleCode) || 0;
 
-      // Reserved: sum of proforma line quantities where reservation is ON (and not already pending)
-      let reserved = 0;
+      // Pending: sum across ALL proformas (active loadings for this article code)
       let pendingLoading = 0;
-
-      proformas.forEach(p => {
-        const line = p.lines.find(l => l.articleCode === articleCode);
-        if (!line) return;
-        const isReserved = reservationSet.has(`${p.id}:${articleCode}`);
-        const pendingQty = pendingByProformaArticle.get(`${p.id}:${articleCode}`) || 0;
-        pendingLoading += pendingQty;
-        if (isReserved) {
-          // If pending, deduct pending from reserved count (pending takes priority)
-          reserved += Math.max(0, line.quantity - pendingQty);
-        }
+      allProformas.forEach(p => {
+        pendingLoading += pendingByProformaArticle.get(`${p.id}:${articleCode}`) || 0;
       });
 
-      const available = Math.max(0, inStock - reserved - pendingLoading);
+      // Available = In Stock − Pending
+      const available = inStock - pendingLoading;
 
-      return { articleCode, inStock, reserved, pendingLoading, available };
+      return { articleCode, inStock, pendingLoading, available };
     });
 
-    return { articleRows, proformas, reservationSet, pendingByProformaArticle };
-  }, [data]);
+    return { articleRows, allProformas, visibleProformas, reservationSet, pendingByProformaArticle };
+  }, [data, visibleProformaIds]);
 
   // Find the product name for an article code
   const getProductName = (articleCode: string) => {
@@ -195,40 +207,69 @@ export default function FactoryStockAllocation() {
 
   return (
     <div className="p-4 flex flex-col gap-4 h-full">
+      {/* Header row */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold">Stock Allocation</h1>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">Reserved</p>
-            <p className="text-2xl font-bold tabular-nums leading-none">
-              {articleRows.reduce((s, r) => s + r.reserved, 0)}
-            </p>
-          </div>
-          <Button variant="outline" size="default" onClick={() => refetch()} data-testid="button-refresh-allocation">
-            <RefreshCw className="h-4 w-4 mr-2" />Refresh
-          </Button>
-        </div>
+        <Button variant="outline" size="default" onClick={() => refetch()} data-testid="button-refresh-allocation">
+          <RefreshCw className="h-4 w-4 mr-2" />Refresh
+        </Button>
       </div>
+
+      {/* Proforma selector toolbar */}
+      {allProformas.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground font-medium">Show proforma columns:</p>
+          <div className="flex flex-wrap gap-2">
+            {allProformas.map(p => {
+              const isOn = visibleProformaIds.has(p.id);
+              return (
+                <Button
+                  key={p.id}
+                  variant={isOn ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => toggleProformaVisible(p.id)}
+                  data-testid={`button-proforma-toggle-${p.id}`}
+                  className="flex flex-col h-auto py-1.5 px-3 items-start gap-0"
+                >
+                  <span className="text-xs font-semibold leading-tight">{p.customerName}</span>
+                  <span className={cn("text-[10px] leading-tight", isOn ? "text-primary-foreground/70" : "text-muted-foreground")}>
+                    {p.name}
+                  </span>
+                  {!p.isActive && (
+                    <span className={cn("text-[10px] leading-tight", isOn ? "text-primary-foreground/60" : "text-muted-foreground/60")}>
+                      inactive
+                    </span>
+                  )}
+                </Button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Legend */}
       <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-sm bg-primary/20 border border-primary/40" />
-          <span>Reserved (toggled ON)</span>
-        </div>
+        {visibleProformas.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-primary/20 border border-primary/40" />
+            <span>Reserved (toggled ON)</span>
+          </div>
+        )}
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-sm bg-amber-200 dark:bg-amber-800/60 border border-amber-400/60" />
           <span>Pending / Loading</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-sm bg-muted border border-border" />
-          <span>Not in proforma</span>
-        </div>
+        {visibleProformas.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-muted border border-border" />
+            <span>Not in proforma</span>
+          </div>
+        )}
       </div>
 
-      {proformas.length === 0 ? (
+      {allProformas.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center text-muted-foreground">
             No proformas found. Create a proforma first to use stock allocation.
@@ -251,9 +292,6 @@ export default function FactoryStockAllocation() {
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[90px]">
                   In Stock
                 </th>
-                <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[90px]">
-                  Reserved
-                </th>
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[110px]">
                   <div className="flex items-center justify-end gap-1">
                     Pending
@@ -268,8 +306,8 @@ export default function FactoryStockAllocation() {
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[90px] text-green-700 dark:text-green-400">
                   Available
                 </th>
-                {/* Proforma columns */}
-                {proformas.map(p => (
+                {/* Visible proforma columns */}
+                {visibleProformas.map(p => (
                   <th key={p.id} className="px-2 py-1.5 font-medium border-b border-r text-center min-w-[130px]">
                     <div className="flex flex-col items-center gap-0.5">
                       <span className="text-xs font-semibold truncate max-w-[120px]" title={p.customerName}>{p.customerName}</span>
@@ -301,12 +339,6 @@ export default function FactoryStockAllocation() {
                   <td className="px-3 py-2 text-right border-r font-mono tabular-nums">
                     {row.inStock}
                   </td>
-                  {/* Reserved */}
-                  <td className="px-3 py-2 text-right border-r font-mono tabular-nums text-muted-foreground">
-                    {row.reserved > 0 ? (
-                      <span className="text-foreground font-medium">{row.reserved}</span>
-                    ) : "—"}
-                  </td>
                   {/* Pending */}
                   <td className="px-3 py-2 text-right border-r font-mono tabular-nums">
                     {row.pendingLoading > 0 ? (
@@ -316,13 +348,13 @@ export default function FactoryStockAllocation() {
                   {/* Available */}
                   <td className={cn(
                     "px-3 py-2 text-right border-r font-mono tabular-nums font-semibold",
-                    row.available > 0 ? "text-green-700 dark:text-green-400" : "text-destructive",
+                    row.available > 0 ? "text-green-700 dark:text-green-400" : row.available === 0 ? "text-muted-foreground" : "text-destructive",
                   )}>
                     {row.available}
                   </td>
 
-                  {/* Per-proforma cells */}
-                  {proformas.map(p => {
+                  {/* Per-proforma cells (only visible proformas) */}
+                  {visibleProformas.map(p => {
                     const line = p.lines.find(l => l.articleCode === row.articleCode);
                     const reservationKey = `${p.id}:${row.articleCode}`;
                     const isReserved = reservationSet.has(reservationKey);
@@ -331,7 +363,6 @@ export default function FactoryStockAllocation() {
                     const isTogglingThis = toggling === reservationKey;
 
                     if (!line) {
-                      // Article not in this proforma
                       return (
                         <td key={p.id} className="px-2 py-2 text-center border-r bg-muted/30">
                           <span className="text-muted-foreground/40 text-xs">—</span>
@@ -340,7 +371,6 @@ export default function FactoryStockAllocation() {
                     }
 
                     if (isPending) {
-                      // Pending/loading — auto-highlight, no toggle
                       return (
                         <td key={p.id} className="px-2 py-2 text-center border-r bg-amber-50 dark:bg-amber-900/20">
                           <div className="flex flex-col items-center gap-0.5">
