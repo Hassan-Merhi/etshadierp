@@ -64,6 +64,7 @@ interface SalesItem {
   totalSales: string;
   totalCost: string;
   profit: string;
+  configuredPrice?: string | null;
 }
 
 interface VoucherWithItems extends Voucher {
@@ -687,7 +688,14 @@ export default function POSDaybook() {
                 <td style={{ textAlign: 'center', padding: '4px 7px', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>{fmtPrint((reprintRowDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0"), 0))}</td>
                 <td style={{ padding: '4px 7px', border: '1px solid #999', backgroundColor: '#eeeeee' }}></td>
                 <td style={{ textAlign: 'center', padding: '4px 7px', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>{fmtPrint((reprintRowDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"), 0), "$")}</td>
-                <td colSpan={3} style={{ padding: '4px 7px', border: '1px solid #999', backgroundColor: '#eeeeee' }}></td>
+                <td style={{ padding: '4px 7px', border: '1px solid #999', backgroundColor: '#eeeeee' }}></td>
+                <td style={{ padding: '4px 7px', border: '1px solid #999', backgroundColor: '#eeeeee' }}></td>
+                <td style={{ textAlign: 'center', padding: '4px 7px', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee', color: (() => { const t = (reprintRowDetails?.salesItems ?? []).reduce((s, i) => s + (parseFloat(i.sellingPrice || "0") - parseFloat(i.configuredPrice || "0")) * parseFloat(i.quantity || "0"), 0); return t > 0 ? '#0a7e1f' : t < 0 ? '#c2272d' : undefined; })() }}>
+                  {(() => {
+                    const t = (reprintRowDetails?.salesItems ?? []).reduce((s, i) => s + (parseFloat(i.sellingPrice || "0") - parseFloat(i.configuredPrice || "0")) * parseFloat(i.quantity || "0"), 0);
+                    return fmtPrint(t, "$");
+                  })()}
+                </td>
               </tr>
             </tfoot>
           </table>
