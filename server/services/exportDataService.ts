@@ -164,6 +164,15 @@ export interface CompanyExportData {
   salaryAdvancesDetail: any[];
   employeeTxnDetail: any[];
   locationStockDetail: any[];
+  // ── Factory Enriched Detail Views ──────────────────────────────────────────
+  factoryBaleDetail: any[];
+  factoryWorkerAdvancesDetail: any[];
+  factoryPayrollDetail: any[];
+  factoryContainerDetail: any[];
+  factorySupplierPaymentsDetail: any[];
+  factoryRawStockDetail: any[];
+  factoryMixBatchDetail: any[];
+  factoryPosSalesDetail: any[];
 }
 
 async function q(sql: string, params?: any[]): Promise<any[]> {
@@ -323,6 +332,14 @@ export async function fetchCompanyExportData(
     spreadsheets,
     importLogs,
     auditLog,
+    factoryBaleDetail,
+    factoryWorkerAdvancesDetail,
+    factoryPayrollDetail,
+    factoryContainerDetail,
+    factorySupplierPaymentsDetail,
+    factoryRawStockDetail,
+    factoryMixBatchDetail,
+    factoryPosSalesDetail,
     voucherLinesDetail,
     poDetail,
     stockTransferDetail,
@@ -391,7 +408,7 @@ export async function fetchCompanyExportData(
     q(`SELECT * FROM erp_worker_docs WHERE company_id = ${cid} ORDER BY id`),
 
     // ── Factory Workers ───────────────────────────────────────────────────────
-    q(`SELECT * FROM factory_workers WHERE company_id = ${cid} ORDER BY name`),
+    q(`SELECT * FROM factory_workers WHERE company_id = ${cid} ORDER BY full_name`),
     q(`SELECT * FROM factory_worker_categories WHERE company_id = ${cid} ORDER BY id`),
     q(`SELECT * FROM factory_worker_documents WHERE company_id = ${cid} ORDER BY id`),
     q(`SELECT * FROM factory_worker_advances WHERE company_id = ${cid} ORDER BY id`),
@@ -403,20 +420,20 @@ export async function fetchCompanyExportData(
     // ── Factory Operations ────────────────────────────────────────────────────
     q(`SELECT * FROM factory_settings WHERE company_id = ${cid}`),
     q(`SELECT * FROM factory_categories WHERE company_id = ${cid} ORDER BY name`),
-    q(`SELECT * FROM factory_daybook_entries WHERE company_id = ${cid} ${df("entry_date")} ORDER BY entry_date, id`),
-    q(`SELECT fde.* FROM factory_daybook_entry_edits fde INNER JOIN factory_daybook_entries fdb ON fdb.id = fde.entry_id WHERE fdb.company_id = ${cid} ORDER BY fde.id`),
-    q(`SELECT * FROM factory_daily_kpi_snapshots WHERE company_id = ${cid} ${df("snapshot_date")} ORDER BY snapshot_date DESC`),
-    q(`SELECT * FROM factory_daily_usages WHERE company_id = ${cid} ${df("usage_date")} ORDER BY usage_date DESC`),
+    q(`SELECT * FROM factory_daybook_entries WHERE company_id = ${cid} ${df("tx_date")} ORDER BY tx_date, id`),
+    q(`SELECT fde.* FROM factory_daybook_entry_edits fde INNER JOIN factory_daybook_entries fdb ON fdb.id = fde.daybook_entry_id WHERE fdb.company_id = ${cid} ORDER BY fde.id`),
+    q(`SELECT * FROM factory_daily_kpi_snapshots WHERE company_id = ${cid} ${df("date")} ORDER BY date DESC`),
+    q(`SELECT * FROM factory_daily_usages WHERE company_id = ${cid} ${df("used_date")} ORDER BY used_date DESC`),
     q(`SELECT * FROM factory_alerts WHERE company_id = ${cid} ORDER BY id DESC`),
     q(`SELECT * FROM factory_duty_audit_log WHERE company_id = ${cid} ORDER BY id DESC`),
 
     // ── Factory Raw / Production ──────────────────────────────────────────────
     q(`SELECT * FROM factory_raw_stock WHERE company_id = ${cid} ORDER BY id`),
     q(`SELECT * FROM factory_raw_material_adjustments WHERE company_id = ${cid} ${df("adjustment_date")} ORDER BY adjustment_date DESC, id`),
-    q(`SELECT * FROM factory_pressing_batches WHERE company_id = ${cid} ${df("press_date")} ORDER BY press_date DESC, id`),
+    q(`SELECT * FROM factory_pressing_batches WHERE company_id = ${cid} ${df("created_at::date")} ORDER BY created_at DESC, id`),
     q(`SELECT * FROM pressing_batches WHERE company_id = ${cid} ORDER BY id DESC`),
     q(`SELECT * FROM factory_mix_batches WHERE company_id = ${cid} ORDER BY id DESC`),
-    q(`SELECT fms.* FROM factory_mix_batch_sources fms INNER JOIN factory_mix_batches fmb ON fmb.id = fms.batch_id WHERE fmb.company_id = ${cid} ORDER BY fms.id`),
+    q(`SELECT fms.* FROM factory_mix_batch_sources fms INNER JOIN factory_mix_batches fmb ON fmb.id = fms.mix_batch_id WHERE fmb.company_id = ${cid} ORDER BY fms.id`),
     q(`SELECT * FROM mix_batches WHERE company_id = ${cid} ORDER BY id DESC`),
     q(`SELECT mbs.* FROM mix_batch_sources mbs INNER JOIN mix_batches mb ON mb.id = mbs.batch_id WHERE mb.company_id = ${cid} ORDER BY mbs.id`),
     q(`SELECT * FROM production_bales WHERE company_id = ${cid} ORDER BY id DESC`),
@@ -424,7 +441,7 @@ export async function fetchCompanyExportData(
 
     // ── Factory Bales ─────────────────────────────────────────────────────────
     q(`SELECT * FROM factory_bale_products WHERE company_id = ${cid} ORDER BY name`),
-    q(`SELECT * FROM factory_bales WHERE company_id = ${cid} ${df("pressed_date")} ORDER BY pressed_date DESC, id`),
+    q(`SELECT * FROM factory_bales WHERE company_id = ${cid} ${df("pressed_at::date")} ORDER BY pressed_at DESC, id`),
     q(`SELECT * FROM factory_bale_sequences WHERE company_id = ${cid} ORDER BY id`),
     q(`SELECT * FROM factory_bale_cost_snapshots WHERE company_id = ${cid} ORDER BY id DESC`),
     q(`SELECT * FROM factory_bale_waste_dispatches WHERE company_id = ${cid} ORDER BY id DESC`),
@@ -439,7 +456,7 @@ export async function fetchCompanyExportData(
 
     // ── Factory Suppliers ─────────────────────────────────────────────────────
     q(`SELECT * FROM factory_suppliers WHERE company_id = ${cid} ORDER BY name`),
-    q(`SELECT * FROM factory_supplier_payments WHERE company_id = ${cid} ${df("payment_date")} ORDER BY payment_date DESC, id`),
+    q(`SELECT * FROM factory_supplier_payments WHERE company_id = ${cid} ${df("date")} ORDER BY date DESC, id`),
     q(`SELECT * FROM factory_supplier_fx_transfers WHERE company_id = ${cid} ORDER BY id DESC`),
     q(`SELECT * FROM factory_supplier_score_snapshots WHERE company_id = ${cid} ORDER BY id DESC`),
 
@@ -448,7 +465,7 @@ export async function fetchCompanyExportData(
     q(`SELECT * FROM factory_fx_allocations WHERE company_id = ${cid} ORDER BY id DESC`),
 
     // ── Factory POS ───────────────────────────────────────────────────────────
-    q(`SELECT * FROM factory_pos_sales WHERE company_id = ${cid} ${df("sale_date")} ORDER BY sale_date DESC, id`),
+    q(`SELECT * FROM factory_pos_sales WHERE company_id = ${cid} ${df("tx_date")} ORDER BY tx_date DESC, id`),
     q(`SELECT fps.* FROM factory_pos_sale_items fps INNER JOIN factory_pos_sales fp ON fp.id = fps.sale_id WHERE fp.company_id = ${cid} ORDER BY fps.id`),
 
     // ── Bales (Sorting) ───────────────────────────────────────────────────────
@@ -471,10 +488,10 @@ export async function fetchCompanyExportData(
     q(`SELECT * FROM inventory_negative_layers WHERE company_id = ${cid} ORDER BY id`),
     q(`SELECT * FROM stock_group_location_archives WHERE company_id = ${cid} AND deleted_at IS NULL ORDER BY id`),
     q(`SELECT sglai.* FROM stock_group_location_archive_items sglai INNER JOIN stock_group_location_archives sgla ON sgla.id = sglai.archive_id WHERE sgla.company_id = ${cid} ORDER BY sglai.id`),
-    q(`SELECT stv.*, l1.name AS from_location_name, l2.name AS to_location_name FROM stock_transfer_vouchers stv LEFT JOIN locations l1 ON l1.id = stv.from_location_id LEFT JOIN locations l2 ON l2.id = stv.to_location_id WHERE stv.company_id = ${cid} ${df("stv.transfer_date")} ORDER BY stv.transfer_date, stv.id`),
-    q(`SELECT sti.* FROM stock_transfer_items sti INNER JOIN stock_transfer_vouchers stv ON stv.id = sti.transfer_voucher_id WHERE stv.company_id = ${cid} ORDER BY sti.id`),
-    q(`SELECT r.* FROM stock_transfer_revisions r INNER JOIN stock_transfer_vouchers stv ON stv.id = r.transfer_id WHERE stv.company_id = ${cid} ORDER BY r.id`),
-    q(`SELECT ri.* FROM stock_transfer_revision_items ri INNER JOIN stock_transfer_revisions r ON r.id = ri.revision_id INNER JOIN stock_transfer_vouchers stv ON stv.id = r.transfer_id WHERE stv.company_id = ${cid} ORDER BY ri.id`),
+    q(`SELECT stv.*, v.voucher_number, v.voucher_date, v.description AS transfer_notes, l1.name AS from_location_name, l2.name AS to_location_name FROM stock_transfer_vouchers stv INNER JOIN vouchers v ON v.id = stv.voucher_id LEFT JOIN locations l1 ON l1.id = stv.source_location_id LEFT JOIN locations l2 ON l2.id = stv.destination_location_id WHERE v.company_id = ${cid} ${df("v.voucher_date")} ORDER BY v.voucher_date, stv.id`),
+    q(`SELECT sti.* FROM stock_transfer_items sti INNER JOIN stock_transfer_vouchers stv ON stv.id = sti.transfer_id INNER JOIN vouchers v ON v.id = stv.voucher_id WHERE v.company_id = ${cid} ORDER BY sti.id`),
+    q(`SELECT r.* FROM stock_transfer_revisions r INNER JOIN stock_transfer_vouchers stv ON stv.id = r.transfer_id INNER JOIN vouchers v ON v.id = stv.voucher_id WHERE v.company_id = ${cid} ORDER BY r.id`),
+    q(`SELECT ri.* FROM stock_transfer_revision_items ri INNER JOIN stock_transfer_revisions r ON r.id = ri.revision_id INNER JOIN stock_transfer_vouchers stv ON stv.id = r.transfer_id INNER JOIN vouchers v ON v.id = stv.voucher_id WHERE v.company_id = ${cid} ORDER BY ri.id`),
     q(`SELECT * FROM stock_adjustment_vouchers WHERE company_id = ${cid} ${df("adjustment_date")} ORDER BY adjustment_date, id`),
     q(`SELECT ai.* FROM stock_adjustment_items ai INNER JOIN stock_adjustment_vouchers av ON av.id = ai.adjustment_voucher_id WHERE av.company_id = ${cid} ORDER BY ai.id`),
     q(`SELECT * FROM proforma_stock_reservations WHERE company_id = ${cid} ORDER BY id`),
@@ -607,7 +624,16 @@ export async function fetchCompanyExportData(
     // ── Audit ─────────────────────────────────────────────────────────────────
     q(`SELECT * FROM audit_log WHERE company_id = ${cid} ${df("created_at::date")} ORDER BY created_at DESC LIMIT 100000`),
 
-    // ── Enriched Detail Views ─────────────────────────────────────────────────
+    // ── Factory Enriched Detail Views ─────────────────────────────────────────
+    q(`SELECT fb.bale_code, fb.reference_number, fb.article_code, fb.product_name, fb.weight_kg, fb.cost_per_kg, fb.total_cost, fb.status, fb.pressed_at, fb.finalized_at, fb.category, fb.grade, fb.quantity, fb.stock_entry_date, fb.notes, fbp.code AS product_code, fbp.selling_price, fbp.production_price, l.name AS erp_location, fmb.batch_code AS mix_batch_code, fmb.batch_number AS mix_batch_number FROM factory_bales fb LEFT JOIN factory_bale_products fbp ON fbp.id = fb.product_id LEFT JOIN locations l ON l.id = fb.erp_location_id LEFT JOIN factory_mix_batches fmb ON fmb.id = fb.mix_batch_id WHERE fb.company_id = ${cid} ${df("fb.pressed_at::date")} ORDER BY fb.pressed_at DESC, fb.id`),
+    q(`SELECT fa.advance_date, fa.amount, fa.remaining_balance, fa.notes, fa.fully_paid, fa.repayment_type, fw.full_name AS worker_name, fw.employee_code, fw.department, fw.position FROM factory_worker_advances fa INNER JOIN factory_workers fw ON fw.id = fa.worker_id WHERE fa.company_id = ${cid} ORDER BY fa.advance_date, fa.id`),
+    q(`SELECT fp.period_start, fp.period_end, fp.status, fp.base_salary, fp.bale_earnings, fp.kg_earnings, fp.overtime_pay, fp.bonuses, fp.deductions, fp.advances, fp.net_salary, fp.bales_count, fp.kg_processed, fp.overtime_hours, fp.total_working_days, fp.present_days, fp.absent_days, fp.transport, fp.notes, fw.full_name AS worker_name, fw.employee_code, fw.department, fw.position, fw.salary_type FROM factory_payrolls fp INNER JOIN factory_workers fw ON fw.id = fp.worker_id WHERE fp.company_id = ${cid} ${df("fp.period_start")} ORDER BY fp.period_start, fp.id`),
+    q(`SELECT fc.container_number, fc.status, fc.arrival_date, fc.total_kg, fc.declared_kg, fc.actual_received_kg, fc.difference_kg, fc.rate_per_kg, fc.currency_code, fc.fx_rate_to_usd, fc.rate_per_kg_usd, fc.freight, fc.other_charges, fc.commission_amount, fc.duty_amount, fc.duty_status, fc.final_payable_amount, fc.final_payable_amount_usd, fc.notes, fs.name AS supplier_name FROM factory_containers fc LEFT JOIN factory_suppliers fs ON fs.id = fc.supplier_id WHERE fc.company_id = ${cid} ORDER BY fc.arrival_date DESC, fc.id`),
+    q(`SELECT fsp.date AS payment_date, fsp.amount, fsp.currency_code, fsp.fx_rate_to_usd, fsp.amount_usd, fsp.notes, fs.name AS supplier_name FROM factory_supplier_payments fsp INNER JOIN factory_suppliers fs ON fs.id = fsp.supplier_id WHERE fsp.company_id = ${cid} ${df("fsp.date")} ORDER BY fsp.date DESC, fsp.id`),
+    q(`SELECT fr.offloaded_at, fr.material_type, fr.quantity_kg, fr.received_kg, fr.used_kg, fr.rate_per_kg, fr.cost_per_kg, fr.cost_per_kg_usd, fr.notes, fc.container_number, fs.name AS supplier_name FROM factory_raw_stock fr LEFT JOIN factory_containers fc ON fc.id = fr.container_id LEFT JOIN factory_suppliers fs ON fs.id = fc.supplier_id WHERE fr.company_id = ${cid} ORDER BY fr.offloaded_at DESC, fr.id`),
+    q(`SELECT fmb.batch_number, fmb.batch_code, fmb.batch_date, fmb.total_weight_kg, fmb.cost_per_kg, fmb.total_cost, fmb.status, fmb.notes, fms.source_type, fms.weight_kg, fms.cost_per_kg AS source_cost_per_kg, fms.total_cost AS source_total_cost, fms.notes AS source_notes, fs.name AS supplier_name, fc.container_number FROM factory_mix_batches fmb LEFT JOIN factory_mix_batch_sources fms ON fms.mix_batch_id = fmb.id LEFT JOIN factory_suppliers fs ON fs.id = fms.supplier_id LEFT JOIN factory_containers fc ON fc.id = fms.container_id WHERE fmb.company_id = ${cid} ORDER BY fmb.batch_date DESC, fmb.id, fms.id`),
+    q(`SELECT fps.sale_number, fps.tx_date AS sale_date, fps.customer_name, fps.notes AS sale_notes, fps.total_amount AS sale_total, fps.currency_code, fps.payment_type, fps.status, fpsi.product_name, fpsi.article_code, fpsi.quantity, fpsi.unit_price, fpsi.total_amount AS item_total FROM factory_pos_sales fps LEFT JOIN factory_pos_sale_items fpsi ON fpsi.sale_id = fps.id WHERE fps.company_id = ${cid} ${df("fps.tx_date")} ORDER BY fps.tx_date DESC, fps.id, fpsi.id`),
+
     q(`SELECT v.voucher_number, v.voucher_type, v.voucher_date, v.description AS voucher_narration, v.currency, v.exchange_rate, v.location_name, la.code AS account_code, la.name AS account_name, la.account_type, CASE WHEN COALESCE(ve.debit_amount,0) > 0 THEN 'DR' ELSE 'CR' END AS dr_cr, COALESCE(ve.debit_amount,0) AS debit_amount, COALESCE(ve.credit_amount,0) AS credit_amount, ve.narration AS entry_narration, TRIM(COALESCE(e.first_name,'') || ' ' || COALESCE(e.last_name,'')) AS employee_name, c.legal_name AS customer_name, s.legal_name AS supplier_name FROM vouchers v LEFT JOIN voucher_entries ve ON ve.voucher_id = v.id LEFT JOIN ledger_accounts la ON la.id = ve.ledger_account_id LEFT JOIN employees e ON e.id = ve.employee_id LEFT JOIN customers c ON c.id = ve.customer_id LEFT JOIN suppliers s ON s.id = ve.supplier_id WHERE v.company_id = ${cid} ${df("v.voucher_date")} ORDER BY v.voucher_date, v.id, ve.id`),
     q(`SELECT po.po_number, po.status, po.currency, po.created_at AS po_date, s.legal_name AS supplier_name, COALESCE(si.code,'') AS item_code, pol.item_name, pol.quantity, pol.rate, pol.line_total, po.freight, po.other_charges, po.surcharge, po.fumigation, po.document_charges, po.discount, po.items_total FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id LEFT JOIN po_line_items pol ON pol.po_id = po.id LEFT JOIN stock_items si ON si.id = pol.stock_item_id WHERE po.company_id = ${cid} ORDER BY po.created_at DESC, po.id, pol.id`),
     q(`SELECT v.voucher_number, v.voucher_date, v.description AS notes, l1.name AS from_location, l2.name AS to_location, si.code AS item_code, si.name AS item_name, sti.quantity, sti.rate, sti.total_amount FROM stock_transfer_vouchers stv INNER JOIN vouchers v ON v.id = stv.voucher_id LEFT JOIN locations l1 ON l1.id = stv.source_location_id LEFT JOIN locations l2 ON l2.id = stv.destination_location_id LEFT JOIN stock_transfer_items sti ON sti.transfer_id = stv.id LEFT JOIN stock_items si ON si.id = sti.stock_item_id WHERE v.company_id = ${cid} ${df("v.voucher_date")} ORDER BY v.voucher_date DESC, stv.id, sti.id`),
@@ -751,6 +777,14 @@ export async function fetchCompanyExportData(
     spreadsheets,
     importLogs,
     auditLog,
+    factoryBaleDetail,
+    factoryWorkerAdvancesDetail,
+    factoryPayrollDetail,
+    factoryContainerDetail,
+    factorySupplierPaymentsDetail,
+    factoryRawStockDetail,
+    factoryMixBatchDetail,
+    factoryPosSalesDetail,
     voucherLinesDetail,
     poDetail,
     stockTransferDetail,

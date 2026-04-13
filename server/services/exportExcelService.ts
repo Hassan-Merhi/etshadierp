@@ -261,7 +261,16 @@ function addSummarySheet(wb: ExcelJS.Workbook, data: CompanyExportData) {
     ["Spreadsheets", data.spreadsheets.length],
     ["Import Logs", data.importLogs.length],
     ["Audit Log", data.auditLog.length],
-    ["— ENRICHED VIEWS —", 0],
+    ["— FACTORY ENRICHED VIEWS —", 0],
+    ["Factory Bale Production Detail", data.factoryBaleDetail.length],
+    ["Factory Worker Advances Detail", data.factoryWorkerAdvancesDetail.length],
+    ["Factory Payroll Detail", data.factoryPayrollDetail.length],
+    ["Factory Container Detail", data.factoryContainerDetail.length],
+    ["Factory Supplier Payments Detail", data.factorySupplierPaymentsDetail.length],
+    ["Factory Raw Stock Detail", data.factoryRawStockDetail.length],
+    ["Factory Mix Batch Detail", data.factoryMixBatchDetail.length],
+    ["Factory POS Sales Detail", data.factoryPosSalesDetail.length],
+    ["— ERP ENRICHED VIEWS —", 0],
     ["Voucher Lines Detail", data.voucherLinesDetail.length],
     ["PO Detail (flat)", data.poDetail.length],
     ["Stock Transfer Detail", data.stockTransferDetail.length],
@@ -468,7 +477,17 @@ export async function buildCompanyWorkbook(data: CompanyExportData): Promise<Buf
   // ── Audit ─────────────────────────────────────────────────────────────────
   addSheet(wb, "Audit Log", data.auditLog);
 
-  // ── Enriched Detail Views ─────────────────────────────────────────────────
+  // ── Factory Enriched Detail Views ─────────────────────────────────────────
+  addSheet(wb, "Factory Bale Production", data.factoryBaleDetail);
+  addSheet(wb, "Factory Worker Advances", data.factoryWorkerAdvancesDetail);
+  addSheet(wb, "Factory Payroll Detail", data.factoryPayrollDetail);
+  addSheet(wb, "Factory Container Detail", data.factoryContainerDetail);
+  addSheet(wb, "Factory Supplier Payments", data.factorySupplierPaymentsDetail);
+  addSheet(wb, "Factory Raw Stock Detail", data.factoryRawStockDetail);
+  addSheet(wb, "Factory Mix Batch Detail", data.factoryMixBatchDetail);
+  addSheet(wb, "Factory POS Sales Detail", data.factoryPosSalesDetail);
+
+  // ── ERP Enriched Detail Views ─────────────────────────────────────────────
   addSheet(wb, "Voucher Lines Detail", data.voucherLinesDetail);
   addSheet(wb, "PO Detail", data.poDetail);
   addSheet(wb, "Stock Transfer Detail", data.stockTransferDetail);
