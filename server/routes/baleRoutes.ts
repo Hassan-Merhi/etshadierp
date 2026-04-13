@@ -22,7 +22,7 @@ import {
   FEATURE_KEYS, fiscalPeriodClosures,
   wasteDispatches, wasteDispatchItems, insertWasteDispatchSchema,
   bales, baleProducts, baleProductCategories, baleTransfers,
-  factoryBales, baleLabelPrints,
+  factoryBales, factoryBaleProducts, baleLabelPrints,
   factoryPressingBatches, factoryMixBatches, factoryMixBatchSources, factoryContainers, factorySuppliers,
   customerOrders, customerOrderBales,
   insertBaleSchema, insertBaleTransferSchema,
