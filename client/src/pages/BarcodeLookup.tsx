@@ -433,8 +433,7 @@ export default function BarcodeLookup() {
                         <InfoRow label="Grade" value={referenceResult.baleInfo.grade} />
                       )}
                       <InfoRow label="Weight" value={`${parseFloat(referenceResult.baleInfo.weightKg).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} KG`} />
-                      <InfoRow label="Cost / KG" value={referenceResult.baleInfo.costPerKg ? parseFloat(referenceResult.baleInfo.costPerKg).toFixed(4) : null} />
-                      <InfoRow label="Total Cost" value={referenceResult.baleInfo.totalCost ? parseFloat(referenceResult.baleInfo.totalCost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null} />
+                      <InfoRow label="Cost / Bale" value={referenceResult.baleInfo.totalCost ? parseFloat(referenceResult.baleInfo.totalCost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null} />
                       {referenceResult.baleInfo.stockEntryDate && (
                         <InfoRow label="Stock Entry Date" value={formatDateOnly(referenceResult.baleInfo.stockEntryDate)} />
                       )}
