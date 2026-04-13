@@ -21,7 +21,7 @@ import {
   auditLog,
   employees,
 } from "@shared/schema";
-import { eq, and, sql, gt, ilike } from "drizzle-orm";
+import { eq, and, sql, gt, ilike, isNull } from "drizzle-orm";
 
 // ─── Multer ───────────────────────────────────────────────────────────────────
 export const upload = multer({
@@ -196,6 +196,93 @@ export async function runIntercompanyPosTransfer(
       "[IntercompanyPOS] Auto-transfer failed:",
       err?.message ?? err
     );
+  }
+}
+
+// ─── Recalculate Intercompany POS for a specific date ─────────────────────────
+// Deletes the existing INTERCO-SRC/DST vouchers for the date and rebuilds them
+// from all non-deleted cash Sales vouchers for that company+date.
+export async function recalculateIntercompanyForDate(
+  companyId: number,
+  date: string
+) {
+  try {
+    const [config] = await db
+      .select()
+      .from(intercompanyPosConfigs)
+      .where(eq(intercompanyPosConfigs.sourceCompanyId, companyId));
+    if (!config || !config.enabled) return;
+
+    // Step 1: Delete existing INTERCO vouchers for this date so we can rebuild
+    const srcVoucherNum = `INTERCO-SRC-${companyId}-${date}`;
+    const dstVoucherNum = `INTERCO-DST-${config.destCompanyId}-${date}`;
+
+    for (const [cId, vNum] of [
+      [companyId, srcVoucherNum],
+      [config.destCompanyId, dstVoucherNum],
+    ] as [number, string][]) {
+      const [existing] = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(
+          and(eq(vouchers.companyId, cId), eq(vouchers.voucherNumber, vNum))
+        );
+      if (existing) {
+        await db
+          .delete(voucherEntries)
+          .where(eq(voucherEntries.voucherId, existing.id));
+        await db.delete(vouchers).where(eq(vouchers.id, existing.id));
+      }
+    }
+
+    // Step 2: Find all non-deleted Sales vouchers for this company+date
+    const daySales = await db
+      .select({ id: vouchers.id })
+      .from(vouchers)
+      .where(
+        and(
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.voucherType, "Sales"),
+          eq(vouchers.voucherDate, date),
+          isNull(vouchers.deletedAt)
+        )
+      );
+
+    // Step 3: For each voucher, find debit entries that belong to Cash-type accounts
+    for (const sv of daySales) {
+      const debitEntries = await db
+        .select({
+          ledgerAccountId: voucherEntries.ledgerAccountId,
+          debitAmount: voucherEntries.debitAmount,
+        })
+        .from(voucherEntries)
+        .where(
+          and(
+            eq(voucherEntries.voucherId, sv.id),
+            sql`${voucherEntries.debitAmount}::numeric > 0`
+          )
+        );
+
+      for (const entry of debitEntries) {
+        if (!entry.ledgerAccountId) continue;
+
+        const [account] = await db
+          .select({ accountType: ledgerAccounts.accountType })
+          .from(ledgerAccounts)
+          .where(eq(ledgerAccounts.id, entry.ledgerAccountId))
+          .limit(1);
+
+        if (!account || account.accountType !== "Cash") continue;
+
+        const amount = parseFloat(entry.debitAmount || "0");
+        if (amount <= 0) continue;
+
+        // Re-run interco transfer for this cash sale entry
+        await runIntercompanyPosTransfer(companyId, entry.ledgerAccountId, amount, date);
+      }
+    }
+  } catch (err: any) {
+    console.error("[IntercompanyPOS Recalc] Error:", err?.message ?? err);
   }
 }
 

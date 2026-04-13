@@ -3,7 +3,7 @@ import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation, canModifyDate } from "../auth";
-import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, runIntercompanyPosTransfer } from "./_helpers";
+import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, runIntercompanyPosTransfer, recalculateIntercompanyForDate } from "./_helpers";
 import {
   inventory, stockItems, stockGroups, stockGroupArchives,
   stockTransferVouchers, stockTransferItems,
@@ -819,6 +819,17 @@ export function registerPosRoutes(app: Express) {
         if (debitEntry?.ledgerAccountId) {
           customerAccount = await storage.getLedgerAccountById(debitEntry.ledgerAccountId);
         }
+      }
+
+      // ── Recalculate INTERCO vouchers for affected date(s) (non-blocking) ──
+      // Always recalculate old date; if date changed, also recalculate new date.
+      const oldDate = existingVoucher.voucherDate;
+      const newDate = voucherDate || oldDate;
+      const datesToRecalc = new Set<string>([oldDate]);
+      if (newDate !== oldDate) datesToRecalc.add(newDate);
+      for (const d of datesToRecalc) {
+        recalculateIntercompanyForDate(req.session.currentCompanyId!, d)
+          .catch((err) => console.error("[IntercompanyPOS Recalc] Unhandled:", err));
       }
 
       res.json({

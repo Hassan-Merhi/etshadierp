@@ -1868,6 +1868,45 @@ export class DbStorage implements IStorage {
     // Delete container charges
     await db.delete(schema.containerCharges).where(eq(schema.containerCharges.containerId, id));
 
+    // Delete container sale voucher (DR: customer account, CR: commission revenue)
+    const sales = await db
+      .select()
+      .from(schema.containerSales)
+      .where(eq(schema.containerSales.containerId, id));
+
+    for (const sale of sales) {
+      if (sale.voucherId) {
+        await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, sale.voucherId));
+        await db.delete(schema.vouchers).where(eq(schema.vouchers.id, sale.voucherId));
+      }
+    }
+    await db.delete(schema.containerSales).where(eq(schema.containerSales.containerId, id));
+
+    // Delete container offload items then offloads
+    const offloads = await db
+      .select({ id: schema.containerOffloads.id })
+      .from(schema.containerOffloads)
+      .where(eq(schema.containerOffloads.containerId, id));
+
+    for (const offload of offloads) {
+      await db.delete(schema.containerOffloadItems).where(eq(schema.containerOffloadItems.offloadId, offload.id));
+    }
+    await db.delete(schema.containerOffloads).where(eq(schema.containerOffloads.containerId, id));
+
+    // Delete container freight payments then freight records
+    const freights = await db
+      .select({ id: schema.containerFreight.id })
+      .from(schema.containerFreight)
+      .where(eq(schema.containerFreight.containerId, id));
+
+    for (const freight of freights) {
+      await db.delete(schema.containerFreightPayments).where(eq(schema.containerFreightPayments.containerFreightId, freight.id));
+    }
+    await db.delete(schema.containerFreight).where(eq(schema.containerFreight.containerId, id));
+
+    // Delete container documents
+    await db.delete(schema.containerDocuments).where(eq(schema.containerDocuments.containerId, id));
+
     // Delete import log entry to allow re-upload of the same file
     await db.delete(schema.importLogs).where(eq(schema.importLogs.containerId, id));
 
