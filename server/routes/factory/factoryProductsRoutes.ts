@@ -913,8 +913,7 @@ export function registerFactoryProductsRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const user = (req.session as any).user;
-      const role = user?.role;
+      const role = req.user?.role || (req.session as any).currentRole;
       if (!["Admin", "Owner", "Developer"].includes(role)) {
         return res.status(403).json({ message: "Admin, Owner, or Developer role required" });
       }
