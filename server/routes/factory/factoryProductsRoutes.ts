@@ -484,6 +484,21 @@ export function registerFactoryProductsRoutes(app: Express) {
         }
       }
 
+      // Reject duplicate names (case-insensitive) within same company
+      const nameToCheck = (req.body.name || "").trim();
+      if (nameToCheck) {
+        const [nameDup] = await db
+          .select({ id: factoryBaleProducts.id })
+          .from(factoryBaleProducts)
+          .where(and(
+            eq(factoryBaleProducts.companyId, companyId),
+            sql`LOWER(${factoryBaleProducts.name}) = LOWER(${nameToCheck})`
+          ));
+        if (nameDup) {
+          return res.status(400).json({ message: `A product named "${nameToCheck}" already exists` });
+        }
+      }
+
       // Try insert; if code/articleCode constraint fires (race condition),
       // keep incrementing the numeric suffix until we find a free slot.
       let product: any;
@@ -547,6 +562,21 @@ export function registerFactoryProductsRoutes(app: Express) {
         .where(and(eq(factoryBaleProducts.id, id), eq(factoryBaleProducts.companyId, companyId)));
 
       if (!existing) return res.status(404).json({ message: "Product not found" });
+
+      // If name is being changed, verify it isn't already taken (case-insensitive)
+      if (name !== undefined && name.trim().toLowerCase() !== existing.name.toLowerCase()) {
+        const [nameConflict] = await db
+          .select({ id: factoryBaleProducts.id })
+          .from(factoryBaleProducts)
+          .where(and(
+            eq(factoryBaleProducts.companyId, companyId),
+            sql`LOWER(${factoryBaleProducts.name}) = LOWER(${name.trim()})`,
+            sql`${factoryBaleProducts.id} != ${id}`
+          ));
+        if (nameConflict) {
+          return res.status(400).json({ message: `A product named "${name.trim()}" already exists` });
+        }
+      }
 
       // If article code is being changed, verify it isn't already taken by another product
       if (articleCode !== undefined && articleCode !== existing.articleCode) {
@@ -909,7 +939,7 @@ export function registerFactoryProductsRoutes(app: Express) {
         return res.status(400).json({ message: "One or more source products not found for this company" });
       }
 
-      // In a transaction: reroute bales then deactivate sources
+      // In a transaction: reroute all referencing rows then deactivate sources
       let movedBales = 0;
       await db.transaction(async (tx) => {
         // Update factory_bales: reassign product + fix inline article_code and product_name
@@ -922,6 +952,24 @@ export function registerFactoryProductsRoutes(app: Express) {
             AND company_id = ${companyId}
         `);
         movedBales = (updateResult as any).rowCount ?? 0;
+
+        // Update factory_pressing_batches: reassign product
+        await tx.execute(sql`
+          UPDATE factory_pressing_batches
+          SET product_id = ${targetId}
+          WHERE product_id = ANY(${sourceIds}::int[])
+            AND company_id = ${companyId}
+        `);
+
+        // Update factory_pos_sale_items: reassign product + fix inline name/articleCode
+        await tx.execute(sql`
+          UPDATE factory_pos_sale_items
+          SET product_id = ${targetId},
+              product_name = ${target.name},
+              article_code = ${target.articleCode || null}
+          WHERE product_id = ANY(${sourceIds}::int[])
+            AND company_id = ${companyId}
+        `);
 
         // Soft-delete source products
         await tx.execute(sql`
