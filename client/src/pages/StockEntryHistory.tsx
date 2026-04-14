@@ -1,11 +1,18 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
-import { ChevronDown, ChevronRight, Download, Search, RotateCcw, List, AlignJustify, FileDown } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Search, RotateCcw, List, AlignJustify, FileDown, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -653,15 +660,33 @@ export default function StockEntryHistory() {
               <List className="w-3 h-3 mr-1" /> Detailed
             </Button>
           </div>
-          <Button variant="outline" size="sm" onClick={resetFilters} data-testid="button-reset-filters">
-            <RotateCcw className="w-3 h-3 mr-1" /> Reset
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExportWorkerPDF} disabled={filteredGroups.length === 0} data-testid="button-export-worker-pdf">
-            <FileDown className="w-3 h-3 mr-1" /> Worker PDF
-          </Button>
-          <Button variant="outline" size="sm" onClick={exportExcel} disabled={filteredGroups.length === 0} data-testid="button-export-excel">
-            <Download className="w-3 h-3 mr-1" /> Export Excel
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" data-testid="button-actions-menu">
+                <MoreVertical className="w-3 h-3 mr-1" /> Actions
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={resetFilters} data-testid="button-reset-filters">
+                <RotateCcw className="w-3 h-3 mr-2" /> Reset Filters
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleExportWorkerPDF}
+                disabled={filteredGroups.length === 0}
+                data-testid="button-export-worker-pdf"
+              >
+                <FileDown className="w-3 h-3 mr-2" /> Worker PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={exportExcel}
+                disabled={filteredGroups.length === 0}
+                data-testid="button-export-excel"
+              >
+                <Download className="w-3 h-3 mr-2" /> Export Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
