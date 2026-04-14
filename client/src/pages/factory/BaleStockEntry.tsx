@@ -1964,20 +1964,6 @@
       queryKey: ["/api/factory/bales"],
     });
 
-    const { data: mixBatchesData } = useQuery<any[]>({
-      queryKey: ["/api/factory/mix-batches"],
-    });
-
-    const finalizedBatchCount = (mixBatchesData || []).filter(
-      (b: any) => b.status === "CLOSED" || b.status === "COMPLETED"
-    ).length;
-
-    const uniquePressingIds = new Set(
-      (balesData || []).map((r: any) => r.bale?.pressingBatchId).filter(Boolean)
-    );
-    const totalPressingDone = uniquePressingIds.size;
-    const remainingOnTables = Math.max(0, finalizedBatchCount - totalPressingDone);
-
     const dayInStock = (balesData || []).filter((row: any) => {
       const bale = row.bale;
       if (bale.status !== "IN_STOCK") return false;
@@ -2047,15 +2033,6 @@
           <span className="text-xs text-muted-foreground">kg</span>
         </div>
 
-        <div className="w-px h-4 bg-border hidden sm:block" />
-
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/25 text-purple-700 dark:text-purple-400">
-            On Tables
-          </span>
-          <span className="text-sm font-semibold tabular-nums" data-testid="text-remaining-on-tables">{remainingOnTables}</span>
-          <span className="text-xs text-muted-foreground">batches</span>
-        </div>
       </div>
     );
   }
