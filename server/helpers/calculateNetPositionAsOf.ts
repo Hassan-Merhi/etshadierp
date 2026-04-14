@@ -1,14 +1,9 @@
 /**
  * Shared helper: calculate the ERP net position as of a specific date.
  *
- * Matches the logic of /api/stats/net-profit exactly:
- *   - ledger account classification via classifyNetPositionAccounts()
- *   - historical stock on floor via calculateHistoricalLocationInventory()
- *   - employee advance/liability from voucher entries
- *   - supplier balances (parent company only)
- *   - stock OTW: containers with importDate ≤ toDate and offloadDate > toDate
- *
- * Returns the four values the caller needs to build a monthly snapshot.
+ * Returns the four summary values PLUS a full breakdown of every line item
+ * on both sides (What We Have / What We Owe) so callers can build detailed
+ * per-month sheets.
  */
 
 import { db } from "../db";
@@ -20,21 +15,28 @@ import { eq, and, or, isNull, lte, sql } from "drizzle-orm";
 import { classifyNetPositionAccounts, round2 } from "../netPositionHelper";
 import { calculateHistoricalLocationInventory } from "../routes/_helpers";
 
+export interface NetPositionLineItem {
+  label: string;
+  value: number;
+  category: string;
+  side: "forUs" | "onUs";
+}
+
 export interface NetPositionSnapshot {
   forUsTotal: number;
   onUsTotal: number;
   netPosition: number;
   netPositionLabel: string;
+  forUsLines: NetPositionLineItem[];
+  onUsLines: NetPositionLineItem[];
 }
 
 export async function calculateNetPositionAsOf(
   companyId: number,
   toDate: string, // YYYY-MM-DD
 ): Promise<NetPositionSnapshot> {
-  // All ledger accounts (including hidden — same as dashboard)
   const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
 
-  // Fetch all voucher entries up to toDate — balance-sheet is cumulative
   const companyEntries = await db
     .select({
       ledgerAccountId: voucherEntries.ledgerAccountId,
@@ -53,7 +55,6 @@ export async function calculateNetPositionAsOf(
     ))
     .execute();
 
-  // Build balance maps (identical structure to statsRoutes.ts)
   const accountBalances  = new Map<number, { debit: number; credit: number }>();
   const supplierBalances = new Map<number, { debit: number; credit: number }>();
   const employeeBalances = new Map<number, { debit: number; credit: number }>();
@@ -75,17 +76,30 @@ export async function calculateNetPositionAsOf(
     }
   }
 
-  // 1. Classify balance-sheet accounts via shared helper
   const parentCompanyId = await storage.getParentCompanyId();
   const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
 
   const classified = classifyNetPositionAccounts(companyAccounts, accountBalances, {
     includeSupplierTypeAccounts: shouldIncludeSuppliers,
   });
+
   let forUsTotal = classified.forUsTotal;
   let onUsTotal  = classified.onUsTotal;
 
-  // 2. Stock on floor — historical inventory as of toDate
+  const forUsLines: NetPositionLineItem[] = classified.forUsAccounts.map((a) => ({
+    label:    a.name,
+    value:    round2(a.value),
+    category: a.category,
+    side:     "forUs",
+  }));
+  const onUsLines: NetPositionLineItem[] = classified.onUsAccounts.map((a) => ({
+    label:    a.name,
+    value:    round2(a.value),
+    category: a.category,
+    side:     "onUs",
+  }));
+
+  // ── Stock on floor ────────────────────────────────────────────────────
   const activeLocationsData = await db
     .select({ id: locations.id })
     .from(locations)
@@ -93,6 +107,7 @@ export async function calculateNetPositionAsOf(
     .execute();
   const activeLocationIds = activeLocationsData.map((l) => l.id);
 
+  let stockFloorTotal = 0;
   if (activeLocationIds.length > 0) {
     const allHistorical = await Promise.all(
       activeLocationIds.map((locId) =>
@@ -103,46 +118,72 @@ export async function calculateNetPositionAsOf(
       for (const inv of items) {
         const qty  = parseFloat(inv.quantity    || "0");
         const rate = parseFloat(inv.averageRate || "0");
-        if (qty > 0) forUsTotal += qty * rate;
+        if (qty > 0) stockFloorTotal += qty * rate;
       }
     }
   }
+  stockFloorTotal = round2(stockFloorTotal);
+  if (stockFloorTotal !== 0) {
+    forUsTotal += stockFloorTotal;
+    forUsLines.push({ label: "Stock on Floor", value: stockFloorTotal, category: "Inventory", side: "forUs" });
+  }
 
-  // 3. Employee balances from voucher entries (advances = asset; owed salary = liability)
+  // ── Employee advances / liabilities ──────────────────────────────────
   const companyEmployees = await db
     .select()
     .from(employees)
     .where(and(eq(employees.companyId, companyId), eq(employees.active, true), isNull(employees.deletedAt)))
     .execute();
 
+  let employeeAdvanceTotal   = 0;
+  let employeeLiabilityTotal = 0;
   for (const emp of companyEmployees) {
     const opening     = parseFloat((emp as any).openingBalance     || "0");
     const openingSide = (emp as any).openingBalanceSide === "Dr" ? 1 : -1;
     const signedOpening = opening * openingSide;
     const balance = employeeBalances.get(emp.id) || { debit: 0, credit: 0 };
     const netBalance = signedOpening + balance.debit - balance.credit;
-    if (netBalance < 0) onUsTotal  += Math.abs(netBalance);
-    else if (netBalance > 0) forUsTotal += netBalance;
+    if (netBalance < 0) {
+      onUsTotal  += Math.abs(netBalance);
+      employeeLiabilityTotal += Math.abs(netBalance);
+    } else if (netBalance > 0) {
+      forUsTotal += netBalance;
+      employeeAdvanceTotal += netBalance;
+    }
+  }
+  if (employeeAdvanceTotal > 0) {
+    forUsLines.push({ label: "Employee Advances", value: round2(employeeAdvanceTotal), category: "Advances", side: "forUs" });
+  }
+  if (employeeLiabilityTotal > 0) {
+    onUsLines.push({ label: "Owed to Employees", value: round2(employeeLiabilityTotal), category: "Payables", side: "onUs" });
   }
 
-  // 4. Supplier balances (parent company only — same restriction as dashboard)
+  // ── Supplier balances ─────────────────────────────────────────────────
   if (shouldIncludeSuppliers) {
     const allSuppliers = await db.select().from(suppliers).where(isNull(suppliers.deletedAt)).execute();
+    let supplierTotal = 0;
     for (const sup of allSuppliers) {
       const balance = supplierBalances.get(sup.id);
       if (balance) {
         const opening    = parseFloat(sup.openingBalance || "0");
         const netBalance = opening + balance.credit - balance.debit;
-        if (netBalance > 0) onUsTotal  += netBalance;
-        else if (netBalance < 0) forUsTotal += Math.abs(netBalance);
+        if (netBalance > 0) {
+          onUsTotal  += netBalance;
+          supplierTotal += netBalance;
+        } else if (netBalance < 0) {
+          forUsTotal += Math.abs(netBalance);
+          forUsLines.push({ label: `Supplier Credit: ${sup.name}`, value: round2(Math.abs(netBalance)), category: "Supplier Credits", side: "forUs" });
+        }
       }
+    }
+    if (supplierTotal > 0) {
+      onUsLines.push({ label: "Supplier Payables", value: round2(supplierTotal), category: "Payables", side: "onUs" });
     }
   }
 
-  // 5. Stock OTW — containers in transit on toDate
-  //    importDate ≤ toDate AND (offloadDate IS NULL OR offloadDate > toDate)
+  // ── Stock OTW ─────────────────────────────────────────────────────────
   const otwContainers = await db
-    .select({ grandTotal: containers.grandTotal, itemsTotal: containers.itemsTotal })
+    .select({ grandTotal: containers.grandTotal, itemsTotal: containers.itemsTotal, containerNo: containers.containerNo })
     .from(containers)
     .where(and(
       eq(containers.companyId, companyId),
@@ -151,11 +192,16 @@ export async function calculateNetPositionAsOf(
     ))
     .execute();
 
+  let otwTotal = 0;
   for (const c of otwContainers) {
-    forUsTotal += parseFloat(c.grandTotal || c.itemsTotal || "0");
+    otwTotal += parseFloat(c.grandTotal || c.itemsTotal || "0");
+  }
+  otwTotal = round2(otwTotal);
+  if (otwTotal !== 0) {
+    forUsTotal += otwTotal;
+    forUsLines.push({ label: "Stock On The Way (OTW)", value: otwTotal, category: "In Transit", side: "forUs" });
   }
 
-  // Final rounding (matches dashboard)
   forUsTotal = round2(forUsTotal);
   onUsTotal  = round2(onUsTotal);
   const netPosition = round2(forUsTotal - onUsTotal);
@@ -165,5 +211,7 @@ export async function calculateNetPositionAsOf(
     onUsTotal,
     netPosition,
     netPositionLabel: netPosition >= 0 ? "We Have More" : "We Owe More",
+    forUsLines,
+    onUsLines,
   };
 }
