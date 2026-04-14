@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft, User, Phone, Building, CreditCard, FileText,
-  DollarSign, Upload, Trash2, Download, Eye, Pencil, Banknote, Plus
+  DollarSign, Upload, Trash2, Download, Eye, Pencil, Banknote, Plus, UserX
 } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -121,6 +121,8 @@ export function ERPWorkerDetail({ worker, onBack, onEdit }: Props) {
   const [advanceNotes, setAdvanceNotes] = useState("");
   const [editAdvance, setEditAdvance] = useState<SalaryAdvance | null>(null);
 
+  const [endContractDialogOpen, setEndContractDialogOpen] = useState(false);
+
   // Fetch ERP transactions for this worker
   const { data: transactions = [], isLoading: txLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/accounts/employee", worker.id, "transactions"],
@@ -216,6 +218,17 @@ export function ERPWorkerDetail({ worker, onBack, onEdit }: Props) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/employees", worker.id, "docs"] });
       toast({ title: "Document deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const endContractMutation = useMutation({
+    mutationFn: async () => apiRequest("PATCH", `/api/employees/${worker.id}`, { active: false }),
+    onSuccess: () => {
+      toast({ title: "Contract ended", description: `${worker.firstName} ${worker.lastName} has been marked as inactive.` });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      setEndContractDialogOpen(false);
+      onBack();
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -380,6 +393,11 @@ export function ERPWorkerDetail({ worker, onBack, onEdit }: Props) {
               {onEdit && (
                 <Button size="sm" variant="outline" className="w-full" onClick={() => onEdit(worker)} data-testid="button-edit-worker-profile">
                   <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit Worker
+                </Button>
+              )}
+              {worker.active !== false && (
+                <Button size="sm" variant="destructive" className="w-full" onClick={() => setEndContractDialogOpen(true)} data-testid="button-end-contract">
+                  <UserX className="h-3.5 w-3.5 mr-1.5" /> End Contract
                 </Button>
               )}
             </CardContent>
@@ -757,6 +775,37 @@ export function ERPWorkerDetail({ worker, onBack, onEdit }: Props) {
             <Button variant="outline" onClick={() => setEditDocDialog(null)}>Cancel</Button>
             <Button onClick={() => { if (editDocDialog) editDocMutation.mutate({ id: editDocDialog.id, fileName: editDocName, description: editDocDesc }); }} disabled={editDocMutation.isPending} data-testid="button-confirm-edit-doc">
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── End Contract dialog ── */}
+      <Dialog open={endContractDialogOpen} onOpenChange={setEndContractDialogOpen}>
+        <DialogContent data-testid="dialog-end-contract">
+          <DialogHeader>
+            <DialogTitle>End Contract — {worker.firstName} {worker.lastName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-1">
+            <p className="text-sm text-muted-foreground">
+              This will mark the worker as <span className="font-semibold text-foreground">Inactive</span> and hide them from all active worker lists and payroll calculations.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Their history, statement, and documents will remain accessible by filtering for Inactive workers.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEndContractDialogOpen(false)} data-testid="button-cancel-end-contract">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => endContractMutation.mutate()}
+              disabled={endContractMutation.isPending}
+              data-testid="button-confirm-end-contract"
+            >
+              <UserX className="h-3.5 w-3.5 mr-1.5" />
+              {endContractMutation.isPending ? "Ending…" : "End Contract"}
             </Button>
           </DialogFooter>
         </DialogContent>
