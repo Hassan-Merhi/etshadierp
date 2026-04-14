@@ -165,7 +165,8 @@ export function registerExportRoutes(app: Express) {
           arc.on("error", reject);
           const dateLabel = new Date().toISOString().substring(0, 10);
           for (const { name, buf } of xlsxBuffers) {
-            arc.append(buf as any, { name: `${name}_Export_${dateLabel}.xlsx` });
+            const safeBuf = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+            arc.append(safeBuf, { name: `${name}_Export_${dateLabel}.xlsx` });
           }
           arc.finalize();
         });

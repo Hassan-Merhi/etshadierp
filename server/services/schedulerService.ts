@@ -7,25 +7,45 @@ import { pool } from "../db";
 
 let schedulerStarted = false;
 
-async function buildZipBuffer(companies: any[]): Promise<{ zip: Buffer; names: string[] }> {
+function getYesterdayRange(): { fromDate: string; toDate: string } {
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const toStr = (d: Date) => d.toISOString().substring(0, 10);
+  return { fromDate: toStr(yesterday), toDate: toStr(yesterday) };
+}
+
+async function buildZipBuffer(
+  companies: any[],
+  fromDate: string,
+  toDate: string
+): Promise<{ zip: Buffer; names: string[]; skipped: string[] }> {
   return new Promise(async (resolve, reject) => {
     const chunks: Buffer[] = [];
+    const names: string[] = [];
+    const skipped: string[] = [];
     const arc = archiver("zip", { zlib: { level: 6 } });
     arc.on("data", (chunk: Buffer) => chunks.push(chunk));
-    arc.on("end", () => resolve({ zip: Buffer.concat(chunks), names: companies.map(c => c.name) }));
+    arc.on("end", () => resolve({ zip: Buffer.concat(chunks), names, skipped }));
     arc.on("error", reject);
 
-    const dateLabel = new Date().toISOString().substring(0, 10);
+    const dateLabel = toDate;
 
     for (const company of companies) {
       try {
-        const data = await fetchCompanyExportData(company.id);
-        const xlsxBuf = await buildCompanyWorkbook(data);
+        console.log(`[DailyExport] Building workbook for company ${company.id} (${company.name}), range ${fromDate}→${toDate}...`);
+        const data = await fetchCompanyExportData(company.id, fromDate, toDate);
+        const rawBuf = await buildCompanyWorkbook(data);
+        // Ensure we pass a proper Node.js Buffer (not Uint8Array) to archiver
+        const xlsxBuf = Buffer.isBuffer(rawBuf) ? rawBuf : Buffer.from(rawBuf);
         const safeName = company.name.replace(/[^a-zA-Z0-9_\- ]/g, "").trim();
         const filename = `${safeName}_Export_${dateLabel}.xlsx`;
-        arc.append(xlsxBuf as any, { name: filename });
+        arc.append(xlsxBuf, { name: filename });
+        names.push(company.name);
+        console.log(`[DailyExport] Workbook ready for ${company.name} (${(xlsxBuf.length / 1024).toFixed(0)} KB)`);
       } catch (err: any) {
-        console.error(`[DailyExport] Failed to generate workbook for company ${company.id}:`, err.message);
+        console.error(`[DailyExport] Failed for company ${company.id} (${company.name}):`, err?.stack || err?.message || err);
+        skipped.push(company.name);
       }
     }
 
@@ -44,9 +64,25 @@ async function runDailyExport(retryCount = 0): Promise<void> {
       return;
     }
 
-    const dateLabel = new Date().toISOString().substring(0, 10);
-    const { zip, names } = await buildZipBuffer(companies);
-    const result = await sendExportEmail(zip, dateLabel, names);
+    const { fromDate, toDate } = getYesterdayRange();
+    console.log(`[DailyExport] Date range: ${fromDate} → ${toDate} for ${companies.length} company/companies`);
+
+    const { zip, names, skipped } = await buildZipBuffer(companies, fromDate, toDate);
+
+    if (names.length === 0) {
+      console.error(`[DailyExport] All ${companies.length} companies failed — nothing to send.`);
+      if (retryCount < MAX_RETRIES) {
+        console.log(`[DailyExport] Retrying in 10 minutes...`);
+        setTimeout(() => runDailyExport(retryCount + 1), 10 * 60 * 1000);
+      }
+      return;
+    }
+
+    if (skipped.length > 0) {
+      console.warn(`[DailyExport] Skipped ${skipped.length} companies: ${skipped.join(", ")}`);
+    }
+
+    const result = await sendExportEmail(zip, toDate, names);
 
     if (result.success) {
       console.log(`[DailyExport] Export emailed successfully for ${names.length} companies.`);
@@ -54,19 +90,17 @@ async function runDailyExport(retryCount = 0): Promise<void> {
     } else {
       console.error(`[DailyExport] Email failed: ${result.error}`);
       if (retryCount < MAX_RETRIES) {
-        const delayMs = 10 * 60 * 1000;
         console.log(`[DailyExport] Retrying in 10 minutes...`);
-        setTimeout(() => runDailyExport(retryCount + 1), delayMs);
+        setTimeout(() => runDailyExport(retryCount + 1), 10 * 60 * 1000);
       } else {
         console.error(`[DailyExport] All ${MAX_RETRIES + 1} attempts failed. Giving up until next scheduled run.`);
       }
     }
   } catch (err: any) {
-    console.error(`[DailyExport] Unexpected error:`, err.message);
+    console.error(`[DailyExport] Unexpected error:`, err?.stack || err?.message || err);
     if (retryCount < MAX_RETRIES) {
-      const delayMs = 10 * 60 * 1000;
       console.log(`[DailyExport] Retrying in 10 minutes...`);
-      setTimeout(() => runDailyExport(retryCount + 1), delayMs);
+      setTimeout(() => runDailyExport(retryCount + 1), 10 * 60 * 1000);
     }
   }
 }
