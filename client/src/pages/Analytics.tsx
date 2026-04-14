@@ -303,6 +303,8 @@ export default function Analytics() {
   const [, navigate] = useLocation();
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const [selectedPeriod, setSelectedPeriod] = useState("all");
+  const [rangeStart, setRangeStart] = useState("");
+  const [rangeEnd, setRangeEnd] = useState("");
   const [detailsPeriod, setDetailsPeriod] = useState("all");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("last_1_month"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
@@ -440,6 +442,9 @@ export default function Analytics() {
     } else if (selectedPeriod === "year") {
       const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
       startDate = firstDayOfYear.toLocaleDateString('en-CA');
+    } else if (selectedPeriod === "range") {
+      if (!rangeStart || !rangeEnd) return {};
+      return { startDate: rangeStart, endDate: rangeEnd };
     }
     return selectedPeriod === "all" ? {} : { startDate, endDate };
   };
@@ -1661,17 +1666,39 @@ export default function Analytics() {
           <Card className="p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <h3 className="text-lg font-medium">Sales by Location</h3>
-              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Time</SelectItem>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="month">This Month</SelectItem>
-                  <SelectItem value="year">This Year</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-wrap items-center gap-2">
+                {selectedPeriod === "range" && (
+                  <>
+                    <Input
+                      type="date"
+                      className="w-auto"
+                      value={rangeStart}
+                      onChange={(e) => setRangeStart(e.target.value)}
+                      data-testid="input-range-start"
+                    />
+                    <span className="text-muted-foreground text-sm">to</span>
+                    <Input
+                      type="date"
+                      className="w-auto"
+                      value={rangeEnd}
+                      onChange={(e) => setRangeEnd(e.target.value)}
+                      data-testid="input-range-end"
+                    />
+                  </>
+                )}
+                <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                  <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-sales-period">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="month">This Month</SelectItem>
+                    <SelectItem value="year">This Year</SelectItem>
+                    <SelectItem value="range">Custom Range</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {salesLoading ? (
