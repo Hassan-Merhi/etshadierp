@@ -944,6 +944,47 @@ let migrationsDone = false;
     `ALTER TABLE whatsapp_stock_settings ADD COLUMN IF NOT EXISTS send_hour integer NOT NULL DEFAULT 18`,
     `ALTER TABLE whatsapp_stock_settings ADD COLUMN IF NOT EXISTS send_day_of_week integer`,
     `ALTER TABLE whatsapp_stock_settings ADD COLUMN IF NOT EXISTS last_sent_at timestamp`,
+
+    // Update ALL existing credit sale voucher entries to use new narration format:
+    // "POS - [Customer Name] - [Location Name]" instead of old "Credit Sale - POSXXX"
+    // Debit entries (customer receivable — Asset account) — use CTE to avoid ambiguity
+    `WITH debit_narrations AS (
+       SELECT ve.id AS entry_id,
+              'POS - ' || la.name || ' - ' || v.location_name AS new_narration
+       FROM voucher_entries ve
+       JOIN vouchers v ON v.id = ve.voucher_id
+       JOIN ledger_accounts la ON la.id = ve.ledger_account_id
+       WHERE v.is_credit_sale = true
+         AND ve.debit_amount::numeric > 0
+         AND la.account_type = 'Asset'
+         AND v.location_name IS NOT NULL
+     )
+     UPDATE voucher_entries
+     SET narration = debit_narrations.new_narration
+     FROM debit_narrations
+     WHERE voucher_entries.id = debit_narrations.entry_id`,
+
+    // Credit entries (SALES account side of credit sale vouchers) — use CTE
+    `WITH credit_narrations AS (
+       SELECT credit_ve.id AS entry_id,
+              'POS - ' || la.name || ' - ' || v.location_name AS new_narration
+       FROM vouchers v
+       JOIN voucher_entries debit_ve ON (
+         debit_ve.voucher_id = v.id AND debit_ve.debit_amount::numeric > 0
+       )
+       JOIN ledger_accounts la ON (
+         la.id = debit_ve.ledger_account_id AND la.account_type = 'Asset'
+       )
+       JOIN voucher_entries credit_ve ON (
+         credit_ve.voucher_id = v.id AND credit_ve.credit_amount::numeric > 0
+       )
+       WHERE v.is_credit_sale = true
+         AND v.location_name IS NOT NULL
+     )
+     UPDATE voucher_entries
+     SET narration = credit_narrations.new_narration
+     FROM credit_narrations
+     WHERE voucher_entries.id = credit_narrations.entry_id`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

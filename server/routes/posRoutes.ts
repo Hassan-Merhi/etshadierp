@@ -381,13 +381,15 @@ export function registerPosRoutes(app: Express) {
           })
           .returning();
 
+        const creditSaleNarration = isCreditSale
+          ? `POS - ${(customerAccount as any).name} - ${location.name}`
+          : `POS Sale - ${voucherNumber}`;
+
         const debitEntry: any = {
           voucherId: txVoucher.id,
           debitAmount: grandTotal.toFixed(2),
           creditAmount: "0",
-          narration: isCreditSale
-            ? `Credit Sale - ${voucherNumber}`
-            : `POS Sale - ${voucherNumber}`,
+          narration: creditSaleNarration,
         };
 
         if (
@@ -410,7 +412,7 @@ export function registerPosRoutes(app: Express) {
           ledgerAccountId: salesAccount.id,
           debitAmount: "0",
           creditAmount: grandTotal.toFixed(2),
-          narration: `POS Sale - ${voucherNumber}`,
+          narration: creditSaleNarration,
         });
 
         const txSaleItems: any[] = [];
