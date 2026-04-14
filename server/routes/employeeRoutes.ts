@@ -1160,6 +1160,7 @@ export function registerEmployeeRoutes(app: Express) {
         eq(vouchers.voucherType, "Sales"),
         isNull(vouchers.deletedAt),
         eq(vouchers.optional, false),
+        eq(vouchers.isCreditSale, false),
         sql`${vouchers.voucherDate} >= ${startDate}`,
         sql`${vouchers.voucherDate} <= ${endDate}`,
       ];
