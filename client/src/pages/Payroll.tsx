@@ -2838,8 +2838,21 @@ export default function Payroll() {
               {bonusSalesPreview && (
                 <div className="rounded-md border bg-muted/30 p-4 space-y-2 text-sm">
                   <div className="flex justify-between">
+                    <span className="text-muted-foreground">Period</span>
+                    <span className="font-medium font-mono text-xs">
+                      {(() => {
+                        const r = bonusSalesPeriod === "thisMonth" ? getThisMonthRange() : { start: bonusSalesStart, end: bonusSalesEnd };
+                        return `${r.start} – ${r.end}`;
+                      })()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-muted-foreground">Location</span>
                     <span className="font-medium">{bonusSalesPreview.locationName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Bales Sold</span>
+                    <span className="font-medium font-mono">{formatNumber(parseFloat(bonusSalesPreview.totalQuantity || "0"))}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Total Sales</span>
@@ -2850,6 +2863,13 @@ export default function Payroll() {
                     <span className="font-medium">{bonusSalesCustomPct}%</span>
                   </div>
                   <Separator />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Formula</span>
+                    <span className="font-mono">
+                      {formatAmount(parseFloat(bonusSalesPreview.totalSalesAmount || "0"))} × {bonusSalesCustomPct}% ={" "}
+                      {formatAmount((parseFloat(bonusSalesPreview.totalSalesAmount || "0") * parseFloat(bonusSalesCustomPct || "0")) / 100)}
+                    </span>
+                  </div>
                   <div className="flex justify-between text-base font-semibold">
                     <span>Bonus Amount</span>
                     <span className="text-green-600 dark:text-green-400 font-mono">
@@ -2965,19 +2985,6 @@ export default function Payroll() {
                     </Button>
                   </div>
                 ))}
-                {balesRows.map((row, idx) => {
-                  const q = parseFloat(row.qty || "0");
-                  const r = parseFloat(row.rate || "0");
-                  const total = q * r;
-                  if (total <= 0) return null;
-                  const loc = locations.find(l => l.id === parseInt(row.locationId))
-                    ?? allCompanyLocations.find(l => l.id === parseInt(row.locationId));
-                  return (
-                    <p key={`hint-${idx}`} className="text-xs text-muted-foreground px-1">
-                      {loc?.name}: {Number(q).toFixed(0)} × {formatAmount(r)} = <strong>{formatAmount(total)}</strong>
-                    </p>
-                  );
-                })}
               </div>
 
               <Button
@@ -2992,12 +2999,56 @@ export default function Payroll() {
               </Button>
 
               {(() => {
-                const total = balesRows.reduce((sum, r) => sum + parseFloat(r.qty || "0") * parseFloat(r.rate || "0"), 0);
-                if (total <= 0) return null;
+                const validRows = balesRows.filter(r => parseFloat(r.qty || "0") > 0 && parseFloat(r.rate || "0") > 0);
+                if (validRows.length === 0) return null;
+                const grandTotal = validRows.reduce((sum, r) => sum + parseFloat(r.qty || "0") * parseFloat(r.rate || "0"), 0);
+                const range = balesPeriod === "thisMonth" ? getThisMonthRange() : { start: balesStart, end: balesEnd };
                 return (
-                  <div className="rounded-md border bg-muted/30 p-3 flex justify-between items-center">
-                    <span className="font-medium text-sm">Total Bonus</span>
-                    <span className="text-green-600 dark:text-green-400 font-semibold font-mono">{formatAmount(total)}</span>
+                  <div className="rounded-md border bg-muted/30 p-4 space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Period</span>
+                      <span className="font-medium font-mono text-xs">{range.start} – {range.end}</span>
+                    </div>
+                    <Separator />
+                    {validRows.map((row, i) => {
+                      const q = parseFloat(row.qty || "0");
+                      const r = parseFloat(row.rate || "0");
+                      const rowTotal = q * r;
+                      const loc = locations.find(l => l.id === parseInt(row.locationId))
+                        ?? allCompanyLocations.find(l => l.id === parseInt(row.locationId));
+                      return (
+                        <div key={i} className="space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Location</span>
+                            <span className="font-medium">{loc?.name ?? "–"}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Bales Sold</span>
+                            <span className="font-medium font-mono">{formatNumber(q)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Rate</span>
+                            <span className="font-medium font-mono">{formatAmount(r)} / bale</span>
+                          </div>
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Formula</span>
+                            <span className="font-mono">{formatNumber(q)} × {formatAmount(r)} = {formatAmount(rowTotal)}</span>
+                          </div>
+                          {validRows.length > 1 && (
+                            <div className="flex justify-between font-medium">
+                              <span>Subtotal</span>
+                              <span className="font-mono">{formatAmount(rowTotal)}</span>
+                            </div>
+                          )}
+                          {i < validRows.length - 1 && <Separator className="mt-1" />}
+                        </div>
+                      );
+                    })}
+                    <Separator />
+                    <div className="flex justify-between text-base font-semibold">
+                      <span>{validRows.length === 1 ? "Bonus Amount" : "Total Bonus"}</span>
+                      <span className="text-green-600 dark:text-green-400 font-mono">{formatAmount(grandTotal)}</span>
+                    </div>
                   </div>
                 );
               })()}
