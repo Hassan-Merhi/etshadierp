@@ -32,6 +32,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 
 interface SalesItem {
   stockItemId: number;
+  stockItemCode: string;
   stockItemName: string;
   stockGroupName: string | null;
   quantity: string;
@@ -47,7 +48,7 @@ interface SalesItem {
 }
 
 interface ItemRow {
-  stockItemId: number;
+  stockItemCode: string;
   stockItemName: string;
   stockGroupName: string;
   byCompany: Record<string, {
@@ -151,22 +152,26 @@ export default function SalesReportComparison() {
   );
 
   const tableData = useMemo((): ItemRow[] => {
-    const map = new Map<number, ItemRow>();
+    const map = new Map<string, ItemRow>();
 
     for (const item of rawItems) {
-      if (!item.stockItemId) continue;
+      if (!item.stockItemCode) continue;
       if (stockGroupFilter !== "all" && item.stockGroupName !== stockGroupFilter) continue;
 
-      if (!map.has(item.stockItemId)) {
-        map.set(item.stockItemId, {
-          stockItemId: item.stockItemId,
-          stockItemName: item.stockItemName,
+      // Group by barcode (stockItemCode) so the same product matches across companies
+      // even if the names differ slightly between them
+      const groupKey = item.stockItemCode.trim();
+
+      if (!map.has(groupKey)) {
+        map.set(groupKey, {
+          stockItemCode: groupKey,
+          stockItemName: item.stockItemName,   // use first name encountered
           stockGroupName: item.stockGroupName || "",
           byCompany: {},
         });
       }
 
-      const row = map.get(item.stockItemId)!;
+      const row = map.get(groupKey)!;
       const code = item.companyCode;
 
       if (!row.byCompany[code]) {
@@ -428,7 +433,7 @@ export default function SalesReportComparison() {
                   </TableHeader>
                   <TableBody>
                     {tableData.map(row => (
-                      <TableRow key={row.stockItemId} data-testid={`row-item-${row.stockItemId}`}>
+                      <TableRow key={row.stockItemCode} data-testid={`row-item-${row.stockItemCode}`}>
                         <TableCell className="font-medium sticky left-0 bg-background z-10">
                           {row.stockItemName}
                         </TableCell>
