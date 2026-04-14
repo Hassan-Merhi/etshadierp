@@ -152,30 +152,29 @@ export default function SalesReportComparison() {
   );
 
   const tableData = useMemo((): ItemRow[] => {
-    const map = new Map<string, ItemRow>();
+    // Pass 1: group by barcode (stockItemCode) for cross-company matching
+    const codeMap = new Map<string, ItemRow>();
 
     for (const item of rawItems) {
       if (!item.stockItemCode) continue;
       if (stockGroupFilter !== "all" && item.stockGroupName !== stockGroupFilter) continue;
 
-      // Group by barcode (stockItemCode) so the same product matches across companies
-      // even if the names differ slightly between them
       const groupKey = item.stockItemCode.trim();
 
-      if (!map.has(groupKey)) {
-        map.set(groupKey, {
+      if (!codeMap.has(groupKey)) {
+        codeMap.set(groupKey, {
           stockItemCode: groupKey,
-          stockItemName: item.stockItemName,   // use first name encountered
+          stockItemName: item.stockItemName,
           stockGroupName: item.stockGroupName || "",
           byCompany: {},
         });
       }
 
-      const row = map.get(groupKey)!;
-      const code = item.companyCode;
+      const row = codeMap.get(groupKey)!;
+      const compCode = item.companyCode;
 
-      if (!row.byCompany[code]) {
-        row.byCompany[code] = {
+      if (!row.byCompany[compCode]) {
+        row.byCompany[compCode] = {
           totalSales: 0,
           totalQty: 0,
           configuredProfit: 0,
@@ -184,15 +183,41 @@ export default function SalesReportComparison() {
         };
       }
 
-      const entry = row.byCompany[code];
-      entry.totalSales      += parseFloat(item.totalSales || "0");
-      entry.totalQty        += parseFloat(item.quantity || "0");
+      const entry = row.byCompany[compCode];
+      entry.totalSales       += parseFloat(item.totalSales || "0");
+      entry.totalQty         += parseFloat(item.quantity || "0");
       entry.configuredProfit += item.configuredProfit || 0;
       entry.configuredProfitPct = item.configuredProfitPercentage || 0;
       entry.costProfitPct       = item.costProfitPercentage || 0;
     }
 
-    let rows = Array.from(map.values());
+    // Pass 2: merge rows that have the same normalised name
+    // (handles the same product entered with different codes in the same company)
+    const normName = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
+    const nameMap = new Map<string, ItemRow>();
+
+    for (const row of codeMap.values()) {
+      const key = normName(row.stockItemName);
+      if (!nameMap.has(key)) {
+        nameMap.set(key, { ...row, byCompany: { ...row.byCompany } });
+      } else {
+        const existing = nameMap.get(key)!;
+        for (const [compCode, entry] of Object.entries(row.byCompany)) {
+          if (!existing.byCompany[compCode]) {
+            existing.byCompany[compCode] = { ...entry };
+          } else {
+            existing.byCompany[compCode].totalSales       += entry.totalSales;
+            existing.byCompany[compCode].totalQty         += entry.totalQty;
+            existing.byCompany[compCode].configuredProfit += entry.configuredProfit;
+          }
+        }
+      }
+    }
+
+    // Pass 3: remove rows where none of the selected companies have any data
+    let rows = Array.from(nameMap.values()).filter(r =>
+      displayCompanies.some(c => !!r.byCompany[c.code])
+    );
 
     if (viewFilter === "gaining") {
       rows = rows.filter(r =>
