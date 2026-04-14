@@ -1964,17 +1964,17 @@
       queryKey: ["/api/factory/bales"],
     });
 
-    const dayInStock = (balesData || []).filter((row: any) => {
+    // All bales entered on the selected date — all statuses, matching Stock Entry History
+    const dayAll = (balesData || []).filter((row: any) => {
       const bale = row.bale;
-      if (bale.status !== "IN_STOCK") return false;
       const baleDate = bale.createdAt ? new Date(bale.createdAt).toLocaleDateString('en-CA') : null;
       return baleDate === selectedDate;
     });
 
     const getCategory = (row: any) => (row.bale.category || "").toLowerCase().trim();
-    const dayGarbage = dayInStock.filter((row: any) => getCategory(row) === "garbage");
-    const dayWipers = dayInStock.filter((row: any) => getCategory(row) === "wipers");
-    const dayRegular = dayInStock.filter((row: any) => getCategory(row) !== "garbage" && getCategory(row) !== "wipers");
+    const dayGarbage = dayAll.filter((row: any) => getCategory(row) === "garbage");
+    const dayWipers = dayAll.filter((row: any) => getCategory(row) === "wipers");
+    const dayRegular = dayAll.filter((row: any) => getCategory(row) !== "garbage" && getCategory(row) !== "wipers");
 
     const totalQty = dayRegular.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
     const totalKg = dayRegular.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
@@ -1996,7 +1996,7 @@
             data-testid="input-summary-date"
           />
           <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-            {isToday ? "Today's In Stock" : "In Stock"}
+            {isToday ? "Today's Production" : "Production"}
           </span>
         </div>
 
