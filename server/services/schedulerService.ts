@@ -54,6 +54,20 @@ async function buildZipBuffer(
       }
     }
 
+    // Include all-companies net position Excel (full current year) in the ZIP
+    try {
+      const year    = new Date().getUTCFullYear();
+      const npStart = `${year}-01-01`;
+      const npEnd   = `${year}-12-31`;
+      console.log(`[DailyExport] Adding all-companies net-position Excel (${npStart}→${npEnd}) to ZIP…`);
+      const npBuf  = await generateAllCompaniesNetPositionExcel(companies, npStart, npEnd);
+      const ensured = Buffer.isBuffer(npBuf) ? npBuf : Buffer.from(npBuf);
+      arc.append(ensured, { name: `NetPosition_AllCompanies_${year}.xlsx` });
+      console.log(`[DailyExport] Net Position Excel added (${(ensured.length / 1024).toFixed(0)} KB)`);
+    } catch (npErr: any) {
+      console.error(`[DailyExport] Failed to build net-position Excel:`, npErr?.message || npErr);
+    }
+
     arc.finalize();
   });
 }
@@ -121,40 +135,36 @@ async function runDailyWhatsAppSend(
   dateLabel: string,
   companies: { id: number; name: string }[],
 ): Promise<void> {
+  const today = new Date().toISOString().split("T")[0];
   try {
     const settings = await getWaSettings();
     if (!settings?.enabled || !settings?.dailyAutoSend) {
       console.log("[WhatsApp] Daily auto-send is disabled — skipping.");
-      return;
+    } else {
+      // Resolve the configured daily export recipient
+      const recipientId = settings.dailyRecipientId;
+      if (!recipientId) {
+        console.log("[WhatsApp] No daily export WhatsApp group configured — skipping daily ZIP send.");
+      } else {
+        const rRow = await pool.query(
+          "SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true",
+          [recipientId],
+        );
+        if (!rRow.rows.length) {
+          console.log(`[WhatsApp] Daily export recipient id=${recipientId} not found or inactive — skipping.`);
+        } else {
+          const chatId      = rRow.rows[0].chat_id as string;
+          const zipFileName = `DailyExport_${dateLabel}.zip`;
+          const zipCaption  = `Daily Company Export — ${dateLabel}\nAll companies included + Net Position (YTD).`;
+          console.log(`[WhatsApp] Sending daily export ZIP to ${chatId}…`);
+          const zipRes = await sendWhatsAppFileToChatId(chatId, dailyZip, zipFileName, zipCaption, "application/zip");
+          console.log(`[WhatsApp] Daily ZIP: ${zipRes.success ? "sent" : zipRes.error}`);
+        }
+      }
     }
-    const recipients = await getActiveRecipients();
-    if (!recipients.length) {
-      console.log("[WhatsApp] No active recipients — skipping daily WhatsApp send.");
-      return;
-    }
 
-    console.log("[WhatsApp] Starting daily send — data ZIP + net-position Excel…");
-
-    // 1. Send daily export ZIP
-    const zipFileName = `DailyExport_${dateLabel}.zip`;
-    const zipCaption  = `Daily Company Export — ${dateLabel}\nAll companies included.`;
-    const zipResult   = await sendWhatsAppFile(dailyZip, zipFileName, zipCaption);
-    console.log(`[WhatsApp] Daily ZIP: sent=${zipResult.sent} failed=${zipResult.failed}`);
-
-    // 2. Build + send all-companies net position Excel (current year)
-    const today     = new Date();
-    const year      = today.getUTCFullYear();
-    const npStart   = `${year}-01-01`;
-    const npEnd     = `${year}-12-31`;
-    console.log(`[WhatsApp] Generating all-companies net-position Excel (${npStart} → ${npEnd})…`);
-    const npBuffer   = await generateAllCompaniesNetPositionExcel(companies, npStart, npEnd);
-    const npFileName = `NetPosition_AllCompanies_${year}.xlsx`;
-    const npCaption  = `Net Position Report — All Companies\nYear: ${year}`;
-    const npResult   = await sendWhatsAppFile(npBuffer, npFileName, npCaption);
-    console.log(`[WhatsApp] Net Position Excel: sent=${npResult.sent} failed=${npResult.failed}`);
-
-    // 3. Stock report — sends to one specific group if configured
-    await runStockReportSend(today.toISOString().split("T")[0]);
+    // Stock report — sends to its own specific group if configured
+    await runStockReportSend(today);
 
     console.log("[WhatsApp] Daily WhatsApp send complete.");
   } catch (err: any) {

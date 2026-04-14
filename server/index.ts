@@ -918,6 +918,7 @@ let migrationsDone = false;
       daily_auto_send boolean NOT NULL DEFAULT false
     )`,
     `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS daily_auto_send boolean NOT NULL DEFAULT false`,
+    `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS daily_recipient_id integer`,
     // WhatsApp recipients (individual numbers or group chatIds)
     `CREATE TABLE IF NOT EXISTS whatsapp_recipients (
       id serial PRIMARY KEY,

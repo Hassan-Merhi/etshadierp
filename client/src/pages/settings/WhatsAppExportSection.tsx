@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   MessageSquare,
   Plus,
@@ -23,12 +24,13 @@ import {
 } from "lucide-react";
 
 interface WaSettings {
-  instanceId: string;
-  apiToken: string;
-  enabled: boolean;
-  monthlyAutoSend: boolean;
-  dailyAutoSend: boolean;
-  hasCredentials: boolean;
+  instanceId:       string;
+  apiToken:         string;
+  enabled:          boolean;
+  monthlyAutoSend:  boolean;
+  dailyAutoSend:    boolean;
+  dailyRecipientId: number | null;
+  hasCredentials:   boolean;
 }
 
 interface Recipient {
@@ -79,8 +81,10 @@ export function WhatsAppExportSection() {
       apiRequest("PUT", "/api/whatsapp/settings", {
         instanceId,
         apiToken,
-        enabled:         settings?.enabled         ?? false,
-        monthlyAutoSend: settings?.monthlyAutoSend ?? false,
+        enabled:          settings?.enabled          ?? false,
+        monthlyAutoSend:  settings?.monthlyAutoSend  ?? false,
+        dailyAutoSend:    settings?.dailyAutoSend    ?? false,
+        dailyRecipientId: settings?.dailyRecipientId ?? null,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] });
@@ -92,11 +96,12 @@ export function WhatsAppExportSection() {
   const toggleEnabled = useMutation({
     mutationFn: (value: boolean) =>
       apiRequest("PUT", "/api/whatsapp/settings", {
-        instanceId: settings?.instanceId ?? "",
-        apiToken:   "••••••",
-        enabled:    value,
-        monthlyAutoSend: settings?.monthlyAutoSend ?? false,
-        dailyAutoSend:   settings?.dailyAutoSend   ?? false,
+        instanceId:       settings?.instanceId       ?? "",
+        apiToken:         "••••••",
+        enabled:          value,
+        monthlyAutoSend:  settings?.monthlyAutoSend  ?? false,
+        dailyAutoSend:    settings?.dailyAutoSend    ?? false,
+        dailyRecipientId: settings?.dailyRecipientId ?? null,
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] }),
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -105,11 +110,12 @@ export function WhatsAppExportSection() {
   const toggleMonthly = useMutation({
     mutationFn: (value: boolean) =>
       apiRequest("PUT", "/api/whatsapp/settings", {
-        instanceId: settings?.instanceId ?? "",
-        apiToken:   "••••••",
-        enabled:    settings?.enabled ?? false,
-        monthlyAutoSend: value,
-        dailyAutoSend:   settings?.dailyAutoSend ?? false,
+        instanceId:       settings?.instanceId       ?? "",
+        apiToken:         "••••••",
+        enabled:          settings?.enabled           ?? false,
+        monthlyAutoSend:  value,
+        dailyAutoSend:    settings?.dailyAutoSend    ?? false,
+        dailyRecipientId: settings?.dailyRecipientId ?? null,
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] }),
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -118,13 +124,31 @@ export function WhatsAppExportSection() {
   const toggleDaily = useMutation({
     mutationFn: (value: boolean) =>
       apiRequest("PUT", "/api/whatsapp/settings", {
-        instanceId: settings?.instanceId ?? "",
-        apiToken:   "••••••",
-        enabled:    settings?.enabled ?? false,
-        monthlyAutoSend: settings?.monthlyAutoSend ?? false,
-        dailyAutoSend:   value,
+        instanceId:       settings?.instanceId       ?? "",
+        apiToken:         "••••••",
+        enabled:          settings?.enabled           ?? false,
+        monthlyAutoSend:  settings?.monthlyAutoSend  ?? false,
+        dailyAutoSend:    value,
+        dailyRecipientId: settings?.dailyRecipientId ?? null,
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const setDailyRecipient = useMutation({
+    mutationFn: (recipientId: number | null) =>
+      apiRequest("PUT", "/api/whatsapp/settings", {
+        instanceId:       settings?.instanceId      ?? "",
+        apiToken:         "••••••",
+        enabled:          settings?.enabled          ?? false,
+        monthlyAutoSend:  settings?.monthlyAutoSend ?? false,
+        dailyAutoSend:    settings?.dailyAutoSend   ?? false,
+        dailyRecipientId: recipientId,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] });
+      toast({ title: "Daily export group saved" });
+    },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -289,19 +313,51 @@ export function WhatsAppExportSection() {
               />
             </div>
 
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Daily Auto-Send (6 PM EST)</p>
-                <p className="text-xs text-muted-foreground">
-                  Every day at 6 PM — sends daily data export ZIP + all-companies net position Excel (full current year) to all active recipients
-                </p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Daily Auto-Send (6 PM EST)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Every day at 6 PM — sends a ZIP containing all company exports + all-companies net position Excel (full current year) to the group selected below
+                  </p>
+                </div>
+                <Switch
+                  data-testid="switch-wa-daily"
+                  checked={settings?.dailyAutoSend ?? false}
+                  onCheckedChange={(v) => toggleDaily.mutate(v)}
+                  disabled={!settings?.enabled}
+                />
               </div>
-              <Switch
-                data-testid="switch-wa-daily"
-                checked={settings?.dailyAutoSend ?? false}
-                onCheckedChange={(v) => toggleDaily.mutate(v)}
-                disabled={!settings?.enabled}
-              />
+
+              {/* Group picker for daily export */}
+              <div className="pl-0 space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Daily Export WhatsApp Group</p>
+                {recipients.filter((r) => r.isGroup).length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">
+                    No group recipients added yet — add one in the Recipients section below.
+                  </p>
+                ) : (
+                  <Select
+                    value={String(settings?.dailyRecipientId ?? "")}
+                    onValueChange={(v) => setDailyRecipient.mutate(v ? parseInt(v) : null)}
+                    disabled={!settings?.enabled || setDailyRecipient.isPending}
+                  >
+                    <SelectTrigger data-testid="select-daily-export-group" className="w-full sm:w-80">
+                      <SelectValue placeholder="Pick a group to receive daily export…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {recipients.filter((r) => r.isGroup).map((r) => (
+                        <SelectItem key={r.id} value={String(r.id)} data-testid={`option-daily-group-${r.id}`}>
+                          <div className="flex items-center gap-2">
+                            <Users className="h-3.5 w-3.5" />
+                            {r.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
             </div>
           </div>
 

@@ -35,12 +35,13 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.json({ instanceId: "", apiToken: "", enabled: false, monthlyAutoSend: false });
       }
       res.json({
-        instanceId:      s.instanceId,
-        apiToken:        s.apiToken ? "••••••" : "",
-        enabled:         s.enabled,
-        monthlyAutoSend: s.monthlyAutoSend,
-        dailyAutoSend:   s.dailyAutoSend,
-        hasCredentials:  !!(s.instanceId && s.apiToken),
+        instanceId:       s.instanceId,
+        apiToken:         s.apiToken ? "••••••" : "",
+        enabled:          s.enabled,
+        monthlyAutoSend:  s.monthlyAutoSend,
+        dailyAutoSend:    s.dailyAutoSend,
+        dailyRecipientId: s.dailyRecipientId,
+        hasCredentials:   !!(s.instanceId && s.apiToken),
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -49,23 +50,25 @@ export function registerWhatsAppRoutes(app: Express) {
 
   app.put("/api/whatsapp/settings", requireAuth, async (req, res) => {
     try {
-      const { instanceId, apiToken, enabled, monthlyAutoSend, dailyAutoSend } = req.body as Record<string, any>;
+      const { instanceId, apiToken, enabled, monthlyAutoSend, dailyAutoSend, dailyRecipientId } = req.body as Record<string, any>;
 
       await pool.query(`
-        INSERT INTO whatsapp_settings (id, instance_id, api_token, enabled, monthly_auto_send, daily_auto_send)
-        VALUES (1, $1, $2, $3, $4, $5)
+        INSERT INTO whatsapp_settings (id, instance_id, api_token, enabled, monthly_auto_send, daily_auto_send, daily_recipient_id)
+        VALUES (1, $1, $2, $3, $4, $5, $6)
         ON CONFLICT (id) DO UPDATE SET
-          instance_id       = EXCLUDED.instance_id,
-          api_token         = CASE WHEN $2 = '' OR $2 = '••••••' THEN whatsapp_settings.api_token ELSE EXCLUDED.api_token END,
-          enabled           = EXCLUDED.enabled,
-          monthly_auto_send = EXCLUDED.monthly_auto_send,
-          daily_auto_send   = EXCLUDED.daily_auto_send
+          instance_id        = EXCLUDED.instance_id,
+          api_token          = CASE WHEN $2 = '' OR $2 = '••••••' THEN whatsapp_settings.api_token ELSE EXCLUDED.api_token END,
+          enabled            = EXCLUDED.enabled,
+          monthly_auto_send  = EXCLUDED.monthly_auto_send,
+          daily_auto_send    = EXCLUDED.daily_auto_send,
+          daily_recipient_id = EXCLUDED.daily_recipient_id
       `, [
-        instanceId      ?? "",
-        apiToken        ?? "",
-        enabled         ?? false,
-        monthlyAutoSend ?? false,
-        dailyAutoSend   ?? false,
+        instanceId        ?? "",
+        apiToken          ?? "",
+        enabled           ?? false,
+        monthlyAutoSend   ?? false,
+        dailyAutoSend     ?? false,
+        dailyRecipientId  ?? null,
       ]);
 
       res.json({ message: "Saved" });
