@@ -1983,7 +1983,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                   onMouseDown={(e) => { e.preventDefault(); selectItem(item); }}
                   className={`w-full text-left px-3 py-3 rounded-md hover-elevate active-elevate-2 ${
                     item.stock === 0 ? "opacity-60" : ""
-                  } ${idx === highlightedIndex && activeRow !== null ? "bg-accent" : ""}`}
+                  } ${idx === highlightedIndex && activeRow !== null ? "bg-primary/20 ring-1 ring-primary/40" : ""}`}
                   data-testid={`item-${idx}`}
                 >
                   <div className="flex items-start justify-between gap-3">
