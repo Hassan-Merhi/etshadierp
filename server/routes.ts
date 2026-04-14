@@ -43,6 +43,7 @@ import { registerChatbotRoutes } from "./routes/chatbotRoutes";
 import { registerCreditNoteRoutes } from "./routes/creditNoteRoutes";
 import { registerNetProfitExcelRoute } from "./routes/netProfitExcelRoute";
 import { registerNetPositionMonthlyExcelRoute } from "./routes/netPositionMonthlyExcelRoute";
+import { registerWhatsAppRoutes } from "./routes/whatsappRoutes";
 import { registerImportCycleRoutes } from "./routes/importCycleRoutes";
 import { registerDebugRoutes } from "./routes/debugRoutes";
 import { registerExportRoutes } from "./routes/exportRoutes";
@@ -1627,6 +1628,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerCreditNoteRoutes(app);
   registerNetProfitExcelRoute(app);
   registerNetPositionMonthlyExcelRoute(app);
+  registerWhatsAppRoutes(app);
   registerExportRoutes(app);
 
   const httpServer = createServer(app);

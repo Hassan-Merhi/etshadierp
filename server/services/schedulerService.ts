@@ -4,6 +4,9 @@ import { fetchAllCompanies, fetchCompanyExportData } from "./exportDataService";
 import { buildCompanyWorkbook } from "./exportExcelService";
 import { sendExportEmail } from "./emailService";
 import { pool } from "../db";
+import { getWaSettings, getActiveRecipients, sendWhatsAppFile } from "./whatsappService";
+import { generateNetPositionExcel } from "../helpers/generateNetPositionExcel";
+import { storage } from "../storage";
 
 let schedulerStarted = false;
 
@@ -115,6 +118,49 @@ export async function isScheduleEnabled(): Promise<boolean> {
   }
 }
 
+// ─── Monthly WhatsApp net-position send ───────────────────────────────────────
+
+async function runMonthlyWhatsAppNetPosition() {
+  console.log("[WhatsApp] Starting monthly net-position send…");
+  try {
+    const settings = await getWaSettings();
+    if (!settings?.enabled || !settings?.monthlyAutoSend) {
+      console.log("[WhatsApp] Monthly auto-send is disabled — skipping.");
+      return;
+    }
+    const recipients = await getActiveRecipients();
+    if (!recipients.length) {
+      console.log("[WhatsApp] No active recipients — skipping.");
+      return;
+    }
+
+    const companies = await storage.getAllCompanies();
+    const endDate   = new Date().toISOString().split("T")[0];
+    const startDate = (() => {
+      const d = new Date(endDate);
+      d.setFullYear(d.getFullYear() - 1);
+      return d.toISOString().split("T")[0];
+    })();
+
+    for (const company of companies as any[]) {
+      try {
+        console.log(`[WhatsApp] Generating net-position Excel for ${company.name}…`);
+        const buffer   = await generateNetPositionExcel(company.id, company.name, startDate, endDate);
+        const safe     = company.name.replace(/[^a-z0-9]/gi, "_");
+        const fileName = `NetPosition_${safe}_${endDate}.xlsx`;
+        const caption  = `Monthly Net Position Report — ${company.name}\nPeriod: ${startDate} → ${endDate}`;
+        const result   = await sendWhatsAppFile(buffer, fileName, caption);
+        console.log(`[WhatsApp] ${company.name}: sent=${result.sent} failed=${result.failed}`);
+      } catch (compErr: any) {
+        console.error(`[WhatsApp] Failed for ${company.name}:`, compErr.message);
+      }
+    }
+    console.log("[WhatsApp] Monthly net-position send complete.");
+  } catch (err: any) {
+    console.error("[WhatsApp] Monthly send error:", err);
+  }
+}
+
 export function startScheduler() {
   if (schedulerStarted) return;
   schedulerStarted = true;
@@ -131,7 +177,15 @@ export function startScheduler() {
     timezone: "America/New_York",
   });
 
+  // Run on the 1st of every month at 7:00 AM EST — send net-position Excel via WhatsApp
+  cron.schedule("0 7 1 * *", async () => {
+    await runMonthlyWhatsAppNetPosition();
+  }, {
+    timezone: "America/New_York",
+  });
+
   console.log("[DailyExport] Scheduler started — will run daily at 6:00 PM EST.");
+  console.log("[WhatsApp] Monthly net-position scheduler started — runs on the 1st of each month at 7:00 AM EST.");
 }
 
 export { runDailyExport, buildZipBuffer };

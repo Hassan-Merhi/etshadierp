@@ -908,6 +908,23 @@ let migrationsDone = false;
       schedule_enabled boolean NOT NULL DEFAULT false,
       last_run_at timestamp
     )`,
+    // WhatsApp (Green API) settings — singleton row id=1
+    `CREATE TABLE IF NOT EXISTS whatsapp_settings (
+      id integer PRIMARY KEY,
+      instance_id varchar(255) NOT NULL DEFAULT '',
+      api_token text NOT NULL DEFAULT '',
+      enabled boolean NOT NULL DEFAULT false,
+      monthly_auto_send boolean NOT NULL DEFAULT false
+    )`,
+    // WhatsApp recipients (individual numbers or group chatIds)
+    `CREATE TABLE IF NOT EXISTS whatsapp_recipients (
+      id serial PRIMARY KEY,
+      chat_id varchar(255) NOT NULL UNIQUE,
+      name varchar(255) NOT NULL DEFAULT '',
+      is_group boolean NOT NULL DEFAULT false,
+      active boolean NOT NULL DEFAULT true,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

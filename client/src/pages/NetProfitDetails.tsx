@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import {
   Card,
   CardContent,
@@ -25,6 +27,7 @@ import {
   Calendar,
   X,
   Download,
+  MessageSquare,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -226,6 +229,7 @@ function todayStr() {
 
 export default function NetProfitDetails() {
   const { formatAmount } = useCurrencyContext();
+  const { toast } = useToast();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   // Local input state — updates freely as user types (no API trigger)
@@ -259,6 +263,27 @@ export default function NetProfitDetails() {
   });
 
   const isFiltered = !!(fromDate || toDate);
+
+  const sendWhatsApp = useMutation({
+    mutationFn: () => {
+      const today = new Date().toLocaleDateString("en-CA");
+      const start = fromDate || fromInput || (() => {
+        const d = new Date();
+        d.setFullYear(d.getFullYear() - 1);
+        return d.toLocaleDateString("en-CA");
+      })();
+      const end = toDate || toInput || today;
+      return apiRequest("POST", "/api/whatsapp/send-net-position", { startDate: start, endDate: end });
+    },
+    onSuccess: async (res: any) => {
+      const body = await res.json();
+      toast({ title: "Sent via WhatsApp", description: body.message });
+    },
+    onError: async (err: any) => {
+      const msg = err?.message || "WhatsApp send failed";
+      toast({ title: "WhatsApp Error", description: msg, variant: "destructive" });
+    },
+  });
 
   if (isLoading) {
     return (
@@ -393,6 +418,17 @@ export default function NetProfitDetails() {
           >
             <Download className="h-4 w-4 mr-2" />
             Monthly Excel
+          </Button>
+          <Button
+            variant="outline"
+            size="default"
+            data-testid="button-send-whatsapp"
+            title="Send monthly net position Excel to WhatsApp group"
+            onClick={() => sendWhatsApp.mutate()}
+            disabled={sendWhatsApp.isPending}
+          >
+            <MessageSquare className="h-4 w-4 mr-2 text-green-600" />
+            {sendWhatsApp.isPending ? "Sending…" : "WhatsApp"}
           </Button>
           <Button onClick={() => refetch()} variant="outline" size="default" data-testid="button-refresh">
             <RefreshCw className="h-4 w-4 mr-2" />
