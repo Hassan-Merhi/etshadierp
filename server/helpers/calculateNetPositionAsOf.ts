@@ -183,7 +183,7 @@ export async function calculateNetPositionAsOf(
 
   // ── Stock OTW ─────────────────────────────────────────────────────────
   const otwContainers = await db
-    .select({ grandTotal: containers.grandTotal, itemsTotal: containers.itemsTotal, containerNo: containers.containerNo })
+    .select({ grandTotal: containers.grandTotal, itemsTotal: containers.itemsTotal })
     .from(containers)
     .where(and(
       eq(containers.companyId, companyId),
