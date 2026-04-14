@@ -143,6 +143,7 @@ export default function FactoryLocationInventory() {
     try { return localStorage.getItem("proforma-inventory-autosave") === "true"; } catch { return false; }
   });
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSilentAutoSaveRef = useRef(false);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [proformaName, setProformaName] = useState("");
@@ -416,13 +417,20 @@ export default function FactoryLocationInventory() {
       return await res.json();
     },
     onSuccess: (result: any) => {
-      toast({ title: "Proforma updated", description: "Lines saved successfully" });
+      const silent = isSilentAutoSaveRef.current;
+      isSilentAutoSaveRef.current = false;
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-proformas") });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/location-inventory"] });
       setSavedProformaId(result.id);
-      setTimeout(() => navigate("/factory/invoicing?tab=proformas"), 800);
+      if (silent) {
+        toast({ title: "Auto-saved", description: "Proforma saved automatically" });
+      } else {
+        toast({ title: "Proforma updated", description: "Lines saved successfully" });
+        setTimeout(() => navigate("/factory/invoicing?tab=proformas"), 800);
+      }
     },
     onError: (error: Error) => {
+      isSilentAutoSaveRef.current = false;
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -888,6 +896,7 @@ export default function FactoryLocationInventory() {
     if (!proformaAutoSave || !proformaMode || !editingProformaId || selections.size === 0) return;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
+      isSilentAutoSaveRef.current = true;
       doSaveProforma();
       autoSaveTimerRef.current = null;
     }, 2000);
