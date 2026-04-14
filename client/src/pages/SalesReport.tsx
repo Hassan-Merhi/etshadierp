@@ -75,7 +75,8 @@ interface SalesReportItem {
 }
 
 interface DailySummary {
-  date: string;
+  date: string;       // compound key used for grouping (may have "-credit" suffix)
+  dateKey: string;    // clean date key for API queries (no suffix)
   displayDate: string;
   totalSales: number;
   totalCost: number;
@@ -278,6 +279,7 @@ export default function SalesReport() {
     } else {
       acc.push({
         date: groupKey,
+        dateKey,
         displayDate,
         totalSales,
         totalCost,
@@ -370,19 +372,21 @@ export default function SalesReport() {
     const params = new URLSearchParams();
     params.set("displayDate", summary.displayDate);
     params.set("grouping", grouping);
+    // Always use the clean dateKey (not the compound group key) for API date params
+    const dk = summary.dateKey;
     if (grouping === "daily") {
-      params.set("startDate", summary.date);
-      params.set("endDate", summary.date);
+      params.set("startDate", dk);
+      params.set("endDate", dk);
     } else if (grouping === "monthly") {
-      const [y, m] = summary.date.split("-").map(Number);
-      const start = `${summary.date}-01`;
+      const [y, m] = dk.split("-").map(Number);
+      const start = `${dk}-01`;
       const lastDay = new Date(y, m, 0).getDate();
-      const end = `${summary.date}-${String(lastDay).padStart(2, "0")}`;
+      const end = `${dk}-${String(lastDay).padStart(2, "0")}`;
       params.set("startDate", start);
       params.set("endDate", end);
     } else {
-      params.set("startDate", `${summary.date}-01-01`);
-      params.set("endDate", `${summary.date}-12-31`);
+      params.set("startDate", `${dk}-01-01`);
+      params.set("endDate", `${dk}-12-31`);
     }
     if (selectedLocation && selectedLocation !== "all") params.set("locationId", selectedLocation);
     if (selectedStockItem && selectedStockItem !== "all") params.set("stockItemId", selectedStockItem);
