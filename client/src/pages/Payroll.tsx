@@ -263,6 +263,7 @@ export default function Payroll() {
   const [bulkBonusDate, setBulkBonusDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [bulkBonusNotes, setBulkBonusNotes] = useState("");
   const [bulkBonusAmounts, setBulkBonusAmounts] = useState<Record<number, string>>({});
+  const [bulkBonusBreakdowns, setBulkBonusBreakdowns] = useState<Record<number, string[]>>({});
   const [bulkBonusStep, setBulkBonusStep] = useState<"edit" | "preview">("edit");
   // Pending bonuses: calculated per-employee, saved for later bulk posting
   const [pendingBonuses, setPendingBonuses] = useState<Record<number, { amount: number; description: string; employeeName: string }>>({});
@@ -936,6 +937,7 @@ export default function Payroll() {
       queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       setBulkBonusDialogOpen(false);
       setBulkBonusAmounts({});
+      setBulkBonusBreakdowns({});
       setBulkBonusNotes("");
       setBulkBonusStep("edit");
       setPendingBonuses({});
@@ -1439,6 +1441,7 @@ export default function Payroll() {
     const start = bulkBonusAutoMonth === "thisMonth" ? getThisMonthRange().start : bulkBonusAutoStart;
     const end = bulkBonusAutoMonth === "thisMonth" ? getThisMonthRange().end : bulkBonusAutoEnd;
     const newAmounts: Record<number, string> = {};
+    const newBreakdowns: Record<number, string[]> = {};
     try {
       for (const emp of employeeStaff) {
         const pct = parseFloat(emp.salesBonusPct || "0");
@@ -1455,14 +1458,18 @@ export default function Payroll() {
         if (!hasBaleRates && !hasPct && !hasPerLocationPct) continue;
 
         let total = 0;
+        const lines: string[] = [];
 
         if (hasBaleRates) {
           for (const r of rates) {
             const srcParam = (r as any).sourceCompanyId ? `&sourceCompanyId=${(r as any).sourceCompanyId}` : "";
             const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${r.locationId}&startDate=${start}&endDate=${end}${srcParam}`);
             const data = await res.json();
-            // Per-unit bale bonus
-            total += parseFloat(data.totalQuantity || "0") * parseFloat(r.rate || "0");
+            const qty = parseFloat(data.totalQuantity || "0");
+            const rate = parseFloat(r.rate || "0");
+            const contrib = qty * rate;
+            total += contrib;
+            lines.push(`${data.locationName || `Loc ${r.locationId}`}: ${qty.toLocaleString()} units × ${rate} = ${contrib.toFixed(2)}`);
           }
         }
         // Per-location % bonus rates take priority over global salesBonusPct
@@ -1471,7 +1478,11 @@ export default function Payroll() {
             const srcParam = r.sourceCompanyId ? `&sourceCompanyId=${r.sourceCompanyId}` : "";
             const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${r.locationId}&startDate=${start}&endDate=${end}${srcParam}`);
             const data = await res.json();
-            total += (parseFloat(data.totalSalesAmount || "0") * parseFloat(r.pct || "0")) / 100;
+            const salesAmt = parseFloat(data.totalSalesAmount || "0");
+            const rPct = parseFloat(r.pct || "0");
+            const contrib = (salesAmt * rPct) / 100;
+            total += contrib;
+            lines.push(`${data.locationName || `Loc ${r.locationId}`}: ${salesAmt.toLocaleString(undefined, { maximumFractionDigits: 2 })} × ${rPct}% = ${contrib.toFixed(2)}`);
           }
         } else {
           // Fallback: global salesBonusPct with per-employee or global location picker
@@ -1482,13 +1493,20 @@ export default function Payroll() {
             const pctSrcParam = empPctSrcCompanyId ? `&sourceCompanyId=${empPctSrcCompanyId}` : "";
             const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${resolvedPctLocationId}&startDate=${start}&endDate=${end}${pctSrcParam}`);
             const data = await res.json();
-            total += (parseFloat(data.totalSalesAmount || "0") * pct) / 100;
+            const salesAmt = parseFloat(data.totalSalesAmount || "0");
+            const contrib = (salesAmt * pct) / 100;
+            total += contrib;
+            lines.push(`${data.locationName || `Loc ${resolvedPctLocationId}`}: ${salesAmt.toLocaleString(undefined, { maximumFractionDigits: 2 })} × ${pct}% = ${contrib.toFixed(2)}`);
           }
         }
 
-        if (total > 0.005) newAmounts[emp.id] = total.toFixed(2);
+        if (total > 0.005) {
+          newAmounts[emp.id] = total.toFixed(2);
+          newBreakdowns[emp.id] = lines;
+        }
       }
       setBulkBonusAmounts(prev => ({ ...prev, ...newAmounts }));
+      setBulkBonusBreakdowns(prev => ({ ...prev, ...newBreakdowns }));
       const count = Object.keys(newAmounts).length;
       toast({ title: "Auto-calculated", description: `Bonus calculated for ${count} employee${count !== 1 ? "s" : ""}` });
     } catch (e: any) {
@@ -4743,6 +4761,7 @@ export default function Payroll() {
                     <TableBody>
                       {employeeStaff.map((emp) => {
                         const isPending = !!pendingBonuses[emp.id];
+                        const breakdown = bulkBonusBreakdowns[emp.id];
                         return (
                           <TableRow key={emp.id}>
                             <TableCell>
@@ -4752,6 +4771,13 @@ export default function Payroll() {
                                   <Badge variant="secondary" className="text-xs">Calculated</Badge>
                                 )}
                               </div>
+                              {breakdown && breakdown.length > 0 && (
+                                <div className="mt-1 space-y-0.5">
+                                  {breakdown.map((line, i) => (
+                                    <p key={i} className="text-xs text-muted-foreground font-mono">{line}</p>
+                                  ))}
+                                </div>
+                              )}
                             </TableCell>
                             <TableCell className="text-right">
                               <Input
