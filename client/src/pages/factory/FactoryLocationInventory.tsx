@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft, MapPin, Layers, Package, Search, Printer, ArrowUpDown,
-  FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2, Pencil, Tag
+  FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2, Pencil, Tag, Zap
 } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { useEscapeBack } from "@/hooks/use-escape-back";
@@ -139,6 +139,10 @@ export default function FactoryLocationInventory() {
   const [hideZeroAvailable, setHideZeroAvailable] = useState(true);
   const [selections, setSelections] = useState<Map<number, ProformaSelection>>(new Map());
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
+  const [proformaAutoSave, setProformaAutoSave] = useState<boolean>(() => {
+    try { return localStorage.getItem("proforma-inventory-autosave") === "true"; } catch { return false; }
+  });
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [proformaName, setProformaName] = useState("");
@@ -868,6 +872,30 @@ export default function FactoryLocationInventory() {
     }
     doSaveProforma();
   };
+
+  const toggleProformaAutoSave = () => {
+    const next = !proformaAutoSave;
+    setProformaAutoSave(next);
+    try { localStorage.setItem("proforma-inventory-autosave", String(next)); } catch {}
+    if (!next && autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+  };
+
+  // Autosave: when editing a proforma, debounce-save 2s after any selection change
+  useEffect(() => {
+    if (!proformaAutoSave || !proformaMode || !editingProformaId || selections.size === 0) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      doSaveProforma();
+      autoSaveTimerRef.current = null;
+    }, 2000);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proformaAutoSave, proformaMode, editingProformaId, selections]);
 
   const handleExportExcel = () => {
     if (!savedProformaId) return;
@@ -1634,7 +1662,26 @@ export default function FactoryLocationInventory() {
             <div className="w-full flex items-center gap-2 mb-1 p-2 rounded-md bg-primary/10 border border-primary/20">
               <FileText className="h-4 w-4 text-primary shrink-0" />
               <span className="text-sm font-medium text-primary">Editing proforma: <span className="font-bold">{proformaName}</span></span>
-              <span className="text-xs text-muted-foreground ml-1">— Select items from inventory and click Update Proforma to save changes</span>
+              <span className="text-xs text-muted-foreground ml-1 flex-1">
+                {proformaAutoSave ? "— Changes auto-save 2 s after you stop editing" : "— Select items from inventory and click Update Proforma to save changes"}
+              </span>
+              {/* Autosave toggle */}
+              <button
+                onClick={toggleProformaAutoSave}
+                className={`flex items-center gap-1.5 px-2.5 h-7 rounded border text-xs font-medium transition-colors shrink-0 ${
+                  proformaAutoSave
+                    ? "bg-green-500/10 border-green-500/50 text-green-600 dark:text-green-400"
+                    : "bg-background border-border text-muted-foreground"
+                }`}
+                data-testid="button-proforma-autosave-toggle"
+                title={proformaAutoSave ? "Autosave ON" : "Autosave OFF"}
+              >
+                <Zap className={`h-3.5 w-3.5 ${proformaAutoSave ? "fill-green-500 text-green-500" : ""}`} />
+                Autosave
+                <span className={`w-7 h-3.5 rounded-full relative transition-colors ${proformaAutoSave ? "bg-green-500" : "bg-muted-foreground/30"}`}>
+                  <span className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white shadow transition-transform ${proformaAutoSave ? "translate-x-3.5" : "translate-x-0.5"}`} />
+                </span>
+              </button>
             </div>
           )}
           <Button variant="outline" size="sm" onClick={selectAllVisible} data-testid="button-select-all">
@@ -2194,14 +2241,22 @@ export default function FactoryLocationInventory() {
                 {formatAmount(grandTotal)} total
               </span>
             </div>
-            <Button
-              onClick={editingProformaId ? handleSaveProforma : handleFinalize}
-              disabled={(bulkCreateMutation.isPending || replaceLinesMutation.isPending) && !!editingProformaId}
-              data-testid="button-finalize-proforma-bar"
-            >
-              <FileText className="h-4 w-4 mr-1" />
-              {editingProformaId ? "Update Proforma" : "Finalize Proforma"}
-            </Button>
+            <div className="flex items-center gap-2">
+              {editingProformaId && proformaAutoSave && (
+                <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                  <Zap className="h-3.5 w-3.5 fill-green-500" />
+                  {replaceLinesMutation.isPending ? "Saving…" : "Auto-saving"}
+                </span>
+              )}
+              <Button
+                onClick={editingProformaId ? handleSaveProforma : handleFinalize}
+                disabled={(bulkCreateMutation.isPending || replaceLinesMutation.isPending) && !!editingProformaId}
+                data-testid="button-finalize-proforma-bar"
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                {editingProformaId ? "Update Proforma" : "Finalize Proforma"}
+              </Button>
+            </div>
           </div>
         </div>
       )}
