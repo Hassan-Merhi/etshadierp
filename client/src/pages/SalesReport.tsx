@@ -31,7 +31,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, ChevronRight, RefreshCw, ChevronDown, Download, Building2 } from "lucide-react";
+import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, ChevronRight, RefreshCw, ChevronDown, Download, Building2, GitCompare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -583,6 +583,11 @@ export default function SalesReport() {
               </PopoverContent>
             </Popover>
           )}
+
+          <Button variant="outline" size="sm" onClick={() => navigate("/sales-report/comparison")} data-testid="button-compare-companies">
+            <GitCompare className="w-4 h-4 mr-2" />
+            Compare
+          </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
