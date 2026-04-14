@@ -934,8 +934,16 @@ let migrationsDone = false;
       company_id integer,
       recipient_id integer,
       auto_send boolean NOT NULL DEFAULT false,
-      enabled boolean NOT NULL DEFAULT false
+      enabled boolean NOT NULL DEFAULT false,
+      frequency varchar(20) NOT NULL DEFAULT 'daily',
+      send_hour integer NOT NULL DEFAULT 18,
+      send_day_of_week integer,
+      last_sent_at timestamp
     )`,
+    `ALTER TABLE whatsapp_stock_settings ADD COLUMN IF NOT EXISTS frequency varchar(20) NOT NULL DEFAULT 'daily'`,
+    `ALTER TABLE whatsapp_stock_settings ADD COLUMN IF NOT EXISTS send_hour integer NOT NULL DEFAULT 18`,
+    `ALTER TABLE whatsapp_stock_settings ADD COLUMN IF NOT EXISTS send_day_of_week integer`,
+    `ALTER TABLE whatsapp_stock_settings ADD COLUMN IF NOT EXISTS last_sent_at timestamp`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

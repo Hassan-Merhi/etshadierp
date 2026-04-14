@@ -212,18 +212,26 @@ export function registerWhatsAppRoutes(app: Express) {
   app.get("/api/whatsapp/stock-settings", requireAuth, async (_req, res) => {
     try {
       const r = await pool.query(
-        `SELECT id, company_id, recipient_id, auto_send, enabled
+        `SELECT id, company_id, recipient_id, auto_send, enabled,
+                frequency, send_hour, send_day_of_week, last_sent_at
          FROM whatsapp_stock_settings ORDER BY id LIMIT 1`,
       );
       if (!r.rows.length) {
-        return res.json({ companyId: null, recipientId: null, autoSend: false, enabled: false });
+        return res.json({
+          companyId: null, recipientId: null, autoSend: false, enabled: false,
+          frequency: "daily", sendHour: 18, sendDayOfWeek: 1, lastSentAt: null,
+        });
       }
       const row = r.rows[0];
       res.json({
-        companyId:   row.company_id,
-        recipientId: row.recipient_id,
-        autoSend:    row.auto_send,
-        enabled:     row.enabled,
+        companyId:     row.company_id,
+        recipientId:   row.recipient_id,
+        autoSend:      row.auto_send,
+        enabled:       row.enabled,
+        frequency:     row.frequency     ?? "daily",
+        sendHour:      row.send_hour     ?? 18,
+        sendDayOfWeek: row.send_day_of_week ?? 1,
+        lastSentAt:    row.last_sent_at  ?? null,
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -232,16 +240,27 @@ export function registerWhatsAppRoutes(app: Express) {
 
   app.put("/api/whatsapp/stock-settings", requireAuth, async (req, res) => {
     try {
-      const { companyId, recipientId, autoSend, enabled } = req.body as Record<string, any>;
+      const { companyId, recipientId, autoSend, enabled, frequency, sendHour, sendDayOfWeek } = req.body as Record<string, any>;
       await pool.query(
-        `INSERT INTO whatsapp_stock_settings (id, company_id, recipient_id, auto_send, enabled)
-         VALUES (1, $1, $2, $3, $4)
+        `INSERT INTO whatsapp_stock_settings (id, company_id, recipient_id, auto_send, enabled, frequency, send_hour, send_day_of_week)
+         VALUES (1, $1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (id) DO UPDATE SET
-           company_id   = EXCLUDED.company_id,
-           recipient_id = EXCLUDED.recipient_id,
-           auto_send    = EXCLUDED.auto_send,
-           enabled      = EXCLUDED.enabled`,
-        [companyId ?? null, recipientId ?? null, autoSend ?? false, enabled ?? false],
+           company_id       = EXCLUDED.company_id,
+           recipient_id     = EXCLUDED.recipient_id,
+           auto_send        = EXCLUDED.auto_send,
+           enabled          = EXCLUDED.enabled,
+           frequency        = EXCLUDED.frequency,
+           send_hour        = EXCLUDED.send_hour,
+           send_day_of_week = EXCLUDED.send_day_of_week`,
+        [
+          companyId    ?? null,
+          recipientId  ?? null,
+          autoSend     ?? false,
+          enabled      ?? false,
+          frequency    ?? "daily",
+          sendHour     ?? 18,
+          sendDayOfWeek ?? null,
+        ],
       );
       res.json({ message: "Saved" });
     } catch (err: any) {

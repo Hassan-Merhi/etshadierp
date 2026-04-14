@@ -163,69 +163,130 @@ async function runDailyWhatsAppSend(
       }
     }
 
-    // Stock report — sends to its own specific group if configured
-    await runStockReportSend(today);
-
     console.log("[WhatsApp] Daily WhatsApp send complete.");
   } catch (err: any) {
     console.error("[WhatsApp] Daily send error:", err?.message || err);
   }
 }
 
-async function runStockReportSend(today: string): Promise<void> {
+// ─── Stock + Net Position Report — independent schedule ───────────────────────
+
+/** Returns true if, given frequency/day config and last_sent_at, it's time to send. */
+function shouldSendStockReport(cfg: {
+  frequency:     string;
+  sendHour:      number;
+  sendDayOfWeek: number | null;
+  lastSentAt:    Date | null;
+}): boolean {
+  // All times in EST (America/New_York)
+  const nowEst = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const currentHour = nowEst.getHours();
+  const currentDay  = nowEst.getDay();  // 0=Sun … 6=Sat
+
+  if (currentHour !== cfg.sendHour) return false;
+
+  // Check if already sent in the current period
+  if (cfg.lastSentAt) {
+    const lastEst = new Date(new Date(cfg.lastSentAt).toLocaleString("en-US", { timeZone: "America/New_York" }));
+    const sameDay   = lastEst.toDateString() === nowEst.toDateString();
+    const sameWeek  = isSameIsoWeek(lastEst, nowEst);
+    const sameMonth = lastEst.getFullYear() === nowEst.getFullYear() && lastEst.getMonth() === nowEst.getMonth();
+
+    if (cfg.frequency === "daily"   && sameDay)   return false;
+    if (cfg.frequency === "weekly"  && sameWeek)  return false;
+    if (cfg.frequency === "monthly" && sameMonth) return false;
+  }
+
+  if (cfg.frequency === "daily") return true;
+
+  if (cfg.frequency === "weekly") {
+    const targetDay = cfg.sendDayOfWeek ?? 1; // default Monday
+    return currentDay === targetDay;
+  }
+
+  if (cfg.frequency === "monthly") {
+    return nowEst.getDate() === 1;
+  }
+
+  return false;
+}
+
+function isSameIsoWeek(a: Date, b: Date): boolean {
+  const getMonday = (d: Date) => {
+    const copy = new Date(d);
+    const day = copy.getDay();
+    const diff = (day === 0 ? -6 : 1) - day;
+    copy.setDate(copy.getDate() + diff);
+    copy.setHours(0, 0, 0, 0);
+    return copy;
+  };
+  return getMonday(a).getTime() === getMonday(b).getTime();
+}
+
+export async function checkAndRunStockReport(): Promise<void> {
   try {
     const r = await pool.query(
-      `SELECT company_id, recipient_id, auto_send, enabled
+      `SELECT company_id, recipient_id, auto_send, enabled,
+              frequency, send_hour, send_day_of_week, last_sent_at
        FROM whatsapp_stock_settings WHERE id = 1`,
     );
     if (!r.rows.length) return;
-    const cfg = r.rows[0];
-    if (!cfg.enabled || !cfg.auto_send) {
-      console.log("[WhatsApp] Stock report auto-send is disabled — skipping.");
-      return;
-    }
-    if (!cfg.company_id || !cfg.recipient_id) {
-      console.log("[WhatsApp] Stock report: no company or recipient configured — skipping.");
-      return;
-    }
+    const row = r.rows[0];
 
-    const recipResult = await pool.query(
+    if (!row.enabled || !row.auto_send) return;
+    if (!row.company_id || !row.recipient_id) return;
+
+    const cfg = {
+      frequency:     (row.frequency     ?? "daily") as string,
+      sendHour:      (row.send_hour     ?? 18)       as number,
+      sendDayOfWeek: (row.send_day_of_week           ?? null) as number | null,
+      lastSentAt:    row.last_sent_at ? new Date(row.last_sent_at) : null,
+    };
+
+    if (!shouldSendStockReport(cfg)) return;
+
+    // Fetch recipient chatId
+    const rq = await pool.query(
       "SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true",
-      [cfg.recipient_id],
+      [row.recipient_id],
     );
-    if (!recipResult.rows.length) {
-      console.log("[WhatsApp] Stock report: recipient not found or inactive — skipping.");
+    if (!rq.rows.length) {
+      console.log("[StockReport] Recipient inactive — skipping.");
       return;
     }
-    const chatId = recipResult.rows[0].chat_id as string;
+    const chatId = rq.rows[0].chat_id as string;
 
     const allCompanies = await storage.getAllCompanies();
-    const company      = (allCompanies as any[]).find((c) => c.id === cfg.company_id);
-    if (!company) {
-      console.log(`[WhatsApp] Stock report: company ${cfg.company_id} not found — skipping.`);
-      return;
-    }
+    const company      = (allCompanies as any[]).find((c) => c.id === row.company_id);
+    if (!company) { console.log(`[StockReport] Company ${row.company_id} not found.`); return; }
 
+    const today     = new Date().toISOString().split("T")[0];
     const yearStart = `${new Date().getUTCFullYear()}-01-01`;
 
-    console.log(`[WhatsApp] Stock report: generating PDF for ${company.name}…`);
-    const pdfBuf  = await generateStockPdf(cfg.company_id, company.name);
+    console.log(`[StockReport] Sending to ${company.name} → ${chatId} (${cfg.frequency})…`);
+
+    // 1. Stock PDF
+    const pdfBuf  = await generateStockPdf(row.company_id, company.name);
     const pdfName = `Stock_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.pdf`;
     const pdfCap  = `Stock Inventory with Cost — ${company.name}\nAs of ${today}`;
     const pdfRes  = await sendWhatsAppFileToChatId(chatId, pdfBuf, pdfName, pdfCap, "application/pdf");
-    console.log(`[WhatsApp] Stock PDF: ${pdfRes.success ? "sent" : pdfRes.error}`);
+    console.log(`[StockReport] PDF: ${pdfRes.success ? "sent" : pdfRes.error}`);
 
-    console.log(`[WhatsApp] Stock report: generating net-position Excel for ${company.name} (${yearStart}→${today})…`);
-    const xlsBuf  = await generateNetPositionExcel(cfg.company_id, company.name, yearStart, today);
+    // 2. Net Position Excel (Jan 1 → today)
+    const xlsBuf  = await generateNetPositionExcel(row.company_id, company.name, yearStart, today);
     const xlsName = `NetPosition_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.xlsx`;
-    const xlsCap  = `Net Position Report — ${company.name}\nPeriod: ${yearStart} → ${today}`;
+    const xlsCap  = `Net Position — ${company.name}\nPeriod: ${yearStart} → ${today}`;
     const xlsRes  = await sendWhatsAppFileToChatId(
       chatId, xlsBuf, xlsName, xlsCap,
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
-    console.log(`[WhatsApp] Net Position Excel (stock config): ${xlsRes.success ? "sent" : xlsRes.error}`);
+    console.log(`[StockReport] Net Position Excel: ${xlsRes.success ? "sent" : xlsRes.error}`);
+
+    // Mark as sent
+    await pool.query(`UPDATE whatsapp_stock_settings SET last_sent_at = now() WHERE id = 1`);
+    console.log(`[StockReport] Done — last_sent_at updated.`);
   } catch (err: any) {
-    console.error("[WhatsApp] Stock report send error:", err?.message || err);
+    console.error("[StockReport] Error:", err?.message || err);
   }
 }
 
@@ -305,8 +366,17 @@ export function startScheduler() {
     timezone: "America/New_York",
   });
 
+  // Stock + Net Position report — check every hour (minute 0) in EST
+  // The function itself decides whether to send based on frequency, send_hour, day-of-week, and last_sent_at
+  cron.schedule("0 * * * *", async () => {
+    await checkAndRunStockReport();
+  }, {
+    timezone: "America/New_York",
+  });
+
   console.log("[DailyExport] Scheduler started — will run daily at 6:00 PM EST.");
   console.log("[WhatsApp] Monthly net-position scheduler started — runs on the 1st of each month at 7:00 AM EST.");
+  console.log("[StockReport] Independent scheduler started — checks every hour.");
 }
 
 export { runDailyExport, buildZipBuffer };
