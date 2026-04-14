@@ -1773,54 +1773,53 @@ export default function Payroll() {
             <div className="space-y-4">
               {/* Payroll Actions */}
               {employeeStaff.length > 0 && (
-                <div className="rounded-md border bg-muted/30 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Payroll Actions</p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setBulkDepositSelections({});
-                        setBulkDepositDialogOpen(true);
-                      }}
-                      data-testid="button-open-bulk-deposit"
-                    >
-                      <ArrowDownCircle className="h-4 w-4 mr-2" />
-                      Bulk Deposit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const fromPending: Record<number, string> = {};
-                        for (const [empId, pb] of Object.entries(pendingBonuses)) {
-                          fromPending[parseInt(empId)] = pb.amount.toFixed(2);
-                        }
-                        setBulkBonusAmounts(fromPending);
-                        setBulkBonusStep("edit");
-                        setBulkBonusDialogOpen(true);
-                      }}
-                      data-testid="button-open-bulk-bonus"
-                    >
-                      <Gift className="h-4 w-4 mr-2" />
-                      Bulk Bonus Deposit
-                      {Object.keys(pendingBonuses).length > 0 && (
-                        <Badge className="ml-2" variant="default">
-                          {Object.keys(pendingBonuses).length}
-                        </Badge>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setBulkWithdrawalAmounts({});
-                        setBulkWithdrawalAccountId("");
-                        setBulkWithdrawalDialogOpen(true);
-                      }}
-                      data-testid="button-open-bulk-withdrawal"
-                    >
-                      <ArrowUpCircle className="h-4 w-4 mr-2" />
-                      Bulk Withdrawal
-                    </Button>
-                  </div>
+                <div className="flex justify-end">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" data-testid="button-open-payroll-actions">
+                        Payroll Actions
+                        {Object.keys(pendingBonuses).length > 0 && (
+                          <Badge className="ml-2" variant="default">
+                            {Object.keys(pendingBonuses).length}
+                          </Badge>
+                        )}
+                        <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => { setBulkDepositSelections({}); setBulkDepositDialogOpen(true); }}
+                        data-testid="button-open-bulk-deposit"
+                      >
+                        <ArrowDownCircle className="h-4 w-4 mr-2" /> Bulk Deposit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          const fromPending: Record<number, string> = {};
+                          for (const [empId, pb] of Object.entries(pendingBonuses)) {
+                            fromPending[parseInt(empId)] = pb.amount.toFixed(2);
+                          }
+                          setBulkBonusAmounts(fromPending);
+                          setBulkBonusStep("edit");
+                          setBulkBonusDialogOpen(true);
+                        }}
+                        data-testid="button-open-bulk-bonus"
+                      >
+                        <Gift className="h-4 w-4 mr-2" /> Bulk Bonus Deposit
+                        {Object.keys(pendingBonuses).length > 0 && (
+                          <Badge className="ml-2" variant="default">
+                            {Object.keys(pendingBonuses).length}
+                          </Badge>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => { setBulkWithdrawalAmounts({}); setBulkWithdrawalAccountId(""); setBulkWithdrawalDialogOpen(true); }}
+                        data-testid="button-open-bulk-withdrawal"
+                      >
+                        <ArrowUpCircle className="h-4 w-4 mr-2" /> Bulk Withdrawal
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               )}
 
