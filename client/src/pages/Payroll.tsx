@@ -33,7 +33,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -1363,7 +1365,9 @@ export default function Payroll() {
     const end = bonusSalesPeriod === "thisMonth" ? getThisMonthRange().end : bonusSalesEnd;
     setBonusSalesLoading(true);
     try {
-      const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${bonusSalesLocationId}&startDate=${start}&endDate=${end}`);
+      const otherCompanyLoc = allCompanyLocations.find(l => l.id === parseInt(bonusSalesLocationId));
+      const srcParam = otherCompanyLoc ? `&sourceCompanyId=${otherCompanyLoc.companyId}` : "";
+      const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${bonusSalesLocationId}&startDate=${start}&endDate=${end}${srcParam}`);
       const data = await res.json();
       setBonusSalesPreview(data);
     } catch (e) {
@@ -2769,9 +2773,20 @@ export default function Payroll() {
                     <SelectValue placeholder="Select location" />
                   </SelectTrigger>
                   <SelectContent>
-                    {locations.map((loc) => (
-                      <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
-                    ))}
+                    <SelectGroup>
+                      <SelectLabel>This Company</SelectLabel>
+                      {locations.map((loc) => (
+                        <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                    {allCompanyLocations.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>Other Companies</SelectLabel>
+                        {allCompanyLocations.map((loc) => (
+                          <SelectItem key={`oc-${loc.id}`} value={String(loc.id)}>{loc.name} ({loc.companyName})</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
