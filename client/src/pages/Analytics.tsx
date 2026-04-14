@@ -1753,13 +1753,13 @@ export default function Analytics() {
                   <TableRow>
                     <TableCell>Total</TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatNumber(salesData.filter(l => l.locationId !== -1).reduce((s, l) => s + (l.totalQuantity ?? 0), 0))}
+                      {formatNumber(salesData.reduce((s, l) => s + (l.totalQuantity ?? 0), 0))}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatAmount(salesData.filter(l => l.locationId !== -1).reduce((s, l) => s + l.totalSales, 0))}
+                      {formatAmount(salesData.reduce((s, l) => s + l.totalSales, 0))}
                     </TableCell>
                     <TableCell className="text-right">
-                      {salesData.filter(l => l.locationId !== -1).reduce((s, l) => s + l.totalTransactions, 0)}
+                      {salesData.reduce((s, l) => s + l.totalTransactions, 0)}
                     </TableCell>
                     <TableCell />
                   </TableRow>
@@ -1787,9 +1787,9 @@ export default function Analytics() {
                   <CardContent className="p-4">
                     <div className="font-semibold mb-2">Total</div>
                     <div className="grid grid-cols-3 text-sm gap-2">
-                      <span className="text-muted-foreground">Bales: <span className="font-mono text-foreground font-semibold">{formatNumber(salesData.filter(l => l.locationId !== -1).reduce((s, l) => s + (l.totalQuantity ?? 0), 0))}</span></span>
-                      <span className="text-muted-foreground">Sales: <span className="font-mono text-foreground font-semibold">{formatAmount(salesData.filter(l => l.locationId !== -1).reduce((s, l) => s + l.totalSales, 0))}</span></span>
-                      <span className="text-muted-foreground text-right">Txns: <span className="text-foreground font-semibold">{salesData.filter(l => l.locationId !== -1).reduce((s, l) => s + l.totalTransactions, 0)}</span></span>
+                      <span className="text-muted-foreground">Bales: <span className="font-mono text-foreground font-semibold">{formatNumber(salesData.reduce((s, l) => s + (l.totalQuantity ?? 0), 0))}</span></span>
+                      <span className="text-muted-foreground">Sales: <span className="font-mono text-foreground font-semibold">{formatAmount(salesData.reduce((s, l) => s + l.totalSales, 0))}</span></span>
+                      <span className="text-muted-foreground text-right">Txns: <span className="text-foreground font-semibold">{salesData.reduce((s, l) => s + l.totalTransactions, 0)}</span></span>
                     </div>
                   </CardContent>
                 </Card>
