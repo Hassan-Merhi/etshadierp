@@ -1836,55 +1836,57 @@ export default function Payroll() {
                     return (
                       <Card key={employee.id} data-testid={`card-employee-${employee.id}`}>
                         <CardContent className="p-4">
-                          <div className="flex items-start gap-4">
-                            <Avatar className="h-11 w-11 shrink-0">
-                              <AvatarFallback className={`text-sm font-semibold ${avatarColor}`}>
-                                {initials}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex flex-wrap items-center gap-2 mb-0.5">
-                                <button
-                                  onClick={() => setStatementEmployee(employee)}
-                                  className="font-semibold text-sm hover:underline cursor-pointer"
-                                  data-testid={`link-employee-statement-${employee.id}`}
-                                >
-                                  {employee.firstName} {employee.lastName}
-                                </button>
-                                {employee.code && (
-                                  <Badge variant="outline" className="text-xs font-mono">
-                                    {employee.code}
-                                  </Badge>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            {/* Avatar + Name */}
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <Avatar className="h-10 w-10 shrink-0">
+                                <AvatarFallback className={`text-sm font-bold ${avatarColor}`}>
+                                  {initials}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <button
+                                    onClick={() => setStatementEmployee(employee)}
+                                    className="font-semibold text-base hover:underline cursor-pointer"
+                                    data-testid={`link-employee-statement-${employee.id}`}
+                                  >
+                                    {employee.firstName} {employee.lastName}
+                                  </button>
+                                  {!employee.active && (
+                                    <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                                  )}
+                                </div>
+                                {employee.department && (
+                                  <p className="text-xs text-muted-foreground">{employee.department}</p>
                                 )}
-                                {!employee.active && (
-                                  <Badge variant="secondary" className="text-xs">Inactive</Badge>
-                                )}
-                              </div>
-                              {employee.department && (
-                                <p className="text-xs text-muted-foreground">{employee.department}</p>
-                              )}
-                              <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                <div>
-                                  <span className="text-xs text-muted-foreground block">Monthly Salary</span>
-                                  <span className="font-mono text-sm">{formatAmount(parseFloat(employee.monthlySalary))}</span>
-                                </div>
-                                <div>
-                                  <span className="text-xs text-muted-foreground block">Balance</span>
-                                  <span className={`font-mono font-semibold text-sm ${balance >= 0 ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
-                                    {formatAmount(balance)}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="text-xs text-muted-foreground block">Total Deposits</span>
-                                  <span className="font-mono text-sm text-muted-foreground">{formatAmount(parseFloat(employee.totalDeposits || "0"))}</span>
-                                </div>
-                                <div>
-                                  <span className="text-xs text-muted-foreground block">Withdrawals</span>
-                                  <span className="font-mono text-sm text-muted-foreground">{formatAmount(parseFloat(employee.totalWithdrawals || "0"))}</span>
-                                </div>
                               </div>
                             </div>
-                            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1 shrink-0">
+
+                            {/* Stats */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 shrink-0">
+                              <div>
+                                <p className="text-xs text-muted-foreground">Salary</p>
+                                <p className="font-mono text-sm font-medium">{formatAmount(parseFloat(employee.monthlySalary))}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground">Balance</p>
+                                <p className={`font-mono text-sm font-bold ${balance >= 0 ? "text-green-500 dark:text-green-400" : "text-destructive"}`}>
+                                  {formatAmount(balance)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground">Deposits</p>
+                                <p className="font-mono text-sm text-muted-foreground">{formatAmount(parseFloat(employee.totalDeposits || "0"))}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground">Withdrawals</p>
+                                <p className="font-mono text-sm text-muted-foreground">{formatAmount(parseFloat(employee.totalWithdrawals || "0"))}</p>
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-1 shrink-0 flex-wrap">
                               <Button size="sm" variant="outline" onClick={() => handleDeposit(employee)} data-testid={`button-deposit-${employee.id}`}>
                                 <TrendingUp className="h-3.5 w-3.5 mr-1" /> Deposit
                               </Button>
