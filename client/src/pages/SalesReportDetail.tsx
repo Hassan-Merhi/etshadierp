@@ -35,6 +35,7 @@ interface SalesReportItem {
   costProfitPercentage: number;
   configuredProfit: number;
   configuredProfitPercentage: number;
+  isCreditSale?: boolean;
   createdAt: string;
   companyId?: number;
   companyCode?: string;
@@ -107,6 +108,7 @@ export default function SalesReportDetail() {
   const grouping = params.get("grouping") || "daily";
   const allCompanies = params.get("allCompanies") === "true";
   const companyFilter = params.get("companyFilter") || "";
+  const isCreditSaleParam = params.get("isCreditSale");
 
   const queryParams = new URLSearchParams();
   if (startDate) queryParams.append("startDate", startDate);
@@ -125,8 +127,11 @@ export default function SalesReportDetail() {
     enabled: !!startDate,
   });
 
-  // Apply P/L filter and optional search term filter
+  // Apply P/L filter, credit sale filter, and optional search term filter
   const filteredItems = items.filter((item) => {
+    // Separate credit vs cash items based on which row was clicked
+    if (isCreditSaleParam === "true" && !item.isCreditSale) return false;
+    if (isCreditSaleParam === "false" && item.isCreditSale) return false;
     if (searchTerm) {
       const lower = searchTerm.toLowerCase();
       const matches =
@@ -252,7 +257,12 @@ export default function SalesReportDetail() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl sm:text-2xl font-bold">Sales Details — {displayDate}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+            Sales Details — {displayDate}
+            {isCreditSaleParam === "true" && (
+              <Badge variant="outline" className="text-sm text-amber-600 border-amber-400 dark:text-amber-400 dark:border-amber-600">Credit Sales</Badge>
+            )}
+          </h1>
           <p className="text-sm text-muted-foreground">
             All items sold {grouping === "daily" ? "on this day" : grouping === "monthly" ? "this month" : "this year"}
             {searchTerm && <span className="ml-1 text-muted-foreground/70">· filtered by "{searchTerm}"</span>}

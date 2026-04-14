@@ -1247,6 +1247,7 @@ export function registerStatsRoutes(app: Express) {
           totalSales: salesItems.totalSales,
           totalCost: salesItems.totalCost,
           costProfit: salesItems.profit, // Actual selling price - cost price
+          isCreditSale: vouchers.isCreditSale,
           createdAt: salesItems.createdAt,
         })
         .from(salesItems)

@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, ChevronRight, RefreshCw, ChevronDown, Download, Building2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,6 +66,7 @@ interface SalesReportItem {
   costProfitPercentage: number;
   configuredProfit: number;
   configuredProfitPercentage: number;
+  isCreditSale?: boolean;
   createdAt: string;
   // Multi-company fields (only present in all-companies view)
   companyId?: number;
@@ -82,6 +84,7 @@ interface DailySummary {
   configuredProfit: number;
   itemCount: number;
   totalQty: number;
+  isCreditSale: boolean;
   items: SalesReportItem[];
 }
 
@@ -224,22 +227,26 @@ export default function SalesReport() {
     return Array.from(uniqueCompanies.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [isMultiCompanyMode, allCompaniesSalesData]);
 
-  // Group sales by date/month/year
+  // Group sales by date/month/year — credit sales get their own separate group
   const groupedData: DailySummary[] = salesData.reduce((acc: DailySummary[], item) => {
     const itemDate = parseISO(item.voucherDate);
-    let groupKey: string;
+    let dateKey: string;
     let displayDate: string;
 
     if (grouping === "daily") {
-      groupKey = format(startOfDay(itemDate), "yyyy-MM-dd");
+      dateKey = format(startOfDay(itemDate), "yyyy-MM-dd");
       displayDate = formatDisplayDate(itemDate);
     } else if (grouping === "monthly") {
-      groupKey = format(startOfMonth(itemDate), "yyyy-MM");
+      dateKey = format(startOfMonth(itemDate), "yyyy-MM");
       displayDate = format(itemDate, "MMMM yyyy");
     } else {
-      groupKey = format(startOfYear(itemDate), "yyyy");
+      dateKey = format(startOfYear(itemDate), "yyyy");
       displayDate = format(itemDate, "yyyy");
     }
+
+    const isCredit = item.isCreditSale === true;
+    // Separate group key so credit and cash rows never merge
+    const groupKey = isCredit ? `${dateKey}-credit` : dateKey;
 
     // Filter by search term
     if (searchTerm) {
@@ -279,6 +286,7 @@ export default function SalesReport() {
         configuredProfit,
         itemCount: 1,
         totalQty: qty,
+        isCreditSale: isCredit,
         items: [item],
       });
     }
@@ -380,6 +388,7 @@ export default function SalesReport() {
     if (selectedStockItem && selectedStockItem !== "all") params.set("stockItemId", selectedStockItem);
     if (selectedStockGroup && selectedStockGroup !== "all") params.set("stockGroupId", selectedStockGroup);
     if (searchTerm) params.set("searchTerm", searchTerm);
+    params.set("isCreditSale", summary.isCreditSale ? "true" : "false");
     if (isMultiCompanyMode) {
       params.set("allCompanies", "true");
       if (selectedCompanies.length > 0) params.set("companyFilter", selectedCompanies.join(","));
@@ -803,7 +812,14 @@ export default function SalesReport() {
                       className={`cursor-pointer hover-elevate${selectedRowDate === group.date ? " bg-muted" : ""}`}
                       onClick={() => handleRowClick(group)}
                     >
-                      <TableCell className="font-medium">{group.displayDate}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {group.displayDate}
+                          {group.isCreditSale && (
+                            <Badge variant="outline" className="text-xs text-amber-600 border-amber-400 dark:text-amber-400 dark:border-amber-600">Credit</Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatNumber(group.itemCount, 0)}
                       </TableCell>
