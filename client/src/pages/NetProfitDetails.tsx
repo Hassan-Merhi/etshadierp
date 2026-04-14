@@ -371,6 +371,29 @@ export default function NetProfitDetails() {
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
+
+          <Button
+            variant="outline"
+            size="default"
+            data-testid="button-export-monthly-excel"
+            title="Export a month-by-month net position snapshot to Excel"
+            onClick={() => {
+              const today = new Date().toLocaleDateString("en-CA");
+              const start = fromDate || fromInput || (() => {
+                const d = new Date();
+                d.setFullYear(d.getFullYear() - 1);
+                return d.toLocaleDateString("en-CA");
+              })();
+              const end = toDate || toInput || today;
+              window.open(
+                `/api/reports/net-position-monthly-excel?startDate=${start}&endDate=${end}`,
+                "_blank"
+              );
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Monthly Excel
+          </Button>
           <Button onClick={() => refetch()} variant="outline" size="default" data-testid="button-refresh">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
