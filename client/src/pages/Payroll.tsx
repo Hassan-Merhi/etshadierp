@@ -111,7 +111,7 @@ export default function Payroll() {
   const [bonusSalesCustomPct, setBonusSalesCustomPct] = useState<string>("");
   const [bonusDate, setBonusDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
   const [bonusNotes, setBonusNotes] = useState<string>("");
-  const [balesRows, setBalesRows] = useState<Array<{ locationId: string; qty: string; rate: string; preview: string | null; loading: boolean }>>([{ locationId: "", qty: "", rate: "", preview: null, loading: false }]);
+  const [balesRows, setBalesRows] = useState<Array<{ locationId: string; sourceCompanyId: string; qty: string; rate: string; preview: string | null; loading: boolean }>>([{ locationId: "", sourceCompanyId: "", qty: "", rate: "", preview: null, loading: false }]);
   const [balesPeriod, setBalesPeriod] = useState<"thisMonth" | "custom">("thisMonth");
   const [balesStart, setBalesStart] = useState<string>("");
   const [balesEnd, setBalesEnd] = useState<string>("");
@@ -1352,7 +1352,7 @@ export default function Payroll() {
     setBonusSalesCustomPct(employee.salesBonusPct != null ? String(employee.salesBonusPct) : "");
     setBonusDate(new Date().toLocaleDateString('en-CA'));
     setBonusNotes("");
-    setBalesRows([{ locationId: "", qty: "", rate: employee.balesBonusRate != null ? String(employee.balesBonusRate) : "", preview: null, loading: false }]);
+    setBalesRows([{ locationId: "", sourceCompanyId: "", qty: "", rate: employee.balesBonusRate != null ? String(employee.balesBonusRate) : "", preview: null, loading: false }]);
     setBalesPeriod("thisMonth");
     setBalesStart(range.start);
     setBalesEnd(range.end);
@@ -1383,7 +1383,8 @@ export default function Payroll() {
     const end = balesPeriod === "thisMonth" ? getThisMonthRange().end : balesEnd;
     setBalesRows(prev => prev.map((r, i) => i === idx ? { ...r, loading: true } : r));
     try {
-      const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${row.locationId}&startDate=${start}&endDate=${end}`);
+      const srcParam = row.sourceCompanyId ? `&sourceCompanyId=${row.sourceCompanyId}` : "";
+      const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${row.locationId}&startDate=${start}&endDate=${end}${srcParam}`);
       const data = await res.json();
       setBalesRows(prev => prev.map((r, i) => i === idx ? { ...r, qty: Number(data.totalQuantity || 0).toFixed(0), loading: false } : r));
     } catch {
@@ -1405,7 +1406,8 @@ export default function Payroll() {
       const parts = balesRows
         .filter(r => r.locationId && parseFloat(r.qty || "0") > 0)
         .map(r => {
-          const loc = locations.find(l => l.id === parseInt(r.locationId));
+          const loc = locations.find(l => l.id === parseInt(r.locationId))
+            ?? allCompanyLocations.find(l => l.id === parseInt(r.locationId));
           return `${Number(r.qty).toFixed(0)} units × ${formatAmount(parseFloat(r.rate || "0"))} at ${loc?.name ?? "Unknown"}`;
         });
       return { amount, description: parts.join("; ") };
@@ -2898,15 +2900,29 @@ export default function Payroll() {
                   <div key={idx} className="grid grid-cols-[1fr_72px_32px_72px_32px] gap-2 items-center">
                     <Select
                       value={row.locationId}
-                      onValueChange={(v) => setBalesRows(prev => prev.map((r, i) => i === idx ? { ...r, locationId: v, qty: "" } : r))}
+                      onValueChange={(v) => {
+                        const otherLoc = allCompanyLocations.find(l => l.id === parseInt(v));
+                        setBalesRows(prev => prev.map((r, i) => i === idx ? { ...r, locationId: v, sourceCompanyId: otherLoc ? String(otherLoc.companyId) : "", qty: "" } : r));
+                      }}
                     >
                       <SelectTrigger data-testid={`select-bales-location-${idx}`} className="h-9">
                         <SelectValue placeholder="Shop" />
                       </SelectTrigger>
                       <SelectContent>
-                        {locations.map((loc) => (
-                          <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
-                        ))}
+                        <SelectGroup>
+                          <SelectLabel>This Company</SelectLabel>
+                          {locations.map((loc) => (
+                            <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                        {allCompanyLocations.length > 0 && (
+                          <SelectGroup>
+                            <SelectLabel>Other Companies</SelectLabel>
+                            {allCompanyLocations.map((loc) => (
+                              <SelectItem key={`oc-${loc.id}`} value={String(loc.id)}>{loc.name} ({loc.companyName})</SelectItem>
+                            ))}
+                          </SelectGroup>
+                        )}
                       </SelectContent>
                     </Select>
                     <Input
@@ -2954,7 +2970,8 @@ export default function Payroll() {
                   const r = parseFloat(row.rate || "0");
                   const total = q * r;
                   if (total <= 0) return null;
-                  const loc = locations.find(l => l.id === parseInt(row.locationId));
+                  const loc = locations.find(l => l.id === parseInt(row.locationId))
+                    ?? allCompanyLocations.find(l => l.id === parseInt(row.locationId));
                   return (
                     <p key={`hint-${idx}`} className="text-xs text-muted-foreground px-1">
                       {loc?.name}: {Number(q).toFixed(0)} × {formatAmount(r)} = <strong>{formatAmount(total)}</strong>
@@ -2967,7 +2984,7 @@ export default function Payroll() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setBalesRows(prev => [...prev, { locationId: "", qty: "", rate: selectedEmployee?.balesBonusRate != null ? String(selectedEmployee.balesBonusRate) : "", preview: null, loading: false }])}
+                onClick={() => setBalesRows(prev => [...prev, { locationId: "", sourceCompanyId: "", qty: "", rate: selectedEmployee?.balesBonusRate != null ? String(selectedEmployee.balesBonusRate) : "", preview: null, loading: false }])}
                 data-testid="button-add-bales-row"
               >
                 <Plus className="h-4 w-4 mr-1" />
