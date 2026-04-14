@@ -672,7 +672,7 @@ export default function StockTransferOrder() {
     // ── Print / page setup ───────────────────────────────────────────────────
     ws.pageSetup = {
       paperSize: 9,            // A4
-      orientation: "landscape",
+      orientation: "portrait",
       fitToPage: true,
       fitToWidth: 1,
       fitToHeight: 0,          // grow vertically as needed
@@ -680,12 +680,12 @@ export default function StockTransferOrder() {
       margins: { left: 0.4, right: 0.4, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 },
     } as ExcelJS.PageSetup;
 
-    // Column widths — wider for comfortable reading when printed
+    // Column widths sized for A4 portrait
     ws.columns = [
-      { width: 58 },
-      { width: 26 },
-      { width: 16 },
-      ...(includeCost ? [{ width: 16 }, { width: 18 }] : []),
+      { width: 46 },
+      { width: 20 },
+      { width: 14 },
+      ...(includeCost ? [{ width: 14 }, { width: 16 }] : []),
     ];
 
     // Color palette
@@ -788,18 +788,18 @@ export default function StockTransferOrder() {
           ...(includeCost ? [item.rate, item.quantity * item.rate] : []),
         ];
         const dataRow = ws.addRow(vals);
-        dataRow.height = 19;
-        dataRow.getCell(1).font = { size: 11 };
+        dataRow.height = 22;
+        dataRow.getCell(1).font = { size: 12 };
         dataRow.getCell(1).alignment = { horizontal: "left", vertical: "middle" };
-        dataRow.getCell(2).font = { size: 11 };
+        dataRow.getCell(2).font = { size: 12 };
         dataRow.getCell(2).alignment = { horizontal: "center", vertical: "middle" };
-        dataRow.getCell(3).font = { size: 11 };
+        dataRow.getCell(3).font = { size: 12 };
         dataRow.getCell(3).alignment = { horizontal: "center", vertical: "middle" };
         if (includeCost) {
-          dataRow.getCell(4).font = { size: 11 };
+          dataRow.getCell(4).font = { size: 12 };
           dataRow.getCell(4).numFmt = "#,##0.00";
           dataRow.getCell(4).alignment = { horizontal: "right", vertical: "middle" };
-          dataRow.getCell(5).font = { size: 11 };
+          dataRow.getCell(5).font = { size: 12 };
           dataRow.getCell(5).numFmt = "#,##0.00";
           dataRow.getCell(5).alignment = { horizontal: "right", vertical: "middle" };
         }
@@ -816,7 +816,7 @@ export default function StockTransferOrder() {
         ...(includeCost ? ["", groupAmt] : []),
       ];
       const subRow = ws.addRow(subtotalVals);
-      subRow.height = 20;
+      subRow.height = 24;
       ws.mergeCells(`A${subRow.number}:B${subRow.number}`);
       for (let c = 1; c <= numCols; c++) {
         const cell = subRow.getCell(c);
