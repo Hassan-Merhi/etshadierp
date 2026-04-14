@@ -102,10 +102,11 @@ const navSections: NavSection[] = [
     label: "Accounting",
     color: "#f59e0b",
     items: [
-      { title: "Accounts",  url: "/accounts",  icon: Wallet    },
-      { title: "Suppliers", url: "/suppliers", icon: Users     },
-      { title: "Customers", url: "/customers", icon: Users     },
-      { title: "Payroll",   url: "/payroll",   icon: UserCheck },
+      { title: "Accounts",          url: "/accounts",          icon: Wallet          },
+      { title: "Suppliers",         url: "/suppliers",         icon: Users           },
+      { title: "Customers",         url: "/customers",         icon: Users           },
+      { title: "Payroll",           url: "/payroll",           icon: UserCheck       },
+      { title: "Company Transfer",  url: "/company-transfer",  icon: ArrowLeftRight  },
     ],
   },
   {

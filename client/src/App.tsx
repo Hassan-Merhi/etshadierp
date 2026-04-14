@@ -61,6 +61,7 @@ const StockQuery = lazy(() => import("@/pages/StockQuery"));
 const StockItemDetail = lazy(() => import("@/pages/StockItemDetail"));
 const FactoryStockItemDetail = lazy(() => import("@/pages/factory/FactoryStockItemDetail"));
 const SalesReport = lazy(() => import("@/pages/SalesReport"));
+const CompanyTransfer = lazy(() => import("@/pages/CompanyTransfer"));
 const POSDaybook = lazy(() => import("@/pages/pos/POSDaybook"));
 const POSDashboard = lazy(() => import("@/pages/pos/POSDashboard"));
 const POSCustomers = lazy(() => import("@/pages/pos/POSCustomers"));
@@ -273,6 +274,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/sales-report" component={SalesReport} />
       <Route path="/sales-report/detail" component={SalesReportDetail} />
       <Route path="/sales-report/comparison" component={SalesReportComparison} />
+      <Route path="/company-transfer" component={CompanyTransfer} />
       {user?.role === "Developer" && <Route path="/net-profit-report" component={NetProfitReport} />}
       <Route path="/combined-inventory"><Redirect to="/stock-otw?tab=combined" /></Route>
       <Route path="/bale-ledger" component={BaleLedger} />

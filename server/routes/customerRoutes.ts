@@ -741,4 +741,223 @@ export function registerCustomerRoutes(app: Express) {
 
   // ─── Intercompany POS Auto-Transfer Config ────────────────────────────────────
 
+  // ─── Simple Company Transfer (Option A – clean move, no IC accounts) ──────────
+
+  // Get ledger accounts for any company the current user has access to
+  app.get("/api/company-accounts/:companyId", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.companyId);
+      const userId = req.session.userId!;
+      const userRoles = await storage.getUserCompaniesWithRoles(userId);
+      const hasAccess = userRoles.some((r: any) => r.companyId === companyId);
+      if (!hasAccess) return res.status(403).json({ message: "No access to this company" });
+      const accounts = await storage.getAllLedgerAccounts(companyId, true);
+      res.json(accounts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // List all simple transfers for the current company (sender or receiver)
+  app.get("/api/simple-company-transfers", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const transfers = await db
+        .select()
+        .from(interCompanyTransfers)
+        .where(
+          or(
+            eq(interCompanyTransfers.fromCompanyId, companyId),
+            eq(interCompanyTransfers.toCompanyId, companyId),
+          ),
+        )
+        .orderBy(desc(interCompanyTransfers.createdAt));
+
+      // Enrich with company names
+      const allCompanies = await storage.getAllCompanies();
+      const companyMap = new Map(allCompanies.map((c: any) => [c.id, c]));
+      const allAccounts = await db.select().from(ledgerAccounts);
+      const accountMap = new Map(allAccounts.map((a: any) => [a.id, a]));
+
+      const enriched = transfers.map((t: any) => ({
+        ...t,
+        fromCompanyName: (companyMap.get(t.fromCompanyId) as any)?.name ?? "Unknown",
+        toCompanyName:   (companyMap.get(t.toCompanyId)   as any)?.name ?? "Unknown",
+        fromAccountName: (accountMap.get(t.fromLedgerAccountId) as any)?.name ?? "Unknown",
+        toAccountName:   (accountMap.get(t.toLedgerAccountId)   as any)?.name ?? "Unknown",
+      }));
+
+      res.json(enriched);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  const simpleTransferSchema = z.object({
+    fromCompanyId:       z.number(),
+    toCompanyId:         z.number(),
+    fromLedgerAccountId: z.number(),
+    toLedgerAccountId:   z.number(),
+    amount:              z.string(),
+    transferDate:        z.string(),
+    description:         z.string().optional(),
+  });
+
+  // Create a simple transfer
+  app.post("/api/simple-company-transfer", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const parsed = simpleTransferSchema.parse(req.body);
+      const amt = parseFloat(parsed.amount);
+      if (isNaN(amt) || amt <= 0) return res.status(400).json({ message: "Amount must be positive" });
+
+      // Verify user has access to both companies
+      const userRoles = await storage.getUserCompaniesWithRoles(userId);
+      const accessIds = userRoles.map((r: any) => r.companyId);
+      if (!accessIds.includes(parsed.fromCompanyId) || !accessIds.includes(parsed.toCompanyId)) {
+        return res.status(403).json({ message: "No access to one or both companies" });
+      }
+
+      const fromCompany = await storage.getCompanyById(parsed.fromCompanyId);
+      const toCompany   = await storage.getCompanyById(parsed.toCompanyId);
+      if (!fromCompany || !toCompany) return res.status(404).json({ message: "Company not found" });
+
+      const desc = parsed.description || `Transfer to ${toCompany.name}`;
+
+      // Helper: get or create a "Transfer Clearing" account in a company
+      async function getOrCreateClearingAccount(companyId: number) {
+        const accounts = await storage.getAllLedgerAccounts(companyId);
+        const existing = accounts.find((a: any) => a.code === "TRANSFER-CLEARING");
+        if (existing) return existing;
+        return storage.createLedgerAccount({
+          companyId,
+          code: "TRANSFER-CLEARING",
+          name: "Transfer Clearing",
+          accountType: "Equity",
+          openingBalance: "0",
+          active: true,
+        });
+      }
+
+      const fromClearing = await getOrCreateClearingAccount(parsed.fromCompanyId);
+      const toClearing   = await getOrCreateClearingAccount(parsed.toCompanyId);
+
+      // ── Voucher in FROM company ────────────────────────────────────────────
+      // Credit: source account (balance goes DOWN — money leaves)
+      // Debit:  Transfer Clearing (internal, user doesn't see as IC)
+      const [fromVoucher] = await db.insert(vouchers).values({
+        companyId:     parsed.fromCompanyId,
+        voucherNumber: `TR-OUT-${Date.now()}`,
+        voucherType:   "Payment",
+        voucherDate:   parsed.transferDate,
+        description:   `${desc} → ${toCompany.name}`,
+        totalAmount:   parsed.amount,
+        optional:      false,
+      }).returning();
+
+      await db.insert(voucherEntries).values([
+        {
+          voucherId:       fromVoucher.id,
+          ledgerAccountId: fromClearing.id,
+          debitAmount:     parsed.amount,
+          creditAmount:    "0",
+          narration:       `Transfer out to ${toCompany.name}`,
+        },
+        {
+          voucherId:       fromVoucher.id,
+          ledgerAccountId: parsed.fromLedgerAccountId,
+          debitAmount:     "0",
+          creditAmount:    parsed.amount,
+          narration:       `Transfer out to ${toCompany.name}`,
+        },
+      ]);
+
+      // ── Voucher in TO company ──────────────────────────────────────────────
+      // Debit:  destination account (balance goes UP — money arrives)
+      // Credit: Transfer Clearing (internal)
+      const [toVoucher] = await db.insert(vouchers).values({
+        companyId:     parsed.toCompanyId,
+        voucherNumber: `TR-IN-${Date.now()}`,
+        voucherType:   "Receipt",
+        voucherDate:   parsed.transferDate,
+        description:   `Transfer from ${fromCompany.name}`,
+        totalAmount:   parsed.amount,
+        optional:      false,
+      }).returning();
+
+      await db.insert(voucherEntries).values([
+        {
+          voucherId:       toVoucher.id,
+          ledgerAccountId: parsed.toLedgerAccountId,
+          debitAmount:     parsed.amount,
+          creditAmount:    "0",
+          narration:       `Transfer in from ${fromCompany.name}`,
+        },
+        {
+          voucherId:       toVoucher.id,
+          ledgerAccountId: toClearing.id,
+          debitAmount:     "0",
+          creditAmount:    parsed.amount,
+          narration:       `Transfer in from ${fromCompany.name}`,
+        },
+      ]);
+
+      // ── Record the transfer link ───────────────────────────────────────────
+      const [transfer] = await db.insert(interCompanyTransfers).values({
+        transferType:        "Cash",
+        fromCompanyId:       parsed.fromCompanyId,
+        toCompanyId:         parsed.toCompanyId,
+        transferDate:        parsed.transferDate,
+        amount:              parsed.amount,
+        fromLedgerAccountId: parsed.fromLedgerAccountId,
+        toLedgerAccountId:   parsed.toLedgerAccountId,
+        fromVoucherId:       fromVoucher.id,
+        toVoucherId:         toVoucher.id,
+        description:         desc,
+      }).returning();
+
+      res.status(201).json(transfer);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Undo (delete) a simple transfer — removes both vouchers and the record
+  app.delete("/api/simple-company-transfer/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [transfer] = await db
+        .select()
+        .from(interCompanyTransfers)
+        .where(eq(interCompanyTransfers.id, id));
+      if (!transfer) return res.status(404).json({ message: "Transfer not found" });
+
+      // Verify user has access to both companies
+      const userId = req.session.userId!;
+      const userRoles = await storage.getUserCompaniesWithRoles(userId);
+      const accessIds = userRoles.map((r: any) => r.companyId);
+      if (!accessIds.includes(transfer.fromCompanyId) || !accessIds.includes(transfer.toCompanyId)) {
+        return res.status(403).json({ message: "No access to one or both companies" });
+      }
+
+      // Delete voucher entries and vouchers for both sides
+      if (transfer.fromVoucherId) {
+        await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, transfer.fromVoucherId));
+        await db.delete(vouchers).where(eq(vouchers.id, transfer.fromVoucherId));
+      }
+      if (transfer.toVoucherId) {
+        await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, transfer.toVoucherId));
+        await db.delete(vouchers).where(eq(vouchers.id, transfer.toVoucherId));
+      }
+
+      // Delete the transfer record
+      await db.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, id));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
 }
