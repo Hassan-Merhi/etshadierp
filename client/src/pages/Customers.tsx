@@ -547,7 +547,6 @@ export default function Customers() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
-                      <TableHead>Voucher</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead className="text-right">Debit</TableHead>
                       <TableHead className="text-right">Credit</TableHead>
@@ -558,7 +557,7 @@ export default function Customers() {
                     {openingBalance !== 0 && (
                       <TableRow className="text-muted-foreground text-sm">
                         <TableCell>—</TableCell>
-                        <TableCell colSpan={2} className="italic">Opening Balance</TableCell>
+                        <TableCell colSpan={1} className="italic">Opening Balance</TableCell>
                         <TableCell></TableCell>
                         <TableCell></TableCell>
                         <TableCell className="text-right font-mono">{formatAmount(Math.abs(openingBalance))}</TableCell>
@@ -572,9 +571,6 @@ export default function Customers() {
                         <TableRow key={t.entryId ?? i}>
                           <TableCell className="font-mono text-sm whitespace-nowrap">
                             {t.voucherDate ? format(new Date(t.voucherDate), "yyyy-MM-dd") : "—"}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                            {t.voucherNumber || "—"}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
                             {t.narration || t.voucherDescription || t.voucherType || "—"}
@@ -595,7 +591,7 @@ export default function Customers() {
                   </TableBody>
                   <TableHeader className="border-t-2">
                     <TableRow className="font-semibold">
-                      <TableHead colSpan={3}>Total</TableHead>
+                      <TableHead colSpan={2}>Total</TableHead>
                       <TableHead className="text-right font-mono text-foreground">{formatAmount(totalDr)}</TableHead>
                       <TableHead className="text-right font-mono text-foreground">{formatAmount(totalCr)}</TableHead>
                       <TableHead className="text-right font-mono text-foreground">
