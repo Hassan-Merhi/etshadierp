@@ -1841,9 +1841,9 @@ export default function Payroll() {
                     return (
                       <Card key={employee.id} data-testid={`card-employee-${employee.id}`}>
                         <CardContent className="p-4">
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                            {/* Avatar + Name */}
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                            {/* Avatar + Name — fixed width so stats align across all cards */}
+                            <div className="flex items-center gap-3 w-56 shrink-0 min-w-0">
                               <Avatar className="h-10 w-10 shrink-0">
                                 <AvatarFallback className={`text-sm font-bold ${avatarColor}`}>
                                   {initials}
@@ -1853,7 +1853,7 @@ export default function Payroll() {
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <button
                                     onClick={() => setStatementEmployee(employee)}
-                                    className="font-semibold text-base hover:underline cursor-pointer"
+                                    className="font-semibold text-base hover:underline cursor-pointer truncate"
                                     data-testid={`link-employee-statement-${employee.id}`}
                                   >
                                     {employee.firstName} {employee.lastName}
@@ -1863,13 +1863,13 @@ export default function Payroll() {
                                   )}
                                 </div>
                                 {employee.department && (
-                                  <p className="text-xs text-muted-foreground">{employee.department}</p>
+                                  <p className="text-xs text-muted-foreground truncate">{employee.department}</p>
                                 )}
                               </div>
                             </div>
 
-                            {/* Stats */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 shrink-0">
+                            {/* Stats — equal-width columns, fills remaining space */}
+                            <div className="grid grid-cols-4 flex-1 min-w-0">
                               <div>
                                 <p className="text-xs text-muted-foreground">Salary</p>
                                 <p className="font-mono text-sm font-medium">{formatAmount(parseFloat(employee.monthlySalary))}</p>
