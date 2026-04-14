@@ -1856,6 +1856,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (!order) return res.status(404).json({ message: "Order not found" });
 
       const [customer] = await db.select().from(customers).where(eq(customers.id, order.customerId));
+      const customerName = customer?.legalName || `order_${orderId}`;
 
       const baleLinks = await db.select().from(customerOrderBales)
         .where(eq(customerOrderBales.orderId, orderId))
@@ -1932,7 +1933,6 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       totalRow.getCell("weight").numFmt = "#,##0.00";
       totalRow.getCell("totalWeight").numFmt = "#,##0.00";
 
-      const customerName = customer?.legalName || `order_${orderId}`;
       const safeName = customerName.replace(/[^a-zA-Z0-9_\-]/g, "_");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="loading_${orderId}_${safeName}.xlsx"`);
