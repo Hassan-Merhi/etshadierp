@@ -94,7 +94,7 @@ export default function SalesReportComparison() {
 
   const enabled = selectedCodes.length >= 2;
 
-  const { data: rawItems = [], isFetching } = useQuery<SalesItem[]>({
+  const { data: rawItems = [], isFetching, isLoading } = useQuery<SalesItem[]>({
     queryKey: ["/api/dashboard/sales-report-all", queryString],
     enabled,
   });
@@ -340,7 +340,12 @@ export default function SalesReportComparison() {
               />
             </div>
 
-            {isFetching ? (
+            {isFetching && !isLoading && (
+              <div className="h-0.5 w-full bg-muted overflow-hidden mb-3 rounded-full">
+                <div className="h-full bg-primary w-1/2 rounded-full animate-pulse" />
+              </div>
+            )}
+            {isLoading ? (
               <div className="text-center py-16 text-muted-foreground">Loading comparison data…</div>
             ) : tableData.length === 0 ? (
               <div className="text-center py-16 text-muted-foreground">No data found for the selected filters</div>
