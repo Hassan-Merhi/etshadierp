@@ -349,12 +349,27 @@ export function startScheduler() {
 
   // Run at 6:00 PM EST (America/New_York) every day
   cron.schedule("0 18 * * *", async () => {
-    const enabled = await isScheduleEnabled();
-    if (!enabled) {
-      console.log("[DailyExport] Schedule is disabled — skipping.");
-      return;
+    const emailEnabled = await isScheduleEnabled();
+
+    if (emailEnabled) {
+      // Full export: builds ZIP, emails it, then sends via WhatsApp
+      await runDailyExport();
+    } else {
+      // Email export is off — still run WhatsApp daily send independently
+      console.log("[DailyExport] Email schedule is disabled — skipping email, running WhatsApp send only.");
+      try {
+        const companies = await fetchAllCompanies();
+        if (!companies?.length) {
+          console.log("[DailyExport] No companies — WhatsApp send skipped.");
+          return;
+        }
+        const { fromDate, toDate } = getYesterdayRange();
+        const { zip } = await buildZipBuffer(companies, fromDate, toDate);
+        await runDailyWhatsAppSend(zip, toDate, companies);
+      } catch (err: any) {
+        console.error("[DailyExport] WhatsApp-only 6 PM send failed:", err?.message || err);
+      }
     }
-    await runDailyExport();
   }, {
     timezone: "America/New_York",
   });
