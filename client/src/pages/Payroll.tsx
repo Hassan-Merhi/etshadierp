@@ -64,6 +64,12 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Check } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -1886,16 +1892,25 @@ export default function Payroll() {
                             </div>
 
                             {/* Actions */}
-                            <div className="flex items-center gap-1 shrink-0 flex-wrap">
-                              <Button size="sm" variant="outline" onClick={() => handleDeposit(employee)} data-testid={`button-deposit-${employee.id}`}>
-                                <TrendingUp className="h-3.5 w-3.5 mr-1" /> Deposit
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleBonus(employee)} data-testid={`button-bonus-${employee.id}`}>
-                                <DollarSign className="h-3.5 w-3.5 mr-1" /> Bonus
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleWithdrawal(employee)} data-testid={`button-withdraw-${employee.id}`}>
-                                <TrendingDown className="h-3.5 w-3.5 mr-1" /> Withdraw
-                              </Button>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button size="sm" variant="outline" data-testid={`button-actions-${employee.id}`}>
+                                    Actions <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleDeposit(employee)} data-testid={`button-deposit-${employee.id}`}>
+                                    <TrendingUp className="h-4 w-4 mr-2" /> Deposit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleBonus(employee)} data-testid={`button-bonus-${employee.id}`}>
+                                    <DollarSign className="h-4 w-4 mr-2" /> Bonus
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleWithdrawal(employee)} data-testid={`button-withdraw-${employee.id}`}>
+                                    <TrendingDown className="h-4 w-4 mr-2" /> Withdraw
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                               <Button size="icon" variant="ghost" onClick={() => { setEditingEmployee(employee); setEditEmployeeDialogOpen(true); }} data-testid={`button-edit-${employee.id}`}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
