@@ -162,13 +162,13 @@ export async function generateNetPositionExcel(
   // ═══════════════════════════════════════════════════════════════════
   const wsSummary = wb.addWorksheet("Summary");
 
-  wsSummary.mergeCells("A1:J1");
+  wsSummary.mergeCells("A1:I1");
   styleTitle(wsSummary.getCell("A1"), `Monthly Net Position Summary — ${companyName}`, 16);
   wsSummary.getRow(1).height = 38;
 
-  wsSummary.mergeCells("A2:J2");
+  wsSummary.mergeCells("A2:I2");
   const sub2 = wsSummary.getCell("A2");
-  sub2.value     = `Period: ${startDate}  →  ${endDate}   |   Balance-sheet snapshot + monthly income statement per row`;
+  sub2.value     = `Period: ${startDate}  →  ${endDate}   |   Balance-sheet snapshot + monthly income breakdown per row`;
   sub2.font      = { italic: true, size: 10, color: { argb: C.MUTED } };
   sub2.alignment = { horizontal: "center" };
   wsSummary.getRow(2).height = 18;
@@ -178,7 +178,7 @@ export async function generateNetPositionExcel(
   const hdrRow = wsSummary.addRow([
     "Month","Snapshot Date",
     "What We Have","What We Owe","Net Position","Status","Monthly Change",
-    "Revenue","Total Expenses","Net Profit/Loss",
+    "Revenue","Total Expenses",
   ]);
   hdrRow.height = 26;
   hdrRow.eachCell((cell, col) => {
@@ -186,8 +186,7 @@ export async function generateNetPositionExcel(
   });
 
   for (const s of snapshots) {
-    const isPos    = s.netPosition >= 0;
-    const isProfitable = s.income.netProfit >= 0;
+    const isPos = s.netPosition >= 0;
     const dr    = wsSummary.addRow([
       s.label,
       s.dateStr,
@@ -198,7 +197,6 @@ export async function generateNetPositionExcel(
       s.change,
       s.income.totalRevenue,
       s.income.totalExpenses,
-      s.income.netProfit,
     ]);
     dr.getCell(1).font = { bold: true };
     dr.getCell(2).alignment = { horizontal: "center" };
@@ -221,13 +219,9 @@ export async function generateNetPositionExcel(
     dr.getCell(8).font   = { color: { argb: C.GREEN } };
     dr.getCell(9).numFmt = currencyFmt;
     dr.getCell(9).font   = { color: { argb: C.RED } };
-    dr.getCell(10).numFmt = signedFmt;
-    dr.getCell(10).font   = { bold: true, color: { argb: isProfitable ? C.GREEN : C.RED } };
 
     dr.eachCell((cell, col) => {
-      const bg = col >= 8
-        ? (isProfitable ? "FFE8F5E9" : "FFFCE4EC")
-        : (isPos ? C.GREEN_BG : C.RED_BG);
+      const bg = col >= 8 ? C.GRAY_BG : (isPos ? C.GREEN_BG : C.RED_BG);
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
       setThin(cell);
     });
@@ -239,11 +233,10 @@ export async function generateNetPositionExcel(
   const isFinalPos  = lastSnap.netPosition >= 0;
   const totalRevenue = round2(snapshots.reduce((s, x) => s + x.income.totalRevenue, 0));
   const totalExpenses = round2(snapshots.reduce((s, x) => s + x.income.totalExpenses, 0));
-  const totalNetProfit = round2(snapshots.reduce((s, x) => s + x.income.netProfit, 0));
   const finalRow    = wsSummary.addRow([
     "Final Net Position","",
     lastSnap.forUsTotal, lastSnap.onUsTotal, Math.abs(lastSnap.netPosition), lastSnap.netPositionLabel, "",
-    totalRevenue, totalExpenses, totalNetProfit,
+    totalRevenue, totalExpenses,
   ]);
   finalRow.height   = 24;
   finalRow.getCell(1).font = { bold: true, size: 12 };
@@ -256,22 +249,20 @@ export async function generateNetPositionExcel(
   finalRow.getCell(8).font   = { bold: true, color: { argb: C.GREEN } };
   finalRow.getCell(9).numFmt = currencyFmt;
   finalRow.getCell(9).font   = { bold: true, color: { argb: C.RED } };
-  finalRow.getCell(10).numFmt = signedFmt;
-  finalRow.getCell(10).font   = { bold: true, size: 12, color: { argb: totalNetProfit >= 0 ? C.GREEN : C.RED } };
   finalRow.eachCell((cell) => {
     cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: isFinalPos ? "FFB3F5D3" : "FFFDCFCF" } };
     cell.border = { top: { style: "medium", color: { argb: C.DARK_BLUE } }, bottom: { style: "medium", color: { argb: C.DARK_BLUE } } };
   });
 
   const totalChange = round2(snapshots.reduce((s, x) => s + (x.change ?? 0), 0));
-  const tcRow       = wsSummary.addRow(["Total Change (period)","","","","","",totalChange,"","",""]);
+  const tcRow       = wsSummary.addRow(["Total Change (period)","","","","","",totalChange,"",""]);
   tcRow.height      = 22;
   tcRow.getCell(1).font = { bold: true };
   tcRow.getCell(7).numFmt = signedFmt;
   tcRow.getCell(7).font   = { bold: true, color: { argb: totalChange >= 0 ? C.GREEN : C.RED } };
   tcRow.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.YELLOW_BG } }; });
 
-  [20, 14, 18, 16, 16, 20, 18, 18, 18, 18].forEach((w, i) => { wsSummary.getColumn(i + 1).width = w; });
+  [20, 14, 18, 16, 16, 20, 18, 18, 18].forEach((w, i) => { wsSummary.getColumn(i + 1).width = w; });
 
   // ═══════════════════════════════════════════════════════════════════
   //  SHEETS 2…N: one per month
@@ -655,16 +646,6 @@ export async function generateNetPositionExcel(
       cell.border = { top: { style: "medium", color: { argb: C.RED } }, bottom: { style: "medium", color: { argb: C.RED } } };
     });
 
-    const npRow = ws.addRow(["NET PROFIT / LOSS", "", inc.netProfit, "", ""]);
-    npRow.height = 28;
-    npRow.getCell(1).font = { bold: true, size: 13 };
-    npRow.getCell(3).numFmt = signedFmt;
-    npRow.getCell(3).font   = { bold: true, size: 13, color: { argb: inc.netProfit >= 0 ? C.GREEN : C.RED } };
-    npRow.eachCell((cell) => {
-      cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: inc.netProfit >= 0 ? "FFB3F5D3" : "FFFDCFCF" } };
-      cell.border = { top: { style: "medium", color: { argb: C.DARK_BLUE } }, bottom: { style: "double", color: { argb: C.DARK_BLUE } } };
-      cell.alignment = { vertical: "middle" };
-    });
 
     ws.getColumn(1).width = 40;
     ws.getColumn(2).width = 18;
