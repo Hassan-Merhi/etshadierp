@@ -240,7 +240,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     ? posCustomers.find((c: any) => String(c.id) === selectedCustomerId)
     : null;
   const [notes, setNotes] = useState("");
-  const [saleDate, setSaleDate] = useState(new Date().toLocaleDateString('en-CA'));
+  const [saleDate, setSaleDate] = useState(new Date().toISOString().substring(0, 10));
   const [searchTerm, setSearchTerm] = useState("");
   const [activeRow, setActiveRow] = useState<number | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -1581,15 +1581,25 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           )}
         </div>
 
-        {/* Date Picker */}
+        {/* Date Picker — frozen to GMT today for POS users */}
         <div className="flex items-center gap-2">
-          <DatePickerInput
-            value={saleDate}
-            onChange={setSaleDate}
-            placeholder="Date"
-            className="w-full sm:w-36"
-            data-testid="input-sale-date"
-          />
+          {posUser ? (
+            <div
+              className="w-full sm:w-36 px-3 py-1.5 rounded-md border bg-muted/50 text-sm text-muted-foreground cursor-not-allowed select-none"
+              title="Date is fixed to today (GMT) for POS users"
+              data-testid="input-sale-date"
+            >
+              {saleDate}
+            </div>
+          ) : (
+            <DatePickerInput
+              value={saleDate}
+              onChange={setSaleDate}
+              placeholder="Date"
+              className="w-full sm:w-36"
+              data-testid="input-sale-date"
+            />
+          )}
         </div>
 
         {/* Hide cash account selector when credit sale is ON */}
