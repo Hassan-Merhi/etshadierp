@@ -110,10 +110,9 @@ export default function SalesReportComparison() {
   const { companies: allCompanies } = useCompany();
 
   const today = new Date().toLocaleDateString("en-CA");
-  const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-    .toLocaleDateString("en-CA");
+  const firstOfYear = new Date(new Date().getFullYear(), 0, 1).toLocaleDateString("en-CA");
 
-  const [startDate, setStartDate] = useState(firstOfMonth);
+  const [startDate, setStartDate] = useState(firstOfYear);
   const [endDate, setEndDate] = useState(today);
   const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
   const [stockGroupFilter, setStockGroupFilter] = useState("all");
