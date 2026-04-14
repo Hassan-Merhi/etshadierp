@@ -63,7 +63,7 @@ type ViewFilter = "all" | "gaining" | "losing";
 
 export default function SalesReportComparison() {
   const [, navigate] = useLocation();
-  const { formatCurrency } = useCurrencyContext();
+  const { formatAmount } = useCurrencyContext();
   const { companies: allCompanies } = useCompany();
 
   const today = new Date().toLocaleDateString("en-CA");
@@ -170,7 +170,7 @@ export default function SalesReportComparison() {
     return rows;
   }, [rawItems, stockGroupFilter, viewFilter, search, displayCompanies]);
 
-  const fmt = (n: number) => formatCurrency(n);
+  const fmt = (n: number) => formatAmount(n);
 
   const profitBadge = (profit: number, pct: number) => {
     if (profit > 0) return (
