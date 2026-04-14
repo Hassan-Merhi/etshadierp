@@ -1964,24 +1964,25 @@
       queryKey: ["/api/factory/bales"],
     });
 
-    // All bales entered on the selected date — all statuses, matching Stock Entry History
+    // Filter by stockEntryDate (same field the Stock Entry History tab uses) — not createdAt
     const dayAll = (balesData || []).filter((row: any) => {
       const bale = row.bale;
-      const baleDate = bale.createdAt ? new Date(bale.createdAt).toLocaleDateString('en-CA') : null;
-      return baleDate === selectedDate;
+      // stockEntryDate is stored as "YYYY-MM-DD" string already
+      return (bale.stockEntryDate || "").slice(0, 10) === selectedDate;
     });
 
     const getCategory = (row: any) => (row.bale.category || "").toLowerCase().trim();
     const dayGarbage = dayAll.filter((row: any) => getCategory(row) === "garbage");
-    const dayWipers = dayAll.filter((row: any) => getCategory(row) === "wipers");
+    const dayWipers  = dayAll.filter((row: any) => getCategory(row) === "wipers");
     const dayRegular = dayAll.filter((row: any) => getCategory(row) !== "garbage" && getCategory(row) !== "wipers");
 
-    const totalQty = dayRegular.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
-    const totalKg = dayRegular.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
-    const garbageQty = dayGarbage.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
-    const garbageKg = dayGarbage.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
-    const wipersQty = dayWipers.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
-    const wipersKg = dayWipers.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+    // Count bale records (same as the COUNT(*) baleCount used by the history tab)
+    const totalQty  = dayRegular.length;
+    const totalKg   = dayRegular.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+    const garbageQty = dayGarbage.length;
+    const garbageKg  = dayGarbage.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+    const wipersQty  = dayWipers.length;
+    const wipersKg   = dayWipers.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
 
     const isToday = selectedDate === todayStr;
 
