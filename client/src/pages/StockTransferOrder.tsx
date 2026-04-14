@@ -669,12 +669,23 @@ export default function StockTransferOrder() {
     const workbook = new ExcelJS.Workbook();
     const ws = workbook.addWorksheet("Truck Trip");
 
-    // Column widths
+    // ── Print / page setup ───────────────────────────────────────────────────
+    ws.pageSetup = {
+      paperSize: 9,            // A4
+      orientation: "landscape",
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,          // grow vertically as needed
+      horizontalCentered: true,
+      margins: { left: 0.4, right: 0.4, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 },
+    } as ExcelJS.PageSetup;
+
+    // Column widths — wider for comfortable reading when printed
     ws.columns = [
-      { width: 42 },
-      { width: 20 },
-      { width: 12 },
-      ...(includeCost ? [{ width: 13 }, { width: 15 }] : []),
+      { width: 58 },
+      { width: 26 },
+      { width: 16 },
+      ...(includeCost ? [{ width: 16 }, { width: 18 }] : []),
     ];
 
     // Color palette
@@ -698,29 +709,29 @@ export default function StockTransferOrder() {
 
     // ── Row 1: Company name banner ──────────────────────────────────────────
     const row1 = ws.addRow([companyName, ...Array(numCols - 1).fill("")]);
-    row1.height = 32;
+    row1.height = 42;
     ws.mergeCells(`A1:${lastColLetter}1`);
     const r1c1 = row1.getCell(1);
     r1c1.value = companyName;
-    r1c1.font = { bold: true, size: 16, color: { argb: WHITE } };
+    r1c1.font = { bold: true, size: 20, color: { argb: WHITE } };
     r1c1.fill = { type: "pattern", pattern: "solid", fgColor: { argb: OLIVE_BG } };
     r1c1.alignment = { horizontal: "center", vertical: "middle" };
     r1c1.border = thinBorder;
 
     // ── Row 2: TRUCK TRIP | DESTINATION: | destName ─────────────────────────
     const row2 = ws.addRow(["TRUCK TRIP", "DESTINATION:", destName, ...(includeCost ? ["", ""] : [])]);
-    row2.height = 20;
+    row2.height = 26;
     if (numCols > 3) ws.mergeCells(`A2:A3`);   // TRUCK TRIP spans rows 2+3
     const r2c1 = row2.getCell(1);
-    r2c1.font = { bold: true, size: 13 };
+    r2c1.font = { bold: true, size: 16 };
     r2c1.alignment = { horizontal: "center", vertical: "middle" };
     r2c1.border = thinBorder;
     const r2c2 = row2.getCell(2);
-    r2c2.font = { bold: true, size: 10 };
+    r2c2.font = { bold: true, size: 12 };
     r2c2.alignment = { horizontal: "right", vertical: "middle" };
     r2c2.border = thinBorder;
     const r2c3 = row2.getCell(3);
-    r2c3.font = { bold: true, size: 10 };
+    r2c3.font = { bold: true, size: 12 };
     r2c3.alignment = { horizontal: "center", vertical: "middle" };
     r2c3.border = thinBorder;
     if (includeCost) {
@@ -730,16 +741,16 @@ export default function StockTransferOrder() {
 
     // ── Row 3: (blank) | DATE: | date ───────────────────────────────────────
     const row3 = ws.addRow(["", "DATE :", exportDate, ...(includeCost ? ["", ""] : [])]);
-    row3.height = 18;
+    row3.height = 22;
     if (numCols === 3) {
       row3.getCell(1).border = thinBorder;
     }
     const r3c2 = row3.getCell(2);
-    r3c2.font = { bold: true, size: 10 };
+    r3c2.font = { bold: true, size: 12 };
     r3c2.alignment = { horizontal: "right", vertical: "middle" };
     r3c2.border = thinBorder;
     const r3c3 = row3.getCell(3);
-    r3c3.font = { bold: true, size: 10 };
+    r3c3.font = { bold: true, size: 12 };
     r3c3.alignment = { horizontal: "center", vertical: "middle" };
     r3c3.border = thinBorder;
     if (includeCost) {
@@ -758,11 +769,11 @@ export default function StockTransferOrder() {
       ...(includeCost ? ["Rate", "Amount"] : []),
     ];
     const row4 = ws.addRow(colHeaders);
-    row4.height = 18;
+    row4.height = 22;
     for (let c = 1; c <= numCols; c++) {
       const cell = row4.getCell(c);
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COL_HDR_BG } };
-      cell.font = { bold: true, size: 10, color: { argb: BLACK } };
+      cell.font = { bold: true, size: 12, color: { argb: BLACK } };
       cell.alignment = { horizontal: c === 1 ? "left" : "center", vertical: "middle" };
       cell.border = thinBorder;
     }
@@ -777,13 +788,18 @@ export default function StockTransferOrder() {
           ...(includeCost ? [item.rate, item.quantity * item.rate] : []),
         ];
         const dataRow = ws.addRow(vals);
-        dataRow.height = 15;
+        dataRow.height = 19;
+        dataRow.getCell(1).font = { size: 11 };
         dataRow.getCell(1).alignment = { horizontal: "left", vertical: "middle" };
+        dataRow.getCell(2).font = { size: 11 };
         dataRow.getCell(2).alignment = { horizontal: "center", vertical: "middle" };
+        dataRow.getCell(3).font = { size: 11 };
         dataRow.getCell(3).alignment = { horizontal: "center", vertical: "middle" };
         if (includeCost) {
+          dataRow.getCell(4).font = { size: 11 };
           dataRow.getCell(4).numFmt = "#,##0.00";
           dataRow.getCell(4).alignment = { horizontal: "right", vertical: "middle" };
+          dataRow.getCell(5).font = { size: 11 };
           dataRow.getCell(5).numFmt = "#,##0.00";
           dataRow.getCell(5).alignment = { horizontal: "right", vertical: "middle" };
         }
@@ -800,12 +816,12 @@ export default function StockTransferOrder() {
         ...(includeCost ? ["", groupAmt] : []),
       ];
       const subRow = ws.addRow(subtotalVals);
-      subRow.height = 16;
+      subRow.height = 20;
       ws.mergeCells(`A${subRow.number}:B${subRow.number}`);
       for (let c = 1; c <= numCols; c++) {
         const cell = subRow.getCell(c);
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: SUB_BG } };
-        cell.font = { bold: true, size: 10, color: { argb: BLACK } };
+        cell.font = { bold: true, size: 12, color: { argb: BLACK } };
         cell.border = thinBorder;
       }
       subRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
@@ -826,11 +842,11 @@ export default function StockTransferOrder() {
       ...(includeCost ? ["", grandAmt] : []),
     ];
     const grandRow = ws.addRow(grandVals);
-    grandRow.height = 20;
+    grandRow.height = 26;
     ws.mergeCells(`A${grandRow.number}:B${grandRow.number}`);
     for (let c = 1; c <= numCols; c++) {
       const cell = grandRow.getCell(c);
-      cell.font = { bold: true, size: 12, color: { argb: RED } };
+      cell.font = { bold: true, size: 14, color: { argb: RED } };
       cell.border = thinBorder;
     }
     grandRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
