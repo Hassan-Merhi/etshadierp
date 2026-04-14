@@ -213,9 +213,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     enabled: isCreditSale,
     retry: false,
   });
-  const selectedCustomer = isCreditSale && selectedCustomerId
-    ? posCustomers.find((c: any) => String(c.id) === selectedCustomerId)
-    : null;
 
   // Fetch voucher details if in edit mode
   const { data: editVoucher, isLoading: editVoucherLoading } = useQuery<any>({
@@ -239,6 +236,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const [paymentAccountType, setPaymentAccountType] = useState<"bank" | "cash" | "credit">("cash");
   const [paymentAccountId, setPaymentAccountId] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const selectedCustomer = isCreditSale && selectedCustomerId
+    ? posCustomers.find((c: any) => String(c.id) === selectedCustomerId)
+    : null;
   const [notes, setNotes] = useState("");
   const [saleDate, setSaleDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [searchTerm, setSearchTerm] = useState("");
