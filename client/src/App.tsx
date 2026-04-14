@@ -698,12 +698,6 @@ function AuthenticatedApp() {
     return <Redirect to="/" />;
   }
 
-  // Auto-flip to ERP: if the user lands on a factory route but their selected company
-  // is not a factory company and they have ERP access, redirect them to ERP immediately.
-  if (isFactoryRoute && !isFactoryCompany && hasErpAccess) {
-    return <Redirect to="/" />;
-  }
-
   if (!isFactoryCompany && !hasErpAccess && hasFactoryAccess && !isFactoryRoute) {
     return <Redirect to={factoryDefaultPage} />;
   }
@@ -728,6 +722,17 @@ function AuthenticatedApp() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
+                  {!isFactoryCompany && hasErpAccess && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLocation("/")}
+                      data-testid="button-switch-erp"
+                    >
+                      <Package className="h-4 w-4 mr-1" />
+                      Switch to ERP
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
