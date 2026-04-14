@@ -950,14 +950,13 @@ let migrationsDone = false;
     // Debit entries (customer receivable — Asset account) — use CTE to avoid ambiguity
     `WITH debit_narrations AS (
        SELECT ve.id AS entry_id,
-              'POS - ' || la.name || ' - ' || v.location_name AS new_narration
+              'POS - ' || la.name || ' - ' || COALESCE(v.location_name, '') AS new_narration
        FROM voucher_entries ve
        JOIN vouchers v ON v.id = ve.voucher_id
        JOIN ledger_accounts la ON la.id = ve.ledger_account_id
        WHERE v.is_credit_sale = true
          AND ve.debit_amount::numeric > 0
          AND la.account_type = 'Asset'
-         AND v.location_name IS NOT NULL
      )
      UPDATE voucher_entries
      SET narration = debit_narrations.new_narration
@@ -967,7 +966,7 @@ let migrationsDone = false;
     // Credit entries (SALES account side of credit sale vouchers) — use CTE
     `WITH credit_narrations AS (
        SELECT credit_ve.id AS entry_id,
-              'POS - ' || la.name || ' - ' || v.location_name AS new_narration
+              'POS - ' || la.name || ' - ' || COALESCE(v.location_name, '') AS new_narration
        FROM vouchers v
        JOIN voucher_entries debit_ve ON (
          debit_ve.voucher_id = v.id AND debit_ve.debit_amount::numeric > 0
@@ -979,7 +978,6 @@ let migrationsDone = false;
          credit_ve.voucher_id = v.id AND credit_ve.credit_amount::numeric > 0
        )
        WHERE v.is_credit_sale = true
-         AND v.location_name IS NOT NULL
      )
      UPDATE voucher_entries
      SET narration = credit_narrations.new_narration

@@ -2292,6 +2292,7 @@ export function registerVoucherRoutes(app: Express) {
       let finalPaymentAccountId = paymentAccountId;
       let finalPaymentAccountType = paymentAccountType;
       let finalIsCreditSale = isCreditSale;
+      let finalCreditCustomerName = ""; // captured when credit-sale customer account is found
 
       if (!finalPaymentAccountId || !finalPaymentAccountType) {
         // Fetch existing voucher entries to derive payment account
@@ -2334,12 +2335,14 @@ export function registerVoucherRoutes(app: Express) {
                   break;
                 } else if (
                   ledgerAccount.accountType === "Asset" ||
-                  entry.narration?.includes("Credit Sale")
+                  entry.narration?.includes("Credit Sale") ||
+                  entry.narration?.startsWith("POS - ")
                 ) {
                   // Found customer receivable account (credit sale)
                   finalPaymentAccountId = String(entry.ledgerAccountId);
                   finalPaymentAccountType = "credit";
                   finalIsCreditSale = true;
+                  finalCreditCustomerName = ledgerAccount.name; // save for narration
                   existingDebitEntry = entry;
                   break;
                 }
@@ -2367,13 +2370,24 @@ export function registerVoucherRoutes(app: Express) {
         const accountId = parseInt(finalPaymentAccountId);
         const accountType = finalPaymentAccountType;
 
+        // If credit sale customer name wasn't captured during detection (came from request body),
+        // look it up now so we can build the correct narration
+        if (finalIsCreditSale && !finalCreditCustomerName && accountType === "credit") {
+          const [customerLedger] = await db
+            .select({ name: ledgerAccounts.name })
+            .from(ledgerAccounts)
+            .where(eq(ledgerAccounts.id, accountId))
+            .limit(1);
+          if (customerLedger) finalCreditCustomerName = customerLedger.name;
+        }
+
         // Debit: Cash/Bank/Customer Account (Asset increases)
         const debitEntry: any = {
           voucherId: id,
           debitAmount: totalSalesAmount.toFixed(2),
           creditAmount: "0",
           narration: finalIsCreditSale
-            ? `Credit Sale - ${existingVoucher.voucherNumber}`
+            ? `POS - ${finalCreditCustomerName} - ${existingVoucher.locationName || ""}`
             : `POS Sale - ${existingVoucher.voucherNumber}`,
         };
 
@@ -2412,7 +2426,9 @@ export function registerVoucherRoutes(app: Express) {
           ledgerAccountId: salesAccount.id,
           debitAmount: "0",
           creditAmount: totalSalesAmount.toFixed(2),
-          narration: `POS Sale - ${existingVoucher.voucherNumber}`,
+          narration: finalIsCreditSale
+            ? `POS - ${finalCreditCustomerName} - ${existingVoucher.locationName || ""}`
+            : `POS Sale - ${existingVoucher.voucherNumber}`,
         });
       } else {
         throw new Error(
