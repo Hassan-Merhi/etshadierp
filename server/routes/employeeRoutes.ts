@@ -1157,6 +1157,9 @@ export function registerEmployeeRoutes(app: Express) {
       const conditions = [
         eq(vouchers.companyId, companyId),
         eq(vouchers.locationId, locId),
+        eq(vouchers.voucherType, "Sales"),
+        isNull(vouchers.deletedAt),
+        eq(vouchers.optional, false),
         sql`${vouchers.voucherDate} >= ${startDate}`,
         sql`${vouchers.voucherDate} <= ${endDate}`,
       ];
