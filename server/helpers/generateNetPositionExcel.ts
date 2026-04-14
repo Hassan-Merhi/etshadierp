@@ -4,12 +4,19 @@
  */
 
 import { calculateNetPositionAsOf, NetPositionLineItem } from "./calculateNetPositionAsOf";
+import { calculateIncomeStatementForPeriod, IncomeStatement } from "./calculateIncomeStatementForPeriod";
 import { round2 } from "../netPositionHelper";
 
 // ─── date helpers ─────────────────────────────────────────────────────────────
 
 function lastDayOfMonth(year: number, month: number): string {
   const d = new Date(Date.UTC(year, month + 1, 0));
+  return d.toISOString().split("T")[0];
+}
+
+function addOneDay(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().split("T")[0];
 }
 
@@ -122,19 +129,27 @@ export async function generateNetPositionExcel(
   if (monthEnds.length === 0) throw new Error("No months in range");
 
   type Snapshot = Awaited<ReturnType<typeof calculateNetPositionAsOf>> & {
-    dateStr: string;
-    label:   string;
-    change:  number | null;
+    dateStr:    string;
+    label:      string;
+    change:     number | null;
+    periodFrom: string;
+    income:     IncomeStatement;
   };
 
   const snapshots: Snapshot[] = [];
-  let prevNet: number | null = null;
+  let prevNet:  number | null = null;
+  let prevDate: string | null = null;
 
   for (const dateStr of monthEnds) {
-    const snap   = await calculateNetPositionAsOf(companyId, dateStr);
+    const periodFrom = prevDate ? addOneDay(prevDate) : startDate;
+    const [snap, income] = await Promise.all([
+      calculateNetPositionAsOf(companyId, dateStr),
+      calculateIncomeStatementForPeriod(companyId, periodFrom, dateStr),
+    ]);
     const change = prevNet !== null ? round2(snap.netPosition - prevNet) : null;
-    snapshots.push({ ...snap, dateStr, label: fmtMonthLabel(dateStr), change });
-    prevNet = snap.netPosition;
+    snapshots.push({ ...snap, dateStr, label: fmtMonthLabel(dateStr), change, periodFrom, income });
+    prevNet  = snap.netPosition;
+    prevDate = dateStr;
   }
 
   const ExcelJS = await import("exceljs");
@@ -147,25 +162,32 @@ export async function generateNetPositionExcel(
   // ═══════════════════════════════════════════════════════════════════
   const wsSummary = wb.addWorksheet("Summary");
 
-  wsSummary.mergeCells("A1:G1");
+  wsSummary.mergeCells("A1:J1");
   styleTitle(wsSummary.getCell("A1"), `Monthly Net Position Summary — ${companyName}`, 16);
   wsSummary.getRow(1).height = 38;
 
-  wsSummary.mergeCells("A2:G2");
+  wsSummary.mergeCells("A2:J2");
   const sub2 = wsSummary.getCell("A2");
-  sub2.value     = `Period: ${startDate}  →  ${endDate}   |   Each row = month-end balance-sheet snapshot`;
+  sub2.value     = `Period: ${startDate}  →  ${endDate}   |   Balance-sheet snapshot + monthly income statement per row`;
   sub2.font      = { italic: true, size: 10, color: { argb: C.MUTED } };
   sub2.alignment = { horizontal: "center" };
   wsSummary.getRow(2).height = 18;
 
   wsSummary.addRow([]);
 
-  const hdrRow = wsSummary.addRow(["Month","Snapshot Date","What We Have","What We Owe","Net Position","Status","Monthly Change"]);
+  const hdrRow = wsSummary.addRow([
+    "Month","Snapshot Date",
+    "What We Have","What We Owe","Net Position","Status","Monthly Change",
+    "Revenue","Total Expenses","Net Profit/Loss",
+  ]);
   hdrRow.height = 26;
-  hdrRow.eachCell((cell) => styleHeader(cell));
+  hdrRow.eachCell((cell, col) => {
+    styleHeader(cell, col >= 8 ? C.MID_BLUE : C.DARK_BLUE);
+  });
 
   for (const s of snapshots) {
-    const isPos = s.netPosition >= 0;
+    const isPos    = s.netPosition >= 0;
+    const isProfitable = s.income.netProfit >= 0;
     const dr    = wsSummary.addRow([
       s.label,
       s.dateStr,
@@ -174,6 +196,9 @@ export async function generateNetPositionExcel(
       Math.abs(s.netPosition),
       s.netPositionLabel,
       s.change,
+      s.income.totalRevenue,
+      s.income.totalExpenses,
+      s.income.netProfit,
     ]);
     dr.getCell(1).font = { bold: true };
     dr.getCell(2).alignment = { horizontal: "center" };
@@ -192,8 +217,18 @@ export async function generateNetPositionExcel(
       changeCell.value = "—";
       changeCell.font  = { color: { argb: C.MUTED }, italic: true };
     }
-    dr.eachCell((cell) => {
-      cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: isPos ? C.GREEN_BG : C.RED_BG } };
+    dr.getCell(8).numFmt = currencyFmt;
+    dr.getCell(8).font   = { color: { argb: C.GREEN } };
+    dr.getCell(9).numFmt = currencyFmt;
+    dr.getCell(9).font   = { color: { argb: C.RED } };
+    dr.getCell(10).numFmt = signedFmt;
+    dr.getCell(10).font   = { bold: true, color: { argb: isProfitable ? C.GREEN : C.RED } };
+
+    dr.eachCell((cell, col) => {
+      const bg = col >= 8
+        ? (isProfitable ? "FFE8F5E9" : "FFFCE4EC")
+        : (isPos ? C.GREEN_BG : C.RED_BG);
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
       setThin(cell);
     });
   }
@@ -202,7 +237,14 @@ export async function generateNetPositionExcel(
 
   const lastSnap    = snapshots[snapshots.length - 1];
   const isFinalPos  = lastSnap.netPosition >= 0;
-  const finalRow    = wsSummary.addRow(["Final Net Position","",lastSnap.forUsTotal,lastSnap.onUsTotal,Math.abs(lastSnap.netPosition),lastSnap.netPositionLabel,""]);
+  const totalRevenue = round2(snapshots.reduce((s, x) => s + x.income.totalRevenue, 0));
+  const totalExpenses = round2(snapshots.reduce((s, x) => s + x.income.totalExpenses, 0));
+  const totalNetProfit = round2(snapshots.reduce((s, x) => s + x.income.netProfit, 0));
+  const finalRow    = wsSummary.addRow([
+    "Final Net Position","",
+    lastSnap.forUsTotal, lastSnap.onUsTotal, Math.abs(lastSnap.netPosition), lastSnap.netPositionLabel, "",
+    totalRevenue, totalExpenses, totalNetProfit,
+  ]);
   finalRow.height   = 24;
   finalRow.getCell(1).font = { bold: true, size: 12 };
   [3,4,5].forEach(i => { finalRow.getCell(i).numFmt = currencyFmt; });
@@ -210,20 +252,26 @@ export async function generateNetPositionExcel(
   finalRow.getCell(4).font = { bold: true, color: { argb: C.RED   } };
   finalRow.getCell(5).font = { bold: true, size: 12, color: { argb: isFinalPos ? C.GREEN : C.RED } };
   finalRow.getCell(6).font = { bold: true, size: 12, color: { argb: isFinalPos ? C.GREEN : C.RED } };
+  finalRow.getCell(8).numFmt = currencyFmt;
+  finalRow.getCell(8).font   = { bold: true, color: { argb: C.GREEN } };
+  finalRow.getCell(9).numFmt = currencyFmt;
+  finalRow.getCell(9).font   = { bold: true, color: { argb: C.RED } };
+  finalRow.getCell(10).numFmt = signedFmt;
+  finalRow.getCell(10).font   = { bold: true, size: 12, color: { argb: totalNetProfit >= 0 ? C.GREEN : C.RED } };
   finalRow.eachCell((cell) => {
     cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: isFinalPos ? "FFB3F5D3" : "FFFDCFCF" } };
     cell.border = { top: { style: "medium", color: { argb: C.DARK_BLUE } }, bottom: { style: "medium", color: { argb: C.DARK_BLUE } } };
   });
 
   const totalChange = round2(snapshots.reduce((s, x) => s + (x.change ?? 0), 0));
-  const tcRow       = wsSummary.addRow(["Total Change (period)","","","","","",totalChange]);
+  const tcRow       = wsSummary.addRow(["Total Change (period)","","","","","",totalChange,"","",""]);
   tcRow.height      = 22;
   tcRow.getCell(1).font = { bold: true };
   tcRow.getCell(7).numFmt = signedFmt;
   tcRow.getCell(7).font   = { bold: true, color: { argb: totalChange >= 0 ? C.GREEN : C.RED } };
   tcRow.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.YELLOW_BG } }; });
 
-  [20, 14, 18, 16, 16, 20, 18].forEach((w, i) => { wsSummary.getColumn(i + 1).width = w; });
+  [20, 14, 18, 16, 16, 20, 18, 18, 18, 18].forEach((w, i) => { wsSummary.getColumn(i + 1).width = w; });
 
   // ═══════════════════════════════════════════════════════════════════
   //  SHEETS 2…N: one per month
@@ -453,10 +501,175 @@ export async function generateNetPositionExcel(
       }
     }
 
-    ws.getColumn(1).width = 36;
+    // ══════════════════════════════════════════════════════════════════
+    // INCOME STATEMENT for this month's period
+    // ══════════════════════════════════════════════════════════════════
+    ws.addRow([]);
+    const inc = snap.income;
+
+    // Section title
+    const isHdr = ws.addRow([
+      `INCOME STATEMENT   (${snap.periodFrom} → ${snap.dateStr})`, "", "", "", ""
+    ]);
+    isHdr.height = 26;
+    isHdr.eachCell((cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.DARK_BLUE } };
+      cell.font = { bold: true, color: { argb: C.WHITE }, size: 12 };
+    });
+
+    // Sub-header: Account | Category | Amount
+    const isColHdr = ws.addRow(["Account / Line Item", "Category", "Amount This Month", "", ""]);
+    isColHdr.height = 20;
+    isColHdr.eachCell((cell) => styleHeader(cell, C.MID_BLUE));
+
+    // ── REVENUE ──────────────────────────────────────────────────────
+    const revSec = ws.addRow(["  REVENUE / SALES", "", "", "", ""]);
+    revSec.height = 20;
+    revSec.eachCell((cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF16A34A" } };
+      cell.font = { bold: true, color: { argb: C.WHITE } };
+    });
+
+    if (inc.revenueLines.length === 0) {
+      const nr = ws.addRow(["  (no revenue recorded)", "", "", "", ""]);
+      nr.getCell(1).font = { italic: true, color: { argb: C.MUTED } };
+      nr.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.GREEN_BG } }; setThin(cell); });
+    }
+    for (const l of inc.revenueLines) {
+      const lr = ws.addRow([`  ${l.label}`, l.category, l.value, "", ""]);
+      lr.getCell(2).font = { size: 9, color: { argb: C.MUTED } };
+      lr.getCell(2).alignment = { horizontal: "center" };
+      lr.getCell(3).numFmt = currencyFmt;
+      lr.getCell(3).font   = { color: { argb: C.GREEN } };
+      lr.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.GREEN_BG } }; setThin(cell); });
+    }
+
+    // Revenue subtotal
+    const revTot = ws.addRow(["Total Revenue", "", inc.totalRevenue, "", ""]);
+    revTot.height = 20;
+    revTot.getCell(1).font = { bold: true };
+    revTot.getCell(3).numFmt = currencyFmt;
+    revTot.getCell(3).font   = { bold: true, size: 12, color: { argb: C.GREEN } };
+    revTot.eachCell((cell) => {
+      cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB3F5D3" } };
+      cell.border = { top: { style: "thin", color: { argb: "FF16A34A" } }, bottom: { style: "thin", color: { argb: "FF16A34A" } } };
+    });
+
+    ws.addRow([]);
+
+    // ── DIRECT EXPENSES (COGS) ────────────────────────────────────────
+    if (inc.directExpLines.length > 0) {
+      const dSec = ws.addRow(["  DIRECT EXPENSES (Cost of Goods)", "", "", "", ""]);
+      dSec.height = 20;
+      dSec.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB45309" } };
+        cell.font = { bold: true, color: { argb: C.WHITE } };
+      });
+      for (const l of inc.directExpLines) {
+        const lr = ws.addRow([`  ${l.label}`, l.category, l.value, "", ""]);
+        lr.getCell(2).font = { size: 9, color: { argb: C.MUTED } };
+        lr.getCell(2).alignment = { horizontal: "center" };
+        lr.getCell(3).numFmt = currencyFmt;
+        lr.getCell(3).font   = { color: { argb: C.RED } };
+        lr.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.AMBER_BG } }; setThin(cell); });
+      }
+      const dTot = ws.addRow(["Total Direct Expenses", "", inc.totalDirectExp, "", ""]);
+      dTot.height = 20;
+      dTot.getCell(1).font = { bold: true };
+      dTot.getCell(3).numFmt = currencyFmt;
+      dTot.getCell(3).font   = { bold: true, color: { argb: C.RED } };
+      dTot.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE0B2" } }; });
+
+      // Gross Profit line
+      const gpRow = ws.addRow(["Gross Profit", "", inc.grossProfit, "", ""]);
+      gpRow.height = 22;
+      gpRow.getCell(1).font = { bold: true, size: 11 };
+      gpRow.getCell(3).numFmt = signedFmt;
+      gpRow.getCell(3).font   = { bold: true, size: 11, color: { argb: inc.grossProfit >= 0 ? C.GREEN : C.RED } };
+      gpRow.eachCell((cell) => {
+        cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: C.YELLOW_BG } };
+        cell.border = { top: { style: "thin", color: { argb: "FFAAAAAA" } }, bottom: { style: "thin", color: { argb: "FFAAAAAA" } } };
+      });
+
+      ws.addRow([]);
+    }
+
+    // ── INDIRECT EXPENSES ─────────────────────────────────────────────
+    if (inc.indirectExpLines.length > 0) {
+      const iSec = ws.addRow(["  INDIRECT EXPENSES (Operating)", "", "", "", ""]);
+      iSec.height = 20;
+      iSec.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF6D28D9" } };
+        cell.font = { bold: true, color: { argb: C.WHITE } };
+      });
+      for (const l of inc.indirectExpLines) {
+        const lr = ws.addRow([`  ${l.label}`, l.category, l.value, "", ""]);
+        lr.getCell(2).font = { size: 9, color: { argb: C.MUTED } };
+        lr.getCell(2).alignment = { horizontal: "center" };
+        lr.getCell(3).numFmt = currencyFmt;
+        lr.getCell(3).font   = { color: { argb: C.RED } };
+        lr.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEDE9FE" } }; setThin(cell); });
+      }
+      const iTot = ws.addRow(["Total Indirect Expenses", "", inc.totalIndirectExp, "", ""]);
+      iTot.height = 20;
+      iTot.getCell(1).font = { bold: true };
+      iTot.getCell(3).numFmt = currencyFmt;
+      iTot.getCell(3).font   = { bold: true, color: { argb: C.RED } };
+      iTot.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD8B4FE" } }; });
+      ws.addRow([]);
+    }
+
+    // ── GENERAL EXPENSES ──────────────────────────────────────────────
+    if (inc.generalExpLines.length > 0) {
+      const gSec = ws.addRow(["  GENERAL EXPENSES", "", "", "", ""]);
+      gSec.height = 20;
+      gSec.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.RED.replace("FF","FF") } };
+        cell.font = { bold: true, color: { argb: C.WHITE } };
+      });
+      for (const l of inc.generalExpLines) {
+        const lr = ws.addRow([`  ${l.label}`, l.category, l.value, "", ""]);
+        lr.getCell(2).font = { size: 9, color: { argb: C.MUTED } };
+        lr.getCell(2).alignment = { horizontal: "center" };
+        lr.getCell(3).numFmt = currencyFmt;
+        lr.getCell(3).font   = { color: { argb: C.RED } };
+        lr.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.RED_BG } }; setThin(cell); });
+      }
+      const gTot = ws.addRow(["Total General Expenses", "", inc.totalGeneralExp, "", ""]);
+      gTot.height = 20;
+      gTot.getCell(1).font = { bold: true };
+      gTot.getCell(3).numFmt = currencyFmt;
+      gTot.getCell(3).font   = { bold: true, color: { argb: C.RED } };
+      gTot.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDCFCF" } }; });
+      ws.addRow([]);
+    }
+
+    // ── TOTALS ────────────────────────────────────────────────────────
+    const expTot = ws.addRow(["TOTAL EXPENSES", "", inc.totalExpenses, "", ""]);
+    expTot.height = 22;
+    expTot.getCell(1).font = { bold: true, size: 11 };
+    expTot.getCell(3).numFmt = currencyFmt;
+    expTot.getCell(3).font   = { bold: true, size: 11, color: { argb: C.RED } };
+    expTot.eachCell((cell) => {
+      cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDCFCF" } };
+      cell.border = { top: { style: "medium", color: { argb: C.RED } }, bottom: { style: "medium", color: { argb: C.RED } } };
+    });
+
+    const npRow = ws.addRow(["NET PROFIT / LOSS", "", inc.netProfit, "", ""]);
+    npRow.height = 28;
+    npRow.getCell(1).font = { bold: true, size: 13 };
+    npRow.getCell(3).numFmt = signedFmt;
+    npRow.getCell(3).font   = { bold: true, size: 13, color: { argb: inc.netProfit >= 0 ? C.GREEN : C.RED } };
+    npRow.eachCell((cell) => {
+      cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: inc.netProfit >= 0 ? "FFB3F5D3" : "FFFDCFCF" } };
+      cell.border = { top: { style: "medium", color: { argb: C.DARK_BLUE } }, bottom: { style: "double", color: { argb: C.DARK_BLUE } } };
+      cell.alignment = { vertical: "middle" };
+    });
+
+    ws.getColumn(1).width = 40;
     ws.getColumn(2).width = 18;
-    ws.getColumn(3).width = 18;
-    ws.getColumn(4).width = 18;
+    ws.getColumn(3).width = 22;
+    ws.getColumn(4).width = 22;
     ws.getColumn(5).width = 18;
   }
 
