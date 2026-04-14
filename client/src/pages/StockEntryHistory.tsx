@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
-import { ChevronDown, ChevronRight, Download, Search, RotateCcw, Grid3X3, List, AlignJustify, FileDown } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Search, RotateCcw, List, AlignJustify, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -655,9 +655,6 @@ export default function StockEntryHistory() {
           </div>
           <Button variant="outline" size="sm" onClick={resetFilters} data-testid="button-reset-filters">
             <RotateCcw className="w-3 h-3 mr-1" /> Reset
-          </Button>
-          <Button variant="outline" size="sm" onClick={handlePrintMatrix} disabled={filteredGroups.length === 0} data-testid="button-print-matrix">
-            <Grid3X3 className="w-3 h-3 mr-1" /> Print Matrix
           </Button>
           <Button variant="outline" size="sm" onClick={handleExportWorkerPDF} disabled={filteredGroups.length === 0} data-testid="button-export-worker-pdf">
             <FileDown className="w-3 h-3 mr-1" /> Worker PDF
