@@ -34,6 +34,8 @@ import {
   CheckCircle2,
   XCircle,
   Info,
+  MessageSquare,
+  Send,
 } from "lucide-react";
 
 interface Recipient { id: number; email: string; active: boolean; created_at: string; }
@@ -207,6 +209,12 @@ export function DailyExportSection() {
   const [activeJobId, setActiveJobId] = useState("");
   const [activeMode, setActiveMode] = useState<"download" | "email">("download");
 
+  // Net position manual send
+  const npDefaultEnd   = new Date().toLocaleDateString("en-CA");
+  const npDefaultStart = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toLocaleDateString("en-CA"); })();
+  const [npStart, setNpStart] = useState(npDefaultStart);
+  const [npEnd,   setNpEnd]   = useState(npDefaultEnd);
+
   const { data: recipients = [] } = useQuery<Recipient[]>({
     queryKey: ["/api/export/recipients"],
   });
@@ -280,6 +288,21 @@ export function DailyExportSection() {
     } catch (e: any) {
       toast({ variant: "destructive", title: "Could not start export", description: e.message });
     }
+  };
+
+  const sendNpToWa = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", "/api/whatsapp/send-net-position", { startDate: npStart, endDate: npEnd }),
+    onSuccess: async (res: any) => {
+      const body = await res.json().catch(() => ({}));
+      toast({ title: "Sent via WhatsApp", description: body.message || "Net position report sent" });
+    },
+    onError: (e: any) => toast({ variant: "destructive", title: "Send failed", description: e.message }),
+  });
+
+  const downloadNpExcel = () => {
+    const url = `/api/reports/net-position-monthly-excel?startDate=${npStart}&endDate=${npEnd}`;
+    window.open(url, "_blank");
   };
 
   return (
@@ -386,6 +409,62 @@ export function DailyExportSection() {
                 ? `Filtered: ${fromDate || "—"} → ${toDate || "—"}`
                 : "Full history (all dates)"}
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Net Position Report */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <MessageSquare className="h-4 w-4 text-green-600" />
+            Net Position Report
+          </CardTitle>
+          <CardDescription>
+            Download or send the monthly net position Excel (includes income statement) via WhatsApp for any date range.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs flex items-center gap-1"><Calendar className="h-3 w-3" />From</Label>
+              <Input
+                type="date"
+                value={npStart}
+                onChange={e => setNpStart(e.target.value)}
+                className="w-40"
+                data-testid="input-np-start"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs flex items-center gap-1"><Calendar className="h-3 w-3" />To</Label>
+              <Input
+                type="date"
+                value={npEnd}
+                onChange={e => setNpEnd(e.target.value)}
+                className="w-40"
+                data-testid="input-np-end"
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={downloadNpExcel}
+              data-testid="button-np-download"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download Excel
+            </Button>
+            <Button
+              onClick={() => sendNpToWa.mutate()}
+              disabled={sendNpToWa.isPending}
+              data-testid="button-np-send-whatsapp"
+            >
+              {sendNpToWa.isPending
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sending...</>
+                : <><Send className="h-4 w-4 mr-2" />Send via WhatsApp</>}
+            </Button>
           </div>
         </CardContent>
       </Card>

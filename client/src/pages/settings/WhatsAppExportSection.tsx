@@ -18,6 +18,7 @@ import {
   CheckCircle,
   XCircle,
   ChevronDown,
+  Loader2,
   ChevronRight,
 } from "lucide-react";
 
@@ -51,6 +52,11 @@ export function WhatsAppExportSection() {
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [newChatId, setNewChatId] = useState("");
   const [newName, setNewName] = useState("");
+
+  const defaultEnd   = new Date().toLocaleDateString("en-CA");
+  const defaultStart = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toLocaleDateString("en-CA"); })();
+  const [npStart, setNpStart] = useState(defaultStart);
+  const [npEnd,   setNpEnd]   = useState(defaultEnd);
 
   const { data: settings } = useQuery<WaSettings>({
     queryKey: ["/api/whatsapp/settings"],
@@ -142,6 +148,16 @@ export function WhatsAppExportSection() {
       toast({ title: "Recipient removed" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const sendNow = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", "/api/whatsapp/send-net-position", { startDate: npStart, endDate: npEnd }),
+    onSuccess: async (res: any) => {
+      const body = await res.json().catch(() => ({}));
+      toast({ title: "Sent via WhatsApp", description: body.message || "Report sent" });
+    },
+    onError: (e: any) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
   });
 
   const handleFetchChats = async () => {
@@ -400,6 +416,49 @@ export function WhatsAppExportSection() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Manual Send Now */}
+          <Separator />
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-semibold">Send Report Now</p>
+              <p className="text-xs text-muted-foreground">Manually send the net position Excel to all active recipients for any date range.</p>
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">From</Label>
+                <Input
+                  type="date"
+                  value={npStart}
+                  onChange={e => setNpStart(e.target.value)}
+                  className="w-38"
+                  data-testid="input-wa-np-start"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">To</Label>
+                <Input
+                  type="date"
+                  value={npEnd}
+                  onChange={e => setNpEnd(e.target.value)}
+                  className="w-38"
+                  data-testid="input-wa-np-end"
+                />
+              </div>
+              <Button
+                onClick={() => sendNow.mutate()}
+                disabled={sendNow.isPending || !settings?.enabled}
+                data-testid="button-wa-send-now"
+              >
+                {sendNow.isPending
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sending...</>
+                  : <><Send className="h-4 w-4 mr-2" />Send Now</>}
+              </Button>
+              {!settings?.enabled && (
+                <p className="text-xs text-muted-foreground">Enable WhatsApp above to send.</p>
+              )}
+            </div>
           </div>
         </div>
       )}
