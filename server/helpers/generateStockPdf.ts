@@ -1,189 +1,254 @@
 /**
- * Generate a Stock-with-Cost PDF for a single company.
- * Shows current inventory (qty > 0) grouped by stock group:
- * Item Code | Item Name | Group | Location | Qty | Unit Cost | Total Value
+ * Stock-with-Cost PDF — matches the Location Inventory "Print with Cost" format exactly.
+ *
+ * Layout  : A4 portrait, ~14mm left/right margins, ~12mm top/bottom
+ * Columns : Particulars | Closing Balance (Qty) | Avg Rate | Total Value
+ * Grouping: by stock group, with a grey header row per group, items indented
  */
 
 import { pool } from "../db";
 
-const PAGE_MARGIN = 30;
-const PAGE_WIDTH  = 841; // A4 landscape
-const USABLE_W    = PAGE_WIDTH - PAGE_MARGIN * 2;
+// ── Page geometry (points) ────────────────────────────────────────────────────
+const PAGE_W   = 595;
+const PAGE_H   = 842;
+const MARGIN_X = 40;   // ≈ 14 mm
+const MARGIN_Y = 34;   // ≈ 12 mm
+const USABLE_W = PAGE_W - MARGIN_X * 2;   // 515 pt
 
-// Column widths (total = 781)
-const COLS = [
-  { header: "Code",        key: "code",         w: 80  },
-  { header: "Item Name",   key: "name",         w: 195 },
-  { header: "Group",       key: "group",        w: 120 },
-  { header: "Location",    key: "location",     w: 120 },
-  { header: "Qty",         key: "qty",          w: 65  },
-  { header: "Unit Cost",   key: "unitCost",     w: 90  },
-  { header: "Total Value", key: "totalValue",   w: 111 },
-];
+// ── Column x-positions & widths ───────────────────────────────────────────────
+const COL_PART_W = 215;
+const COL_QTY_W  = 100;
+const COL_RATE_W = 100;
+const COL_VAL_W  = 100;
 
-// Pre-compute x offsets
-const COL_X: number[] = [];
-let _cx = PAGE_MARGIN;
-for (const c of COLS) { COL_X.push(_cx); _cx += c.w; }
+const X_PART = MARGIN_X;
+const X_QTY  = X_PART + COL_PART_W;
+const X_RATE = X_QTY  + COL_QTY_W;
+const X_VAL  = X_RATE + COL_RATE_W;
 
-function fmt(n: number, dec = 2) {
-  return n.toFixed(dec).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtQty(n: number): string {
+  return Math.floor(n).toLocaleString("en-US");
+}
+function fmtAmt(n: number): string {
+  return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+function fmtDate(d: Date): string {
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }).replace(/ /g, "-");
 }
 
+// ── Types ─────────────────────────────────────────────────────────────────────
 interface StockRow {
-  code:      string;
-  name:      string;
-  group:     string;
-  location:  string;
-  qty:       number;
-  unitCost:  number;
-  totalValue:number;
+  itemName:   string;
+  groupName:  string;
+  uom:        string;
+  qty:        number;
+  avgRate:    number;
+  totalValue: number;
 }
 
+// ── Main export ───────────────────────────────────────────────────────────────
 export async function generateStockPdf(
   companyId:   number,
   companyName: string,
 ): Promise<Buffer> {
-  // ── Fetch data ────────────────────────────────────────────────────────────
+
+  // ── Fetch inventory ─────────────────────────────────────────────────────────
   const result = await pool.query<{
-    code: string; name: string; group_name: string | null;
-    location_name: string; quantity: string;
-    average_rate: string; total_value: string;
+    item_name: string; group_name: string | null; uom: string;
+    quantity: string; average_rate: string; total_value: string;
   }>(
-    `SELECT si.code, si.name,
-            sg.name AS group_name,
-            l.name  AS location_name,
-            i.quantity, i.average_rate, i.total_value
+    `SELECT si.name  AS item_name,
+            sg.name  AS group_name,
+            si.uom,
+            i.quantity,
+            i.average_rate,
+            i.total_value
      FROM inventory i
      JOIN stock_items si ON si.id = i.stock_item_id
      LEFT JOIN stock_groups sg ON sg.id = si.stock_group_id
      JOIN locations l ON l.id = i.location_id
      WHERE l.company_id = $1
        AND i.quantity::numeric > 0
-     ORDER BY LOWER(COALESCE(sg.name,'')), LOWER(si.code), LOWER(l.name)`,
+     ORDER BY LOWER(COALESCE(sg.name, 'zzzzz')), LOWER(si.name)`,
     [companyId],
   );
 
   const rows: StockRow[] = result.rows.map((r) => ({
-    code:       r.code,
-    name:       r.name,
-    group:      r.group_name || "—",
-    location:   r.location_name,
-    qty:        parseFloat(r.quantity    || "0"),
-    unitCost:   parseFloat(r.average_rate || "0"),
+    itemName:   r.item_name,
+    groupName:  r.group_name || "Unassigned",
+    uom:        r.uom || "BL",
+    qty:        parseFloat(r.quantity     || "0"),
+    avgRate:    parseFloat(r.average_rate || "0"),
     totalValue: parseFloat(r.total_value  || "0"),
   }));
 
-  const grandTotal = rows.reduce((s, r) => s + r.totalValue, 0);
-  const today      = new Date().toLocaleDateString("en-GB", {
-    day: "2-digit", month: "short", year: "numeric",
-  });
+  // Group by stock group (order preserved from SQL sort)
+  const grouped: { groupName: string; items: StockRow[] }[] = [];
+  for (const row of rows) {
+    const last = grouped[grouped.length - 1];
+    if (last && last.groupName === row.groupName) {
+      last.items.push(row);
+    } else {
+      grouped.push({ groupName: row.groupName, items: [row] });
+    }
+  }
 
-  // ── Build PDF ─────────────────────────────────────────────────────────────
+  const grandTotalQty   = rows.reduce((s, r) => s + r.qty,        0);
+  const grandTotalValue = rows.reduce((s, r) => s + r.totalValue,  0);
+
+  const now        = new Date();
+  const dateStr    = fmtDate(now);
+  const printedStr = `${dateStr} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
+
+  // ── Build PDF ───────────────────────────────────────────────────────────────
   const PDFDocument = (await import("pdfkit")).default;
-  const doc = new PDFDocument({ margin: PAGE_MARGIN, size: "A4", layout: "landscape" });
+  const doc = new PDFDocument({ margin: 0, size: "A4", autoFirstPage: true });
 
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
-
   const pdfReady = new Promise<Buffer>((resolve, reject) => {
     doc.on("end",   () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
   });
 
-  // ── Title block ───────────────────────────────────────────────────────────
-  doc.fontSize(15).font("Helvetica-Bold")
-     .text(`${companyName} — Stock Inventory with Cost`, PAGE_MARGIN, PAGE_MARGIN, { width: USABLE_W, align: "center" });
-  doc.fontSize(10).font("Helvetica")
-     .text(`As of ${today}  |  Items with qty > 0 only`, { align: "center" });
-  doc.moveDown(0.6);
+  let pageNum = 1;
 
-  // ── Table header ──────────────────────────────────────────────────────────
-  const drawHeader = () => {
-    const y = doc.y;
+  // ── Page header ─────────────────────────────────────────────────────────────
+  function drawPageHeader(): number {
+    let y = MARGIN_Y;
+
+    // Company name — 16pt bold underlined centered
+    doc.font("Helvetica-Bold").fontSize(16).fillColor("#000000");
+    doc.text(companyName, X_PART, y, { width: USABLE_W, align: "center", underline: true, lineBreak: false });
+    y += 22;
+
+    // "Godown Summary" — 12pt bold centered
+    doc.font("Helvetica-Bold").fontSize(12);
+    doc.text("Godown Summary", X_PART, y, { width: USABLE_W, align: "center", lineBreak: false });
+    y += 17;
+
+    // Date — 9pt centered #333
+    doc.font("Helvetica").fontSize(9).fillColor("#333333");
+    doc.text(dateStr, X_PART, y, { width: USABLE_W, align: "center", lineBreak: false });
+    y += 13;
+
+    // Meta line: thin border, then "Printed: ..." left + "Page N" right — 8pt #666
     doc.save();
-    doc.rect(PAGE_MARGIN, y, USABLE_W, 16).fill("#1E3A5F");
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8);
-    COLS.forEach((c, i) => {
-      const align = i >= 4 ? "right" : "left";
-      const px    = align === "right" ? COL_X[i] : COL_X[i] + 2;
-      doc.text(c.header, px, y + 4, { width: c.w - 4, align });
-    });
+    doc.moveTo(X_PART, y)
+       .lineTo(X_PART + USABLE_W, y)
+       .strokeColor("#cccccc").lineWidth(0.5).stroke();
     doc.restore();
+    y += 4;
+    doc.font("Helvetica").fontSize(8).fillColor("#666666");
+    doc.text(`Printed: ${printedStr}`, X_PART, y, { lineBreak: false });
+    doc.text(`Page ${pageNum}`, X_PART, y, { width: USABLE_W, align: "right", lineBreak: false });
+    y += 13;
+
     doc.fillColor("#000000");
-    doc.y = y + 18;
-  };
+    return y;
+  }
 
-  drawHeader();
-
-  // ── Rows ──────────────────────────────────────────────────────────────────
-  let rowIndex = 0;
-  let lastGroup = "";
-
-  for (const row of rows) {
-    // Group separator
-    if (row.group !== lastGroup) {
-      if (doc.y > doc.page.height - 100) {
-        doc.addPage({ layout: "landscape" });
-        drawHeader();
-      }
-      const gy = doc.y;
-      doc.save();
-      doc.rect(PAGE_MARGIN, gy, USABLE_W, 13).fill("#DDEEFF");
-      doc.fillColor("#1E3A5F").font("Helvetica-Bold").fontSize(8)
-         .text(row.group, PAGE_MARGIN + 4, gy + 3, { width: USABLE_W - 8 });
-      doc.restore();
-      doc.fillColor("#000000");
-      doc.y = gy + 14;
-      lastGroup = row.group;
-    }
-
-    if (doc.y > doc.page.height - 60) {
-      doc.addPage({ layout: "landscape" });
-      drawHeader();
-    }
-
-    const y   = doc.y;
-    const bg  = rowIndex % 2 === 0 ? "#FFFFFF" : "#F5F8FF";
+  // ── Table header ─────────────────────────────────────────────────────────────
+  function drawTableHeader(y: number): number {
+    const rowH = 18;
+    // Background
     doc.save();
-    doc.rect(PAGE_MARGIN, y, USABLE_W, 13).fill(bg);
-    doc.fillColor("#000000").font("Helvetica").fontSize(7.5);
-
-    const cells = [
-      { text: row.code,                  align: "left"  },
-      { text: row.name,                  align: "left"  },
-      { text: row.group,                 align: "left"  },
-      { text: row.location,              align: "left"  },
-      { text: fmt(row.qty, 3),           align: "right" },
-      { text: fmt(row.unitCost, 2),      align: "right" },
-      { text: fmt(row.totalValue, 2),    align: "right" },
-    ] as const;
-
-    cells.forEach((cell, i) => {
-      const px = cell.align === "right" ? COL_X[i] : COL_X[i] + 2;
-      doc.text(cell.text, px, y + 3, { width: COLS[i].w - 4, align: cell.align, lineBreak: false });
-    });
-
+    doc.rect(X_PART, y, USABLE_W, rowH).fill("#f8f8f8");
     doc.restore();
-    doc.y = y + 14;
-    rowIndex++;
+    // Bold 2px bottom border
+    doc.save();
+    doc.moveTo(X_PART, y + rowH).lineTo(X_PART + USABLE_W, y + rowH)
+       .strokeColor("#333333").lineWidth(1.5).stroke();
+    doc.restore();
+
+    // "Particulars"
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000");
+    doc.text("Particulars", X_PART + 4, y + 5, { width: COL_PART_W - 8, align: "left", lineBreak: false });
+
+    // "Closing Balance" + small "Quantity" sub-label
+    doc.font("Helvetica-Bold").fontSize(10);
+    doc.text("Closing Balance", X_QTY, y + 2, { width: COL_QTY_W, align: "right", lineBreak: false });
+    doc.font("Helvetica").fontSize(8);
+    doc.text("Quantity", X_QTY, y + 11, { width: COL_QTY_W, align: "right", lineBreak: false });
+
+    doc.font("Helvetica-Bold").fontSize(10);
+    doc.text("Avg Rate",    X_RATE, y + 5, { width: COL_RATE_W, align: "right", lineBreak: false });
+    doc.text("Total Value", X_VAL,  y + 5, { width: COL_VAL_W,  align: "right", lineBreak: false });
+
+    return y + rowH + 1;
   }
 
-  // ── Grand Total ───────────────────────────────────────────────────────────
-  if (doc.y > doc.page.height - 80) {
-    doc.addPage({ layout: "landscape" });
+  // ── Page overflow check ───────────────────────────────────────────────────
+  function checkPage(y: number, need: number): number {
+    if (y + need > PAGE_H - MARGIN_Y) {
+      doc.addPage({ size: "A4" });
+      pageNum++;
+      let ny = drawPageHeader();
+      ny = drawTableHeader(ny);
+      return ny;
+    }
+    return y;
   }
-  doc.moveDown(0.3);
-  const ty = doc.y;
+
+  // ── First page ────────────────────────────────────────────────────────────
+  let y = drawPageHeader();
+  y += 2;
+  y = drawTableHeader(y);
+
+  // ── Group + item rows ─────────────────────────────────────────────────────
+  for (const { groupName, items } of grouped) {
+    const groupQty   = items.reduce((s, r) => s + r.qty,        0);
+    const groupValue = items.reduce((s, r) => s + r.totalValue,  0);
+    const firstUom   = items[0]?.uom || "BL";
+
+    // Group header row — 14pt tall, #eaeaea, bold 10pt
+    y = checkPage(y, 14);
+    const groupH = 14;
+    doc.save();
+    doc.rect(X_PART, y, USABLE_W, groupH).fill("#eaeaea");
+    doc.moveTo(X_PART, y).lineTo(X_PART + USABLE_W, y).strokeColor("#666666").lineWidth(0.5).stroke();
+    doc.moveTo(X_PART, y + groupH).lineTo(X_PART + USABLE_W, y + groupH).strokeColor("#666666").lineWidth(0.5).stroke();
+    doc.restore();
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000");
+    doc.text(groupName, X_PART + 8, y + 3, { width: COL_PART_W - 12, align: "left",  lineBreak: false });
+    doc.text(`${fmtQty(groupQty)} ${firstUom}`, X_QTY, y + 3, { width: COL_QTY_W, align: "right", lineBreak: false });
+    // Avg Rate cell is blank on group row (matches location inventory)
+    doc.text(fmtAmt(groupValue), X_VAL, y + 3, { width: COL_VAL_W, align: "right", lineBreak: false });
+    y += groupH;
+
+    // Item rows — 11pt tall, 9pt font, indented particulars
+    for (const item of items) {
+      y = checkPage(y, 12);
+      const itemH = 12;
+      // Light bottom border
+      doc.save();
+      doc.moveTo(X_PART, y + itemH).lineTo(X_PART + USABLE_W, y + itemH)
+         .strokeColor("#999999").lineWidth(0.3).stroke();
+      doc.restore();
+      doc.font("Helvetica").fontSize(9).fillColor("#000000");
+      doc.text(item.itemName, X_PART + 16, y + 2, { width: COL_PART_W - 20, align: "left",  lineBreak: false });
+      doc.text(`${fmtQty(item.qty)} ${item.uom}`, X_QTY, y + 2,  { width: COL_QTY_W,  align: "right", lineBreak: false });
+      doc.text(fmtAmt(item.avgRate),    X_RATE, y + 2, { width: COL_RATE_W, align: "right", lineBreak: false });
+      doc.text(fmtAmt(item.totalValue), X_VAL,  y + 2, { width: COL_VAL_W,  align: "right", lineBreak: false });
+      y += itemH;
+    }
+  }
+
+  // ── Grand Total row ───────────────────────────────────────────────────────
+  y = checkPage(y, 20);
+  y += 2;  // small gap before total
+  const totalH = 16;
   doc.save();
-  doc.rect(PAGE_MARGIN, ty, USABLE_W, 16).fill("#1E3A5F");
-  doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(9)
-     .text(`Grand Total  (${rows.length} line${rows.length !== 1 ? "s" : ""})`, PAGE_MARGIN + 4, ty + 4, {
-       width: USABLE_W - 120, align: "left",
-     });
-  doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(9)
-     .text(fmt(grandTotal, 2), COL_X[6], ty + 4, { width: COLS[6].w - 4, align: "right" });
+  doc.rect(X_PART, y, USABLE_W, totalH).fill("#eaeaea");
+  doc.moveTo(X_PART, y).lineTo(X_PART + USABLE_W, y).strokeColor("#333333").lineWidth(1).stroke();
+  doc.moveTo(X_PART, y + totalH).lineTo(X_PART + USABLE_W, y + totalH).strokeColor("#333333").lineWidth(1).stroke();
   doc.restore();
+  doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000");
+  doc.text("Grand Total", X_PART + 8, y + 4, { width: COL_PART_W - 12, align: "left",  lineBreak: false });
+  const grandUom = rows[0]?.uom || "BL";
+  doc.text(`${fmtQty(grandTotalQty)} ${grandUom}`, X_QTY, y + 4, { width: COL_QTY_W, align: "right", lineBreak: false });
+  doc.text(fmtAmt(grandTotalValue), X_VAL, y + 4, { width: COL_VAL_W, align: "right", lineBreak: false });
 
   doc.end();
   return pdfReady;
