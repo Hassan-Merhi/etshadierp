@@ -26,7 +26,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ArrowLeft, Building2, ChevronDown, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowLeft, Building2, ChevronDown } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useCompany } from "@/contexts/CompanyContext";
 
@@ -60,6 +60,49 @@ interface ItemRow {
 }
 
 type ViewFilter = "all" | "gaining" | "losing";
+
+interface Company { code: string; name: string; }
+
+function getAiResult(row: ItemRow, companies: Company[]): string {
+  if (companies.length < 2) return "—";
+
+  const data = companies.map(c => ({
+    code: c.code,
+    name: c.name.toUpperCase(),
+    qty: row.byCompany[c.code]?.totalQty ?? 0,
+    profit: row.byCompany[c.code]?.configuredProfit ?? 0,
+  }));
+
+  const hasAnyData = data.some(d => d.qty > 0 || d.profit !== 0);
+  if (!hasAnyData) return "—";
+
+  const maxQty    = Math.max(...data.map(d => d.qty));
+  const maxProfit = Math.max(...data.map(d => d.profit));
+
+  const qtyWinners    = data.filter(d => d.qty === maxQty);
+  const profitWinners = data.filter(d => d.profit === maxProfit);
+
+  const qtyTied    = qtyWinners.length > 1;
+  const profitTied = profitWinners.length > 1;
+
+  if (qtyTied && profitTied) return "EQUAL IN BOTH";
+
+  const sameWinner =
+    !qtyTied &&
+    !profitTied &&
+    qtyWinners[0].code === profitWinners[0].code;
+
+  if (sameWinner) {
+    return `${qtyWinners[0].name} BETTER IN SALES & PROFIT`;
+  }
+
+  const salesPart  = qtyTied    ? "SALES EQUAL"  : `${qtyWinners[0].name} BETTER IN SALES`;
+  const profitPart = profitTied ? "PROFIT EQUAL" : `${profitWinners[0].name} BETTER IN PROFIT`;
+
+  if (qtyTied)    return profitPart;
+  if (profitTied) return salesPart;
+  return `${profitPart} — ${salesPart}`;
+}
 
 export default function SalesReportComparison() {
   const [, navigate] = useLocation();
@@ -113,7 +156,6 @@ export default function SalesReportComparison() {
 
     for (const item of rawItems) {
       if (!item.stockItemId) continue;
-
       if (stockGroupFilter !== "all" && item.stockGroupName !== stockGroupFilter) continue;
 
       if (!map.has(item.stockItemId)) {
@@ -139,11 +181,11 @@ export default function SalesReportComparison() {
       }
 
       const entry = row.byCompany[code];
-      entry.totalSales += parseFloat(item.totalSales || "0");
-      entry.totalQty += parseFloat(item.quantity || "0");
+      entry.totalSales      += parseFloat(item.totalSales || "0");
+      entry.totalQty        += parseFloat(item.quantity || "0");
       entry.configuredProfit += item.configuredProfit || 0;
       entry.configuredProfitPct = item.configuredProfitPercentage || 0;
-      entry.costProfitPct = item.costProfitPercentage || 0;
+      entry.costProfitPct       = item.costProfitPercentage || 0;
     }
 
     let rows = Array.from(map.values());
@@ -172,22 +214,34 @@ export default function SalesReportComparison() {
 
   const fmt = (n: number) => formatAmount(n);
 
-  const profitBadge = (profit: number, pct: number) => {
-    if (profit > 0) return (
-      <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-mono text-xs">
-        <TrendingUp className="h-3 w-3" />
-        {fmt(profit)}
-        <span className="text-muted-foreground">({pct.toFixed(1)}%)</span>
+  const fmtQty = (n: number) =>
+    n % 1 === 0 ? n.toFixed(0) : n.toFixed(2);
+
+  const fmtAvgPrice = (totalSales: number, totalQty: number) => {
+    if (!totalQty) return "—";
+    return fmt(totalSales / totalQty);
+  };
+
+  const profitCell = (profit: number) => {
+    if (profit === 0) return <span className="text-muted-foreground text-xs font-mono">—</span>;
+    const sign = profit > 0 ? "+" : "";
+    return (
+      <span className={`font-mono text-xs font-semibold ${profit > 0 ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
+        {sign}{fmt(profit)}
       </span>
     );
-    if (profit < 0) return (
-      <span className="flex items-center gap-1 text-destructive font-mono text-xs">
-        <TrendingDown className="h-3 w-3" />
-        {fmt(profit)}
-        <span className="text-muted-foreground">({pct.toFixed(1)}%)</span>
+  };
+
+  const aiResultCell = (row: ItemRow) => {
+    const verdict = getAiResult(row, displayCompanies);
+    if (verdict === "—") return <span className="text-muted-foreground text-xs">—</span>;
+
+    const isPositive = verdict.includes("EQUAL IN BOTH");
+    return (
+      <span className={`text-xs font-medium ${isPositive ? "text-muted-foreground" : "text-foreground"}`}>
+        {verdict}
       </span>
     );
-    return <span className="text-muted-foreground text-xs">—</span>;
   };
 
   const summaryForCompany = (code: string) => {
@@ -195,7 +249,7 @@ export default function SalesReportComparison() {
     for (const row of tableData) {
       const entry = row.byCompany[code];
       if (entry) {
-        totalSales += entry.totalSales;
+        totalSales  += entry.totalSales;
         totalProfit += entry.configuredProfit;
       }
     }
@@ -218,7 +272,6 @@ export default function SalesReportComparison() {
 
         {/* Controls */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Date range */}
           <div className="flex items-center gap-1">
             <Input
               type="date"
@@ -237,14 +290,11 @@ export default function SalesReportComparison() {
             />
           </div>
 
-          {/* Company selector */}
           <Popover open={companyPopoverOpen} onOpenChange={setCompanyPopoverOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" className="gap-2" data-testid="button-company-select">
                 <Building2 className="h-4 w-4" />
-                {selectedCodes.length === 0
-                  ? "Select Companies"
-                  : `${selectedCodes.length} Selected`}
+                {selectedCodes.length === 0 ? "Select Companies" : `${selectedCodes.length} Selected`}
                 <ChevronDown className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
@@ -269,7 +319,6 @@ export default function SalesReportComparison() {
             </PopoverContent>
           </Popover>
 
-          {/* Stock group */}
           <Select value={stockGroupFilter} onValueChange={setStockGroupFilter} data-testid="select-stock-group">
             <SelectTrigger className="w-44 h-9">
               <SelectValue placeholder="All Groups" />
@@ -282,16 +331,13 @@ export default function SalesReportComparison() {
             </SelectContent>
           </Select>
 
-          {/* View filter */}
           <div className="flex rounded-md border overflow-hidden">
             {(["all", "gaining", "losing"] as ViewFilter[]).map(v => (
               <button
                 key={v}
                 onClick={() => setViewFilter(v)}
                 className={`px-3 h-9 text-sm capitalize transition-colors ${
-                  viewFilter === v
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-background hover:bg-muted"
+                  viewFilter === v ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
                 }`}
                 data-testid={`filter-${v}`}
               >
@@ -311,7 +357,7 @@ export default function SalesReportComparison() {
           </div>
         ) : (
           <>
-            {/* Summary cards per company */}
+            {/* Summary cards */}
             <div className="flex flex-wrap gap-3 mb-6">
               {displayCompanies.map(c => {
                 const { totalSales, totalProfit } = summaryForCompany(c.code);
@@ -345,6 +391,7 @@ export default function SalesReportComparison() {
                 <div className="h-full bg-primary w-1/2 rounded-full animate-pulse" />
               </div>
             )}
+
             {isLoading ? (
               <div className="text-center py-16 text-muted-foreground">Loading comparison data…</div>
             ) : tableData.length === 0 ? (
@@ -353,25 +400,31 @@ export default function SalesReportComparison() {
               <div className="rounded-md border overflow-auto">
                 <Table>
                   <TableHeader>
+                    {/* Row 1: Item | Group | [Company name spanning 3 cols each] | AI Result */}
                     <TableRow>
                       <TableHead className="min-w-[200px] sticky left-0 bg-background z-10">Item</TableHead>
                       <TableHead className="w-36">Group</TableHead>
                       {displayCompanies.map(c => (
-                        <TableHead key={c.code} colSpan={3} className="text-center border-l">
+                        <TableHead key={c.code} colSpan={3} className="text-center border-l uppercase tracking-wide text-xs">
                           {c.name}
                         </TableHead>
                       ))}
+                      <TableHead className="min-w-[220px] border-l text-center text-xs uppercase tracking-wide">
+                        AI Result
+                      </TableHead>
                     </TableRow>
+                    {/* Row 2: sub-labels per company */}
                     <TableRow className="text-xs text-muted-foreground">
                       <TableHead className="sticky left-0 bg-background z-10" />
                       <TableHead />
                       {displayCompanies.map(c => (
                         <>
-                          <TableHead key={`${c.code}-sales`} className="border-l font-normal">Sales</TableHead>
-                          <TableHead key={`${c.code}-qty`} className="font-normal">Qty</TableHead>
-                          <TableHead key={`${c.code}-profit`} className="font-normal">Profit</TableHead>
+                          <TableHead key={`${c.code}-qty`} className="border-l font-normal">Qty Sold</TableHead>
+                          <TableHead key={`${c.code}-avg`} className="font-normal">Av Price</TableHead>
+                          <TableHead key={`${c.code}-prf`} className="font-normal">Profit</TableHead>
                         </>
                       ))}
+                      <TableHead className="border-l" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -391,27 +444,28 @@ export default function SalesReportComparison() {
                           const entry = row.byCompany[c.code];
                           if (!entry) return (
                             <>
-                              <TableCell key={`${c.code}-s`} className="border-l text-muted-foreground text-center">—</TableCell>
-                              <TableCell key={`${c.code}-q`} className="text-muted-foreground text-center">—</TableCell>
-                              <TableCell key={`${c.code}-p`} className="text-muted-foreground text-center">—</TableCell>
+                              <TableCell key={`${c.code}-q`} className="border-l text-muted-foreground text-center text-xs">—</TableCell>
+                              <TableCell key={`${c.code}-a`} className="text-muted-foreground text-center text-xs">—</TableCell>
+                              <TableCell key={`${c.code}-p`} className="text-muted-foreground text-center text-xs">—</TableCell>
                             </>
                           );
                           return (
                             <>
-                              <TableCell key={`${c.code}-s`} className="border-l font-mono text-sm">
-                                {fmt(entry.totalSales)}
+                              <TableCell key={`${c.code}-q`} className="border-l font-mono text-sm">
+                                {fmtQty(entry.totalQty)}
                               </TableCell>
-                              <TableCell key={`${c.code}-q`} className="font-mono text-sm text-muted-foreground">
-                                {entry.totalQty % 1 === 0
-                                  ? entry.totalQty.toFixed(0)
-                                  : entry.totalQty.toFixed(2)}
+                              <TableCell key={`${c.code}-a`} className="font-mono text-sm text-muted-foreground">
+                                {fmtAvgPrice(entry.totalSales, entry.totalQty)}
                               </TableCell>
                               <TableCell key={`${c.code}-p`}>
-                                {profitBadge(entry.configuredProfit, entry.configuredProfitPct)}
+                                {profitCell(entry.configuredProfit)}
                               </TableCell>
                             </>
                           );
                         })}
+                        <TableCell className="border-l">
+                          {aiResultCell(row)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
