@@ -54,9 +54,7 @@ interface ItemRow {
   byCompany: Record<string, {
     totalSales: number;
     totalQty: number;
-    configuredProfit: number;
-    configuredProfitPct: number;
-    costProfitPct: number;
+    costProfit: number;
   }>;
 }
 
@@ -71,7 +69,7 @@ function getAiResult(row: ItemRow, companies: Company[]): string {
     code: c.code,
     name: c.name.toUpperCase(),
     qty: row.byCompany[c.code]?.totalQty ?? 0,
-    profit: row.byCompany[c.code]?.configuredProfit ?? 0,
+    profit: row.byCompany[c.code]?.costProfit ?? 0,
   }));
 
   const hasAnyData = data.some(d => d.qty > 0 || d.profit !== 0);
@@ -174,21 +172,13 @@ export default function SalesReportComparison() {
       const compCode = item.companyCode;
 
       if (!row.byCompany[compCode]) {
-        row.byCompany[compCode] = {
-          totalSales: 0,
-          totalQty: 0,
-          configuredProfit: 0,
-          configuredProfitPct: 0,
-          costProfitPct: 0,
-        };
+        row.byCompany[compCode] = { totalSales: 0, totalQty: 0, costProfit: 0 };
       }
 
       const entry = row.byCompany[compCode];
-      entry.totalSales       += parseFloat(item.totalSales || "0");
-      entry.totalQty         += parseFloat(item.quantity || "0");
-      entry.configuredProfit += item.configuredProfit || 0;
-      entry.configuredProfitPct = item.configuredProfitPercentage || 0;
-      entry.costProfitPct       = item.costProfitPercentage || 0;
+      entry.totalSales += parseFloat(item.totalSales || "0");
+      entry.totalQty   += parseFloat(item.quantity    || "0");
+      entry.costProfit += parseFloat(item.costProfit  || "0");
     }
 
     // Pass 2: merge rows that have the same normalised name
@@ -206,9 +196,9 @@ export default function SalesReportComparison() {
           if (!existing.byCompany[compCode]) {
             existing.byCompany[compCode] = { ...entry };
           } else {
-            existing.byCompany[compCode].totalSales       += entry.totalSales;
-            existing.byCompany[compCode].totalQty         += entry.totalQty;
-            existing.byCompany[compCode].configuredProfit += entry.configuredProfit;
+            existing.byCompany[compCode].totalSales += entry.totalSales;
+            existing.byCompany[compCode].totalQty   += entry.totalQty;
+            existing.byCompany[compCode].costProfit += entry.costProfit;
           }
         }
       }
@@ -221,11 +211,11 @@ export default function SalesReportComparison() {
 
     if (viewFilter === "gaining") {
       rows = rows.filter(r =>
-        displayCompanies.some(c => (r.byCompany[c.code]?.configuredProfit ?? 0) > 0)
+        displayCompanies.some(c => (r.byCompany[c.code]?.costProfit ?? 0) > 0)
       );
     } else if (viewFilter === "losing") {
       rows = rows.filter(r =>
-        displayCompanies.some(c => (r.byCompany[c.code]?.configuredProfit ?? 0) < 0)
+        displayCompanies.some(c => (r.byCompany[c.code]?.costProfit ?? 0) < 0)
       );
     }
 
@@ -279,7 +269,7 @@ export default function SalesReportComparison() {
       const entry = row.byCompany[code];
       if (entry) {
         totalSales  += entry.totalSales;
-        totalProfit += entry.configuredProfit;
+        totalProfit += entry.costProfit;
       }
     }
     return { totalSales, totalProfit };
@@ -487,7 +477,7 @@ export default function SalesReportComparison() {
                                 {fmtAvgPrice(entry.totalSales, entry.totalQty)}
                               </TableCell>
                               <TableCell key={`${c.code}-p`}>
-                                {profitCell(entry.configuredProfit)}
+                                {profitCell(entry.costProfit)}
                               </TableCell>
                             </>
                           );
