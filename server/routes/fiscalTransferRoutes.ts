@@ -159,8 +159,8 @@ export function registerFiscalTransferRoutes(app: Express) {
 
       const { startDate, endDate } = req.query;
 
-      // Build query conditions
-      const conditions = [
+      // Build query conditions (applied to vouchers via join)
+      const conditions: any[] = [
         eq(vouchers.companyId, req.session.currentCompanyId),
         eq(vouchers.voucherType, "Sales"),
         isNull(vouchers.deletedAt),
@@ -175,40 +175,26 @@ export function registerFiscalTransferRoutes(app: Express) {
         conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
       }
 
-      // Get all sales vouchers with location info
-      const salesVouchers = await db
+      // Aggregate from salesItems (same source as payroll sales-summary)
+      // Groups by location + isCreditSale so credit sales stay separate
+      const rows = await db
         .select({
-          voucherId: vouchers.id,
           locationId: vouchers.locationId,
           locationName: locations.name,
           locationCode: locations.code,
-          voucherDate: vouchers.voucherDate,
-          totalAmount: vouchers.totalAmount,
           isCreditSale: vouchers.isCreditSale,
-        })
-        .from(vouchers)
-        .leftJoin(locations, eq(vouchers.locationId, locations.id))
-        .where(and(...conditions));
-
-      // Fetch total bale quantity per voucher from salesItems
-      const qtyRows = await db
-        .select({
-          voucherId: salesItems.voucherId,
           totalQuantity: sql<string>`COALESCE(SUM(${salesItems.quantity}), 0)`,
+          totalSales: sql<string>`COALESCE(SUM(${salesItems.totalSales}), 0)`,
+          totalTransactions: sql<string>`COUNT(DISTINCT ${vouchers.id})`,
         })
         .from(salesItems)
         .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .leftJoin(locations, eq(vouchers.locationId, locations.id))
         .where(and(...conditions))
-        .groupBy(salesItems.voucherId);
-
-      const quantityByVoucher = new Map<number, number>();
-      for (const row of qtyRows) {
-        quantityByVoucher.set(row.voucherId, parseFloat(row.totalQuantity));
-      }
+        .groupBy(vouchers.locationId, locations.name, locations.code, vouchers.isCreditSale);
 
       const CREDIT_SALES_ID = -1;
 
-      // Group by location; credit sales go into a dedicated synthetic group
       const salesByLocation = new Map<
         number,
         {
@@ -218,18 +204,20 @@ export function registerFiscalTransferRoutes(app: Express) {
           totalSales: number;
           totalTransactions: number;
           totalQuantity: number;
+          isCreditSale?: boolean;
         }
       >();
 
-      for (const sale of salesVouchers) {
-        const amount = parseFloat(sale.totalAmount || "0");
-        const qty = quantityByVoucher.get(sale.voucherId) ?? 0;
+      for (const row of rows) {
+        const qty = parseFloat(row.totalQuantity);
+        const amount = parseFloat(row.totalSales);
+        const txns = parseInt(row.totalTransactions as string);
 
-        if (sale.isCreditSale) {
+        if (row.isCreditSale) {
           const existing = salesByLocation.get(CREDIT_SALES_ID);
           if (existing) {
             existing.totalSales += amount;
-            existing.totalTransactions += 1;
+            existing.totalTransactions += txns;
             existing.totalQuantity += qty;
           } else {
             salesByLocation.set(CREDIT_SALES_ID, {
@@ -237,25 +225,27 @@ export function registerFiscalTransferRoutes(app: Express) {
               locationName: "Credit Sales",
               locationCode: "CREDIT",
               totalSales: amount,
-              totalTransactions: 1,
+              totalTransactions: txns,
               totalQuantity: qty,
+              isCreditSale: true,
             });
           }
         } else {
-          if (!sale.locationId) continue;
-          const existing = salesByLocation.get(sale.locationId);
+          if (!row.locationId) continue;
+          const existing = salesByLocation.get(row.locationId);
           if (existing) {
             existing.totalSales += amount;
-            existing.totalTransactions += 1;
+            existing.totalTransactions += txns;
             existing.totalQuantity += qty;
           } else {
-            salesByLocation.set(sale.locationId, {
-              locationId: sale.locationId,
-              locationName: sale.locationName || "Unknown",
-              locationCode: sale.locationCode || "",
+            salesByLocation.set(row.locationId, {
+              locationId: row.locationId,
+              locationName: row.locationName || "Unknown",
+              locationCode: row.locationCode || "",
               totalSales: amount,
-              totalTransactions: 1,
+              totalTransactions: txns,
               totalQuantity: qty,
+              isCreditSale: false,
             });
           }
         }
