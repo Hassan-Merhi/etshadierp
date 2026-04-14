@@ -37,6 +37,7 @@ export function registerWhatsAppRoutes(app: Express) {
         apiToken:        s.apiToken ? "••••••" : "",
         enabled:         s.enabled,
         monthlyAutoSend: s.monthlyAutoSend,
+        dailyAutoSend:   s.dailyAutoSend,
         hasCredentials:  !!(s.instanceId && s.apiToken),
       });
     } catch (err: any) {
@@ -46,21 +47,23 @@ export function registerWhatsAppRoutes(app: Express) {
 
   app.put("/api/whatsapp/settings", requireAuth, async (req, res) => {
     try {
-      const { instanceId, apiToken, enabled, monthlyAutoSend } = req.body as Record<string, any>;
+      const { instanceId, apiToken, enabled, monthlyAutoSend, dailyAutoSend } = req.body as Record<string, any>;
 
       await pool.query(`
-        INSERT INTO whatsapp_settings (id, instance_id, api_token, enabled, monthly_auto_send)
-        VALUES (1, $1, $2, $3, $4)
+        INSERT INTO whatsapp_settings (id, instance_id, api_token, enabled, monthly_auto_send, daily_auto_send)
+        VALUES (1, $1, $2, $3, $4, $5)
         ON CONFLICT (id) DO UPDATE SET
           instance_id       = EXCLUDED.instance_id,
           api_token         = CASE WHEN $2 = '' OR $2 = '••••••' THEN whatsapp_settings.api_token ELSE EXCLUDED.api_token END,
           enabled           = EXCLUDED.enabled,
-          monthly_auto_send = EXCLUDED.monthly_auto_send
+          monthly_auto_send = EXCLUDED.monthly_auto_send,
+          daily_auto_send   = EXCLUDED.daily_auto_send
       `, [
-        instanceId     ?? "",
-        apiToken       ?? "",
-        enabled        ?? false,
+        instanceId      ?? "",
+        apiToken        ?? "",
+        enabled         ?? false,
         monthlyAutoSend ?? false,
+        dailyAutoSend   ?? false,
       ]);
 
       res.json({ message: "Saved" });

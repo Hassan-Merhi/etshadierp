@@ -14,6 +14,7 @@ export interface WaSettings {
   apiToken:   string;
   enabled:    boolean;
   monthlyAutoSend: boolean;
+  dailyAutoSend:   boolean;
 }
 
 export interface WaRecipient {
@@ -42,7 +43,7 @@ export function normaliseChatId(raw: string): string {
 
 export async function getWaSettings(): Promise<WaSettings | null> {
   const res = await pool.query(
-    "SELECT instance_id, api_token, enabled, monthly_auto_send FROM whatsapp_settings WHERE id = 1",
+    "SELECT instance_id, api_token, enabled, monthly_auto_send, daily_auto_send FROM whatsapp_settings WHERE id = 1",
   );
   if (!res.rows?.length) return null;
   const r = res.rows[0];
@@ -51,6 +52,7 @@ export async function getWaSettings(): Promise<WaSettings | null> {
     apiToken:        r.api_token   ?? "",
     enabled:         r.enabled     ?? false,
     monthlyAutoSend: r.monthly_auto_send ?? false,
+    dailyAutoSend:   r.daily_auto_send   ?? false,
   };
 }
 

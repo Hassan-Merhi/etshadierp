@@ -914,8 +914,10 @@ let migrationsDone = false;
       instance_id varchar(255) NOT NULL DEFAULT '',
       api_token text NOT NULL DEFAULT '',
       enabled boolean NOT NULL DEFAULT false,
-      monthly_auto_send boolean NOT NULL DEFAULT false
+      monthly_auto_send boolean NOT NULL DEFAULT false,
+      daily_auto_send boolean NOT NULL DEFAULT false
     )`,
+    `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS daily_auto_send boolean NOT NULL DEFAULT false`,
     // WhatsApp recipients (individual numbers or group chatIds)
     `CREATE TABLE IF NOT EXISTS whatsapp_recipients (
       id serial PRIMARY KEY,

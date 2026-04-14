@@ -27,6 +27,7 @@ interface WaSettings {
   apiToken: string;
   enabled: boolean;
   monthlyAutoSend: boolean;
+  dailyAutoSend: boolean;
   hasCredentials: boolean;
 }
 
@@ -95,6 +96,7 @@ export function WhatsAppExportSection() {
         apiToken:   "••••••",
         enabled:    value,
         monthlyAutoSend: settings?.monthlyAutoSend ?? false,
+        dailyAutoSend:   settings?.dailyAutoSend   ?? false,
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] }),
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -107,6 +109,20 @@ export function WhatsAppExportSection() {
         apiToken:   "••••••",
         enabled:    settings?.enabled ?? false,
         monthlyAutoSend: value,
+        dailyAutoSend:   settings?.dailyAutoSend ?? false,
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const toggleDaily = useMutation({
+    mutationFn: (value: boolean) =>
+      apiRequest("PUT", "/api/whatsapp/settings", {
+        instanceId: settings?.instanceId ?? "",
+        apiToken:   "••••••",
+        enabled:    settings?.enabled ?? false,
+        monthlyAutoSend: settings?.monthlyAutoSend ?? false,
+        dailyAutoSend:   value,
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] }),
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -269,6 +285,21 @@ export function WhatsAppExportSection() {
                 data-testid="switch-wa-monthly"
                 checked={settings?.monthlyAutoSend ?? false}
                 onCheckedChange={(v) => toggleMonthly.mutate(v)}
+                disabled={!settings?.enabled}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Daily Auto-Send (6 PM EST)</p>
+                <p className="text-xs text-muted-foreground">
+                  Every day at 6 PM — sends daily data export ZIP + all-companies net position Excel (full current year) to all active recipients
+                </p>
+              </div>
+              <Switch
+                data-testid="switch-wa-daily"
+                checked={settings?.dailyAutoSend ?? false}
+                onCheckedChange={(v) => toggleDaily.mutate(v)}
                 disabled={!settings?.enabled}
               />
             </div>
