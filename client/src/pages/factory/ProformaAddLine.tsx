@@ -1,7 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Check, Plus, Search, X } from "lucide-react";
+import { ArrowLeft, Check, Plus, Search, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,9 @@ import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
+
+const AUTOSAVE_KEY = "proforma-autosave-enabled";
+const AUTOSAVE_DELAY_MS = 1500;
 
 interface StockItem {
   id: number;
@@ -51,6 +54,12 @@ export default function ProformaAddLine() {
   const [qty, setQty] = useState("1");
   const [price, setPrice] = useState("");
   const [addedCodes, setAddedCodes] = useState<Set<string>>(new Set());
+  const [autoSave, setAutoSave] = useState<boolean>(() => {
+    try { return localStorage.getItem(AUTOSAVE_KEY) === "true"; } catch { return false; }
+  });
+  const [autoSaveCountdown, setAutoSaveCountdown] = useState(0);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const numericProformaId = parseInt(proformaId);
 
@@ -119,9 +128,48 @@ export default function ProformaAddLine() {
     },
   });
 
+  const clearAutoSaveTimers = () => {
+    if (autoSaveTimer.current) { clearTimeout(autoSaveTimer.current); autoSaveTimer.current = null; }
+    if (countdownInterval.current) { clearInterval(countdownInterval.current); countdownInterval.current = null; }
+    setAutoSaveCountdown(0);
+  };
+
+  const toggleAutoSave = () => {
+    const next = !autoSave;
+    setAutoSave(next);
+    try { localStorage.setItem(AUTOSAVE_KEY, String(next)); } catch {}
+    if (!next) clearAutoSaveTimers();
+  };
+
+  // Start autosave countdown whenever selectedItem, qty, or price change (and autosave is on)
+  useEffect(() => {
+    clearAutoSaveTimers();
+    if (!autoSave || !selectedItem || !qty || !price) return;
+
+    const steps = Math.ceil(AUTOSAVE_DELAY_MS / 100);
+    let remaining = steps;
+    setAutoSaveCountdown(100);
+
+    countdownInterval.current = setInterval(() => {
+      remaining -= 1;
+      setAutoSaveCountdown(Math.round((remaining / steps) * 100));
+      if (remaining <= 0) {
+        if (countdownInterval.current) clearInterval(countdownInterval.current);
+      }
+    }, 100);
+
+    autoSaveTimer.current = setTimeout(() => {
+      addMutation.mutate();
+    }, AUTOSAVE_DELAY_MS);
+
+    return clearAutoSaveTimers;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSave, selectedItem?.id, qty, price]);
+
   const handleSelectItem = (item: StockItem) => {
     if (selectedItem?.id === item.id) {
       setSelectedItem(null);
+      clearAutoSaveTimers();
       return;
     }
     setSelectedItem(item);
@@ -147,6 +195,23 @@ export default function ProformaAddLine() {
           <p className="text-xs text-muted-foreground">Adding line to</p>
           <h1 className="text-sm font-semibold truncate">{proformaName}</h1>
         </div>
+        {/* Autosave toggle */}
+        <button
+          onClick={toggleAutoSave}
+          className={`flex items-center gap-1.5 px-3 h-9 rounded-md border text-sm font-medium transition-colors ${
+            autoSave
+              ? "bg-green-500/10 border-green-500/50 text-green-600 dark:text-green-400"
+              : "bg-background border-border text-muted-foreground"
+          }`}
+          data-testid="button-autosave-toggle"
+          title={autoSave ? "Autosave ON — items added automatically" : "Autosave OFF — press Add manually"}
+        >
+          <Zap className={`h-4 w-4 ${autoSave ? "fill-green-500 text-green-500" : ""}`} />
+          <span className="hidden sm:inline">Autosave</span>
+          <span className={`w-8 h-4 rounded-full relative transition-colors ${autoSave ? "bg-green-500" : "bg-muted-foreground/30"}`}>
+            <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${autoSave ? "translate-x-4" : "translate-x-0.5"}`} />
+          </span>
+        </button>
         <Button variant="outline" size="sm" onClick={goBack} data-testid="button-done">
           Done
         </Button>
@@ -263,17 +328,34 @@ export default function ProformaAddLine() {
       {/* Sticky bottom panel when item selected */}
       {selectedItem && (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-background border-t shadow-lg px-4 py-4">
+          {/* Autosave progress bar */}
+          {autoSave && autoSaveCountdown > 0 && (
+            <div className="absolute top-0 left-0 right-0 h-1 bg-muted overflow-hidden rounded-none">
+              <div
+                className="h-full bg-green-500 transition-all duration-100"
+                style={{ width: `${autoSaveCountdown}%` }}
+              />
+            </div>
+          )}
           <div className="max-w-2xl mx-auto">
             <div className="flex items-start gap-3 mb-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">{selectedItem.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold truncate">{selectedItem.name}</p>
+                  {autoSave && (
+                    <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-0.5 shrink-0">
+                      <Zap className="h-3 w-3 fill-green-500" />
+                      {addMutation.isPending ? "Saving…" : "Auto-adding…"}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground font-mono">{selectedItem.code}</p>
               </div>
               <Button
                 size="icon"
                 variant="ghost"
                 className="shrink-0"
-                onClick={() => setSelectedItem(null)}
+                onClick={() => { setSelectedItem(null); clearAutoSaveTimers(); }}
                 data-testid="button-deselect"
               >
                 <X className="h-4 w-4" />
@@ -305,7 +387,7 @@ export default function ProformaAddLine() {
                 />
               </div>
               <Button
-                onClick={() => addMutation.mutate()}
+                onClick={() => { clearAutoSaveTimers(); addMutation.mutate(); }}
                 disabled={!qty || !price || addMutation.isPending}
                 data-testid="button-add-line"
               >
