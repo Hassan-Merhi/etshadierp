@@ -105,6 +105,7 @@ import { PosSettingsTab } from "./settings/PosSettingsTab";
 import { ExportAccountsSection } from "./settings/ExportAccountsSection";
 import { DailyExportSection } from "./settings/DailyExportSection";
 import { WhatsAppExportSection } from "./settings/WhatsAppExportSection";
+import { StockReportSection } from "./settings/StockReportSection";
 import { FileStorageTab } from "./settings/FileStorageTab";
 import { BulkRenameTab } from "./settings/BulkRenameTab";
 import { LoginHistoryTab } from "./settings/LoginHistoryTab";
@@ -1902,6 +1903,7 @@ const FACTORY_COST_FIELDS = [
             <>
               <DailyExportSection />
               <WhatsAppExportSection />
+              <StockReportSection />
             </>
           )}
 

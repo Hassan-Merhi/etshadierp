@@ -4,9 +4,10 @@ import { fetchAllCompanies, fetchCompanyExportData } from "./exportDataService";
 import { buildCompanyWorkbook } from "./exportExcelService";
 import { sendExportEmail } from "./emailService";
 import { pool } from "../db";
-import { getWaSettings, getActiveRecipients, sendWhatsAppFile } from "./whatsappService";
+import { getWaSettings, getActiveRecipients, sendWhatsAppFile, sendWhatsAppFileToChatId } from "./whatsappService";
 import { generateNetPositionExcel } from "../helpers/generateNetPositionExcel";
 import { generateAllCompaniesNetPositionExcel } from "../helpers/generateAllCompaniesNetPositionExcel";
+import { generateStockPdf } from "../helpers/generateStockPdf";
 import { storage } from "../storage";
 
 let schedulerStarted = false;
@@ -152,9 +153,69 @@ async function runDailyWhatsAppSend(
     const npResult   = await sendWhatsAppFile(npBuffer, npFileName, npCaption);
     console.log(`[WhatsApp] Net Position Excel: sent=${npResult.sent} failed=${npResult.failed}`);
 
+    // 3. Stock report — sends to one specific group if configured
+    await runStockReportSend(today.toISOString().split("T")[0]);
+
     console.log("[WhatsApp] Daily WhatsApp send complete.");
   } catch (err: any) {
     console.error("[WhatsApp] Daily send error:", err?.message || err);
+  }
+}
+
+async function runStockReportSend(today: string): Promise<void> {
+  try {
+    const r = await pool.query(
+      `SELECT company_id, recipient_id, auto_send, enabled
+       FROM whatsapp_stock_settings WHERE id = 1`,
+    );
+    if (!r.rows.length) return;
+    const cfg = r.rows[0];
+    if (!cfg.enabled || !cfg.auto_send) {
+      console.log("[WhatsApp] Stock report auto-send is disabled — skipping.");
+      return;
+    }
+    if (!cfg.company_id || !cfg.recipient_id) {
+      console.log("[WhatsApp] Stock report: no company or recipient configured — skipping.");
+      return;
+    }
+
+    const recipResult = await pool.query(
+      "SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true",
+      [cfg.recipient_id],
+    );
+    if (!recipResult.rows.length) {
+      console.log("[WhatsApp] Stock report: recipient not found or inactive — skipping.");
+      return;
+    }
+    const chatId = recipResult.rows[0].chat_id as string;
+
+    const allCompanies = await storage.getAllCompanies();
+    const company      = (allCompanies as any[]).find((c) => c.id === cfg.company_id);
+    if (!company) {
+      console.log(`[WhatsApp] Stock report: company ${cfg.company_id} not found — skipping.`);
+      return;
+    }
+
+    const yearStart = `${new Date().getUTCFullYear()}-01-01`;
+
+    console.log(`[WhatsApp] Stock report: generating PDF for ${company.name}…`);
+    const pdfBuf  = await generateStockPdf(cfg.company_id, company.name);
+    const pdfName = `Stock_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.pdf`;
+    const pdfCap  = `Stock Inventory with Cost — ${company.name}\nAs of ${today}`;
+    const pdfRes  = await sendWhatsAppFileToChatId(chatId, pdfBuf, pdfName, pdfCap, "application/pdf");
+    console.log(`[WhatsApp] Stock PDF: ${pdfRes.success ? "sent" : pdfRes.error}`);
+
+    console.log(`[WhatsApp] Stock report: generating net-position Excel for ${company.name} (${yearStart}→${today})…`);
+    const xlsBuf  = await generateNetPositionExcel(cfg.company_id, company.name, yearStart, today);
+    const xlsName = `NetPosition_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.xlsx`;
+    const xlsCap  = `Net Position Report — ${company.name}\nPeriod: ${yearStart} → ${today}`;
+    const xlsRes  = await sendWhatsAppFileToChatId(
+      chatId, xlsBuf, xlsName, xlsCap,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    console.log(`[WhatsApp] Net Position Excel (stock config): ${xlsRes.success ? "sent" : xlsRes.error}`);
+  } catch (err: any) {
+    console.error("[WhatsApp] Stock report send error:", err?.message || err);
   }
 }
 

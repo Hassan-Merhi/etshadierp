@@ -927,6 +927,14 @@ let migrationsDone = false;
       active boolean NOT NULL DEFAULT true,
       created_at timestamp NOT NULL DEFAULT now()
     )`,
+    // Stock + Net Position report — per-company config sent to one specific group
+    `CREATE TABLE IF NOT EXISTS whatsapp_stock_settings (
+      id serial PRIMARY KEY,
+      company_id integer,
+      recipient_id integer,
+      auto_send boolean NOT NULL DEFAULT false,
+      enabled boolean NOT NULL DEFAULT false
+    )`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

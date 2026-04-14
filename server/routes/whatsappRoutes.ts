@@ -20,8 +20,10 @@ import {
   normaliseChatId,
   fetchGreenApiChats,
   sendWhatsAppFile,
+  sendWhatsAppFileToChatId,
 } from "../services/whatsappService";
 import { generateNetPositionExcel, generateMonthEnds } from "../helpers/generateNetPositionExcel";
+import { generateStockPdf } from "../helpers/generateStockPdf";
 
 export function registerWhatsAppRoutes(app: Express) {
   // ── Settings (singleton row id=1) ──────────────────────────────────────────
@@ -198,6 +200,106 @@ export function registerWhatsAppRoutes(app: Express) {
       }
     } catch (err: any) {
       console.error("[WhatsApp] send-net-position error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Stock + Net Position Report Settings ────────────────────────────────────
+
+  app.get("/api/whatsapp/stock-settings", requireAuth, async (_req, res) => {
+    try {
+      const r = await pool.query(
+        `SELECT id, company_id, recipient_id, auto_send, enabled
+         FROM whatsapp_stock_settings ORDER BY id LIMIT 1`,
+      );
+      if (!r.rows.length) {
+        return res.json({ companyId: null, recipientId: null, autoSend: false, enabled: false });
+      }
+      const row = r.rows[0];
+      res.json({
+        companyId:   row.company_id,
+        recipientId: row.recipient_id,
+        autoSend:    row.auto_send,
+        enabled:     row.enabled,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.put("/api/whatsapp/stock-settings", requireAuth, async (req, res) => {
+    try {
+      const { companyId, recipientId, autoSend, enabled } = req.body as Record<string, any>;
+      await pool.query(
+        `INSERT INTO whatsapp_stock_settings (id, company_id, recipient_id, auto_send, enabled)
+         VALUES (1, $1, $2, $3, $4)
+         ON CONFLICT (id) DO UPDATE SET
+           company_id   = EXCLUDED.company_id,
+           recipient_id = EXCLUDED.recipient_id,
+           auto_send    = EXCLUDED.auto_send,
+           enabled      = EXCLUDED.enabled`,
+        [companyId ?? null, recipientId ?? null, autoSend ?? false, enabled ?? false],
+      );
+      res.json({ message: "Saved" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Send Stock + Net Position to one specific group ─────────────────────────
+
+  app.post("/api/whatsapp/send-stock-report", requireAuth, async (req, res) => {
+    try {
+      const { companyId: reqCompanyId, recipientId: reqRecipientId } = req.body as Record<string, any>;
+
+      // Resolve company
+      const companyId = reqCompanyId ? parseInt(reqCompanyId) : null;
+      if (!companyId) return res.status(400).json({ message: "companyId is required" });
+
+      const allCompanies = await storage.getAllCompanies();
+      const company      = allCompanies.find((c: any) => c.id === companyId);
+      if (!company) return res.status(404).json({ message: "Company not found" });
+
+      // Resolve recipient chatId
+      const recipientId = reqRecipientId ? parseInt(reqRecipientId) : null;
+      if (!recipientId) return res.status(400).json({ message: "recipientId is required" });
+
+      const rResult = await pool.query(
+        "SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true",
+        [recipientId],
+      );
+      if (!rResult.rows.length) return res.status(404).json({ message: "Recipient not found or inactive" });
+      const chatId = rResult.rows[0].chat_id as string;
+
+      const today    = new Date().toISOString().split("T")[0];
+      const yearStart = `${new Date().getUTCFullYear()}-01-01`;
+
+      // 1. Stock PDF
+      console.log(`[WhatsApp] Generating stock PDF for ${company.name}…`);
+      const pdfBuf   = await generateStockPdf(companyId, company.name);
+      const pdfName  = `Stock_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.pdf`;
+      const pdfCap   = `Stock Inventory with Cost — ${company.name}\nAs of ${today}`;
+      const pdfRes   = await sendWhatsAppFileToChatId(chatId, pdfBuf, pdfName, pdfCap, "application/pdf");
+      if (!pdfRes.success) {
+        return res.status(502).json({ message: pdfRes.error || "Failed to send stock PDF" });
+      }
+
+      // 2. Net Position Excel (Jan 1 → today)
+      console.log(`[WhatsApp] Generating net-position Excel for ${company.name} (${yearStart}→${today})…`);
+      const xlsBuf  = await generateNetPositionExcel(companyId, company.name, yearStart, today);
+      const xlsName = `NetPosition_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.xlsx`;
+      const xlsCap  = `Net Position Report — ${company.name}\nPeriod: ${yearStart} → ${today}`;
+      const xlsRes  = await sendWhatsAppFileToChatId(
+        chatId, xlsBuf, xlsName, xlsCap,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      if (!xlsRes.success) {
+        return res.status(502).json({ message: xlsRes.error || "Failed to send net position Excel" });
+      }
+
+      res.json({ message: `Stock PDF + Net Position Excel sent to ${chatId}` });
+    } catch (err: any) {
+      console.error("[WhatsApp] send-stock-report error:", err);
       res.status(500).json({ message: err.message });
     }
   });

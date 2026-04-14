@@ -105,6 +105,38 @@ interface SendResult {
   error?:  string;
 }
 
+/** Send a single file to one specific chatId (not all recipients) */
+export async function sendWhatsAppFileToChatId(
+  chatId:   string,
+  buffer:   Buffer,
+  fileName: string,
+  caption:  string,
+  mimeType = "application/octet-stream",
+): Promise<{ success: boolean; error?: string }> {
+  const settings = await getWaSettings();
+  if (!settings?.instanceId || !settings?.apiToken) {
+    return { success: false, error: "WhatsApp credentials not configured" };
+  }
+  if (!settings.enabled) {
+    return { success: false, error: "WhatsApp sending is disabled" };
+  }
+
+  const url  = baseUrl(settings.instanceId, settings.apiToken, "sendFileByUpload");
+  const form = new FormData();
+  const blob = new Blob([buffer], { type: mimeType });
+  form.append("chatId",   chatId);
+  form.append("file",     blob, fileName);
+  form.append("fileName", fileName);
+  if (caption) form.append("caption", caption);
+
+  const response = await fetch(url, { method: "POST", body: form });
+  if (!response.ok) {
+    const body = await response.text();
+    return { success: false, error: `Green API ${response.status}: ${body}` };
+  }
+  return { success: true };
+}
+
 export async function sendWhatsAppFile(
   buffer:   Buffer,
   fileName: string,
