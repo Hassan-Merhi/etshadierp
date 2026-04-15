@@ -1982,8 +1982,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     onSuccess: () => {
       toast({ title: "Revision approved", description: "Quantities have been updated." });
       setApproveRevisionTarget(null);
+      // Reset the hydration guard so the form re-loads with the new quantities
+      hydratedVoucherIdRef.current = null;
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", stockTransferToEdit?.id, "revisions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", voucherIdToEdit] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers/list"] });
     },
     onError: (err: any) => {
       toast({ title: "Approval failed", description: err.message, variant: "destructive" });
