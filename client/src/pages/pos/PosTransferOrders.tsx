@@ -101,6 +101,14 @@ function formatDateTime(dateStr: string) {
   try { return format(parseISO(dateStr), "MMM dd, yyyy HH:mm"); } catch { return dateStr; }
 }
 
+/** Format a quantity string/number removing trailing .000-style zeros */
+function fmtQty(val: string | number): string {
+  const n = typeof val === "string" ? parseFloat(val) : val;
+  if (isNaN(n)) return String(val);
+  // Show up to 3 decimal places but strip trailing zeros
+  return n % 1 === 0 ? String(n) : n.toFixed(3).replace(/\.?0+$/, "");
+}
+
 interface ExtraItem {
   stockItemId: number;
   stockItemName: string;
@@ -647,11 +655,11 @@ function EditableTransferDetail({
                         data-testid={`text-rev-item-${rev.id}-${i}`}>
                         <span className="font-medium truncate">{ri.stockItemName}</span>
                         <div className="flex items-center gap-2 shrink-0 font-mono">
-                          <span className="text-muted-foreground">{ri.originalQuantity}</span>
+                          <span className="text-muted-foreground">{fmtQty(ri.originalQuantity)}</span>
                           <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                          <span className="font-semibold">{ri.newQuantity}</span>
+                          <span className="font-semibold">{fmtQty(ri.newQuantity)}</span>
                           <span className={cn("font-medium", delta > 0 ? "text-green-600 dark:text-green-400" : "text-destructive")}>
-                            ({delta > 0 ? "+" : ""}{ri.delta})
+                            ({delta > 0 ? "+" : ""}{fmtQty(ri.delta)})
                           </span>
                         </div>
                       </div>

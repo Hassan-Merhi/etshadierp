@@ -1082,8 +1082,13 @@ export function registerFiscalTransferRoutes(app: Express) {
         .where(eq(stockTransferRevisions.transferId, transferRow.id))
         .orderBy(asc(stockTransferRevisions.revisionNumber));
 
+      // POS users only see their own revisions; non-POS users (admins) see all
+      const visibleRevisionRows = isPosUser
+        ? revisionRows.filter(r => r.createdBy === req.user?.id)
+        : revisionRows;
+
       const revisions = await Promise.all(
-        revisionRows.map(async (rev) => {
+        visibleRevisionRows.map(async (rev) => {
           const items = await db.select().from(stockTransferRevisionItems).where(eq(stockTransferRevisionItems.revisionId, rev.id));
           return { ...rev, items };
         })
@@ -1161,7 +1166,7 @@ export function registerFiscalTransferRoutes(app: Express) {
 
         const [newRev] = await db
           .insert(stockTransferRevisions)
-          .values({ transferId, revisionNumber: nextNum, note: note?.trim() || null, optional: isOptional })
+          .values({ transferId, revisionNumber: nextNum, note: note?.trim() || null, optional: isOptional, createdBy: req.user?.id ?? null })
           .returning();
         revision = newRev;
       }

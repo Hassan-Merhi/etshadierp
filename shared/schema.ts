@@ -964,6 +964,7 @@ export const stockTransferRevisions = pgTable("stock_transfer_revisions", {
   note: text("note"),
   optional: boolean("optional").default(false).notNull(),
   revisionDate: timestamp("revision_date").notNull().defaultNow(),
+  createdBy: varchar("created_by"),
 });
 
 export const stockTransferRevisionItems = pgTable("stock_transfer_revision_items", {
