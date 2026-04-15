@@ -64,7 +64,7 @@
   import { useAppMode } from "@/contexts/AppModeContext";
   import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
   import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, Archive } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -107,6 +107,7 @@ import { DailyExportSection } from "./settings/DailyExportSection";
 import { WhatsAppExportSection } from "./settings/WhatsAppExportSection";
 import { StockReportSection } from "./settings/StockReportSection";
 import { NetPositionExportSection } from "./settings/NetPositionExportSection";
+import { DailyAutoSendSection } from "./settings/DailyAutoSendSection";
 import { FileStorageTab } from "./settings/FileStorageTab";
 import { BulkRenameTab } from "./settings/BulkRenameTab";
 import { LoginHistoryTab } from "./settings/LoginHistoryTab";
@@ -1095,6 +1096,7 @@ const FACTORY_COST_FIELDS = [
           { key: "export-accounts", label: "Export Accounts", icon: Download },
           { key: "daily-export", label: "Daily Export", icon: Download },
           { key: "np-export", label: "Net Position Export", icon: TrendingUp },
+          { key: "daily-autosend", label: "Daily Auto-Send", icon: Archive },
         ],
       },
       {
@@ -1912,6 +1914,10 @@ const FACTORY_COST_FIELDS = [
 
           {activeSection === "np-export" && (
             <NetPositionExportSection />
+          )}
+
+          {activeSection === "daily-autosend" && (
+            <DailyAutoSendSection />
           )}
 
           {activeSection === "fiscal" && (

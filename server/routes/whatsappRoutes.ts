@@ -25,6 +25,7 @@ import {
 import { generateNetPositionExcel, generateMonthEnds } from "../helpers/generateNetPositionExcel";
 import { generateStockPdf } from "../helpers/generateStockPdf";
 import { sendExportEmail } from "../services/emailService";
+import { triggerDailyWhatsAppSendNow } from "../services/schedulerService";
 import archiver from "archiver";
 
 export function registerWhatsAppRoutes(app: Express) {
@@ -340,6 +341,15 @@ export function registerWhatsAppRoutes(app: Express) {
   });
 
   // ── Send Net Position (all companies) to group + email NOW ──────────────────
+
+  app.post("/api/daily-export/trigger-whatsapp", requireAuth, async (_req, res) => {
+    try {
+      const result = await triggerDailyWhatsAppSendNow();
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
 
   app.post("/api/whatsapp/send-np-all-now", requireAuth, async (req, res) => {
     try {

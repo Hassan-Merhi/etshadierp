@@ -511,4 +511,16 @@ export function startScheduler() {
   console.log("[NetPositionExport] Scheduled export checker started — checks every hour.");
 }
 
+/** Manually trigger the daily ZIP → WhatsApp send (bypasses schedule check). */
+export async function triggerDailyWhatsAppSendNow(): Promise<{ message: string }> {
+  const companies = await fetchAllCompanies();
+  if (!companies || companies.length === 0) {
+    return { message: "No companies found." };
+  }
+  const today = getTodayLabel();
+  const { zip } = await buildZipBuffer(companies, undefined, undefined, today);
+  await runDailyWhatsAppSend(zip, today, companies);
+  return { message: `Daily ZIP sent to WhatsApp (${companies.length} companies, label: ${today}).` };
+}
+
 export { runDailyExport, buildZipBuffer };
