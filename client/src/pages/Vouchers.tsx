@@ -448,17 +448,25 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const data = await res.json();
       return Array.isArray(data) ? data[0] : data;
     },
+    staleTime: 0,
   });
+
+  // Stable transfer ID ref — prevents revision query key from going undefined during
+  // background refetch of stockTransferToEdit, which would cause transferRevisions to
+  // flash empty and collapse the revision history panel.
+  const lastKnownTransferIdRef = useRef<number | null>(null);
+  if (stockTransferToEdit?.id) lastKnownTransferIdRef.current = stockTransferToEdit.id;
+  const stableTransferId = stockTransferToEdit?.id ?? lastKnownTransferIdRef.current;
 
   // Fetch revisions for stock transfer being edited
   const { data: transferRevisions = [] } = useQuery<any[]>({
-    queryKey: ["/api/stock-transfers", stockTransferToEdit?.id, "revisions"],
+    queryKey: ["/api/stock-transfers", stableTransferId, "revisions"],
     queryFn: async () => {
-      const res = await fetch(`/api/stock-transfers/${stockTransferToEdit!.id}/revisions`, { credentials: "include" });
+      const res = await fetch(`/api/stock-transfers/${stableTransferId}/revisions`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch revisions");
       return res.json();
     },
-    enabled: !!stockTransferToEdit?.id,
+    enabled: !!stableTransferId,
   });
 
   // Fetch stock adjustment data for editing if voucherIdToEdit is present
@@ -1982,9 +1990,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     onSuccess: () => {
       toast({ title: "Revision approved", description: "Quantities have been updated." });
       setApproveRevisionTarget(null);
+      // Keep revision history panel open after approval
+      setTransferRevisionsExpanded(true);
       // Reset the hydration guard so the form re-loads with the new quantities
       hydratedVoucherIdRef.current = null;
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", stockTransferToEdit?.id, "revisions"] });
+      // Use lastKnownTransferIdRef so the revision query key remains stable even
+      // while stockTransferToEdit is in a background-refetch state
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", lastKnownTransferIdRef.current, "revisions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", voucherIdToEdit] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers/list"] });
     },
@@ -2581,9 +2593,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         note: transferRevisionNote.trim() || null,
         items: revisionItems,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", stockTransferToEdit!.id, "revisions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", lastKnownTransferIdRef.current, "revisions"] });
       setTransferRevisionNote("");
       setTransferRevisionDialogOpen(false);
+      setTransferRevisionsExpanded(true);
       const nextRevNum = transferRevisions.length + 1;
       toast({ title: "Revision Saved", description: `Rev ${nextRevNum} recorded and transfer updated` });
     } catch (error: any) {
@@ -5754,7 +5767,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           </Dialog>
 
           {/* ── Transfer Revision History Panel ── */}
-          {voucherIdToEdit && stockTransferToEdit?.id && (
+          {voucherIdToEdit && stableTransferId && (
             <Card className="mt-4">
               <CardHeader
                 className="p-4 cursor-pointer select-none"
@@ -5804,8 +5817,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             <Switch
                               checked={rev.optional}
                               onCheckedChange={async (checked) => {
-                                await modeApiRequest("PATCH", `/api/stock-transfer-revisions/${rev.id}/optional`, { optional: checked });
-                                queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", stockTransferToEdit.id, "revisions"] });
+                                try {
+                                  await modeApiRequest("PATCH", `/api/stock-transfer-revisions/${rev.id}/optional`, { optional: checked });
+                                } finally {
+                                  // Always refetch after toggle (success or failure) so the UI is in sync
+                                  setTransferRevisionsExpanded(true);
+                                  queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", lastKnownTransferIdRef.current, "revisions"] });
+                                }
                               }}
                               data-testid={`switch-transfer-revision-optional-${rev.id}`}
                             />
