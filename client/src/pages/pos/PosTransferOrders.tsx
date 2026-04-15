@@ -146,7 +146,7 @@ function ItemSearchPanel({
   }, [activeIdx]);
 
   return (
-    <div className="flex flex-col h-full border-l bg-card w-64 shrink-0">
+    <div className="flex flex-col h-full">
       {/* Panel header */}
       <div className="flex items-start justify-between gap-2 px-3 py-3 border-b">
         <div>
@@ -349,7 +349,7 @@ function EditableTransferDetail({
         </div>
       </div>
 
-      {/* ── Main flex row: table + optional right panel ── */}
+      {/* ── Main content ── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Left: scrollable content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -606,8 +606,13 @@ function EditableTransferDetail({
           )}
         </div>
 
-        {/* Right: search panel */}
-        {panelOpen && (
+        {/* Spacer: reserves room for the fixed panel so content doesn't slide under it */}
+        {panelOpen && <div className="w-64 shrink-0" />}
+      </div>
+
+      {/* Fixed right panel — positioned relative to the viewport, not the flex chain */}
+      {panelOpen && (
+        <div className="fixed right-0 top-12 bottom-0 w-64 z-30 bg-card border-l flex flex-col shadow-md overflow-hidden">
           <ItemSearchPanel
             matches={panelMatches}
             activeIdx={panelActiveIdx}
@@ -616,8 +621,8 @@ function EditableTransferDetail({
             onPick={addExtraItem}
             onClose={() => { setPanelOpen(false); setPanelSearch(""); }}
           />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
