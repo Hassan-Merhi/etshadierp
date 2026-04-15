@@ -61,6 +61,7 @@ interface TransferDetailItem {
 interface RevisionItem {
   stockItemId: number;
   stockItemName: string;
+  sourceLocationName?: string | null;
   originalQuantity: string;
   delta: string;
   newQuantity: string;
@@ -282,20 +283,25 @@ function ViewTransferDialog({
                         )}
                       </div>
                       {rev.note && <p className="text-xs text-muted-foreground">{rev.note}</p>}
-                      <div className="divide-y rounded-md border overflow-hidden">
+                      <div className="rounded-md border overflow-hidden">
+                        <div className="grid grid-cols-[1fr_auto_auto_auto_auto] bg-muted/30 border-b px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide gap-x-4">
+                          <span>Item</span>
+                          <span>Location</span>
+                          <span className="text-right">Was</span>
+                          <span className="text-right">Now</span>
+                          <span className="text-right">Change</span>
+                        </div>
                         {rev.items.map((ri, i) => {
                           const delta = parseFloat(ri.delta);
                           return (
-                            <div key={i} className="flex items-center justify-between px-3 py-1.5 text-xs gap-4 bg-card">
+                            <div key={i} className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center px-3 py-2 text-xs gap-x-4 bg-card border-b last:border-b-0">
                               <span className="font-medium truncate">{ri.stockItemName}</span>
-                              <div className="flex items-center gap-2 shrink-0 font-mono">
-                                <span className="text-muted-foreground">{fmtQty(ri.originalQuantity)}</span>
-                                <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                                <span className="font-semibold">{fmtQty(ri.newQuantity)}</span>
-                                <span className={cn("font-medium", delta > 0 ? "text-green-600 dark:text-green-400" : "text-destructive")}>
-                                  ({delta > 0 ? "+" : ""}{fmtQty(ri.delta)})
-                                </span>
-                              </div>
+                              <span className="text-muted-foreground whitespace-nowrap">{ri.sourceLocationName ?? "—"}</span>
+                              <span className="font-mono text-right text-muted-foreground">{fmtQty(ri.originalQuantity)}</span>
+                              <span className="font-mono font-semibold text-right">{fmtQty(ri.newQuantity)}</span>
+                              <span className={cn("font-mono font-semibold text-right", delta > 0 ? "text-green-600 dark:text-green-400" : "text-destructive")}>
+                                {delta > 0 ? "+" : ""}{fmtQty(ri.delta)}
+                              </span>
                             </div>
                           );
                         })}
@@ -514,20 +520,25 @@ function EditableTransferDetail({
                   )}
                 </div>
                 {rev.note && <p className="text-xs text-muted-foreground">{rev.note}</p>}
-                <div className="divide-y rounded-md border overflow-hidden">
+                <div className="rounded-md border overflow-hidden">
+                  <div className="grid grid-cols-[1fr_auto_auto_auto_auto] bg-muted/30 border-b px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide gap-x-4">
+                    <span>Item</span>
+                    <span>Location</span>
+                    <span className="text-right">Was</span>
+                    <span className="text-right">Now</span>
+                    <span className="text-right">Change</span>
+                  </div>
                   {rev.items.map((ri, i) => {
                     const delta = parseFloat(ri.delta);
                     return (
-                      <div key={i} className="flex items-center justify-between px-3 py-1.5 text-xs gap-4 bg-card" data-testid={`text-rev-item-${rev.id}-${i}`}>
+                      <div key={i} className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center px-3 py-2 text-xs gap-x-4 bg-card border-b last:border-b-0" data-testid={`text-rev-item-${rev.id}-${i}`}>
                         <span className="font-medium truncate">{ri.stockItemName}</span>
-                        <div className="flex items-center gap-2 shrink-0 font-mono">
-                          <span className="text-muted-foreground">{fmtQty(ri.originalQuantity)}</span>
-                          <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                          <span className="font-semibold">{fmtQty(ri.newQuantity)}</span>
-                          <span className={cn("font-medium", delta > 0 ? "text-green-600 dark:text-green-400" : "text-destructive")}>
-                            ({delta > 0 ? "+" : ""}{fmtQty(ri.delta)})
-                          </span>
-                        </div>
+                        <span className="text-muted-foreground whitespace-nowrap">{ri.sourceLocationName ?? "—"}</span>
+                        <span className="font-mono text-right text-muted-foreground">{fmtQty(ri.originalQuantity)}</span>
+                        <span className="font-mono font-semibold text-right">{fmtQty(ri.newQuantity)}</span>
+                        <span className={cn("font-mono font-semibold text-right", delta > 0 ? "text-green-600 dark:text-green-400" : "text-destructive")}>
+                          {delta > 0 ? "+" : ""}{fmtQty(ri.delta)}
+                        </span>
                       </div>
                     );
                   })}
