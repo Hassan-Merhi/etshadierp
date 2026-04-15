@@ -2403,92 +2403,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             </div>
           </div>
 
-          {/* Hidden Stock Print Template — kept inside dialog so it mounts early for prefetch */}
-          <div style={{ display: 'none' }}>
-            <div ref={stockPrintRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', backgroundColor: 'white', color: 'black' }}>
-              <style dangerouslySetInnerHTML={{ __html: `
-                @page { size: A4; margin: 12mm 14mm; }
-                @media print {
-                  body { margin: 0; font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                  .stock-header { text-align: center; margin-bottom: 10px; }
-                  .stock-header h1 { font-size: 16pt; font-weight: bold; margin: 0 0 4px 0; text-decoration: underline; }
-                  .stock-header p { font-size: 9pt; margin: 0; color: #333; }
-                  .stock-meta { display: flex; justify-content: space-between; font-size: 8pt; color: #666; margin-top: 6px; padding-top: 4px; border-top: 1px solid #ccc; }
-                  .stock-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 8px; }
-                  .stock-table th { font-size: 9pt; font-weight: bold; padding: 4px 8px; border-bottom: 2px solid #333; text-align: left; background-color: #f0f0f0; }
-                  .stock-table th.qty-col { text-align: right; }
-                  .stock-table td { padding: 3px 8px; border-bottom: 1px solid #ccc; vertical-align: middle; }
-                  .stock-table td.qty-col { text-align: right; font-weight: 500; white-space: nowrap; }
-                  .stock-table tr.group-row td { font-weight: bold; font-size: 10pt; background-color: #e8e8e8; padding: 4px 8px; border-bottom: 1px solid #666; border-top: 1px solid #666; }
-                  .stock-table tr.item-row td { padding-left: 16px; }
-                  .stock-table tr.negative-row td { background-color: rgba(255,200,200,0.5); }
-                  .stock-table tr.total-row td { font-weight: bold; font-size: 10pt; border-top: 2px solid #333; border-bottom: 2px solid #333; padding: 5px 8px; background-color: #f0f0f0; }
-                }
-              `}} />
-              {/* Header */}
-              <div className="stock-header">
-                <h1>{activeLocation?.name ?? "Stock Report"}</h1>
-                <p>Godown Summary</p>
-                <p>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}</p>
-                <div className="stock-meta">
-                  <span>Printed: {new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-              </div>
-              {/* Table */}
-              {stockInventory.length === 0 ? (
-                <p style={{ textAlign: 'center', color: '#666', marginTop: '20px' }}>No inventory found at this location.</p>
-              ) : (() => {
-                const sorted = [...stockInventory]
-                  .filter(item => parseFloat(item.quantity || '0') !== 0)
-                  .sort((a, b) => (a.stockGroupName || '').localeCompare(b.stockGroupName || '') || a.stockItemName.localeCompare(b.stockItemName));
-                const grouped = sorted.reduce((acc: Record<string, { name: string; items: any[] }>, item) => {
-                  const key = item.stockGroupCode || 'UNCAT';
-                  if (!acc[key]) acc[key] = { name: item.stockGroupName || 'Unassigned', items: [] };
-                  acc[key].items.push(item);
-                  return acc;
-                }, {});
-                const grandTotal = sorted.reduce((s, i) => s + Math.floor(parseFloat(i.quantity || '0')), 0);
-                return (
-                  <table className="stock-table">
-                    <thead>
-                      <tr>
-                        <th>Item</th>
-                        <th className="qty-col">Qty (BL)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.entries(grouped).map(([groupCode, { name, items }]) => {
-                        const groupQty = (items as any[]).reduce((s, i) => s + Math.floor(parseFloat(i.quantity || '0')), 0);
-                        return [
-                          <tr key={`g-${groupCode}`} className="group-row">
-                            <td>{name}</td>
-                            <td className="qty-col">{groupQty.toLocaleString()}</td>
-                          </tr>,
-                          ...(items as any[]).map((item) => {
-                            const qty = Math.floor(parseFloat(item.quantity || '0'));
-                            const isNeg = qty < 0;
-                            return (
-                              <tr key={`i-${item.inventoryId || item.stockItemId}`} className={`item-row${isNeg ? ' negative-row' : ''}`}>
-                                <td>{item.stockItemName}</td>
-                                <td className="qty-col">{qty.toLocaleString()}</td>
-                              </tr>
-                            );
-                          }),
-                        ];
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr className="total-row">
-                        <td>Grand Total</td>
-                        <td className="qty-col">{grandTotal.toLocaleString()}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                );
-              })()}
-            </div>
-          </div>
-
           <AlertDialogFooter>
             <Button variant="outline" onClick={() => { setShowPrintDialog(false); if (editVoucherId) navigate("/pos-daybook"); }} data-testid="button-cancel-print">
               Close
@@ -2506,6 +2420,90 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Hidden Stock Print Template — lives outside all dialogs so ref stays mounted */}
+      <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', visibility: 'hidden', pointerEvents: 'none' }}>
+        <div ref={stockPrintRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', backgroundColor: 'white', color: 'black' }}>
+          <style dangerouslySetInnerHTML={{ __html: `
+            @page { size: A4; margin: 12mm 14mm; }
+            @media print {
+              body { margin: 0; font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .stock-header { text-align: center; margin-bottom: 10px; }
+              .stock-header h1 { font-size: 16pt; font-weight: bold; margin: 0 0 4px 0; text-decoration: underline; }
+              .stock-header p { font-size: 9pt; margin: 0; color: #333; }
+              .stock-meta { display: flex; justify-content: space-between; font-size: 8pt; color: #666; margin-top: 6px; padding-top: 4px; border-top: 1px solid #ccc; }
+              .stock-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 8px; }
+              .stock-table th { font-size: 9pt; font-weight: bold; padding: 4px 8px; border-bottom: 2px solid #333; text-align: left; background-color: #f0f0f0; }
+              .stock-table th.qty-col { text-align: right; }
+              .stock-table td { padding: 3px 8px; border-bottom: 1px solid #ccc; vertical-align: middle; }
+              .stock-table td.qty-col { text-align: right; font-weight: 500; white-space: nowrap; }
+              .stock-table tr.group-row td { font-weight: bold; font-size: 10pt; background-color: #e8e8e8; padding: 4px 8px; border-bottom: 1px solid #666; border-top: 1px solid #666; }
+              .stock-table tr.item-row td { padding-left: 16px; }
+              .stock-table tr.negative-row td { background-color: rgba(255,200,200,0.5); }
+              .stock-table tr.total-row td { font-weight: bold; font-size: 10pt; border-top: 2px solid #333; border-bottom: 2px solid #333; padding: 5px 8px; background-color: #f0f0f0; }
+            }
+          `}} />
+          <div className="stock-header">
+            <h1>{activeLocation?.name ?? "Stock Report"}</h1>
+            <p>Godown Summary</p>
+            <p>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}</p>
+            <div className="stock-meta">
+              <span>Printed: {new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+          </div>
+          {stockInventory.length === 0 ? (
+            <p style={{ textAlign: 'center', color: '#666', marginTop: '20px' }}>No inventory found at this location.</p>
+          ) : (() => {
+            const sorted = [...stockInventory]
+              .filter(item => parseFloat(item.quantity || '0') !== 0)
+              .sort((a, b) => (a.stockGroupName || '').localeCompare(b.stockGroupName || '') || a.stockItemName.localeCompare(b.stockItemName));
+            const grouped = sorted.reduce((acc: Record<string, { name: string; items: any[] }>, item) => {
+              const key = item.stockGroupCode || 'UNCAT';
+              if (!acc[key]) acc[key] = { name: item.stockGroupName || 'Unassigned', items: [] };
+              acc[key].items.push(item);
+              return acc;
+            }, {});
+            const grandTotal = sorted.reduce((s, i) => s + Math.floor(parseFloat(i.quantity || '0')), 0);
+            return (
+              <table className="stock-table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th className="qty-col">Qty (BL)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(grouped).map(([groupCode, { name, items }]) => {
+                    const groupQty = (items as any[]).reduce((s, i) => s + Math.floor(parseFloat(i.quantity || '0')), 0);
+                    return [
+                      <tr key={`g-${groupCode}`} className="group-row">
+                        <td>{name}</td>
+                        <td className="qty-col">{groupQty.toLocaleString()}</td>
+                      </tr>,
+                      ...(items as any[]).map((item) => {
+                        const qty = Math.floor(parseFloat(item.quantity || '0'));
+                        const isNeg = qty < 0;
+                        return (
+                          <tr key={`i-${item.inventoryId || item.stockItemId}`} className={`item-row${isNeg ? ' negative-row' : ''}`}>
+                            <td>{item.stockItemName}</td>
+                            <td className="qty-col">{qty.toLocaleString()}</td>
+                          </tr>
+                        );
+                      }),
+                    ];
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="total-row">
+                    <td>Grand Total</td>
+                    <td className="qty-col">{grandTotal.toLocaleString()}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            );
+          })()}
+        </div>
+      </div>
 
       {/* Stock Print Prompt — appears after invoice is printed */}
       <AlertDialog open={showStockPrompt} onOpenChange={setShowStockPrompt}>
