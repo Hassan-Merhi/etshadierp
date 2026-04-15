@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft, MapPin, Layers, Package, Search, Printer, ArrowUpDown,
-  FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2, Pencil, Tag, Zap
+  FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2, Pencil, Tag, Zap, Eye
 } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { useEscapeBack } from "@/hooks/use-escape-back";
@@ -136,6 +136,7 @@ export default function FactoryLocationInventory() {
   const modeApiRequest = getApiRequest(appMode);
 
   const [proformaMode, setProformaMode] = useState(false);
+  const [showZeroStock, setShowZeroStock] = useState(false);
   const [hideZeroAvailable, setHideZeroAvailable] = useState(true);
   const [selections, setSelections] = useState<Map<number, ProformaSelection>>(new Map());
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
@@ -324,7 +325,7 @@ export default function FactoryLocationInventory() {
     enabled: !!selectedLocation && proformaMode,
   });
 
-  // Catalog of all bale products — always fetched in proforma mode so "Show 0" is instant
+  // Catalog of all bale products — fetched in proforma mode OR when showZeroStock is on
   const { data: catalogBaleProducts = [] } = useQuery<Array<{ id: number; articleCode: string | null; name: string; sellingPrice: string | null; categoryId: number | null; active: boolean }>>({
     queryKey: ["/api/factory/bale-products"],
     queryFn: async () => {
@@ -332,7 +333,7 @@ export default function FactoryLocationInventory() {
       if (!res.ok) throw new Error("Failed to fetch bale products catalog");
       return res.json();
     },
-    enabled: proformaMode,
+    enabled: proformaMode || showZeroStock,
   });
 
   const { data: catalogCategories = [] } = useQuery<Array<{ id: number; name: string }>>({
@@ -342,16 +343,18 @@ export default function FactoryLocationInventory() {
       if (!res.ok) throw new Error("Failed to fetch categories");
       return res.json();
     },
-    enabled: proformaMode,
+    enabled: proformaMode || showZeroStock,
   });
 
   // In proforma mode use the reservations-aware data; otherwise use the plain inventory.
   // In proforma mode always merge all catalog products (even those with 0 stock) so every product is visible for selection.
   const activeInventoryData: FactoryBaleProduct[] = useMemo(() => {
     const base = proformaMode && availableInventoryData.length > 0 ? availableInventoryData : inventoryData;
-    // When hiding zero-stock items (or outside proforma mode), return base as-is
-    if (hideZeroAvailable || !proformaMode) return base;
     const catNameMap = new Map(catalogCategories.map((c) => [c.id, c.name]));
+
+    const shouldMergeZero = (!hideZeroAvailable && proformaMode) || (!proformaMode && showZeroStock);
+    if (!shouldMergeZero) return base;
+
     const inStockIds = new Set(base.map((p) => p.productId));
     // Include ALL catalog products not already in stock — active or inactive
     const zeroItems: FactoryBaleProduct[] = catalogBaleProducts
@@ -370,7 +373,7 @@ export default function FactoryLocationInventory() {
         isInactive: p.active === false,
       }));
     return [...base, ...zeroItems];
-  }, [proformaMode, hideZeroAvailable, availableInventoryData, inventoryData, catalogBaleProducts, catalogCategories]);
+  }, [proformaMode, showZeroStock, hideZeroAvailable, availableInventoryData, inventoryData, catalogBaleProducts, catalogCategories]);
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/factory/customers"],
@@ -625,7 +628,8 @@ export default function FactoryLocationInventory() {
             const matchesCatFilter = selectedCategory.categoryId === -1
               ? (categoryFilter === "__all__" || p.category === categoryFilter)
               : true;
-            if (hideZeroAvailable && p.baleCount === 0) return false;
+            const hideZero = proformaMode ? hideZeroAvailable : !showZeroStock;
+            if (hideZero && p.baleCount === 0) return false;
             if (proformaMode && showSelectedOnly) return matchesSearch && matchesCatFilter && selections.has(p.productId);
             return matchesSearch && matchesCatFilter;
           }
@@ -1324,6 +1328,19 @@ export default function FactoryLocationInventory() {
               >
                 {catSortDir === "asc" ? "\u2191" : "\u2193"}
               </Button>
+              {!proformaMode && (
+                <Button
+                  variant={showZeroStock ? "default" : "outline"}
+                  size="default"
+                  onClick={() => setShowZeroStock(v => !v)}
+                  data-testid="button-show-zero-stock-categories"
+                  className="gap-2"
+                >
+                  <Eye className="h-4 w-4" />
+                  <span className="hidden sm:inline">{showZeroStock ? "Hide zero stock" : "Show zero stock"}</span>
+                  <span className="sm:hidden">Zero</span>
+                </Button>
+              )}
             </div>
           </div>
 
@@ -1772,6 +1789,19 @@ export default function FactoryLocationInventory() {
             >
               {prodSortDir === "asc" ? "\u2191" : "\u2193"}
             </Button>
+            {!proformaMode && (
+              <Button
+                variant={showZeroStock ? "default" : "outline"}
+                size="default"
+                onClick={() => setShowZeroStock(v => !v)}
+                data-testid="button-show-zero-stock-products"
+                className="gap-2"
+              >
+                <Eye className="h-4 w-4" />
+                <span className="hidden sm:inline">{showZeroStock ? "Hide zero stock" : "Show zero stock"}</span>
+                <span className="sm:hidden">Zero</span>
+              </Button>
+            )}
           </div>
         </div>
 
