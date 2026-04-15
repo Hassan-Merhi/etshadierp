@@ -1,13 +1,15 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
-import { ArrowLeft, ChevronRight, RotateCcw, Plus, Minus, Loader2, Save, CheckCircle2, AlertCircle, Search, X } from "lucide-react";
+import {
+  ArrowLeft, ChevronRight, RotateCcw, Plus, Minus, Loader2, Save,
+  CheckCircle2, Search, X, ArrowRight, Clock, Package2
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
@@ -36,7 +38,7 @@ interface TransferSummary {
   inventoryApplied: boolean;
 }
 
-interface TransferItem {
+interface TransferDetailItem {
   id: number;
   transferId: number;
   stockItemId: number;
@@ -44,14 +46,11 @@ interface TransferItem {
   sourceLocationId?: number;
   sourceLocationName?: string;
   quantity: string;
-  rate: string;
 }
 
 interface RevisionItem {
   stockItemId: number;
   stockItemName: string;
-  sourceLocationId?: number;
-  sourceLocationName?: string;
   originalQuantity: string;
   delta: string;
   newQuantity: string;
@@ -78,13 +77,14 @@ interface TransferDetail {
   destinationLocationId: number;
   destinationLocationName: string;
   notes?: string;
-  items: TransferItem[];
+  items: TransferDetailItem[];
   revisions: Revision[];
 }
 
 interface InventoryItem {
   stockItemId: number;
   name: string;
+  stockItemName?: string;
   locationId: number;
   quantity?: string;
 }
@@ -93,17 +93,38 @@ function formatDate(dateStr: string) {
   try { return format(parseISO(dateStr), "MMM dd, yyyy"); } catch { return dateStr; }
 }
 
-// ─── Detail view ──────────────────────────────────────────────────────────────
+function formatDateTime(dateStr: string) {
+  try { return format(parseISO(dateStr), "MMM dd, yyyy HH:mm"); } catch { return dateStr; }
+}
 
-function TransferOrderDetail({ voucherId, posUser, onBack }: { voucherId: number; posUser: PosUser; onBack: () => void }) {
+// ─── Extra item row for newly-added items ─────────────────────────────────────
+interface ExtraItem {
+  stockItemId: number;
+  stockItemName: string;
+  qtyDraft: string;
+}
+
+// ─── Detail view ──────────────────────────────────────────────────────────────
+function TransferOrderDetail({
+  voucherId,
+  posUser,
+  onBack,
+}: {
+  voucherId: number;
+  posUser: PosUser;
+  onBack: () => void;
+}) {
   const { toast } = useToast();
+  // delta per item id (relative: "+3", "-2", or absolute)
   const [deltas, setDeltas] = useState<Record<number, string>>({});
+  const [deltaDrafts, setDeltaDrafts] = useState<Record<number, string>>({});
+  const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
   const [note, setNote] = useState("");
   const [itemSearch, setItemSearch] = useState("");
   const [showItemPicker, setShowItemPicker] = useState(false);
-  const [extraItems, setExtraItems] = useState<Array<{ stockItemId: number; stockItemName: string; delta: string }>>([]);
+  const pickerRef = useRef<HTMLDivElement>(null);
 
-  const { data: detail, isLoading, error } = useQuery<TransferDetail>({
+  const { data: detail, isLoading } = useQuery<TransferDetail>({
     queryKey: ["/api/pos-transfer-detail", voucherId],
     queryFn: async () => {
       const res = await fetch(`/api/pos-transfer-detail?voucherId=${voucherId}`, { credentials: "include" });
@@ -112,358 +133,478 @@ function TransferOrderDetail({ voucherId, posUser, onBack }: { voucherId: number
     },
   });
 
-  const { data: inventory = [] } = useQuery<InventoryItem[]>({
+  const { data: rawInventory = [] } = useQuery<InventoryItem[]>({
     queryKey: ["/api/inventory", posUser.assignedLocationId],
     queryFn: async () => {
       if (!posUser.assignedLocationId) return [];
-      const res = await fetch(`/api/inventory?locationId=${posUser.assignedLocationId}`, { credentials: "include" });
+      const res = await fetch(`/api/locations/${posUser.assignedLocationId}/inventory`, { credentials: "include" });
       return res.ok ? res.json() : [];
     },
     enabled: !!posUser.assignedLocationId,
   });
 
   const revisionMutation = useMutation({
-    mutationFn: async (payload: { transferId: number; note: string; items: any[]; optional: boolean }) => {
-      const res = await apiRequest("POST", `/api/stock-transfers/${payload.transferId}/revisions`, {
+    mutationFn: async (payload: { transferId: number; note: string; items: any[] }) => {
+      return apiRequest("POST", `/api/stock-transfers/${payload.transferId}/revisions`, {
         note: payload.note,
         items: payload.items,
-        optional: payload.optional,
+        optional: true,
       });
-      return res;
     },
     onSuccess: () => {
-      toast({ title: "Revision saved", description: "Your adjustments have been submitted for review." });
+      toast({ title: "Revision saved", description: "Your adjustments have been submitted for the admin to review." });
       queryClient.invalidateQueries({ queryKey: ["/api/pos-transfer-detail", voucherId] });
       setDeltas({});
+      setDeltaDrafts({});
       setExtraItems([]);
       setNote("");
     },
     onError: (err: any) => {
-      toast({ title: "Error saving revision", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
-  const getDelta = (itemId: number) => parseFloat(deltas[itemId] ?? "0") || 0;
-  const setDelta = (itemId: number, val: string) => setDeltas(prev => ({ ...prev, [itemId]: val }));
+  // Parse delta for an item (may be "+3", "-2", "5", etc.)
+  const getDeltaNum = (itemId: number): number => {
+    const val = (deltaDrafts[itemId] ?? deltas[itemId] ?? "0").trim();
+    if (!val || val === "-" || val === "+") return 0;
+    return parseFloat(val) || 0;
+  };
+
+  const setDeltaVal = (itemId: number, val: string) => {
+    setDeltas(prev => ({ ...prev, [itemId]: val }));
+    setDeltaDrafts(prev => ({ ...prev, [itemId]: val }));
+  };
+
+  const applyDraftDelta = (itemId: number, original: number) => {
+    const draft = (deltaDrafts[itemId] ?? "").trim();
+    if (!draft || draft === "-" || draft === "+") {
+      setDeltaVal(itemId, "0");
+      return;
+    }
+    const num = parseFloat(draft) || 0;
+    setDeltaVal(itemId, String(num));
+  };
+
   const adjustDelta = (itemId: number, by: number) => {
-    const cur = getDelta(itemId);
-    setDelta(itemId, String(cur + by));
+    const cur = getDeltaNum(itemId);
+    setDeltaVal(itemId, String(cur + by));
   };
 
-  const adjustExtraDelta = (idx: number, by: number) => {
-    setExtraItems(prev => prev.map((it, i) => i === idx ? { ...it, delta: String((parseFloat(it.delta) || 0) + by) } : it));
-  };
+  const existingIds = new Set((detail?.items ?? []).map(i => i.stockItemId));
+  const inventory = (rawInventory as any[]).map(i => ({
+    stockItemId: i.stockItemId ?? i.id,
+    name: i.stockItemName ?? i.name ?? "",
+    quantity: i.quantity ?? "0",
+  }));
 
-  const existingStockIds = new Set(detail?.items.map(i => i.stockItemId) ?? []);
   const filteredInventory = inventory.filter(inv =>
-    !existingStockIds.has(inv.stockItemId) &&
+    !existingIds.has(inv.stockItemId) &&
+    !extraItems.some(e => e.stockItemId === inv.stockItemId) &&
     inv.name.toLowerCase().includes(itemSearch.toLowerCase())
   );
 
-  const addExtraItem = (inv: InventoryItem) => {
-    if (extraItems.some(e => e.stockItemId === inv.stockItemId)) return;
-    setExtraItems(prev => [...prev, { stockItemId: inv.stockItemId, stockItemName: inv.name, delta: "0" }]);
+  const addExtraItem = (inv: { stockItemId: number; name: string }) => {
+    setExtraItems(prev => [...prev, { stockItemId: inv.stockItemId, stockItemName: inv.name, qtyDraft: "0" }]);
     setShowItemPicker(false);
     setItemSearch("");
   };
 
-  const removeExtraItem = (idx: number) => {
+  const updateExtraQty = (idx: number, val: string) => {
+    setExtraItems(prev => prev.map((it, i) => i === idx ? { ...it, qtyDraft: val } : it));
+  };
+
+  const removeExtra = (idx: number) => {
     setExtraItems(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const handleSaveRevision = () => {
+  const handleSave = () => {
     if (!detail) return;
 
-    const changedBaseItems = (detail.items || [])
-      .map(item => {
-        const delta = getDelta(item.id);
-        const original = parseFloat(item.quantity);
-        return {
-          stockItemId: item.stockItemId,
-          stockItemName: item.stockItemName,
-          sourceLocationId: item.sourceLocationId ?? detail.sourceLocationId,
-          sourceLocationName: item.sourceLocationName ?? detail.sourceLocationName,
-          originalQuantity: item.quantity,
-          delta: String(delta),
-          newQuantity: String(original + delta),
-        };
-      });
+    const baseItems = (detail.items ?? []).map(item => {
+      const delta = getDeltaNum(item.id);
+      const original = parseFloat(item.quantity) || 0;
+      return {
+        stockItemId: item.stockItemId,
+        stockItemName: item.stockItemName,
+        sourceLocationId: item.sourceLocationId ?? detail.sourceLocationId,
+        sourceLocationName: item.sourceLocationName ?? detail.sourceLocationName,
+        originalQuantity: item.quantity,
+        delta: String(delta),
+        newQuantity: String(original + delta),
+      };
+    });
 
     const newItems = extraItems
-      .filter(e => (parseFloat(e.delta) || 0) !== 0)
+      .map(e => ({ ...e, qty: parseFloat(e.qtyDraft) || 0 }))
+      .filter(e => e.qty !== 0)
       .map(e => ({
         stockItemId: e.stockItemId,
         stockItemName: e.stockItemName,
         sourceLocationId: posUser.assignedLocationId,
         sourceLocationName: detail.sourceLocationName,
         originalQuantity: "0",
-        delta: e.delta,
-        newQuantity: e.delta,
+        delta: String(e.qty),
+        newQuantity: String(e.qty),
       }));
 
-    const allItems = [...changedBaseItems, ...newItems];
-
+    const allItems = [...baseItems, ...newItems];
     if (allItems.length === 0) {
-      toast({ title: "No changes", description: "Please adjust at least one item quantity.", variant: "destructive" });
+      toast({ title: "No changes", description: "Adjust at least one item quantity.", variant: "destructive" });
       return;
     }
 
-    revisionMutation.mutate({ transferId: detail.transferId, note, items: allItems, optional: true });
+    revisionMutation.mutate({ transferId: detail.transferId, note, items: allItems });
   };
+
+  const hasChanges =
+    (detail?.items ?? []).some(i => getDeltaNum(i.id) !== 0) ||
+    extraItems.some(e => (parseFloat(e.qtyDraft) || 0) !== 0);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
-  if (error || !detail) {
+  if (!detail) {
     return (
-      <div className="space-y-4">
-        <Button variant="ghost" size="sm" onClick={onBack} data-testid="button-back-to-list">
-          <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
-        </Button>
-        <div className="flex items-center gap-2 text-destructive">
-          <AlertCircle className="h-4 w-4" />
-          <span>Failed to load transfer order.</span>
-        </div>
+      <div className="space-y-3 p-4">
+        <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4 mr-1.5" />Back</Button>
+        <p className="text-sm text-destructive">Failed to load order.</p>
       </div>
     );
   }
-
-  const hasAnyChange = detail.items.some(i => getDelta(i.id) !== 0) || extraItems.some(e => (parseFloat(e.delta) || 0) !== 0);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      {/* Header bar */}
+      <div className="flex items-center gap-2 flex-wrap">
         <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back-to-list">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="flex-1 min-w-0">
-          <div className="font-semibold text-base">{detail.voucherNumber}</div>
-          <div className="text-xs text-muted-foreground">{formatDate(detail.voucherDate)} &middot; {detail.sourceLocationName} &rarr; {detail.destinationLocationName}</div>
+        <div className="flex items-center gap-1.5 text-sm flex-wrap flex-1 min-w-0">
+          <span className="font-semibold" data-testid="text-voucher-number">{detail.voucherNumber}</span>
+          <span className="text-muted-foreground hidden sm:inline">&middot;</span>
+          <span className="text-muted-foreground hidden sm:inline">{formatDate(detail.voucherDate)}</span>
         </div>
-        {detail.inventoryApplied && (
-          <Badge variant="secondary" data-testid="badge-inventory-applied">Applied</Badge>
-        )}
-        {detail.optional && (
-          <Badge variant="outline" data-testid="badge-optional">Draft</Badge>
-        )}
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{detail.sourceLocationName}</span>
+          <ArrowRight className="h-3 w-3" />
+          <span className="font-medium text-foreground">{detail.destinationLocationName}</span>
+        </div>
+        {detail.inventoryApplied && <Badge variant="secondary">Applied</Badge>}
+        {detail.optional && <Badge variant="outline">Draft</Badge>}
       </div>
 
-      {/* Items table */}
-      <Card>
-        <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
-          <CardTitle className="text-sm font-semibold">Items</CardTitle>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowItemPicker(prev => !prev)}
-            data-testid="button-add-item"
-          >
-            <Plus className="h-3.5 w-3.5 mr-1" />
-            Add Item
-          </Button>
-        </CardHeader>
+      {/* Main table card */}
+      <Card className="overflow-hidden">
+        {/* Desktop table header */}
+        <div className="hidden sm:grid grid-cols-[2rem_1fr_6rem_7rem_6rem_2.5rem] bg-muted/50 border-b px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          <span>#</span>
+          <span>Item</span>
+          <span className="text-right">Original</span>
+          <span className="text-center">Adjustment</span>
+          <span className="text-right">New Qty</span>
+          <span></span>
+        </div>
 
-        {showItemPicker && (
-          <div className="px-4 pb-3 space-y-2">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Search items..."
-                value={itemSearch}
-                onChange={e => setItemSearch(e.target.value)}
-                className="pl-8 h-8 text-sm"
-                data-testid="input-item-search"
-                autoFocus
-              />
-            </div>
-            <div className="border rounded-md max-h-40 overflow-y-auto">
-              {filteredInventory.length === 0 ? (
-                <div className="text-xs text-muted-foreground p-3">No items found</div>
-              ) : filteredInventory.slice(0, 20).map(inv => (
-                <button
-                  key={inv.stockItemId}
-                  type="button"
-                  className="w-full text-left px-3 py-2 text-sm hover-elevate"
-                  onClick={() => addExtraItem(inv)}
-                  data-testid={`button-pick-item-${inv.stockItemId}`}
-                >
-                  {inv.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <CardContent className="pt-0">
-          <div className="space-y-0 divide-y">
-            {detail.items.map((item) => {
-              const delta = getDelta(item.id);
-              const original = parseFloat(item.quantity);
-              const newQty = original + delta;
-              return (
-                <div key={item.id} className="py-2.5 space-y-1.5" data-testid={`row-item-${item.id}`}>
-                  <div className="font-medium text-sm">{item.stockItemName}</div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs text-muted-foreground w-20 shrink-0">
-                      Original: <strong>{original}</strong>
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => adjustDelta(item.id, -1)}
-                        data-testid={`button-minus-${item.id}`}
-                        className="h-7 w-7"
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <Input
-                        type="number"
-                        value={deltas[item.id] ?? "0"}
-                        onChange={e => setDelta(item.id, e.target.value)}
-                        className="h-7 w-16 text-center text-sm"
-                        data-testid={`input-delta-${item.id}`}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => adjustDelta(item.id, 1)}
-                        data-testid={`button-plus-${item.id}`}
-                        className="h-7 w-7"
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    <span className={cn("text-xs font-medium", delta !== 0 ? (delta > 0 ? "text-green-600 dark:text-green-400" : "text-destructive") : "text-muted-foreground")}>
-                      New: <strong>{newQty}</strong>
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-
-            {extraItems.map((item, idx) => {
-              const delta = parseFloat(item.delta) || 0;
-              return (
-                <div key={`extra-${item.stockItemId}`} className="py-2.5 space-y-1.5" data-testid={`row-extra-item-${item.stockItemId}`}>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm flex-1">{item.stockItemName}</span>
-                    <Badge variant="outline" className="text-xs">New</Badge>
-                    <Button
+        <div>
+          {/* Existing items */}
+          {(detail.items ?? []).map((item, idx) => {
+            const deltaNum = getDeltaNum(item.id);
+            const original = parseFloat(item.quantity) || 0;
+            const newQty = original + deltaNum;
+            const changed = deltaNum !== 0;
+            return (
+              <div
+                key={item.id}
+                data-testid={`row-item-${item.id}`}
+                className={cn(
+                  "border-b last:border-b-0",
+                  changed && "bg-primary/5"
+                )}
+              >
+                {/* Desktop row */}
+                <div className="hidden sm:grid grid-cols-[2rem_1fr_6rem_7rem_6rem_2.5rem] items-center px-3 py-1.5 gap-2">
+                  <span className="text-xs text-muted-foreground">{idx + 1}</span>
+                  <span className="text-sm font-medium truncate">{item.stockItemName}</span>
+                  <span className="text-sm font-mono text-right">{original}</span>
+                  {/* Adjustment */}
+                  <div className="flex items-center justify-center gap-1">
+                    <button
                       type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeExtraItem(idx)}
-                      data-testid={`button-remove-extra-${item.stockItemId}`}
-                      className="h-6 w-6"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => adjustExtraDelta(idx, -1)}
-                      data-testid={`button-extra-minus-${item.stockItemId}`}
-                      className="h-7 w-7"
+                      onClick={() => adjustDelta(item.id, -1)}
+                      className="h-6 w-6 flex items-center justify-center rounded border bg-background hover-elevate active-elevate-2 text-muted-foreground shrink-0"
+                      data-testid={`button-minus-${item.id}`}
                     >
                       <Minus className="h-3 w-3" />
-                    </Button>
-                    <Input
-                      type="number"
-                      value={item.delta}
-                      onChange={e => setExtraItems(prev => prev.map((it, i) => i === idx ? { ...it, delta: e.target.value } : it))}
-                      className="h-7 w-16 text-center text-sm"
-                      data-testid={`input-extra-delta-${item.stockItemId}`}
+                    </button>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={deltaDrafts[item.id] ?? deltas[item.id] ?? "0"}
+                      onChange={e => setDeltaDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                      onBlur={() => applyDraftDelta(item.id, original)}
+                      className="w-12 text-center text-sm border rounded bg-background px-1 py-0.5 font-mono outline-none focus:ring-1 focus:ring-ring"
+                      data-testid={`input-delta-${item.id}`}
                     />
-                    <Button
+                    <button
                       type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => adjustExtraDelta(idx, 1)}
-                      data-testid={`button-extra-plus-${item.stockItemId}`}
-                      className="h-7 w-7"
+                      onClick={() => adjustDelta(item.id, 1)}
+                      className="h-6 w-6 flex items-center justify-center rounded border bg-background hover-elevate active-elevate-2 text-muted-foreground shrink-0"
+                      data-testid={`button-plus-${item.id}`}
                     >
                       <Plus className="h-3 w-3" />
-                    </Button>
-                    <span className="text-xs text-muted-foreground ml-1">qty: <strong>{delta}</strong></span>
+                    </button>
                   </div>
+                  <span className={cn(
+                    "text-sm font-mono font-semibold text-right",
+                    changed && (deltaNum > 0 ? "text-green-600 dark:text-green-400" : "text-destructive")
+                  )}>
+                    {newQty}
+                  </span>
+                  <div />
                 </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Note + Save */}
-      <Card>
-        <CardContent className="pt-4 space-y-3">
-          <Textarea
-            placeholder="Optional note for this revision..."
-            value={note}
-            onChange={e => setNote(e.target.value)}
-            rows={2}
-            className="resize-none text-sm"
-            data-testid="textarea-revision-note"
-          />
-          <Button
-            type="button"
-            onClick={handleSaveRevision}
-            disabled={!hasAnyChange || revisionMutation.isPending}
-            className="w-full"
-            data-testid="button-save-revision"
-          >
-            {revisionMutation.isPending ? (
-              <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Saving...</>
-            ) : (
-              <><Save className="h-4 w-4 mr-1.5" /> Save Revision</>
-            )}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Revisions history */}
-      {detail.revisions.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Revision History</h3>
-          {detail.revisions.map(rev => (
-            <Card key={rev.id} data-testid={`card-revision-${rev.id}`}>
-              <CardContent className="pt-3 pb-3 space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium">Revision #{rev.revisionNumber}</span>
-                  <div className="flex items-center gap-1.5">
-                    {rev.optional ? (
-                      <Badge variant="outline" className="text-xs" data-testid={`badge-rev-optional-${rev.id}`}>Pending Review</Badge>
-                    ) : (
-                      <Badge variant="default" className="text-xs" data-testid={`badge-rev-approved-${rev.id}`}>
-                        <CheckCircle2 className="h-3 w-3 mr-1" />Approved
-                      </Badge>
+                {/* Mobile row */}
+                <div className="sm:hidden p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium">{item.stockItemName}</span>
+                    <span className="text-xs text-muted-foreground">#{idx + 1}</span>
+                  </div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-xs text-muted-foreground">Original: <strong className="text-foreground">{original}</strong></span>
+                    <div className="flex items-center gap-1">
+                      <button type="button" onClick={() => adjustDelta(item.id, -1)}
+                        className="h-7 w-7 flex items-center justify-center rounded border bg-background hover-elevate active-elevate-2"
+                        data-testid={`button-minus-mobile-${item.id}`}>
+                        <Minus className="h-3 w-3" />
+                      </button>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={deltaDrafts[item.id] ?? deltas[item.id] ?? "0"}
+                        onChange={e => setDeltaDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                        onBlur={() => applyDraftDelta(item.id, original)}
+                        className="w-14 text-center text-sm border rounded bg-background px-2 py-1 font-mono outline-none focus:ring-1 focus:ring-ring"
+                        data-testid={`input-delta-mobile-${item.id}`}
+                      />
+                      <button type="button" onClick={() => adjustDelta(item.id, 1)}
+                        className="h-7 w-7 flex items-center justify-center rounded border bg-background hover-elevate active-elevate-2"
+                        data-testid={`button-plus-mobile-${item.id}`}>
+                        <Plus className="h-3 w-3" />
+                      </button>
+                    </div>
+                    {changed && (
+                      <span className={cn("text-xs font-semibold", deltaNum > 0 ? "text-green-600 dark:text-green-400" : "text-destructive")}>
+                        New: {newQty}
+                      </span>
                     )}
                   </div>
                 </div>
-                {rev.note && <p className="text-xs text-muted-foreground">{rev.note}</p>}
-                <div className="space-y-1 pt-1">
-                  {rev.items.map((ri, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs text-muted-foreground gap-2" data-testid={`text-rev-item-${rev.id}-${i}`}>
-                      <span className="font-medium text-foreground truncate">{ri.stockItemName}</span>
-                      <span className="shrink-0">
-                        {ri.originalQuantity} &rarr; <strong>{ri.newQuantity}</strong>
-                        <span className={cn("ml-1", parseFloat(ri.delta) > 0 ? "text-green-600 dark:text-green-400" : "text-destructive")}>
-                          ({parseFloat(ri.delta) > 0 ? "+" : ""}{ri.delta})
-                        </span>
-                      </span>
+              </div>
+            );
+          })}
+
+          {/* Extra (added) items */}
+          {extraItems.map((item, idx) => {
+            const qty = parseFloat(item.qtyDraft) || 0;
+            return (
+              <div
+                key={`extra-${item.stockItemId}`}
+                className="border-b last:border-b-0 bg-primary/5"
+                data-testid={`row-extra-${item.stockItemId}`}
+              >
+                {/* Desktop */}
+                <div className="hidden sm:grid grid-cols-[2rem_1fr_6rem_7rem_6rem_2.5rem] items-center px-3 py-1.5 gap-2">
+                  <span className="text-xs text-muted-foreground">{(detail.items?.length ?? 0) + idx + 1}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm font-medium truncate">{item.stockItemName}</span>
+                    <Badge variant="outline" className="text-xs shrink-0">New</Badge>
+                  </div>
+                  <span className="text-sm font-mono text-right text-muted-foreground">—</span>
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="number"
+                      min="0"
+                      value={item.qtyDraft}
+                      onChange={e => updateExtraQty(idx, e.target.value)}
+                      className="w-20 text-center text-sm border rounded bg-background px-1 py-0.5 font-mono outline-none focus:ring-1 focus:ring-ring"
+                      data-testid={`input-extra-qty-${item.stockItemId}`}
+                    />
+                  </div>
+                  <span className="text-sm font-mono font-semibold text-right text-green-600 dark:text-green-400">{qty > 0 ? qty : "—"}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeExtra(idx)}
+                    className="h-6 w-6 flex items-center justify-center rounded hover-elevate text-muted-foreground"
+                    data-testid={`button-remove-extra-${item.stockItemId}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+
+                {/* Mobile */}
+                <div className="sm:hidden p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-sm font-medium truncate">{item.stockItemName}</span>
+                      <Badge variant="outline" className="text-xs shrink-0">New</Badge>
                     </div>
-                  ))}
+                    <button type="button" onClick={() => removeExtra(idx)}
+                      className="h-6 w-6 flex items-center justify-center rounded hover-elevate text-muted-foreground"
+                      data-testid={`button-remove-extra-mobile-${item.stockItemId}`}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Qty:</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={item.qtyDraft}
+                      onChange={e => updateExtraQty(idx, e.target.value)}
+                      className="w-20 text-center text-sm border rounded bg-background px-2 py-1 font-mono outline-none focus:ring-1 focus:ring-ring"
+                      data-testid={`input-extra-qty-mobile-${item.stockItemId}`}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Add Item row */}
+        <div className="border-t">
+          {showItemPicker ? (
+            <div className="p-3 space-y-2" ref={pickerRef}>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search items to add..."
+                  value={itemSearch}
+                  onChange={e => setItemSearch(e.target.value)}
+                  className="pl-8 h-8 text-sm"
+                  data-testid="input-item-search"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => { setShowItemPicker(false); setItemSearch(""); }}
+                  className="absolute right-2 top-1.5 h-5 w-5 flex items-center justify-center text-muted-foreground hover-elevate"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="border rounded-md max-h-36 overflow-y-auto bg-popover">
+                {filteredInventory.length === 0 ? (
+                  <div className="text-xs text-muted-foreground p-3 text-center">No items found</div>
+                ) : filteredInventory.slice(0, 30).map(inv => (
+                  <button
+                    key={inv.stockItemId}
+                    type="button"
+                    onClick={() => addExtraItem(inv)}
+                    className="w-full text-left px-3 py-2 text-sm hover-elevate border-b last:border-b-0 flex items-center justify-between gap-2"
+                    data-testid={`button-pick-${inv.stockItemId}`}
+                  >
+                    <span className="truncate">{inv.name}</span>
+                    {inv.quantity && <span className="text-xs text-muted-foreground shrink-0">{parseFloat(inv.quantity)} in stock</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowItemPicker(true)}
+              className="w-full px-3 py-2 text-sm text-muted-foreground flex items-center gap-2 hover-elevate"
+              data-testid="button-add-item"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add item
+            </button>
+          )}
+        </div>
+
+        {/* Totals row */}
+        <div className="border-t px-3 py-2 bg-muted/30 flex items-center justify-end gap-4 text-xs text-muted-foreground">
+          <span>Total Items: <strong className="text-foreground">{(detail.items?.length ?? 0) + extraItems.length}</strong></span>
+        </div>
+      </Card>
+
+      {/* Notes + Save */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start">
+        <Textarea
+          placeholder="Notes (optional)..."
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          rows={2}
+          className="resize-none text-sm flex-1"
+          data-testid="textarea-revision-note"
+        />
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={!hasChanges || revisionMutation.isPending}
+          className="w-full sm:w-auto shrink-0"
+          data-testid="button-save-revision"
+        >
+          {revisionMutation.isPending ? (
+            <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Saving...</>
+          ) : (
+            <><Save className="h-4 w-4 mr-1.5" />Save Revision</>
+          )}
+        </Button>
+      </div>
+
+      {/* Revision history */}
+      {(detail.revisions?.length ?? 0) > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Revision History</span>
+          </div>
+          {detail.revisions.map(rev => (
+            <Card key={rev.id} data-testid={`card-revision-${rev.id}`}>
+              <CardContent className="pt-3 pb-3 space-y-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">Revision #{rev.revisionNumber}</span>
+                    <span className="text-xs text-muted-foreground">{formatDateTime(rev.createdAt)}</span>
+                  </div>
+                  {rev.optional ? (
+                    <Badge variant="outline" className="text-xs" data-testid={`badge-pending-${rev.id}`}>Pending Admin Review</Badge>
+                  ) : (
+                    <Badge variant="default" className="text-xs" data-testid={`badge-approved-${rev.id}`}>
+                      <CheckCircle2 className="h-3 w-3 mr-1" />Approved
+                    </Badge>
+                  )}
+                </div>
+                {rev.note && <p className="text-xs text-muted-foreground">{rev.note}</p>}
+                <div className="divide-y rounded-md border overflow-hidden">
+                  {rev.items.map((ri, i) => {
+                    const delta = parseFloat(ri.delta);
+                    return (
+                      <div key={i} className="flex items-center justify-between px-3 py-1.5 text-xs gap-4 bg-card"
+                        data-testid={`text-rev-item-${rev.id}-${i}`}>
+                        <span className="font-medium truncate">{ri.stockItemName}</span>
+                        <div className="flex items-center gap-2 shrink-0 font-mono">
+                          <span className="text-muted-foreground">{ri.originalQuantity}</span>
+                          <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                          <span className="font-semibold">{ri.newQuantity}</span>
+                          <span className={cn(
+                            "font-medium",
+                            delta > 0 ? "text-green-600 dark:text-green-400" : "text-destructive"
+                          )}>
+                            ({delta > 0 ? "+" : ""}{ri.delta})
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -475,7 +616,6 @@ function TransferOrderDetail({ voucherId, posUser, onBack }: { voucherId: number
 }
 
 // ─── List view ────────────────────────────────────────────────────────────────
-
 export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
   const [selectedVoucherId, setSelectedVoucherId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
@@ -488,26 +628,20 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
     },
   });
 
-  const filteredTransfers = useMemo(() => {
+  const transfers = useMemo(() => {
     return allTransfers.filter(t => {
-      const destLower = t.destinationLocationName?.toLowerCase() ?? "";
-      const isKolwezi = destLower.includes("kolwezi");
-      if (!isKolwezi) return false;
-
-      const searchLower = search.toLowerCase().trim();
-      if (searchLower) {
-        return (
-          t.voucherNumber?.toLowerCase().includes(searchLower) ||
-          t.stockItemNames?.some(n => n.toLowerCase().includes(searchLower))
-        );
-      }
-      return true;
+      if (!t.destinationLocationName?.toLowerCase().includes("kolwezi")) return false;
+      const s = search.toLowerCase().trim();
+      if (!s) return true;
+      return t.voucherNumber?.toLowerCase().includes(s) ||
+        t.stockItemNames?.some(n => n.toLowerCase().includes(s));
     });
   }, [allTransfers, search]);
 
+  // ── Detail view (inline, no route change) ──
   if (selectedVoucherId !== null) {
     return (
-      <div className="p-4 max-w-lg mx-auto">
+      <div className="p-4">
         <TransferOrderDetail
           voucherId={selectedVoucherId}
           posUser={posUser}
@@ -517,67 +651,67 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
     );
   }
 
+  // ── List view ──
   return (
-    <div className="p-4 max-w-lg mx-auto space-y-4">
+    <div className="p-4 space-y-4">
       <div>
-        <h1 className="text-lg font-semibold" data-testid="text-page-title">Kolwezi Transfer Orders</h1>
-        <p className="text-sm text-muted-foreground">Review and adjust incoming transfer orders</p>
+        <h1 className="text-base font-semibold" data-testid="text-page-title">Kolwezi Transfer Orders</h1>
+        <p className="text-xs text-muted-foreground">Review and adjust quantities for your location</p>
       </div>
 
       <div className="relative">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by voucher or item..."
+          placeholder="Search voucher or item..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="pl-9"
+          className="pl-9 h-9"
           data-testid="input-list-search"
         />
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
+        <div className="flex items-center justify-center py-16">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
-      ) : filteredTransfers.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground text-sm" data-testid="text-empty-state">
-          <RotateCcw className="h-8 w-8 mx-auto mb-2 opacity-30" />
-          No Kolwezi transfer orders found
+      ) : transfers.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground" data-testid="text-empty">
+          <Package2 className="h-10 w-10 mx-auto mb-2 opacity-25" />
+          <p className="text-sm">No Kolwezi transfer orders found</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {filteredTransfers.map(t => (
-            <Card
+        <div className="space-y-0 border rounded-md divide-y overflow-hidden">
+          {transfers.map(t => (
+            <button
               key={t.voucherId}
-              className="cursor-pointer hover-elevate"
+              type="button"
               onClick={() => setSelectedVoucherId(t.voucherId)}
-              data-testid={`card-transfer-${t.voucherId}`}
+              className="w-full text-left px-4 py-3 hover-elevate flex items-center gap-3 bg-card"
+              data-testid={`row-transfer-${t.voucherId}`}
             >
-              <CardContent className="pt-3 pb-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm" data-testid={`text-voucher-number-${t.voucherId}`}>{t.voucherNumber}</span>
-                      {t.inventoryApplied && (
-                        <Badge variant="secondary" className="text-xs" data-testid={`badge-applied-${t.voucherId}`}>Applied</Badge>
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {formatDate(t.voucherDate)} &middot; {t.destinationLocationName}
-                    </div>
-                    {t.stockItemNames?.length > 0 && (
-                      <div className="text-xs text-muted-foreground mt-1 truncate">
-                        {t.stockItemNames.slice(0, 3).join(", ")}{t.stockItemNames.length > 3 ? ` +${t.stockItemNames.length - 3} more` : ""}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs text-muted-foreground">{t.itemCount} item{t.itemCount !== 1 ? "s" : ""}</span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
+              <div className="flex-1 min-w-0 space-y-0.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold" data-testid={`text-voucher-${t.voucherId}`}>{t.voucherNumber}</span>
+                  {t.inventoryApplied && (
+                    <Badge variant="secondary" className="text-xs" data-testid={`badge-applied-${t.voucherId}`}>Applied</Badge>
+                  )}
+                  <span className="text-xs text-muted-foreground">{t.destinationLocationName}</span>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="text-xs text-muted-foreground">
+                  {formatDate(t.voucherDate)}
+                </div>
+                {(t.stockItemNames?.length ?? 0) > 0 && (
+                  <div className="text-xs text-muted-foreground truncate">
+                    {t.stockItemNames.slice(0, 3).join(", ")}
+                    {(t.stockItemNames.length > 3) ? ` +${t.stockItemNames.length - 3} more` : ""}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0 text-muted-foreground">
+                <span className="text-xs">{t.itemCount} items</span>
+                <ChevronRight className="h-4 w-4" />
+              </div>
+            </button>
           ))}
         </div>
       )}
