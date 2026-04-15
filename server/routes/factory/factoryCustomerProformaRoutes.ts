@@ -632,6 +632,24 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       }
       const customerMap = new Map(customerRows.map((c: any) => [c.id, c.legalName]));
 
+      // 6. Product names for all in-stock article codes (fills in names for codes not in any proforma)
+      const allArticleCodes = [...new Set([
+        ...inStockCounts.map((s: any) => s.articleCode),
+        ...allLines.map((l: any) => l.articleCode),
+      ])];
+      let productNamesMap: Record<string, string> = {};
+      if (allArticleCodes.length > 0) {
+        const prodRaw = await db.execute(
+          sql`SELECT DISTINCT ON (article_code) article_code as "articleCode", name
+              FROM factory_bale_products
+              WHERE article_code = ANY(${sql.raw(`ARRAY[${allArticleCodes.map((c: string) => `'${c.replace(/'/g, "''")}'`).join(',')}]`)})
+              ORDER BY article_code`
+        );
+        (prodRaw.rows || prodRaw as any[]).forEach((r: any) => {
+          if (r.name) productNamesMap[r.articleCode] = r.name;
+        });
+      }
+
       res.json({
         proformas: allProformas.map((p: any) => ({
           id: p.id,
@@ -644,6 +662,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           lines: allLines.filter((l: any) => l.proformaId === p.id),
         })),
         inStockCounts,
+        productNames: productNamesMap,
         reservations,
         activeOrders: activeOrders.map((o: any) => ({
           id: o.id,

@@ -26,6 +26,7 @@ interface Proforma {
 interface AllocationData {
   proformas: Proforma[];
   inStockCounts: { articleCode: string; count: number }[];
+  productNames: Record<string, string>;
   reservations: any[];
   activeOrders: any[];
 }
@@ -92,7 +93,7 @@ export default function FactoryStockAllocation() {
     const visibleProformas = allProformas.filter(p => visibleProformaIds.has(p.id));
     const inStockMap = new Map(data.inStockCounts.map(s => [s.articleCode, s.count]));
 
-    const productNameByCode = new Map<string, string>();
+    const productNameByCode = new Map<string, string>(Object.entries(data.productNames || {}));
     allProformas.forEach(p => p.lines.forEach(l => { if (l.productName) productNameByCode.set(l.articleCode, l.productName); }));
 
     const articleCodeSet = new Set<string>();
