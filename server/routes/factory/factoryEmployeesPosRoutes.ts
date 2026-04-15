@@ -2413,15 +2413,53 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const ledgerForUsTotal = classified.forUsTotal;
       const ledgerOnUsTotal = classified.onUsTotal;
 
-      // ── 3. Combine and return ────────────────────────────────────────────
-      const forUsTotal = round2(ledgerForUsTotal);
+      // ── 3. Inventory (Stock In Hand) — sell value ────────────────────────
+      // Sum sellingPrice × 1 bale for every IN_STOCK or FINALIZED bale,
+      // matching the same filter the location-inventory screen uses.
+      const inventoryBaleRows = await db
+        .select({ productId: factoryBales.productId, articleCode: factoryBales.articleCode })
+        .from(factoryBales)
+        .where(and(
+          eq(factoryBales.companyId, companyId),
+          or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+        ));
+
+      const productRowsForInv = await db
+        .select({ id: factoryBaleProducts.id, articleCode: factoryBaleProducts.articleCode, sellingPrice: factoryBaleProducts.sellingPrice })
+        .from(factoryBaleProducts)
+        .where(eq(factoryBaleProducts.companyId, companyId));
+
+      const productByIdForInv   = new Map(productRowsForInv.map(p => [p.id, p]));
+      const productByCodeForInv = new Map(
+        productRowsForInv.filter(p => p.articleCode).map(p => [p.articleCode!.toLowerCase(), p])
+      );
+
+      let inventorySellValue = 0;
+      for (const bale of inventoryBaleRows) {
+        const product = bale.productId
+          ? productByIdForInv.get(bale.productId)
+          : bale.articleCode
+            ? productByCodeForInv.get(bale.articleCode.toLowerCase())
+            : undefined;
+        if (!product) continue;
+        inventorySellValue += parseFloat(product.sellingPrice || "0");
+      }
+      inventorySellValue = round2(inventorySellValue);
+
+      // ── 4. Combine and return ────────────────────────────────────────────
+      const forUsTotal = round2(ledgerForUsTotal + inventorySellValue);
       const onUsTotal = round2(ledgerOnUsTotal + totalSupplierLiabilities);
       const netPosition = round2(forUsTotal - onUsTotal);
 
       // Build breakdown arrays
-      const forUsAccounts = ledgerForUs
-        .sort((a, b) => b.value - a.value)
-        .map(a => ({ ...a, value: round2(a.value) }));
+      const inventoryAccount = inventorySellValue > 0
+        ? [{ name: "Stock In Hand (Inventory)", code: "INVENTORY", value: inventorySellValue, category: "Inventory" }]
+        : [];
+
+      const forUsAccounts = [
+        ...inventoryAccount,
+        ...ledgerForUs.sort((a, b) => b.value - a.value).map(a => ({ ...a, value: round2(a.value) })),
+      ];
 
       // Group ledger on-us by category
       const ledgerOnUsGrouped: Record<string, number> = {};
@@ -2459,6 +2497,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         forUs: { total: forUsTotal, breakdown: forUsBreakdown, accounts: forUsAccounts },
         onUs: { total: onUsTotal, breakdown: onUsBreakdown, accounts: onUsAccounts },
         supplierLiabilities: round2(totalSupplierLiabilities),
+        inventoryValue: inventorySellValue,
         ledgerAssets: round2(ledgerForUsTotal),
         ledgerLiabilities: round2(ledgerOnUsTotal),
       });

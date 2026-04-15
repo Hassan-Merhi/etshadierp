@@ -35,6 +35,7 @@ interface NetPositionData {
   forUs: { total: number; breakdown: BreakdownItem[]; accounts: AccountItem[] };
   onUs: { total: number; breakdown: BreakdownItem[]; accounts: AccountItem[] };
   supplierLiabilities: number;
+  inventoryValue: number;
   ledgerAssets: number;
   ledgerLiabilities: number;
 }
@@ -316,7 +317,7 @@ export default function FactoryNetPosition() {
       )}
 
       {/* Sub-totals info */}
-      {!isLoading && data && (data.supplierLiabilities > 0 || data.ledgerAssets > 0) && (
+      {!isLoading && data && (data.supplierLiabilities > 0 || data.ledgerAssets > 0 || data.inventoryValue > 0) && (
         <Card data-testid="card-composition">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
@@ -325,7 +326,14 @@ export default function FactoryNetPosition() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+              {data.inventoryValue > 0 && (
+                <div className="space-y-1">
+                  <p className="text-muted-foreground text-xs uppercase tracking-wide">Stock In Hand</p>
+                  <p className="font-mono font-semibold text-green-600 dark:text-green-400" data-testid="text-inventory-value">{fmt(data.inventoryValue)}</p>
+                  <p className="text-xs text-muted-foreground">Location inventory sell value</p>
+                </div>
+              )}
               <div className="space-y-1">
                 <p className="text-muted-foreground text-xs uppercase tracking-wide">Ledger Assets</p>
                 <p className="font-mono font-semibold text-green-600 dark:text-green-400">{fmt(data.ledgerAssets)}</p>
