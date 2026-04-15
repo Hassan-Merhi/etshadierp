@@ -685,17 +685,18 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      // 1. In-stock bale counts by article code
-      const inStockRaw = await db.execute(
+      // 1. Free bale counts (truly available, not assigned to any order)
+      const freeStockRaw = await db.execute(
         sql`SELECT article_code as "articleCode", COUNT(*)::int as count
             FROM factory_bales
             WHERE company_id = ${companyId} AND status = 'IN_STOCK'
             GROUP BY article_code`
       );
-      const inStockCounts: { articleCode: string; count: number }[] = (inStockRaw.rows || inStockRaw as any[]).map((r: any) => ({
+      const freeStockCounts: { articleCode: string; count: number }[] = (freeStockRaw.rows || freeStockRaw as any[]).map((r: any) => ({
         articleCode: r.articleCode,
         count: Number(r.count),
       }));
+      const freeStockMap = new Map(freeStockCounts.map(s => [s.articleCode, s.count]));
 
       // 2. Active loadings (LOADING + PENDING_VERIFICATION)
       const loadingsRaw = await db.execute(
@@ -740,9 +741,16 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         custRows.forEach((c: any) => customerMap.set(c.id, c.legalName));
       }
 
-      // 5. Product name lookup from factory_bale_products via factory_bales
+      // 5. Build total stock counts = free IN_STOCK + reserved in active loadings per article
+      const totalStockMap = new Map<string, number>(freeStockMap);
+      for (const b of loadingBales) {
+        totalStockMap.set(b.articleCode, (totalStockMap.get(b.articleCode) || 0) + b.count);
+      }
+      const totalStockCounts = Array.from(totalStockMap.entries()).map(([articleCode, count]) => ({ articleCode, count }));
+
+      // 6. Product name lookup from factory_bale_products
       const articleCodeSet = new Set<string>([
-        ...inStockCounts.map((s: any) => s.articleCode),
+        ...freeStockCounts.map((s: any) => s.articleCode),
         ...loadingBales.map((b: any) => b.articleCode),
       ]);
       const productNameByCode = new Map<string, string>();
@@ -760,7 +768,10 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       }
 
       res.json({
-        inStockCounts,
+        // totalStockCounts: free IN_STOCK + reserved-in-loading — shown in "In Stock" column
+        inStockCounts: totalStockCounts,
+        // freeStockCounts: truly free bales — used to compute Remaining on the frontend
+        freeStockCounts: freeStockCounts,
         loadings: loadings.map((l: any) => ({
           id:              l.id,
           customerId:      l.customerId,

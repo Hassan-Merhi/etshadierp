@@ -41,7 +41,8 @@ interface LoadingEntry {
   balesByArticle: { articleCode: string; count: number }[];
 }
 interface LoadingModeData {
-  inStockCounts: { articleCode: string; count: number }[];
+  inStockCounts: { articleCode: string; count: number }[];   // total pool (free + in loadings)
+  freeStockCounts: { articleCode: string; count: number }[];  // truly free bales
   loadings: LoadingEntry[];
   productNames: Record<string, string>;
 }
@@ -115,20 +116,20 @@ export default function FactoryStockAllocation() {
     const data = loadingQuery.data;
     if (!data) return { articleRows: [], loadings: [] };
 
-    const inStockMap = new Map(data.inStockCounts.map(s => [s.articleCode, s.count]));
+    // inStockCounts = total pool (free IN_STOCK + reserved in active loadings)
+    const totalStockMap = new Map(data.inStockCounts.map(s => [s.articleCode, s.count]));
+    // freeStockCounts = truly free bales → used for Remaining
+    const freeStockMap = new Map((data.freeStockCounts || []).map(s => [s.articleCode, s.count]));
 
-    // All article codes across in-stock + all loadings
+    // All article codes across total stock + all loadings
     const articleCodeSet = new Set<string>();
     data.inStockCounts.forEach(s => articleCodeSet.add(s.articleCode));
     data.loadings.forEach(l => l.balesByArticle.forEach(b => articleCodeSet.add(b.articleCode)));
 
     const articleRows = Array.from(articleCodeSet).sort().map(articleCode => {
-      const inStock = inStockMap.get(articleCode) || 0;
-      const totalLoaded = data.loadings.reduce((sum, l) => {
-        const b = l.balesByArticle.find(b => b.articleCode === articleCode);
-        return sum + (b ? b.count : 0);
-      }, 0);
-      const remaining = inStock - totalLoaded;
+      const inStock = totalStockMap.get(articleCode) || 0;          // total pool
+      const remaining = freeStockMap.get(articleCode) || 0;          // truly free
+      const totalLoaded = inStock - remaining;                        // derived
       const displayName = data.productNames[articleCode] || articleCode;
       return { articleCode, displayName, inStock, totalLoaded, remaining };
     });
