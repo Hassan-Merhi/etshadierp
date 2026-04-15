@@ -29,7 +29,7 @@ interface Recipient {
 
 export function DailyAutoSendSection() {
   const { toast } = useToast();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
 
   const { data: settings } = useQuery<WaSettings>({
     queryKey: ["/api/whatsapp/settings"],
