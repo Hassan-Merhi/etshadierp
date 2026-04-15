@@ -1906,6 +1906,7 @@ const FACTORY_COST_FIELDS = [
               <DailyExportSection />
               <WhatsAppExportSection />
               <StockReportSection />
+              <NetPositionExportSection />
             </>
           )}
 

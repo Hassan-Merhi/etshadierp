@@ -64,7 +64,7 @@ function currentYearDateRange(): { start: string; end: string } {
 
 export function NetPositionExportSection() {
   const { toast } = useToast();
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   const { data: recipients = [] } = useQuery<Recipient[]>({
     queryKey: ["/api/whatsapp/recipients"],
