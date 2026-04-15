@@ -254,6 +254,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const inputRefs = useRef<{ [key: string]: HTMLInputElement }>({});
   const itemListRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
+  const stockPrintRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   // Mobile-specific state
@@ -582,6 +583,18 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         navigate("/pos-daybook");
       }
     },
+  });
+
+  // Stock inventory query — only fetch when the print dialog is open and we have a location
+  const printLocationId = activeLocation?.id ?? (editVoucher as any)?.locationId ?? null;
+  const { data: stockInventory = [], isLoading: stockInventoryLoading } = useQuery<any[]>({
+    queryKey: [`/api/locations/${printLocationId}/inventory`],
+    enabled: showPrintDialog && !!printLocationId,
+  });
+
+  const handleStockPrint = useReactToPrint({
+    contentRef: stockPrintRef,
+    documentTitle: `Stock_${(activeLocation?.name || "Location").replace(/\s+/g, "_")}_${new Date().toLocaleDateString('en-CA')}`,
   });
 
   // Save draft mutation
@@ -2386,6 +2399,92 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             </div>
           </div>
 
+          {/* Hidden Stock Print Template */}
+          <div className="hidden">
+            <div ref={stockPrintRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', backgroundColor: 'white', color: 'black' }}>
+              <style dangerouslySetInnerHTML={{ __html: `
+                @page { size: A4; margin: 12mm 14mm; }
+                @media print {
+                  body { margin: 0; font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                  .stock-header { text-align: center; margin-bottom: 10px; }
+                  .stock-header h1 { font-size: 16pt; font-weight: bold; margin: 0 0 4px 0; text-decoration: underline; }
+                  .stock-header p { font-size: 9pt; margin: 0; color: #333; }
+                  .stock-meta { display: flex; justify-content: space-between; font-size: 8pt; color: #666; margin-top: 6px; padding-top: 4px; border-top: 1px solid #ccc; }
+                  .stock-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 8px; }
+                  .stock-table th { font-size: 9pt; font-weight: bold; padding: 4px 8px; border-bottom: 2px solid #333; text-align: left; background-color: #f0f0f0; }
+                  .stock-table th.qty-col { text-align: right; }
+                  .stock-table td { padding: 3px 8px; border-bottom: 1px solid #ccc; vertical-align: middle; }
+                  .stock-table td.qty-col { text-align: right; font-weight: 500; white-space: nowrap; }
+                  .stock-table tr.group-row td { font-weight: bold; font-size: 10pt; background-color: #e8e8e8; padding: 4px 8px; border-bottom: 1px solid #666; border-top: 1px solid #666; }
+                  .stock-table tr.item-row td { padding-left: 16px; }
+                  .stock-table tr.negative-row td { background-color: rgba(255,200,200,0.5); }
+                  .stock-table tr.total-row td { font-weight: bold; font-size: 10pt; border-top: 2px solid #333; border-bottom: 2px solid #333; padding: 5px 8px; background-color: #f0f0f0; }
+                }
+              `}} />
+              {/* Header */}
+              <div className="stock-header">
+                <h1>{activeLocation?.name ?? "Stock Report"}</h1>
+                <p>Godown Summary</p>
+                <p>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}</p>
+                <div className="stock-meta">
+                  <span>Printed: {new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+              </div>
+              {/* Table */}
+              {stockInventory.length === 0 ? (
+                <p style={{ textAlign: 'center', color: '#666', marginTop: '20px' }}>No inventory found at this location.</p>
+              ) : (() => {
+                const sorted = [...stockInventory]
+                  .filter(item => parseFloat(item.quantity || '0') !== 0)
+                  .sort((a, b) => (a.stockGroupName || '').localeCompare(b.stockGroupName || '') || a.stockItemName.localeCompare(b.stockItemName));
+                const grouped = sorted.reduce((acc: Record<string, { name: string; items: any[] }>, item) => {
+                  const key = item.stockGroupCode || 'UNCAT';
+                  if (!acc[key]) acc[key] = { name: item.stockGroupName || 'Unassigned', items: [] };
+                  acc[key].items.push(item);
+                  return acc;
+                }, {});
+                const grandTotal = sorted.reduce((s, i) => s + Math.floor(parseFloat(i.quantity || '0')), 0);
+                return (
+                  <table className="stock-table">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th className="qty-col">Qty (BL)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(grouped).map(([groupCode, { name, items }]) => {
+                        const groupQty = (items as any[]).reduce((s, i) => s + Math.floor(parseFloat(i.quantity || '0')), 0);
+                        return [
+                          <tr key={`g-${groupCode}`} className="group-row">
+                            <td>{name}</td>
+                            <td className="qty-col">{groupQty.toLocaleString()}</td>
+                          </tr>,
+                          ...(items as any[]).map((item) => {
+                            const qty = Math.floor(parseFloat(item.quantity || '0'));
+                            const isNeg = qty < 0;
+                            return (
+                              <tr key={`i-${item.inventoryId || item.stockItemId}`} className={`item-row${isNeg ? ' negative-row' : ''}`}>
+                                <td>{item.stockItemName}</td>
+                                <td className="qty-col">{qty.toLocaleString()}</td>
+                              </tr>
+                            );
+                          }),
+                        ];
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="total-row">
+                        <td>Grand Total</td>
+                        <td className="qty-col">{grandTotal.toLocaleString()}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                );
+              })()}
+            </div>
+          </div>
+
           <AlertDialogFooter>
             <Button variant="outline" onClick={() => { setShowPrintDialog(false); if (editVoucherId) navigate("/pos-daybook"); }} data-testid="button-cancel-print">
               Close
@@ -2396,6 +2495,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 New Sale
               </Button>
             )}
+            <Button variant="outline" onClick={() => handleStockPrint()} disabled={stockInventoryLoading} className="gap-2" data-testid="button-print-stock">
+              <Printer className="h-4 w-4" />
+              {stockInventoryLoading ? "Loading…" : "Print Stock"}
+            </Button>
             <Button onClick={handlePrint} className="gap-2" data-testid="button-print-invoice">
               <Printer className="h-4 w-4" />
               Print Invoice
