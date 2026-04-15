@@ -2415,14 +2415,14 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const ledgerOnUsTotal = classified.onUsTotal;
 
       // ── 3. Inventory (Stock In Hand) — sell value ────────────────────────
-      // Sum sellingPrice × 1 bale for every IN_STOCK or FINALIZED bale,
-      // matching the same filter the location-inventory screen uses.
+      // Only count IN_STOCK bales — FINALIZED bales are historical sold bales
+      // and would massively over-count the inventory value.
       const inventoryBaleRows = await db
         .select({ productId: factoryBales.productId, articleCode: factoryBales.articleCode })
         .from(factoryBales)
         .where(and(
           eq(factoryBales.companyId, companyId),
-          or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+          eq(factoryBales.status, "IN_STOCK"),
         ));
 
       const productRowsForInv = await db
