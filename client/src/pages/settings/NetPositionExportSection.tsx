@@ -8,9 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Send, ChevronDown, ChevronRight, Loader2, Users, Clock, Calendar, CheckCircle2 } from "lucide-react";
+import {
+  TrendingUp, Send, ChevronDown, ChevronRight, Loader2,
+  Users, Clock, Calendar, CheckCircle2, Info,
+} from "lucide-react";
 
-interface Recipient  { id: number; chatId: string; name: string; isGroup: boolean; active: boolean; }
+interface Recipient { id: number; chatId: string; name: string; isGroup: boolean; active: boolean; }
 
 interface NpSettings {
   recipientId:   number | null;
@@ -42,7 +45,7 @@ function formatHour(h: number): string {
 const HOURS = Array.from({ length: 24 }, (_, i) => ({ value: String(i), label: formatHour(i) }));
 
 function scheduleLabel(cfg: NpSettings | undefined): string {
-  if (!cfg?.autoSend) return "";
+  if (!cfg?.autoSend || !cfg?.enabled) return "";
   const time = formatHour(cfg.sendHour ?? 18);
   if (cfg.frequency === "daily")   return `Daily at ${time} EST`;
   if (cfg.frequency === "monthly") return `Monthly (1st) at ${time} EST`;
@@ -51,6 +54,12 @@ function scheduleLabel(cfg: NpSettings | undefined): string {
     return `Every ${day} at ${time} EST`;
   }
   return "Auto-Send On";
+}
+
+function currentYearDateRange(): { start: string; end: string } {
+  const year = new Date().getFullYear();
+  const today = new Date().toISOString().split("T")[0];
+  return { start: `${year}-01-01`, end: today };
 }
 
 export function NetPositionExportSection() {
@@ -69,29 +78,32 @@ export function NetPositionExportSection() {
 
   const groups = recipients.filter((r) => r.isGroup && r.active);
 
-  const [recipientId,   setRecipientId]   = useState<number | null>(null);
-  const [frequency,     setFrequency]     = useState("daily");
-  const [sendHour,      setSendHour]      = useState(18);
-  const [sendDayOfWeek, setSendDayOfWeek] = useState(1);
+  // Local state — null means "not changed by user, use cfg value"
+  const [recipientId,   setRecipientId]   = useState<number | null | undefined>(undefined);
+  const [frequency,     setFrequency]     = useState<string | null>(null);
+  const [sendHour,      setSendHour]      = useState<number | null>(null);
+  const [sendDayOfWeek, setSendDayOfWeek] = useState<number | null>(null);
 
-  const effective = {
-    recipientId:   recipientId   ?? cfg?.recipientId   ?? null,
-    frequency:     frequency     || cfg?.frequency     || "daily",
-    sendHour:      sendHour      ?? cfg?.sendHour      ?? 18,
-    sendDayOfWeek: sendDayOfWeek ?? cfg?.sendDayOfWeek ?? 1,
+  // Effective values: user-changed local state wins, otherwise use saved config
+  const eff = {
+    recipientId:   recipientId   !== undefined ? recipientId   : (cfg?.recipientId   ?? null),
+    frequency:     frequency     !== null      ? frequency     : (cfg?.frequency     ?? "daily"),
+    sendHour:      sendHour      !== null      ? sendHour      : (cfg?.sendHour      ?? 18),
+    sendDayOfWeek: sendDayOfWeek !== null      ? sendDayOfWeek : (cfg?.sendDayOfWeek ?? 1),
   };
 
+  const buildPayload = (overrides?: Partial<NpSettings & { recipientId: number | null }>) => ({
+    recipientId:   eff.recipientId,
+    frequency:     eff.frequency,
+    sendHour:      eff.sendHour,
+    sendDayOfWeek: eff.sendDayOfWeek,
+    enabled:       cfg?.enabled  ?? false,
+    autoSend:      cfg?.autoSend ?? false,
+    ...overrides,
+  });
+
   const saveSettings = useMutation({
-    mutationFn: (patch: Partial<NpSettings & { recipientId: number | null }>) =>
-      apiRequest("PUT", "/api/whatsapp/np-settings", {
-        recipientId:   effective.recipientId,
-        frequency:     effective.frequency,
-        sendHour:      effective.sendHour,
-        sendDayOfWeek: effective.sendDayOfWeek,
-        enabled:       cfg?.enabled  ?? false,
-        autoSend:      cfg?.autoSend ?? false,
-        ...patch,
-      }),
+    mutationFn: () => apiRequest("PUT", "/api/whatsapp/np-settings", buildPayload()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/np-settings"] });
       toast({ title: "Settings saved" });
@@ -101,37 +113,21 @@ export function NetPositionExportSection() {
 
   const toggleEnabled = useMutation({
     mutationFn: (value: boolean) =>
-      apiRequest("PUT", "/api/whatsapp/np-settings", {
-        recipientId:   effective.recipientId,
-        frequency:     effective.frequency,
-        sendHour:      effective.sendHour,
-        sendDayOfWeek: effective.sendDayOfWeek,
-        enabled:       value,
-        autoSend:      cfg?.autoSend ?? false,
-      }),
+      apiRequest("PUT", "/api/whatsapp/np-settings", buildPayload({ enabled: value })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/np-settings"] }),
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const toggleAutoSend = useMutation({
     mutationFn: (value: boolean) =>
-      apiRequest("PUT", "/api/whatsapp/np-settings", {
-        recipientId:   effective.recipientId,
-        frequency:     effective.frequency,
-        sendHour:      effective.sendHour,
-        sendDayOfWeek: effective.sendDayOfWeek,
-        enabled:       cfg?.enabled ?? false,
-        autoSend:      value,
-      }),
+      apiRequest("PUT", "/api/whatsapp/np-settings", buildPayload({ autoSend: value })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/np-settings"] }),
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const sendNow = useMutation({
     mutationFn: () =>
-      apiRequest("POST", "/api/whatsapp/send-np-all-now", {
-        recipientId: effective.recipientId,
-      }),
+      apiRequest("POST", "/api/whatsapp/send-np-all-now", { recipientId: eff.recipientId }),
     onSuccess: async (res: any) => {
       const body = await res.json().catch(() => ({}));
       toast({ title: "Net Position Export Sent", description: body.message || "Done" });
@@ -140,6 +136,7 @@ export function NetPositionExportSection() {
   });
 
   const label = scheduleLabel(cfg);
+  const { start: npStart, end: npEnd } = currentYearDateRange();
 
   return (
     <div className="border rounded-md" data-testid="section-np-export">
@@ -154,8 +151,8 @@ export function NetPositionExportSection() {
             <p className="font-semibold">Net Position Export Schedule</p>
             <p className="text-sm text-muted-foreground">
               {label
-                ? `Sends all-companies net position ZIP to a group + email — ${label}`
-                : "Send all-companies net position ZIP to a WhatsApp group + email on a schedule"}
+                ? `All-companies net position ZIP → WhatsApp group + email — ${label}`
+                : "Send all-companies net position ZIP to a WhatsApp group and email on a schedule"}
             </p>
           </div>
         </div>
@@ -172,38 +169,15 @@ export function NetPositionExportSection() {
       {expanded && (
         <div className="border-t p-4 space-y-5">
 
-          {/* ── Enable toggles ──────────────────────────────────────── */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Enable</p>
-                <p className="text-xs text-muted-foreground">Allow this export schedule to run</p>
-              </div>
-              <Switch
-                data-testid="switch-np-enabled"
-                checked={cfg?.enabled ?? false}
-                onCheckedChange={(v) => toggleEnabled.mutate(v)}
-                disabled={toggleEnabled.isPending}
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Auto-Send</p>
-                <p className="text-xs text-muted-foreground">
-                  Automatically send on the configured schedule
-                </p>
-              </div>
-              <Switch
-                data-testid="switch-np-autosend"
-                checked={cfg?.autoSend ?? false}
-                onCheckedChange={(v) => toggleAutoSend.mutate(v)}
-                disabled={!(cfg?.enabled) || toggleAutoSend.isPending}
-              />
+          {/* ── Date range note ─────────────────────────────────────── */}
+          <div className="flex items-start gap-2 rounded-md bg-muted/50 border p-3">
+            <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+            <div className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Date range: </span>
+              Jan 1, {new Date().getFullYear()} → today ({npEnd}).
+              Every send covers from the start of the current year up to the date the export runs.
             </div>
           </div>
-
-          <Separator />
 
           {/* ── WhatsApp group ──────────────────────────────────────── */}
           <div className="space-y-2">
@@ -212,16 +186,16 @@ export function NetPositionExportSection() {
               WhatsApp Group
             </Label>
             <p className="text-xs text-muted-foreground">
-              The ZIP (net position Excel for every company) will be sent to this group.
-              Add groups in the WhatsApp Export section above.
+              A ZIP containing one net position Excel per company will be sent to this group.
+              Manage groups in the WhatsApp Export section above.
             </p>
             {groups.length === 0 ? (
               <p className="text-xs text-muted-foreground italic">
-                No active group recipients — add one in the WhatsApp Export section.
+                No active group recipients — add one in the WhatsApp Export section first.
               </p>
             ) : (
               <Select
-                value={String(effective.recipientId ?? "")}
+                value={String(eff.recipientId ?? "")}
                 onValueChange={(v) => setRecipientId(v ? parseInt(v) : null)}
               >
                 <SelectTrigger data-testid="select-np-group" className="w-full sm:w-80">
@@ -255,8 +229,8 @@ export function NetPositionExportSection() {
               <div className="space-y-1">
                 <Label className="text-xs">Frequency</Label>
                 <Select
-                  value={effective.frequency}
-                  onValueChange={setFrequency}
+                  value={eff.frequency}
+                  onValueChange={(v) => setFrequency(v)}
                 >
                   <SelectTrigger data-testid="select-np-frequency">
                     <SelectValue />
@@ -264,7 +238,7 @@ export function NetPositionExportSection() {
                   <SelectContent>
                     <SelectItem value="daily">Daily</SelectItem>
                     <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="monthly">Monthly (1st)</SelectItem>
+                    <SelectItem value="monthly">Monthly (1st of month)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -273,7 +247,7 @@ export function NetPositionExportSection() {
               <div className="space-y-1">
                 <Label className="text-xs">Send Time (EST)</Label>
                 <Select
-                  value={String(effective.sendHour)}
+                  value={String(eff.sendHour)}
                   onValueChange={(v) => setSendHour(parseInt(v))}
                 >
                   <SelectTrigger data-testid="select-np-hour">
@@ -288,14 +262,14 @@ export function NetPositionExportSection() {
               </div>
 
               {/* Day of week (weekly only) */}
-              {effective.frequency === "weekly" && (
+              {eff.frequency === "weekly" && (
                 <div className="space-y-1">
                   <Label className="text-xs flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
                     Day of Week
                   </Label>
                   <Select
-                    value={String(effective.sendDayOfWeek)}
+                    value={String(eff.sendDayOfWeek)}
                     onValueChange={(v) => setSendDayOfWeek(parseInt(v))}
                   >
                     <SelectTrigger data-testid="select-np-day">
@@ -312,6 +286,39 @@ export function NetPositionExportSection() {
             </div>
           </div>
 
+          <Separator />
+
+          {/* ── Enable toggles ──────────────────────────────────────── */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Enable</p>
+                <p className="text-xs text-muted-foreground">Activate this export schedule</p>
+              </div>
+              <Switch
+                data-testid="switch-np-enabled"
+                checked={cfg?.enabled ?? false}
+                onCheckedChange={(v) => toggleEnabled.mutate(v)}
+                disabled={toggleEnabled.isPending}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Auto-Send</p>
+                <p className="text-xs text-muted-foreground">
+                  Run automatically on the configured schedule
+                </p>
+              </div>
+              <Switch
+                data-testid="switch-np-autosend"
+                checked={cfg?.autoSend ?? false}
+                onCheckedChange={(v) => toggleAutoSend.mutate(v)}
+                disabled={!(cfg?.enabled) || toggleAutoSend.isPending}
+              />
+            </div>
+          </div>
+
           {/* Last sent */}
           {cfg?.lastSentAt && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -323,9 +330,9 @@ export function NetPositionExportSection() {
           <Separator />
 
           {/* ── Actions ─────────────────────────────────────────────── */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
-              onClick={() => saveSettings.mutate({})}
+              onClick={() => saveSettings.mutate()}
               disabled={saveSettings.isPending}
               data-testid="button-np-save"
             >
@@ -347,8 +354,8 @@ export function NetPositionExportSection() {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            "Send Now" generates net position Excels for all companies (current year to date),
-            bundles them in a ZIP, and sends to the selected WhatsApp group and all email recipients.
+            "Send Now" immediately sends the ZIP ({npStart} → {npEnd}) to the selected WhatsApp group and all email recipients.
+            The scheduler checks every hour and sends automatically when the time matches.
           </p>
         </div>
       )}
