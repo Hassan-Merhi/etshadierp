@@ -869,7 +869,8 @@ export function registerFiscalTransferRoutes(app: Express) {
         .where(eq(stockTransferRevisions.transferId, transferId))
         .orderBy(asc(stockTransferRevisions.revisionNumber));
 
-      const result = await Promise.all(
+      // Fetch all items for all revisions
+      const allRevWithItems = await Promise.all(
         revisionRows.map(async (rev) => {
           const items = await db
             .select()
@@ -879,7 +880,69 @@ export function registerFiscalTransferRoutes(app: Express) {
         })
       );
 
-      res.json(result);
+      // Split optional (POS) and non-optional (admin) revisions
+      const optionalRevs = allRevWithItems.filter(r => r.optional);
+      const nonOptionalRevs = allRevWithItems.filter(r => !r.optional);
+
+      let finalRevisions = [...nonOptionalRevs];
+
+      if (optionalRevs.length > 0) {
+        // Merge all optional revisions into one, computing net delta per item
+        // Key: `${stockItemId}:${sourceLocationId}`
+        const netMap = new Map<string, {
+          stockItemId: number; stockItemName: string;
+          sourceLocationId: number | null; sourceLocationName: string | null;
+          originalQuantity: string; newQuantity: string; delta: string;
+        }>();
+
+        for (const rev of optionalRevs) {
+          for (const item of rev.items) {
+            const key = `${item.stockItemId}:${item.sourceLocationId ?? ""}`;
+            const existing = netMap.get(key);
+            if (!existing) {
+              // First time we see this item — take its originalQuantity as the baseline
+              netMap.set(key, {
+                stockItemId: item.stockItemId,
+                stockItemName: item.stockItemName,
+                sourceLocationId: item.sourceLocationId,
+                sourceLocationName: item.sourceLocationName,
+                originalQuantity: item.originalQuantity,
+                newQuantity: item.newQuantity,
+                delta: item.delta,
+              });
+            } else {
+              // Update with latest newQuantity and recompute net delta
+              const origQty = parseFloat(existing.originalQuantity);
+              const newQty = parseFloat(item.newQuantity);
+              const netDelta = newQty - origQty;
+              netMap.set(key, {
+                ...existing,
+                newQuantity: String(newQty),
+                delta: netDelta >= 0 ? `+${netDelta}` : String(netDelta),
+              });
+            }
+          }
+        }
+
+        // Use the earliest optional revision as the "shell" for metadata
+        const earliest = optionalRevs[0];
+        const latest = optionalRevs[optionalRevs.length - 1];
+        const mergedRevision = {
+          ...earliest,
+          revisionNumber: earliest.revisionNumber,
+          revisionDate: latest.revisionDate,
+          note: latest.note ?? earliest.note,
+          items: Array.from(netMap.values()),
+          // synthetic flag: how many optional revs were merged
+          _mergedCount: optionalRevs.length,
+        };
+
+        finalRevisions = [mergedRevision, ...nonOptionalRevs].sort(
+          (a, b) => a.revisionNumber - b.revisionNumber
+        );
+      }
+
+      res.json(finalRevisions);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1074,13 +1137,37 @@ export function registerFiscalTransferRoutes(app: Express) {
         const [revision] = await tx.select().from(stockTransferRevisions).where(eq(stockTransferRevisions.id, revisionId));
         if (!revision) throw new Error("Revision not found");
 
-        // Load revision items
-        const revItems = await tx.select().from(stockTransferRevisionItems).where(eq(stockTransferRevisionItems.revisionId, revisionId));
-        if (revItems.length === 0) throw new Error("Revision has no items");
-
         // Load the transfer
         const [transfer] = await tx.select().from(stockTransferVouchers).where(eq(stockTransferVouchers.id, revision.transferId));
         if (!transfer) throw new Error("Transfer not found");
+
+        // Load ALL optional revisions for this transfer and compute net delta per item
+        // (mirrors the merge logic in the GET endpoint so approval matches what admin sees)
+        const allOptionalRevs = await tx.select().from(stockTransferRevisions)
+          .where(and(eq(stockTransferRevisions.transferId, revision.transferId), eq(stockTransferRevisions.optional, true)))
+          .orderBy(asc(stockTransferRevisions.revisionNumber));
+
+        const allOptionalRevIds = allOptionalRevs.map(r => r.id);
+        const allOptionalItems = allOptionalRevIds.length > 0
+          ? await tx.select().from(stockTransferRevisionItems).where(inArray(stockTransferRevisionItems.revisionId, allOptionalRevIds))
+          : [];
+
+        if (allOptionalItems.length === 0) throw new Error("Revision has no items");
+
+        // Compute net delta per item (same key logic as GET endpoint)
+        const netMap = new Map<string, { stockItemId: number; sourceLocationId: number | null; originalQuantity: string; newQuantity: string }>();
+        for (const rev of allOptionalRevs) {
+          const items = allOptionalItems.filter(i => i.revisionId === rev.id);
+          for (const item of items) {
+            const key = `${item.stockItemId}:${item.sourceLocationId ?? ""}`;
+            const existing = netMap.get(key);
+            if (!existing) {
+              netMap.set(key, { stockItemId: item.stockItemId, sourceLocationId: item.sourceLocationId, originalQuantity: item.originalQuantity, newQuantity: item.newQuantity });
+            } else {
+              netMap.set(key, { ...existing, newQuantity: item.newQuantity });
+            }
+          }
+        }
 
         // Load destination location for inventory
         const [destLocation] = await tx.select({ companyId: locations.companyId }).from(locations).where(eq(locations.id, transfer.destinationLocationId));
@@ -1089,20 +1176,19 @@ export function registerFiscalTransferRoutes(app: Express) {
         // Load existing transfer items
         const existingItems = await tx.select().from(stockTransferItems).where(eq(stockTransferItems.transferId, transfer.id));
 
-        let totalAmount = 0;
-
-        for (const revItem of revItems) {
-          const delta = parseFloat(revItem.delta);
-          if (delta === 0) continue;
+        for (const [, netItem] of netMap) {
+          const origQty = parseFloat(netItem.originalQuantity);
+          const newQty = parseFloat(netItem.newQuantity);
+          const netDelta = newQty - origQty;
+          if (netDelta === 0) continue;
 
           // Find the matching transfer item by stockItemId (+ sourceLocationId if set)
           const match = existingItems.find(i =>
-            i.stockItemId === revItem.stockItemId &&
-            (!revItem.sourceLocationId || i.sourceLocationId === revItem.sourceLocationId)
+            i.stockItemId === netItem.stockItemId &&
+            (!netItem.sourceLocationId || i.sourceLocationId === netItem.sourceLocationId)
           );
 
           if (match) {
-            const newQty = parseFloat(revItem.newQuantity);
             const rate = parseFloat(match.rate ?? "0");
             const newTotal = newQty * rate;
 
@@ -1111,12 +1197,10 @@ export function registerFiscalTransferRoutes(app: Express) {
               .set({ quantity: String(newQty), totalAmount: newTotal.toFixed(2) })
               .where(eq(stockTransferItems.id, match.id));
 
-            totalAmount += newTotal;
-
             // Apply inventory delta only if transfer was already applied to inventory
-            if (transfer.inventoryApplied && revItem.sourceLocationId) {
-              await adjustInventory(tx, revItem.sourceLocationId, revItem.stockItemId, -delta, companyId!);
-              await adjustInventory(tx, transfer.destinationLocationId, revItem.stockItemId, delta, companyId!, rate);
+            if (transfer.inventoryApplied && netItem.sourceLocationId) {
+              await adjustInventory(tx, netItem.sourceLocationId, netItem.stockItemId, -netDelta, companyId!);
+              await adjustInventory(tx, transfer.destinationLocationId, netItem.stockItemId, netDelta, companyId!, rate);
             }
           }
         }
@@ -1129,8 +1213,10 @@ export function registerFiscalTransferRoutes(app: Express) {
         // Update voucher total
         await tx.update(vouchers).set({ totalAmount: fullTotal.toFixed(2) }).where(eq(vouchers.id, transfer.voucherId));
 
-        // Mark revision as approved (not optional / reference-only)
-        await tx.update(stockTransferRevisions).set({ optional: false }).where(eq(stockTransferRevisions.id, revisionId));
+        // Mark ALL optional revisions for this transfer as approved (handles merged display case)
+        await tx.update(stockTransferRevisions)
+          .set({ optional: false })
+          .where(and(eq(stockTransferRevisions.transferId, revision.transferId), eq(stockTransferRevisions.optional, true)));
       });
 
       res.json({ success: true });
