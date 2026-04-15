@@ -2,14 +2,18 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import {
-  ArrowLeft, ChevronRight, RotateCcw, Loader2, Save,
-  CheckCircle2, Search, X, ArrowRight, Clock, Package2
+  ArrowLeft, ChevronRight, Loader2, Save,
+  CheckCircle2, Search, X, ArrowRight, Clock, Package2, Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
@@ -97,14 +101,12 @@ function formatDateTime(dateStr: string) {
   try { return format(parseISO(dateStr), "MMM dd, yyyy HH:mm"); } catch { return dateStr; }
 }
 
-// ─── Extra item row for newly-added items ─────────────────────────────────────
 interface ExtraItem {
   stockItemId: number;
   stockItemName: string;
   qtyDraft: string;
 }
 
-// ─── Inline search + dropdown for adding items ────────────────────────────────
 function AddItemCombobox({
   inventory,
   alreadyAdded,
@@ -151,7 +153,6 @@ function AddItemCombobox({
 
   return (
     <div ref={containerRef} className="border-t relative">
-      {/* Search input row */}
       <div className="relative px-3 py-2">
         <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
         <input
@@ -179,8 +180,6 @@ function AddItemCombobox({
           </button>
         )}
       </div>
-
-      {/* Results dropdown — absolutely positioned to float over content below */}
       {showDropdown && (
         <div className="absolute left-0 right-0 z-50 bg-popover border-x border-b rounded-b-md shadow-md max-h-52 overflow-y-auto">
           {matches.length === 0 ? (
@@ -208,30 +207,121 @@ function AddItemCombobox({
   );
 }
 
-// ─── Detail view ──────────────────────────────────────────────────────────────
-function TransferOrderDetail({
-  voucherId,
-  posUser,
-  onBack,
+// ─── Read-only locked detail view (applied transfers) ─────────────────────────
+function LockedTransferDetail({
+  detail,
 }: {
-  voucherId: number;
+  detail: TransferDetail;
+}) {
+  return (
+    <div className="space-y-4">
+      {/* Locked notice */}
+      <div className="flex items-center gap-2 px-3 py-2.5 bg-muted/50 rounded-md text-sm text-muted-foreground border">
+        <Lock className="h-4 w-4 shrink-0" />
+        <span>This transfer has been applied to inventory and is locked for editing.</span>
+      </div>
+
+      {/* Items table — read-only */}
+      <Card className="overflow-hidden">
+        <div className="border-b px-4 py-2.5 bg-muted/30">
+          <h3 className="text-sm font-semibold">Items</h3>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-8 text-xs">#</TableHead>
+              <TableHead className="text-xs">Item</TableHead>
+              <TableHead className="text-right text-xs">Qty</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {detail.items.map((item, idx) => (
+              <TableRow key={item.id}>
+                <TableCell className="text-xs text-muted-foreground py-2">{idx + 1}</TableCell>
+                <TableCell className="text-sm font-medium py-2">{item.stockItemName}</TableCell>
+                <TableCell className="text-right font-mono text-sm py-2">{parseFloat(item.quantity)}</TableCell>
+              </TableRow>
+            ))}
+            <TableRow className="bg-muted/20">
+              <TableCell />
+              <TableCell className="text-xs font-semibold py-2">Total items</TableCell>
+              <TableCell className="text-right font-mono text-sm font-semibold py-2">
+                {detail.items.reduce((s, i) => s + parseFloat(i.quantity), 0)}
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </Card>
+
+      {/* Revision history */}
+      {(detail.revisions?.length ?? 0) > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Revision History</span>
+          </div>
+          {detail.revisions.map(rev => (
+            <Card key={rev.id} data-testid={`card-revision-${rev.id}`}>
+              <CardContent className="pt-3 pb-3 space-y-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">Revision #{rev.revisionNumber}</span>
+                    <span className="text-xs text-muted-foreground">{formatDateTime(rev.createdAt)}</span>
+                  </div>
+                  {rev.optional ? (
+                    <Badge variant="outline" className="text-xs" data-testid={`badge-pending-${rev.id}`}>Pending Admin Review</Badge>
+                  ) : (
+                    <Badge variant="default" className="text-xs" data-testid={`badge-approved-${rev.id}`}>
+                      <CheckCircle2 className="h-3 w-3 mr-1" />Approved
+                    </Badge>
+                  )}
+                </div>
+                {rev.note && <p className="text-xs text-muted-foreground">{rev.note}</p>}
+                <div className="divide-y rounded-md border overflow-hidden">
+                  {rev.items.map((ri, i) => {
+                    const delta = parseFloat(ri.delta);
+                    return (
+                      <div key={i} className="flex items-center justify-between px-3 py-1.5 text-xs gap-4 bg-card"
+                        data-testid={`text-rev-item-${rev.id}-${i}`}>
+                        <span className="font-medium truncate">{ri.stockItemName}</span>
+                        <div className="flex items-center gap-2 shrink-0 font-mono">
+                          <span className="text-muted-foreground">{ri.originalQuantity}</span>
+                          <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                          <span className="font-semibold">{ri.newQuantity}</span>
+                          <span className={cn(
+                            "font-medium",
+                            delta > 0 ? "text-green-600 dark:text-green-400" : "text-destructive"
+                          )}>
+                            ({delta > 0 ? "+" : ""}{ri.delta})
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Editable detail view ─────────────────────────────────────────────────────
+function EditableTransferDetail({
+  detail,
+  posUser,
+  voucherId,
+}: {
+  detail: TransferDetail;
   posUser: PosUser;
-  onBack: () => void;
+  voucherId: number;
 }) {
   const { toast } = useToast();
-  // delta per item id (signed: "-5" to deduct, "3" to add)
   const [deltas, setDeltas] = useState<Record<number, string>>({});
   const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
   const [note, setNote] = useState("");
-
-  const { data: detail, isLoading } = useQuery<TransferDetail>({
-    queryKey: ["/api/pos-transfer-detail", voucherId],
-    queryFn: async () => {
-      const res = await fetch(`/api/pos-transfer-detail?voucherId=${voucherId}`, { credentials: "include" });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-  });
 
   const { data: rawInventory = [] } = useQuery<InventoryItem[]>({
     queryKey: ["/api/inventory", posUser.assignedLocationId],
@@ -263,7 +353,6 @@ function TransferOrderDetail({
     },
   });
 
-  // Parse delta for an item — type "-5" to deduct, "5" to add
   const getDeltaNum = (itemId: number): number => {
     const val = (deltas[itemId] ?? "").trim();
     if (!val || val === "-" || val === "+") return 0;
@@ -281,8 +370,7 @@ function TransferOrderDetail({
     setDeltaVal(itemId, num === 0 ? "" : String(num));
   };
 
-  // Items are pre-filtered by the backend for POS users (only their location)
-  const myItems = detail?.items ?? [];
+  const myItems = detail.items;
 
   const locationInventory = (rawInventory as any[]).map(i => ({
     stockItemId: i.stockItemId ?? i.id,
@@ -303,8 +391,6 @@ function TransferOrderDetail({
   };
 
   const handleSave = () => {
-    if (!detail) return;
-
     const baseItems = myItems.map(item => {
       const delta = getDeltaNum(item.id);
       const original = parseFloat(item.quantity) || 0;
@@ -345,58 +431,20 @@ function TransferOrderDetail({
     myItems.some(i => getDeltaNum(i.id) !== 0) ||
     extraItems.some(e => (parseFloat(e.qtyDraft) || 0) !== 0);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (!detail) {
-    return (
-      <div className="space-y-3 p-4">
-        <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4 mr-1.5" />Back</Button>
-        <p className="text-sm text-destructive">Failed to load order.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
-      {/* Header bar */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back-to-list">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex items-center gap-1.5 text-sm flex-wrap flex-1 min-w-0">
-          <span className="font-semibold" data-testid="text-voucher-number">{detail.voucherNumber}</span>
-          <span className="text-muted-foreground hidden sm:inline">&middot;</span>
-          <span className="text-muted-foreground hidden sm:inline">{formatDate(detail.voucherDate)}</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">{detail.sourceLocationName}</span>
-          <ArrowRight className="h-3 w-3" />
-          <span className="font-medium text-foreground">{detail.destinationLocationName}</span>
-        </div>
-        {detail.inventoryApplied && <Badge variant="secondary">Applied</Badge>}
-        {detail.optional && <Badge variant="outline">Draft</Badge>}
-      </div>
-
       {/* Main table card */}
       <Card className="overflow-hidden">
-        {/* Desktop table header */}
-        <div className="hidden sm:grid grid-cols-[2rem_1fr_6rem_7rem_6rem_2.5rem] bg-muted/50 border-b px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+        <div className="hidden sm:grid grid-cols-[2rem_1fr_6rem_7rem_6rem_2.5rem] bg-muted/30 border-b px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           <span>#</span>
           <span>Item</span>
           <span className="text-right">Original</span>
           <span className="text-center">Adjustment</span>
           <span className="text-right">New Qty</span>
-          <span></span>
+          <span />
         </div>
 
         <div>
-          {/* Existing items from this user's location */}
           {myItems.map((item, idx) => {
             const deltaNum = getDeltaNum(item.id);
             const original = parseFloat(item.quantity) || 0;
@@ -406,17 +454,12 @@ function TransferOrderDetail({
               <div
                 key={item.id}
                 data-testid={`row-item-${item.id}`}
-                className={cn(
-                  "border-b last:border-b-0",
-                  changed && "bg-primary/5"
-                )}
+                className={cn("border-b last:border-b-0", changed && "bg-primary/5")}
               >
-                {/* Desktop row */}
                 <div className="hidden sm:grid grid-cols-[2rem_1fr_6rem_7rem_6rem_2.5rem] items-center px-3 py-1.5 gap-2">
                   <span className="text-xs text-muted-foreground">{idx + 1}</span>
                   <span className="text-sm font-medium truncate">{item.stockItemName}</span>
                   <span className="text-sm font-mono text-right">{original}</span>
-                  {/* Adjustment — type a signed number directly: -5 to deduct, 5 to add */}
                   <div className="flex items-center justify-center">
                     <input
                       type="text"
@@ -438,7 +481,6 @@ function TransferOrderDetail({
                   <div />
                 </div>
 
-                {/* Mobile row */}
                 <div className="sm:hidden p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium">{item.stockItemName}</span>
@@ -467,7 +509,6 @@ function TransferOrderDetail({
             );
           })}
 
-          {/* Extra (added) items */}
           {extraItems.map((item, idx) => {
             const qty = parseFloat(item.qtyDraft) || 0;
             return (
@@ -476,7 +517,6 @@ function TransferOrderDetail({
                 className="border-b last:border-b-0 bg-primary/5"
                 data-testid={`row-extra-${item.stockItemId}`}
               >
-                {/* Desktop — same grid as existing items */}
                 <div className="hidden sm:grid grid-cols-[2rem_1fr_6rem_7rem_6rem_2.5rem] items-center px-3 py-1.5 gap-2">
                   <span className="text-xs text-muted-foreground">{myItems.length + idx + 1}</span>
                   <span className="text-sm font-medium truncate">{item.stockItemName}</span>
@@ -508,7 +548,6 @@ function TransferOrderDetail({
                   </button>
                 </div>
 
-                {/* Mobile — same layout as existing mobile rows */}
                 <div className="sm:hidden p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium">{item.stockItemName}</span>
@@ -530,9 +569,7 @@ function TransferOrderDetail({
                       data-testid={`input-extra-qty-mobile-${item.stockItemId}`}
                     />
                     {qty > 0 && (
-                      <span className="text-xs font-semibold text-green-600 dark:text-green-400">
-                        New: {qty}
-                      </span>
+                      <span className="text-xs font-semibold text-green-600 dark:text-green-400">New: {qty}</span>
                     )}
                   </div>
                 </div>
@@ -541,15 +578,13 @@ function TransferOrderDetail({
           })}
         </div>
 
-        {/* Add Item row — inline combobox */}
         <AddItemCombobox
-          inventory={locationInventory ?? []}
+          inventory={locationInventory}
           alreadyAdded={extraItems.map(e => e.stockItemId)}
           existingIds={myItems.map(i => i.stockItemId)}
           onAdd={addExtraItem}
         />
 
-        {/* Totals row */}
         <div className="border-t px-3 py-2 bg-muted/30 flex items-center justify-end gap-4 text-xs text-muted-foreground">
           <span>Total Items: <strong className="text-foreground">{myItems.length + extraItems.length}</strong></span>
         </div>
@@ -615,10 +650,7 @@ function TransferOrderDetail({
                           <span className="text-muted-foreground">{ri.originalQuantity}</span>
                           <ArrowRight className="h-3 w-3 text-muted-foreground" />
                           <span className="font-semibold">{ri.newQuantity}</span>
-                          <span className={cn(
-                            "font-medium",
-                            delta > 0 ? "text-green-600 dark:text-green-400" : "text-destructive"
-                          )}>
+                          <span className={cn("font-medium", delta > 0 ? "text-green-600 dark:text-green-400" : "text-destructive")}>
                             ({delta > 0 ? "+" : ""}{ri.delta})
                           </span>
                         </div>
@@ -630,6 +662,77 @@ function TransferOrderDetail({
             </Card>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Detail shell (loads data, decides locked vs editable) ────────────────────
+function TransferOrderDetail({
+  voucherId,
+  posUser,
+  onBack,
+}: {
+  voucherId: number;
+  posUser: PosUser;
+  onBack: () => void;
+}) {
+  const { data: detail, isLoading } = useQuery<TransferDetail>({
+    queryKey: ["/api/pos-transfer-detail", voucherId],
+    queryFn: async () => {
+      const res = await fetch(`/api/pos-transfer-detail?voucherId=${voucherId}`, { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3 p-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (!detail) {
+    return (
+      <div className="space-y-3 p-4">
+        <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4 mr-1.5" />Back</Button>
+        <p className="text-sm text-destructive">Failed to load order.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back-to-list">
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="flex items-center gap-1.5 text-sm flex-1 min-w-0 flex-wrap">
+          <span className="font-semibold" data-testid="text-voucher-number">{detail.voucherNumber}</span>
+          <span className="text-muted-foreground hidden sm:inline">&middot;</span>
+          <span className="text-muted-foreground hidden sm:inline">{formatDate(detail.voucherDate)}</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{detail.sourceLocationName}</span>
+          <ArrowRight className="h-3 w-3" />
+          <span className="font-medium text-foreground">{detail.destinationLocationName}</span>
+        </div>
+        {detail.inventoryApplied && (
+          <Badge variant="secondary" className="gap-1">
+            <Lock className="h-3 w-3" />Applied
+          </Badge>
+        )}
+        {detail.optional && !detail.inventoryApplied && <Badge variant="outline">Draft</Badge>}
+      </div>
+
+      {detail.inventoryApplied ? (
+        <LockedTransferDetail detail={detail} />
+      ) : (
+        <EditableTransferDetail detail={detail} posUser={posUser} voucherId={voucherId} />
       )}
     </div>
   );
@@ -658,7 +761,6 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
     });
   }, [allTransfers, search]);
 
-  // ── Detail view (inline, no route change) ──
   if (selectedVoucherId !== null) {
     return (
       <div className="p-4">
@@ -671,14 +773,15 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
     );
   }
 
-  // ── List view ──
   return (
     <div className="p-4 space-y-4">
+      {/* Page header */}
       <div>
         <h1 className="text-base font-semibold" data-testid="text-page-title">Kolwezi Transfer Orders</h1>
         <p className="text-xs text-muted-foreground">Review and adjust quantities for your location</p>
       </div>
 
+      {/* Search */}
       <div className="relative">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
@@ -690,9 +793,16 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
         />
       </div>
 
+      {/* List */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        <div className="border rounded-md divide-y overflow-hidden">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="px-4 py-3 space-y-1.5">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-3 w-64" />
+            </div>
+          ))}
         </div>
       ) : transfers.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground" data-testid="text-empty">
@@ -700,7 +810,7 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
           <p className="text-sm">No Kolwezi transfer orders found</p>
         </div>
       ) : (
-        <div className="space-y-0 border rounded-md divide-y overflow-hidden">
+        <div className="border rounded-md divide-y overflow-hidden">
           {transfers.map(t => (
             <button
               key={t.voucherId}
@@ -710,23 +820,31 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
               data-testid={`row-transfer-${t.voucherId}`}
             >
               <div className="flex-1 min-w-0 space-y-0.5">
+                {/* Row 1: voucher number + badges + date */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold" data-testid={`text-voucher-${t.voucherId}`}>{t.voucherNumber}</span>
-                  {t.inventoryApplied && (
-                    <Badge variant="secondary" className="text-xs" data-testid={`badge-applied-${t.voucherId}`}>Applied</Badge>
-                  )}
+                  <span className="text-sm font-semibold font-mono" data-testid={`text-voucher-${t.voucherId}`}>
+                    {t.voucherNumber}
+                  </span>
+                  {t.inventoryApplied ? (
+                    <Badge variant="secondary" className="text-xs gap-1" data-testid={`badge-applied-${t.voucherId}`}>
+                      <Lock className="h-2.5 w-2.5" />Applied
+                    </Badge>
+                  ) : null}
                   <span className="text-xs text-muted-foreground">{t.destinationLocationName}</span>
                 </div>
+                {/* Row 2: date */}
                 <div className="text-xs text-muted-foreground">
                   {formatDate(t.voucherDate)}
                 </div>
+                {/* Row 3: item names preview */}
                 {(t.stockItemNames?.length ?? 0) > 0 && (
                   <div className="text-xs text-muted-foreground truncate">
                     {t.stockItemNames.slice(0, 3).join(", ")}
-                    {(t.stockItemNames.length > 3) ? ` +${t.stockItemNames.length - 3} more` : ""}
+                    {t.stockItemNames.length > 3 ? ` +${t.stockItemNames.length - 3} more` : ""}
                   </div>
                 )}
               </div>
+              {/* Right side: item count + chevron */}
               <div className="flex items-center gap-2 shrink-0 text-muted-foreground">
                 <span className="text-xs">{t.itemCount} items</span>
                 <ChevronRight className="h-4 w-4" />
