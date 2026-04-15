@@ -12,19 +12,23 @@ import { storage } from "../storage";
 
 let schedulerStarted = false;
 
-function getYesterdayRange(): { fromDate: string; toDate: string } {
-  const now = new Date();
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const toStr = (d: Date) => d.toISOString().substring(0, 10);
-  return { fromDate: toStr(yesterday), toDate: toStr(yesterday) };
+function getTodayLabel(): string {
+  return new Date().toISOString().substring(0, 10);
 }
 
+/**
+ * Build a ZIP of per-company Excel exports.
+ * Pass fromDate/toDate as empty strings or undefined for full-history export.
+ * dateLabel is used in filenames only (defaults to today).
+ */
 async function buildZipBuffer(
   companies: any[],
-  fromDate: string,
-  toDate: string
+  fromDate: string | undefined,
+  toDate: string | undefined,
+  dateLabel?: string
 ): Promise<{ zip: Buffer; names: string[]; skipped: string[] }> {
+  const label = dateLabel || getTodayLabel();
+
   return new Promise(async (resolve, reject) => {
     const chunks: Buffer[] = [];
     const names: string[] = [];
@@ -34,17 +38,14 @@ async function buildZipBuffer(
     arc.on("end", () => resolve({ zip: Buffer.concat(chunks), names, skipped }));
     arc.on("error", reject);
 
-    const dateLabel = toDate;
-
     for (const company of companies) {
       try {
-        console.log(`[DailyExport] Building workbook for company ${company.id} (${company.name}), range ${fromDate}→${toDate}...`);
+        console.log(`[DailyExport] Building workbook for company ${company.id} (${company.name}), range ${fromDate || "*"}→${toDate || "*"}...`);
         const data = await fetchCompanyExportData(company.id, fromDate, toDate);
         const rawBuf = await buildCompanyWorkbook(data);
-        // Ensure we pass a proper Node.js Buffer (not Uint8Array) to archiver
         const xlsxBuf = Buffer.isBuffer(rawBuf) ? rawBuf : Buffer.from(rawBuf);
         const safeName = company.name.replace(/[^a-zA-Z0-9_\- ]/g, "").trim();
-        const filename = `${safeName}_Export_${dateLabel}.xlsx`;
+        const filename = `${safeName}_Export_${label}.xlsx`;
         arc.append(xlsxBuf, { name: filename });
         names.push(company.name);
         console.log(`[DailyExport] Workbook ready for ${company.name} (${(xlsxBuf.length / 1024).toFixed(0)} KB)`);
@@ -58,7 +59,7 @@ async function buildZipBuffer(
     try {
       const year    = new Date().getUTCFullYear();
       const npStart = `${year}-01-01`;
-      const npEnd   = `${year}-12-31`;
+      const npEnd   = getTodayLabel();
       console.log(`[DailyExport] Adding all-companies net-position Excel (${npStart}→${npEnd}) to ZIP…`);
       const npBuf  = await generateAllCompaniesNetPositionExcel(companies, npStart, npEnd);
       const ensured = Buffer.isBuffer(npBuf) ? npBuf : Buffer.from(npBuf);
@@ -66,6 +67,38 @@ async function buildZipBuffer(
       console.log(`[DailyExport] Net Position Excel added (${(ensured.length / 1024).toFixed(0)} KB)`);
     } catch (npErr: any) {
       console.error(`[DailyExport] Failed to build net-position Excel:`, npErr?.message || npErr);
+    }
+
+    arc.finalize();
+  });
+}
+
+/**
+ * Build a ZIP containing per-company net position Excel files.
+ */
+async function buildNetPositionZip(
+  companies: any[],
+  startDate: string,
+  endDate: string
+): Promise<Buffer> {
+  return new Promise(async (resolve, reject) => {
+    const chunks: Buffer[] = [];
+    const arc = archiver("zip", { zlib: { level: 6 } });
+    arc.on("data", (chunk: Buffer) => chunks.push(chunk));
+    arc.on("end", () => resolve(Buffer.concat(chunks)));
+    arc.on("error", reject);
+
+    for (const company of companies) {
+      try {
+        const buf  = await generateNetPositionExcel(company.id, company.name, startDate, endDate);
+        const safe = company.name.replace(/[^a-z0-9]/gi, "_");
+        arc.append(Buffer.isBuffer(buf) ? buf : Buffer.from(buf), {
+          name: `NetPosition_${safe}_${endDate}.xlsx`,
+        });
+        console.log(`[NetPositionExport] Added ${company.name}`);
+      } catch (e: any) {
+        console.error(`[NetPositionExport] Failed for ${company.name}:`, e.message);
+      }
     }
 
     arc.finalize();
@@ -83,13 +116,17 @@ async function runDailyExport(retryCount = 0): Promise<void> {
       return;
     }
 
-    const { fromDate, toDate } = getYesterdayRange();
-    console.log(`[DailyExport] Date range: ${fromDate} → ${toDate} for ${companies.length} company/companies`);
+    const today = getTodayLabel();
+    // Use full history (no date filter) so the export is never empty
+    console.log(`[DailyExport] Building full-history export for ${companies.length} company/companies (label: ${today})`);
 
-    const { zip, names, skipped } = await buildZipBuffer(companies, fromDate, toDate);
+    const { zip, names, skipped } = await buildZipBuffer(companies, undefined, undefined, today);
+
+    // Always attempt WhatsApp send, even if some companies failed
+    await runDailyWhatsAppSend(zip, today, companies);
 
     if (names.length === 0) {
-      console.error(`[DailyExport] All ${companies.length} companies failed — nothing to send.`);
+      console.error(`[DailyExport] All ${companies.length} companies failed — nothing to email.`);
       if (retryCount < MAX_RETRIES) {
         console.log(`[DailyExport] Retrying in 10 minutes...`);
         setTimeout(() => runDailyExport(retryCount + 1), 10 * 60 * 1000);
@@ -101,7 +138,7 @@ async function runDailyExport(retryCount = 0): Promise<void> {
       console.warn(`[DailyExport] Skipped ${skipped.length} companies: ${skipped.join(", ")}`);
     }
 
-    const result = await sendExportEmail(zip, toDate, names);
+    const result = await sendExportEmail(zip, today, names);
 
     if (result.success) {
       console.log(`[DailyExport] Export emailed successfully for ${names.length} companies.`);
@@ -115,9 +152,6 @@ async function runDailyExport(retryCount = 0): Promise<void> {
         console.error(`[DailyExport] All ${MAX_RETRIES + 1} attempts failed. Giving up until next scheduled run.`);
       }
     }
-
-    // WhatsApp daily send — independent of email success
-    await runDailyWhatsAppSend(zip, toDate, companies);
 
   } catch (err: any) {
     console.error(`[DailyExport] Unexpected error:`, err?.stack || err?.message || err);
@@ -135,33 +169,39 @@ async function runDailyWhatsAppSend(
   dateLabel: string,
   companies: { id: number; name: string }[],
 ): Promise<void> {
-  const today = new Date().toISOString().split("T")[0];
   try {
     const settings = await getWaSettings();
-    if (!settings?.enabled || !settings?.dailyAutoSend) {
-      console.log("[WhatsApp] Daily auto-send is disabled — skipping.");
-    } else {
-      // Resolve the configured daily export recipient
-      const recipientId = settings.dailyRecipientId;
-      if (!recipientId) {
-        console.log("[WhatsApp] No daily export WhatsApp group configured — skipping daily ZIP send.");
-      } else {
-        const rRow = await pool.query(
-          "SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true",
-          [recipientId],
-        );
-        if (!rRow.rows.length) {
-          console.log(`[WhatsApp] Daily export recipient id=${recipientId} not found or inactive — skipping.`);
-        } else {
-          const chatId      = rRow.rows[0].chat_id as string;
-          const zipFileName = `DailyExport_${dateLabel}.zip`;
-          const zipCaption  = `Daily Company Export — ${dateLabel}\nAll companies included + Net Position (YTD).`;
-          console.log(`[WhatsApp] Sending daily export ZIP to ${chatId}…`);
-          const zipRes = await sendWhatsAppFileToChatId(chatId, dailyZip, zipFileName, zipCaption, "application/zip");
-          console.log(`[WhatsApp] Daily ZIP: ${zipRes.success ? "sent" : zipRes.error}`);
-        }
-      }
+    if (!settings?.enabled) {
+      console.log("[WhatsApp] WhatsApp is disabled — skipping daily ZIP send.");
+      return;
     }
+    if (!settings?.dailyAutoSend) {
+      console.log("[WhatsApp] Daily auto-send toggle is off — skipping.");
+      return;
+    }
+
+    // Resolve the configured daily export recipient
+    const recipientId = settings.dailyRecipientId;
+    if (!recipientId) {
+      console.log("[WhatsApp] No daily export WhatsApp group configured — skipping daily ZIP send.");
+      return;
+    }
+
+    const rRow = await pool.query(
+      "SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true",
+      [recipientId],
+    );
+    if (!rRow.rows.length) {
+      console.log(`[WhatsApp] Daily export recipient id=${recipientId} not found or inactive — skipping.`);
+      return;
+    }
+
+    const chatId      = rRow.rows[0].chat_id as string;
+    const zipFileName = `DailyExport_${dateLabel}.zip`;
+    const zipCaption  = `Daily Company Export — ${dateLabel}\nAll companies included + Net Position (YTD).`;
+    console.log(`[WhatsApp] Sending daily export ZIP to ${chatId}…`);
+    const zipRes = await sendWhatsAppFileToChatId(chatId, dailyZip, zipFileName, zipCaption, "application/zip");
+    console.log(`[WhatsApp] Daily ZIP: ${zipRes.success ? "sent" : zipRes.error}`);
 
     console.log("[WhatsApp] Daily WhatsApp send complete.");
   } catch (err: any) {
@@ -260,7 +300,7 @@ export async function checkAndRunStockReport(): Promise<void> {
     const company      = (allCompanies as any[]).find((c) => c.id === row.company_id);
     if (!company) { console.log(`[StockReport] Company ${row.company_id} not found.`); return; }
 
-    const today     = new Date().toISOString().split("T")[0];
+    const today     = getTodayLabel();
     const yearStart = `${new Date().getUTCFullYear()}-01-01`;
 
     console.log(`[StockReport] Sending to ${company.name} → ${chatId} (${cfg.frequency})…`);
@@ -287,6 +327,82 @@ export async function checkAndRunStockReport(): Promise<void> {
     console.log(`[StockReport] Done — last_sent_at updated.`);
   } catch (err: any) {
     console.error("[StockReport] Error:", err?.message || err);
+  }
+}
+
+// ─── Net Position Scheduled Export — all companies → WhatsApp group + email ──
+
+export async function checkAndRunNetPositionExport(): Promise<void> {
+  try {
+    const r = await pool.query(
+      `SELECT recipient_id, frequency, send_hour, send_day_of_week,
+              enabled, auto_send, last_sent_at
+       FROM net_position_export_settings WHERE id = 1`,
+    );
+    if (!r.rows.length) return;
+    const row = r.rows[0];
+
+    if (!row.enabled || !row.auto_send) return;
+
+    const cfg = {
+      frequency:     (row.frequency      ?? "daily") as string,
+      sendHour:      (row.send_hour      ?? 18)       as number,
+      sendDayOfWeek: (row.send_day_of_week            ?? null) as number | null,
+      lastSentAt:    row.last_sent_at ? new Date(row.last_sent_at) : null,
+    };
+
+    if (!shouldSendStockReport(cfg)) return;
+
+    const companies = await storage.getAllCompanies() as any[];
+    if (!companies.length) {
+      console.log("[NetPositionExport] No companies found — skipping.");
+      return;
+    }
+
+    const today    = getTodayLabel();
+    const year     = new Date().getUTCFullYear();
+    const npStart  = `${year}-01-01`;
+    const npEnd    = today;
+
+    console.log(`[NetPositionExport] Building net position ZIP for ${companies.length} companies (${npStart}→${npEnd})…`);
+    const zipBuf = await buildNetPositionZip(companies, npStart, npEnd);
+    console.log(`[NetPositionExport] ZIP ready (${(zipBuf.length / 1024).toFixed(0)} KB)`);
+
+    // Send to WhatsApp group
+    if (row.recipient_id) {
+      const rq = await pool.query(
+        "SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true",
+        [row.recipient_id],
+      );
+      if (rq.rows.length) {
+        const chatId = rq.rows[0].chat_id as string;
+        const waSettings = await getWaSettings();
+        if (waSettings?.enabled) {
+          const waRes = await sendWhatsAppFileToChatId(
+            chatId,
+            zipBuf,
+            `NetPosition_AllCompanies_${today}.zip`,
+            `Net Position Report — All Companies\nPeriod: ${npStart} → ${npEnd}`,
+            "application/zip",
+          );
+          console.log(`[NetPositionExport] WhatsApp: ${waRes.success ? "sent" : waRes.error}`);
+        } else {
+          console.log("[NetPositionExport] WhatsApp not enabled — skipping WhatsApp send.");
+        }
+      } else {
+        console.log(`[NetPositionExport] Recipient id=${row.recipient_id} inactive — skipping WhatsApp.`);
+      }
+    }
+
+    // Send via email (uses existing export_recipients + export_settings for credentials)
+    const emailResult = await sendExportEmail(zipBuf, today, companies.map((c) => c.name));
+    console.log(`[NetPositionExport] Email: ${emailResult.success ? "sent" : emailResult.error}`);
+
+    // Mark as sent
+    await pool.query(`UPDATE net_position_export_settings SET last_sent_at = now() WHERE id = 1`);
+    console.log(`[NetPositionExport] Done — last_sent_at updated.`);
+  } catch (err: any) {
+    console.error("[NetPositionExport] Error:", err?.message || err);
   }
 }
 
@@ -317,7 +433,7 @@ async function runMonthlyWhatsAppNetPosition() {
     }
 
     const companies = await storage.getAllCompanies();
-    const endDate   = new Date().toISOString().split("T")[0];
+    const endDate   = getTodayLabel();
     const startDate = (() => {
       const d = new Date(endDate);
       d.setFullYear(d.getFullYear() - 1);
@@ -352,7 +468,7 @@ export function startScheduler() {
     const emailEnabled = await isScheduleEnabled();
 
     if (emailEnabled) {
-      // Full export: builds ZIP, emails it, then sends via WhatsApp
+      // Full export: builds ZIP (full history), emails it, then sends via WhatsApp
       await runDailyExport();
     } else {
       // Email export is off — still run WhatsApp daily send independently
@@ -363,9 +479,9 @@ export function startScheduler() {
           console.log("[DailyExport] No companies — WhatsApp send skipped.");
           return;
         }
-        const { fromDate, toDate } = getYesterdayRange();
-        const { zip } = await buildZipBuffer(companies, fromDate, toDate);
-        await runDailyWhatsAppSend(zip, toDate, companies);
+        const today = getTodayLabel();
+        const { zip } = await buildZipBuffer(companies, undefined, undefined, today);
+        await runDailyWhatsAppSend(zip, today, companies);
       } catch (err: any) {
         console.error("[DailyExport] WhatsApp-only 6 PM send failed:", err?.message || err);
       }
@@ -382,9 +498,9 @@ export function startScheduler() {
   });
 
   // Stock + Net Position report — check every hour (minute 0) in EST
-  // The function itself decides whether to send based on frequency, send_hour, day-of-week, and last_sent_at
   cron.schedule("0 * * * *", async () => {
     await checkAndRunStockReport();
+    await checkAndRunNetPositionExport();
   }, {
     timezone: "America/New_York",
   });
@@ -392,6 +508,7 @@ export function startScheduler() {
   console.log("[DailyExport] Scheduler started — will run daily at 6:00 PM EST.");
   console.log("[WhatsApp] Monthly net-position scheduler started — runs on the 1st of each month at 7:00 AM EST.");
   console.log("[StockReport] Independent scheduler started — checks every hour.");
+  console.log("[NetPositionExport] Scheduled export checker started — checks every hour.");
 }
 
 export { runDailyExport, buildZipBuffer };

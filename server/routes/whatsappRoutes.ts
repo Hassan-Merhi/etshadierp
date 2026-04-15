@@ -24,6 +24,8 @@ import {
 } from "../services/whatsappService";
 import { generateNetPositionExcel, generateMonthEnds } from "../helpers/generateNetPositionExcel";
 import { generateStockPdf } from "../helpers/generateStockPdf";
+import { sendExportEmail } from "../services/emailService";
+import archiver from "archiver";
 
 export function registerWhatsAppRoutes(app: Express) {
   // ── Settings (singleton row id=1) ──────────────────────────────────────────
@@ -264,6 +266,141 @@ export function registerWhatsAppRoutes(app: Express) {
       );
       res.json({ message: "Saved" });
     } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Net Position Scheduled Export Settings ──────────────────────────────────
+
+  app.get("/api/whatsapp/np-settings", requireAuth, async (_req, res) => {
+    try {
+      const r = await pool.query(
+        `SELECT id, recipient_id, frequency, send_hour, send_day_of_week,
+                enabled, auto_send, last_sent_at
+         FROM net_position_export_settings WHERE id = 1`,
+      );
+      if (!r.rows.length) {
+        return res.json({
+          recipientId: null, frequency: "daily", sendHour: 18,
+          sendDayOfWeek: 1, enabled: false, autoSend: false, lastSentAt: null,
+        });
+      }
+      const row = r.rows[0];
+      res.json({
+        recipientId:   row.recipient_id,
+        frequency:     row.frequency      ?? "daily",
+        sendHour:      row.send_hour      ?? 18,
+        sendDayOfWeek: row.send_day_of_week ?? 1,
+        enabled:       row.enabled        ?? false,
+        autoSend:      row.auto_send      ?? false,
+        lastSentAt:    row.last_sent_at   ?? null,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.put("/api/whatsapp/np-settings", requireAuth, async (req, res) => {
+    try {
+      const { recipientId, frequency, sendHour, sendDayOfWeek, enabled, autoSend } = req.body as Record<string, any>;
+      await pool.query(
+        `INSERT INTO net_position_export_settings
+           (id, recipient_id, frequency, send_hour, send_day_of_week, enabled, auto_send)
+         VALUES (1, $1, $2, $3, $4, $5, $6)
+         ON CONFLICT (id) DO UPDATE SET
+           recipient_id     = EXCLUDED.recipient_id,
+           frequency        = EXCLUDED.frequency,
+           send_hour        = EXCLUDED.send_hour,
+           send_day_of_week = EXCLUDED.send_day_of_week,
+           enabled          = EXCLUDED.enabled,
+           auto_send        = EXCLUDED.auto_send`,
+        [
+          recipientId  ?? null,
+          frequency    ?? "daily",
+          sendHour     ?? 18,
+          sendDayOfWeek ?? null,
+          enabled      ?? false,
+          autoSend     ?? false,
+        ],
+      );
+      res.json({ message: "Saved" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Send Net Position (all companies) to group + email NOW ──────────────────
+
+  app.post("/api/whatsapp/send-np-all-now", requireAuth, async (req, res) => {
+    try {
+      const { recipientId: reqRecipientId } = req.body as Record<string, any>;
+
+      const allCompanies = await storage.getAllCompanies() as any[];
+      if (!allCompanies.length) return res.status(400).json({ message: "No companies found" });
+
+      const today    = new Date().toISOString().split("T")[0];
+      const year     = new Date().getUTCFullYear();
+      const npStart  = `${year}-01-01`;
+      const npEnd    = today;
+
+      // Build ZIP
+      const zipBuf = await new Promise<Buffer>(async (resolve, reject) => {
+        const chunks: Buffer[] = [];
+        const arc = archiver("zip", { zlib: { level: 6 } });
+        arc.on("data", (chunk: Buffer) => chunks.push(chunk));
+        arc.on("end", () => resolve(Buffer.concat(chunks)));
+        arc.on("error", reject);
+        for (const company of allCompanies) {
+          try {
+            const buf = await generateNetPositionExcel(company.id, company.name, npStart, npEnd);
+            const safe = company.name.replace(/[^a-z0-9]/gi, "_");
+            arc.append(Buffer.isBuffer(buf) ? buf : Buffer.from(buf), {
+              name: `NetPosition_${safe}_${npEnd}.xlsx`,
+            });
+          } catch (e: any) {
+            console.error(`[NpAllNow] Failed for ${company.name}:`, e.message);
+          }
+        }
+        arc.finalize();
+      });
+
+      const messages: string[] = [];
+
+      // WhatsApp send
+      const recipientId = reqRecipientId ? parseInt(reqRecipientId) : null;
+      if (recipientId) {
+        const rq = await pool.query(
+          "SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true",
+          [recipientId],
+        );
+        if (rq.rows.length) {
+          const chatId = rq.rows[0].chat_id as string;
+          const waSettings = await getWaSettings();
+          if (waSettings?.enabled) {
+            const waRes = await sendWhatsAppFileToChatId(
+              chatId, zipBuf,
+              `NetPosition_AllCompanies_${today}.zip`,
+              `Net Position Report — All Companies\nPeriod: ${npStart} → ${npEnd}`,
+              "application/zip",
+            );
+            messages.push(`WhatsApp: ${waRes.success ? "sent" : waRes.error}`);
+          } else {
+            messages.push("WhatsApp not enabled");
+          }
+        } else {
+          messages.push("WhatsApp recipient not found or inactive");
+        }
+      } else {
+        messages.push("No WhatsApp group selected");
+      }
+
+      // Email send
+      const emailResult = await sendExportEmail(zipBuf, today, allCompanies.map((c) => c.name));
+      messages.push(`Email: ${emailResult.success ? "sent" : (emailResult.error || "failed")}`);
+
+      res.json({ message: messages.join(" | ") });
+    } catch (err: any) {
+      console.error("[NpAllNow] Error:", err?.message || err);
       res.status(500).json({ message: err.message });
     }
   });

@@ -983,6 +983,18 @@ let migrationsDone = false;
      SET narration = credit_narrations.new_narration
      FROM credit_narrations
      WHERE voucher_entries.id = credit_narrations.entry_id`,
+
+    // Net position scheduled export — configurable group + frequency
+    `CREATE TABLE IF NOT EXISTS net_position_export_settings (
+       id           integer PRIMARY KEY DEFAULT 1,
+       recipient_id integer,
+       frequency    varchar(20) NOT NULL DEFAULT 'daily',
+       send_hour    integer NOT NULL DEFAULT 18,
+       send_day_of_week integer,
+       enabled      boolean NOT NULL DEFAULT false,
+       auto_send    boolean NOT NULL DEFAULT false,
+       last_sent_at timestamp
+    )`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
