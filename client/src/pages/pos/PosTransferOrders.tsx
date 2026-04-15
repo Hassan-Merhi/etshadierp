@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import {
@@ -104,6 +104,109 @@ interface ExtraItem {
   qtyDraft: string;
 }
 
+// ─── Inline combobox for adding items ─────────────────────────────────────────
+function AddItemCombobox({
+  inventory,
+  alreadyAdded,
+  existingIds,
+  onAdd,
+}: {
+  inventory: { stockItemId: number; name: string; quantity: string }[];
+  alreadyAdded: number[];
+  existingIds: number[];
+  onAdd: (inv: { stockItemId: number; name: string }) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const alreadySet = new Set([...alreadyAdded, ...existingIds]);
+
+  const matches = useMemo(() =>
+    inventory
+      .filter(i => !alreadySet.has(i.stockItemId) && i.name.toLowerCase().includes(search.toLowerCase()))
+      .slice(0, 25),
+    [inventory, search, alreadyAdded, existingIds]
+  );
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
+        inputRef.current && !inputRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const pick = (inv: { stockItemId: number; name: string }) => {
+    onAdd(inv);
+    setSearch("");
+    setOpen(false);
+    inputRef.current?.focus();
+  };
+
+  return (
+    <div className="border-t relative">
+      <div className="flex items-center gap-2 px-3 py-1.5">
+        <Plus className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder="Add item..."
+          value={search}
+          onChange={e => { setSearch(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={e => {
+            if (e.key === "Escape") { setOpen(false); setSearch(""); }
+            if (e.key === "Enter" && matches.length === 1) pick(matches[0]);
+          }}
+          className="flex-1 text-sm bg-transparent outline-none text-muted-foreground placeholder:text-muted-foreground/60 py-0.5"
+          data-testid="input-add-item-combobox"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => { setSearch(""); setOpen(false); }}
+            className="h-4 w-4 flex items-center justify-center text-muted-foreground hover-elevate"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+
+      {open && search.length > 0 && (
+        <div
+          ref={dropdownRef}
+          className="absolute left-0 right-0 z-50 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto"
+          style={{ top: "100%" }}
+        >
+          {matches.length === 0 ? (
+            <div className="text-xs text-muted-foreground p-3 text-center">No items found</div>
+          ) : matches.map(inv => (
+            <button
+              key={inv.stockItemId}
+              type="button"
+              onMouseDown={e => { e.preventDefault(); pick(inv); }}
+              className="w-full text-left px-3 py-2 text-sm hover-elevate border-b last:border-b-0 flex items-center justify-between gap-2"
+              data-testid={`button-pick-${inv.stockItemId}`}
+            >
+              <span className="truncate">{inv.name}</span>
+              {parseFloat(inv.quantity) > 0 && (
+                <span className="text-xs text-muted-foreground shrink-0">{parseFloat(inv.quantity)} in stock</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Detail view ──────────────────────────────────────────────────────────────
 function TransferOrderDetail({
   voucherId,
@@ -119,9 +222,6 @@ function TransferOrderDetail({
   const [deltas, setDeltas] = useState<Record<number, string>>({});
   const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
   const [note, setNote] = useState("");
-  const [itemSearch, setItemSearch] = useState("");
-  const [showItemPicker, setShowItemPicker] = useState(false);
-  const pickerRef = useRef<HTMLDivElement>(null);
 
   const { data: detail, isLoading } = useQuery<TransferDetail>({
     queryKey: ["/api/pos-transfer-detail", voucherId],
@@ -183,23 +283,14 @@ function TransferOrderDetail({
   // Items are pre-filtered by the backend for POS users (only their location)
   const myItems = detail?.items ?? [];
 
-  const existingIds = new Set(myItems.map(i => i.stockItemId));
-  const inventory = (rawInventory as any[]).map(i => ({
+  const locationInventory = (rawInventory as any[]).map(i => ({
     stockItemId: i.stockItemId ?? i.id,
     name: i.stockItemName ?? i.name ?? "",
     quantity: i.quantity ?? "0",
   }));
 
-  const filteredInventory = inventory.filter(inv =>
-    !existingIds.has(inv.stockItemId) &&
-    !extraItems.some(e => e.stockItemId === inv.stockItemId) &&
-    inv.name.toLowerCase().includes(itemSearch.toLowerCase())
-  );
-
   const addExtraItem = (inv: { stockItemId: number; name: string }) => {
     setExtraItems(prev => [...prev, { stockItemId: inv.stockItemId, stockItemName: inv.name, qtyDraft: "" }]);
-    setShowItemPicker(false);
-    setItemSearch("");
   };
 
   const updateExtraQty = (idx: number, val: string) => {
@@ -449,57 +540,13 @@ function TransferOrderDetail({
           })}
         </div>
 
-        {/* Add Item row */}
-        <div className="border-t">
-          {showItemPicker ? (
-            <div className="p-3 space-y-2" ref={pickerRef}>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="Search items to add..."
-                  value={itemSearch}
-                  onChange={e => setItemSearch(e.target.value)}
-                  className="pl-8 h-8 text-sm"
-                  data-testid="input-item-search"
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={() => { setShowItemPicker(false); setItemSearch(""); }}
-                  className="absolute right-2 top-1.5 h-5 w-5 flex items-center justify-center text-muted-foreground hover-elevate"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <div className="border rounded-md max-h-36 overflow-y-auto bg-popover">
-                {filteredInventory.length === 0 ? (
-                  <div className="text-xs text-muted-foreground p-3 text-center">No items found</div>
-                ) : filteredInventory.slice(0, 30).map(inv => (
-                  <button
-                    key={inv.stockItemId}
-                    type="button"
-                    onClick={() => addExtraItem(inv)}
-                    className="w-full text-left px-3 py-2 text-sm hover-elevate border-b last:border-b-0 flex items-center justify-between gap-2"
-                    data-testid={`button-pick-${inv.stockItemId}`}
-                  >
-                    <span className="truncate">{inv.name}</span>
-                    {inv.quantity && <span className="text-xs text-muted-foreground shrink-0">{parseFloat(inv.quantity)} in stock</span>}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowItemPicker(true)}
-              className="w-full px-3 py-2 text-sm text-muted-foreground flex items-center gap-2 hover-elevate"
-              data-testid="button-add-item"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add item
-            </button>
-          )}
-        </div>
+        {/* Add Item row — inline combobox */}
+        <AddItemCombobox
+          inventory={locationInventory ?? []}
+          alreadyAdded={extraItems.map(e => e.stockItemId)}
+          existingIds={myItems.map(i => i.stockItemId)}
+          onAdd={addExtraItem}
+        />
 
         {/* Totals row */}
         <div className="border-t px-3 py-2 bg-muted/30 flex items-center justify-end gap-4 text-xs text-muted-foreground">
