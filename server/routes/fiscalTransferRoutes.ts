@@ -795,12 +795,34 @@ export function registerFiscalTransferRoutes(app: Express) {
           itemCount: items.length,
         });
 
+        // Auto-fill rate from inventory for items with no rate (e.g. POS users who don't see cost)
+        const itemsWithRate = await Promise.all(items.map(async (item: any) => {
+          if (!item.rate || parseFloat(item.rate) === 0) {
+            const [invRow] = await db
+              .select({ averageRate: inventory.averageRate })
+              .from(inventory)
+              .where(and(eq(inventory.locationId, item.sourceLocationId), eq(inventory.stockItemId, item.stockItemId)))
+              .limit(1);
+            const resolvedRate = parseFloat(invRow?.averageRate ?? "0");
+            return { ...item, rate: resolvedRate.toFixed(2) };
+          }
+          return item;
+        }));
+
         const transfer = await storage.createStockTransfer(
           voucherId,
           destinationLocationId,
           notes || "",
-          items,
+          itemsWithRate,
         );
+
+        // Update voucher totalAmount based on actual rates (important for POS transfers where rate starts at 0)
+        const actualTotal = itemsWithRate.reduce((sum: number, item: any) => {
+          return sum + (parseFloat(item.quantity) * parseFloat(item.rate));
+        }, 0);
+        if (actualTotal > 0) {
+          await db.update(vouchers).set({ totalAmount: actualTotal.toFixed(2) }).where(eq(vouchers.id, voucherId));
+        }
 
         console.log("[Stock Transfer] Transfer created successfully:", {
           transferId: transfer.transfer.id,
