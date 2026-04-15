@@ -3,7 +3,6 @@ import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
-import { calculateRawMaterialStockValue } from "../../helpers/calculateRawMaterialStockValue";
 import { adjustInventory } from "../../inventoryHelper";
 import {
   writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
@@ -2414,41 +2413,78 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const ledgerForUsTotal = classified.forUsTotal;
       const ledgerOnUsTotal = classified.onUsTotal;
 
-      // ── 3. Inventory (Stock In Hand) — sell value ────────────────────────
-      // Only count IN_STOCK bales — FINALIZED bales are historical sold bales
-      // and would massively over-count the inventory value.
-      const inventoryBaleRows = await db
-        .select({ productId: factoryBales.productId, articleCode: factoryBales.articleCode })
-        .from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          eq(factoryBales.status, "IN_STOCK"),
-        ));
+      // ── 3. Inventory (Stock In Hand) — direct SQL sum of selling price ──────
+      // Single query: sum selling_price for every IN_STOCK bale that has a
+      // matched product, scoped strictly to companyId.
+      const invResult = await db.execute(sql`
+        SELECT COALESCE(SUM(p.selling_price::numeric), 0) AS total
+        FROM   factory_bales   b
+        JOIN   factory_bale_products p ON p.id = b.product_id
+        WHERE  b.company_id = ${companyId}
+          AND  b.status     = 'IN_STOCK'
+          AND  p.company_id = ${companyId}
+      `);
+      const invRow = ((invResult as any).rows ?? (invResult as any))[0] ?? {};
+      const inventorySellValue = round2(parseFloat(String(invRow?.total ?? "0")));
 
-      const productRowsForInv = await db
-        .select({ id: factoryBaleProducts.id, articleCode: factoryBaleProducts.articleCode, sellingPrice: factoryBaleProducts.sellingPrice })
-        .from(factoryBaleProducts)
-        .where(eq(factoryBaleProducts.companyId, companyId));
+      // ── 3b. Raw material stock value — direct SQL, mirrors /api/factory/raw-stock
+      const rawResult = await db.execute(sql`
+        SELECT
+          fc.supplier_id,
+          SUM(frs.received_kg::numeric)                                            AS total_recv,
+          SUM(frs.used_kg::numeric)                                                AS total_used,
+          SUM(frs.received_kg::numeric *
+              COALESCE(NULLIF(frs.cost_per_kg_usd::numeric, 0), frs.cost_per_kg::numeric, 0))
+            / NULLIF(SUM(frs.received_kg::numeric), 0)                             AS avg_cpk_usd
+        FROM   factory_raw_stock   frs
+        JOIN   factory_containers  fc  ON fc.id  = frs.container_id
+        WHERE  frs.company_id = ${companyId}
+          AND  fc.status     != 'DELETED'
+        GROUP  BY fc.supplier_id
+      `);
+      const rawRows: any[] = (rawResult as any).rows ?? (rawResult as any);
 
-      const productByIdForInv   = new Map(productRowsForInv.map(p => [p.id, p]));
-      const productByCodeForInv = new Map(
-        productRowsForInv.filter(p => p.articleCode).map(p => [p.articleCode!.toLowerCase(), p])
-      );
+      const adjResult = await db.execute(sql`
+        SELECT supplier_id, type, kg::numeric AS kg, cost_per_kg::numeric AS cpk
+        FROM   factory_raw_material_adjustments
+        WHERE  company_id = ${companyId}
+      `);
+      const adjRows: any[] = (adjResult as any).rows ?? (adjResult as any);
 
-      let inventorySellValue = 0;
-      for (const bale of inventoryBaleRows) {
-        const product = bale.productId
-          ? productByIdForInv.get(bale.productId)
-          : bale.articleCode
-            ? productByCodeForInv.get(bale.articleCode.toLowerCase())
-            : undefined;
-        if (!product) continue;
-        inventorySellValue += parseFloat(product.sellingPrice || "0");
+      // Build per-supplier totals (same weighted-average logic as the route)
+      type SupMap = { recv: number; used: number; cpkUsd: number };
+      const supMap = new Map<string, SupMap>();
+      for (const r of rawRows) {
+        const key    = r.supplier_id ? `s${r.supplier_id}` : `u`;
+        const recv   = parseFloat(String(r.total_recv  ?? "0")) || 0;
+        const used   = parseFloat(String(r.total_used  ?? "0")) || 0;
+        const cpkUsd = parseFloat(String(r.avg_cpk_usd ?? "0")) || 0;
+        supMap.set(key, { recv, used, cpkUsd });
       }
-      inventorySellValue = round2(inventorySellValue);
-
-      // ── 3b. Raw material stock value (cost-based) ─────────────────────────
-      const rawMaterialStockValue = await calculateRawMaterialStockValue(companyId);
+      for (const a of adjRows) {
+        const key    = a.supplier_id ? `s${a.supplier_id}` : `MANUAL`;
+        const kg     = parseFloat(String(a.kg  ?? "0")) || 0;
+        const cpk    = parseFloat(String(a.cpk ?? "0")) || 0;
+        const isAdd  = a.type === "ADD";
+        const ex     = supMap.get(key);
+        if (ex) {
+          if (isAdd) {
+            const prevVal = ex.recv * ex.cpkUsd;
+            ex.recv   += kg;
+            ex.cpkUsd  = ex.recv > 0 ? (prevVal + kg * cpk) / ex.recv : 0;
+          } else {
+            ex.used += kg;
+          }
+        } else if (isAdd) {
+          supMap.set(key, { recv: kg, used: 0, cpkUsd: cpk });
+        }
+      }
+      let rawTotal = 0;
+      for (const s of supMap.values()) {
+        const val = (s.recv - s.used) * s.cpkUsd;
+        if (val > 0) rawTotal += val;
+      }
+      const rawMaterialStockValue = round2(rawTotal);
 
       // ── 4. Combine and return ────────────────────────────────────────────
       // Rename for clarity — these are the two factory-specific values.
