@@ -197,7 +197,7 @@ function TransferOrderDetail({
   );
 
   const addExtraItem = (inv: { stockItemId: number; name: string }) => {
-    setExtraItems(prev => [...prev, { stockItemId: inv.stockItemId, stockItemName: inv.name, qtyDraft: "0" }]);
+    setExtraItems(prev => [...prev, { stockItemId: inv.stockItemId, stockItemName: inv.name, qtyDraft: "" }]);
     setShowItemPicker(false);
     setItemSearch("");
   };
@@ -384,25 +384,28 @@ function TransferOrderDetail({
                 className="border-b last:border-b-0 bg-primary/5"
                 data-testid={`row-extra-${item.stockItemId}`}
               >
-                {/* Desktop */}
+                {/* Desktop — same grid as existing items */}
                 <div className="hidden sm:grid grid-cols-[2rem_1fr_6rem_7rem_6rem_2.5rem] items-center px-3 py-1.5 gap-2">
                   <span className="text-xs text-muted-foreground">{myItems.length + idx + 1}</span>
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm font-medium truncate">{item.stockItemName}</span>
-                    <Badge variant="outline" className="text-xs shrink-0">New</Badge>
-                  </div>
-                  <span className="text-sm font-mono text-right text-muted-foreground">—</span>
+                  <span className="text-sm font-medium truncate">{item.stockItemName}</span>
+                  <span className="text-sm font-mono text-right text-muted-foreground">0</span>
                   <div className="flex items-center justify-center">
                     <input
-                      type="number"
-                      min="0"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
                       value={item.qtyDraft}
                       onChange={e => updateExtraQty(idx, e.target.value)}
-                      className="w-20 text-center text-sm border rounded bg-background px-1 py-0.5 font-mono outline-none focus:ring-1 focus:ring-ring"
+                      className="w-16 text-center text-sm border rounded bg-background px-1 py-0.5 font-mono outline-none focus:ring-1 focus:ring-ring"
                       data-testid={`input-extra-qty-${item.stockItemId}`}
                     />
                   </div>
-                  <span className="text-sm font-mono font-semibold text-right text-green-600 dark:text-green-400">{qty > 0 ? qty : "—"}</span>
+                  <span className={cn(
+                    "text-sm font-mono font-semibold text-right",
+                    qty > 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                  )}>
+                    {qty > 0 ? qty : "—"}
+                  </span>
                   <button
                     type="button"
                     onClick={() => removeExtra(idx)}
@@ -413,29 +416,32 @@ function TransferOrderDetail({
                   </button>
                 </div>
 
-                {/* Mobile */}
+                {/* Mobile — same layout as existing mobile rows */}
                 <div className="sm:hidden p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm font-medium truncate">{item.stockItemName}</span>
-                      <Badge variant="outline" className="text-xs shrink-0">New</Badge>
-                    </div>
+                    <span className="text-sm font-medium">{item.stockItemName}</span>
                     <button type="button" onClick={() => removeExtra(idx)}
                       className="h-6 w-6 flex items-center justify-center rounded hover-elevate text-muted-foreground"
                       data-testid={`button-remove-extra-mobile-${item.stockItemId}`}>
                       <X className="h-3 w-3" />
                     </button>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Qty:</span>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-xs text-muted-foreground">Original: <strong className="text-foreground">0</strong></span>
                     <input
-                      type="number"
-                      min="0"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
                       value={item.qtyDraft}
                       onChange={e => updateExtraQty(idx, e.target.value)}
-                      className="w-20 text-center text-sm border rounded bg-background px-2 py-1 font-mono outline-none focus:ring-1 focus:ring-ring"
+                      className="w-16 text-center text-sm border rounded bg-background px-2 py-1 font-mono outline-none focus:ring-1 focus:ring-ring"
                       data-testid={`input-extra-qty-mobile-${item.stockItemId}`}
                     />
+                    {qty > 0 && (
+                      <span className="text-xs font-semibold text-green-600 dark:text-green-400">
+                        New: {qty}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
