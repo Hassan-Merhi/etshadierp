@@ -477,14 +477,21 @@ export function registerFiscalTransferRoutes(app: Express) {
         : [];
       const locationMap = new Map(locationRows.map(l => [l.id, l.name]));
 
+      // Determine if this is a POS user and their assigned location
+      const isPosUserList = req.user?.role?.startsWith("POS");
+      const posLocationIdList = isPosUserList
+        ? (req.user?.assignedLocationId ?? req.session?.currentLocationId ?? null)
+        : null;
+
       // Batch-fetch item counts and totals per transfer
       const transferIds = rows.map(r => r.transferId);
       const itemRows = await db
         .select({
-          transferId:  stockTransferItems.transferId,
-          totalAmount: stockTransferItems.totalAmount,
-          stockItemId: stockTransferItems.stockItemId,
-          quantity:    stockTransferItems.quantity,
+          transferId:       stockTransferItems.transferId,
+          totalAmount:      stockTransferItems.totalAmount,
+          stockItemId:      stockTransferItems.stockItemId,
+          quantity:         stockTransferItems.quantity,
+          sourceLocationId: stockTransferItems.sourceLocationId,
         })
         .from(stockTransferItems)
         .where(inArray(stockTransferItems.transferId, transferIds))
@@ -500,15 +507,16 @@ export function registerFiscalTransferRoutes(app: Express) {
         : [];
       const stockItemMap = new Map(stockItemRows.map(s => [s.id, s.name]));
 
-      // Group items by transfer
+      // Group items by transfer — for POS users, only keep items from their location
       const itemsByTransfer = new Map<number, typeof itemRows>();
       for (const item of itemRows) {
+        if (posLocationIdList !== null && item.sourceLocationId !== posLocationIdList) continue;
         const arr = itemsByTransfer.get(item.transferId) || [];
         arr.push(item);
         itemsByTransfer.set(item.transferId, arr);
       }
 
-      const result = rows.map(r => {
+      const allResult = rows.map(r => {
         const items = itemsByTransfer.get(r.transferId) || [];
         const totalAmount = items.reduce((s, i) => s + parseFloat(i.totalAmount || "0"), 0);
         const stockItemNames = [...new Set(
@@ -526,11 +534,17 @@ export function registerFiscalTransferRoutes(app: Express) {
           itemCount:            items.length,
           totalAmount:          Math.round(totalAmount * 100) / 100,
           stockItemNames,
+          _hasMyItems:          items.length > 0,
           createdAt:            r.createdAt,
         };
       });
 
-      res.json(result);
+      // For POS users: exclude transfers that have no items from their location
+      const result = posLocationIdList !== null
+        ? allResult.filter(r => r._hasMyItems)
+        : allResult;
+
+      res.json(result.map(({ _hasMyItems, ...r }) => r));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
