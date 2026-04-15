@@ -3,6 +3,7 @@ import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
+import { calculateRawMaterialStockValue } from "../../helpers/calculateRawMaterialStockValue";
 import { adjustInventory } from "../../inventoryHelper";
 import {
   writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
@@ -2446,8 +2447,11 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       }
       inventorySellValue = round2(inventorySellValue);
 
+      // ── 3b. Raw material stock value (cost-based) ─────────────────────────
+      const rawMaterialStockValue = await calculateRawMaterialStockValue(companyId);
+
       // ── 4. Combine and return ────────────────────────────────────────────
-      const forUsTotal = round2(ledgerForUsTotal + inventorySellValue);
+      const forUsTotal = round2(ledgerForUsTotal + inventorySellValue + rawMaterialStockValue);
       const onUsTotal = round2(ledgerOnUsTotal + totalSupplierLiabilities);
       const netPosition = round2(forUsTotal - onUsTotal);
 
@@ -2455,9 +2459,13 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const inventoryAccount = inventorySellValue > 0
         ? [{ name: "Stock In Hand (Inventory)", code: "INVENTORY", value: inventorySellValue, category: "Inventory" }]
         : [];
+      const rawMaterialAccount = rawMaterialStockValue > 0
+        ? [{ name: "Raw Material Stock", code: "RAW_MATERIAL", value: rawMaterialStockValue, category: "Inventory" }]
+        : [];
 
       const forUsAccounts = [
         ...inventoryAccount,
+        ...rawMaterialAccount,
         ...ledgerForUs.sort((a, b) => b.value - a.value).map(a => ({ ...a, value: round2(a.value) })),
       ];
 
@@ -2498,6 +2506,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         onUs: { total: onUsTotal, breakdown: onUsBreakdown, accounts: onUsAccounts },
         supplierLiabilities: round2(totalSupplierLiabilities),
         inventoryValue: inventorySellValue,
+        rawMaterialValue: rawMaterialStockValue,
         ledgerAssets: round2(ledgerForUsTotal),
         ledgerLiabilities: round2(ledgerOnUsTotal),
       });

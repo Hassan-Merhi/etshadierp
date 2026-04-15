@@ -60,6 +60,7 @@ interface NetPositionData {
   netPosition: number;
   supplierLiabilities: number;
   inventoryValue: number;
+  rawMaterialValue: number;
   forUs: { total: number; breakdown: { name: string; value: number }[]; accounts: { name: string; code: string; value: number; category: string }[] };
   onUs: { total: number; breakdown: { name: string; value: number }[]; accounts: { name: string; code: string; value: number; category: string }[] };
 }
