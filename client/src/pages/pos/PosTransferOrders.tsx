@@ -115,9 +115,8 @@ function TransferOrderDetail({
   onBack: () => void;
 }) {
   const { toast } = useToast();
-  // delta per item id (relative: "+3", "-2", or absolute)
+  // delta per item id (signed: "-5" to deduct, "3" to add)
   const [deltas, setDeltas] = useState<Record<number, string>>({});
-  const [deltaDrafts, setDeltaDrafts] = useState<Record<number, string>>({});
   const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
   const [note, setNote] = useState("");
   const [itemSearch, setItemSearch] = useState("");
@@ -155,7 +154,6 @@ function TransferOrderDetail({
       toast({ title: "Revision saved", description: "Your adjustments have been submitted for the admin to review." });
       queryClient.invalidateQueries({ queryKey: ["/api/pos-transfer-detail", voucherId] });
       setDeltas({});
-      setDeltaDrafts({});
       setExtraItems([]);
       setNote("");
     },
@@ -164,34 +162,37 @@ function TransferOrderDetail({
     },
   });
 
-  // Parse delta for an item (may be "+3", "-2", "5", etc.)
+  // Parse delta for an item — type "-5" to deduct, "5" to add
   const getDeltaNum = (itemId: number): number => {
-    const val = (deltaDrafts[itemId] ?? deltas[itemId] ?? "0").trim();
+    const val = (deltas[itemId] ?? "").trim();
     if (!val || val === "-" || val === "+") return 0;
     return parseFloat(val) || 0;
   };
 
   const setDeltaVal = (itemId: number, val: string) => {
     setDeltas(prev => ({ ...prev, [itemId]: val }));
-    setDeltaDrafts(prev => ({ ...prev, [itemId]: val }));
   };
 
-  const applyDraftDelta = (itemId: number, original: number) => {
-    const draft = (deltaDrafts[itemId] ?? "").trim();
-    if (!draft || draft === "-" || draft === "+") {
-      setDeltaVal(itemId, "0");
-      return;
-    }
-    const num = parseFloat(draft) || 0;
-    setDeltaVal(itemId, String(num));
+  const normalizeDelta = (itemId: number) => {
+    const val = (deltas[itemId] ?? "").trim();
+    if (!val || val === "-" || val === "+") { setDeltaVal(itemId, ""); return; }
+    const num = parseFloat(val) || 0;
+    setDeltaVal(itemId, num === 0 ? "" : String(num));
   };
 
   const adjustDelta = (itemId: number, by: number) => {
     const cur = getDeltaNum(itemId);
-    setDeltaVal(itemId, String(cur + by));
+    const next = cur + by;
+    setDeltaVal(itemId, next === 0 ? "" : String(next));
   };
 
-  const existingIds = new Set((detail?.items ?? []).map(i => i.stockItemId));
+  // Only show items sourced from this POS user's location
+  const myItems = (detail?.items ?? []).filter(item => {
+    const srcId = item.sourceLocationId ?? detail?.sourceLocationId;
+    return srcId === posUser.assignedLocationId;
+  });
+
+  const existingIds = new Set(myItems.map(i => i.stockItemId));
   const inventory = (rawInventory as any[]).map(i => ({
     stockItemId: i.stockItemId ?? i.id,
     name: i.stockItemName ?? i.name ?? "",
@@ -221,7 +222,7 @@ function TransferOrderDetail({
   const handleSave = () => {
     if (!detail) return;
 
-    const baseItems = (detail.items ?? []).map(item => {
+    const baseItems = myItems.map(item => {
       const delta = getDeltaNum(item.id);
       const original = parseFloat(item.quantity) || 0;
       return {
@@ -258,7 +259,7 @@ function TransferOrderDetail({
   };
 
   const hasChanges =
-    (detail?.items ?? []).some(i => getDeltaNum(i.id) !== 0) ||
+    myItems.some(i => getDeltaNum(i.id) !== 0) ||
     extraItems.some(e => (parseFloat(e.qtyDraft) || 0) !== 0);
 
   if (isLoading) {
@@ -312,8 +313,8 @@ function TransferOrderDetail({
         </div>
 
         <div>
-          {/* Existing items */}
-          {(detail.items ?? []).map((item, idx) => {
+          {/* Existing items from this user's location */}
+          {myItems.map((item, idx) => {
             const deltaNum = getDeltaNum(item.id);
             const original = parseFloat(item.quantity) || 0;
             const newQty = original + deltaNum;
@@ -345,10 +346,11 @@ function TransferOrderDetail({
                     <input
                       type="text"
                       inputMode="numeric"
-                      value={deltaDrafts[item.id] ?? deltas[item.id] ?? "0"}
-                      onChange={e => setDeltaDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
-                      onBlur={() => applyDraftDelta(item.id, original)}
-                      className="w-12 text-center text-sm border rounded bg-background px-1 py-0.5 font-mono outline-none focus:ring-1 focus:ring-ring"
+                      placeholder="0"
+                      value={deltas[item.id] ?? ""}
+                      onChange={e => setDeltaVal(item.id, e.target.value)}
+                      onBlur={() => normalizeDelta(item.id)}
+                      className="w-14 text-center text-sm border rounded bg-background px-1 py-0.5 font-mono outline-none focus:ring-1 focus:ring-ring"
                       data-testid={`input-delta-${item.id}`}
                     />
                     <button
@@ -386,9 +388,10 @@ function TransferOrderDetail({
                       <input
                         type="text"
                         inputMode="numeric"
-                        value={deltaDrafts[item.id] ?? deltas[item.id] ?? "0"}
-                        onChange={e => setDeltaDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
-                        onBlur={() => applyDraftDelta(item.id, original)}
+                        placeholder="0"
+                        value={deltas[item.id] ?? ""}
+                        onChange={e => setDeltaVal(item.id, e.target.value)}
+                        onBlur={() => normalizeDelta(item.id)}
                         className="w-14 text-center text-sm border rounded bg-background px-2 py-1 font-mono outline-none focus:ring-1 focus:ring-ring"
                         data-testid={`input-delta-mobile-${item.id}`}
                       />
@@ -420,7 +423,7 @@ function TransferOrderDetail({
               >
                 {/* Desktop */}
                 <div className="hidden sm:grid grid-cols-[2rem_1fr_6rem_7rem_6rem_2.5rem] items-center px-3 py-1.5 gap-2">
-                  <span className="text-xs text-muted-foreground">{(detail.items?.length ?? 0) + idx + 1}</span>
+                  <span className="text-xs text-muted-foreground">{myItems.length + idx + 1}</span>
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-sm font-medium truncate">{item.stockItemName}</span>
                     <Badge variant="outline" className="text-xs shrink-0">New</Badge>
@@ -531,7 +534,7 @@ function TransferOrderDetail({
 
         {/* Totals row */}
         <div className="border-t px-3 py-2 bg-muted/30 flex items-center justify-end gap-4 text-xs text-muted-foreground">
-          <span>Total Items: <strong className="text-foreground">{(detail.items?.length ?? 0) + extraItems.length}</strong></span>
+          <span>Total Items: <strong className="text-foreground">{myItems.length + extraItems.length}</strong></span>
         </div>
       </Card>
 
