@@ -700,17 +700,19 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
       // 2. Active loadings (LOADING + PENDING_VERIFICATION)
       const loadingsRaw = await db.execute(
-        sql`SELECT id, customer_id as "customerId", container_number as "containerNumber", status
+        sql`SELECT id, customer_id as "customerId", container_number as "containerNumber", status,
+                   proforma_id_used as "proformaIdUsed"
             FROM customer_orders
             WHERE company_id = ${companyId} AND status IN ('LOADING','PENDING_VERIFICATION')
             ORDER BY id`
       );
-      const loadings: { id: number; customerId: number; containerNumber: string | null; status: string }[] =
+      const loadings: { id: number; customerId: number; containerNumber: string | null; status: string; proformaIdUsed: number | null }[] =
         (loadingsRaw.rows || loadingsRaw as any[]).map((r: any) => ({
           id:              r.id,
           customerId:      r.customerId,
           containerNumber: r.containerNumber || null,
           status:          r.status,
+          proformaIdUsed:  r.proformaIdUsed || null,
         }));
 
       // 3. Bale counts per loading per article code
@@ -728,6 +730,23 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           orderId:     r.orderId,
           articleCode: r.articleCode,
           count:       Number(r.count),
+        }));
+      }
+
+      // 3b. Proforma target quantities for each loading (via proformaIdUsed)
+      const proformaIds = [...new Set(loadings.map((l: any) => l.proformaIdUsed))].filter((id): id is number => id != null);
+      let proformaLines: { proformaId: number; articleCode: string; quantity: number }[] = [];
+      if (proformaIds.length > 0) {
+        const plRaw = await db.select({
+          proformaId: customerProformaLines.proformaId,
+          articleCode: customerProformaLines.articleCode,
+          quantity: customerProformaLines.quantity,
+        }).from(customerProformaLines)
+          .where(inArray(customerProformaLines.proformaId, proformaIds));
+        proformaLines = plRaw.map((r: any) => ({
+          proformaId: r.proformaId,
+          articleCode: r.articleCode,
+          quantity: Number(r.quantity),
         }));
       }
 
@@ -778,9 +797,16 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           customerName:    customerMap.get(l.customerId) || `Customer #${l.customerId}`,
           containerNumber: l.containerNumber,
           status:          l.status,
+          // balesByArticle: actual bales already scanned into this order
           balesByArticle:  loadingBales
             .filter((b: any) => b.orderId === l.id)
             .map((b: any) => ({ articleCode: b.articleCode, count: b.count })),
+          // proformaTargets: proforma line quantities (the target to load)
+          proformaTargets: l.proformaIdUsed
+            ? proformaLines
+                .filter((pl: any) => pl.proformaId === l.proformaIdUsed)
+                .map((pl: any) => ({ articleCode: pl.articleCode, quantity: pl.quantity }))
+            : [],
         })),
         productNames: Object.fromEntries(productNameByCode),
       });

@@ -39,6 +39,7 @@ interface LoadingEntry {
   containerNumber: string | null;
   status: string;
   balesByArticle: { articleCode: string; count: number }[];
+  proformaTargets: { articleCode: string; quantity: number }[];
 }
 interface LoadingModeData {
   inStockCounts: { articleCode: string; count: number }[];   // total pool (free + in loadings)
@@ -74,7 +75,7 @@ export default function FactoryStockAllocation() {
     },
     retry: 1,
     enabled: activeTab === "loading",
-    refetchInterval: 20_000,
+    refetchInterval: 10_000,
   });
 
   const toggleProformaVisible = (id: number) => {
@@ -121,21 +122,29 @@ export default function FactoryStockAllocation() {
     // freeStockCounts = truly free bales → used for Remaining
     const freeStockMap = new Map((data.freeStockCounts || []).map(s => [s.articleCode, s.count]));
 
-    // All article codes across total stock + all loadings
+    // All article codes: from total stock + scanned bales + proforma targets
     const articleCodeSet = new Set<string>();
     data.inStockCounts.forEach(s => articleCodeSet.add(s.articleCode));
-    data.loadings.forEach(l => l.balesByArticle.forEach(b => articleCodeSet.add(b.articleCode)));
+    data.loadings.forEach(l => {
+      l.balesByArticle.forEach(b => articleCodeSet.add(b.articleCode));
+      l.proformaTargets.forEach(t => articleCodeSet.add(t.articleCode));
+    });
 
     const articleRows = Array.from(articleCodeSet).sort().map(articleCode => {
       const inStock = totalStockMap.get(articleCode) || 0;          // total pool
       const remaining = freeStockMap.get(articleCode) || 0;          // truly free
-      const totalLoaded = inStock - remaining;                        // derived
       const displayName = data.productNames[articleCode] || articleCode;
-      return { articleCode, displayName, inStock, totalLoaded, remaining };
+      return { articleCode, displayName, inStock, remaining };
     });
 
     // Only show rows where there's something to display
-    const nonEmptyRows = articleRows.filter(r => r.inStock > 0 || r.totalLoaded > 0);
+    const nonEmptyRows = articleRows.filter(r =>
+      r.inStock > 0 ||
+      data.loadings.some(l =>
+        l.balesByArticle.some(b => b.articleCode === r.articleCode) ||
+        l.proformaTargets.some(t => t.articleCode === r.articleCode)
+      )
+    );
 
     return { articleRows: nonEmptyRows, loadings: data.loadings };
   }, [loadingQuery.data]);
@@ -303,7 +312,7 @@ export default function FactoryStockAllocation() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                   </span>
-                  Live — updates every 20 seconds
+                  Live — updates every 10 seconds
                 </div>
                 <span className="text-xs text-muted-foreground">·</span>
                 <span className="text-xs text-muted-foreground">{loadingComputed.loadings.length} active loading{loadingComputed.loadings.length !== 1 ? "s" : ""}</span>
@@ -369,18 +378,43 @@ export default function FactoryStockAllocation() {
                           {row.remaining}
                         </td>
 
-                        {/* Per-loading bale count cells */}
+                        {/* Per-loading cells: shows still needed = target - scanned */}
                         {loadingComputed.loadings.map(l => {
-                          const b = l.balesByArticle.find(b => b.articleCode === row.articleCode);
-                          if (!b) return (
+                          const target = l.proformaTargets.find(t => t.articleCode === row.articleCode);
+                          const scanned = l.balesByArticle.find(b => b.articleCode === row.articleCode);
+
+                          // Article not in this loading's proforma at all
+                          if (!target && !scanned) return (
                             <td key={l.id} className="px-2 py-2 text-center border-r bg-muted/30">
                               <span className="text-muted-foreground/40 text-xs">—</span>
                             </td>
                           );
+
+                          const targetQty = target?.quantity ?? 0;
+                          const scannedQty = scanned?.count ?? 0;
+                          const stillNeeded = targetQty - scannedQty;
+
+                          // Overloaded: scanned more than target
+                          if (stillNeeded < 0) return (
+                            <td key={l.id} className="px-2 py-2 text-center border-r">
+                              <span className="font-semibold font-mono tabular-nums text-destructive">{stillNeeded}</span>
+                              <div className="text-[10px] text-destructive/70">overloaded</div>
+                            </td>
+                          );
+
+                          // Done: exactly met
+                          if (stillNeeded === 0) return (
+                            <td key={l.id} className="px-2 py-2 text-center border-r">
+                              <span className="font-semibold font-mono tabular-nums text-green-700 dark:text-green-400">0</span>
+                              <div className="text-[10px] text-green-700/70 dark:text-green-400/70">done</div>
+                            </td>
+                          );
+
+                          // Still needs bales
                           return (
                             <td key={l.id} className="px-2 py-2 text-center border-r">
-                              <span className="font-semibold font-mono tabular-nums text-foreground">{b.count}</span>
-                              <div className="text-[10px] text-muted-foreground/60">bales</div>
+                              <span className="font-semibold font-mono tabular-nums text-amber-600 dark:text-amber-400">{stillNeeded}</span>
+                              <div className="text-[10px] text-muted-foreground/60">needed</div>
                             </td>
                           );
                         })}
