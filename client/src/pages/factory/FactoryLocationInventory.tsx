@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
-  ChevronLeft, MapPin, Layers, Package, Search, Printer, ArrowUpDown,
+  ChevronLeft, ChevronRight, MapPin, Layers, Package, Search, Printer, ArrowUpDown,
   FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2, Pencil, Tag, Zap, Eye
 } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
@@ -1248,11 +1248,19 @@ export default function FactoryLocationInventory() {
 
     return (
       <div className="p-4 md:p-6 max-w-5xl mx-auto">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-6">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl md:text-3xl font-bold" data-testid="text-page-title">
-              {selectedLocation.name} — Categories
-            </h1>
+        <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-3" aria-label="Breadcrumb">
+          <button onClick={handleBackToLocations} className="hover:text-foreground transition-colors" data-testid="breadcrumb-locations">
+            Locations
+          </button>
+          <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
+          <span className="font-medium text-foreground truncate">{selectedLocation.name}</span>
+          <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
+          <span>Categories</span>
+        </nav>
+
+        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">{selectedLocation.name}</h1>
             <Button
               variant="ghost"
               size="icon"
@@ -1263,36 +1271,58 @@ export default function FactoryLocationInventory() {
               <Pencil className="h-4 w-4" />
             </Button>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={handleBackToLocations} data-testid="button-back-locations">
-              <ChevronLeft className="h-4 w-4 mr-1" /> Locations
-            </Button>
+          <div className="flex items-center gap-2">
             <Button variant="default" size="sm" onClick={handleViewAll} data-testid="button-view-all">
               <Package className="h-4 w-4 mr-1" /> View All Items
             </Button>
-            <Button variant="outline" size="sm" onClick={() => handlePrint()} data-testid="button-print">
-              <Printer className="h-4 w-4 mr-1" /> Print
+            <Button variant="outline" size="icon" onClick={() => handlePrint()} data-testid="button-print" title="Print">
+              <Printer className="h-4 w-4" />
             </Button>
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => { const p = new URLSearchParams(); if (hideAvgCost) p.set("includeCost","0"); if (hideSellingPrice) p.set("includeSellPrice","0"); const qs = p.toString(); window.open(`/api/factory/location-inventory/${selectedLocation.id}/export/excel${qs ? "?"+qs : ""}`, "_blank"); }}
               data-testid="button-export-location-excel"
+              title="Export Excel"
             >
-              <FileSpreadsheet className="h-4 w-4 mr-1" /> Export Excel
+              <FileSpreadsheet className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
+        {!inventoryLoading && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
+              <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-muted-foreground">Categories:</span>
+              <span className="font-mono font-semibold">{regularCategories.length}</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
+              <span className="text-muted-foreground">Bales:</span>
+              <span className="font-mono font-semibold">{totalBales.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
+              <span className="text-muted-foreground">Total KG:</span>
+              <span className="font-mono font-semibold">{fmt(totalKg)}</span>
+            </div>
+            {!hideSellingPrice && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
+                <span className="text-muted-foreground">Sell Value:</span>
+                <span className="font-mono font-semibold">{formatAmount(totalSellValue)}</span>
+              </div>
+            )}
+          </div>
+        )}
+
         <Card className="p-4 w-full" ref={printRef}>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <div className="flex flex-col gap-2 mb-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search categories or items..."
                 value={categorySearch}
                 onChange={(e) => setCategorySearch(e.target.value)}
-                className="pl-10"
+                className="pl-9"
                 data-testid="input-search-categories"
               />
             </div>
@@ -1331,14 +1361,13 @@ export default function FactoryLocationInventory() {
               {!proformaMode && (
                 <Button
                   variant={showZeroStock ? "default" : "outline"}
-                  size="default"
+                  size="sm"
                   onClick={() => setShowZeroStock(v => !v)}
                   data-testid="button-show-zero-stock-categories"
-                  className="gap-2"
+                  className="gap-1.5"
                 >
                   <Eye className="h-4 w-4" />
-                  <span className="hidden sm:inline">{showZeroStock ? "Hide zero stock" : "Show zero stock"}</span>
-                  <span className="sm:hidden">Zero</span>
+                  {showZeroStock ? "Hide zero" : "Show zero"}
                 </Button>
               )}
             </div>
@@ -1376,7 +1405,7 @@ export default function FactoryLocationInventory() {
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div><span className="text-muted-foreground">Bales: </span><span className="font-mono">{prod.baleCount.toLocaleString()}</span></div>
                         <div className="text-right"><span className="text-muted-foreground">KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
-                        {!hideSellingPrice && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>}
+                        {!hideSellingPrice && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>}
                       </div>
                     </Card>
                   ))}
@@ -1385,7 +1414,7 @@ export default function FactoryLocationInventory() {
                       <span>Total ({sorted.length} items, {gTotalBales.toLocaleString()} bales)</span>
                       <span className="font-mono">{fmt(gTotalKg)} KG</span>
                     </div>
-                    {!hideSellingPrice && <div className="text-right text-sm font-mono font-bold text-primary">{formatAmount(gTotalSellCost)} sell</div>}
+                    {!hideSellingPrice && <div className="text-right text-sm font-mono font-bold">{formatAmount(gTotalSellCost)} sell</div>}
                   </Card>
                 </div>
 
@@ -1417,14 +1446,14 @@ export default function FactoryLocationInventory() {
                           <td className="px-3 font-medium">{prod.productName}</td>
                           <td className="text-right px-3 font-mono">{prod.baleCount.toLocaleString()}</td>
                           <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
+                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
                         </tr>
                       ))}
                       <tr className="border-t bg-muted/50 h-12 font-bold">
                         <td className="px-3" colSpan={3}>Total ({sorted.length} items)</td>
                         <td className="text-right px-3 font-mono">{gTotalBales.toLocaleString()}</td>
                         <td className="text-right px-3 font-mono">{fmt(gTotalKg)}</td>
-                        {!hideSellingPrice && <td className="text-right px-3 font-mono text-primary">{formatAmount(gTotalSellCost)}</td>}
+                        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(gTotalSellCost)}</td>}
                       </tr>
                     </tbody>
                   </table>
@@ -1458,7 +1487,7 @@ export default function FactoryLocationInventory() {
                               <div><span className="text-muted-foreground">Products: </span><span>{cat.productCount}</span></div>
                               <div className="text-right"><span className="text-muted-foreground">Bales: </span><span className="font-mono">{cat.baleCount.toLocaleString()}</span></div>
                               <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(cat.totalWeight)}</span></div>
-                              {!hideSellingPrice && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono text-primary">{formatAmount(cat.totalSellValue)}</span></div>}
+                              {!hideSellingPrice && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium">{formatAmount(cat.totalSellValue)}</span></div>}
                             </div>
                           </Card>
                         ))}
@@ -1467,7 +1496,7 @@ export default function FactoryLocationInventory() {
                             <span>Total ({totalProducts} products, {totalBales.toLocaleString()} bales)</span>
                             <span className="font-mono">{fmt(totalKg)} KG</span>
                           </div>
-                          {!hideSellingPrice && <div className="text-right text-sm font-mono font-bold text-primary">{formatAmount(totalSellValue)} sell</div>}
+                          {!hideSellingPrice && <div className="text-right text-sm font-mono font-bold">{formatAmount(totalSellValue)} sell</div>}
                         </Card>
                       </>
                     )}
@@ -1514,7 +1543,7 @@ export default function FactoryLocationInventory() {
                                 <td className="text-right px-3 font-mono">{cat.productCount}</td>
                                 <td className="text-right px-3 font-mono">{cat.baleCount.toLocaleString()}</td>
                                 <td className="text-right px-3 font-mono">{fmt(cat.totalWeight)}</td>
-                                {!hideSellingPrice && <td className="text-right px-3 font-mono text-primary">{formatAmount(cat.totalSellValue)}</td>}
+                                {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(cat.totalSellValue)}</td>}
                               </tr>
                             ))}
                             <tr className="border-t bg-muted/50 h-12 font-bold">
@@ -1522,7 +1551,7 @@ export default function FactoryLocationInventory() {
                               <td className="text-right px-3 font-mono">{totalProducts}</td>
                               <td className="text-right px-3 font-mono">{totalBales.toLocaleString()}</td>
                               <td className="text-right px-3 font-mono">{fmt(totalKg)}</td>
-                              {!hideSellingPrice && <td className="text-right px-3 font-mono text-primary">{formatAmount(totalSellValue)}</td>}
+                              {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(totalSellValue)}</td>}
                             </tr>
                           </>
                         )}
@@ -1552,7 +1581,7 @@ export default function FactoryLocationInventory() {
                           <div><span className="text-muted-foreground">Products: </span><span>{cat.productCount}</span></div>
                           <div className="text-right"><span className="text-muted-foreground">Bales: </span><span className="font-mono">{cat.baleCount.toLocaleString()}</span></div>
                           <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(cat.totalWeight)}</span></div>
-                          {!hideSellingPrice && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono text-primary">{formatAmount(cat.totalSellValue)}</span></div>}
+                          {!hideSellingPrice && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium">{formatAmount(cat.totalSellValue)}</span></div>}
                         </div>
                       </Card>
                     ))}
@@ -1561,7 +1590,7 @@ export default function FactoryLocationInventory() {
                         <span>Total ({spTotalProducts} products, {spTotalBales.toLocaleString()} bales)</span>
                         <span className="font-mono">{fmt(spTotalKg)} KG</span>
                       </div>
-                      {!hideSellingPrice && <div className="text-right text-sm font-mono font-bold text-primary">{formatAmount(spTotalSellValue)} sell</div>}
+                      {!hideSellingPrice && <div className="text-right text-sm font-mono font-bold">{formatAmount(spTotalSellValue)} sell</div>}
                     </Card>
                   </div>
 
@@ -1600,7 +1629,7 @@ export default function FactoryLocationInventory() {
                             <td className="text-right px-3 font-mono">{cat.productCount}</td>
                             <td className="text-right px-3 font-mono">{cat.baleCount.toLocaleString()}</td>
                             <td className="text-right px-3 font-mono">{fmt(cat.totalWeight)}</td>
-                            {!hideSellingPrice && <td className="text-right px-3 font-mono text-primary">{formatAmount(cat.totalSellValue)}</td>}
+                            {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(cat.totalSellValue)}</td>}
                           </tr>
                         ))}
                         <tr className="border-t bg-muted/50 h-12 font-bold">
@@ -1608,7 +1637,7 @@ export default function FactoryLocationInventory() {
                           <td className="text-right px-3 font-mono">{spTotalProducts}</td>
                           <td className="text-right px-3 font-mono">{spTotalBales.toLocaleString()}</td>
                           <td className="text-right px-3 font-mono">{fmt(spTotalKg)}</td>
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono text-primary">{formatAmount(spTotalSellValue)}</td>}
+                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(spTotalSellValue)}</td>}
                         </tr>
                       </tbody>
                     </table>
@@ -1641,35 +1670,26 @@ export default function FactoryLocationInventory() {
   const allCategoryNamesForProducts = isAllItems
     ? [...new Set(activeInventoryData.map((p) => p.category || ""))].filter(Boolean).sort()
     : [];
-  const colSpanAll = (isAllItems ? 9 : 8) + (proformaMode ? 2 : 0) - (hideSellingPrice ? 2 : 0);
-  const colSpanLabel = isAllItems ? 3 : 2;
+  const colSpanAll = (isAllItems ? 8 : 7) + (proformaMode ? 2 : 0) - (hideSellingPrice ? 2 : 0);
+  const colSpanLabel = isAllItems ? 2 : 1;
 
   return (
     <div className={`p-4 md:p-6 max-w-6xl mx-auto ${proformaMode && selections.size > 0 ? "pb-24" : ""}`}>
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-6">
-        <h1 className="text-xl md:text-3xl font-bold" data-testid="text-page-title">
-          {selectedLocation.name} — {selectedCategory.categoryName}
-        </h1>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={handleBackToCategories} data-testid="button-back-categories">
-            <ChevronLeft className="h-4 w-4 mr-1" /> Categories
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleBackToLocations} data-testid="button-back-locations">
-            <MapPin className="h-4 w-4 mr-1" /> Locations
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => handlePrint()} data-testid="button-print">
-            <Printer className="h-4 w-4 mr-1" /> Print
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const p = new URLSearchParams(); if (hideAvgCost) p.set("includeCost","0"); if (hideSellingPrice) p.set("includeSellPrice","0"); const qs = p.toString(); window.open(`/api/factory/location-inventory/${selectedLocation!.id}/export/excel${qs ? "?"+qs : ""}`, "_blank");
-            }}
-            data-testid="button-export-inventory-excel"
-          >
-            <FileSpreadsheet className="h-4 w-4 mr-1" /> Export Excel
-          </Button>
+      <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-3" aria-label="Breadcrumb">
+        <button onClick={handleBackToLocations} className="hover:text-foreground transition-colors" data-testid="breadcrumb-locations">
+          Locations
+        </button>
+        <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
+        <button onClick={handleBackToCategories} className="hover:text-foreground transition-colors" data-testid="breadcrumb-categories">
+          {selectedLocation.name}
+        </button>
+        <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
+        <span className="text-foreground">{selectedCategory.categoryName}</span>
+      </nav>
+
+      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+        <h1 className="text-2xl font-bold" data-testid="text-page-title">{selectedCategory.categoryName}</h1>
+        <div className="flex items-center gap-2">
           <Button
             variant={proformaMode ? "destructive" : "default"}
             size="sm"
@@ -1679,8 +1699,45 @@ export default function FactoryLocationInventory() {
             <ClipboardList className="h-4 w-4 mr-1" />
             {proformaMode ? "Exit Proforma Mode" : "Enter Proforma Mode"}
           </Button>
+          <Button variant="outline" size="icon" onClick={() => handlePrint()} data-testid="button-print" title="Print">
+            <Printer className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => {
+              const p = new URLSearchParams(); if (hideAvgCost) p.set("includeCost","0"); if (hideSellingPrice) p.set("includeSellPrice","0"); const qs = p.toString(); window.open(`/api/factory/location-inventory/${selectedLocation!.id}/export/excel${qs ? "?"+qs : ""}`, "_blank");
+            }}
+            data-testid="button-export-inventory-excel"
+            title="Export Excel"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+          </Button>
         </div>
       </div>
+
+      {!inventoryLoading && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
+            <span className="text-muted-foreground">Products:</span>
+            <span className="font-mono font-semibold">{regularProducts.length}</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
+            <span className="text-muted-foreground">Bales:</span>
+            <span className="font-mono font-semibold">{totalBales.toLocaleString()}</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
+            <span className="text-muted-foreground">Total KG:</span>
+            <span className="font-mono font-semibold">{fmt(totalKg)}</span>
+          </div>
+          {!hideSellingPrice && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
+              <span className="text-muted-foreground">Sell Value:</span>
+              <span className="font-mono font-semibold">{formatAmount(totalSellValue)}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {proformaMode && (
         <div className="mb-4 flex items-center gap-2 flex-wrap">
@@ -1744,14 +1801,14 @@ export default function FactoryLocationInventory() {
       )}
 
       <Card className="p-4 w-full" ref={printRef}>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+        <div className="flex flex-col gap-2 mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by bale name or article code..."
               value={productSearch}
               onChange={(e) => setProductSearch(e.target.value)}
-              className="pl-10"
+              className="pl-9"
               data-testid="input-search-products"
             />
           </div>
@@ -1792,14 +1849,13 @@ export default function FactoryLocationInventory() {
             {!proformaMode && (
               <Button
                 variant={showZeroStock ? "default" : "outline"}
-                size="default"
+                size="sm"
                 onClick={() => setShowZeroStock(v => !v)}
                 data-testid="button-show-zero-stock-products"
-                className="gap-2"
+                className="gap-1.5"
               >
                 <Eye className="h-4 w-4" />
-                <span className="hidden sm:inline">{showZeroStock ? "Hide zero stock" : "Show zero stock"}</span>
-                <span className="sm:hidden">Zero</span>
+                {showZeroStock ? "Hide zero" : "Show zero"}
               </Button>
             )}
           </div>
@@ -1870,8 +1926,8 @@ export default function FactoryLocationInventory() {
                       </div>
                       <div className="text-right"><span className="text-muted-foreground">Wt/Bale: </span><span className="font-mono">{fmt(weightPerBale)} KG</span></div>
                       <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
-                      {!hideSellingPrice && <div className="text-right"><span className="text-muted-foreground">Sell Price: </span><span className="font-mono text-primary">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</span></div>}
-                      {!hideSellingPrice && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>}
+                      {!hideSellingPrice && <div className="text-right"><span className="text-muted-foreground">Sell Price: </span><span className="font-mono">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</span></div>}
+                      {!hideSellingPrice && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>}
                     </div>
                     {proformaMode && isSelected && selection && (
                       <div className="mt-2 pt-2 border-t flex items-center gap-2 flex-wrap">
@@ -1905,7 +1961,7 @@ export default function FactoryLocationInventory() {
                     <span>Total ({regularProducts.length} products, {totalBales.toLocaleString()} bales)</span>
                     <span className="font-mono">{fmt(totalKg)} KG</span>
                   </div>
-                  <div className="text-right text-sm font-mono font-bold text-primary">{formatAmount(totalSellValue)} sell</div>
+                  <div className="text-right text-sm font-mono font-bold">{formatAmount(totalSellValue)} sell</div>
                 </Card>
               )}
               {isAllItems && specialProducts.length > 0 && (
@@ -1969,8 +2025,8 @@ export default function FactoryLocationInventory() {
                           </div>
                           <div className="text-right"><span className="text-muted-foreground">Wt/Bale: </span><span className="font-mono">{fmt(weightPerBale)} KG</span></div>
                           <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
-                          {!hideSellingPrice && <div className="text-right"><span className="text-muted-foreground">Sell Price: </span><span className="font-mono text-primary">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</span></div>}
-                          {!hideSellingPrice && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>}
+                          {!hideSellingPrice && <div className="text-right"><span className="text-muted-foreground">Sell Price: </span><span className="font-mono">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</span></div>}
+                          {!hideSellingPrice && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>}
                         </div>
                         {proformaMode && isSelected && selection && (
                           <div className="mt-2 pt-2 border-t flex items-center gap-2 flex-wrap">
@@ -1989,7 +2045,7 @@ export default function FactoryLocationInventory() {
                       <span>Total ({specialProducts.length} products, {spProdTotalBales.toLocaleString()} bales)</span>
                       <span className="font-mono">{fmt(spProdTotalKg)} KG</span>
                     </div>
-                    {!hideSellingPrice && <div className="text-right text-sm font-mono font-bold text-primary">{formatAmount(spProdTotalSellValue)} sell</div>}
+                    {!hideSellingPrice && <div className="text-right text-sm font-mono font-bold">{formatAmount(spProdTotalSellValue)} sell</div>}
                   </Card>
                 </>
               )}
@@ -1999,12 +2055,11 @@ export default function FactoryLocationInventory() {
 
         <div className="hidden md:block space-y-0 w-full">
           <div className="rounded-md border overflow-x-auto w-full">
-            <table className="table-fixed text-sm" style={{ minWidth: "900px", width: "100%" }}>
+            <table className="table-fixed text-sm" style={{ minWidth: "780px", width: "100%" }}>
               <colgroup>
                 {proformaMode && <col style={{ width: "36px" }} />}
-                {isAllItems && <col style={{ width: "120px" }} />}
-                <col style={{ width: "110px" }} />
-                <col style={{ minWidth: "180px" }} />
+                {isAllItems && <col style={{ width: "110px" }} />}
+                <col style={{ minWidth: "200px" }} />
                 <col style={{ width: "70px" }} />
                 {proformaMode && <col style={{ width: "80px" }} />}
                 {proformaMode && <col style={{ width: "110px" }} />}
@@ -2018,7 +2073,6 @@ export default function FactoryLocationInventory() {
                 <tr className="h-12">
                   {proformaMode && <th className="px-2"></th>}
                   {isAllItems && <th className="text-left px-3 font-medium">Category</th>}
-                  <th className="text-left px-3 font-medium">Article Code</th>
                   <th className="text-left px-3 font-medium whitespace-nowrap">Bale Name</th>
                   <th className="text-right px-3 font-medium whitespace-nowrap">{proformaMode ? "Available" : "Bales"}</th>
                   {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
@@ -2052,14 +2106,14 @@ export default function FactoryLocationInventory() {
                             </td>
                           )}
                           {isAllItems && <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>}
-                          <td className="px-3 text-muted-foreground font-mono text-xs">{prod.articleCode}</td>
-                          <td className="px-3 font-medium">
+                          <td className="px-3">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <button onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)} className={`text-left whitespace-nowrap ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`} data-testid={`link-product-desktop-${prod.productId}`}>
+                              <button onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)} className={`text-left font-medium ${proformaMode ? "" : "hover:underline cursor-pointer"}`} data-testid={`link-product-desktop-${prod.productId}`}>
                                 {prod.productName}
                               </button>
                               {prod.isInactive && <Badge variant="outline" className="text-xs text-muted-foreground no-default-active-elevate">Inactive</Badge>}
                             </div>
+                            {prod.articleCode && <div className="text-xs text-muted-foreground font-mono mt-0.5">{prod.articleCode}</div>}
                           </td>
                           <td className="text-right px-3 font-mono whitespace-nowrap">
                             {prod.baleCount}
@@ -2079,8 +2133,8 @@ export default function FactoryLocationInventory() {
                             </td>
                           )}
                           <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono text-primary">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
+                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
+                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
                           <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
                           {!proformaMode && (
                             <td className="px-1 text-center">
@@ -2118,8 +2172,8 @@ export default function FactoryLocationInventory() {
                       {proformaMode && <td></td>}
                       {proformaMode && <td></td>}
                       <td className="text-right px-3 font-mono">{proformaMode ? fmt(totalKg) : ""}</td>
-                      {!hideSellingPrice && <td className="text-right px-3 font-mono text-primary"></td>}
-                      {!hideSellingPrice && <td className="text-right px-3 font-mono text-primary">{formatAmount(totalSellValue)}</td>}
+                      {!hideSellingPrice && <td className="text-right px-3 font-mono"></td>}
+                      {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(totalSellValue)}</td>}
                       <td className="text-right px-3 font-mono">{fmt(totalKg)}</td>
                       {!proformaMode && <td></td>}
                     </tr>
@@ -2133,12 +2187,11 @@ export default function FactoryLocationInventory() {
             <div className="mt-6">
               <p className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Wipers &amp; Garbage</p>
               <div className="rounded-md border overflow-x-auto w-full">
-                <table className="table-fixed text-sm" style={{ minWidth: "900px", width: "100%" }}>
+                <table className="table-fixed text-sm" style={{ minWidth: "780px", width: "100%" }}>
                   <colgroup>
                     {proformaMode && <col style={{ width: "36px" }} />}
-                    <col style={{ width: "120px" }} />
                     <col style={{ width: "110px" }} />
-                    <col style={{ minWidth: "180px" }} />
+                    <col style={{ minWidth: "200px" }} />
                     <col style={{ width: "70px" }} />
                     {proformaMode && <col style={{ width: "80px" }} />}
                     {proformaMode && <col style={{ width: "110px" }} />}
@@ -2152,7 +2205,6 @@ export default function FactoryLocationInventory() {
                     <tr className="h-12">
                       {proformaMode && <th className="px-2"></th>}
                       <th className="text-left px-3 font-medium">Category</th>
-                      <th className="text-left px-3 font-medium">Article Code</th>
                       <th className="text-left px-3 font-medium whitespace-nowrap">Bale Name</th>
                       <th className="text-right px-3 font-medium whitespace-nowrap">{proformaMode ? "Available" : "Bales"}</th>
                       {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
@@ -2178,14 +2230,14 @@ export default function FactoryLocationInventory() {
                             </td>
                           )}
                           <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>
-                          <td className="px-3 text-muted-foreground font-mono text-xs">{prod.articleCode}</td>
-                          <td className="px-3 font-medium">
+                          <td className="px-3">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <button onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)} className={`text-left whitespace-nowrap ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`} data-testid={`link-product-desktop-sp-${prod.productId}`}>
+                              <button onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)} className={`text-left font-medium ${proformaMode ? "" : "hover:underline cursor-pointer"}`} data-testid={`link-product-desktop-sp-${prod.productId}`}>
                                 {prod.productName}
                               </button>
                               {prod.isInactive && <Badge variant="outline" className="text-xs text-muted-foreground no-default-active-elevate">Inactive</Badge>}
                             </div>
+                            {prod.articleCode && <div className="text-xs text-muted-foreground font-mono mt-0.5">{prod.articleCode}</div>}
                           </td>
                           <td className="text-right px-3 font-mono whitespace-nowrap">
                             {prod.baleCount}
@@ -2205,8 +2257,8 @@ export default function FactoryLocationInventory() {
                             </td>
                           )}
                           <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono text-primary">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
+                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
+                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
                           <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
                           {!proformaMode && (
                             <td className="px-1 text-center">
@@ -2244,8 +2296,8 @@ export default function FactoryLocationInventory() {
                       {proformaMode && <td></td>}
                       {proformaMode && <td></td>}
                       <td className="text-right px-3 font-mono">{proformaMode ? fmt(spProdTotalKg) : ""}</td>
-                      {!hideSellingPrice && <td className="text-right px-3 font-mono text-primary"></td>}
-                      {!hideSellingPrice && <td className="text-right px-3 font-mono text-primary">{formatAmount(spProdTotalSellValue)}</td>}
+                      {!hideSellingPrice && <td className="text-right px-3 font-mono"></td>}
+                      {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(spProdTotalSellValue)}</td>}
                       <td className="text-right px-3 font-mono">{fmt(spProdTotalKg)}</td>
                       {!proformaMode && <td></td>}
                     </tr>
