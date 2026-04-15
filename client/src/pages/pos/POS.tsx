@@ -265,6 +265,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const [mobileRowEditIndex, setMobileRowEditIndex] = useState<number | null>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
   const [saleJustCompleted, setSaleJustCompleted] = useState(false);
+  const [showStockPrompt, setShowStockPrompt] = useState(false);
 
   // Reset sale state when POS user switches location
   const prevLocationRef = useRef<number | null>(null);
@@ -581,15 +582,18 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       setShowPrintDialog(false);
       if (editVoucherId) {
         navigate("/pos-daybook");
+      } else {
+        // After printing the invoice, prompt to print stock
+        setShowStockPrompt(true);
       }
     },
   });
 
-  // Stock inventory query — only fetch when the print dialog is open and we have a location
+  // Stock inventory query — prefetch when invoice dialog is open so it's ready for the stock prompt
   const printLocationId = activeLocation?.id ?? (editVoucher as any)?.locationId ?? null;
   const { data: stockInventory = [], isLoading: stockInventoryLoading } = useQuery<any[]>({
     queryKey: [`/api/locations/${printLocationId}/inventory`],
-    enabled: showPrintDialog && !!printLocationId,
+    enabled: (showPrintDialog || showStockPrompt) && !!printLocationId,
   });
 
   const handleStockPrint = useReactToPrint({
@@ -2399,8 +2403,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             </div>
           </div>
 
-          {/* Hidden Stock Print Template */}
-          <div className="hidden">
+          {/* Hidden Stock Print Template — kept inside dialog so it mounts early for prefetch */}
+          <div style={{ display: 'none' }}>
             <div ref={stockPrintRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', backgroundColor: 'white', color: 'black' }}>
               <style dangerouslySetInnerHTML={{ __html: `
                 @page { size: A4; margin: 12mm 14mm; }
@@ -2495,13 +2499,35 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 New Sale
               </Button>
             )}
-            <Button variant="outline" onClick={() => handleStockPrint()} disabled={stockInventoryLoading} className="gap-2" data-testid="button-print-stock">
-              <Printer className="h-4 w-4" />
-              {stockInventoryLoading ? "Loading…" : "Print Stock"}
-            </Button>
             <Button onClick={handlePrint} className="gap-2" data-testid="button-print-invoice">
               <Printer className="h-4 w-4" />
               Print Invoice
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Stock Print Prompt — appears after invoice is printed */}
+      <AlertDialog open={showStockPrompt} onOpenChange={setShowStockPrompt}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Print Stock?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Would you like to print the current stock report for <strong>{activeLocation?.name}</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => setShowStockPrompt(false)} data-testid="button-skip-stock-print">
+              Skip
+            </Button>
+            <Button
+              onClick={() => { setShowStockPrompt(false); handleStockPrint(); }}
+              disabled={stockInventoryLoading}
+              className="gap-2"
+              data-testid="button-confirm-stock-print"
+            >
+              <Printer className="h-4 w-4" />
+              {stockInventoryLoading ? "Loading…" : "Print Stock"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
