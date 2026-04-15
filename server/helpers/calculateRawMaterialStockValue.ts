@@ -122,12 +122,15 @@ export async function calculateRawMaterialStockValue(companyId: number): Promise
   }
 
   let total = 0;
-  for (const s of supplierMap.values()) {
+  console.log(`[RawMaterialStock] companyId=${companyId} rawStockRows=${results.length} adjustments=${adjustments.length} supplierMapSize=${supplierMap.size}`);
+  for (const [key, s] of supplierMap.entries()) {
     const remaining = s._totalReceived - s._totalUsed;
     // Route frontend picks valueRemainingUsd first, falls back to valueRemaining
     const valueUsd = remaining * s._avgCostPerKgUsd;
+    console.log(`  [${key}] recv=${s._totalReceived.toFixed(2)} used=${s._totalUsed.toFixed(2)} rem=${remaining.toFixed(2)} cpkUsd=${s._avgCostPerKgUsd.toFixed(4)} val=${valueUsd.toFixed(2)}`);
     if (valueUsd > 0) total += valueUsd;
   }
+  console.log(`[RawMaterialStock] TOTAL=${total.toFixed(2)}`);
 
   return Math.round((total + Number.EPSILON) * 100) / 100;
 }
