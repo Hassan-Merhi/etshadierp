@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import {
-  ArrowLeft, ChevronRight, RotateCcw, Plus, Minus, Loader2, Save,
+  ArrowLeft, ChevronRight, RotateCcw, Plus, Loader2, Save,
   CheckCircle2, Search, X, ArrowRight, Clock, Package2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -180,17 +180,8 @@ function TransferOrderDetail({
     setDeltaVal(itemId, num === 0 ? "" : String(num));
   };
 
-  const adjustDelta = (itemId: number, by: number) => {
-    const cur = getDeltaNum(itemId);
-    const next = cur + by;
-    setDeltaVal(itemId, next === 0 ? "" : String(next));
-  };
-
-  // Only show items sourced from this POS user's location
-  const myItems = (detail?.items ?? []).filter(item => {
-    const srcId = item.sourceLocationId ?? detail?.sourceLocationId;
-    return srcId === posUser.assignedLocationId;
-  });
+  // Items are pre-filtered by the backend for POS users (only their location)
+  const myItems = detail?.items ?? [];
 
   const existingIds = new Set(myItems.map(i => i.stockItemId));
   const inventory = (rawInventory as any[]).map(i => ({
@@ -333,16 +324,8 @@ function TransferOrderDetail({
                   <span className="text-xs text-muted-foreground">{idx + 1}</span>
                   <span className="text-sm font-medium truncate">{item.stockItemName}</span>
                   <span className="text-sm font-mono text-right">{original}</span>
-                  {/* Adjustment */}
-                  <div className="flex items-center justify-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => adjustDelta(item.id, -1)}
-                      className="h-6 w-6 flex items-center justify-center rounded border bg-background hover-elevate active-elevate-2 text-muted-foreground shrink-0"
-                      data-testid={`button-minus-${item.id}`}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </button>
+                  {/* Adjustment — type a signed number directly: -5 to deduct, 5 to add */}
+                  <div className="flex items-center justify-center">
                     <input
                       type="text"
                       inputMode="numeric"
@@ -350,17 +333,9 @@ function TransferOrderDetail({
                       value={deltas[item.id] ?? ""}
                       onChange={e => setDeltaVal(item.id, e.target.value)}
                       onBlur={() => normalizeDelta(item.id)}
-                      className="w-14 text-center text-sm border rounded bg-background px-1 py-0.5 font-mono outline-none focus:ring-1 focus:ring-ring"
+                      className="w-16 text-center text-sm border rounded bg-background px-1 py-0.5 font-mono outline-none focus:ring-1 focus:ring-ring"
                       data-testid={`input-delta-${item.id}`}
                     />
-                    <button
-                      type="button"
-                      onClick={() => adjustDelta(item.id, 1)}
-                      className="h-6 w-6 flex items-center justify-center rounded border bg-background hover-elevate active-elevate-2 text-muted-foreground shrink-0"
-                      data-testid={`button-plus-${item.id}`}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </button>
                   </div>
                   <span className={cn(
                     "text-sm font-mono font-semibold text-right",
@@ -379,28 +354,16 @@ function TransferOrderDetail({
                   </div>
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className="text-xs text-muted-foreground">Original: <strong className="text-foreground">{original}</strong></span>
-                    <div className="flex items-center gap-1">
-                      <button type="button" onClick={() => adjustDelta(item.id, -1)}
-                        className="h-7 w-7 flex items-center justify-center rounded border bg-background hover-elevate active-elevate-2"
-                        data-testid={`button-minus-mobile-${item.id}`}>
-                        <Minus className="h-3 w-3" />
-                      </button>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="0"
-                        value={deltas[item.id] ?? ""}
-                        onChange={e => setDeltaVal(item.id, e.target.value)}
-                        onBlur={() => normalizeDelta(item.id)}
-                        className="w-14 text-center text-sm border rounded bg-background px-2 py-1 font-mono outline-none focus:ring-1 focus:ring-ring"
-                        data-testid={`input-delta-mobile-${item.id}`}
-                      />
-                      <button type="button" onClick={() => adjustDelta(item.id, 1)}
-                        className="h-7 w-7 flex items-center justify-center rounded border bg-background hover-elevate active-elevate-2"
-                        data-testid={`button-plus-mobile-${item.id}`}>
-                        <Plus className="h-3 w-3" />
-                      </button>
-                    </div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={deltas[item.id] ?? ""}
+                      onChange={e => setDeltaVal(item.id, e.target.value)}
+                      onBlur={() => normalizeDelta(item.id)}
+                      className="w-16 text-center text-sm border rounded bg-background px-2 py-1 font-mono outline-none focus:ring-1 focus:ring-ring"
+                      data-testid={`input-delta-mobile-${item.id}`}
+                    />
                     {changed && (
                       <span className={cn("text-xs font-semibold", deltaNum > 0 ? "text-green-600 dark:text-green-400" : "text-destructive")}>
                         New: {newQty}

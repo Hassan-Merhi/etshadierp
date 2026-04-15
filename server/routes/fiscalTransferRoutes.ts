@@ -902,10 +902,18 @@ export function registerFiscalTransferRoutes(app: Express) {
         .from(vouchers)
         .where(eq(vouchers.id, voucherId));
 
-      const transferItems = await db
+      // For POS users: only return items sourced from their assigned location
+      const isPosUser = req.user?.role?.startsWith("POS");
+      const posLocationId = isPosUser ? (req.user?.assignedLocationId ?? req.session?.currentLocationId ?? null) : null;
+
+      const allTransferItems = await db
         .select()
         .from(stockTransferItems)
         .where(eq(stockTransferItems.transferId, transferRow.id));
+
+      const transferItems = posLocationId
+        ? allTransferItems.filter(i => i.sourceLocationId === posLocationId)
+        : allTransferItems;
 
       const stockItemIdSet = [...new Set(transferItems.map(i => i.stockItemId).filter(Boolean))] as number[];
       const stockItemRows = stockItemIdSet.length > 0
