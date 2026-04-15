@@ -140,7 +140,7 @@ async function runDailyWhatsAppSend(
 
     const chatId      = rRow.rows[0].chat_id as string;
     const zipFileName = `DailyExport_${dateLabel}.zip`;
-    const zipCaption  = `Daily Company Export — ${dateLabel}\nAll companies included + Net Position (YTD).`;
+    const zipCaption  = `Daily Company Export — ${dateLabel}\nAll companies included.`;
     console.log(`[WhatsApp] Sending daily export ZIP to ${chatId}…`);
     const zipRes = await sendWhatsAppFileToChatId(chatId, dailyZip, zipFileName, zipCaption, "application/zip");
     console.log(`[WhatsApp] Daily ZIP: ${zipRes.success ? "sent" : zipRes.error}`);
