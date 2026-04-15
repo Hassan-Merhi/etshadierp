@@ -5775,6 +5775,20 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   ) : (
                     transferRevisions.map((rev: any) => (
                       <div key={rev.id} className="border rounded-md overflow-hidden">
+                        {/* Pending approval banner */}
+                        {rev.optional && (
+                          <div className="flex items-center justify-between gap-3 px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border-b">
+                            <span className="text-xs font-medium text-amber-800 dark:text-amber-300">Pending POS adjustment — awaiting admin approval</span>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => setApproveRevisionTarget(rev)}
+                              data-testid={`button-approve-revision-${rev.id}`}
+                            >
+                              Approve
+                            </Button>
+                          </div>
+                        )}
                         <div className="flex items-center justify-between gap-3 p-3 bg-muted/40 flex-wrap">
                           <div className="flex items-center gap-2 flex-wrap">
                             <Badge variant={rev.optional ? "secondary" : "default"}>Rev {rev.revisionNumber}</Badge>
@@ -5782,28 +5796,16 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             <span className="text-xs text-muted-foreground">{rev.revisionDate ? new Date(rev.revisionDate).toLocaleDateString() : ""}</span>
                             {rev.note && <span className="text-xs italic text-muted-foreground">"{rev.note}"</span>}
                           </div>
-                          <div className="flex items-center gap-2">
-                            {rev.optional && (
-                              <Button
-                                size="sm"
-                                variant="default"
-                                onClick={() => setApproveRevisionTarget(rev)}
-                                data-testid={`button-approve-revision-${rev.id}`}
-                              >
-                                Approve
-                              </Button>
-                            )}
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="text-muted-foreground">Reference only:</span>
-                              <Switch
-                                checked={rev.optional}
-                                onCheckedChange={async (checked) => {
-                                  await modeApiRequest("PATCH", `/api/stock-transfer-revisions/${rev.id}/optional`, { optional: checked });
-                                  queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", stockTransferToEdit.id, "revisions"] });
-                                }}
-                                data-testid={`switch-transfer-revision-optional-${rev.id}`}
-                              />
-                            </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="text-muted-foreground">Reference only:</span>
+                            <Switch
+                              checked={rev.optional}
+                              onCheckedChange={async (checked) => {
+                                await modeApiRequest("PATCH", `/api/stock-transfer-revisions/${rev.id}/optional`, { optional: checked });
+                                queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", stockTransferToEdit.id, "revisions"] });
+                              }}
+                              data-testid={`switch-transfer-revision-optional-${rev.id}`}
+                            />
                           </div>
                         </div>
                         {rev.items && rev.items.length > 0 && (

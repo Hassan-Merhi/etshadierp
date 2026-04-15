@@ -969,7 +969,7 @@ export function registerFiscalTransferRoutes(app: Express) {
     }
   });
 
-  // Transfer Revisions - POST (create)
+  // Transfer Revisions - POST (create or update existing optional revision)
   app.post("/api/stock-transfers/:transferId/revisions", requireAuth, async (req, res) => {
     try {
       const transferId = parseInt(req.params.transferId);
@@ -980,19 +980,47 @@ export function registerFiscalTransferRoutes(app: Express) {
         return res.status(400).json({ message: "At least one changed item is required" });
       }
 
-      const existing = await db
-        .select({ revisionNumber: stockTransferRevisions.revisionNumber })
-        .from(stockTransferRevisions)
-        .where(eq(stockTransferRevisions.transferId, transferId))
-        .orderBy(desc(stockTransferRevisions.revisionNumber))
-        .limit(1);
+      const isOptional = optionalFlag === true;
 
-      const nextNum = existing.length > 0 ? existing[0].revisionNumber + 1 : 1;
+      // If this is an optional (POS) revision, check if there is already one pending
+      // and update it in-place rather than creating a new revision
+      let revision: any = null;
+      if (isOptional) {
+        const [existingOptional] = await db
+          .select()
+          .from(stockTransferRevisions)
+          .where(and(eq(stockTransferRevisions.transferId, transferId), eq(stockTransferRevisions.optional, true)))
+          .orderBy(asc(stockTransferRevisions.revisionNumber))
+          .limit(1);
 
-      const [revision] = await db
-        .insert(stockTransferRevisions)
-        .values({ transferId, revisionNumber: nextNum, note: note?.trim() || null, optional: optionalFlag === true })
-        .returning();
+        if (existingOptional) {
+          // Replace items on the existing revision
+          await db.delete(stockTransferRevisionItems).where(eq(stockTransferRevisionItems.revisionId, existingOptional.id));
+          await db
+            .update(stockTransferRevisions)
+            .set({ note: note?.trim() || existingOptional.note, revisionDate: new Date() })
+            .where(eq(stockTransferRevisions.id, existingOptional.id));
+          revision = { ...existingOptional, note: note?.trim() || existingOptional.note };
+        }
+      }
+
+      if (!revision) {
+        // Create new revision
+        const [latest] = await db
+          .select({ revisionNumber: stockTransferRevisions.revisionNumber })
+          .from(stockTransferRevisions)
+          .where(eq(stockTransferRevisions.transferId, transferId))
+          .orderBy(desc(stockTransferRevisions.revisionNumber))
+          .limit(1);
+
+        const nextNum = latest ? latest.revisionNumber + 1 : 1;
+
+        const [newRev] = await db
+          .insert(stockTransferRevisions)
+          .values({ transferId, revisionNumber: nextNum, note: note?.trim() || null, optional: isOptional })
+          .returning();
+        revision = newRev;
+      }
 
       await db.insert(stockTransferRevisionItems).values(
         items.map((item: any) => ({
