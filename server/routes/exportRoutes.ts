@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from "../auth";
 import { fetchAllCompanies, fetchCompanyExportData } from "../services/exportDataService";
 import { buildCompanyWorkbook } from "../services/exportExcelService";
 import { sendExportEmail } from "../services/emailService";
+import { generateAllCompaniesNetPositionExcel } from "../helpers/generateAllCompaniesNetPositionExcel";
 import {
   createJob, getJob, addStep, finishJob, failJob,
 } from "../services/exportJobManager";
@@ -157,16 +158,34 @@ export function registerExportRoutes(app: Express) {
 
         addStep(job, "Building ZIP archive...", "info");
 
+        const dateLabel = new Date().toISOString().substring(0, 10);
+        const year      = new Date().getUTCFullYear();
+        const npStart   = `${year}-01-01`;
+        const npEnd     = dateLabel;
+
+        // Build Net Position Excel for all companies (same as the scheduler does)
+        let npBuf: Buffer | null = null;
+        try {
+          addStep(job, "Building Net Position Excel (all companies, YTD)...", "info");
+          const raw = await generateAllCompaniesNetPositionExcel(companies, npStart, npEnd);
+          npBuf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+          addStep(job, `Net Position Excel ready (${(npBuf.length / 1024).toFixed(0)} KB)`, "success");
+        } catch (npErr: any) {
+          addStep(job, `Net Position Excel failed: ${npErr.message}`, "warning");
+        }
+
         const zipBuf = await new Promise<Buffer>((resolve, reject) => {
           const chunks: Buffer[] = [];
           const arc = archiver("zip", { zlib: { level: 6 } });
           arc.on("data", (c: Buffer) => chunks.push(c));
           arc.on("end", () => resolve(Buffer.concat(chunks)));
           arc.on("error", reject);
-          const dateLabel = new Date().toISOString().substring(0, 10);
           for (const { name, buf } of xlsxBuffers) {
             const safeBuf = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
             arc.append(safeBuf, { name: `${name}_Export_${dateLabel}.xlsx` });
+          }
+          if (npBuf) {
+            arc.append(npBuf, { name: `NetPosition_AllCompanies_${year}.xlsx` });
           }
           arc.finalize();
         });
@@ -176,7 +195,6 @@ export function registerExportRoutes(app: Express) {
 
         if (mode === "email") {
           addStep(job, "Sending email to recipients...", "info");
-          const dateLabel = new Date().toISOString().substring(0, 10);
           const result = await sendExportEmail(zipBuf, dateLabel, companies.map((c: any) => c.name));
           if (result.success) {
             addStep(job, "Email sent successfully to all recipients", "success");
