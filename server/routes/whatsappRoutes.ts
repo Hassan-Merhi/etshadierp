@@ -342,9 +342,13 @@ export function registerWhatsAppRoutes(app: Express) {
 
   // ── Send Net Position (all companies) to group + email NOW ──────────────────
 
-  app.post("/api/daily-export/trigger-whatsapp", requireAuth, async (_req, res) => {
+  app.post("/api/daily-export/trigger-whatsapp", requireAuth, async (req, res) => {
     try {
-      const result = await triggerDailyWhatsAppSendNow();
+      const { fromDate, toDate } = req.body as { fromDate?: string; toDate?: string };
+      const result = await triggerDailyWhatsAppSendNow(
+        fromDate || undefined,
+        toDate   || undefined,
+      );
       res.json(result);
     } catch (err: any) {
       res.status(500).json({ message: err.message });

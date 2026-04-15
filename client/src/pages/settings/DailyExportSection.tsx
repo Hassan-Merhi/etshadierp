@@ -290,6 +290,28 @@ export function DailyExportSection() {
     }
   };
 
+  const { data: waSettings } = useQuery<{ enabled: boolean; dailyAutoSend: boolean; dailyRecipientId: number | null; hasCredentials: boolean }>({
+    queryKey: ["/api/whatsapp/settings"],
+  });
+  const waReady = !!(waSettings?.enabled && waSettings?.dailyRecipientId);
+
+  const [sendingWa, setSendingWa] = useState(false);
+  const sendViaWhatsApp = async () => {
+    setSendingWa(true);
+    try {
+      const body: any = {};
+      if (fromDate) body.fromDate = fromDate;
+      if (toDate)   body.toDate   = toDate;
+      const res = await apiRequest("POST", "/api/daily-export/trigger-whatsapp", body) as any;
+      const data = await res.json().catch(() => ({}));
+      toast({ title: "Sent via WhatsApp", description: data.message || "ZIP sent to configured group" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "WhatsApp send failed", description: e.message });
+    } finally {
+      setSendingWa(false);
+    }
+  };
+
   const sendNpToWa = useMutation({
     mutationFn: () =>
       apiRequest("POST", "/api/whatsapp/send-net-position", { startDate: npStart, endDate: npEnd }),
@@ -399,6 +421,19 @@ export function DailyExportSection() {
                   {(recipients.length === 0 || !settings?.gmailUser) && (
                     <span className="ml-2 text-xs text-muted-foreground">
                       {!settings?.gmailUser ? "(no Gmail configured)" : "(no recipients)"}
+                    </span>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={sendViaWhatsApp}
+                  disabled={!waReady || sendingWa}
+                  data-testid="menu-export-whatsapp"
+                >
+                  <MessageSquare className="h-4 w-4 mr-2 text-green-600" />
+                  {sendingWa ? "Sending…" : "Send via WhatsApp"}
+                  {!waReady && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {!waSettings?.hasCredentials ? "(no credentials)" : !waSettings?.enabled ? "(WA disabled)" : "(no group set)"}
                     </span>
                   )}
                 </DropdownMenuItem>
