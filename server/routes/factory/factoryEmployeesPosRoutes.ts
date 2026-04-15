@@ -2451,22 +2451,36 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const rawMaterialStockValue = await calculateRawMaterialStockValue(companyId);
 
       // ── 4. Combine and return ────────────────────────────────────────────
-      const forUsTotal = round2(ledgerForUsTotal + inventorySellValue + rawMaterialStockValue);
+      // Rename for clarity — these are the two factory-specific values.
+      const baleInventoryValue = round2(inventorySellValue);
+
+      // Guard: strip any ledger account whose category could collide with our
+      // factory-injected "Inventory" / "Stock" entries.  Accounts with type
+      // "Inventory" bypass the name-pattern exclusion in classifyNetPositionAccounts
+      // (that guard only runs for types in assetAccountTypes).  Removing them
+      // here guarantees ONE source of truth for both factory values.
+      const inventoryCategoryRx = /inventory|stock in hand|stock on hand|raw material/i;
+      const cleanLedgerForUs = ledgerForUs.filter(
+        a => !inventoryCategoryRx.test(a.category) && !inventoryCategoryRx.test(a.name),
+      );
+      const cleanLedgerForUsTotal = round2(
+        cleanLedgerForUs.reduce((s, a) => s + a.value, 0),
+      );
+
+      // forUsTotal is built from exactly three sources — no more, no less.
+      const forUsTotal = round2(cleanLedgerForUsTotal + baleInventoryValue + rawMaterialStockValue);
       const onUsTotal = round2(ledgerOnUsTotal + totalSupplierLiabilities);
       const netPosition = round2(forUsTotal - onUsTotal);
 
-      // Build breakdown arrays
-      const inventoryAccount = inventorySellValue > 0
-        ? [{ name: "Stock In Hand (Inventory)", code: "INVENTORY", value: inventorySellValue, category: "Inventory" }]
-        : [];
-      const rawMaterialAccount = rawMaterialStockValue > 0
-        ? [{ name: "Raw Material Stock", code: "RAW_MATERIAL", value: rawMaterialStockValue, category: "Inventory" }]
-        : [];
+      // Inject factory-specific lines explicitly (always present so the UI
+      // always has a named row for both even when the value is 0).
+      const factoryInventoryEntry = { name: "Stock In Hand (Inventory)", code: "INVENTORY", value: baleInventoryValue, category: "Inventory" };
+      const factoryRawMaterialEntry = { name: "Factory Raw Material Stock", code: "RAW_MATERIAL", value: rawMaterialStockValue, category: "Raw Material" };
 
       const forUsAccounts = [
-        ...inventoryAccount,
-        ...rawMaterialAccount,
-        ...ledgerForUs.sort((a, b) => b.value - a.value).map(a => ({ ...a, value: round2(a.value) })),
+        factoryInventoryEntry,
+        factoryRawMaterialEntry,
+        ...cleanLedgerForUs.sort((a, b) => b.value - a.value).map(a => ({ ...a, value: round2(a.value) })),
       ];
 
       // Group ledger on-us by category
@@ -2505,9 +2519,9 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         forUs: { total: forUsTotal, breakdown: forUsBreakdown, accounts: forUsAccounts },
         onUs: { total: onUsTotal, breakdown: onUsBreakdown, accounts: onUsAccounts },
         supplierLiabilities: round2(totalSupplierLiabilities),
-        inventoryValue: inventorySellValue,
+        inventoryValue: baleInventoryValue,
         rawMaterialValue: rawMaterialStockValue,
-        ledgerAssets: round2(ledgerForUsTotal),
+        ledgerAssets: cleanLedgerForUsTotal,
         ledgerLiabilities: round2(ledgerOnUsTotal),
       });
     } catch (error: any) {
