@@ -45,8 +45,13 @@ export async function buildFullExportZip(
       log(`[${company.name}] workbook ready (${(buf.length / 1024).toFixed(0)} KB)`, "success");
     } catch (err: any) {
       log(`[${company.name}] Failed: ${err?.message || err}`, "error");
+      if (err?.stack) console.error(`[FullExport] Stack for ${company.name}:`, err.stack);
       skipped.push(company.name);
     }
+  }
+
+  if (xlsxBuffers.length === 0) {
+    log(`WARNING: All ${companies.length} companies failed — ZIP will be empty. Check server logs for errors.`, "error");
   }
 
   const zip = await new Promise<Buffer>((resolve, reject) => {
