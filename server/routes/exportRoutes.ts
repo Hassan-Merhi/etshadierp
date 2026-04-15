@@ -1,11 +1,9 @@
 import type { Express, Request, Response } from "express";
-import archiver from "archiver";
 import { pool } from "../db";
 import { requireAuth, requireRole } from "../auth";
-import { fetchAllCompanies, fetchCompanyExportData } from "../services/exportDataService";
-import { buildCompanyWorkbook } from "../services/exportExcelService";
+import { fetchAllCompanies } from "../services/exportDataService";
 import { sendExportEmail } from "../services/emailService";
-import { generateAllCompaniesNetPositionExcel } from "../helpers/generateAllCompaniesNetPositionExcel";
+import { buildFullExportZip } from "../helpers/buildFullExportZip";
 import {
   createJob, getJob, addStep, finishJob, failJob,
 } from "../services/exportJobManager";
@@ -129,73 +127,24 @@ export function registerExportRoutes(app: Express) {
         }
         addStep(job, `Found ${companies.length} company/companies to export`, "success");
 
-        const xlsxBuffers: { name: string; buf: Buffer }[] = [];
+        const { zip: zipBuf, names, skipped } = await buildFullExportZip(
+          companies,
+          fromDate,
+          toDate,
+          (msg, level) => addStep(job, msg, level ?? "info"),
+        );
 
-        for (const company of companies) {
-          try {
-            addStep(job, `[${company.name}] Querying all data...`, "info");
-            const data = await fetchCompanyExportData(company.id, fromDate, toDate);
-
-            const totalRecords = [
-              data.vouchers.length, data.voucherEntries.length,
-              data.suppliers.length, data.customers.length,
-              data.employees.length, data.factoryWorkers.length,
-              data.stockItems.length, data.inventory.length,
-              data.containers.length, data.bales.length,
-              data.factoryBales.length, data.purchaseOrders.length,
-              data.auditLog.length,
-            ].reduce((a, b) => a + b, 0);
-
-            addStep(job, `[${company.name}] ${totalRecords.toLocaleString()} records fetched — building Excel workbook...`, "info");
-            const buf = await buildCompanyWorkbook(data);
-            const safeName = company.name.replace(/[^a-zA-Z0-9_\- ]/g, "").trim();
-            xlsxBuffers.push({ name: safeName, buf });
-            addStep(job, `[${company.name}] Excel workbook ready (${(buf.length / 1024 / 1024).toFixed(1)} MB)`, "success");
-          } catch (err: any) {
-            addStep(job, `[${company.name}] Failed: ${err.message}`, "error");
-          }
+        if (skipped.length > 0) {
+          addStep(job, `Skipped ${skipped.length} companies: ${skipped.join(", ")}`, "warning");
         }
-
-        addStep(job, "Building ZIP archive...", "info");
 
         const dateLabel = new Date().toISOString().substring(0, 10);
-        const year      = new Date().getUTCFullYear();
-        const npStart   = `${year}-01-01`;
-        const npEnd     = dateLabel;
-
-        // Build Net Position Excel for all companies (same as the scheduler does)
-        let npBuf: Buffer | null = null;
-        try {
-          addStep(job, "Building Net Position Excel (all companies, YTD)...", "info");
-          const raw = await generateAllCompaniesNetPositionExcel(companies, npStart, npEnd);
-          npBuf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
-          addStep(job, `Net Position Excel ready (${(npBuf.length / 1024).toFixed(0)} KB)`, "success");
-        } catch (npErr: any) {
-          addStep(job, `Net Position Excel failed: ${npErr.message}`, "warning");
-        }
-
-        const zipBuf = await new Promise<Buffer>((resolve, reject) => {
-          const chunks: Buffer[] = [];
-          const arc = archiver("zip", { zlib: { level: 6 } });
-          arc.on("data", (c: Buffer) => chunks.push(c));
-          arc.on("end", () => resolve(Buffer.concat(chunks)));
-          arc.on("error", reject);
-          for (const { name, buf } of xlsxBuffers) {
-            const safeBuf = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
-            arc.append(safeBuf, { name: `${name}_Export_${dateLabel}.xlsx` });
-          }
-          if (npBuf) {
-            arc.append(npBuf, { name: `NetPosition_AllCompanies_${year}.xlsx` });
-          }
-          arc.finalize();
-        });
-
         const sizeMB = (zipBuf.length / 1024 / 1024).toFixed(1);
         addStep(job, `ZIP archive ready — ${sizeMB} MB total`, "success");
 
         if (mode === "email") {
           addStep(job, "Sending email to recipients...", "info");
-          const result = await sendExportEmail(zipBuf, dateLabel, companies.map((c: any) => c.name));
+          const result = await sendExportEmail(zipBuf, dateLabel, names);
           if (result.success) {
             addStep(job, "Email sent successfully to all recipients", "success");
             finishJob(job);
