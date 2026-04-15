@@ -1972,6 +1972,23 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [transferRevisionNote, setTransferRevisionNote] = useState("");
   const [isTransferSavingRevision, setIsTransferSavingRevision] = useState(false);
   const [transferRevisionsExpanded, setTransferRevisionsExpanded] = useState(false);
+  const [approveRevisionTarget, setApproveRevisionTarget] = useState<any | null>(null);
+
+  const approveRevisionMutation = useMutation({
+    mutationFn: async (revisionId: number) => {
+      const res = await modeApiRequest("POST", `/api/stock-transfer-revisions/${revisionId}/approve`, {});
+      return res;
+    },
+    onSuccess: () => {
+      toast({ title: "Revision approved", description: "Quantities have been updated." });
+      setApproveRevisionTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", stockTransferToEdit?.id, "revisions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Approval failed", description: err.message, variant: "destructive" });
+    },
+  });
   const [transferQtyDraft, setTransferQtyDraft] = useState<Record<number, string>>({});
   const [importValidationResult, setImportValidationResult] = useState<any>(null);
   const [importDestLocation, setImportDestLocation] = useState<string>("");
@@ -5681,6 +5698,58 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             </form>
           </Form>
 
+          {/* ── Revision Approve Dialog ── */}
+          <Dialog open={!!approveRevisionTarget} onOpenChange={open => { if (!open) setApproveRevisionTarget(null); }}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Approve Revision</DialogTitle>
+                <DialogDescription>
+                  The following quantity changes will be applied to the transfer. This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              {approveRevisionTarget && (
+                <div className="overflow-x-auto rounded-md border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/40">
+                      <tr>
+                        <th className="text-left p-2 font-medium">Item</th>
+                        <th className="text-right p-2 font-medium">Was</th>
+                        <th className="text-right p-2 font-medium">Change</th>
+                        <th className="text-right p-2 font-medium">Now</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(approveRevisionTarget.items ?? []).map((item: any, idx: number) => {
+                        const delta = parseFloat(item.delta);
+                        return (
+                          <tr key={idx} className="border-t">
+                            <td className="p-2 font-medium">{item.stockItemName}</td>
+                            <td className="p-2 text-right font-mono text-muted-foreground">{formatNumber(parseFloat(item.originalQuantity), 0)}</td>
+                            <td className={`p-2 text-right font-mono font-semibold ${delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                              {delta > 0 ? "+" : ""}{formatNumber(delta, 0)}
+                            </td>
+                            <td className="p-2 text-right font-mono font-semibold">{formatNumber(parseFloat(item.newQuantity), 0)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setApproveRevisionTarget(null)} data-testid="button-approve-revision-cancel">Cancel</Button>
+                <Button
+                  variant="default"
+                  disabled={approveRevisionMutation.isPending}
+                  onClick={() => approveRevisionTarget && approveRevisionMutation.mutate(approveRevisionTarget.id)}
+                  data-testid="button-approve-revision-confirm"
+                >
+                  {approveRevisionMutation.isPending ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Applying…</> : "Approve & Apply"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           {/* ── Transfer Revision History Panel ── */}
           {voucherIdToEdit && stockTransferToEdit?.id && (
             <Card className="mt-4">
@@ -5713,16 +5782,28 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             <span className="text-xs text-muted-foreground">{rev.revisionDate ? new Date(rev.revisionDate).toLocaleDateString() : ""}</span>
                             {rev.note && <span className="text-xs italic text-muted-foreground">"{rev.note}"</span>}
                           </div>
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="text-muted-foreground">Reference only:</span>
-                            <Switch
-                              checked={rev.optional}
-                              onCheckedChange={async (checked) => {
-                                await modeApiRequest("PATCH", `/api/stock-transfer-revisions/${rev.id}/optional`, { optional: checked });
-                                queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", stockTransferToEdit.id, "revisions"] });
-                              }}
-                              data-testid={`switch-transfer-revision-optional-${rev.id}`}
-                            />
+                          <div className="flex items-center gap-2">
+                            {rev.optional && (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => setApproveRevisionTarget(rev)}
+                                data-testid={`button-approve-revision-${rev.id}`}
+                              >
+                                Approve
+                              </Button>
+                            )}
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-muted-foreground">Reference only:</span>
+                              <Switch
+                                checked={rev.optional}
+                                onCheckedChange={async (checked) => {
+                                  await modeApiRequest("PATCH", `/api/stock-transfer-revisions/${rev.id}/optional`, { optional: checked });
+                                  queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", stockTransferToEdit.id, "revisions"] });
+                                }}
+                                data-testid={`switch-transfer-revision-optional-${rev.id}`}
+                              />
+                            </div>
                           </div>
                         </div>
                         {rev.items && rev.items.length > 0 && (

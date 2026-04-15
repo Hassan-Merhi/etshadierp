@@ -1035,6 +1035,83 @@ export function registerFiscalTransferRoutes(app: Express) {
     }
   });
 
+  // Revisions - APPROVE (apply deltas to transfer items and inventory)
+  app.post("/api/stock-transfer-revisions/:id/approve", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const revisionId = parseInt(req.params.id);
+      if (!revisionId) return res.status(400).json({ message: "Revision ID required" });
+
+      await db.transaction(async (tx) => {
+        // Load revision
+        const [revision] = await tx.select().from(stockTransferRevisions).where(eq(stockTransferRevisions.id, revisionId));
+        if (!revision) throw new Error("Revision not found");
+
+        // Load revision items
+        const revItems = await tx.select().from(stockTransferRevisionItems).where(eq(stockTransferRevisionItems.revisionId, revisionId));
+        if (revItems.length === 0) throw new Error("Revision has no items");
+
+        // Load the transfer
+        const [transfer] = await tx.select().from(stockTransferVouchers).where(eq(stockTransferVouchers.id, revision.transferId));
+        if (!transfer) throw new Error("Transfer not found");
+
+        // Load destination location for inventory
+        const [destLocation] = await tx.select({ companyId: locations.companyId }).from(locations).where(eq(locations.id, transfer.destinationLocationId));
+        const companyId = destLocation?.companyId ?? null;
+
+        // Load existing transfer items
+        const existingItems = await tx.select().from(stockTransferItems).where(eq(stockTransferItems.transferId, transfer.id));
+
+        let totalAmount = 0;
+
+        for (const revItem of revItems) {
+          const delta = parseFloat(revItem.delta);
+          if (delta === 0) continue;
+
+          // Find the matching transfer item by stockItemId (+ sourceLocationId if set)
+          const match = existingItems.find(i =>
+            i.stockItemId === revItem.stockItemId &&
+            (!revItem.sourceLocationId || i.sourceLocationId === revItem.sourceLocationId)
+          );
+
+          if (match) {
+            const newQty = parseFloat(revItem.newQuantity);
+            const rate = parseFloat(match.rate ?? "0");
+            const newTotal = newQty * rate;
+
+            await tx
+              .update(stockTransferItems)
+              .set({ quantity: String(newQty), totalAmount: newTotal.toFixed(2) })
+              .where(eq(stockTransferItems.id, match.id));
+
+            totalAmount += newTotal;
+
+            // Apply inventory delta only if transfer was already applied to inventory
+            if (transfer.inventoryApplied && revItem.sourceLocationId) {
+              await adjustInventory(tx, revItem.sourceLocationId, revItem.stockItemId, -delta, companyId!);
+              await adjustInventory(tx, transfer.destinationLocationId, revItem.stockItemId, delta, companyId!, rate);
+            }
+          }
+        }
+
+        // Recalculate total from all items (including ones not in this revision)
+        const allItems = await tx.select({ qty: stockTransferItems.quantity, rate: stockTransferItems.rate })
+          .from(stockTransferItems).where(eq(stockTransferItems.transferId, transfer.id));
+        const fullTotal = allItems.reduce((s, i) => s + parseFloat(i.qty) * parseFloat(i.rate ?? "0"), 0);
+
+        // Update voucher total
+        await tx.update(vouchers).set({ totalAmount: fullTotal.toFixed(2) }).where(eq(vouchers.id, transfer.voucherId));
+
+        // Mark revision as approved (not optional / reference-only)
+        await tx.update(stockTransferRevisions).set({ optional: false }).where(eq(stockTransferRevisions.id, revisionId));
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Revision Approve] Error:", error.message);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Revisions - DELETE
   app.delete("/api/stock-transfer-revisions/:id", requireAuth, requireNonPOS, async (req, res) => {
     try {
