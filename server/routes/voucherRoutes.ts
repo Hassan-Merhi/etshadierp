@@ -284,10 +284,13 @@ export function registerVoucherRoutes(app: Express) {
   );
 
   // Create a new voucher
-
-  // Create a new voucher
-  app.post("/api/vouchers", requireAuth, requireNonPOS, async (req, res) => {
+  app.post("/api/vouchers", requireAuth, async (req, res) => {
     try {
+      const isPOS = (req as any).user?.role?.startsWith("POS");
+      const voucherType = req.body.voucherType;
+      if (isPOS && voucherType !== "StockTransfer" && voucherType !== "Stock Transfer") {
+        return res.status(403).json({ message: "Access denied: This resource is not available for POS users" });
+      }
       const companyId = req.session.currentCompanyId;
       const exchangeRate = companyId ? await getCurrentExchangeRate(companyId) : null;
       const voucher = await storage.createVoucher({ ...req.body, exchangeRate });
