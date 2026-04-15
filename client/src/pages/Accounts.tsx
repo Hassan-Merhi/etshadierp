@@ -662,7 +662,7 @@ export default function Accounts() {
           voucherType: txn.voucherType,
           voucherDate: txn.voucherDate,
           voucherDescription: txn.voucherDescription,
-          narration: txn.voucherDescription || txn.narration || "",
+          narration: txn.narration || "",
           totalDebit: debit,
           totalCredit: credit,
           currency: txn.currency,
@@ -2411,9 +2411,7 @@ export default function Accounts() {
                                         data-testid={`link-voucher-${voucher.voucherId}`}
                                       >
                                         <span className="truncate max-w-[280px]" dir="ltr">
-                                          {voucher.narration ||
-                                            voucher.voucherDescription ||
-                                            voucher.voucherNumber}
+                                          {voucher.narration || voucher.voucherNumber}
                                         </span>
                                         <ExternalLink className="h-3 w-3 flex-shrink-0" />
                                       </button>
@@ -2427,7 +2425,7 @@ export default function Accounts() {
                                         data-testid={`link-voucher-${voucher.voucherId}`}
                                       >
                                         <span className="truncate max-w-[280px]" dir="ltr">
-                                          {voucher.narration || voucher.voucherDescription || "-"}
+                                          {voucher.voucherDescription || voucher.narration || "-"}
                                         </span>
                                         <ExternalLink className="h-3 w-3 flex-shrink-0" />
                                       </button>
@@ -2514,7 +2512,7 @@ export default function Accounts() {
                                             data-testid={`link-voucher-${voucher.voucherId}`}
                                           >
                                             <span className="truncate text-muted-foreground" dir="ltr">
-                                              {voucher.narration || voucher.voucherDescription || "-"}
+                                              {voucher.voucherDescription || voucher.narration || "-"}
                                             </span>
                                             <ExternalLink className="h-3 w-3 flex-shrink-0" />
                                           </button>
@@ -2526,7 +2524,7 @@ export default function Accounts() {
                                           data-testid={`link-voucher-${voucher.voucherId}`}
                                         >
                                           <span className="truncate" dir="ltr">
-                                            {voucher.narration || voucher.voucherDescription || voucher.voucherNumber}
+                                            {voucher.narration || voucher.voucherNumber}
                                           </span>
                                           <ExternalLink className="h-3 w-3 flex-shrink-0" />
                                         </button>
