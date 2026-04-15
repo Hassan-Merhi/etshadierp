@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import {
-  ArrowLeft, ChevronRight, RotateCcw, Plus, Loader2, Save,
+  ArrowLeft, ChevronRight, RotateCcw, Loader2, Save,
   CheckCircle2, Search, X, ArrowRight, Clock, Package2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -104,7 +104,7 @@ interface ExtraItem {
   qtyDraft: string;
 }
 
-// ─── Inline combobox for adding items ─────────────────────────────────────────
+// ─── Inline search + dropdown for adding items ────────────────────────────────
 function AddItemCombobox({
   inventory,
   alreadyAdded,
@@ -119,23 +119,20 @@ function AddItemCombobox({
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const alreadySet = new Set([...alreadyAdded, ...existingIds]);
 
   const matches = useMemo(() =>
     inventory
       .filter(i => !alreadySet.has(i.stockItemId) && i.name.toLowerCase().includes(search.toLowerCase()))
-      .slice(0, 25),
+      .slice(0, 30),
     [inventory, search, alreadyAdded, existingIds]
   );
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (
-        dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
-        inputRef.current && !inputRef.current.contains(e.target as Node)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     };
@@ -150,14 +147,17 @@ function AddItemCombobox({
     inputRef.current?.focus();
   };
 
+  const showDropdown = open && search.length > 0;
+
   return (
-    <div className="border-t relative">
-      <div className="flex items-center gap-2 px-3 py-1.5">
-        <Plus className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+    <div ref={containerRef} className="border-t relative">
+      {/* Search input row */}
+      <div className="relative px-3 py-2">
+        <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
         <input
           ref={inputRef}
           type="text"
-          placeholder="Add item..."
+          placeholder="Search items to add..."
           value={search}
           onChange={e => { setSearch(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
@@ -165,42 +165,43 @@ function AddItemCombobox({
             if (e.key === "Escape") { setOpen(false); setSearch(""); }
             if (e.key === "Enter" && matches.length === 1) pick(matches[0]);
           }}
-          className="flex-1 text-sm bg-transparent outline-none text-muted-foreground placeholder:text-muted-foreground/60 py-0.5"
-          data-testid="input-add-item-combobox"
+          className="w-full pl-7 pr-7 py-1.5 text-sm border rounded bg-background outline-none focus:ring-1 focus:ring-ring"
+          data-testid="input-add-item-search"
+          autoComplete="off"
         />
         {search && (
           <button
             type="button"
-            onClick={() => { setSearch(""); setOpen(false); }}
-            className="h-4 w-4 flex items-center justify-center text-muted-foreground hover-elevate"
+            onMouseDown={e => { e.preventDefault(); setSearch(""); setOpen(false); inputRef.current?.focus(); }}
+            className="absolute right-5 top-1/2 -translate-y-1/2 h-4 w-4 flex items-center justify-center text-muted-foreground hover-elevate"
           >
             <X className="h-3 w-3" />
           </button>
         )}
       </div>
 
-      {open && search.length > 0 && (
-        <div
-          ref={dropdownRef}
-          className="absolute left-0 right-0 z-50 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto"
-          style={{ top: "100%" }}
-        >
+      {/* Results dropdown — absolutely positioned to float over content below */}
+      {showDropdown && (
+        <div className="absolute left-0 right-0 z-50 bg-popover border-x border-b rounded-b-md shadow-md max-h-52 overflow-y-auto">
           {matches.length === 0 ? (
-            <div className="text-xs text-muted-foreground p-3 text-center">No items found</div>
-          ) : matches.map(inv => (
-            <button
-              key={inv.stockItemId}
-              type="button"
-              onMouseDown={e => { e.preventDefault(); pick(inv); }}
-              className="w-full text-left px-3 py-2 text-sm hover-elevate border-b last:border-b-0 flex items-center justify-between gap-2"
-              data-testid={`button-pick-${inv.stockItemId}`}
-            >
-              <span className="truncate">{inv.name}</span>
-              {parseFloat(inv.quantity) > 0 && (
-                <span className="text-xs text-muted-foreground shrink-0">{parseFloat(inv.quantity)} in stock</span>
-              )}
-            </button>
-          ))}
+            <div className="text-xs text-muted-foreground px-4 py-3 text-center">No items found</div>
+          ) : matches.map(inv => {
+            const qty = parseFloat(inv.quantity);
+            return (
+              <button
+                key={inv.stockItemId}
+                type="button"
+                onMouseDown={e => { e.preventDefault(); pick(inv); }}
+                className="w-full text-left px-4 py-2.5 text-sm hover-elevate border-b last:border-b-0 flex items-center justify-between gap-4"
+                data-testid={`button-pick-${inv.stockItemId}`}
+              >
+                <span className="truncate">{inv.name}</span>
+                <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+                  {qty > 0 ? `${qty} in stock` : "0 in stock"}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
