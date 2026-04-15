@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import { Eye, Trash2, RotateCcw } from "lucide-react";
+import { Eye, Trash2, RotateCcw, Download } from "lucide-react";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import {
   AlertDialog,
@@ -243,6 +243,15 @@ export default function FactoryInvoices() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => window.open(`/api/factory/customer-orders/${order.id}/export-pdf`, "_blank")}
+                          data-testid={`button-download-pdf-${order.id}`}
+                          title="Download Invoice PDF"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"

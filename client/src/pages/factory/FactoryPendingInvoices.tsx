@@ -7,7 +7,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import { ClipboardCheck, Eye, Package, Trash2, Download } from "lucide-react";
+import { ClipboardCheck, Eye, Package, Trash2, Download, FileText } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -195,6 +195,15 @@ export default function FactoryPendingInvoices() {
                           data-testid={`button-review-order-${order.id}`}
                         >
                           <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Download Invoice PDF"
+                          onClick={() => window.open(`/api/factory/customer-orders/${order.id}/export-pdf`, "_blank")}
+                          data-testid={`button-download-pdf-${order.id}`}
+                        >
+                          <FileText className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
