@@ -120,70 +120,30 @@ function fmtQty(val: string | number): string {
   return n % 1 === 0 ? String(n) : n.toFixed(3).replace(/\.?0+$/, "");
 }
 
-// ─── Right-side item search panel ─────────────────────────────────────────────
+// ─── Right-side item search panel (results only — input lives in the bar) ──────
 function ItemSearchPanel({
-  inventory,
+  matches,
+  activeIdx,
   locationName,
-  alreadyAdded,
-  existingIds,
-  onAdd,
+  onActiveChange,
+  onPick,
   onClose,
 }: {
-  inventory: { stockItemId: number; name: string; quantity: string }[];
+  matches: { stockItemId: number; name: string; quantity: string }[];
+  activeIdx: number;
   locationName: string;
-  alreadyAdded: number[];
-  existingIds: number[];
-  onAdd: (item: { stockItemId: number; name: string }) => void;
+  onActiveChange: (i: number) => void;
+  onPick: (item: { stockItemId: number; name: string }) => void;
   onClose: () => void;
 }) {
-  const [search, setSearch] = useState("");
-  const [activeIdx, setActiveIdx] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const alreadySet = new Set([...alreadyAdded, ...existingIds]);
-
-  const matches = useMemo(() =>
-    inventory.filter(i => !alreadySet.has(i.stockItemId) && i.name.toLowerCase().includes(search.toLowerCase())),
-    [inventory, search, alreadyAdded, existingIds]
-  );
-
-  useEffect(() => { setActiveIdx(0); }, [search]);
 
   useEffect(() => {
-    // Scroll active item into view
     if (listRef.current) {
       const active = listRef.current.querySelector("[data-active=true]") as HTMLElement | null;
       active?.scrollIntoView({ block: "nearest" });
     }
   }, [activeIdx]);
-
-  useEffect(() => {
-    const t = setTimeout(() => inputRef.current?.focus(), 50);
-    return () => clearTimeout(t);
-  }, []);
-
-  const pick = useCallback((item: { stockItemId: number; name: string }) => {
-    onAdd(item);
-    setSearch("");
-    setActiveIdx(0);
-    inputRef.current?.focus();
-  }, [onAdd]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActiveIdx(i => Math.min(i + 1, matches.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActiveIdx(i => Math.max(i - 1, 0));
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      if (matches[activeIdx]) pick(matches[activeIdx]);
-    } else if (e.key === "Tab" || e.key === "Escape") {
-      e.preventDefault();
-      onClose();
-    }
-  };
 
   return (
     <div className="flex flex-col h-full border-l bg-card w-64 shrink-0">
@@ -198,30 +158,10 @@ function ItemSearchPanel({
         </Button>
       </div>
 
-      {/* Search input */}
-      <div className="px-2 py-2 border-b">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder="Search..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="w-full pl-8 pr-2 py-1.5 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring"
-            data-testid="input-panel-search"
-            autoComplete="off"
-          />
-        </div>
-      </div>
-
       {/* Items list */}
       <div ref={listRef} className="flex-1 overflow-y-auto">
         {matches.length === 0 ? (
-          <div className="text-center py-8 text-xs text-muted-foreground">
-            {search ? "No items found" : "Start typing to search"}
-          </div>
+          <div className="text-center py-8 text-xs text-muted-foreground">No items found</div>
         ) : (
           matches.map((item, i) => {
             const qty = parseFloat(item.quantity) || 0;
@@ -230,8 +170,8 @@ function ItemSearchPanel({
                 key={item.stockItemId}
                 type="button"
                 data-active={i === activeIdx}
-                onClick={() => pick(item)}
-                onMouseEnter={() => setActiveIdx(i)}
+                onClick={() => onPick(item)}
+                onMouseEnter={() => onActiveChange(i)}
                 className={cn(
                   "w-full text-left px-3 py-2 text-sm border-b last:border-b-0 flex items-center justify-between gap-2 transition-none",
                   i === activeIdx ? "bg-accent text-accent-foreground" : "hover-elevate"
@@ -243,7 +183,7 @@ function ItemSearchPanel({
                   "text-xs font-mono shrink-0 tabular-nums",
                   qty > 0 ? "text-foreground" : "text-muted-foreground"
                 )}>
-                  {qty > 0 ? qty : "0"}
+                  {qty > 0 ? fmtQty(qty) : "0"}
                 </span>
               </button>
             );
@@ -268,6 +208,9 @@ function EditableTransferDetail({
   const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
   const [note, setNote] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
+  const [panelSearch, setPanelSearch] = useState("");
+  const [panelActiveIdx, setPanelActiveIdx] = useState(0);
+  const searchBarRef = useRef<HTMLInputElement>(null);
   const deltaRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const { data: rawInventory = [] } = useQuery<InventoryItem[]>({
@@ -314,13 +257,33 @@ function EditableTransferDetail({
     quantity: i.quantity ?? "0",
   }));
 
+  const alreadyAddedIds = new Set([
+    ...extraItems.map(e => e.stockItemId),
+    ...myItems.map(i => i.stockItemId),
+  ]);
+
+  const panelMatches = useMemo(() =>
+    locationInventory.filter(i =>
+      !alreadyAddedIds.has(i.stockItemId) &&
+      i.name.toLowerCase().includes(panelSearch.toLowerCase())
+    ),
+    [locationInventory, panelSearch, extraItems, myItems]
+  );
+
+  useEffect(() => { setPanelActiveIdx(0); }, [panelSearch]);
+
   const addExtraItem = (inv: { stockItemId: number; name: string }) => {
     setExtraItems(p => [...p, { stockItemId: inv.stockItemId, stockItemName: inv.name, qtyDraft: "" }]);
-    // focus new extra item's input after render
+    setPanelSearch("");
+    // focus the new extra item's adjustment input after render
     setTimeout(() => {
-      const key = `extra-${inv.stockItemId}`;
-      deltaRefs.current[key]?.focus();
+      deltaRefs.current[`extra-${inv.stockItemId}`]?.focus();
     }, 50);
+  };
+
+  const openPanel = () => {
+    setPanelOpen(true);
+    setTimeout(() => searchBarRef.current?.focus(), 30);
   };
 
   const updateExtraQty = (idx: number, val: string) =>
@@ -366,14 +329,6 @@ function EditableTransferDetail({
     extraItems.some(e => (parseFloat(e.qtyDraft) || 0) !== 0);
 
   const totalItems = myItems.length + extraItems.length;
-
-  // Handle keyboard: Tab on search bar row opens panel
-  const handleSearchBarKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === "Tab") {
-      e.preventDefault();
-      setPanelOpen(true);
-    }
-  };
 
   return (
     <div className="flex flex-col h-full">
@@ -431,7 +386,7 @@ function EditableTransferDetail({
                   {/* Item name — click to open search panel */}
                   <button
                     type="button"
-                    onClick={() => setPanelOpen(true)}
+                    onClick={() => openPanel()}
                     className="text-sm font-medium text-left truncate hover:text-primary transition-colors cursor-pointer"
                     title={item.stockItemName}
                     data-testid={`button-item-name-${item.id}`}
@@ -521,17 +476,51 @@ function EditableTransferDetail({
               );
             })}
 
-            {/* Search-to-add bar */}
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => setPanelOpen(true)}
-              onKeyDown={handleSearchBarKeyDown}
-              className="flex items-center gap-2 px-3 py-2.5 text-sm text-muted-foreground cursor-pointer hover-elevate border-t"
-              data-testid="button-open-search-panel"
-            >
-              <Search className="h-3.5 w-3.5 shrink-0" />
-              <span>Search items to add...</span>
+            {/* Search-to-add bar — a real typeable input */}
+            <div className="flex items-center gap-2 px-3 py-2 border-t bg-muted/10">
+              <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <input
+                ref={searchBarRef}
+                type="text"
+                placeholder="Search items to add..."
+                value={panelSearch}
+                onChange={e => {
+                  setPanelSearch(e.target.value);
+                  if (!panelOpen) setPanelOpen(true);
+                }}
+                onFocus={() => { if (!panelOpen) setPanelOpen(true); }}
+                onKeyDown={e => {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setPanelActiveIdx(i => Math.min(i + 1, panelMatches.length - 1));
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setPanelActiveIdx(i => Math.max(i - 1, 0));
+                  } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (panelMatches[panelActiveIdx]) addExtraItem(panelMatches[panelActiveIdx]);
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    setPanelOpen(false);
+                    setPanelSearch("");
+                  } else if (e.key === "Tab") {
+                    setPanelOpen(false);
+                    setPanelSearch("");
+                  }
+                }}
+                className="flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
+                data-testid="input-search-bar"
+                autoComplete="off"
+              />
+              {panelSearch && (
+                <button
+                  type="button"
+                  onClick={() => { setPanelSearch(""); searchBarRef.current?.focus(); }}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
 
             {/* Footer */}
@@ -620,12 +609,12 @@ function EditableTransferDetail({
         {/* Right: search panel */}
         {panelOpen && (
           <ItemSearchPanel
-            inventory={locationInventory}
+            matches={panelMatches}
+            activeIdx={panelActiveIdx}
             locationName={detail.sourceLocationName}
-            alreadyAdded={extraItems.map(e => e.stockItemId)}
-            existingIds={myItems.map(i => i.stockItemId)}
-            onAdd={addExtraItem}
-            onClose={() => setPanelOpen(false)}
+            onActiveChange={setPanelActiveIdx}
+            onPick={addExtraItem}
+            onClose={() => { setPanelOpen(false); setPanelSearch(""); }}
           />
         )}
       </div>
