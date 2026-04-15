@@ -52,7 +52,17 @@ export function registerWhatsAppRoutes(app: Express) {
 
   app.put("/api/whatsapp/settings", requireAuth, async (req, res) => {
     try {
-      const { instanceId, apiToken, enabled, monthlyAutoSend, dailyAutoSend, dailyRecipientId } = req.body as Record<string, any>;
+      const body = req.body as Record<string, any>;
+
+      // Fetch existing row so we can preserve fields not sent by the caller
+      const existing = await getWaSettings();
+
+      const instanceId       = body.instanceId       ?? existing?.instanceId      ?? "";
+      const apiToken         = body.apiToken         ?? existing?.apiToken        ?? "";
+      const enabled          = body.enabled          !== undefined ? body.enabled         : (existing?.enabled         ?? false);
+      const monthlyAutoSend  = body.monthlyAutoSend  !== undefined ? body.monthlyAutoSend  : (existing?.monthlyAutoSend  ?? false);
+      const dailyAutoSend    = body.dailyAutoSend    !== undefined ? body.dailyAutoSend    : (existing?.dailyAutoSend    ?? false);
+      const dailyRecipientId = body.dailyRecipientId !== undefined ? body.dailyRecipientId : (existing?.dailyRecipientId ?? null);
 
       await pool.query(`
         INSERT INTO whatsapp_settings (id, instance_id, api_token, enabled, monthly_auto_send, daily_auto_send, daily_recipient_id)
@@ -65,12 +75,12 @@ export function registerWhatsAppRoutes(app: Express) {
           daily_auto_send    = EXCLUDED.daily_auto_send,
           daily_recipient_id = EXCLUDED.daily_recipient_id
       `, [
-        instanceId        ?? "",
-        apiToken          ?? "",
-        enabled           ?? false,
-        monthlyAutoSend   ?? false,
-        dailyAutoSend     ?? false,
-        dailyRecipientId  ?? null,
+        instanceId,
+        apiToken,
+        enabled,
+        monthlyAutoSend,
+        dailyAutoSend,
+        dailyRecipientId,
       ]);
 
       res.json({ message: "Saved" });

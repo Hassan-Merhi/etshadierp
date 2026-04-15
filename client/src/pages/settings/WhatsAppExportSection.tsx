@@ -8,41 +8,34 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   MessageSquare,
   Plus,
   Trash2,
   Users,
-  RefreshCw,
-  Send,
   CheckCircle,
   XCircle,
   ChevronDown,
-  Loader2,
   ChevronRight,
 } from "lucide-react";
 
 interface WaSettings {
-  instanceId:       string;
-  apiToken:         string;
-  enabled:          boolean;
-  monthlyAutoSend:  boolean;
-  dailyAutoSend:    boolean;
-  dailyRecipientId: number | null;
-  hasCredentials:   boolean;
+  instanceId:     string;
+  apiToken:       string;
+  enabled:        boolean;
+  hasCredentials: boolean;
 }
 
 interface Recipient {
-  id: number;
-  chatId: string;
-  name: string;
+  id:      number;
+  chatId:  string;
+  name:    string;
   isGroup: boolean;
-  active: boolean;
+  active:  boolean;
 }
 
 interface GreenChat {
-  id: string;
+  id:   string;
   name: string;
   type: string;
 }
@@ -51,15 +44,10 @@ export function WhatsAppExportSection() {
   const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [instanceId, setInstanceId] = useState("");
-  const [apiToken, setApiToken] = useState("");
+  const [apiToken,   setApiToken]   = useState("");
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [newChatId, setNewChatId] = useState("");
-  const [newName, setNewName] = useState("");
-
-  const defaultEnd   = new Date().toLocaleDateString("en-CA");
-  const defaultStart = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toLocaleDateString("en-CA"); })();
-  const [npStart, setNpStart] = useState(defaultStart);
-  const [npEnd,   setNpEnd]   = useState(defaultEnd);
+  const [newName,   setNewName]   = useState("");
 
   const { data: settings } = useQuery<WaSettings>({
     queryKey: ["/api/whatsapp/settings"],
@@ -81,10 +69,7 @@ export function WhatsAppExportSection() {
       apiRequest("PUT", "/api/whatsapp/settings", {
         instanceId,
         apiToken,
-        enabled:          settings?.enabled          ?? false,
-        monthlyAutoSend:  settings?.monthlyAutoSend  ?? false,
-        dailyAutoSend:    settings?.dailyAutoSend    ?? false,
-        dailyRecipientId: settings?.dailyRecipientId ?? null,
+        enabled: settings?.enabled ?? false,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] });
@@ -96,59 +81,11 @@ export function WhatsAppExportSection() {
   const toggleEnabled = useMutation({
     mutationFn: (value: boolean) =>
       apiRequest("PUT", "/api/whatsapp/settings", {
-        instanceId:       settings?.instanceId       ?? "",
-        apiToken:         "••••••",
-        enabled:          value,
-        monthlyAutoSend:  settings?.monthlyAutoSend  ?? false,
-        dailyAutoSend:    settings?.dailyAutoSend    ?? false,
-        dailyRecipientId: settings?.dailyRecipientId ?? null,
+        instanceId: settings?.instanceId ?? "",
+        apiToken:   "••••••",
+        enabled:    value,
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] }),
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const toggleMonthly = useMutation({
-    mutationFn: (value: boolean) =>
-      apiRequest("PUT", "/api/whatsapp/settings", {
-        instanceId:       settings?.instanceId       ?? "",
-        apiToken:         "••••••",
-        enabled:          settings?.enabled           ?? false,
-        monthlyAutoSend:  value,
-        dailyAutoSend:    settings?.dailyAutoSend    ?? false,
-        dailyRecipientId: settings?.dailyRecipientId ?? null,
-      }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] }),
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const toggleDaily = useMutation({
-    mutationFn: (value: boolean) =>
-      apiRequest("PUT", "/api/whatsapp/settings", {
-        instanceId:       settings?.instanceId       ?? "",
-        apiToken:         "••••••",
-        enabled:          settings?.enabled           ?? false,
-        monthlyAutoSend:  settings?.monthlyAutoSend  ?? false,
-        dailyAutoSend:    value,
-        dailyRecipientId: settings?.dailyRecipientId ?? null,
-      }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] }),
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const setDailyRecipient = useMutation({
-    mutationFn: (recipientId: number | null) =>
-      apiRequest("PUT", "/api/whatsapp/settings", {
-        instanceId:       settings?.instanceId      ?? "",
-        apiToken:         "••••••",
-        enabled:          settings?.enabled          ?? false,
-        monthlyAutoSend:  settings?.monthlyAutoSend ?? false,
-        dailyAutoSend:    settings?.dailyAutoSend   ?? false,
-        dailyRecipientId: recipientId,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] });
-      toast({ title: "Daily export group saved" });
-    },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -190,16 +127,6 @@ export function WhatsAppExportSection() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const sendNow = useMutation({
-    mutationFn: () =>
-      apiRequest("POST", "/api/whatsapp/send-net-position", { startDate: npStart, endDate: npEnd }),
-    onSuccess: async (res: any) => {
-      const body = await res.json().catch(() => ({}));
-      toast({ title: "Sent via WhatsApp", description: body.message || "Report sent" });
-    },
-    onError: (e: any) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
-  });
-
   const handleFetchChats = async () => {
     setShowGroupPicker(true);
     await fetchChats();
@@ -219,7 +146,7 @@ export function WhatsAppExportSection() {
           <div>
             <p className="font-semibold">WhatsApp Export</p>
             <p className="text-sm text-muted-foreground">
-              Send net position Excel to a WhatsApp group via Green API (free)
+              Green API credentials, recipients, and master on/off switch
             </p>
           </div>
         </div>
@@ -281,84 +208,20 @@ export function WhatsAppExportSection() {
 
           <Separator />
 
-          {/* ── Toggles ─────────────────────────────────────────────── */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Enable WhatsApp Sending</p>
-                <p className="text-xs text-muted-foreground">
-                  Allow the "Send to WhatsApp" button and auto-send to work
-                </p>
-              </div>
-              <Switch
-                data-testid="switch-wa-enabled"
-                checked={settings?.enabled ?? false}
-                onCheckedChange={(v) => toggleEnabled.mutate(v)}
-                disabled={!settings?.hasCredentials}
-              />
+          {/* ── Enable toggle ────────────────────────────────────────── */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Enable WhatsApp Sending</p>
+              <p className="text-xs text-muted-foreground">
+                Master switch — enables all WhatsApp auto-send features and the "Send" buttons
+              </p>
             </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Monthly Auto-Send</p>
-                <p className="text-xs text-muted-foreground">
-                  Automatically send net position Excel on the 1st of each month
-                </p>
-              </div>
-              <Switch
-                data-testid="switch-wa-monthly"
-                checked={settings?.monthlyAutoSend ?? false}
-                onCheckedChange={(v) => toggleMonthly.mutate(v)}
-                disabled={!settings?.enabled}
-              />
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Daily Auto-Send (6 PM EST)</p>
-                  <p className="text-xs text-muted-foreground">
-                    Every day at 6 PM — sends a ZIP containing all company exports + all-companies net position Excel (full current year) to the group selected below
-                  </p>
-                </div>
-                <Switch
-                  data-testid="switch-wa-daily"
-                  checked={settings?.dailyAutoSend ?? false}
-                  onCheckedChange={(v) => toggleDaily.mutate(v)}
-                  disabled={!settings?.enabled}
-                />
-              </div>
-
-              {/* Group picker for daily export */}
-              <div className="pl-0 space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">Daily Export WhatsApp Group</p>
-                {recipients.filter((r) => r.isGroup).length === 0 ? (
-                  <p className="text-xs text-muted-foreground italic">
-                    No group recipients added yet — add one in the Recipients section below.
-                  </p>
-                ) : (
-                  <Select
-                    value={String(settings?.dailyRecipientId ?? "")}
-                    onValueChange={(v) => setDailyRecipient.mutate(v ? parseInt(v) : null)}
-                    disabled={!settings?.enabled || setDailyRecipient.isPending}
-                  >
-                    <SelectTrigger data-testid="select-daily-export-group" className="w-full sm:w-80">
-                      <SelectValue placeholder="Pick a group to receive daily export…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {recipients.filter((r) => r.isGroup).map((r) => (
-                        <SelectItem key={r.id} value={String(r.id)} data-testid={`option-daily-group-${r.id}`}>
-                          <div className="flex items-center gap-2">
-                            <Users className="h-3.5 w-3.5" />
-                            {r.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-            </div>
+            <Switch
+              data-testid="switch-wa-enabled"
+              checked={settings?.enabled ?? false}
+              onCheckedChange={(v) => toggleEnabled.mutate(v)}
+              disabled={!settings?.hasCredentials}
+            />
           </div>
 
           <Separator />
@@ -379,7 +242,7 @@ export function WhatsAppExportSection() {
               </Button>
             </div>
 
-            {/* Group picker */}
+            {/* Group picker from Green API */}
             {showGroupPicker && (
               <div className="border rounded-md p-3 space-y-2 bg-muted/40">
                 <p className="text-xs font-medium text-muted-foreground">
@@ -398,9 +261,7 @@ export function WhatsAppExportSection() {
                         <div className="flex items-center gap-2 min-w-0">
                           <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                           <span className="truncate">{g.name}</span>
-                          <span className="text-xs text-muted-foreground truncate hidden sm:block">
-                            {g.id}
-                          </span>
+                          <span className="text-xs text-muted-foreground truncate hidden sm:block">{g.id}</span>
                         </div>
                         {already ? (
                           <Badge variant="secondary">Added</Badge>
@@ -426,7 +287,9 @@ export function WhatsAppExportSection() {
             {/* Manual entry */}
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground">
-                Or enter a chatId manually. For DRC use <code className="bg-muted px-1 rounded">243XXXXXXXXX@c.us</code> (individual) or paste a group chatId ending in <code className="bg-muted px-1 rounded">@g.us</code>.
+                Or enter a chatId manually. For DRC use{" "}
+                <code className="bg-muted px-1 rounded">243XXXXXXXXX@c.us</code> (individual) or paste a group chatId ending in{" "}
+                <code className="bg-muted px-1 rounded">@g.us</code>.
               </p>
               <div className="flex gap-2 flex-wrap">
                 <Input
@@ -503,49 +366,6 @@ export function WhatsAppExportSection() {
                 ))}
               </div>
             )}
-          </div>
-
-          {/* Manual Send Now */}
-          <Separator />
-          <div className="space-y-3">
-            <div>
-              <p className="text-sm font-semibold">Send Report Now</p>
-              <p className="text-xs text-muted-foreground">Manually send the net position Excel to all active recipients for any date range.</p>
-            </div>
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">From</Label>
-                <Input
-                  type="date"
-                  value={npStart}
-                  onChange={e => setNpStart(e.target.value)}
-                  className="w-38"
-                  data-testid="input-wa-np-start"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">To</Label>
-                <Input
-                  type="date"
-                  value={npEnd}
-                  onChange={e => setNpEnd(e.target.value)}
-                  className="w-38"
-                  data-testid="input-wa-np-end"
-                />
-              </div>
-              <Button
-                onClick={() => sendNow.mutate()}
-                disabled={sendNow.isPending || !settings?.enabled}
-                data-testid="button-wa-send-now"
-              >
-                {sendNow.isPending
-                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sending...</>
-                  : <><Send className="h-4 w-4 mr-2" />Send Now</>}
-              </Button>
-              {!settings?.enabled && (
-                <p className="text-xs text-muted-foreground">Enable WhatsApp above to send.</p>
-              )}
-            </div>
           </div>
         </div>
       )}
