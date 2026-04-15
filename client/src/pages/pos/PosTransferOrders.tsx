@@ -304,6 +304,7 @@ function EditableTransferDetail({
         newQuantity: String(original + delta),
       };
     });
+    const myLocationName = myItems[0]?.sourceLocationName ?? detail.sourceLocationName;
     const newItems = extraItems
       .map(e => ({ ...e, qty: parseFloat(e.qtyDraft) || 0 }))
       .filter(e => e.qty !== 0)
@@ -311,7 +312,7 @@ function EditableTransferDetail({
         stockItemId: e.stockItemId,
         stockItemName: e.stockItemName,
         sourceLocationId: posUser.assignedLocationId,
-        sourceLocationName: detail.sourceLocationName,
+        sourceLocationName: myLocationName,
         originalQuantity: "0",
         delta: String(e.qty),
         newQuantity: String(e.qty),
@@ -559,12 +560,17 @@ function EditableTransferDetail({
                 <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Revision History</span>
               </div>
-              {detail.revisions.map(rev => (
+              {detail.revisions.map(rev => {
+                const revLocName = rev.items[0]?.sourceLocationName ?? null;
+                return (
                 <Card key={rev.id} data-testid={`card-revision-${rev.id}`}>
                   <CardContent className="pt-3 pb-3 space-y-2">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-semibold">Revision #{rev.revisionNumber}</span>
+                        {revLocName && (
+                          <span className="text-xs text-muted-foreground">· From: <span className="font-medium text-foreground">{revLocName}</span></span>
+                        )}
                         <span className="text-xs text-muted-foreground">{formatDateTime(rev.createdAt)}</span>
                       </div>
                       {rev.optional ? (
@@ -575,11 +581,10 @@ function EditableTransferDetail({
                         </Badge>
                       )}
                     </div>
-                    {rev.note && <p className="text-xs text-muted-foreground">{rev.note}</p>}
+                    {rev.note && <p className="text-xs text-muted-foreground italic">{rev.note}</p>}
                     <div className="rounded-md border overflow-hidden">
-                      <div className="grid grid-cols-[1fr_auto_auto_auto_auto] bg-muted/30 border-b px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide gap-x-4">
+                      <div className="grid grid-cols-[1fr_auto_auto_auto] bg-muted/30 border-b px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide gap-x-4">
                         <span>Item</span>
-                        <span>Location</span>
                         <span className="text-right">Was</span>
                         <span className="text-right">Now</span>
                         <span className="text-right">Change</span>
@@ -587,9 +592,8 @@ function EditableTransferDetail({
                       {rev.items.map((ri, i) => {
                         const delta = parseFloat(ri.delta);
                         return (
-                          <div key={i} className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center px-3 py-2 text-xs gap-x-4 bg-card border-b last:border-b-0" data-testid={`text-rev-item-${rev.id}-${i}`}>
-                            <span className="font-medium truncate">{ri.stockItemName}</span>
-                            <span className="text-muted-foreground whitespace-nowrap">{ri.sourceLocationName ?? "—"}</span>
+                          <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] items-center px-3 py-2 text-xs gap-x-4 bg-card border-b last:border-b-0" data-testid={`text-rev-item-${rev.id}-${i}`}>
+                            <span className="font-medium">{ri.stockItemName}</span>
                             <span className="font-mono text-right text-muted-foreground">{fmtQty(ri.originalQuantity)}</span>
                             <span className="font-mono font-semibold text-right">{fmtQty(ri.newQuantity)}</span>
                             <span className={cn("font-mono font-semibold text-right", delta > 0 ? "text-green-600 dark:text-green-400" : "text-destructive")}>
@@ -601,7 +605,8 @@ function EditableTransferDetail({
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -732,30 +737,34 @@ function ViewTransferDialog({
                   <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Revision History</span>
                 </div>
-                {detail.revisions.map(rev => (
+                {detail.revisions.map(rev => {
+                  const revLocName = rev.items[0]?.sourceLocationName ?? null;
+                  return (
                   <Card key={rev.id}>
                     <CardContent className="pt-3 pb-3 space-y-2">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-semibold">Revision #{rev.revisionNumber}</span>
+                          {revLocName && (
+                            <span className="text-xs text-muted-foreground">· From: <span className="font-medium text-foreground">{revLocName}</span></span>
+                          )}
                           <span className="text-xs text-muted-foreground">{formatDateTime(rev.createdAt)}</span>
                         </div>
                         {rev.optional
                           ? <Badge variant="outline" className="text-xs">Pending Admin Review</Badge>
                           : <Badge variant="default" className="text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />Approved</Badge>}
                       </div>
-                      {rev.note && <p className="text-xs text-muted-foreground">{rev.note}</p>}
+                      {rev.note && <p className="text-xs text-muted-foreground italic">{rev.note}</p>}
                       <div className="rounded-md border overflow-hidden">
-                        <div className="grid grid-cols-[1fr_auto_auto_auto_auto] bg-muted/30 border-b px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide gap-x-4">
-                          <span>Item</span><span>Location</span>
+                        <div className="grid grid-cols-[1fr_auto_auto_auto] bg-muted/30 border-b px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide gap-x-4">
+                          <span>Item</span>
                           <span className="text-right">Was</span><span className="text-right">Now</span><span className="text-right">Change</span>
                         </div>
                         {rev.items.map((ri, i) => {
                           const delta = parseFloat(ri.delta);
                           return (
-                            <div key={i} className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center px-3 py-2 text-xs gap-x-4 bg-card border-b last:border-b-0">
-                              <span className="font-medium truncate">{ri.stockItemName}</span>
-                              <span className="text-muted-foreground whitespace-nowrap">{ri.sourceLocationName ?? "—"}</span>
+                            <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] items-center px-3 py-2 text-xs gap-x-4 bg-card border-b last:border-b-0">
+                              <span className="font-medium">{ri.stockItemName}</span>
                               <span className="font-mono text-right text-muted-foreground">{fmtQty(ri.originalQuantity)}</span>
                               <span className="font-mono font-semibold text-right">{fmtQty(ri.newQuantity)}</span>
                               <span className={cn("font-mono font-semibold text-right", delta > 0 ? "text-green-600 dark:text-green-400" : "text-destructive")}>
@@ -767,7 +776,8 @@ function ViewTransferDialog({
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

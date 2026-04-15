@@ -1082,6 +1082,7 @@ export function registerFiscalTransferRoutes(app: Express) {
       const locationIds = new Set<number>();
       if (transferRow.sourceLocationId) locationIds.add(transferRow.sourceLocationId);
       if (transferRow.destinationLocationId) locationIds.add(transferRow.destinationLocationId);
+      if (posLocationId) locationIds.add(posLocationId);
       for (const item of transferItems) {
         if (item.sourceLocationId) locationIds.add(item.sourceLocationId);
       }
@@ -1104,7 +1105,15 @@ export function registerFiscalTransferRoutes(app: Express) {
       const revisions = await Promise.all(
         visibleRevisionRows.map(async (rev) => {
           const items = await db.select().from(stockTransferRevisionItems).where(eq(stockTransferRevisionItems.revisionId, rev.id));
-          return { ...rev, items };
+          return {
+            ...rev,
+            items: items.map(item => ({
+              ...item,
+              sourceLocationName: item.sourceLocationId
+                ? (locationMap.get(item.sourceLocationId) ?? item.sourceLocationName)
+                : item.sourceLocationName,
+            })),
+          };
         })
       );
 
@@ -1116,7 +1125,11 @@ export function registerFiscalTransferRoutes(app: Express) {
         optional: voucherRow?.optional,
         inventoryApplied: transferRow.inventoryApplied,
         sourceLocationId: transferRow.sourceLocationId,
-        sourceLocationName: transferRow.sourceLocationId ? (locationMap.get(transferRow.sourceLocationId) ?? "Unknown") : "Multi-source",
+        sourceLocationName: transferRow.sourceLocationId
+          ? (locationMap.get(transferRow.sourceLocationId) ?? "Unknown")
+          : posLocationId
+            ? (locationMap.get(posLocationId) ?? "Unknown")
+            : "Multi-source",
         destinationLocationId: transferRow.destinationLocationId,
         destinationLocationName: locationMap.get(transferRow.destinationLocationId) ?? "Unknown",
         notes: transferRow.notes,
