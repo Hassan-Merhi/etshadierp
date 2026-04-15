@@ -660,6 +660,106 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
     }
   });
 
+  // GET /api/factory/stock-allocation/loading-mode — returns active loadings with per-article bale counts
+  app.get("/api/factory/stock-allocation/loading-mode", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // 1. In-stock bale counts by article code
+      const inStockRaw = await db.execute(
+        sql`SELECT article_code as "articleCode", COUNT(*)::int as count
+            FROM factory_bales
+            WHERE company_id = ${companyId} AND status = 'IN_STOCK'
+            GROUP BY article_code`
+      );
+      const inStockCounts: { articleCode: string; count: number }[] = (inStockRaw.rows || inStockRaw as any[]).map((r: any) => ({
+        articleCode: r.articleCode,
+        count: Number(r.count),
+      }));
+
+      // 2. Active loadings (LOADING + PENDING_VERIFICATION)
+      const loadingsRaw = await db.execute(
+        sql`SELECT id, customer_id as "customerId", container_number as "containerNumber", status
+            FROM customer_orders
+            WHERE company_id = ${companyId} AND status IN ('LOADING','PENDING_VERIFICATION')
+            ORDER BY id`
+      );
+      const loadings: { id: number; customerId: number; containerNumber: string | null; status: string }[] =
+        (loadingsRaw.rows || loadingsRaw as any[]).map((r: any) => ({
+          id:              r.id,
+          customerId:      r.customerId,
+          containerNumber: r.containerNumber || null,
+          status:          r.status,
+        }));
+
+      // 3. Bale counts per loading per article code
+      let loadingBales: { orderId: number; articleCode: string; count: number }[] = [];
+      if (loadings.length > 0) {
+        const ids = loadings.map((l: any) => l.id);
+        const balesRaw = await db.execute(
+          sql`SELECT cob.order_id as "orderId", fb.article_code as "articleCode", COUNT(*)::int as count
+              FROM customer_order_bales cob
+              JOIN factory_bales fb ON fb.id = cob.bale_id
+              WHERE cob.order_id = ANY(${sql.raw(`ARRAY[${ids.join(',')}]`)})
+              GROUP BY cob.order_id, fb.article_code`
+        );
+        loadingBales = (balesRaw.rows || balesRaw as any[]).map((r: any) => ({
+          orderId:     r.orderId,
+          articleCode: r.articleCode,
+          count:       Number(r.count),
+        }));
+      }
+
+      // 4. Customer names
+      const customerIds = [...new Set(loadings.map((l: any) => l.customerId))].filter((id): id is number => id != null);
+      let customerMap = new Map<number, string>();
+      if (customerIds.length > 0) {
+        const custRows = await db.select({ id: customers.id, legalName: customers.legalName })
+          .from(customers)
+          .where(inArray(customers.id, customerIds));
+        custRows.forEach((c: any) => customerMap.set(c.id, c.legalName));
+      }
+
+      // 5. Product name lookup from factory_bale_products via factory_bales
+      const articleCodeSet = new Set<string>([
+        ...inStockCounts.map((s: any) => s.articleCode),
+        ...loadingBales.map((b: any) => b.articleCode),
+      ]);
+      const productNameByCode = new Map<string, string>();
+      if (articleCodeSet.size > 0) {
+        const codes = Array.from(articleCodeSet);
+        const prodRaw = await db.execute(
+          sql`SELECT DISTINCT ON (fbp.article_code) fbp.article_code as "articleCode", fbp.name
+              FROM factory_bale_products fbp
+              WHERE fbp.article_code = ANY(${sql.raw(`ARRAY[${codes.map((c: string) => `'${c.replace(/'/g, "''")}'`).join(',')}]`)})
+              ORDER BY fbp.article_code`
+        );
+        (prodRaw.rows || prodRaw as any[]).forEach((r: any) => {
+          if (r.name) productNameByCode.set(r.articleCode, r.name);
+        });
+      }
+
+      res.json({
+        inStockCounts,
+        loadings: loadings.map((l: any) => ({
+          id:              l.id,
+          customerId:      l.customerId,
+          customerName:    customerMap.get(l.customerId) || `Customer #${l.customerId}`,
+          containerNumber: l.containerNumber,
+          status:          l.status,
+          balesByArticle:  loadingBales
+            .filter((b: any) => b.orderId === l.id)
+            .map((b: any) => ({ articleCode: b.articleCode, count: b.count })),
+        })),
+        productNames: Object.fromEntries(productNameByCode),
+      });
+    } catch (error: any) {
+      console.error("Error fetching loading-mode stock allocation:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // POST /api/factory/stock-allocation/reservations/toggle — toggle a reservation on/off
   app.post("/api/factory/stock-allocation/reservations/toggle", requireAuth, async (req: any, res: any) => {
     try {
