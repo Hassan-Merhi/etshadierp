@@ -547,6 +547,17 @@ export default function Daybook({ user }: { user?: any } = {}) {
     return [];
   }, [expandedEntriesRaw]);
 
+  // Revision history for Stock Transfer vouchers shown in the view dialog
+  const isStockTransferVoucher =
+    selectedVoucher?.voucherType === "Stock Transfer" ||
+    selectedVoucher?.voucherType === "StockTransfer";
+  const { data: voucherRevisions = [], isLoading: revisionsLoading } = useQuery<any[]>({
+    queryKey: selectedVoucher && isStockTransferVoucher && viewDialogOpen
+      ? [`/api/stock-transfers/by-voucher/${selectedVoucher.id}/revisions`]
+      : [],
+    enabled: !!selectedVoucher && isStockTransferVoucher && viewDialogOpen,
+  });
+
   // Update purchaseOrderData when response changes (avoid setState in useMemo)
   useEffect(() => {
     if (!viewVoucherEntriesRaw) {
@@ -3501,6 +3512,69 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   </div>
                 )}
               </div>
+
+              {/* Revision History — only for Stock Transfer vouchers */}
+              {isStockTransferVoucher && (revisionsLoading || voucherRevisions.length > 0) && (
+                <div>
+                  <h3 className="font-semibold mb-3">Revision History</h3>
+                  {revisionsLoading ? (
+                    <div className="space-y-2">
+                      <Skeleton className="h-16 w-full" />
+                      <Skeleton className="h-16 w-full" />
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {voucherRevisions.map((rev: any) => (
+                        <div key={rev.id} className="border rounded-md p-3 space-y-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">Rev #{rev.revisionNumber}</span>
+                              {rev.optional && (
+                                <Badge variant="outline" className="text-xs">POS Adjustment{rev._mergedCount > 1 ? ` (${rev._mergedCount} submissions)` : ""}</Badge>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {rev.createdAt ? new Date(rev.createdAt).toLocaleString() : ""}
+                            </span>
+                          </div>
+                          {rev.note && (
+                            <p className="text-sm text-muted-foreground">{rev.note}</p>
+                          )}
+                          {rev.items && rev.items.length > 0 && (
+                            <div className="border rounded-md overflow-hidden">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="text-xs py-2">Item</TableHead>
+                                    <TableHead className="text-right text-xs py-2">Was</TableHead>
+                                    <TableHead className="text-right text-xs py-2">Now</TableHead>
+                                    <TableHead className="text-right text-xs py-2">Change</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {rev.items.map((item: any, idx: number) => {
+                                    const delta = parseFloat(item.delta ?? "0");
+                                    return (
+                                      <TableRow key={idx}>
+                                        <TableCell className="py-1.5 text-sm">{item.stockItemName}</TableCell>
+                                        <TableCell className="py-1.5 text-right font-mono text-sm text-muted-foreground">{parseFloat(item.originalQuantity)}</TableCell>
+                                        <TableCell className="py-1.5 text-right font-mono text-sm font-semibold">{parseFloat(item.newQuantity)}</TableCell>
+                                        <TableCell className={`py-1.5 text-right font-mono text-sm font-semibold ${delta > 0 ? "text-green-600 dark:text-green-400" : delta < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
+                                          {delta > 0 ? "+" : ""}{delta}
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           {selectedVoucher && (

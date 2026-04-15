@@ -857,6 +857,87 @@ export function registerFiscalTransferRoutes(app: Express) {
     }
   });
 
+  // Transfer Revisions - GET by voucherId (must be before :transferId route)
+  app.get("/api/stock-transfers/by-voucher/:voucherId/revisions", requireAuth, async (req, res) => {
+    try {
+      const voucherId = parseInt(req.params.voucherId);
+      if (!voucherId) return res.status(400).json({ message: "Voucher ID required" });
+      const transfer = await storage.getStockTransferByVoucherId(voucherId);
+      if (!transfer) return res.json([]);
+      req.params.transferId = String(transfer.id);
+      // Fall through to transferId revisions logic by re-routing internally
+      const transferId = transfer.id;
+
+      const revisionRows = await db
+        .select()
+        .from(stockTransferRevisions)
+        .where(eq(stockTransferRevisions.transferId, transferId))
+        .orderBy(asc(stockTransferRevisions.revisionNumber));
+
+      const allRevWithItems = await Promise.all(
+        revisionRows.map(async (rev) => {
+          const items = await db
+            .select()
+            .from(stockTransferRevisionItems)
+            .where(eq(stockTransferRevisionItems.revisionId, rev.id));
+          return { ...rev, items };
+        })
+      );
+
+      const optionalRevs = allRevWithItems.filter(r => r.optional);
+      const nonOptionalRevs = allRevWithItems.filter(r => !r.optional);
+      let finalRevisions = [...nonOptionalRevs];
+
+      if (optionalRevs.length > 0) {
+        const netMap = new Map<string, {
+          stockItemId: number; stockItemName: string;
+          sourceLocationId: number | null; sourceLocationName: string | null;
+          originalQuantity: string; newQuantity: string; delta: string;
+        }>();
+
+        for (const rev of optionalRevs) {
+          for (const item of rev.items) {
+            const key = `${item.stockItemId}:${item.sourceLocationId ?? ""}`;
+            const existing = netMap.get(key);
+            if (!existing) {
+              netMap.set(key, {
+                stockItemId: item.stockItemId,
+                stockItemName: item.stockItemName,
+                sourceLocationId: item.sourceLocationId,
+                sourceLocationName: item.sourceLocationName,
+                originalQuantity: item.originalQuantity,
+                newQuantity: item.newQuantity,
+                delta: item.delta,
+              });
+            } else {
+              const netDelta = parseFloat(item.newQuantity) - parseFloat(existing.originalQuantity);
+              netMap.set(key, {
+                ...existing,
+                newQuantity: item.newQuantity,
+                delta: String(netDelta),
+              });
+            }
+          }
+        }
+
+        const first = optionalRevs[0];
+        const last = optionalRevs[optionalRevs.length - 1];
+        const mergedOptional = {
+          ...first,
+          note: last.note,
+          createdAt: last.createdAt,
+          _mergedCount: optionalRevs.length,
+          items: Array.from(netMap.values()),
+        };
+        finalRevisions = [mergedOptional, ...nonOptionalRevs];
+      }
+
+      res.json(finalRevisions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Transfer Revisions - GET
   app.get("/api/stock-transfers/:transferId/revisions", requireAuth, async (req, res) => {
     try {
