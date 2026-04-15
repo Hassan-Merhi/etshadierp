@@ -2,8 +2,9 @@ import { useState, useMemo, type Dispatch, type SetStateAction } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import {
-  Play, CheckCircle2, Clock, DollarSign, ChevronDown, ChevronRight, X, Users, Trash2, CalendarDays, Printer, RotateCcw, Wrench,
+  Play, CheckCircle2, Clock, DollarSign, ChevronDown, ChevronRight, X, Users, Trash2, CalendarDays, Printer, RotateCcw, Wrench, FileDown,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -893,6 +894,56 @@ export default function FactoryPayrollTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPreviewOpen(false)}>Back</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const rows = previewRows.map((r) => {
+                  const transportAmt = parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2));
+                  const deductAmt = parseFloat(advanceOverrides[r.id] || "0");
+                  const net = r.base + r.bonus + transportAmt - deductAmt;
+                  return {
+                    "Name": r.name,
+                    "Position": r.position || "",
+                    "Present Days": r.presentDays,
+                    "Absent Days": r.absentDays,
+                    "Base ($)": r.base.toFixed(2),
+                    "Bonus ($)": r.bonus.toFixed(2),
+                    "Transport ($)": transportAmt.toFixed(2),
+                    "Advance Deduction ($)": deductAmt.toFixed(2),
+                    "Net Pay ($)": net.toFixed(2),
+                  };
+                });
+                const totalNet = previewRows.reduce((s, r) => {
+                  const transportAmt = parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2));
+                  const deductAmt = parseFloat(advanceOverrides[r.id] || "0");
+                  return s + r.base + r.bonus + transportAmt - deductAmt;
+                }, 0);
+                rows.push({
+                  "Name": "TOTAL",
+                  "Position": "",
+                  "Present Days": "" as any,
+                  "Absent Days": "" as any,
+                  "Base ($)": "",
+                  "Bonus ($)": "",
+                  "Transport ($)": "",
+                  "Advance Deduction ($)": "",
+                  "Net Pay ($)": totalNet.toFixed(2),
+                });
+                const ws = XLSX.utils.json_to_sheet(rows);
+                const colWidths = [
+                  { wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 13 },
+                  { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 22 }, { wch: 14 },
+                ];
+                ws["!cols"] = colWidths;
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Payroll");
+                XLSX.writeFile(wb, `Payroll_${runForm.periodStart}_${runForm.periodEnd}.xlsx`);
+              }}
+              data-testid="button-export-payroll-excel"
+            >
+              <FileDown className="h-4 w-4 mr-2" />
+              Export Excel
+            </Button>
             <Button
               onClick={() => generateMutation.mutate()}
               disabled={generateMutation.isPending || previewRows.length === 0}
