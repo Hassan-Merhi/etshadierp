@@ -863,13 +863,89 @@ export function registerFiscalTransferRoutes(app: Express) {
     }
   });
 
+  // POS Transfer Order Detail endpoint - returns full detail with names
+  app.get("/api/pos-transfer-detail", requireAuth, async (req, res) => {
+    try {
+      const voucherId = req.query.voucherId ? parseInt(req.query.voucherId as string) : null;
+      if (!voucherId) return res.status(400).json({ message: "voucherId required" });
+
+      const [transferRow] = await db
+        .select()
+        .from(stockTransferVouchers)
+        .where(eq(stockTransferVouchers.voucherId, voucherId));
+      if (!transferRow) return res.status(404).json({ message: "Transfer not found" });
+
+      const [voucherRow] = await db
+        .select({ voucherNumber: vouchers.voucherNumber, voucherDate: vouchers.voucherDate, optional: vouchers.optional })
+        .from(vouchers)
+        .where(eq(vouchers.id, voucherId));
+
+      const transferItems = await db
+        .select()
+        .from(stockTransferItems)
+        .where(eq(stockTransferItems.transferId, transferRow.id));
+
+      const stockItemIdSet = [...new Set(transferItems.map(i => i.stockItemId).filter(Boolean))] as number[];
+      const stockItemRows = stockItemIdSet.length > 0
+        ? await db.select({ id: stockItems.id, name: stockItems.name }).from(stockItems).where(inArray(stockItems.id, stockItemIdSet))
+        : [];
+      const stockItemMap = new Map(stockItemRows.map(s => [s.id, s.name]));
+
+      const locationIds = new Set<number>();
+      if (transferRow.sourceLocationId) locationIds.add(transferRow.sourceLocationId);
+      if (transferRow.destinationLocationId) locationIds.add(transferRow.destinationLocationId);
+      for (const item of transferItems) {
+        if (item.sourceLocationId) locationIds.add(item.sourceLocationId);
+      }
+      const locationRows = locationIds.size > 0
+        ? await db.select({ id: locations.id, name: locations.name }).from(locations).where(inArray(locations.id, Array.from(locationIds)))
+        : [];
+      const locationMap = new Map(locationRows.map(l => [l.id, l.name]));
+
+      const revisionRows = await db
+        .select()
+        .from(stockTransferRevisions)
+        .where(eq(stockTransferRevisions.transferId, transferRow.id))
+        .orderBy(asc(stockTransferRevisions.revisionNumber));
+
+      const revisions = await Promise.all(
+        revisionRows.map(async (rev) => {
+          const items = await db.select().from(stockTransferRevisionItems).where(eq(stockTransferRevisionItems.revisionId, rev.id));
+          return { ...rev, items };
+        })
+      );
+
+      res.json({
+        transferId: transferRow.id,
+        voucherId,
+        voucherNumber: voucherRow?.voucherNumber,
+        voucherDate: voucherRow?.voucherDate,
+        optional: voucherRow?.optional,
+        inventoryApplied: transferRow.inventoryApplied,
+        sourceLocationId: transferRow.sourceLocationId,
+        sourceLocationName: transferRow.sourceLocationId ? (locationMap.get(transferRow.sourceLocationId) ?? "Unknown") : "Multi-source",
+        destinationLocationId: transferRow.destinationLocationId,
+        destinationLocationName: locationMap.get(transferRow.destinationLocationId) ?? "Unknown",
+        notes: transferRow.notes,
+        items: transferItems.map(i => ({
+          ...i,
+          stockItemName: stockItemMap.get(i.stockItemId) ?? "Unknown",
+          sourceLocationName: i.sourceLocationId ? (locationMap.get(i.sourceLocationId) ?? null) : null,
+        })),
+        revisions,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Transfer Revisions - POST (create)
-  app.post("/api/stock-transfers/:transferId/revisions", requireAuth, requireNonPOS, async (req, res) => {
+  app.post("/api/stock-transfers/:transferId/revisions", requireAuth, async (req, res) => {
     try {
       const transferId = parseInt(req.params.transferId);
       if (!transferId) return res.status(400).json({ message: "Transfer ID required" });
 
-      const { note, items } = req.body;
+      const { note, items, optional: optionalFlag } = req.body;
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "At least one changed item is required" });
       }
@@ -885,7 +961,7 @@ export function registerFiscalTransferRoutes(app: Express) {
 
       const [revision] = await db
         .insert(stockTransferRevisions)
-        .values({ transferId, revisionNumber: nextNum, note: note?.trim() || null, optional: false })
+        .values({ transferId, revisionNumber: nextNum, note: note?.trim() || null, optional: optionalFlag === true })
         .returning();
 
       await db.insert(stockTransferRevisionItems).values(

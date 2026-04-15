@@ -21,7 +21,7 @@ import { CursorNavProvider } from "@/contexts/CursorNavContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search, Tag, Building2 } from "lucide-react";
+import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search, Tag, Building2, ClipboardList } from "lucide-react";
 import { FactorySidebar } from "@/components/FactorySidebar";
 import { PropertiesSidebar } from "@/components/PropertiesSidebar";
 import { OfflineBanner } from "@/components/OfflineBanner";
@@ -67,6 +67,7 @@ const POSDashboard = lazy(() => import("@/pages/pos/POSDashboard"));
 const POSCustomers = lazy(() => import("@/pages/pos/POSCustomers"));
 const POSSettings = lazy(() => import("@/pages/pos/POSSettings"));
 const POSPriceList = lazy(() => import("@/pages/pos/POSPriceList"));
+const PosTransferOrders = lazy(() => import("@/pages/pos/PosTransferOrders"));
 const EditSupplier = lazy(() => import("@/pages/EditSupplier"));
 const SupplierProformas = lazy(() => import("@/pages/SupplierProformas"));
 const ContainerVerification = lazy(() => import("@/pages/ContainerVerification"));
@@ -228,6 +229,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
         <Route path="/pos-chat" component={Chat} />
         <Route path="/pos-settings" component={POSSettings} />
         <Route path="/pos-price-list">{() => <POSPriceList posUser={user} />}</Route>
+        <Route path="/pos-transfer-orders">{() => <PosTransferOrders posUser={user} />}</Route>
         <Route>{() => <POS posUser={user} />}</Route>
       </Switch>
     );
@@ -502,6 +504,7 @@ function AuthenticatedApp() {
     const isOnChat = currentLocation === "/pos-chat";
     const isOnSettings = currentLocation === "/pos-settings";
     const isOnPriceList = currentLocation === "/pos-price-list";
+    const isOnTransferOrders = currentLocation === "/pos-transfer-orders";
 
     const posNavItems = [
       { label: "Point of Sale", icon: ShoppingCart, active: isOnPOS, testId: "button-pos-tab", onClick: () => setLocation("/") },
@@ -509,6 +512,7 @@ function AuthenticatedApp() {
       { label: "Inventory", icon: MapPin, active: isOnInventory, testId: "button-inventory-tab", onClick: () => setLocation("/location-inventory") },
       { label: "Price List", icon: Tag, active: isOnPriceList, testId: "button-price-list-tab", onClick: () => setLocation("/pos-price-list") },
       { label: "Transfer", icon: Package, active: isOnTransfer, testId: "button-stock-transfer-tab", onClick: () => setLocation("/vouchers?tab=transfer") },
+      { label: "Orders", icon: ClipboardList, active: isOnTransferOrders, testId: "button-transfer-orders-tab", onClick: () => setLocation("/pos-transfer-orders") },
       ...(user.canAccessCustomers ? [{ label: "Customers", icon: Users, active: isOnCustomers, testId: "button-customers-tab", onClick: () => setLocation("/pos-customers") }] : []),
       ...(posImportEnabled ? [{ label: "Import", icon: Upload, active: isOnImport, testId: "button-pos-import-tab", onClick: () => setLocation("/pos-import") }] : []),
       { label: "Chat", icon: MessageSquare, active: isOnChat, testId: "button-chat-tab", onClick: () => setLocation("/pos-chat"), badge: chatUnread?.count || 0 },
