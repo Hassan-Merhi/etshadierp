@@ -1094,6 +1094,7 @@ const FACTORY_COST_FIELDS = [
           { key: "files", label: "File Storage", icon: Upload },
           { key: "export-accounts", label: "Export Accounts", icon: Download },
           { key: "daily-export", label: "Daily Export", icon: Download },
+          { key: "np-export", label: "Net Position Export", icon: TrendingUp },
         ],
       },
       {
@@ -1905,8 +1906,11 @@ const FACTORY_COST_FIELDS = [
               <DailyExportSection />
               <WhatsAppExportSection />
               <StockReportSection />
-              <NetPositionExportSection />
             </>
+          )}
+
+          {activeSection === "np-export" && (
+            <NetPositionExportSection />
           )}
 
           {activeSection === "fiscal" && (
