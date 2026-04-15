@@ -540,7 +540,6 @@ export function registerFiscalTransferRoutes(app: Express) {
   app.get(
     "/api/stock-transfers",
     requireAuth,
-    requireNonPOS,
     async (req, res) => {
       try {
         const voucherId = req.query.voucherId ? parseInt(req.query.voucherId as string) : null;
@@ -562,7 +561,6 @@ export function registerFiscalTransferRoutes(app: Express) {
   app.post(
     "/api/stock-transfers",
     requireAuth,
-    requireNonPOS,
     async (req, res) => {
       try {
         const { voucherId, sourceLocationId, destinationLocationId, notes, items, allowNegativeInventory, voucherDate, optional } = req.body;
