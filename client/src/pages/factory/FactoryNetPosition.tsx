@@ -298,7 +298,7 @@ export default function FactoryNetPosition() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Side
             label="What We Have"
-            sublabel="Assets owed to us — cash, receivables, bank balances"
+            sublabel="Assets owed to us — cash, inventory, receivables, customer balances (Dr)"
             total={data?.forUs.total ?? 0}
             breakdown={data?.forUs.breakdown ?? []}
             accounts={data?.forUs.accounts ?? []}

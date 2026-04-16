@@ -2413,6 +2413,81 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const ledgerForUsTotal = classified.forUsTotal;
       const ledgerOnUsTotal = classified.onUsTotal;
 
+      // ── 2c. Customer DR/CR balances (customers without a linked ledger account) ──
+      // Customers that have a ledgerAccountId already flow through the ledger
+      // classification above — skip them here to avoid double-counting.
+      const allCustomersForNP = await db.select().from(customers)
+        .where(and(eq(customers.companyId, companyId), isNull(customers.deletedAt)));
+
+      const noLedgerCustomers = (allCustomersForNP as any[]).filter((c: any) => !c.ledgerAccountId);
+
+      const customerItems: { name: string; balanceUsd: number }[] = [];
+
+      if (noLedgerCustomers.length > 0) {
+        const cIds = noLedgerCustomers.map((c: any) => c.id);
+
+        // Sales totals from finalized orders
+        const cSalesRows = await db.select({
+          customerId: customerOrders.customerId,
+          total: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric)), 0)`,
+        })
+          .from(customerOrders)
+          .where(and(
+            inArray(customerOrders.customerId, cIds),
+            eq(customerOrders.companyId, companyId),
+            eq(customerOrders.status, "FINALIZED"),
+          ))
+          .groupBy(customerOrders.customerId);
+
+        const cSalesMap = new Map(cSalesRows.map((r: any) => [r.customerId, parseFloat(r.total || "0")]));
+
+        // Non-invoice balance adjustments
+        const cNonInvRows = await db.select({
+          customerId: customerBalances.customerId,
+          net: sql<string>`COALESCE(SUM(CAST(${customerBalances.debitAmount} AS numeric) - CAST(${customerBalances.creditAmount} AS numeric)), 0)`,
+        })
+          .from(customerBalances)
+          .where(and(
+            inArray(customerBalances.customerId, cIds),
+            eq(customerBalances.companyId, companyId),
+            sql`${customerBalances.referenceType} IS DISTINCT FROM 'INVOICE'`,
+          ))
+          .groupBy(customerBalances.customerId);
+
+        const cNonInvMap = new Map(cNonInvRows.map((r: any) => [r.customerId, parseFloat(r.net || "0")]));
+
+        // Voucher entries directly linked via customerId (no ledgerAccountId)
+        const cVoucherRows = await db.select({
+          customerId: voucherEntries.customerId,
+          net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
+        })
+          .from(voucherEntries)
+          .innerJoin(vouchers, and(
+            eq(voucherEntries.voucherId, vouchers.id),
+            eq(vouchers.companyId, companyId),
+            sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
+          ))
+          .where(and(
+            inArray(voucherEntries.customerId as any, cIds),
+            isNull(voucherEntries.ledgerAccountId),
+          ))
+          .groupBy(voucherEntries.customerId);
+
+        const cVoucherMap = new Map(cVoucherRows.map((r: any) => [r.customerId, parseFloat(r.net || "0")]));
+
+        for (const c of noLedgerCustomers) {
+          const salesTotal = cSalesMap.get(c.id) ?? 0;
+          const nonInvNet = cNonInvMap.get(c.id) ?? 0;
+          const voucherNet = cVoucherMap.get(c.id) ?? 0;
+          const opening = parseFloat(c.openingBalance || "0");
+          const openingSide = c.openingBalanceSide || "Dr";
+          const totalBalance = (openingSide === "Dr" ? opening : -opening) + salesTotal + nonInvNet + voucherNet;
+          if (Math.abs(totalBalance) > 0.01) {
+            customerItems.push({ name: c.legalName || c.name || `Customer #${c.id}`, balanceUsd: round2(totalBalance) });
+          }
+        }
+      }
+
       // ── 3. Inventory (Stock In Hand) — direct SQL sum of selling price ──────
       // Single query: sum selling_price for every IN_STOCK bale that has a
       // matched product, scoped strictly to companyId.
@@ -2503,9 +2578,16 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         cleanLedgerForUs.reduce((s, a) => s + a.value, 0),
       );
 
-      // forUsTotal is built from exactly three sources — no more, no less.
-      const forUsTotal = round2(cleanLedgerForUsTotal + baleInventoryValue + rawMaterialStockValue);
-      const onUsTotal = round2(ledgerOnUsTotal + totalSupplierLiabilities);
+      // ── Split customer items into DR (asset) and CR (liability) ──────────────
+      const customerDrItems = customerItems.filter(c => c.balanceUsd > 0);
+      const customerCrItems = customerItems.filter(c => c.balanceUsd < 0);
+      const totalCustomerDr = round2(customerDrItems.reduce((s, c) => s + c.balanceUsd, 0));
+      const totalCustomerCr = round2(customerCrItems.reduce((s, c) => s + Math.abs(c.balanceUsd), 0));
+
+      // forUsTotal: ledger assets + inventory + raw material + customer receivables (DR)
+      const forUsTotal = round2(cleanLedgerForUsTotal + baleInventoryValue + rawMaterialStockValue + totalCustomerDr);
+      // onUsTotal: ledger liabilities + supplier balances + customer credit balances (CR)
+      const onUsTotal = round2(ledgerOnUsTotal + totalSupplierLiabilities + totalCustomerCr);
       const netPosition = round2(forUsTotal - onUsTotal);
 
       // Inject factory-specific lines explicitly (always present so the UI
@@ -2517,6 +2599,9 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         factoryInventoryEntry,
         factoryRawMaterialEntry,
         ...cleanLedgerForUs.sort((a, b) => b.value - a.value).map(a => ({ ...a, value: round2(a.value) })),
+        ...customerDrItems
+          .sort((a, b) => b.balanceUsd - a.balanceUsd)
+          .map(c => ({ name: c.name, code: "CUSTOMER_DR", value: round2(c.balanceUsd), category: "Customer" })),
       ];
 
       // Group ledger on-us by category
@@ -2531,6 +2616,9 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           .sort((a, b) => b.balanceUsd - a.balanceUsd)
           .map(s => ({ name: s.name, code: "SUPPLIER", value: round2(s.balanceUsd), category: "Supplier" })),
         ...ledgerOnUs.sort((a, b) => b.value - a.value).map(a => ({ ...a, value: round2(a.value) })),
+        ...customerCrItems
+          .sort((a, b) => Math.abs(b.balanceUsd) - Math.abs(a.balanceUsd))
+          .map(c => ({ name: c.name, code: "CUSTOMER_CR", value: round2(Math.abs(c.balanceUsd)), category: "Customer" })),
       ];
 
       const forUsBreakdown = Object.entries(
@@ -2545,6 +2633,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         ...Object.entries(ledgerOnUsGrouped)
           .map(([name, value]) => ({ name, value: round2(value) }))
           .sort((a, b) => b.value - a.value),
+        ...(totalCustomerCr > 0 ? [{ name: "Customer", value: totalCustomerCr }] : []),
       ];
 
       res.json({
