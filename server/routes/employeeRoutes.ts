@@ -1680,8 +1680,19 @@ export function registerEmployeeRoutes(app: Express) {
   // List payroll runs for current company
   app.get("/api/payroll/runs", requireAuth, requireNonPOS, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      // Accept companyId from query param (explicit) or fall back to session
+      const paramCompanyId = req.query.companyId ? parseInt(req.query.companyId as string) : null;
+      const sessionCompanyId = req.session.currentCompanyId;
+      const companyId = paramCompanyId || sessionCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // Validate that the requesting user has access to this company
+      if (paramCompanyId && paramCompanyId !== sessionCompanyId) {
+        const userRoles = await storage.getUserCompaniesWithRoles(req.session.userId);
+        const hasAccess = userRoles.some((r: any) => r.companyId === paramCompanyId);
+        if (!hasAccess) return res.status(403).json({ message: "Access denied to this company" });
+      }
+
       const runs = await db.select().from(erpPayrollRuns)
         .where(eq(erpPayrollRuns.companyId, companyId))
         .orderBy(desc(erpPayrollRuns.createdAt));

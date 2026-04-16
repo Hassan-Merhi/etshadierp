@@ -177,10 +177,12 @@ export default function ERPRunPayroll() {
   const { data: payrollRuns = [], isLoading: runsLoading } = useQuery<PayrollRun[]>({
     queryKey: ["/api/payroll/runs", companyId],
     queryFn: async () => {
-      const res = await fetch("/api/payroll/runs", { credentials: "include" });
+      if (!companyId) return [];
+      const res = await fetch(`/api/payroll/runs?companyId=${companyId}`, { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
+    enabled: !!companyId,
   });
 
   const cashAccounts = useMemo(() => ledgerAccounts.filter((a) => a.accountType === "Cash"), [ledgerAccounts]);
