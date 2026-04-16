@@ -641,23 +641,21 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       // ── Logo centred, taller ──
       const pageW = doc.page.width; // 595
-      const logoW = 160;
-      const logoH = 70;
+      const logoW = 220;
+      const logoH = 96;
       const custHmdLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
       if (fs.existsSync(custHmdLogoPath)) {
-        try { doc.image(custHmdLogoPath, (pageW - logoW) / 2, 14, { width: logoW, height: logoH, fit: [logoW, logoH] }); } catch {}
+        try { doc.image(custHmdLogoPath, (pageW - logoW) / 2, 10, { width: logoW, height: logoH, fit: [logoW, logoH] }); } catch {}
       }
 
       // ── Dark header bar (centred title) ──
-      const hdrTop = 88;
+      const hdrTop = 114;
       doc.rect(40, hdrTop, 515, 36).fill("#1F3864");
       doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(14)
-        .text("Account Statement", 40, hdrTop + 10, { width: 515, align: "center" });
-      const printDate = fmtDate(getClientDate(req));
-      doc.font("Helvetica").fontSize(8).text(`Printed: ${printDate}`, 420, hdrTop + 24, { width: 131, align: "right" });
+        .text("Account Statement", 40, hdrTop + 11, { width: 515, align: "center" });
 
       // ── Customer info block (single line: "Customer: NAME") ──
-      const infoY = 132;
+      const infoY = 158;
       doc.fillColor("#000000").font("Helvetica").fontSize(9);
       const custLabel = "Customer: ";
       doc.text(custLabel, 40, infoY, { continued: true });
