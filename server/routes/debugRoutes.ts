@@ -7,7 +7,7 @@ import {
   inventory, stockItems, stockGroups, stockGroupArchives,
   stockTransferVouchers, stockTransferItems,
   stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems,
+  containers, containerOffloads, containerOffloadItems, containerCharges,
   bankAccounts, fixedAssets, ledgerAccounts, insertLedgerAccountSchema,
   insertStockGroupSchema, insertStockItemSchema, insertContainerSchema,
   insertStockTransferVoucherSchema, insertStockAdjustmentVoucherSchema,
@@ -1335,6 +1335,7 @@ export function registerDebugRoutes(app: Express) {
           totalBales: containerOffloads.totalBales,
           additionalCostPerBale: containerOffloads.additionalCostPerBale,
           offloadedAt: containerOffloads.offloadedAt,
+          containerChargesTotal: containers.chargesTotal,
         })
         .from(containerOffloads)
         .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
@@ -1359,7 +1360,52 @@ export function registerDebugRoutes(app: Express) {
         .where(eq(containerOffloadItems.offloadId, offloadId))
         .execute();
 
-      res.json({ ...offload, items });
+      // Fetch PO-level charges for the container (freight, fumigation, surcharge, documentCharges, discount, otherCharges)
+      const pos = await db
+        .select({
+          id: purchaseOrders.id,
+          poNumber: purchaseOrders.poNumber,
+          freight: purchaseOrders.freight,
+          surcharge: purchaseOrders.surcharge,
+          fumigation: purchaseOrders.fumigation,
+          documentCharges: purchaseOrders.documentCharges,
+          discount: purchaseOrders.discount,
+          otherCharges: purchaseOrders.otherCharges,
+        })
+        .from(purchaseOrders)
+        .where(eq(purchaseOrders.containerId, offload.containerId))
+        .execute();
+
+      // Aggregate PO charges for display
+      const poFreight = pos.reduce((s, p) => s + parseFloat(p.freight || "0"), 0);
+      const poSurcharge = pos.reduce((s, p) => s + parseFloat(p.surcharge || "0"), 0);
+      const poFumigation = pos.reduce((s, p) => s + parseFloat(p.fumigation || "0"), 0);
+      const poDocumentCharges = pos.reduce((s, p) => s + parseFloat(p.documentCharges || "0"), 0);
+      const poDiscount = pos.reduce((s, p) => s + parseFloat(p.discount || "0"), 0);
+      const poOtherCharges = pos.reduce((s, p) => s + parseFloat(p.otherCharges || "0"), 0);
+
+      // Fetch additional charges (fumigation, misc charges attached to the container)
+      const additionalCharges = await db
+        .select({
+          id: containerCharges.id,
+          chargeType: containerCharges.chargeType,
+          amount: containerCharges.amount,
+        })
+        .from(containerCharges)
+        .where(eq(containerCharges.containerId, offload.containerId))
+        .execute();
+
+      const poCharges = {
+        freight: poFreight,
+        surcharge: poSurcharge,
+        fumigation: poFumigation,
+        documentCharges: poDocumentCharges,
+        discount: poDiscount,
+        otherCharges: poOtherCharges,
+        total: parseFloat(offload.containerChargesTotal || "0"),
+      };
+
+      res.json({ ...offload, items, poCharges, additionalCharges });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
