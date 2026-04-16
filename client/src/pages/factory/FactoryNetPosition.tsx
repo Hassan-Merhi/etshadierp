@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Clock,
   CheckCircle2,
+  PackageOpen,
 } from "lucide-react";
 
 interface AccountItem {
@@ -51,8 +52,10 @@ interface NetPositionData {
   ledgerLiabilities: number;
   pendingOrders: OrderItem[];
   verifiedOrders: OrderItem[];
+  loadingOrders: OrderItem[];
   pendingTotal: number;
   verifiedTotal: number;
+  loadingTotal: number;
 }
 
 function fmt(n: number, currency = "USD"): string {
@@ -289,7 +292,10 @@ export default function FactoryNetPosition() {
   });
 
   const isPositive = (data?.netPosition ?? 0) >= 0;
-  const hasPendingVerified = (data?.pendingOrders?.length ?? 0) + (data?.verifiedOrders?.length ?? 0) > 0;
+  const hasPendingVerified =
+    (data?.pendingOrders?.length ?? 0) +
+    (data?.verifiedOrders?.length ?? 0) +
+    (data?.loadingOrders?.length ?? 0) > 0;
 
   if (error) {
     return (
@@ -412,7 +418,7 @@ export default function FactoryNetPosition() {
                 <Clock className="h-4 w-4 text-amber-500" />
                 <CardTitle className="text-base">Upcoming Receivables</CardTitle>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 {(data?.pendingTotal ?? 0) > 0 && (
                   <span className="text-xs text-muted-foreground">
                     Pending: <span className="font-mono font-semibold text-amber-500 dark:text-amber-400">{fmt(data?.pendingTotal ?? 0)}</span>
@@ -423,13 +429,20 @@ export default function FactoryNetPosition() {
                     Verified: <span className="font-mono font-semibold text-blue-500 dark:text-blue-400">{fmt(data?.verifiedTotal ?? 0)}</span>
                   </span>
                 )}
-                <span className="text-xs text-muted-foreground">
-                  Total: <span className="font-mono font-semibold text-foreground">{fmt((data?.pendingTotal ?? 0) + (data?.verifiedTotal ?? 0))}</span>
+                {(data?.loadingTotal ?? 0) > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    Loading: <span className="font-mono font-semibold text-purple-500 dark:text-purple-400">{fmt(data?.loadingTotal ?? 0)}</span>
+                  </span>
+                )}
+                <span className="text-xs text-muted-foreground border-l border-border pl-3">
+                  Total: <span className="font-mono font-semibold text-foreground">
+                    {fmt((data?.pendingTotal ?? 0) + (data?.verifiedTotal ?? 0) + (data?.loadingTotal ?? 0))}
+                  </span>
                 </span>
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Orders awaiting finalization — not yet counted in net position. Totals update live as bales are added.
+              Orders not yet finalized — not counted in net position. Loading orders update live as bales are scanned.
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -448,6 +461,14 @@ export default function FactoryNetPosition() {
               icon={<CheckCircle2 className="h-4 w-4 text-blue-500" />}
               accentClass="text-blue-500 dark:text-blue-400"
               badgeClass="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+            />
+            <OrderGroup
+              label="Loading (In Progress)"
+              orders={data?.loadingOrders ?? []}
+              total={data?.loadingTotal ?? 0}
+              icon={<PackageOpen className="h-4 w-4 text-purple-500" />}
+              accentClass="text-purple-500 dark:text-purple-400"
+              badgeClass="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20"
             />
           </CardContent>
         </Card>

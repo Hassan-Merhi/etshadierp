@@ -2408,25 +2408,38 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         },
       );
 
-      const ledgerForUs = classified.forUsAccounts;
-      const ledgerOnUs = classified.onUsAccounts;
-      const ledgerForUsTotal = classified.forUsTotal;
-      const ledgerOnUsTotal = classified.onUsTotal;
-
-      // ── 2c. Customer DR/CR balances (customers without a linked ledger account) ──
-      // Customers that have a ledgerAccountId already flow through the ledger
-      // classification above — skip them here to avoid double-counting.
+      // ── 2c. Customer balances — ALL customers, authoritative formula ─────────
+      // Customer ledger accounts (linked via customers.ledgerAccountId) capture only
+      // a subset of the true customer balance: CHARGE-* freight/clearance vouchers.
+      // The bulk of the balance lives in customer_orders (FINALIZED grandTotal).
+      // To get the correct figure we:
+      //   a) exclude customer-owned ledger accounts from the ledger classification, and
+      //   b) compute every customer's balance via the same formula as the Customers page.
       const allCustomersForNP = await db.select().from(customers)
         .where(and(eq(customers.companyId, companyId), isNull(customers.deletedAt)));
 
-      const noLedgerCustomers = (allCustomersForNP as any[]).filter((c: any) => !c.ledgerAccountId);
+      // Build a set of ledger account IDs owned by customers so we can strip them
+      // from the ledger classification output (prevents double-counting).
+      const customerLedgerIds = new Set<number>(
+        (allCustomersForNP as any[])
+          .filter((c: any) => c.ledgerAccountId)
+          .map((c: any) => c.ledgerAccountId as number),
+      );
+
+      // Strip customer-linked accounts from the classifier output.
+      const ledgerForUs = classified.forUsAccounts.filter((a: any) => !customerLedgerIds.has(a.id));
+      const ledgerOnUs = classified.onUsAccounts.filter((a: any) => !customerLedgerIds.has(a.id));
+      const ledgerForUsTotal = round2(ledgerForUs.reduce((s: number, a: any) => s + a.value, 0));
+      const ledgerOnUsTotal = round2(ledgerOnUs.reduce((s: number, a: any) => s + a.value, 0));
 
       const customerItems: { name: string; balanceUsd: number }[] = [];
 
-      if (noLedgerCustomers.length > 0) {
-        const cIds = noLedgerCustomers.map((c: any) => c.id);
+      if ((allCustomersForNP as any[]).length > 0) {
+        const cIds = (allCustomersForNP as any[]).map((c: any) => c.id);
+        const custLedgerIds = [...customerLedgerIds];
 
-        // Sales totals from finalized orders
+        // Sales totals from FINALIZED orders (these include CHARGE-* freight amounts
+        // so CHARGE-* vouchers must NOT be added separately — they are already in grandTotal).
         const cSalesRows = await db.select({
           customerId: customerOrders.customerId,
           total: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric)), 0)`,
@@ -2441,7 +2454,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
 
         const cSalesMap = new Map(cSalesRows.map((r: any) => [r.customerId, parseFloat(r.total || "0")]));
 
-        // Non-invoice balance adjustments
+        // Non-invoice balance adjustments (manual Dr/Cr adjustments, not order-based).
         const cNonInvRows = await db.select({
           customerId: customerBalances.customerId,
           net: sql<string>`COALESCE(SUM(CAST(${customerBalances.debitAmount} AS numeric) - CAST(${customerBalances.creditAmount} AS numeric)), 0)`,
@@ -2456,7 +2469,26 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
 
         const cNonInvMap = new Map(cNonInvRows.map((r: any) => [r.customerId, parseFloat(r.net || "0")]));
 
-        // Voucher entries directly linked via customerId (no ledgerAccountId)
+        // Voucher entries via ledgerAccountId — EXCLUDE CHARGE-* (already in salesTotal).
+        const cLedgerVoucherRows = custLedgerIds.length > 0
+          ? await db.select({
+              ledgerAccountId: voucherEntries.ledgerAccountId,
+              net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
+            })
+              .from(voucherEntries)
+              .innerJoin(vouchers, and(
+                eq(voucherEntries.voucherId, vouchers.id),
+                eq(vouchers.companyId, companyId),
+                sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
+              ))
+              .where(inArray(voucherEntries.ledgerAccountId as any, custLedgerIds))
+              .groupBy(voucherEntries.ledgerAccountId)
+          : [];
+        const cLedgerVoucherMap = new Map(
+          (cLedgerVoucherRows as any[]).map((r: any) => [r.ledgerAccountId, parseFloat(r.net || "0")]),
+        );
+
+        // Voucher entries directly linked via customerId (no ledgerAccountId) — EXCLUDE CHARGE-*.
         const cVoucherRows = await db.select({
           customerId: voucherEntries.customerId,
           net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
@@ -2473,12 +2505,14 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           ))
           .groupBy(voucherEntries.customerId);
 
-        const cVoucherMap = new Map(cVoucherRows.map((r: any) => [r.customerId, parseFloat(r.net || "0")]));
+        const cVoucherMap = new Map((cVoucherRows as any[]).map((r: any) => [r.customerId, parseFloat(r.net || "0")]));
 
-        for (const c of noLedgerCustomers) {
+        for (const c of allCustomersForNP as any[]) {
           const salesTotal = cSalesMap.get(c.id) ?? 0;
           const nonInvNet = cNonInvMap.get(c.id) ?? 0;
-          const voucherNet = cVoucherMap.get(c.id) ?? 0;
+          const ledgerVoucherNet = c.ledgerAccountId ? (cLedgerVoucherMap.get(c.ledgerAccountId) ?? 0) : 0;
+          const directVoucherNet = cVoucherMap.get(c.id) ?? 0;
+          const voucherNet = ledgerVoucherNet + directVoucherNet;
           const opening = parseFloat(c.openingBalance || "0");
           const openingSide = c.openingBalanceSide || "Dr";
           const totalBalance = (openingSide === "Dr" ? opening : -opening) + salesTotal + nonInvNet + voucherNet;
@@ -2636,7 +2670,9 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         ...(totalCustomerCr > 0 ? [{ name: "Customer", value: totalCustomerCr }] : []),
       ];
 
-      // ── 5. Pending & Verified orders (upcoming receivables) ──────────────────
+      // ── 5. Pending, Verified & Loading orders (upcoming receivables) ──────────
+      // LOADING orders are actively being packed — their grandTotal updates live
+      // as bales are scanned, which is exactly what the user wants to see here.
       const pendingVerifiedRows = await db
         .select({
           id: customerOrders.id,
@@ -2651,32 +2687,25 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         .innerJoin(customers, eq(customerOrders.customerId, customers.id))
         .where(and(
           eq(customerOrders.companyId, companyId),
-          inArray(customerOrders.status, ["PENDING", "VERIFIED"]),
+          inArray(customerOrders.status, ["PENDING", "VERIFIED", "LOADING"]),
         ))
         .orderBy(desc(customerOrders.orderDate));
 
-      const pendingOrders = (pendingVerifiedRows as any[])
-        .filter(r => r.status === "PENDING")
-        .map(r => ({
-          id: r.id,
-          customerName: r.customerName || `Customer #${r.customerId}`,
-          orderDate: r.orderDate,
-          grandTotal: round2(parseFloat(r.grandTotal || "0")),
-          totalQtyBales: r.totalQtyBales ?? 0,
-        }));
+      const mapOrder = (r: any) => ({
+        id: r.id,
+        customerName: r.customerName || `Customer #${r.customerId}`,
+        orderDate: r.orderDate,
+        grandTotal: round2(parseFloat(r.grandTotal || "0")),
+        totalQtyBales: r.totalQtyBales ?? 0,
+      });
 
-      const verifiedOrders = (pendingVerifiedRows as any[])
-        .filter(r => r.status === "VERIFIED")
-        .map(r => ({
-          id: r.id,
-          customerName: r.customerName || `Customer #${r.customerId}`,
-          orderDate: r.orderDate,
-          grandTotal: round2(parseFloat(r.grandTotal || "0")),
-          totalQtyBales: r.totalQtyBales ?? 0,
-        }));
+      const pendingOrders  = (pendingVerifiedRows as any[]).filter(r => r.status === "PENDING").map(mapOrder);
+      const verifiedOrders = (pendingVerifiedRows as any[]).filter(r => r.status === "VERIFIED").map(mapOrder);
+      const loadingOrders  = (pendingVerifiedRows as any[]).filter(r => r.status === "LOADING").map(mapOrder);
 
-      const pendingTotal = round2(pendingOrders.reduce((s, o) => s + o.grandTotal, 0));
+      const pendingTotal  = round2(pendingOrders.reduce((s, o) => s + o.grandTotal, 0));
       const verifiedTotal = round2(verifiedOrders.reduce((s, o) => s + o.grandTotal, 0));
+      const loadingTotal  = round2(loadingOrders.reduce((s, o) => s + o.grandTotal, 0));
 
       res.json({
         forUsTotal,
@@ -2691,8 +2720,10 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         ledgerAssets: cleanLedgerForUsTotal,
         pendingOrders,
         verifiedOrders,
+        loadingOrders,
         pendingTotal,
         verifiedTotal,
+        loadingTotal,
         ledgerLiabilities: round2(ledgerOnUsTotal),
       });
     } catch (error: any) {
