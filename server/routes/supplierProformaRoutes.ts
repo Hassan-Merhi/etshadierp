@@ -11,7 +11,26 @@ import {
   purchaseOrders,
   poLineItems,
   stockItems,
+  stockItemCodeAliases,
 } from "@shared/schema";
+
+async function buildAliasMap(companyId: number): Promise<Map<string, string>> {
+  const aliases = await db
+    .select({ aliasCode: stockItemCodeAliases.aliasCode, primaryCode: stockItems.code })
+    .from(stockItemCodeAliases)
+    .innerJoin(stockItems, eq(stockItemCodeAliases.stockItemId, stockItems.id))
+    .where(eq(stockItemCodeAliases.companyId, companyId));
+  const map = new Map<string, string>();
+  for (const a of aliases) {
+    map.set(a.aliasCode.toLowerCase(), a.primaryCode);
+  }
+  return map;
+}
+
+function resolveBarcode(bc: string, aliasMap: Map<string, string>): string {
+  const lower = bc.toLowerCase();
+  return aliasMap.get(lower) ?? bc;
+}
 
 export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
 
@@ -383,9 +402,11 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       const loadedItems = await db.select().from(supplierContainerLoadedItems)
         .where(eq(supplierContainerLoadedItems.containerId, containerId));
 
+      const aliasMap = await buildAliasMap(companyId);
+
       const proformaByBarcode = new Map<string, any>();
       for (const line of proformaLines) {
-        const bc = (line.barcode || "").trim();
+        const bc = resolveBarcode((line.barcode || "").trim(), aliasMap);
         if (proformaByBarcode.has(bc)) {
           const existing = proformaByBarcode.get(bc);
           existing.qty += line.qty;
@@ -402,7 +423,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
 
       const loadedByBarcode = new Map<string, any>();
       for (const item of loadedItems) {
-        const bc = (item.barcode || "").trim();
+        const bc = resolveBarcode((item.barcode || "").trim(), aliasMap);
         if (loadedByBarcode.has(bc)) {
           const existing = loadedByBarcode.get(bc);
           existing.qty += item.qty;
@@ -508,15 +529,17 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       const loadedItemsList = await db.select().from(supplierContainerLoadedItems)
         .where(eq(supplierContainerLoadedItems.containerId, containerId));
 
+      const aliasMap = await buildAliasMap(companyId);
+
       const proformaByBarcode = new Map<string, any>();
       for (const line of proformaLinesList) {
-        const bc = (line.barcode || "").trim();
+        const bc = resolveBarcode((line.barcode || "").trim(), aliasMap);
         if (proformaByBarcode.has(bc)) { proformaByBarcode.get(bc).qty += line.qty; }
         else { proformaByBarcode.set(bc, { ...line, qty: line.qty, weightPerBale: parseFloat(line.weightPerBale || "0"), pricePerBale: parseFloat(line.pricePerBale || "0") }); }
       }
       const loadedByBarcode = new Map<string, any>();
       for (const item of loadedItemsList) {
-        const bc = (item.barcode || "").trim();
+        const bc = resolveBarcode((item.barcode || "").trim(), aliasMap);
         if (loadedByBarcode.has(bc)) { loadedByBarcode.get(bc).qty += item.qty; }
         else { loadedByBarcode.set(bc, { ...item, qty: item.qty, weightPerBale: parseFloat(item.weightPerBale || "0"), pricePerBale: parseFloat(item.pricePerBale || "0") }); }
       }
@@ -811,15 +834,17 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       const loadedItemsList = await db.select().from(supplierContainerLoadedItems)
         .where(eq(supplierContainerLoadedItems.containerId, containerId));
 
+      const aliasMap = await buildAliasMap(companyId);
+
       const proformaByBarcode = new Map<string, any>();
       for (const line of proformaLinesList) {
-        const bc = (line.barcode || "").trim();
+        const bc = resolveBarcode((line.barcode || "").trim(), aliasMap);
         if (proformaByBarcode.has(bc)) { proformaByBarcode.get(bc).qty += line.qty; }
         else { proformaByBarcode.set(bc, { ...line, qty: line.qty, weightPerBale: parseFloat(line.weightPerBale || "0"), pricePerBale: parseFloat(line.pricePerBale || "0") }); }
       }
       const loadedByBarcode = new Map<string, any>();
       for (const item of loadedItemsList) {
-        const bc = (item.barcode || "").trim();
+        const bc = resolveBarcode((item.barcode || "").trim(), aliasMap);
         if (loadedByBarcode.has(bc)) { loadedByBarcode.get(bc).qty += item.qty; }
         else { loadedByBarcode.set(bc, { ...item, qty: item.qty, weightPerBale: parseFloat(item.weightPerBale || "0"), pricePerBale: parseFloat(item.pricePerBale || "0") }); }
       }
