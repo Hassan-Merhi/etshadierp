@@ -286,6 +286,7 @@ export function registerGlobalTransactionRoutes(
           totalAmount:   vouchers.totalAmount,
           currency:      vouchers.currency,
           optional:      vouchers.optional,
+          description:   vouchers.description,
         })
         .from(vouchers)
         .innerJoin(companies, eq(companies.id, vouchers.companyId))

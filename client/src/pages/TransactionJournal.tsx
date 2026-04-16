@@ -16,8 +16,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
-} from "@/components/ui/sheet";
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -152,9 +152,10 @@ export default function TransactionJournal() {
   const [page,           setPage]           = useState(1);
   const LIMIT = 50;
 
-  // ── Detail drawer ──
+  // ── Detail dialog ──
   const [detailId, setDetailId] = useState<number | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [entryBalances, setEntryBalances] = useState<Record<number, string>>({});
 
   // ── Build query string (memoized to avoid spurious refetches) ──
   const queryParamsStr = useMemo(() => {
@@ -202,9 +203,31 @@ export default function TransactionJournal() {
   });
 
   const openDetail = (id: number) => {
+    setEntryBalances({});
     setDetailId(id);
     setDrawerOpen(true);
   };
+
+  // Fetch per-entry account balances when detail opens
+  useEffect(() => {
+    if (!drawerOpen || !detailData) return;
+    const entries = detailData.entries.filter((e) => e.ledgerAccountId);
+    if (entries.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const results: Record<number, string> = {};
+      await Promise.all(entries.map(async (e) => {
+        try {
+          const res = await fetch(`/api/accounts/ledger/${e.ledgerAccountId}/balance`, { credentials: "include" });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (!cancelled) results[e.id] = data.balance?.toString() ?? "0";
+        } catch { /* ignore */ }
+      }));
+      if (!cancelled) setEntryBalances(results);
+    })();
+    return () => { cancelled = true; };
+  }, [drawerOpen, detailData]);
 
   const handleSearch = useCallback(() => {
     setSearch(searchInput);
@@ -642,126 +665,124 @@ export default function TransactionJournal() {
         </CardContent>
       </Card>
 
-      {/* ── Voucher detail drawer ── */}
-      <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto flex flex-col gap-4">
+      {/* ── Voucher detail dialog ── */}
+      <Dialog open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Voucher Details</DialogTitle>
+            <DialogDescription>View voucher information</DialogDescription>
+          </DialogHeader>
+
           {detailLoading ? (
-            <div className="flex flex-col gap-3 mt-4">
+            <div className="flex flex-col gap-3">
               {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}
             </div>
           ) : detailData ? (
-            <>
-              <SheetHeader>
-                <SheetTitle className="flex items-center gap-2">
-                  <Receipt className="h-5 w-5 text-muted-foreground" />
-                  {detailData.voucher.voucherNumber}
-                </SheetTitle>
-                <SheetDescription>
-                  {detailData.voucher.companyName} · {fmtDate(detailData.voucher.voucherDate)}
-                </SheetDescription>
-              </SheetHeader>
-
-              {/* Meta chips */}
-              <div className="flex flex-wrap gap-2 items-center">
-                <VoucherTypeBadge type={detailData.voucher.voucherType} />
-                <Badge variant="outline" className="font-mono">{detailData.voucher.currency}</Badge>
-                {detailData.voucher.optional && (
-                  <Badge variant="outline">Draft / Optional</Badge>
-                )}
-                <span className={`text-xs font-medium px-2 py-0.5 rounded ${companyColor(detailData.voucher.companyId)}`}>
-                  {detailData.voucher.companyName}
-                </span>
-              </div>
-
-              {/* Amount */}
-              <div className="rounded-md border px-4 py-3 bg-muted/30">
-                <div className="text-xs text-muted-foreground mb-1">Total Amount</div>
-                <div className="text-2xl font-semibold font-mono">
-                  {detailData.voucher.currency} {parseFloat(detailData.voucher.totalAmount || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            <div className="flex flex-col gap-4">
+              {/* Date + Type row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Date</p>
+                  <p className="text-sm font-semibold">{fmtDate(detailData.voucher.voucherDate)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Type</p>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <VoucherTypeBadge type={detailData.voucher.voucherType} />
+                    {detailData.voucher.optional && (
+                      <Badge variant="outline" className="text-xs">Optional</Badge>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Entries table */}
+              {/* Description */}
+              {(detailData.voucher.description || detailData.voucher.narration) && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Description</p>
+                  <p className="text-sm">{detailData.voucher.description || detailData.voucher.narration}</p>
+                </div>
+              )}
+
+              {/* Entries */}
               <div>
-                <div className="text-sm font-medium mb-2">Journal Entries</div>
+                <p className="text-sm font-medium mb-2">Entries</p>
                 <div className="rounded-md border overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Account</TableHead>
-                        <TableHead>Narration</TableHead>
-                        <TableHead className="text-right w-24">Debit</TableHead>
-                        <TableHead className="text-right w-24">Credit</TableHead>
+                        <TableHead className="text-right w-32">Amount</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {detailData.entries.map((e) => (
-                        <TableRow key={e.id} data-testid={`row-entry-${e.id}`}>
-                          <TableCell className="text-sm font-medium">
-                            {e.accountName || `Account #${e.ledgerAccountId}`}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">
-                            {e.narration || "—"}
-                          </TableCell>
-                          <TableCell className="text-right text-sm font-mono">
-                            {formatAmount(e.debitAmount)}
-                          </TableCell>
-                          <TableCell className="text-right text-sm font-mono">
-                            {formatAmount(e.creditAmount)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {detailData.entries.map((e) => {
+                        const amount = Math.max(
+                          parseFloat(e.debitAmount  || "0"),
+                          parseFloat(e.creditAmount || "0"),
+                        );
+                        const bal = entryBalances[e.id];
+                        return (
+                          <TableRow key={e.id} data-testid={`row-entry-${e.id}`}>
+                            <TableCell className="py-2">
+                              <p className="text-sm font-medium">
+                                {e.accountName || `Account #${e.ledgerAccountId}`}
+                              </p>
+                              {bal !== undefined && (
+                                <p className="text-xs text-muted-foreground">
+                                  Balance: {detailData.voucher.currency} {parseFloat(bal).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                </p>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right text-sm font-mono py-2">
+                              {detailData.voucher.currency} {amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {/* Total row */}
+                      {detailData.entries.length > 0 && (() => {
+                        const total = detailData.entries.reduce((s, e) =>
+                          s + Math.max(parseFloat(e.debitAmount || "0"), parseFloat(e.creditAmount || "0")), 0);
+                        return (
+                          <TableRow className="border-t font-semibold bg-muted/20">
+                            <TableCell className="py-2 text-sm">Total</TableCell>
+                            <TableCell className="text-right text-sm font-mono py-2">
+                              {detailData.voucher.currency} {total.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })()}
                     </TableBody>
                   </Table>
                 </div>
               </div>
 
-              {/* Totals row */}
-              {detailData.entries.length > 0 && (() => {
-                const totalDr = detailData.entries.reduce((s, e) => s + parseFloat(e.debitAmount  || "0"), 0);
-                const totalCr = detailData.entries.reduce((s, e) => s + parseFloat(e.creditAmount || "0"), 0);
-                return (
-                  <div className="flex gap-6 rounded-md border px-4 py-2 bg-muted/20 text-sm">
-                    <span className="text-muted-foreground">Total Debit:</span>
-                    <span className="font-mono font-medium">{totalDr.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                    <span className="text-muted-foreground ml-4">Total Credit:</span>
-                    <span className="font-mono font-medium">{totalCr.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                  </div>
-                );
-              })()}
-
-              {/* Actions */}
-              <div className="flex flex-wrap gap-2 pt-1">
+              {/* Footer actions */}
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" onClick={() => setDrawerOpen(false)} data-testid="button-detail-close">
+                  Close
+                </Button>
                 <Button
                   variant="default"
-                  onClick={() => openInCompany(
-                    detailData.voucher.companyId,
-                    `/voucher-detail/${detailData.voucher.id}`
-                  )}
-                  data-testid="button-open-in-company"
+                  onClick={() => {
+                    setDrawerOpen(false);
+                    openInCompany(detailData.voucher.companyId, `/daybook?voucherId=${detailData.voucher.id}`);
+                  }}
+                  data-testid="button-detail-edit"
                 >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Open in {detailData.voucher.companyName}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => openInCompany(
-                    detailData.voucher.companyId,
-                    `/daybook`
-                  )}
-                  data-testid="button-open-daybook"
-                >
-                  Open Daybook
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Edit
                 </Button>
               </div>
-            </>
+            </div>
           ) : (
             <div className="text-center text-muted-foreground py-8">
               Could not load voucher details.
             </div>
           )}
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
