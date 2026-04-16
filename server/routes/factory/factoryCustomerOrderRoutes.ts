@@ -1874,6 +1874,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           otherChargesTotal: customerOrders.otherChargesTotal,
           grandTotal: customerOrders.grandTotal,
           totalQtyBales: customerOrders.totalQtyBales,
+          containerNumber: customerOrders.containerNumber,
           customerName: customers.legalName,
           customerCode: customers.code,
         })
@@ -1883,69 +1884,221 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       if (!order) return res.status(404).json({ message: "Order not found" });
 
-      const lines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
-      const charges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+      const rawLines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
 
-      // Build article-code → product name map from factoryBaleProducts so the export
-      // always shows the canonical product name regardless of what was stored in baleName
-      const articleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
+      // Canonical product names from factoryBaleProducts
+      const articleCodes = [...new Set(rawLines.map((l: any) => l.articleCode).filter(Boolean))];
       const productNameMap = new Map<string, string>();
+      const wtPerBaleMap = new Map<string, number>();
       if (articleCodes.length > 0) {
         const products = await db
-          .select({ articleCode: factoryBaleProducts.articleCode, name: factoryBaleProducts.name })
+          .select({ articleCode: factoryBaleProducts.articleCode, name: factoryBaleProducts.name, weightPerBaleKg: factoryBaleProducts.weightPerBaleKg })
           .from(factoryBaleProducts)
-          .where(and(
-            eq(factoryBaleProducts.companyId, companyId),
-            inArray(factoryBaleProducts.articleCode, articleCodes)
-          ));
+          .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes)));
         for (const p of products) {
-          if (p.articleCode) productNameMap.set(p.articleCode, p.name);
+          if (p.articleCode) {
+            productNameMap.set(p.articleCode, p.name);
+            wtPerBaleMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0"));
+          }
         }
       }
 
-      const sortedLines = lines.sort((a: any, b: any) => {
-        const nameA = productNameMap.get(a.articleCode) || a.baleName || "";
-        const nameB = productNameMap.get(b.articleCode) || b.baleName || "";
-        return nameA.localeCompare(nameB);
-      });
+      const lines = rawLines
+        .map((l: any) => ({
+          articleCode: l.articleCode || "",
+          productName: productNameMap.get(l.articleCode) || l.baleName || l.articleCode || "",
+          qty: parseInt(l.qty || "0"),
+          wtPerBale: wtPerBaleMap.get(l.articleCode) || parseFloat(l.weightPerBale || "0"),
+          totalWt: parseFloat(l.totalWeight || "0"),
+          pricePerBale: parseFloat(l.pricePerBale || "0"),
+          total: parseFloat(l.totalPrice || "0"),
+        }))
+        .sort((a: any, b: any) => a.articleCode.localeCompare(b.articleCode));
 
-      const csvFmtNum = (val: any): string => {
-        const n = parseFloat(val);
-        if (isNaN(n)) return val ?? "";
-        return n % 1 === 0 ? n.toFixed(0) : n.toFixed(2).replace(/\.?0+$/, "");
+      // Currency
+      const baseCurrency = (company as any)?.baseCurrency || "USD";
+      const currencySymbolMap: Record<string, string> = { USD: "$", GBP: "£", EUR: "€", CFA: "CFA", XOF: "CFA", XAF: "CFA" };
+      const currSym = currencySymbolMap[baseCurrency.toUpperCase()] ?? baseCurrency;
+      const fmtMoney = (n: number) => `${currSym}${n % 1 === 0 ? n.toLocaleString() : n.toFixed(2)}`;
+      const fmtNum = (n: number) => n % 1 === 0 ? n.toLocaleString() : n.toFixed(2);
+
+      const ExcelJS = (await import("exceljs")).default;
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Commercial Invoice");
+      const COL = 8;
+
+      sheet.columns = [
+        { key: "c1", width: 6 },
+        { key: "c2", width: 16 },
+        { key: "c3", width: 30 },
+        { key: "c4", width: 8 },
+        { key: "c5", width: 11 },
+        { key: "c6", width: 13 },
+        { key: "c7", width: 13 },
+        { key: "c8", width: 14 },
+      ];
+
+      const DARK_BLUE = "FF1F3864";
+      const LIGHT_GRAY = "FFF5F5F5";
+      const WHITE = "FFFFFFFF";
+
+      const merge = (r: number, c1: number, c2: number) => sheet.mergeCells(r, c1, r, c2);
+      const setFill = (cell: any, argb: string) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } }; };
+      const setBorder = (row: any) => {
+        row.eachCell((cell: any) => {
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFDDDDDD" } },
+            bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
+            left: { style: "thin", color: { argb: "FFDDDDDD" } },
+            right: { style: "thin", color: { argb: "FFDDDDDD" } },
+          };
+        });
       };
-      const csvFmtMoney = (val: any): string => `$${csvFmtNum(val)}`;
 
-      let csv = `Company: ${company?.name || ""}\n`;
-      csv += `Invoice: ${order.invoiceNumber || "DRAFT"}\n`;
-      csv += `Customer: ${order.customerName} (${order.customerCode})\n`;
-      csv += `Date: ${order.orderDate}\n\n`;
-      csv += `#,Article Code,Product Name,Qty,Weight/Bale,Total Weight,Price/Bale,Total Price\n`;
+      // ── Logo row ──
+      const logoRow = sheet.addRow([]);
+      logoRow.height = 80;
+      try {
+        const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+        if (fs.existsSync(logoPath)) {
+          const logoBuf = fs.readFileSync(logoPath);
+          const logoId = workbook.addImage({ buffer: logoBuf as Buffer, extension: "jpeg" });
+          sheet.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 120, height: 80 } });
+        }
+      } catch {}
 
-      sortedLines.forEach((line: any, idx: number) => {
-        const productName = productNameMap.get(line.articleCode) || line.baleName || "";
-        csv += `${idx + 1},${line.articleCode},${productName.replace(/,/g, " ")},${csvFmtNum(line.qty)},${csvFmtNum(line.weightPerBale)},${csvFmtNum(line.totalWeight)},${csvFmtMoney(line.pricePerBale)},${csvFmtMoney(line.totalPrice)}\n`;
+      // ── Company name ──
+      const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
+      r1.height = 22;
+      r1.getCell(1).font = { bold: true, size: 14, color: { argb: DARK_BLUE } };
+      r1.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+      merge(r1.number, 1, COL);
+
+      // ── "Commercial Invoice" title ──
+      const r2 = sheet.addRow(["Commercial Invoice"]);
+      r2.height = 20;
+      r2.getCell(1).font = { bold: true, size: 13, color: { argb: DARK_BLUE } };
+      r2.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+      merge(r2.number, 1, COL);
+      sheet.addRow([]);
+
+      // ── Invoice details ──
+      const invoiceNum = order.invoiceNumber || `INV-${String(orderId).padStart(6, "0")}`;
+      const orderDateFmt = order.orderDate
+        ? new Date(order.orderDate).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" })
+        : "-";
+
+      const details = [
+        ["Invoice No.", invoiceNum],
+        ["Customer", `${order.customerName || "-"}`],
+        ["Date", orderDateFmt],
+        ["Container", (order as any).containerNumber || "-"],
+      ];
+      for (const [label, value] of details) {
+        const dr = sheet.addRow(["", "", "", "", "", label, "", value]);
+        dr.getCell(6).font = { bold: true, size: 10 };
+        dr.getCell(6).alignment = { horizontal: "right" };
+        dr.getCell(8).font = { size: 10 };
+        dr.getCell(8).alignment = { horizontal: "left" };
+        merge(dr.number, 6, 7);
+      }
+      sheet.addRow([]);
+
+      // ── Table header ──
+      const hdrRow = sheet.addRow(["#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt", "Price/Bale", "Total"]);
+      hdrRow.height = 18;
+      hdrRow.eachCell((cell: any) => {
+        cell.font = { bold: true, color: { argb: WHITE }, size: 10 };
+        setFill(cell, DARK_BLUE);
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.border = { top: { style: "thin", color: { argb: WHITE } }, bottom: { style: "thin", color: { argb: WHITE } }, left: { style: "thin", color: { argb: WHITE } }, right: { style: "thin", color: { argb: WHITE } } };
       });
 
-      csv += `\nCharges\n`;
-      csv += `Name,Type,Amount\n`;
-      for (const charge of charges) {
-        csv += `${(charge.name || "").replace(/,/g, " ")},${charge.chargeType},${csvFmtMoney(charge.amount)}\n`;
-      }
+      // ── Data rows ──
+      let totalQty = 0, totalWtAll = 0, totalAll = 0;
+      lines.forEach((g: any, idx: number) => {
+        totalQty += g.qty;
+        totalWtAll += g.totalWt;
+        totalAll += g.total;
+        const dr = sheet.addRow([
+          idx + 1,
+          g.articleCode,
+          g.productName,
+          g.qty,
+          fmtNum(g.wtPerBale),
+          fmtNum(g.totalWt),
+          fmtMoney(g.pricePerBale),
+          fmtMoney(g.total),
+        ]);
+        dr.height = 15;
+        if (idx % 2 === 1) {
+          dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
+        }
+        dr.getCell(1).alignment = { horizontal: "center" };
+        dr.getCell(4).alignment = { horizontal: "right" };
+        dr.getCell(5).alignment = { horizontal: "right" };
+        dr.getCell(6).alignment = { horizontal: "right" };
+        dr.getCell(7).alignment = { horizontal: "right" };
+        dr.getCell(8).alignment = { horizontal: "right" };
+        setBorder(dr);
+      });
 
-      csv += `\nSummary\n`;
-      csv += `Subtotal Bales,${csvFmtMoney(order.subtotalBales)}\n`;
-      csv += `Freight,${csvFmtMoney(order.freightAmount)}\n`;
-      csv += `Other Charges,${csvFmtMoney(order.otherChargesTotal)}\n`;
-      csv += `Grand Total,${csvFmtMoney(order.grandTotal)}\n`;
-      csv += `Total Qty Bales,${csvFmtNum(order.totalQtyBales)}\n`;
+      // ── Totals row ──
+      const totRow = sheet.addRow(["", "", "Totals", totalQty, "", fmtNum(totalWtAll), "", fmtMoney(totalAll)]);
+      totRow.height = 16;
+      totRow.eachCell((cell: any) => {
+        cell.font = { bold: true, size: 10, color: { argb: WHITE } };
+        setFill(cell, DARK_BLUE);
+        cell.alignment = { horizontal: "right" };
+      });
+      totRow.getCell(3).alignment = { horizontal: "center" };
 
-      const filename = `invoice_${order.invoiceNumber || orderId}.csv`;
-      res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-      res.send(csv);
+      sheet.addRow([]);
+
+      // ── Financial summary block ──
+      const subtotal = parseFloat(order.subtotalBales || "0");
+      const freight = parseFloat(order.freightAmount || "0");
+      const clearance = parseFloat(order.otherChargesTotal || "0");
+      const grandTotal = parseFloat(order.grandTotal || "0");
+
+      const summaryData: [string, number][] = [
+        ["Subtotal (Bales)", subtotal],
+        ["Freight", freight],
+        ["Clearance", clearance],
+        ["Grand Total", grandTotal],
+      ];
+
+      const sumHdr = sheet.addRow(["", "", "", "", "", "", "Name", "Amount"]);
+      sumHdr.getCell(7).font = { bold: true, color: { argb: WHITE }, size: 10 };
+      sumHdr.getCell(8).font = { bold: true, color: { argb: WHITE }, size: 10 };
+      setFill(sumHdr.getCell(7), DARK_BLUE);
+      setFill(sumHdr.getCell(8), DARK_BLUE);
+      sumHdr.getCell(7).alignment = { horizontal: "center" };
+      sumHdr.getCell(8).alignment = { horizontal: "center" };
+
+      summaryData.forEach(([label, amount], idx) => {
+        const sr = sheet.addRow(["", "", "", "", "", "", label, fmtMoney(amount)]);
+        const isGrandTotal = idx === summaryData.length - 1;
+        const bg = isGrandTotal ? DARK_BLUE : (idx % 2 === 0 ? WHITE : LIGHT_GRAY);
+        const fg = isGrandTotal ? WHITE : "FF000000";
+        setFill(sr.getCell(7), bg);
+        setFill(sr.getCell(8), bg);
+        sr.getCell(7).font = { bold: isGrandTotal, size: 10, color: { argb: fg } };
+        sr.getCell(8).font = { bold: isGrandTotal, size: 10, color: { argb: fg } };
+        sr.getCell(7).alignment = { horizontal: "left" };
+        sr.getCell(8).alignment = { horizontal: "right" };
+        sr.getCell(7).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
+        sr.getCell(8).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
+      });
+
+      const dateStr = getClientDate(req);
+      const fileName = `invoice_${invoiceNum.replace(/[^a-zA-Z0-9]/g, "_")}_${dateStr}.xlsx`;
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      await workbook.xlsx.write(res);
+      res.end();
     } catch (error: any) {
-      console.error("Error exporting order to CSV:", error);
+      console.error("Error exporting order to Excel:", error);
       res.status(500).json({ message: error.message });
     }
   });
