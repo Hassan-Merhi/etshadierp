@@ -1336,6 +1336,8 @@ export function registerDebugRoutes(app: Express) {
           additionalCostPerBale: containerOffloads.additionalCostPerBale,
           offloadedAt: containerOffloads.offloadedAt,
           containerChargesTotal: containers.chargesTotal,
+          optional: containerOffloads.optional,
+          companyId: containers.companyId,
         })
         .from(containerOffloads)
         .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
@@ -1454,6 +1456,100 @@ export function registerDebugRoutes(app: Express) {
 
       res.json({ ...offload, items, poCharges, additionalCharges, liveCharges });
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Toggle offload optional status — suspends/unsuspends inventory + vouchers without reversing permanently
+  app.post("/api/offloads/:id/toggle-optional", requireAuth, async (req, res) => {
+    try {
+      const offloadId = parseInt(req.params.id);
+      if (isNaN(offloadId)) return res.status(400).json({ message: "Invalid offload ID" });
+
+      const [offload] = await db
+        .select({
+          id: containerOffloads.id,
+          containerId: containerOffloads.containerId,
+          locationId: containerOffloads.locationId,
+          optional: containerOffloads.optional,
+          companyId: containers.companyId,
+          containerNumber: containers.containerNumber,
+        })
+        .from(containerOffloads)
+        .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
+        .where(eq(containerOffloads.id, offloadId))
+        .execute();
+
+      if (!offload) return res.status(404).json({ message: "Offload not found" });
+
+      const makeOptional = !offload.optional; // toggle
+      const cn = offload.containerNumber;
+
+      // Fetch the exact offload items (quantities + values as-offloaded)
+      const offloadItems = await db
+        .select()
+        .from(containerOffloadItems)
+        .where(eq(containerOffloadItems.offloadId, offloadId))
+        .execute();
+
+      if (offloadItems.length === 0) {
+        return res.status(400).json({ message: "No offload items found — cannot toggle optional status" });
+      }
+
+      await db.transaction(async (tx) => {
+        // 1. Toggle inventory
+        for (const item of offloadItems) {
+          const qty   = parseFloat(item.quantity);
+          const value = parseFloat(item.totalValue);
+          const rate  = parseFloat(item.rate);
+
+          if (makeOptional) {
+            // Suspending: remove the stock that was added at offload
+            await reverseInventoryByExactValue(tx, offload.locationId, item.stockItemId, qty, value, offload.companyId);
+          } else {
+            // Unsuspending: add the stock back at the original rate
+            await adjustInventory(tx, offload.locationId, item.stockItemId, qty, offload.companyId, rate);
+          }
+        }
+
+        // 2. Toggle all offload-related vouchers (DUTY-, OFFICE-, TRANS-, XFER-, CHG-)
+        const offloadVouchers = await tx
+          .select({ id: vouchers.id })
+          .from(vouchers)
+          .where(
+            or(
+              like(vouchers.voucherNumber, `DUTY-${cn}-%`),
+              like(vouchers.voucherNumber, `OFFICE-${cn}-%`),
+              like(vouchers.voucherNumber, `TRANS-${cn}-%`),
+              like(vouchers.voucherNumber, `XFER-${cn}-%`),
+              like(vouchers.voucherNumber, `CHG-${cn}-%`),
+            )
+          )
+          .execute();
+
+        if (offloadVouchers.length > 0) {
+          const voucherIds = offloadVouchers.map(v => v.id);
+          await tx
+            .update(vouchers)
+            .set({ optional: makeOptional })
+            .where(inArray(vouchers.id, voucherIds));
+        }
+
+        // 3. Update the offload record itself
+        await tx
+          .update(containerOffloads)
+          .set({ optional: makeOptional })
+          .where(eq(containerOffloads.id, offloadId));
+      });
+
+      res.json({
+        optional: makeOptional,
+        message: makeOptional
+          ? "Offload suspended — stock removed and vouchers set to optional."
+          : "Offload restored — stock re-added and vouchers made active.",
+      });
+    } catch (error: any) {
+      console.error("Error toggling offload optional:", error);
       res.status(500).json({ message: error.message });
     }
   });

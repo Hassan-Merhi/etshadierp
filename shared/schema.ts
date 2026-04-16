@@ -663,6 +663,7 @@ export const containerOffloads = pgTable("container_offloads", {
   totalBales: decimal("total_bales", { precision: 15, scale: 3 }).notNull(),
   additionalCostPerBale: decimal("additional_cost_per_bale", { precision: 20, scale: 2 }).notNull(),
   offloadedAt: timestamp("offloaded_at").notNull().defaultNow(),
+  optional: boolean("optional").notNull().default(false),
 });
 
 export const insertContainerOffloadSchema = createInsertSchema(containerOffloads).omit({

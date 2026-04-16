@@ -1,10 +1,23 @@
 import { useParams, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ExternalLink, Package, Zap } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { ArrowLeft, ExternalLink, Package, Zap, PauseCircle, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { parseISO, format } from "date-fns";
 
 function formatAmount(value: number) {
@@ -79,6 +92,8 @@ interface OffloadDetailData {
   additionalCostPerBale: string;
   offloadedAt: string;
   containerChargesTotal: string;
+  optional: boolean;
+  companyId: number;
   items: OffloadItem[];
   poCharges: PoCharges;
   additionalCharges: AdditionalCharge[];
@@ -130,10 +145,23 @@ export default function OffloadDetail() {
   const params = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const id = params.id;
+  const { toast } = useToast();
 
   const { data: offload, isLoading } = useQuery<OffloadDetailData>({
     queryKey: [`/api/offloads/${id}`],
     enabled: !!id,
+  });
+
+  const toggleOptionalMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/offloads/${id}/toggle-optional`),
+    onSuccess: async (res) => {
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: [`/api/offloads/${id}`] });
+      toast({ title: data.optional ? "Offload suspended" : "Offload restored", description: data.message });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const itemsTotal = offload?.items.reduce((s, i) => s + Number(i.totalValue), 0) ?? 0;
@@ -176,7 +204,7 @@ export default function OffloadDetail() {
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <div>
+        <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className="text-amber-600 border-amber-500 bg-amber-500/10 gap-1">
               <Package className="w-3 h-3" />
@@ -186,6 +214,12 @@ export default function OffloadDetail() {
               <Skeleton className="h-7 w-40" />
             ) : (
               <h1 className="text-xl font-semibold">{offload?.containerNumber}</h1>
+            )}
+            {offload?.optional && (
+              <Badge variant="outline" className="text-red-600 border-red-500 bg-red-500/10 gap-1">
+                <PauseCircle className="w-3 h-3" />
+                Suspended
+              </Badge>
             )}
             {anyVoucherUpdated && (
               <Badge variant="outline" className="text-amber-600 border-amber-500 bg-amber-500/10 gap-1 text-xs">
@@ -201,6 +235,45 @@ export default function OffloadDetail() {
             </p>
           )}
         </div>
+        {offload && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant={offload.optional ? "default" : "outline"}
+                className="gap-2"
+                data-testid="button-toggle-optional"
+                disabled={toggleOptionalMutation.isPending}
+              >
+                {offload.optional
+                  ? <><PlayCircle className="w-4 h-4" /> Restore Offload</>
+                  : <><PauseCircle className="w-4 h-4" /> Suspend Offload</>
+                }
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {offload.optional ? "Restore Offload?" : "Suspend Offload?"}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  {offload.optional
+                    ? `This will re-add all ${formatNumber(Number(offload.totalBales))} bales back into stock at the original rates, and make all related vouchers (duties, transport, office, transfer, additional charges) active again.`
+                    : `This will remove all ${formatNumber(Number(offload.totalBales))} bales from stock and mark all related vouchers (duties, transport, office, transfer, additional charges) as optional so they are excluded from financial calculations. You can restore it at any time.`
+                  }
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => toggleOptionalMutation.mutate()}
+                  className={offload.optional ? "" : "bg-destructive text-destructive-foreground hover:bg-destructive/90"}
+                >
+                  {offload.optional ? "Restore" : "Suspend"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
 
       {isLoading ? (
