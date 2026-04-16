@@ -2255,8 +2255,35 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
   // ─────────────────────────────────────────────────────────────────────────
   app.get("/api/factory/net-position", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      // Resolve factory company ID the same way my-access does:
+      // 1. pinned factoryCompanyId (if it's a factory-type company)
+      // 2. currentCompanyId (if it's factory-type)
+      // 3. first active factory-type company in DB
+      // 4. fall back to currentCompanyId
+      let companyId: number | null = (req.session as any).factoryCompanyId || null;
+
+      if (!companyId) {
+        const currentId = (req.session as any).currentCompanyId;
+        if (currentId) {
+          const [cur] = await db.select({ id: companies.id, companyType: companies.companyType })
+            .from(companies).where(eq(companies.id, currentId));
+          if (cur?.companyType === "factory") companyId = cur.id;
+        }
+      }
+
+      if (!companyId) {
+        const [fc] = await db.select({ id: companies.id })
+          .from(companies)
+          .where(and(eq(companies.companyType, "factory"), eq(companies.active, true)))
+          .limit(1);
+        if (fc) companyId = fc.id;
+      }
+
+      if (!companyId) companyId = (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // Pin it for subsequent requests this session
+      (req.session as any).factoryCompanyId = companyId;
 
       const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 

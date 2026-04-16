@@ -407,10 +407,10 @@ export default function FactoryNetPosition() {
         </div>
       )}
 
-      {/* Upcoming Receivables — Pending & Verified Orders */}
+      {/* Upcoming Receivables — Pending, Verified & Loading Orders */}
       {isLoading ? (
         <Skeleton className="h-48 w-full rounded-md" />
-      ) : hasPendingVerified ? (
+      ) : (
         <Card data-testid="card-upcoming-receivables">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -446,33 +446,41 @@ export default function FactoryNetPosition() {
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
-            <OrderGroup
-              label="Pending"
-              orders={data?.pendingOrders ?? []}
-              total={data?.pendingTotal ?? 0}
-              icon={<Clock className="h-4 w-4 text-amber-500" />}
-              accentClass="text-amber-500 dark:text-amber-400"
-              badgeClass="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-            />
-            <OrderGroup
-              label="Verified"
-              orders={data?.verifiedOrders ?? []}
-              total={data?.verifiedTotal ?? 0}
-              icon={<CheckCircle2 className="h-4 w-4 text-blue-500" />}
-              accentClass="text-blue-500 dark:text-blue-400"
-              badgeClass="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
-            />
-            <OrderGroup
-              label="Loading (In Progress)"
-              orders={data?.loadingOrders ?? []}
-              total={data?.loadingTotal ?? 0}
-              icon={<PackageOpen className="h-4 w-4 text-purple-500" />}
-              accentClass="text-purple-500 dark:text-purple-400"
-              badgeClass="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20"
-            />
+            {!hasPendingVerified ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No pending, verified, or loading orders at this time.
+              </p>
+            ) : (
+              <>
+                <OrderGroup
+                  label="Pending"
+                  orders={data?.pendingOrders ?? []}
+                  total={data?.pendingTotal ?? 0}
+                  icon={<Clock className="h-4 w-4 text-amber-500" />}
+                  accentClass="text-amber-500 dark:text-amber-400"
+                  badgeClass="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                />
+                <OrderGroup
+                  label="Verified"
+                  orders={data?.verifiedOrders ?? []}
+                  total={data?.verifiedTotal ?? 0}
+                  icon={<CheckCircle2 className="h-4 w-4 text-blue-500" />}
+                  accentClass="text-blue-500 dark:text-blue-400"
+                  badgeClass="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+                />
+                <OrderGroup
+                  label="Loading (In Progress)"
+                  orders={data?.loadingOrders ?? []}
+                  total={data?.loadingTotal ?? 0}
+                  icon={<PackageOpen className="h-4 w-4 text-purple-500" />}
+                  accentClass="text-purple-500 dark:text-purple-400"
+                  badgeClass="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20"
+                />
+              </>
+            )}
           </CardContent>
         </Card>
-      ) : null}
+      )}
 
       {/* Sub-totals info */}
       {!isLoading && data && (data.supplierLiabilities > 0 || data.ledgerAssets > 0 || data.inventoryValue > 0 || data.rawMaterialValue > 0) && (
