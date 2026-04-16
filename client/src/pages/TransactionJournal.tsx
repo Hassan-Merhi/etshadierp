@@ -648,7 +648,7 @@ export default function TransactionJournal() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => window.open(`/daybook?voucherId=${v.id}`, "_blank")}
+                            onClick={() => openInCompany(v.companyId, `/daybook?voucherId=${v.id}`)}
                             data-testid={`button-edit-voucher-${v.id}`}
                             title="Open in Daybook"
                           >
