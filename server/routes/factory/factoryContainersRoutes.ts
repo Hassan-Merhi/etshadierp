@@ -278,18 +278,18 @@ export function registerFactoryContainersRoutes(app: Express) {
           exchangeRate: String(commFx),
           sourceModule: "FACTORY",
         }).returning();
-        // Dr Commission Expense account
-        await db.insert(voucherEntries).values({
-          voucherId: commVoucher.id,
-          ledgerAccountId: container.commissionAccountId,
-          debitAmount: String(commissionAmt),
-          creditAmount: "0",
-          narration: `Commission expense - container ${container.containerNumber}`,
-        });
-        // Cr Broker (factory supplier payable)
+        // Dr Broker (factory supplier payable) — records what we owe the broker
         await db.insert(voucherEntries).values({
           voucherId: commVoucher.id,
           factorySupplierId: container.commissionSupplierId,
+          debitAmount: String(commissionAmt),
+          creditAmount: "0",
+          narration: `Commission due to broker - container ${container.containerNumber}`,
+        });
+        // Cr Commission Payable - [Broker] — LIABILITY increases (we owe them)
+        await db.insert(voucherEntries).values({
+          voucherId: commVoucher.id,
+          ledgerAccountId: container.commissionAccountId,
           debitAmount: "0",
           creditAmount: String(commissionAmt),
           narration: `Commission payable to broker - container ${container.containerNumber}`,
