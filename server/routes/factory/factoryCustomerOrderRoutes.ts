@@ -2417,23 +2417,15 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       <td></td>
       <td></td>
       <td></td>
-      <td>${fmtMoney(order.grandTotal)}</td>
+      <td>${fmtMoney(order.subtotalBales)}</td>
     </tr></tfoot>
   </table>
-
-  ${charges.length > 0 ? `
-  <div class="section-heading" style="margin-top:16px">Charges</div>
-  <table class="charges-table">
-    <thead><tr><th>Name</th><th>Type</th><th>Amount</th></tr></thead>
-    <tbody>${chargesHtml}</tbody>
-  </table>` : ""}
 
   <div class="totals-wrap">
     <table class="totals-table">
       <tr><td>Subtotal (Bales)</td><td>${fmtMoney(order.subtotalBales)}</td></tr>
       <tr><td>Freight</td><td>${fmtMoney(order.freightAmount)}</td></tr>
       <tr><td>Other Charges</td><td>${fmtMoney(order.otherChargesTotal)}</td></tr>
-      <tr><td>Total Qty Bales</td><td>${fmtNum(order.totalQtyBales)}</td></tr>
       <tr class="grand"><td>Grand Total</td><td>${fmtMoney(order.grandTotal)}</td></tr>
     </table>
   </div>
