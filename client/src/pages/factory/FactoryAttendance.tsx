@@ -235,7 +235,10 @@ export default function FactoryAttendance() {
       if (mode === "excel") {
         exportRangeExcel(rangeWorkers, rangeAttendance, dates, rangeStart, rangeEnd, lang);
       } else {
-        const html = generateRangePrintHtml(rangeWorkers, rangeAttendance, dates, rangeStart, rangeEnd, lang);
+        // Print should only show active workers — inactive ones have no records
+        // and would incorrectly default to "Present" for every day.
+        const activeOnly = (rangeWorkers as WorkerRow[]).filter((w) => w.active !== false);
+        const html = generateRangePrintHtml(activeOnly, rangeAttendance, dates, rangeStart, rangeEnd, lang);
         openPrintWindow(html);
       }
     } catch (err: any) {
@@ -259,11 +262,12 @@ export default function FactoryAttendance() {
   const handlePrintWithLang = (lang: "en" | "ar") => {
     const weekDays = getWeekDays(selectedDate);
     if (printDialog === "blank") {
-      const html = generateWeeklyBlankSheetHtml(data?.workers ?? [], weekDays, shift, lang);
+      // Print only active workers — inactive ones should not appear
+      const html = generateWeeklyBlankSheetHtml(workers, weekDays, shift, lang);
       openPrintWindow(html);
     } else if (printDialog === "results") {
       const html = generateWeeklyResultsSheetHtml(
-        data?.workers ?? [],
+        workers,           // active workers only
         attendanceMap,
         notesMap,
         weekDays,
@@ -1437,7 +1441,8 @@ function buildRangeSheet(
   startDate: string,
   endDate: string,
   lang: PrintLang,
-  sheetTitle: string
+  sheetTitle: string,
+  useBlankDefault = false   // true for inactive workers: no record = blank cell, not Present
 ) {
   const dateHeaders = dates.map((d) => {
     const dt = new Date(d + "T00:00:00");
@@ -1457,13 +1462,16 @@ function buildRangeSheet(
     let presentCount = 0;
     let absentCount  = 0;
     const dayCells = dates.map((d) => {
-      const status = wMap.get(d) ?? "Present";
+      const recorded = wMap.get(d);
+      // Inactive workers: if no explicit record exists, leave cell blank.
+      const status = recorded ?? (useBlankDefault ? null : "Present");
+      if (!status) return "";          // blank cell for inactive with no record
       const mark = STATUS_MARKS[status] ?? status.charAt(0);
       if (status === "Absent") absentCount++;
       else presentCount++;
       return mark;
     });
-    return [i + 1, w.fullName, ...dayCells, presentCount, absentCount];
+    return [i + 1, w.fullName, ...dayCells, presentCount || "", absentCount || ""];
   });
 
   const titleLabel = lang === "ar" ? "كشف الحضور" : "Attendance Sheet";
@@ -1508,8 +1516,8 @@ function exportRangeExcel(
   const activeLabel   = lang === "ar" ? "العمال النشطون"      : "Active Workers";
   const inactiveLabel = lang === "ar" ? "العمال غير النشطين" : "Inactive Workers";
 
-  const activeSheet   = buildRangeSheet(activeWorkers,   lookup, dates, startDate, endDate, lang, activeLabel);
-  const inactiveSheet = buildRangeSheet(inactiveWorkers, lookup, dates, startDate, endDate, lang, inactiveLabel);
+  const activeSheet   = buildRangeSheet(activeWorkers,   lookup, dates, startDate, endDate, lang, activeLabel, false);
+  const inactiveSheet = buildRangeSheet(inactiveWorkers, lookup, dates, startDate, endDate, lang, inactiveLabel, true);
 
   XLSX.utils.book_append_sheet(wb, activeSheet,   lang === "ar" ? "نشط"      : "Active Workers");
   XLSX.utils.book_append_sheet(wb, inactiveSheet, lang === "ar" ? "غير نشط" : "Inactive Workers");
