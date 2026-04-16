@@ -119,18 +119,19 @@ function LiveBadge({ original, live }: { original: number; live: number }) {
   );
 }
 
-function ChargeRow({ label, original, live, isSubtotal = false, isNegative = false }: {
+function ChargeRow({ label, original, live, isSubtotal = false, isNegative = false, indent = false }: {
   label: string;
   original: number;
   live?: number;
   isSubtotal?: boolean;
   isNegative?: boolean;
+  indent?: boolean;
 }) {
   const displayValue = live !== undefined ? live : original;
   if (displayValue === 0 && (live === undefined || live === 0)) return null;
   return (
     <tr className={isSubtotal ? "border-t bg-muted/20 font-medium" : "border-b"}>
-      <td className="p-3 flex items-center gap-1">
+      <td className={`p-3 ${indent ? "pl-5" : ""} flex items-center gap-1`}>
         {label}
         {live !== undefined && <LiveBadge original={original} live={live} />}
       </td>
@@ -348,94 +349,91 @@ export default function OffloadDetail() {
             </div>
           )}
 
-          {/* Container Freight Charges from Purchase Orders */}
-          {hasPoCharges && (
-            <div>
-              <p className="text-sm font-medium mb-2 text-muted-foreground uppercase tracking-wide">Container Freight Charges</p>
-              <div className="border rounded-md">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/40">
-                      <th className="text-left p-3 font-medium">Charge</th>
-                      <th className="text-right p-3 font-medium">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {offload.poCharges.freight > 0 && (
-                      <tr className="border-b">
-                        <td className="p-3">Freight</td>
-                        <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.freight)}</td>
-                      </tr>
-                    )}
-                    {offload.poCharges.fumigation > 0 && (
-                      <tr className="border-b">
-                        <td className="p-3">Fumigation</td>
-                        <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.fumigation)}</td>
-                      </tr>
-                    )}
-                    {offload.poCharges.surcharge > 0 && (
-                      <tr className="border-b">
-                        <td className="p-3">Surcharge</td>
-                        <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.surcharge)}</td>
-                      </tr>
-                    )}
-                    {offload.poCharges.documentCharges > 0 && (
-                      <tr className="border-b">
-                        <td className="p-3">Document Charges</td>
-                        <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.documentCharges)}</td>
-                      </tr>
-                    )}
-                    {offload.poCharges.otherCharges > 0 && (
-                      <tr className="border-b">
-                        <td className="p-3">Other Charges</td>
-                        <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.otherCharges)}</td>
-                      </tr>
-                    )}
-                    {offload.poCharges.discount > 0 && (
-                      <tr className="border-b">
-                        <td className="p-3">Discount</td>
-                        <td className="p-3 text-right font-mono text-green-600 dark:text-green-400">
-                          -{formatAmount(offload.poCharges.discount)}
-                        </td>
-                      </tr>
-                    )}
-                    <tr className="bg-muted/20 font-medium">
-                      <td className="p-3">Subtotal</td>
-                      <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.total)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Offload Landing Charges — uses live voucher values */}
+          {/* Unified Import Charges — all PO freight + landing charges in one table */}
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                {hasPoCharges ? "Offload Landing Charges" : "Import Charges"}
-              </p>
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Import Charges</p>
               {live?.hasVouchers && (
                 <Badge variant="outline" className="text-xs gap-1">
                   <Zap className="w-3 h-3" />
-                  Live from vouchers
+                  Landing charges from live vouchers
                 </Badge>
               )}
             </div>
-            <div className="border rounded-md">
+            <div className="border rounded-md overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/40">
                     <th className="text-left p-3 font-medium">Charge</th>
-                    <th className="text-right p-3 font-medium">Amount</th>
+                    <th className="text-right p-3 font-medium w-36">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
+                  {/* ── Container Freight (from POs) ── */}
+                  {hasPoCharges && (
+                    <tr className="bg-muted/20">
+                      <td colSpan={2} className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Container Freight
+                      </td>
+                    </tr>
+                  )}
+                  {offload.poCharges.freight > 0 && (
+                    <tr className="border-b">
+                      <td className="p-3 pl-5">Freight</td>
+                      <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.freight)}</td>
+                    </tr>
+                  )}
+                  {offload.poCharges.fumigation > 0 && (
+                    <tr className="border-b">
+                      <td className="p-3 pl-5">Fumigation</td>
+                      <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.fumigation)}</td>
+                    </tr>
+                  )}
+                  {offload.poCharges.surcharge > 0 && (
+                    <tr className="border-b">
+                      <td className="p-3 pl-5">Surcharge</td>
+                      <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.surcharge)}</td>
+                    </tr>
+                  )}
+                  {offload.poCharges.documentCharges > 0 && (
+                    <tr className="border-b">
+                      <td className="p-3 pl-5">Document Charges</td>
+                      <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.documentCharges)}</td>
+                    </tr>
+                  )}
+                  {offload.poCharges.otherCharges > 0 && (
+                    <tr className="border-b">
+                      <td className="p-3 pl-5">Other Charges</td>
+                      <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.otherCharges)}</td>
+                    </tr>
+                  )}
+                  {offload.poCharges.discount > 0 && (
+                    <tr className="border-b">
+                      <td className="p-3 pl-5">Discount</td>
+                      <td className="p-3 text-right font-mono text-green-600 dark:text-green-400">
+                        -{formatAmount(offload.poCharges.discount)}
+                      </td>
+                    </tr>
+                  )}
+                  {hasPoCharges && (
+                    <tr className="border-b border-t bg-muted/10 font-medium">
+                      <td className="p-3 pl-5 text-muted-foreground">Freight Subtotal</td>
+                      <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.total)}</td>
+                    </tr>
+                  )}
+
+                  {/* ── Landing / Local Charges ── */}
+                  <tr className="bg-muted/20">
+                    <td colSpan={2} className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Landing Charges
+                    </td>
+                  </tr>
                   {(displayDuties > 0 || storedDuties > 0) && (
                     <ChargeRow
                       label="Duties"
                       original={storedDuties}
                       live={live?.hasVouchers ? live.duties : undefined}
+                      indent
                     />
                   )}
                   {(displayOfficeCharges > 0 || storedOfficeCharges > 0) && (
@@ -443,6 +441,7 @@ export default function OffloadDetail() {
                       label="Office Charges"
                       original={storedOfficeCharges}
                       live={live?.hasVouchers ? live.officeCharges : undefined}
+                      indent
                     />
                   )}
                   {(displayTransferCharges > 0 || storedTransferCharges > 0) && (
@@ -450,6 +449,7 @@ export default function OffloadDetail() {
                       label="Transfer Charges"
                       original={storedTransferCharges}
                       live={live?.hasVouchers ? live.transferCharges : undefined}
+                      indent
                     />
                   )}
                   {(displayTransportFees > 0 || storedTransportFees > 0) && (
@@ -457,53 +457,38 @@ export default function OffloadDetail() {
                       label="Transport Fees"
                       original={storedTransportFees}
                       live={live?.hasVouchers ? live.transportFees : undefined}
+                      indent
                     />
                   )}
                   {offload.additionalCharges.filter(c => Number(c.amount) !== 0).map((c) => (
                     <tr key={c.id} className="border-b">
-                      <td className="p-3">{c.chargeType}</td>
+                      <td className="p-3 pl-5">{c.chargeType}</td>
                       <td className="p-3 text-right font-mono">{formatAmount(Number(c.amount))}</td>
                     </tr>
                   ))}
-                  {hasPoCharges ? (
-                    <tr className="bg-muted/20 font-medium">
-                      <td className="p-3">Subtotal</td>
-                      <td className="p-3 text-right font-mono">{formatAmount(displayOffloadTotal)}</td>
-                    </tr>
-                  ) : (
-                    <tr className="bg-muted/20 font-medium">
-                      <td className="p-3">Total Charges</td>
-                      <td className="p-3 text-right font-mono">{formatAmount(displayGrandCharges)}</td>
+                  {displayAddlCharges > 0 && (
+                    <tr className="border-b">
+                      <td className="p-3 pl-5 flex items-center gap-1">
+                        Additional Charges
+                        {live?.hasVouchers && <Badge variant="outline" className="text-[10px] px-1 py-0 gap-0.5"><Zap className="w-2.5 h-2.5" />live</Badge>}
+                      </td>
+                      <td className="p-3 text-right font-mono">{formatAmount(displayAddlCharges)}</td>
                     </tr>
                   )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Combined totals when there are PO charges */}
-          {hasPoCharges && (
-            <div className="border rounded-md">
-              <table className="w-full text-sm">
-                <tbody>
-                  <tr className="border-b">
-                    <td className="p-3 text-muted-foreground">Container Freight Charges</td>
-                    <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.total)}</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="p-3 text-muted-foreground">
-                      Offload Landing Charges{displayAddlCharges > 0 ? " + Additional" : ""}
-                    </td>
+                  <tr className="border-b border-t bg-muted/10 font-medium">
+                    <td className="p-3 pl-5 text-muted-foreground">Landing Subtotal</td>
                     <td className="p-3 text-right font-mono">{formatAmount(displayOffloadTotal)}</td>
                   </tr>
-                  <tr className="bg-muted/30 font-semibold">
-                    <td className="p-3">Total All Charges</td>
+
+                  {/* ── Grand Total + Cost/Bale ── */}
+                  <tr className="bg-muted/30 font-semibold border-t-2">
+                    <td className="p-3">Total Charges</td>
                     <td className="p-3 text-right font-mono">{formatAmount(displayGrandCharges)}</td>
                   </tr>
-                  <tr className="border-t text-sm text-muted-foreground">
-                    <td className="p-3">
+                  <tr className="text-muted-foreground">
+                    <td className="p-3 text-sm">
                       Cost / Bale&nbsp;
-                      <span className="font-mono text-xs">
+                      <span className="font-mono text-xs text-muted-foreground">
                         ({formatAmount(displayGrandCharges)} ÷ {formatNumber(Number(offload.totalBales))} bales)
                       </span>
                     </td>
@@ -514,7 +499,7 @@ export default function OffloadDetail() {
                 </tbody>
               </table>
             </div>
-          )}
+          </div>
 
           <div className="border rounded-md p-4 flex items-center justify-between bg-muted/20">
             <div>
