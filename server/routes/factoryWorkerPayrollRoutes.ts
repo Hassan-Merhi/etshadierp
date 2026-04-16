@@ -235,8 +235,14 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
         advanceListByWorker[adv.workerId].push(adv);
       }
 
-      // Calendar days in period (used as denominator for transport proration)
-      const totalCalendarDays = days;
+      // Transport denominator = total days in the MONTH of periodStart.
+      // This ensures two half-month runs (e.g. Apr 1-15 + Apr 16-30) add up to
+      // exactly the full monthly transport allowance for a fully-present worker.
+      // e.g. for April (30 days): daily rate = $80/30 = $2.67 → 15d = $40
+      const transportMonthDays = (() => {
+        const d = new Date(periodStart);
+        return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      })();
 
       const result = targetWorkers.map((worker: any) => {
         const baseSal = parseFloat(worker.baseSalary || "0");
@@ -288,8 +294,10 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
 
         let transport = 0;
         if (transportMonthly > 0) {
-          if (workerAttRecs.length > 0 && totalCalendarDays > 0) {
-            transport = (presentDays / totalCalendarDays) * transportMonthly;
+          if (workerAttRecs.length > 0 && transportMonthDays > 0) {
+            // dailyRate = monthlyRate / daysInMonth
+            // transport = dailyRate * presentDays
+            transport = (presentDays / transportMonthDays) * transportMonthly;
           } else {
             transport = transportMonthly;
           }
@@ -318,7 +326,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
           totalAdvanceBalance,
           pendingAdvances,
           net,
-          totalWorkingDays: totalCalendarDays,
+          totalWorkingDays: transportMonthDays,   // full month days — denominator used for proration
           presentDays,
           absentDays,
           presentDates,
@@ -407,7 +415,9 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
               base = computeMonthlyPayFromAttendance(baseSal, periodStart, workerAttRecords);
             }
           }
-          // Transport allowance — prorated by attendance (calendar days as denominator)
+          // Transport allowance — prorated by: (presentDays / daysInMonth) * monthlyRate
+          // Using the full month days (not period days) as denominator so two
+          // half-month runs add up to exactly the monthly allowance.
           const workerAttRecs2 = attendanceByWorker.get(worker.id) || [];
           let presentDays2 = 0;
           for (const att of workerAttRecs2) {
@@ -415,13 +425,14 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
             else if (att.status === "Half Day") presentDays2 += 0.5;
           }
 
+          const monthDaysForTransport = daysInMonth(periodStart);
           const workerTransportDefault2 = parseFloat((worker as any).transportAllowance || "0");
           const transportOverrideAmt2 = transportOverrides ? parseFloat(transportOverrides[String(worker.id)] ?? "-1") : -1;
           const transportMonthly2 = transportOverrideAmt2 >= 0 ? transportOverrideAmt2 : workerTransportDefault2;
           let transport = 0;
           if (transportMonthly2 > 0) {
-            if (workerAttRecs2.length > 0 && days > 0) {
-              transport = (presentDays2 / days) * transportMonthly2;
+            if (workerAttRecs2.length > 0 && monthDaysForTransport > 0) {
+              transport = (presentDays2 / monthDaysForTransport) * transportMonthly2;
             } else {
               transport = transportMonthly2;
             }
