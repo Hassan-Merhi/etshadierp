@@ -34,6 +34,7 @@
   import { Label } from "@/components/ui/label";
   import * as XLSX from "xlsx";
   import StockEntryHistory from "../StockEntryHistory";
+  import { AdminAuthDialog } from "@/components/AdminAuthDialog";
   import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
   import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, formatLabelNum, A4_DESIGN_OPTIONS, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
   import { consumeRef } from "@/lib/refPool";
@@ -77,6 +78,8 @@
     const { data: baleProducts, isLoading: productsLoading } = useQuery<FactoryBaleProduct[]>({
       queryKey: ["/api/factory/bale-products"],
     });
+    const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+    const isAdmin = ["Admin", "Owner", "Developer"].includes(currentUser?.role || "");
     const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
     const { data: categories } = useQuery<FactoryCategory[]>({ queryKey: ["/api/factory/categories"] });
     const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/factory/workers"] });
@@ -101,6 +104,9 @@
     const [quickCreateCategoryId, setQuickCreateCategoryId] = useState("");
     const [quickCreateWeight, setQuickCreateWeight] = useState("");
     const [quickCreateGrade, setQuickCreateGrade] = useState("");
+    const [adminAuthOpen, setAdminAuthOpen] = useState(false);
+    const [pendingAdminAuth, setPendingAdminAuth] = useState<{ username: string; password: string } | null>(null);
+    const [pendingCreateName, setPendingCreateName] = useState("");
 
     const activeCategories = categories?.filter((c) => c.isActive);
 
@@ -110,6 +116,7 @@
         if (quickCreateCategoryId) body.categoryId = parseInt(quickCreateCategoryId);
         if (quickCreateWeight) body.weightPerBaleKg = quickCreateWeight;
         if (quickCreateGrade) body.grade = quickCreateGrade;
+        if (pendingAdminAuth) body.adminAuth = pendingAdminAuth;
         const response = await modeApiRequest("POST", "/api/factory/bale-products", body);
         if (!response.ok) {
           const err = await response.json();
@@ -125,6 +132,8 @@
         setQuickCreateCategoryId("");
         setQuickCreateWeight("");
         setQuickCreateGrade("");
+        setPendingAdminAuth(null);
+        setPendingCreateName("");
         setScanInput("");
         setShowDropdown(false);
         const defaultWeight = newProduct.weightPerBaleKg ? parseFloat(newProduct.weightPerBaleKg) : 25;
@@ -579,9 +588,15 @@
                         type="button"
                         className="w-full text-left px-3 py-2 hover-elevate flex items-center gap-2 text-sm font-medium border-t text-muted-foreground"
                         onClick={() => {
-                          setQuickCreateName(scanInput.trim());
-                          setQuickCreateOpen(true);
+                          const name = scanInput.trim();
                           setShowDropdown(false);
+                          if (isAdmin) {
+                            setQuickCreateName(name);
+                            setQuickCreateOpen(true);
+                          } else {
+                            setPendingCreateName(name);
+                            setAdminAuthOpen(true);
+                          }
                         }}
                         data-testid="button-quick-create-product-inline"
                       >
@@ -597,9 +612,15 @@
                         type="button"
                         className="w-full text-left px-3 py-2 hover-elevate flex items-center gap-2 text-sm font-medium border-t"
                         onClick={() => {
-                          setQuickCreateName(scanInput.trim());
-                          setQuickCreateOpen(true);
+                          const name = scanInput.trim();
                           setShowDropdown(false);
+                          if (isAdmin) {
+                            setQuickCreateName(name);
+                            setQuickCreateOpen(true);
+                          } else {
+                            setPendingCreateName(name);
+                            setAdminAuthOpen(true);
+                          }
                         }}
                         data-testid="button-quick-create-product"
                       >
@@ -926,6 +947,21 @@
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <AdminAuthDialog
+          open={adminAuthOpen}
+          onOpenChange={(open) => {
+            setAdminAuthOpen(open);
+            if (!open) setPendingCreateName("");
+          }}
+          action="create a new bale product"
+          onAuthorized={(credentials) => {
+            setPendingAdminAuth(credentials);
+            setAdminAuthOpen(false);
+            setQuickCreateName(pendingCreateName);
+            setQuickCreateOpen(true);
+          }}
+        />
 
         <Dialog open={designPickerOpen} onOpenChange={(open) => { if (!open) { setDesignPickerOpen(false); setPendingPrintLabels(null); } }}>
           <DialogContent>

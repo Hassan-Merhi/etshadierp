@@ -399,6 +399,28 @@ export function registerFactoryProductsRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
+      const callerRole = req.user?.role || "";
+      const isPrivileged = ["Admin", "Owner", "Developer"].includes(callerRole);
+      if (!isPrivileged) {
+        const { adminAuth } = req.body;
+        if (!adminAuth?.username || !adminAuth?.password) {
+          return res.status(403).json({ message: "Admin authorization required to create products" });
+        }
+        const [adminUser] = await db.select().from(users).where(eq(users.username, adminAuth.username));
+        if (!adminUser || !adminUser.active) {
+          return res.status(403).json({ message: "Invalid admin credentials" });
+        }
+        const passwordValid = await verifySupervisorPassword(adminAuth.password, adminUser.password);
+        if (!passwordValid) {
+          return res.status(403).json({ message: "Invalid admin credentials" });
+        }
+        const [adminRole] = await db.select().from(userCompanyRoles)
+          .where(and(eq(userCompanyRoles.userId, adminUser.id), eq(userCompanyRoles.companyId, companyId)));
+        if (!adminRole || !["Admin", "Owner", "Developer"].includes(adminRole.role)) {
+          return res.status(403).json({ message: "The provided user does not have admin access to this company" });
+        }
+      }
+
       let code = req.body.code;
       let articleCode = req.body.articleCode;
       const grade = req.body.grade;

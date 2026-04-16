@@ -43,11 +43,15 @@ const formSchema = z.object({
 interface CreateBaleProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  adminAuth?: { username: string; password: string } | null;
+  onClose?: () => void;
 }
 
 export function CreateBaleProductDialog({
   open,
   onOpenChange,
+  adminAuth,
+  onClose,
 }: CreateBaleProductDialogProps) {
   const { toast } = useToast();
 
@@ -72,6 +76,7 @@ export function CreateBaleProductDialog({
       if (data.categoryId && data.categoryId !== "none") body.categoryId = parseInt(data.categoryId);
       if (data.weightPerBaleKg) body.weightPerBaleKg = data.weightPerBaleKg;
       if (data.description) body.description = data.description;
+      if (adminAuth) body.adminAuth = adminAuth;
       const response = await factoryApiRequest("POST", "/api/factory/bale-products", body);
       if (!response.ok) {
         const err = await response.json();

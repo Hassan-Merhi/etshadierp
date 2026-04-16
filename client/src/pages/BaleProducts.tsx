@@ -38,6 +38,7 @@ import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { CreateBaleProductDialog } from "../components/CreateBaleProductDialog";
+import { AdminAuthDialog } from "@/components/AdminAuthDialog";
 import type { FactoryBaleProduct, FactoryCategory } from "@shared/schema";
 
 interface ImportPreviewRow {
@@ -60,6 +61,8 @@ interface GroupedProduct {
 
 export default function BaleProducts() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [adminAuthOpen, setAdminAuthOpen] = useState(false);
+  const [pendingAdminAuth, setPendingAdminAuth] = useState<{ username: string; password: string } | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importPreview, setImportPreview] = useState<ImportPreviewRow[]>([]);
   const [importError, setImportError] = useState("");
@@ -95,6 +98,9 @@ export default function BaleProducts() {
       });
     }
   }, [editingProduct]);
+
+  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const isAdmin = ["Admin", "Owner", "Developer"].includes(currentUser?.role || "");
 
   const { data: myAccess } = useQuery<{ hiddenCostFields: string[] }>({
     queryKey: ["/api/factory/my-access"],
@@ -543,7 +549,16 @@ export default function BaleProducts() {
             <Upload className="h-4 w-4 mr-2" />
             Import Excel
           </Button>
-          <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-product">
+          <Button
+            onClick={() => {
+              if (isAdmin) {
+                setCreateDialogOpen(true);
+              } else {
+                setAdminAuthOpen(true);
+              }
+            }}
+            data-testid="button-create-product"
+          >
             <Plus className="h-4 w-4 mr-2" />
             Create Product
           </Button>
@@ -946,7 +961,27 @@ export default function BaleProducts() {
         </CardContent>
       </Card>
 
-      <CreateBaleProductDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
+      <CreateBaleProductDialog
+        open={createDialogOpen}
+        onOpenChange={(open) => {
+          setCreateDialogOpen(open);
+          if (!open) setPendingAdminAuth(null);
+        }}
+        adminAuth={pendingAdminAuth}
+      />
+
+      <AdminAuthDialog
+        open={adminAuthOpen}
+        onOpenChange={(open) => {
+          setAdminAuthOpen(open);
+        }}
+        action="create a new bale product"
+        onAuthorized={(credentials) => {
+          setPendingAdminAuth(credentials);
+          setAdminAuthOpen(false);
+          setCreateDialogOpen(true);
+        }}
+      />
 
       <Dialog open={!!editingProduct} onOpenChange={(open) => { if (!open) setEditingProduct(null); }}>
         <DialogContent>
