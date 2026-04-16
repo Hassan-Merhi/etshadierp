@@ -388,14 +388,16 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       }
 
       // Pre-resolve ledger accounts OUTSIDE the transaction to prevent concurrent insert conflicts
-      const [expenseAcc, payableAccGen] = await Promise.all([
+      const [expenseAcc, payableAccGen, advancesAccGen] = await Promise.all([
         findOrCreateLedger(companyId, "Factory Worker Payroll", "Expense"),
         findOrCreateLedger(companyId, "Payroll Payable", "Liability"),
+        findOrCreateLedger(companyId, "Factory Worker Advances", "Asset"),
       ]);
 
       const created = await db.transaction(async (tx: any) => {
         let count = 0;
         let totalNet = 0;
+        let totalAdvanceDeductions = 0;
         for (const worker of targetWorkers) {
           const baseSal = parseFloat(worker.baseSalary || "0");
           const freq = (worker as any).payFrequency || worker.salaryType || "Monthly";
@@ -462,10 +464,12 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
           // Settle advances immediately at generate time so remaining balance updates right away
           await settleAdvancesForPayroll(tx, companyId, worker.id, advanceDeduction);
           totalNet += net;
+          totalAdvanceDeductions += advanceDeduction;
           count++;
         }
-        // Accounting: Dr Payroll Expense / Cr Payroll Payable
-        if (totalNet > 0) {
+        // Accounting: Dr Payroll Expense (gross) / Cr Payroll Payable (net) / Cr Factory Worker Advances (deductions)
+        const totalGross = totalNet + totalAdvanceDeductions;
+        if (totalGross > 0) {
           const payableAcc = payableAccGen;
           const desc = `Payroll expense: ${count} worker${count !== 1 ? "s" : ""} (${periodStart} – ${periodEnd})`;
           const [genVoucher] = await tx.insert(vouchers).values({
@@ -474,14 +478,21 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
             voucherType: "Journal",
             voucherDate: periodStart,
             description: desc,
-            totalAmount: totalNet.toFixed(2),
+            totalAmount: totalGross.toFixed(2),
             currency: "USD",
             sourceModule: "FACTORY",
           }).returning();
-          await tx.insert(voucherEntries).values([
-            { voucherId: genVoucher.id, ledgerAccountId: expenseAcc.id, debitAmount: totalNet.toFixed(2), creditAmount: "0", narration: desc },
-            { voucherId: genVoucher.id, ledgerAccountId: payableAcc.id, debitAmount: "0", creditAmount: totalNet.toFixed(2), narration: desc },
-          ]);
+          const journalEntries: any[] = [
+            { voucherId: genVoucher.id, ledgerAccountId: expenseAcc.id, debitAmount: totalGross.toFixed(2), creditAmount: "0", narration: desc },
+          ];
+          if (totalNet > 0) {
+            journalEntries.push({ voucherId: genVoucher.id, ledgerAccountId: payableAcc.id, debitAmount: "0", creditAmount: totalNet.toFixed(2), narration: desc });
+          }
+          // Credit Factory Worker Advances to reduce the asset as deductions are settled
+          if (totalAdvanceDeductions > 0) {
+            journalEntries.push({ voucherId: genVoucher.id, ledgerAccountId: advancesAccGen.id, debitAmount: "0", creditAmount: totalAdvanceDeductions.toFixed(2), narration: `Advance deductions settled - ${count} worker${count !== 1 ? "s" : ""} (${periodStart} – ${periodEnd})` });
+          }
+          await tx.insert(voucherEntries).values(journalEntries);
         }
         await writeDaybookEntry(tx, {
           companyId,
