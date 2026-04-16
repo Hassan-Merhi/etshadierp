@@ -2485,27 +2485,52 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         }
       }
 
-      // Fetch all bales linked to this order
-      const baleLinks = await db.select().from(customerOrderBales)
+      // Fetch all bales linked to this order, joining to factoryBales + factoryBaleProducts
+      // to get the canonical articleCode (in case the denormalised field on orderBales is null)
+      const baleLinks = await db
+        .select({
+          id: customerOrderBales.id,
+          baleId: customerOrderBales.baleId,
+          orderBaleArticleCode: customerOrderBales.articleCode,
+          baleName: customerOrderBales.baleName,
+          baleArticleCode: factoryBales.articleCode,
+          baleProductId: factoryBales.productId,
+          baleProductName: factoryBales.productName,
+          productArticleCode: factoryBaleProducts.articleCode,
+          productName: factoryBaleProducts.name,
+        })
+        .from(customerOrderBales)
+        .leftJoin(factoryBales, eq(customerOrderBales.baleId, factoryBales.id))
+        .leftJoin(factoryBaleProducts, eq(factoryBales.productId, factoryBaleProducts.id))
         .where(eq(customerOrderBales.orderId, orderId));
 
-      // Count loaded bales per article code
+      // Resolve canonical article code: productArticleCode > baleArticleCode > orderBaleArticleCode
+      // Use canonical product name from factoryBaleProducts when available
       const loadedMap = new Map<string, { count: number; name: string }>();
       for (const link of baleLinks) {
-        const code = link.articleCode || "";
-        const entry = loadedMap.get(code) || { count: 0, name: link.baleName || code };
+        const code = link.productArticleCode || link.baleArticleCode || link.orderBaleArticleCode || "";
+        if (!code) continue; // skip completely unidentified bales
+        const name = link.productName || link.baleProductName || link.baleName || code;
+        const entry = loadedMap.get(code) || { count: 0, name };
         entry.count += 1;
         loadedMap.set(code, entry);
       }
 
-      // Canonical product names
+      // Build canonical product name map (already resolved above via join, but also from proforma)
       const allCodes = [...new Set([...proformaMap.keys(), ...loadedMap.keys()])];
       const productNameMap = new Map<string, string>();
-      if (allCodes.length > 0) {
+      // Seed from the join results
+      for (const link of baleLinks) {
+        const code = link.productArticleCode || link.baleArticleCode || link.orderBaleArticleCode || "";
+        if (code && link.productName) productNameMap.set(code, link.productName);
+      }
+      // Fill any remaining from DB (e.g. proforma codes that have no loaded bales)
+      const missingCodes = allCodes.filter((c) => !productNameMap.has(c));
+      if (missingCodes.length > 0) {
         const prods = await db
           .select({ articleCode: factoryBaleProducts.articleCode, name: factoryBaleProducts.name })
           .from(factoryBaleProducts)
-          .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, allCodes)));
+          .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, missingCodes)));
         for (const p of prods) { if (p.articleCode) productNameMap.set(p.articleCode, p.name); }
       }
 
@@ -2552,15 +2577,16 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("Loading Status");
-      const COL = 6;
+      const COL = 7; // now 7 columns (#, ArticleCode, Product, Requested, Loaded, Diff, Status)
 
       sheet.columns = [
-        { key: "c1", width: 6 },
-        { key: "c2", width: 16 },
-        { key: "c3", width: 30 },
-        { key: "c4", width: 13 },
-        { key: "c5", width: 13 },
-        { key: "c6", width: 20 },
+        { key: "c1", width: 6  },  // #
+        { key: "c2", width: 16 },  // Article Code
+        { key: "c3", width: 32 },  // Product
+        { key: "c4", width: 13 },  // Requested
+        { key: "c5", width: 13 },  // Loaded
+        { key: "c6", width: 11 },  // Diff
+        { key: "c7", width: 20 },  // Status
       ];
 
       const DARK_BLUE   = "FF1F3864";
@@ -2586,24 +2612,24 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       // Logo
       const logoRow = sheet.addRow([]);
-      logoRow.height = 80;
+      logoRow.height = 110;
       try {
         const lp = path.join(process.cwd(), "server", "hmd-logo.png");
         if (fs.existsSync(lp)) {
           const lid = workbook.addImage({ buffer: fs.readFileSync(lp) as Buffer, extension: "jpeg" });
-          sheet.addImage(lid, { tl: { col: 0, row: 0 }, ext: { width: 120, height: 80 } });
+          sheet.addImage(lid, { tl: { col: 0, row: 0 }, ext: { width: 180, height: 110 } });
         }
       } catch {}
 
       const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
-      r1.height = 22;
-      r1.getCell(1).font = { bold: true, size: 14, color: { argb: DARK_BLUE } };
+      r1.height = 26;
+      r1.getCell(1).font = { bold: true, size: 16, color: { argb: DARK_BLUE } };
       r1.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
       merge(r1.number, 1, COL);
 
       const r2 = sheet.addRow(["Loading Status Report"]);
-      r2.height = 18;
-      r2.getCell(1).font = { bold: true, size: 12, color: { argb: DARK_BLUE } };
+      r2.height = 22;
+      r2.getCell(1).font = { bold: true, size: 14, color: { argb: DARK_BLUE } };
       r2.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
       merge(r2.number, 1, COL);
 
@@ -2614,25 +2640,26 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       const details = [
         ["Invoice No.", invoiceNum],
-        ["Customer", order.customerName || "-"],
-        ["Date", dateStr],
-        ["Container", order.containerNumber || "-"],
+        ["Customer",    order.customerName || "-"],
+        ["Date",        dateStr],
+        ["Container",   order.containerNumber || "-"],
       ];
       for (const [label, value] of details) {
-        const dr = sheet.addRow(["", "", "", label, "", value]);
-        dr.getCell(4).font = { bold: true, size: 10 };
-        dr.getCell(4).alignment = { horizontal: "right" };
-        dr.getCell(6).font = { size: 10 };
-        merge(dr.number, 4, 5);
+        const dr = sheet.addRow(["", "", "", "", label, "", value]);
+        dr.height = 20;
+        dr.getCell(5).font = { bold: true, size: 11 };
+        dr.getCell(5).alignment = { horizontal: "right" };
+        dr.getCell(7).font = { size: 11 };
+        merge(dr.number, 5, 6);
       }
 
       sheet.addRow([]);
 
       // Table header
-      const hdr = sheet.addRow(["#", "Article Code", "Product", "Requested", "Loaded", "Status"]);
-      hdr.height = 18;
+      const hdr = sheet.addRow(["#", "Article Code", "Product", "Requested", "Loaded", "Diff", "Status"]);
+      hdr.height = 24;
       hdr.eachCell((cell: any) => {
-        cell.font = { bold: true, color: { argb: WHITE }, size: 10 };
+        cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
         setFill(cell, DARK_BLUE);
         cell.alignment = { horizontal: "center", vertical: "middle" };
         cell.border = { top: { style: "thin", color: { argb: WHITE } }, bottom: { style: "thin", color: { argb: WHITE } }, left: { style: "thin", color: { argb: WHITE } }, right: { style: "thin", color: { argb: WHITE } } };
@@ -2641,14 +2668,22 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       // Data rows
       rows.forEach((row, idx) => {
         const style = statusStyle[row.status] || { bg: LIGHT_GRAY, fg: "FF000000" };
-        const dr = sheet.addRow([idx + 1, row.articleCode, row.productName, row.requested, row.loaded, row.status]);
-        dr.height = 15;
+        const diffLabel = row.diff === 0 ? "0" : (row.diff > 0 ? `+${row.diff}` : `${row.diff}`);
+        const dr = sheet.addRow([idx + 1, row.articleCode, row.productName, row.requested, row.loaded, diffLabel, row.status]);
+        dr.height = 20;
+        dr.eachCell((cell: any) => { cell.font = { size: 11 }; });
         if (idx % 2 === 1) dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
         // Status cell: always coloured
-        const statusCell = dr.getCell(6);
+        const statusCell = dr.getCell(7);
         setFill(statusCell, style.bg);
-        statusCell.font = { bold: true, size: 10, color: { argb: style.fg } };
+        statusCell.font = { bold: true, size: 11, color: { argb: style.fg } };
         statusCell.alignment = { horizontal: "center" };
+        // Diff cell: colour by positive/negative/zero
+        const diffCell = dr.getCell(6);
+        diffCell.alignment = { horizontal: "center" };
+        if (row.diff > 0) diffCell.font = { bold: true, size: 11, color: { argb: "FFC62828" } };
+        else if (row.diff < 0) diffCell.font = { bold: true, size: 11, color: { argb: "FFE65100" } };
+        else diffCell.font = { bold: true, size: 11, color: { argb: "FF2E7D32" } };
         dr.getCell(1).alignment = { horizontal: "center" };
         dr.getCell(4).alignment = { horizontal: "right" };
         dr.getCell(5).alignment = { horizontal: "right" };
@@ -2665,19 +2700,21 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       // Totals row
       const totalLoaded = rows.reduce((s, r) => s + r.loaded, 0);
       const totalRequested = rows.reduce((s, r) => s + r.requested, 0);
-      const totRow = sheet.addRow(["", "", "Totals", totalRequested, totalLoaded, ""]);
-      totRow.height = 16;
+      const totalDiff = totalLoaded - totalRequested;
+      const totRow = sheet.addRow(["", "", "Totals", totalRequested, totalLoaded, totalDiff === 0 ? "0" : (totalDiff > 0 ? `+${totalDiff}` : `${totalDiff}`), ""]);
+      totRow.height = 22;
       totRow.eachCell((cell: any) => {
-        cell.font = { bold: true, size: 10, color: { argb: WHITE } };
+        cell.font = { bold: true, size: 11, color: { argb: WHITE } };
         setFill(cell, DARK_BLUE);
         cell.alignment = { horizontal: "right" };
       });
       totRow.getCell(3).alignment = { horizontal: "center" };
+      totRow.getCell(6).alignment = { horizontal: "center" };
 
       // Legend
       sheet.addRow([]);
       const legendHdr = sheet.addRow(["Legend"]);
-      legendHdr.getCell(1).font = { bold: true, size: 10 };
+      legendHdr.getCell(1).font = { bold: true, size: 11 };
       const legend: [string, typeof statusStyle[string]][] = [
         ["LOADED — exact quantity matched", statusStyle["LOADED"]],
         ["OVERLOADED — more than requested", statusStyle["OVERLOADED"]],
@@ -2688,7 +2725,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       for (const [label, st] of legend) {
         const lr = sheet.addRow(["", label]);
         setFill(lr.getCell(2), st.bg);
-        lr.getCell(2).font = { size: 9, color: { argb: st.fg }, bold: true };
+        lr.getCell(2).font = { size: 10, color: { argb: st.fg }, bold: true };
         lr.getCell(2).alignment = { horizontal: "left" };
         merge(lr.number, 2, COL);
       }
