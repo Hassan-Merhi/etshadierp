@@ -263,38 +263,9 @@ export function registerFactoryContainersRoutes(app: Express) {
         });
       }
 
-      // Double-entry: Commission (Dr Commission Expense / Cr Broker Payable)
-      if (commissionAmt > 0 && container.commissionAccountId && container.commissionSupplierId) {
-        const commFx = parseFloat(container.fxRateToUsd || "1");
-        const commVoucherNum = `FACTORY-COMM-${container.id}-${Date.now()}`;
-        const [commVoucher] = await db.insert(vouchers).values({
-          companyId,
-          voucherType: "Journal",
-          voucherNumber: commVoucherNum,
-          voucherDate: container.arrivalDate || today,
-          description: `Commission on container ${container.containerNumber}`,
-          totalAmount: String(commissionAmt),
-          currency: container.commissionCurrencyCode || "USD",
-          exchangeRate: String(commFx),
-          sourceModule: "FACTORY",
-        }).returning();
-        // Dr Broker (factory supplier payable) — records what we owe the broker
-        await db.insert(voucherEntries).values({
-          voucherId: commVoucher.id,
-          factorySupplierId: container.commissionSupplierId,
-          debitAmount: String(commissionAmt),
-          creditAmount: "0",
-          narration: `Commission due to broker - container ${container.containerNumber}`,
-        });
-        // Cr Commission Payable - [Broker] — LIABILITY increases (we owe them)
-        await db.insert(voucherEntries).values({
-          voucherId: commVoucher.id,
-          ledgerAccountId: container.commissionAccountId,
-          debitAmount: "0",
-          creditAmount: String(commissionAmt),
-          narration: `Commission payable to broker - container ${container.containerNumber}`,
-        });
-      }
+      // Commission is already included in the factory supplier balance calculation
+      // (via container.commissionAmount in the supplier liability formula).
+      // Posting a separate journal voucher would double-count it, so we skip it here.
 
       // Double-entry: Freight (Dr Freight Expense / Cr Supplier Payable)
       // Freight posts in its own currency (may differ from container currency)
