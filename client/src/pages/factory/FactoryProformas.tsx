@@ -423,6 +423,14 @@ export default function FactoryProformas() {
                       <Badge variant="secondary" data-testid={`badge-lines-count-${proforma.id}`}>
                         {proforma.lines?.length || 0} lines
                       </Badge>
+                      {(() => {
+                        const d = formatProformaDate(proforma.createdAt, proforma.updatedAt);
+                        return d.value ? (
+                          <span className="text-xs text-muted-foreground" data-testid={`text-proforma-date-${proforma.id}`}>
+                            {d.label} {d.value}
+                          </span>
+                        ) : null;
+                      })()}
                     </button>
                     <div className="flex items-center gap-1">
                       <Button
