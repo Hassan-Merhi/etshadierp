@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, Pencil, Search, Tag, RefreshCw } from "lucide-react";
+import { Check, X, Pencil, Search, Tag, RefreshCw, AlertCircle } from "lucide-react";
 
 interface FactoryBaleProduct {
   id: number;
@@ -39,6 +39,7 @@ export default function FactoryPriceList() {
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [showZeroOnly, setShowZeroOnly] = useState(false);
   const [editingCell, setEditingCell] = useState<{ productId: number; field: "sellingPrice" | "productionPrice"; value: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -104,7 +105,8 @@ export default function FactoryPriceList() {
       (p.articleCode || "").toLowerCase().includes(search.toLowerCase()) ||
       (p.code || "").toLowerCase().includes(search.toLowerCase());
     const matchCategory = categoryFilter === "all" || String(p.categoryId) === categoryFilter;
-    return matchSearch && matchCategory;
+    const matchZeroOnly = !showZeroOnly || parseFloat(p.sellingPrice || "0") === 0;
+    return matchSearch && matchCategory && matchZeroOnly;
   });
 
   const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
@@ -150,6 +152,15 @@ export default function FactoryPriceList() {
             ))}
           </SelectContent>
         </Select>
+        <Button
+          variant={showZeroOnly ? "default" : "outline"}
+          onClick={() => setShowZeroOnly(v => !v)}
+          className="gap-2 whitespace-nowrap"
+          data-testid="button-show-zero-price-only"
+        >
+          <AlertCircle className="h-4 w-4" />
+          {showZeroOnly ? "Showing unpriced" : "Show unpriced"}
+        </Button>
       </div>
 
       <Card>
@@ -304,7 +315,7 @@ export default function FactoryPriceList() {
               <Tag className="mx-auto h-12 w-12 text-muted-foreground" />
               <h3 className="mt-4 text-lg font-semibold">No products found</h3>
               <p className="text-muted-foreground mt-2 text-sm">
-                {search || categoryFilter !== "all" ? "Try adjusting your filters." : "Add bale products to see them here."}
+                {showZeroOnly ? "All products have a selling price set." : search || categoryFilter !== "all" ? "Try adjusting your filters." : "Add bale products to see them here."}
               </p>
             </div>
           )}
