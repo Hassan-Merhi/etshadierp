@@ -44,7 +44,7 @@ export default function FactoryPendingInvoices() {
   const { formatDisplayDate } = useDateFormat();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [statusFilter, setStatusFilter] = useState<string>("PENDING_VERIFICATION");
   const { toast } = useToast();
 
   const { data: pendingOrders = [], isLoading: pendingLoading } = useQuery<CustomerOrder[]>({
@@ -53,6 +53,10 @@ export default function FactoryPendingInvoices() {
 
   const { data: verifiedOrders = [], isLoading: verifiedLoading } = useQuery<CustomerOrder[]>({
     queryKey: ["/api/factory/customer-orders?status=VERIFIED"],
+  });
+
+  const { data: finalizedOrders = [], isLoading: finalizedLoading } = useQuery<CustomerOrder[]>({
+    queryKey: ["/api/factory/customer-orders?status=FINALIZED"],
   });
 
   const deleteMutation = useMutation({
@@ -74,8 +78,8 @@ export default function FactoryPendingInvoices() {
     },
   });
 
-  const allOrders = [...pendingOrders, ...verifiedOrders];
-  const isLoading = pendingLoading || verifiedLoading;
+  const allOrders = [...pendingOrders, ...verifiedOrders, ...finalizedOrders];
+  const isLoading = pendingLoading || verifiedLoading || finalizedLoading;
 
   const filteredOrders = statusFilter === "ALL"
     ? allOrders
@@ -84,13 +88,22 @@ export default function FactoryPendingInvoices() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "PENDING_VERIFICATION":
-        return <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800">Pending Verification</Badge>;
+        return <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800">Pending</Badge>;
       case "VERIFIED":
         return <Badge variant="outline" className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800">Verified</Badge>;
+      case "FINALIZED":
+        return <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">Finalized</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
   };
+
+  const filters: { key: string; label: string; count: number }[] = [
+    { key: "PENDING_VERIFICATION", label: "Pending",    count: pendingOrders.length  },
+    { key: "VERIFIED",             label: "Verified",   count: verifiedOrders.length },
+    { key: "FINALIZED",            label: "Finalized",  count: finalizedOrders.length },
+    { key: "ALL",                  label: "All",        count: allOrders.length      },
+  ];
 
   return (
     <div className="flex flex-col h-full p-6">
@@ -98,35 +111,22 @@ export default function FactoryPendingInvoices() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2" data-testid="text-page-title">
             <ClipboardCheck className="h-7 w-7" />
-            Pending Invoices
+            Pending &amp; Finalized Invoices
           </h1>
-          <p className="text-muted-foreground text-sm sm:text-base">Orders awaiting verification</p>
+          <p className="text-muted-foreground text-sm sm:text-base">Orders awaiting or completed verification</p>
         </div>
-        <div className="flex items-center gap-2" data-testid="filter-tabs">
-          <Button
-            variant={statusFilter === "ALL" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStatusFilter("ALL")}
-            data-testid="button-filter-all"
-          >
-            All ({allOrders.length})
-          </Button>
-          <Button
-            variant={statusFilter === "PENDING_VERIFICATION" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStatusFilter("PENDING_VERIFICATION")}
-            data-testid="button-filter-pending"
-          >
-            Pending ({pendingOrders.length})
-          </Button>
-          <Button
-            variant={statusFilter === "VERIFIED" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStatusFilter("VERIFIED")}
-            data-testid="button-filter-verified"
-          >
-            Verified ({verifiedOrders.length})
-          </Button>
+        <div className="flex flex-wrap items-center gap-2" data-testid="filter-tabs">
+          {filters.map((f) => (
+            <Button
+              key={f.key}
+              variant={statusFilter === f.key ? "default" : "outline"}
+              size="sm"
+              onClick={() => setStatusFilter(f.key)}
+              data-testid={`button-filter-${f.key.toLowerCase()}`}
+            >
+              {f.label} ({f.count})
+            </Button>
+          ))}
         </div>
       </div>
 
@@ -156,7 +156,7 @@ export default function FactoryPendingInvoices() {
                   <TableCell colSpan={7} className="text-center text-muted-foreground py-8" data-testid="text-no-orders">
                     <div className="flex flex-col items-center gap-2">
                       <Package className="h-10 w-10 opacity-40" />
-                      <p>No pending invoices found</p>
+                      <p>No invoices found</p>
                     </div>
                   </TableCell>
                 </TableRow>
