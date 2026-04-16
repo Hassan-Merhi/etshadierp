@@ -133,6 +133,7 @@ function companyColor(id: number) {
 // ─── Today helpers ─────────────────────────────────────────────────────────────
 
 function todayStr() { return format(new Date(), "yyyy-MM-dd"); }
+function nDaysAgo(n: number) { return format(addDays(new Date(), -n), "yyyy-MM-dd"); }
 function shiftDateStr(dateStr: string, days: number) {
   return format(addDays(parseISO(dateStr), days), "yyyy-MM-dd");
 }
@@ -145,7 +146,7 @@ export default function TransactionJournal() {
   const { toast } = useToast();
 
   // ── Filter state ──
-  const [startDate,      setStartDate]      = useState(todayStr());
+  const [startDate,      setStartDate]      = useState(nDaysAgo(7));
   const [endDate,        setEndDate]        = useState(todayStr());
   const [selectedCos,    setSelectedCos]    = useState<number[]>([]);   // empty = all
   const [voucherType,    setVoucherType]    = useState("all");
