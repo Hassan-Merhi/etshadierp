@@ -1180,122 +1180,233 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
 
-      // Load customer
-      const [customer] = await db.select().from(customers)
-        .where(eq(customers.id, order.customerId));
+      const [customer] = await db.select().from(customers).where(eq(customers.id, order.customerId));
+      const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
 
-      // Load bale links
-      const baleLinks = await db.select().from(customerOrderBales)
-        .where(eq(customerOrderBales.orderId, orderId));
-
-      // Load bale details
+      const baleLinks = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
       const baleIds = baleLinks.map((b: any) => b.baleId).filter(Boolean);
       const baleRows: any[] = baleIds.length > 0
         ? await db.select().from(factoryBales).where(inArray(factoryBales.id, baleIds))
         : [];
 
-      // Load products for name mapping
       const productIds = [...new Set(baleRows.map((b: any) => b.productId).filter((id: any) => id != null))];
       const productRecords: any[] = productIds.length > 0
         ? await db.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds as number[]))
         : [];
       const productMap = new Map<number, any>(productRecords.map((p: any) => [p.id, p]));
+      const balePriceMap = new Map<number, number>(baleLinks.map((l: any) => [l.baleId, parseFloat(l.priceUsed || "0")]));
 
-      // Load charges
-      const charges = await db.select().from(customerOrderCharges)
-        .where(eq(customerOrderCharges.orderId, orderId));
+      // Group bales by product article code
+      interface ProductGroup {
+        articleCode: string;
+        productName: string;
+        qty: number;
+        wtPerBale: number;
+        totalWt: number;
+        pricePerBale: number;
+        total: number;
+      }
+      const grouped = new Map<string, ProductGroup>();
+      for (const bale of baleRows) {
+        const product = productMap.get(bale.productId);
+        const articleCode = product?.articleCode || bale.articleCode || "UNKNOWN";
+        const productName = product?.name || bale.productName || articleCode;
+        const wtPerBale = parseFloat(product?.weightPerBaleKg || bale.weightKg || "0");
+        const price = balePriceMap.get(bale.id) || 0;
+        if (!grouped.has(articleCode)) {
+          grouped.set(articleCode, { articleCode, productName, qty: 0, wtPerBale, totalWt: 0, pricePerBale: price, total: 0 });
+        }
+        const g = grouped.get(articleCode)!;
+        g.qty += 1;
+        g.totalWt += parseFloat(bale.weightKg || wtPerBale.toString());
+        g.total += price;
+      }
+
+      const lines = Array.from(grouped.values()).sort((a, b) => a.articleCode.localeCompare(b.articleCode));
+
+      // Currency
+      const baseCurrency = (company as any)?.baseCurrency || "USD";
+      const currencySymbolMap: Record<string, string> = { USD: "$", GBP: "£", EUR: "€", CFA: "CFA", XOF: "CFA", XAF: "CFA" };
+      const currSym = currencySymbolMap[baseCurrency.toUpperCase()] ?? baseCurrency;
+      const fmtMoney = (n: number) => `${currSym}${n % 1 === 0 ? n.toLocaleString() : n.toFixed(2)}`;
+      const fmtNum = (n: number) => n % 1 === 0 ? n.toLocaleString() : n.toFixed(2);
 
       const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Commercial Invoice");
+      const COL = 8;
 
-      // ── Sheet 1: Order Summary ──
-      const summarySheet = workbook.addWorksheet("Order Summary");
-      summarySheet.columns = [
-        { header: "Field", key: "field", width: 28 },
-        { header: "Value", key: "value", width: 40 },
+      sheet.columns = [
+        { key: "c1", width: 6 },
+        { key: "c2", width: 16 },
+        { key: "c3", width: 30 },
+        { key: "c4", width: 8 },
+        { key: "c5", width: 11 },
+        { key: "c6", width: 13 },
+        { key: "c7", width: 13 },
+        { key: "c8", width: 14 },
       ];
-      const summaryRows = [
-        { field: "Order #", value: order.id },
-        { field: "Invoice Number", value: order.invoiceNumber || "-" },
-        { field: "Customer", value: customer?.legalName || `Customer #${order.customerId}` },
-        { field: "Order Date", value: order.orderDate || "-" },
-        { field: "Status", value: order.status },
-        { field: "Container Number", value: order.containerNumber || "-" },
-        { field: "Shipping Company", value: order.shippingCompany || "-" },
-        { field: "Total Bales", value: order.totalQtyBales || baleRows.length },
-        { field: "Subtotal (Bales)", value: parseFloat(order.subtotalBales || "0") },
-        { field: "Freight Amount", value: parseFloat(order.freightAmount || "0") },
-        { field: "Other Charges", value: parseFloat(order.otherChargesTotal || "0") },
-        { field: "Grand Total", value: parseFloat(order.grandTotal || "0") },
+
+      const DARK_BLUE = "FF1F3864";
+      const LIGHT_GRAY = "FFF5F5F5";
+      const WHITE = "FFFFFFFF";
+      const GOLD = "FFD4AF37";
+
+      const merge = (r: number, c1: number, c2: number) => sheet.mergeCells(r, c1, r, c2);
+      const setFill = (cell: any, argb: string) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } }; };
+      const setBorder = (row: any) => {
+        row.eachCell((cell: any) => {
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFDDDDDD" } },
+            bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
+            left: { style: "thin", color: { argb: "FFDDDDDD" } },
+            right: { style: "thin", color: { argb: "FFDDDDDD" } },
+          };
+        });
+      };
+
+      // ── Logo row ──
+      const logoRow = sheet.addRow([]);
+      logoRow.height = 80;
+      try {
+        const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+        if (fs.existsSync(logoPath)) {
+          const logoBuf = fs.readFileSync(logoPath);
+          const logoId = workbook.addImage({ buffer: logoBuf as Buffer, extension: "jpeg" });
+          sheet.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 120, height: 80 } });
+        }
+      } catch {}
+
+      // ── Company name ──
+      const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
+      r1.height = 22;
+      r1.getCell(1).font = { bold: true, size: 14, color: { argb: DARK_BLUE } };
+      r1.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+      merge(r1.number, 1, COL);
+
+      // ── "Commercial Invoice" title ──
+      const r2 = sheet.addRow(["Commercial Invoice"]);
+      r2.height = 20;
+      r2.getCell(1).font = { bold: true, size: 13, color: { argb: DARK_BLUE } };
+      r2.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+      merge(r2.number, 1, COL);
+      sheet.addRow([]);
+
+      // ── Invoice details (right-aligned block) ──
+      const invoiceNum = order.invoiceNumber || `INV-${String(orderId).padStart(6, "0")}`;
+      const orderDateFmt = order.orderDate
+        ? new Date(order.orderDate).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" })
+        : "-";
+
+      const details = [
+        ["Invoice No.", invoiceNum],
+        ["Customer", customer?.legalName || "-"],
+        ["Date", orderDateFmt],
+        ["Container", order.containerNumber || "-"],
       ];
-      summaryRows.forEach((r) => summarySheet.addRow(r));
-      summarySheet.getRow(1).font = { bold: true };
+      for (const [label, value] of details) {
+        const dr = sheet.addRow(["", "", "", "", "", label, "", value]);
+        dr.getCell(6).font = { bold: true, size: 10 };
+        dr.getCell(6).alignment = { horizontal: "right" };
+        dr.getCell(8).font = { size: 10 };
+        dr.getCell(8).alignment = { horizontal: "left" };
+        merge(dr.number, 6, 7);
+      }
+      sheet.addRow([]);
 
-      const [fCfgOrder] = await db.select({ hideAvgCost: factorySettings.hideAvgCost, hideSellingPrice: factorySettings.hideSellingPrice }).from(factorySettings).where(eq(factorySettings.companyId, companyId)).limit(1);
-      const showCostOrder = !fCfgOrder?.hideAvgCost;
-
-      // ── Sheet 2: Bale Details ──
-      const baleSheet = workbook.addWorksheet("Bale Details");
-      const baleSheetCols: any[] = [
-        { header: "#", key: "seq", width: 6 },
-        { header: "Reference", key: "ref", width: 18 },
-        { header: "Article Code", key: "articleCode", width: 14 },
-        { header: "Product Name", key: "productName", width: 30 },
-        { header: "Weight (kg)", key: "weightKg", width: 14 },
-      ];
-      if (showCostOrder) baleSheetCols.push({ header: "Cost/kg", key: "costPerKg", width: 12 });
-      baleSheetCols.push({ header: "Status", key: "status", width: 16 });
-      if (!fCfgOrder?.hideSellingPrice) baleSheetCols.push({ header: "Price Used", key: "priceUsed", width: 14 });
-      baleSheet.columns = baleSheetCols;
-      baleSheet.getRow(1).font = { bold: true };
-
-      // Map baleId -> price from link table
-      const balePriceMap = new Map<number, string>(baleLinks.map((l: any) => [l.baleId, l.priceUsed]));
-
-      baleRows.forEach((bale: any, i: number) => {
-        const product = productMap.get(bale.productId);
-        const baleDetailRow: any = {
-          seq: i + 1,
-          ref: bale.referenceNumber || bale.baleCode || "-",
-          articleCode: product?.articleCode || bale.articleCode || "-",
-          productName: product?.name || product?.articleCode || "-",
-          weightKg: parseFloat(bale.weightKg || "0"),
-        };
-        if (showCostOrder) baleDetailRow.costPerKg = parseFloat(bale.costPerKg || "0");
-        baleDetailRow.status = bale.status || "-";
-        if (!fCfgOrder?.hideSellingPrice) baleDetailRow.priceUsed = parseFloat(balePriceMap.get(bale.id) || "0");
-        baleSheet.addRow(baleDetailRow);
+      // ── Table header ──
+      const hdrRow = sheet.addRow(["#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt", "Price/Bale", "Total"]);
+      hdrRow.height = 18;
+      hdrRow.eachCell((cell: any) => {
+        cell.font = { bold: true, color: { argb: WHITE }, size: 10 };
+        setFill(cell, DARK_BLUE);
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.border = { top: { style: "thin", color: { argb: WHITE } }, bottom: { style: "thin", color: { argb: WHITE } }, left: { style: "thin", color: { argb: WHITE } }, right: { style: "thin", color: { argb: WHITE } } };
       });
 
-      // Totals row
-      if (baleRows.length > 0) {
-        const totalDetailRow: any = {
-          seq: "",
-          ref: "TOTAL",
-          articleCode: "",
-          productName: "",
-          weightKg: baleRows.reduce((s: number, b: any) => s + parseFloat(b.weightKg || "0"), 0),
-        };
-        if (showCostOrder) totalDetailRow.costPerKg = "";
-        totalDetailRow.status = "";
-        if (!fCfgOrder?.hideSellingPrice) totalDetailRow.priceUsed = "";
-        const totalRow = baleSheet.addRow(totalDetailRow);
-        totalRow.font = { bold: true };
-      }
+      // ── Data rows ──
+      let totalQty = 0, totalWtAll = 0, totalAll = 0;
+      lines.forEach((g, idx) => {
+        totalQty += g.qty;
+        totalWtAll += g.totalWt;
+        totalAll += g.total;
+        const dr = sheet.addRow([
+          idx + 1,
+          g.articleCode,
+          g.productName,
+          g.qty,
+          fmtNum(g.wtPerBale),
+          fmtNum(g.totalWt),
+          fmtMoney(g.pricePerBale),
+          fmtMoney(g.total),
+        ]);
+        dr.height = 15;
+        if (idx % 2 === 1) {
+          dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
+        }
+        dr.getCell(1).alignment = { horizontal: "center" };
+        dr.getCell(4).alignment = { horizontal: "right" };
+        dr.getCell(5).alignment = { horizontal: "right" };
+        dr.getCell(6).alignment = { horizontal: "right" };
+        dr.getCell(7).alignment = { horizontal: "right" };
+        dr.getCell(8).alignment = { horizontal: "right" };
+        setBorder(dr);
+      });
 
-      // ── Sheet 3: Charges ──
-      if (charges.length > 0) {
-        const chargeSheet = workbook.addWorksheet("Charges");
-        chargeSheet.columns = [
-          { header: "Description", key: "description", width: 36 },
-          { header: "Amount", key: "amount", width: 16 },
-        ];
-        chargeSheet.getRow(1).font = { bold: true };
-        charges.forEach((c: any) => chargeSheet.addRow({ description: c.description, amount: parseFloat(c.amount || "0") }));
-      }
+      // ── Totals row ──
+      const totRow = sheet.addRow(["", "", "Totals", totalQty, "", fmtNum(totalWtAll), "", fmtMoney(totalAll)]);
+      totRow.height = 16;
+      totRow.eachCell((cell: any) => {
+        cell.font = { bold: true, size: 10, color: { argb: WHITE } };
+        setFill(cell, DARK_BLUE);
+        cell.alignment = { horizontal: "right" };
+      });
+      totRow.getCell(3).alignment = { horizontal: "center" };
+      totRow.getCell(4).alignment = { horizontal: "right" };
+      totRow.getCell(6).alignment = { horizontal: "right" };
+      totRow.getCell(8).alignment = { horizontal: "right" };
+
+      sheet.addRow([]);
+
+      // ── Financial summary block ──
+      const subtotal = parseFloat(order.subtotalBales || "0");
+      const freight = parseFloat(order.freightAmount || "0");
+      const clearance = parseFloat(order.otherChargesTotal || "0");
+      const grandTotal = parseFloat(order.grandTotal || "0");
+
+      const summaryData = [
+        ["Subtotal (Bales)", subtotal],
+        ["Freight", freight],
+        ["Clearance", clearance],
+        ["Grand Total", grandTotal],
+      ];
+
+      // Header row for summary
+      const sumHdr = sheet.addRow(["", "", "", "", "", "", "Name", "Amount"]);
+      sumHdr.getCell(7).font = { bold: true, color: { argb: WHITE }, size: 10 };
+      sumHdr.getCell(8).font = { bold: true, color: { argb: WHITE }, size: 10 };
+      setFill(sumHdr.getCell(7), DARK_BLUE);
+      setFill(sumHdr.getCell(8), DARK_BLUE);
+      sumHdr.getCell(7).alignment = { horizontal: "center" };
+      sumHdr.getCell(8).alignment = { horizontal: "center" };
+
+      summaryData.forEach(([label, amount], idx) => {
+        const sr = sheet.addRow(["", "", "", "", "", "", label as string, fmtMoney(amount as number)]);
+        const isGrandTotal = idx === summaryData.length - 1;
+        const bg = isGrandTotal ? DARK_BLUE : (idx % 2 === 0 ? WHITE : LIGHT_GRAY);
+        const fg = isGrandTotal ? WHITE : "FF000000";
+        setFill(sr.getCell(7), bg);
+        setFill(sr.getCell(8), bg);
+        sr.getCell(7).font = { bold: isGrandTotal, size: 10, color: { argb: fg } };
+        sr.getCell(8).font = { bold: isGrandTotal, size: 10, color: { argb: fg } };
+        sr.getCell(7).alignment = { horizontal: "left" };
+        sr.getCell(8).alignment = { horizontal: "right" };
+        sr.getCell(7).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
+        sr.getCell(8).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
+      });
 
       const dateStr = getClientDate(req);
-      const fileName = `order_${orderId}_${order.invoiceNumber || "draft"}_${dateStr}.xlsx`;
+      const fileName = `invoice_${invoiceNum.replace(/[^a-zA-Z0-9]/g, "_")}_${dateStr}.xlsx`;
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
       await workbook.xlsx.write(res);
