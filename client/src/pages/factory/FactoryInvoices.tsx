@@ -11,7 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import { Eye, Trash2, RotateCcw, Download } from "lucide-react";
+import { Eye, Trash2, RotateCcw, Download, FileSpreadsheet, FileText } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import {
   AlertDialog,
@@ -243,15 +249,34 @@ export default function FactoryInvoices() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => window.open(`/api/factory/customer-orders/${order.id}/export-pdf`, "_blank")}
-                          data-testid={`button-download-pdf-${order.id}`}
-                          title="Download Invoice PDF"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              data-testid={`button-download-${order.id}`}
+                              title="Download Invoice"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => window.open(`/api/factory/customer-orders/${order.id}/export/excel`, "_blank")}
+                              data-testid={`button-download-excel-${order.id}`}
+                            >
+                              <FileSpreadsheet className="h-4 w-4 mr-2" />
+                              Excel
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => window.open(`/api/factory/customer-orders/${order.id}/export-pdf`, "_blank")}
+                              data-testid={`button-download-pdf-${order.id}`}
+                            >
+                              <FileText className="h-4 w-4 mr-2" />
+                              PDF
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                         <Button
                           variant="ghost"
                           size="icon"
