@@ -197,8 +197,8 @@ export function registerGlobalTransactionRoutes(
           companyName: companies.name,
           currency:    vouchers.currency,
           voucherCount: count(),
-          totalDebits: sql<string>`SUM(CASE WHEN ve.debit_amount > 0 THEN ve.debit_amount ELSE 0 END)`,
-          totalCredits: sql<string>`SUM(CASE WHEN ve.credit_amount > 0 THEN ve.credit_amount ELSE 0 END)`,
+          totalDebits:  sql<string>`SUM(CASE WHEN ${voucherEntries.debitAmount}  > 0 THEN ${voucherEntries.debitAmount}  ELSE 0 END)`,
+          totalCredits: sql<string>`SUM(CASE WHEN ${voucherEntries.creditAmount} > 0 THEN ${voucherEntries.creditAmount} ELSE 0 END)`,
         })
         .from(vouchers)
         .innerJoin(companies, eq(companies.id, vouchers.companyId))

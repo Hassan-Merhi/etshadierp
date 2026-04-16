@@ -995,6 +995,8 @@ let migrationsDone = false;
        auto_send    boolean NOT NULL DEFAULT false,
        last_sent_at timestamp
     )`,
+    // container_offloads.optional — marks optional bale lines (added Apr 2026)
+    `ALTER TABLE container_offloads ADD COLUMN IF NOT EXISTS optional BOOLEAN NOT NULL DEFAULT false`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
