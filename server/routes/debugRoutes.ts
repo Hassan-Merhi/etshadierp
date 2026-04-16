@@ -1405,7 +1405,54 @@ export function registerDebugRoutes(app: Express) {
         total: parseFloat(offload.containerChargesTotal || "0"),
       };
 
-      res.json({ ...offload, items, poCharges, additionalCharges });
+      // Fetch LIVE voucher totals for this container so external edits are reflected immediately
+      // Pattern: DUTY-{containerNumber}-*, OFFICE-{containerNumber}-*, TRANS-{containerNumber}-*, XFER-{containerNumber}-*, CHG-{containerNumber}-*
+      const cn = offload.containerNumber;
+      const liveVouchers = await db
+        .select({ voucherNumber: vouchers.voucherNumber, totalAmount: vouchers.totalAmount })
+        .from(vouchers)
+        .where(
+          or(
+            like(vouchers.voucherNumber, `DUTY-${cn}-%`),
+            like(vouchers.voucherNumber, `OFFICE-${cn}-%`),
+            like(vouchers.voucherNumber, `TRANS-${cn}-%`),
+            like(vouchers.voucherNumber, `XFER-${cn}-%`),
+            like(vouchers.voucherNumber, `CHG-${cn}-%`),
+          )
+        )
+        .execute();
+
+      const sumByPrefix = (prefix: string) =>
+        liveVouchers
+          .filter(v => v.voucherNumber.startsWith(`${prefix}-${cn}-`))
+          .reduce((s, v) => s + parseFloat(v.totalAmount || "0"), 0);
+
+      const liveDuties          = sumByPrefix("DUTY");
+      const liveOfficeCharges   = sumByPrefix("OFFICE");
+      const liveTransportFees   = sumByPrefix("TRANS");
+      const liveTransferCharges = sumByPrefix("XFER");
+      const liveAddlCharges     = sumByPrefix("CHG");
+
+      const liveTotalOffloadCharges = liveDuties + liveOfficeCharges + liveTransportFees + liveTransferCharges + liveAddlCharges;
+      const liveTotalAllCharges     = liveTotalOffloadCharges + poCharges.total;
+      const totalBalesNum           = parseFloat(offload.totalBales || "0");
+      const liveAdditionalCostPerBale = totalBalesNum > 0
+        ? Math.round((liveTotalAllCharges / totalBalesNum) * 100) / 100
+        : 0;
+
+      const liveCharges = {
+        duties:          liveDuties,
+        officeCharges:   liveOfficeCharges,
+        transportFees:   liveTransportFees,
+        transferCharges: liveTransferCharges,
+        additionalCharges: liveAddlCharges,
+        totalOffloadCharges: liveTotalOffloadCharges,
+        totalAllCharges:  liveTotalAllCharges,
+        additionalCostPerBale: liveAdditionalCostPerBale,
+        hasVouchers: liveVouchers.length > 0,
+      };
+
+      res.json({ ...offload, items, poCharges, additionalCharges, liveCharges });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
