@@ -167,8 +167,6 @@ export default function OffloadDetail() {
 
   const itemsTotal = offload?.items.reduce((s, i) => s + Number(i.totalValue), 0) ?? 0;
   const live = offload?.liveCharges;
-  const hasPoCharges = (offload?.poCharges?.total ?? 0) > 0;
-
   // Prefer live voucher amounts when available
   const displayDuties         = live?.hasVouchers ? live.duties          : Number(offload?.duties || 0);
   const displayOfficeCharges  = live?.hasVouchers ? live.officeCharges   : Number(offload?.officeCharges || 0);
@@ -178,7 +176,6 @@ export default function OffloadDetail() {
   const displayOffloadTotal   = live?.hasVouchers ? live.totalOffloadCharges
     : (displayDuties + displayOfficeCharges + displayTransportFees + displayTransferCharges + displayAddlCharges);
 
-  const displayGrandCharges       = live?.hasVouchers ? live.totalAllCharges     : Number(offload?.totalCharges || 0);
   const displayCostPerBale        = live?.hasVouchers ? live.additionalCostPerBale : Number(offload?.additionalCostPerBale || 0);
 
   // Stored original values for comparison badges
@@ -369,59 +366,6 @@ export default function OffloadDetail() {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* ── Container Freight (from POs) ── */}
-                  {hasPoCharges && (
-                    <tr className="bg-muted/20">
-                      <td colSpan={2} className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                        Container Freight
-                      </td>
-                    </tr>
-                  )}
-                  {offload.poCharges.freight > 0 && (
-                    <tr className="border-b">
-                      <td className="p-3 pl-5">Freight</td>
-                      <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.freight)}</td>
-                    </tr>
-                  )}
-                  {offload.poCharges.fumigation > 0 && (
-                    <tr className="border-b">
-                      <td className="p-3 pl-5">Fumigation</td>
-                      <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.fumigation)}</td>
-                    </tr>
-                  )}
-                  {offload.poCharges.surcharge > 0 && (
-                    <tr className="border-b">
-                      <td className="p-3 pl-5">Surcharge</td>
-                      <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.surcharge)}</td>
-                    </tr>
-                  )}
-                  {offload.poCharges.documentCharges > 0 && (
-                    <tr className="border-b">
-                      <td className="p-3 pl-5">Document Charges</td>
-                      <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.documentCharges)}</td>
-                    </tr>
-                  )}
-                  {offload.poCharges.otherCharges > 0 && (
-                    <tr className="border-b">
-                      <td className="p-3 pl-5">Other Charges</td>
-                      <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.otherCharges)}</td>
-                    </tr>
-                  )}
-                  {offload.poCharges.discount > 0 && (
-                    <tr className="border-b">
-                      <td className="p-3 pl-5">Discount</td>
-                      <td className="p-3 text-right font-mono text-green-600 dark:text-green-400">
-                        -{formatAmount(offload.poCharges.discount)}
-                      </td>
-                    </tr>
-                  )}
-                  {hasPoCharges && (
-                    <tr className="border-b border-t bg-muted/10 font-medium">
-                      <td className="p-3 pl-5 text-muted-foreground">Freight Subtotal</td>
-                      <td className="p-3 text-right font-mono">{formatAmount(offload.poCharges.total)}</td>
-                    </tr>
-                  )}
-
                   {/* ── Landing / Local Charges ── */}
                   <tr className="bg-muted/20">
                     <td colSpan={2} className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -483,17 +427,19 @@ export default function OffloadDetail() {
                   {/* ── Grand Total + Cost/Bale ── */}
                   <tr className="bg-muted/30 font-semibold border-t-2">
                     <td className="p-3">Total Charges</td>
-                    <td className="p-3 text-right font-mono">{formatAmount(displayGrandCharges)}</td>
+                    <td className="p-3 text-right font-mono">{formatAmount(displayOffloadTotal)}</td>
                   </tr>
                   <tr className="text-muted-foreground">
                     <td className="p-3 text-sm">
                       Cost / Bale&nbsp;
                       <span className="font-mono text-xs text-muted-foreground">
-                        ({formatAmount(displayGrandCharges)} ÷ {formatNumber(Number(offload.totalBales))} bales)
+                        ({formatAmount(displayOffloadTotal)} ÷ {formatNumber(Number(offload.totalBales))} bales)
                       </span>
                     </td>
                     <td className="p-3 text-right font-mono font-semibold text-amber-600 dark:text-amber-400">
-                      {formatAmount(displayCostPerBale)} / bale
+                      {Number(offload.totalBales) > 0
+                        ? formatAmount(Math.round((displayOffloadTotal / Number(offload.totalBales)) * 100) / 100)
+                        : formatAmount(0)} / bale
                     </td>
                   </tr>
                 </tbody>
@@ -505,11 +451,6 @@ export default function OffloadDetail() {
             <div>
               <p className="text-sm text-muted-foreground">Grand Total (charges included in rates)</p>
               <p className="text-2xl font-semibold font-mono mt-0.5">{formatAmount(itemsTotal)}</p>
-              {hasPoCharges && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Bale cost = purchase rate + {formatAmount(displayCostPerBale)} / bale
-                </p>
-              )}
             </div>
             <Button
               variant="outline"
