@@ -13,7 +13,7 @@ import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Star, Pencil, FileText, Check, LayoutGrid, Download, RefreshCw, Search, BookOpen, PenLine, Truck, ArrowRightLeft } from "lucide-react";
+import { Plus, Trash2, Star, Pencil, FileText, Check, LayoutGrid, Download, RefreshCw, Search, BookOpen, PenLine, Truck, ArrowRightLeft, Clock } from "lucide-react";
 import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -35,6 +35,8 @@ interface Proforma {
   companyId: number;
   name: string;
   isActive: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
   lines: ProformaLine[];
 }
 
@@ -271,6 +273,19 @@ export default function FactoryProformas() {
     } else {
       setInlineQtyLineId(null);
     }
+  };
+
+  const formatProformaDate = (createdAt: string | null, updatedAt: string | null): { label: string; value: string } => {
+    const created = createdAt ? new Date(createdAt) : null;
+    const updated = updatedAt ? new Date(updatedAt) : null;
+    const fmt = (d: Date) => d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    if (updated && created && (updated.getTime() - created.getTime() > 60_000)) {
+      return { label: "Edited", value: fmt(updated) };
+    }
+    if (created) {
+      return { label: "Created", value: fmt(created) };
+    }
+    return { label: "", value: "" };
   };
 
   const applyCatalogPricesMutation = useMutation({
