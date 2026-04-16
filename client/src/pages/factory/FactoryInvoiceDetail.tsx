@@ -139,7 +139,11 @@ export default function FactoryInvoiceDetail() {
       return res.json();
     },
     onSuccess: (data: any) => {
-      toast({ title: "Prices updated", description: `Applied current prices to ${data.repriced} bale(s)` });
+      if (data.repriced === 0) {
+        toast({ title: "Prices already current", description: "All bale prices already match the current catalogue — no changes needed." });
+      } else {
+        toast({ title: "Prices updated", description: `Updated ${data.repriced} bale(s) to current catalogue prices.` });
+      }
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
     },
     onError: (error: any) => {

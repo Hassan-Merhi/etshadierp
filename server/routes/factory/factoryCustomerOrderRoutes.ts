@@ -996,38 +996,50 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
       if (orderBales.length === 0) return res.status(400).json({ message: "Order has no bales to reprice" });
 
-      let proformaLines: any[] = [];
-      if (order.proformaIdUsed) {
-        proformaLines = await db.select().from(customerProformaLines)
-          .where(eq(customerProformaLines.proformaId, order.proformaIdUsed));
+      // "Apply Current Prices" = use the CURRENT catalogue selling price as primary source.
+      // Proforma price is only a fallback if no catalogue price is found for that article.
+
+      // 1. Collect all unique article codes from this order
+      const articleCodes = [...new Set(orderBales.map(b => b.articleCode).filter(Boolean) as string[])];
+
+      // 2. Bulk-fetch current selling prices by article code for this company
+      const cataloguePriceMap = new Map<string, string>(); // articleCode → sellingPrice
+      if (articleCodes.length > 0) {
+        const catalogueRows = await db
+          .select({ articleCode: factoryBaleProducts.articleCode, sellingPrice: factoryBaleProducts.sellingPrice })
+          .from(factoryBaleProducts)
+          .where(and(
+            eq(factoryBaleProducts.companyId, companyId),
+            inArray(factoryBaleProducts.articleCode, articleCodes),
+          ));
+        for (const r of catalogueRows) {
+          if (r.articleCode && r.sellingPrice != null) {
+            cataloguePriceMap.set(r.articleCode.toLowerCase(), r.sellingPrice);
+          }
+        }
       }
 
+      // 3. Proforma prices as fallback for articles not in catalogue
       const proformaMap = new Map<string, string>();
-      for (const pl of proformaLines) {
-        if (pl.articleCode) proformaMap.set(pl.articleCode.toLowerCase(), pl.pricePerBale);
+      if (order.proformaIdUsed) {
+        const proformaLines = await db.select().from(customerProformaLines)
+          .where(eq(customerProformaLines.proformaId, order.proformaIdUsed));
+        for (const pl of proformaLines) {
+          if (pl.articleCode) proformaMap.set(pl.articleCode.toLowerCase(), pl.pricePerBale);
+        }
       }
 
       let updated = 0;
       for (const bale of orderBales) {
-        let newPrice: string | null = null;
+        const codeKey = bale.articleCode?.toLowerCase();
+        // Priority 1: current catalogue price; Priority 2: proforma price
+        const newPrice = (codeKey && cataloguePriceMap.has(codeKey))
+          ? cataloguePriceMap.get(codeKey)!
+          : (codeKey && proformaMap.has(codeKey))
+            ? proformaMap.get(codeKey)!
+            : null;
 
-        if (bale.articleCode && proformaMap.has(bale.articleCode.toLowerCase())) {
-          newPrice = proformaMap.get(bale.articleCode.toLowerCase())!;
-        }
-
-        if (!newPrice) {
-          const [factoryBale] = await db.select({ productId: factoryBales.productId })
-            .from(factoryBales)
-            .where(eq(factoryBales.id, bale.baleId));
-          if (factoryBale?.productId) {
-            const [product] = await db.select({ sellingPrice: factoryBaleProducts.sellingPrice })
-              .from(factoryBaleProducts)
-              .where(eq(factoryBaleProducts.id, factoryBale.productId));
-            if (product?.sellingPrice) newPrice = product.sellingPrice;
-          }
-        }
-
-        if (newPrice !== null) {
+        if (newPrice !== null && newPrice !== bale.priceUsed) {
           await db.update(customerOrderBales)
             .set({ priceUsed: newPrice })
             .where(eq(customerOrderBales.id, bale.id));
