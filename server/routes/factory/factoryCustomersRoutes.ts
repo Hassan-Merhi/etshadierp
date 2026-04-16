@@ -545,11 +545,31 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const openingSide = customer.openingBalanceSide || "Dr";
       let runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
 
+      // Build container number map for INVOICE-type rows
+      const invoiceRefIds = [...new Set(
+        allRowsPdf.filter((r: any) => r.referenceType === "INVOICE" && r.referenceId).map((r: any) => r.referenceId as number)
+      )];
+      const containerNumMap = new Map<number, string>();
+      if (invoiceRefIds.length > 0) {
+        const orderContainers = await db
+          .select({ id: customerOrders.id, containerNumber: customerOrders.containerNumber })
+          .from(customerOrders)
+          .where(inArray(customerOrders.id, invoiceRefIds));
+        for (const o of orderContainers) {
+          if (o.containerNumber) containerNumMap.set(o.id, o.containerNumber);
+        }
+      }
+
       const rows = allRowsPdf.map((row: any) => {
         const debit = parseFloat(row.debitAmount || "0");
         const credit = parseFloat(row.creditAmount || "0");
         runningBalance += debit - credit;
-        return { ...row, debit, credit };
+        // Use container number as description for INVOICE rows
+        let desc = row.description || "—";
+        if (row.referenceType === "INVOICE" && row.referenceId) {
+          desc = containerNumMap.get(row.referenceId) || desc;
+        }
+        return { ...row, debit, credit, desc };
       });
 
       const totalDr = rows.reduce((s: number, r: any) => s + r.debit, 0);
@@ -557,7 +577,22 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const closingBalance = Math.abs(runningBalance);
       const closingBalanceSide = runningBalance >= 0 ? "Dr" : "Cr";
 
-      const fmtAmt = (n: number) => n > 0 ? n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";
+      // Format: $1,234 (no .00 for whole numbers)
+      const fmtAmt = (n: number) => {
+        if (n <= 0) return "";
+        const rounded = Math.round(n * 100) / 100;
+        if (Math.abs(rounded - Math.round(rounded)) < 0.005) {
+          return `$${Math.round(rounded).toLocaleString("en-US")}`;
+        }
+        return `$${rounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      };
+      const fmtBalance = (n: number, side: string) => {
+        const rounded = Math.round(n * 100) / 100;
+        const numStr = Math.abs(rounded - Math.round(rounded)) < 0.005
+          ? `$${Math.round(rounded).toLocaleString("en-US")}`
+          : `$${rounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        return `${numStr} ${side}`;
+      };
       const fmtDate = (d: string) => {
         if (!d) return "";
         const [y, m, day] = d.split("-");
@@ -571,7 +606,6 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       const PDFDocument = (await import("pdfkit")).default;
       const pathModCust = await import("path");
-      const companyName = (company as any)?.legalName || "Company";
 
       // Arabic font + reshaper — always load
       const custFontDir = pathModCust.join(process.cwd(), "server", "fonts");
@@ -605,36 +639,38 @@ export function registerFactoryCustomersRoutes(app: Express) {
           .text(ar ? custShape(text) : text, x, yPos, { width: w, align: ar ? "right" : align });
       };
 
-      // ── Logo above header ──
+      // ── Logo centred, taller ──
+      const pageW = doc.page.width; // 595
+      const logoW = 160;
+      const logoH = 70;
       const custHmdLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
       if (fs.existsSync(custHmdLogoPath)) {
-        try { doc.image(custHmdLogoPath, (doc.page.width - 200) / 2, 10, { width: 200 }); } catch {}
+        try { doc.image(custHmdLogoPath, (pageW - logoW) / 2, 14, { width: logoW, height: logoH, fit: [logoW, logoH] }); } catch {}
       }
 
-      // ── Dark header bar ──
-      doc.rect(40, 96, 515, 40).fill("#1F3864");
-      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(13)
-        .text("Account Statement", 44, 102, { width: 350 });
+      // ── Dark header bar (centred title) ──
+      const hdrTop = 88;
+      doc.rect(40, hdrTop, 515, 36).fill("#1F3864");
+      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(14)
+        .text("Account Statement", 40, hdrTop + 10, { width: 515, align: "center" });
       const printDate = fmtDate(getClientDate(req));
-      doc.font("Helvetica").fontSize(8).text(`Printed: ${printDate}`, 420, 116, { width: 135, align: "right" });
+      doc.font("Helvetica").fontSize(8).text(`Printed: ${printDate}`, 420, hdrTop + 24, { width: 131, align: "right" });
 
-      // ── Customer info block ──
-      const infoY = 140;
+      // ── Customer info block (single line: "Customer: NAME") ──
+      const infoY = 132;
       doc.fillColor("#000000").font("Helvetica").fontSize(9);
-      doc.text("Customer:", 40, infoY);
-      custRender(customer.legalName, 40, infoY + 12, 250);
-      doc.font("Helvetica").text(`Code: ${customer.code || "—"}`, 40, infoY + 24);
-      doc.text(`Phone: ${customer.phone || "—"}`, 40, infoY + 36);
-      const obLabel = `${openingBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${openingSide}`;
-      doc.text(`Opening Balance: `, 300, infoY + 12, { continued: true }).font("Helvetica-Bold").text(obLabel);
+      const custLabel = "Customer: ";
+      doc.text(custLabel, 40, infoY, { continued: true });
+      doc.font("Helvetica-Bold");
+      custRender(customer.legalName, 40 + doc.widthOfString(custLabel), infoY, 300);
       doc.font("Helvetica");
 
       // ── Table ──
       const colX   = [40,  115, 185, 380, 468];
       const colW   = [75,   70, 195,  88,  87];
-      const colHdr = ["Date", "Type", "Description", "Debit (Dr)", "Credit (Cr)"];
+      const colHdr = ["Date", "Type", "Container", "Debit (Dr)", "Credit (Cr)"];
       const colAlign: Array<"left" | "right"> = ["left", "left", "left", "right", "right"];
-      const tableTop = infoY + 68;
+      const tableTop = infoY + 22;
 
       doc.rect(40, tableTop, 515, 14).fill("#1F3864");
       doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(8);
@@ -645,28 +681,13 @@ export function registerFactoryCustomersRoutes(app: Express) {
       doc.fillColor("#000000").font("Helvetica").fontSize(8);
       let y = tableTop + 16;
 
-      // Opening balance row if non-zero
-      if (openingBalance > 0) {
-        doc.rect(40, y, 515, 13).fill("#EFF3FB");
-        doc.fillColor("#000000");
-        doc.text(fmtDate(getClientDate(req)), colX[0] + 2, y + 3, { width: colW[0] - 4 });
-        doc.text("Opening Bal.", colX[1] + 2, y + 3, { width: colW[1] - 4 });
-        doc.text("Opening Balance", colX[2] + 2, y + 3, { width: colW[2] - 4 });
-        if (openingSide === "Dr") {
-          doc.text(obLabel, colX[3] + 2, y + 3, { width: colW[3] - 4, align: "right" });
-        } else {
-          doc.text(obLabel, colX[4] + 2, y + 3, { width: colW[4] - 4, align: "right" });
-        }
-        y += 13;
-      }
-
       rows.forEach((row: any, idx: number) => {
         if (y > 760) { doc.addPage(); y = 40; }
         if (idx % 2 === 1) { doc.rect(40, y, 515, 13).fill("#F8F8F8"); doc.fillColor("#000000"); }
         doc.font("Helvetica").fontSize(8);
         doc.text(fmtDate(row.transactionDate), colX[0] + 2, y + 3, { width: colW[0] - 4 });
         doc.text(txLabel(row.transactionType), colX[1] + 2, y + 3, { width: colW[1] - 4 });
-        custRender(row.description || "—", colX[2] + 2, y + 3, colW[2] - 4, "left");
+        custRender(row.desc || "—", colX[2] + 2, y + 3, colW[2] - 4, "left");
         doc.font("Helvetica").fontSize(8);
         if (row.debit > 0) doc.text(fmtAmt(row.debit), colX[3] + 2, y + 3, { width: colW[3] - 4, align: "right" });
         if (row.credit > 0) doc.text(fmtAmt(row.credit), colX[4] + 2, y + 3, { width: colW[4] - 4, align: "right" });
@@ -682,15 +703,15 @@ export function registerFactoryCustomersRoutes(app: Express) {
       doc.rect(40, y, 515, 15).fill("#1F3864");
       doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(8);
       doc.text("TOTAL", colX[2] + 2, y + 4, { width: colW[2] - 4 });
-      doc.text(fmtAmt(totalDr) || "0.00", colX[3] + 2, y + 4, { width: colW[3] - 4, align: "right" });
-      doc.text(fmtAmt(totalCr) || "0.00", colX[4] + 2, y + 4, { width: colW[4] - 4, align: "right" });
+      doc.text(fmtAmt(totalDr) || "$0", colX[3] + 2, y + 4, { width: colW[3] - 4, align: "right" });
+      doc.text(fmtAmt(totalCr) || "$0", colX[4] + 2, y + 4, { width: colW[4] - 4, align: "right" });
       y += 17;
 
       // Closing balance row
       doc.rect(40, y, 515, 15).fill("#EFF3FB");
       doc.fillColor("#000000").font("Helvetica-Bold").fontSize(8);
       doc.text("Closing Balance", colX[2] + 2, y + 4, { width: colW[2] - 4 });
-      const closingStr = closingBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + closingBalanceSide;
+      const closingStr = fmtBalance(closingBalance, closingBalanceSide);
       if (closingBalanceSide === "Dr") {
         doc.text(closingStr, colX[3] + 2, y + 4, { width: colW[3] - 4, align: "right" });
       } else {
