@@ -47,6 +47,7 @@ import { registerWhatsAppRoutes } from "./routes/whatsappRoutes";
 import { registerImportCycleRoutes } from "./routes/importCycleRoutes";
 import { registerDebugRoutes } from "./routes/debugRoutes";
 import { registerExportRoutes } from "./routes/exportRoutes";
+import { registerGlobalTransactionRoutes } from "./routes/globalTransactionRoutes";
 import {
   requireAuth,
   requireRole,
@@ -1065,6 +1066,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerFactoryIntelligenceRoutes(app, requireAuth, db);
   registerFactoryAttendanceRoutes(app, requireAuth, db);
   registerSupplierProformaRoutes(app, requireAuth);
+  registerGlobalTransactionRoutes(app, requireAuth);
 
   // Lightweight health check for offline ping detection
   app.get("/api/health", (_req, res) => {

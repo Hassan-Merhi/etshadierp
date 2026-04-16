@@ -45,6 +45,7 @@ const FactoryVouchers = lazy(() => import("@/pages/factory/FactoryVouchers"));
 const Suppliers = lazy(() => import("@/pages/Suppliers"));
 const Vouchers = lazy(() => import("@/pages/Vouchers"));
 const Daybook = lazy(() => import("@/pages/Daybook"));
+const TransactionJournal = lazy(() => import("@/pages/TransactionJournal"));
 const FactoryDaybook = lazy(() => import("@/pages/factory/FactoryDaybook"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const AccountingCreate = lazy(() => import("@/pages/AccountingCreate"));
@@ -261,6 +262,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/vouchers/:id/edit" component={VoucherEdit} />
       <Route path="/purchase-orders/:id/edit" component={PurchaseOrderEdit} />
       <Route path="/daybook">{() => <Daybook user={user} />}</Route>
+      <Route path="/transaction-journal" component={TransactionJournal} />
       <Route path="/payroll" component={Payroll} />
       <Route path="/create" component={AccountingCreate} />
       <Route path="/import-stock-items" component={ImportStockItems} />
