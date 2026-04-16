@@ -773,15 +773,23 @@ export default function FactoryPayrollTab() {
           <DialogHeader>
             <DialogTitle>Payroll Preview</DialogTitle>
             <DialogDescription>
-              {previewRows.length} workers · {runForm.periodStart} to {runForm.periodEnd} · Net Total: ${previewRows.reduce((s, r) => s + r.base + r.bonus + parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2)) - parseFloat(advanceOverrides[r.id] || "0"), 0).toFixed(2)}
+              {previewRows.length} workers · {runForm.periodStart} to {runForm.periodEnd} · Net Total: ${previewRows.reduce((s, r) => {
+                const monthlyRate = parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2));
+                const hasAtt = r.presentDates.length > 0 || r.absentDates.length > 0 || r.halfDayDates.length > 0;
+                const prorated = hasAtt && r.totalWorkingDays > 0 ? (r.presentDays / r.totalWorkingDays) * monthlyRate : monthlyRate;
+                return s + r.base + r.bonus + prorated - parseFloat(advanceOverrides[r.id] || "0");
+              }, 0).toFixed(2)}
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto space-y-2">
             {previewRows.map((r) => {
               const hasAtt = r.presentDates.length > 0 || r.absentDates.length > 0 || r.halfDayDates.length > 0;
               const deductAmt = parseFloat(advanceOverrides[r.id] || "0");
-              const transportAmt = parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2));
-              const computedNet = r.base + r.bonus + transportAmt - deductAmt;
+              const monthlyRate = parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2));
+              const proratedTransport = hasAtt && r.totalWorkingDays > 0
+                ? (r.presentDays / r.totalWorkingDays) * monthlyRate
+                : monthlyRate;
+              const computedNet = r.base + r.bonus + proratedTransport - deductAmt;
               const isExpanded = expandedAdvanceWorkers.has(r.id);
               return (
                 <div key={r.id} className="border rounded-md" data-testid={`row-preview-${r.id}`}>
@@ -817,17 +825,23 @@ export default function FactoryPayrollTab() {
                       <span className="text-muted-foreground">Base: ${r.base.toFixed(2)}</span>
                       {r.bonus > 0 && <span className="text-muted-foreground">Bonus: ${r.bonus.toFixed(2)}</span>}
                       {r.transportMonthly > 0 && (
-                        <span className="text-muted-foreground flex items-center gap-1">
-                          Transport:
+                        <span className="text-muted-foreground flex flex-wrap items-center gap-1">
+                          <span>Transport/mo:</span>
                           <Input
                             type="number"
                             step="0.01"
                             min="0"
                             value={transportOverrides[r.id] ?? r.transportMonthly.toFixed(2)}
                             onChange={(e) => setTransportOverrides((prev) => ({ ...prev, [r.id]: e.target.value }))}
-                            className="w-24 h-6 text-xs font-mono px-1"
+                            className="w-20 h-6 text-xs font-mono px-1"
                             data-testid={`input-transport-${r.id}`}
                           />
+                          {hasAtt && r.totalWorkingDays > 0 && (
+                            <span className="text-xs text-amber-600 dark:text-amber-400 font-mono whitespace-nowrap">
+                              {r.presentDays % 1 === 0 ? r.presentDays.toFixed(0) : r.presentDays}/{r.totalWorkingDays}d
+                              {" = "}${proratedTransport.toFixed(2)}
+                            </span>
+                          )}
                         </span>
                       )}
                       <span className="font-semibold">Net: ${computedNet.toFixed(2)}</span>
@@ -898,23 +912,33 @@ export default function FactoryPayrollTab() {
               variant="outline"
               onClick={() => {
                 const rows = previewRows.map((r) => {
-                  const transportAmt = parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2));
+                  const mRate = parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2));
+                  const rHasAtt = r.presentDates.length > 0 || r.absentDates.length > 0 || r.halfDayDates.length > 0;
+                  const transportAmt = rHasAtt && r.totalWorkingDays > 0
+                    ? (r.presentDays / r.totalWorkingDays) * mRate
+                    : mRate;
                   const deductAmt = parseFloat(advanceOverrides[r.id] || "0");
                   const net = r.base + r.bonus + transportAmt - deductAmt;
                   return {
                     "Name": r.name,
                     "Position": r.position || "",
                     "Present Days": r.presentDays,
+                    "Total Days": r.totalWorkingDays,
                     "Absent Days": r.absentDays,
                     "Base ($)": r.base.toFixed(2),
                     "Bonus ($)": r.bonus.toFixed(2),
-                    "Transport ($)": transportAmt.toFixed(2),
+                    "Transport/mo ($)": mRate.toFixed(2),
+                    "Transport Paid ($)": transportAmt.toFixed(2),
                     "Advance Deduction ($)": deductAmt.toFixed(2),
                     "Net Pay ($)": net.toFixed(2),
                   };
                 });
                 const totalNet = previewRows.reduce((s, r) => {
-                  const transportAmt = parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2));
+                  const mRate = parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2));
+                  const rHasAtt = r.presentDates.length > 0 || r.absentDates.length > 0 || r.halfDayDates.length > 0;
+                  const transportAmt = rHasAtt && r.totalWorkingDays > 0
+                    ? (r.presentDays / r.totalWorkingDays) * mRate
+                    : mRate;
                   const deductAmt = parseFloat(advanceOverrides[r.id] || "0");
                   return s + r.base + r.bonus + transportAmt - deductAmt;
                 }, 0);

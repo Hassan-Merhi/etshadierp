@@ -235,15 +235,8 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
         advanceListByWorker[adv.workerId].push(adv);
       }
 
-      // Count weekdays in period for totalWorkingDays
-      let totalWorkingDays = 0;
-      const cur = new Date(periodStart + "T00:00:00");
-      const periodEndDate = new Date(periodEnd + "T00:00:00");
-      while (cur <= periodEndDate) {
-        const dow = cur.getDay();
-        if (dow !== 0 && dow !== 6) totalWorkingDays++;
-        cur.setDate(cur.getDate() + 1);
-      }
+      // Calendar days in period (used as denominator for transport proration)
+      const totalCalendarDays = days;
 
       const result = targetWorkers.map((worker: any) => {
         const baseSal = parseFloat(worker.baseSalary || "0");
@@ -295,8 +288,8 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
 
         let transport = 0;
         if (transportMonthly > 0) {
-          if (workerAttRecs.length > 0 && totalWorkingDays > 0) {
-            transport = (presentDays / totalWorkingDays) * transportMonthly;
+          if (workerAttRecs.length > 0 && totalCalendarDays > 0) {
+            transport = (presentDays / totalCalendarDays) * transportMonthly;
           } else {
             transport = transportMonthly;
           }
@@ -325,7 +318,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
           totalAdvanceBalance,
           pendingAdvances,
           net,
-          totalWorkingDays,
+          totalWorkingDays: totalCalendarDays,
           presentDays,
           absentDays,
           presentDates,
@@ -414,7 +407,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
               base = computeMonthlyPayFromAttendance(baseSal, periodStart, workerAttRecords);
             }
           }
-          // Transport allowance — prorated by attendance
+          // Transport allowance — prorated by attendance (calendar days as denominator)
           const workerAttRecs2 = attendanceByWorker.get(worker.id) || [];
           let presentDays2 = 0;
           for (const att of workerAttRecs2) {
@@ -422,23 +415,13 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
             else if (att.status === "Half Day") presentDays2 += 0.5;
           }
 
-          // Count working days in period for transport proration
-          let workingDays2 = 0;
-          const cur2 = new Date(periodStart + "T00:00:00");
-          const endDate2 = new Date(periodEnd + "T00:00:00");
-          while (cur2 <= endDate2) {
-            const dow = cur2.getDay();
-            if (dow !== 0 && dow !== 6) workingDays2++;
-            cur2.setDate(cur2.getDate() + 1);
-          }
-
           const workerTransportDefault2 = parseFloat((worker as any).transportAllowance || "0");
           const transportOverrideAmt2 = transportOverrides ? parseFloat(transportOverrides[String(worker.id)] ?? "-1") : -1;
           const transportMonthly2 = transportOverrideAmt2 >= 0 ? transportOverrideAmt2 : workerTransportDefault2;
           let transport = 0;
           if (transportMonthly2 > 0) {
-            if (workerAttRecs2.length > 0 && workingDays2 > 0) {
-              transport = (presentDays2 / workingDays2) * transportMonthly2;
+            if (workerAttRecs2.length > 0 && days > 0) {
+              transport = (presentDays2 / days) * transportMonthly2;
             } else {
               transport = transportMonthly2;
             }
