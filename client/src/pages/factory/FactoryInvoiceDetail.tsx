@@ -2,6 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -11,8 +12,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation, useRoute } from "wouter";
 import { useEscapeBack } from "@/hooks/use-escape-back";
-import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw, Container } from "lucide-react";
+import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw, Container, Pencil } from "lucide-react";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
+import { useState, useRef } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -78,6 +80,9 @@ export default function FactoryInvoiceDetail() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
+  const [editingArticleCode, setEditingArticleCode] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
   useEscapeBack(() => navigate("/factory/invoicing?tab=invoices"));
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -151,6 +156,51 @@ export default function FactoryInvoiceDetail() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const repriceArticleMutation = useMutation({
+    mutationFn: async ({ articleCode, pricePerBale }: { articleCode: string; pricePerBale: number }) => {
+      const res = await modeApiRequest("PATCH", `/api/factory/customer-orders/${orderId}/bales/reprice-article`, {
+        articleCode,
+        pricePerBale,
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to update price");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Price updated", description: "All bales for this article have been repriced and totals recalculated." });
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
+      setEditingArticleCode(null);
+    },
+    onError: (error: any) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      setEditingArticleCode(null);
+    },
+  });
+
+  const startEdit = (articleCode: string, currentPrice: number) => {
+    setEditingArticleCode(articleCode);
+    setEditValue(String(currentPrice));
+    setTimeout(() => inputRef.current?.select(), 30);
+  };
+
+  const commitEdit = (articleCode: string) => {
+    const price = parseFloat(editValue);
+    if (isNaN(price) || price < 0) {
+      toast({ title: "Invalid price", description: "Please enter a valid number.", variant: "destructive" });
+      setEditingArticleCode(null);
+      return;
+    }
+    repriceArticleMutation.mutate({ articleCode, pricePerBale: price });
+  };
+
+  const cancelEdit = () => {
+    setEditingArticleCode(null);
+    setEditValue("");
+  };
 
   const handleExportExcel = () => {
     if (!orderId) return;
@@ -379,7 +429,12 @@ export default function FactoryInvoiceDetail() {
               <TableHead className="text-right">Qty</TableHead>
               <TableHead className="text-right">Weight/Bale</TableHead>
               <TableHead className="text-right">Total Weight</TableHead>
-              <TableHead className="text-right">Price/Bale</TableHead>
+              <TableHead className="text-right">
+                Price/Bale
+                {(isVerifiedStatus || order.status === "FINALIZED") && (
+                  <Pencil className="inline ml-1 h-3 w-3 text-muted-foreground" />
+                )}
+              </TableHead>
               <TableHead className="text-right">Total Price</TableHead>
             </TableRow>
           </TableHeader>
@@ -410,7 +465,38 @@ export default function FactoryInvoiceDetail() {
                     {Number(line.totalWeight || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-price-per-bale-${idx}`}>
-                    {Number(line.pricePerBale || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    {(isVerifiedStatus || order.status === "FINALIZED") ? (
+                      editingArticleCode === line.articleCode ? (
+                        <Input
+                          ref={inputRef}
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") commitEdit(line.articleCode);
+                            if (e.key === "Escape") cancelEdit();
+                          }}
+                          onBlur={() => commitEdit(line.articleCode)}
+                          className="h-7 w-28 text-right font-mono p-1 ml-auto"
+                          disabled={repriceArticleMutation.isPending}
+                          data-testid={`input-price-${idx}`}
+                        />
+                      ) : (
+                        <button
+                          onClick={() => startEdit(line.articleCode, line.pricePerBale)}
+                          className="group flex items-center justify-end gap-1 w-full hover-elevate rounded-md px-1 py-0.5"
+                          data-testid={`button-edit-price-${idx}`}
+                          title="Click to edit price"
+                        >
+                          <span>{Number(line.pricePerBale || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                          <Pencil className="h-3 w-3 text-muted-foreground invisible group-hover:visible" />
+                        </button>
+                      )
+                    ) : (
+                      Number(line.pricePerBale || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+                    )}
                   </TableCell>
                   <TableCell className="text-right font-mono font-semibold" data-testid={`text-total-price-${idx}`}>
                     {Number(line.totalPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
