@@ -64,6 +64,13 @@ interface NavSection {
 
 const navSections: NavSection[] = [
   {
+    label: "Overview",
+    color: "#3b82f6",
+    items: [
+      { title: "Production Report", url: "/factory/production-report", icon: BarChart3 },
+    ],
+  },
+  {
     label: "Operations",
     color: "#f97316",
     items: [

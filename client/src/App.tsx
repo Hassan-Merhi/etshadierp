@@ -122,6 +122,7 @@ const FactoryNetProfitAnalytics = lazy(() => import("@/pages/factory/FactoryNetP
 const FactoryNetPosition = lazy(() => import("@/pages/factory/FactoryNetPosition"));
 const FactoryNetPositionDetails = lazy(() => import("@/pages/factory/FactoryNetPositionDetails"));
 const FactoryFinancialSnapshot = lazy(() => import("@/pages/factory/FactoryFinancialSnapshot"));
+const DailyProductionReport = lazy(() => import("@/pages/factory/DailyProductionReport"));
 const CompanyDataReset = lazy(() => import("@/pages/CompanyDataReset"));
 const StockTransferOrder = lazy(() => import("@/pages/StockTransferOrder"));
 const StockTransfers = lazy(() => import("@/pages/StockTransfers"));
@@ -849,6 +850,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/net-profit-analytics" component={FactoryNetProfitAnalytics} />
                     <Route path="/factory/net-position" component={FactoryNetPosition} />
                     <Route path="/factory/financial-snapshot" component={FactoryFinancialSnapshot} />
+                    <Route path="/factory/production-report" component={DailyProductionReport} />
                     <Route><Redirect to={factoryDefaultPage} /></Route>
                   </Switch>
                   </Suspense>

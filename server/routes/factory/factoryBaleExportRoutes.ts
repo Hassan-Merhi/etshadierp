@@ -744,4 +744,125 @@ export function registerFactoryBaleExportRoutes(app: Express) {
   // 7. Factory Pressing (create-and-print)
   // ───────────────────────────────────────────────
 
+  // ───────────────────────────────────────────────
+  // 8. Daily Production Value Report
+  // ───────────────────────────────────────────────
+  app.get("/api/factory/production-value-report", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const from = req.query.from as string | undefined;
+      const to = req.query.to as string | undefined;
+
+      // ── Build date range conditions ──
+      const baleConditions: any[] = [
+        eq(factoryBales.companyId, companyId),
+        // Only count bales that have been pressed (IN_STOCK, FINALIZED, or SOLD)
+        sql`${factoryBales.status} IN ('IN_STOCK','FINALIZED','SOLD')`,
+      ];
+      if (from) baleConditions.push(sql`DATE(${factoryBales.stockEntryDate}) >= ${from}`);
+      if (to)   baleConditions.push(sql`DATE(${factoryBales.stockEntryDate}) <= ${to}`);
+
+      const mixBatchConditions: any[] = [eq(factoryMixBatches.companyId, companyId)];
+      if (from) mixBatchConditions.push(sql`DATE(${factoryMixBatches.createdAt}) >= ${from}`);
+      if (to)   mixBatchConditions.push(sql`DATE(${factoryMixBatches.createdAt}) <= ${to}`);
+
+      // ── Fetch bales with product selling price ──
+      const baleRows = await db
+        .select({
+          id: factoryBales.id,
+          articleCode: factoryBales.articleCode,
+          productName: factoryBales.productName,
+          weightKg: factoryBales.weightKg,
+          stockEntryDate: factoryBales.stockEntryDate,
+          sellingPrice: factoryBaleProducts.sellingPrice,
+          productId: factoryBales.productId,
+        })
+        .from(factoryBales)
+        .leftJoin(factoryBaleProducts, eq(factoryBales.productId, factoryBaleProducts.id))
+        .where(and(...baleConditions));
+
+      // ── Aggregate by article code ──
+      const productMap = new Map<string, {
+        articleCode: string;
+        productName: string;
+        qty: number;
+        totalWeightKg: number;
+        sellingPricePerBale: number;
+        totalValue: number;
+      }>();
+
+      for (const bale of baleRows) {
+        const code = bale.articleCode || "UNKNOWN";
+        const name = bale.productName || code;
+        const wt = parseFloat(bale.weightKg || "0");
+        const price = parseFloat(bale.sellingPrice || "0");
+        const value = price; // price is per bale (not per kg)
+
+        const existing = productMap.get(code);
+        if (existing) {
+          existing.qty += 1;
+          existing.totalWeightKg += wt;
+          existing.totalValue += value;
+        } else {
+          productMap.set(code, { articleCode: code, productName: name, qty: 1, totalWeightKg: wt, sellingPricePerBale: price, totalValue: value });
+        }
+      }
+
+      const productRows = [...productMap.values()].sort((a, b) => a.articleCode.localeCompare(b.articleCode));
+
+      const totalBales = productRows.reduce((s, r) => s + r.qty, 0);
+      const totalBaleWeightKg = productRows.reduce((s, r) => s + r.totalWeightKg, 0);
+      const totalProductionValue = productRows.reduce((s, r) => s + r.totalValue, 0);
+
+      // ── Fetch mix batches ──
+      const mixBatchRows = await db
+        .select({
+          id: factoryMixBatches.id,
+          batchCode: factoryMixBatches.batchCode,
+          name: factoryMixBatches.name,
+          totalWeightKg: factoryMixBatches.totalWeightKg,
+          costPerKg: factoryMixBatches.costPerKg,
+          totalCost: factoryMixBatches.totalCost,
+          createdAt: factoryMixBatches.createdAt,
+        })
+        .from(factoryMixBatches)
+        .where(and(...mixBatchConditions))
+        .orderBy(factoryMixBatches.createdAt);
+
+      const totalMixWeightKg = mixBatchRows.reduce((s: number, r: any) => s + parseFloat(r.totalWeightKg || "0"), 0);
+      const totalMixCost = mixBatchRows.reduce((s: number, r: any) => s + parseFloat(r.totalCost || "0"), 0);
+
+      // ── Kg comparison ──
+      const kgDiff = totalBaleWeightKg - totalMixWeightKg;
+
+      res.json({
+        from: from || null,
+        to: to || null,
+        production: {
+          totalBales,
+          totalWeightKg: totalBaleWeightKg,
+          totalValue: totalProductionValue,
+          byProduct: productRows,
+        },
+        rawMaterial: {
+          totalBatches: mixBatchRows.length,
+          totalWeightKg: totalMixWeightKg,
+          totalCost: totalMixCost,
+          batches: mixBatchRows,
+        },
+        kgComparison: {
+          producedKg: totalBaleWeightKg,
+          mixedKg: totalMixWeightKg,
+          diffKg: kgDiff,
+          diffLabel: kgDiff >= 0 ? "more produced than mixed" : "less produced than mixed",
+        },
+      });
+    } catch (error: any) {
+      console.error("Error fetching production value report:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
 }
