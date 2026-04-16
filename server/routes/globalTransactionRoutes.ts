@@ -125,7 +125,14 @@ export function registerGlobalTransactionRoutes(
 
       if (startDate) conditions.push(gte(vouchers.voucherDate, startDate));
       if (endDate)   conditions.push(lte(vouchers.voucherDate, endDate));
-      if (voucherType && voucherType !== "all") conditions.push(eq(vouchers.voucherType, voucherType));
+      if (voucherType && voucherType !== "all") {
+        // Treat "Stock Transfer" and "StockTransfer" as the same type
+        if (voucherType === "Stock Transfer" || voucherType === "StockTransfer") {
+          conditions.push(or(eq(vouchers.voucherType, "Stock Transfer"), eq(vouchers.voucherType, "StockTransfer")));
+        } else {
+          conditions.push(eq(vouchers.voucherType, voucherType));
+        }
+      }
       if (currency    && currency    !== "all") conditions.push(eq(vouchers.currency, currency));
 
       // optional filter: "active" → false, "optional" → true, "all" → both

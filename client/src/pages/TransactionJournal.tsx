@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -161,27 +161,35 @@ export default function TransactionJournal() {
   const [detailId, setDetailId] = useState<number | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // ── Build query string ──
-  const queryParams = new URLSearchParams({
-    startDate,
-    endDate,
-    voucherType,
-    currency,
-    optional: optionalFilter,
-    includeFactory: String(includeFactory),
-    page:     String(page),
-    limit:    String(LIMIT),
-    ...(search         ? { search }                                : {}),
-    ...(selectedCos.length ? { companyIds: selectedCos.join(",") } : {}),
-  });
+  // ── Build query string (memoized to avoid spurious refetches) ──
+  const queryParamsStr = useMemo(() => {
+    const p = new URLSearchParams({
+      startDate,
+      endDate,
+      voucherType,
+      currency,
+      optional: optionalFilter,
+      includeFactory: String(includeFactory),
+      page:  String(page),
+      limit: String(LIMIT),
+      ...(search             ? { search }                                : {}),
+      ...(selectedCos.length ? { companyIds: selectedCos.join(",") } : {}),
+    });
+    return p.toString();
+  }, [startDate, endDate, voucherType, currency, optionalFilter, includeFactory, page, search, selectedCos]);
 
   const { data, isLoading, isFetching, refetch } = useQuery<JournalResponse>({
-    queryKey: ["/api/global/transactions", queryParams.toString()],
+    queryKey: ["/api/global/transactions", queryParamsStr],
     queryFn: async () => {
-      const res = await fetch(`/api/global/transactions?${queryParams}`);
+      const res = await fetch(`/api/global/transactions?${queryParamsStr}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load transactions");
       return res.json();
     },
+    // Keep old data visible while a background refresh or filter change is in flight —
+    // this prevents the table from blanking out between fetches.
+    placeholderData: (prev) => prev,
+    // Silent background refresh every 30 seconds, just like Daybook.
+    refetchInterval: 30_000,
   });
 
   const { data: voucherTypes } = useQuery<string[]>({
@@ -280,6 +288,9 @@ export default function TransactionJournal() {
           <h1 className="text-xl font-semibold flex items-center gap-2">
             <FileText className="h-5 w-5 text-muted-foreground" />
             All Daybook
+            {isFetching && (
+              <RefreshCw className="h-4 w-4 text-muted-foreground animate-spin" data-testid="icon-refreshing" />
+            )}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             All vouchers across all companies — filtered and searchable
@@ -467,6 +478,43 @@ export default function TransactionJournal() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Type quick-filter chips ── */}
+      {(() => {
+        const chips = [
+          { label: "All",            value: "all" },
+          { label: "Payment",        value: "Payment" },
+          { label: "Receipt",        value: "Receipt" },
+          { label: "Sales",          value: "Sales" },
+          { label: "Purchase",       value: "Purchase" },
+          { label: "Stock Transfer", value: "Stock Transfer" },
+          { label: "Journal",        value: "Journal" },
+          { label: "Mixed",          value: "Mixed" },
+          { label: "Production",     value: "Production" },
+          { label: "Consumption",    value: "Consumption" },
+        ];
+        return (
+          <div className="flex flex-wrap gap-1.5" data-testid="type-chips">
+            {chips.map((c) => {
+              const active = voucherType === c.value || (c.value === "all" && voucherType === "all");
+              return (
+                <button
+                  key={c.value}
+                  onClick={() => setVoucherType(c.value)}
+                  data-testid={`chip-type-${c.value.replace(/\s+/g, "-").toLowerCase()}`}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors
+                    ${active
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-muted-foreground border-border hover:text-foreground hover:border-foreground/40"
+                    }`}
+                >
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* ── Summary cards ── */}
       {!isLoading && Object.keys(summaryByCompany).length > 0 && (
