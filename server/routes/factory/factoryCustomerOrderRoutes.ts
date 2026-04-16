@@ -999,11 +999,12 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       // "Apply Current Prices" = use the CURRENT catalogue selling price as primary source.
       // Proforma price is only a fallback if no catalogue price is found for that article.
 
-      // 1. Collect all unique article codes from this order
+      // 1. Collect all unique article codes and bale IDs from this order
       const articleCodes = [...new Set(orderBales.map(b => b.articleCode).filter(Boolean) as string[])];
+      const baleIds      = [...new Set(orderBales.map(b => b.baleId).filter(Boolean))];
 
-      // 2. Bulk-fetch current selling prices by article code for this company
-      const cataloguePriceMap = new Map<string, string>(); // articleCode → sellingPrice
+      // 2a. Bulk-fetch current selling prices by article code (primary path)
+      const cataloguePriceMap = new Map<string, string>(); // lowerArticleCode → sellingPrice
       if (articleCodes.length > 0) {
         const catalogueRows = await db
           .select({ articleCode: factoryBaleProducts.articleCode, sellingPrice: factoryBaleProducts.sellingPrice })
@@ -1014,7 +1015,23 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           ));
         for (const r of catalogueRows) {
           if (r.articleCode && r.sellingPrice != null) {
-            cataloguePriceMap.set(r.articleCode.toLowerCase(), r.sellingPrice);
+            cataloguePriceMap.set(r.articleCode.toLowerCase().trim(), r.sellingPrice);
+          }
+        }
+      }
+
+      // 2b. Fallback: also pull prices via factoryBales.productId chain
+      //     This covers cases where the article code in the bale doesn't match the catalogue entry.
+      const baleIdPriceMap = new Map<number, string>(); // baleId → sellingPrice
+      if (baleIds.length > 0) {
+        const chainRows = await db
+          .select({ baleId: factoryBales.id, sellingPrice: factoryBaleProducts.sellingPrice })
+          .from(factoryBales)
+          .innerJoin(factoryBaleProducts, eq(factoryBaleProducts.id, factoryBales.productId))
+          .where(inArray(factoryBales.id, baleIds));
+        for (const r of chainRows) {
+          if (r.baleId && r.sellingPrice != null) {
+            baleIdPriceMap.set(r.baleId, r.sellingPrice);
           }
         }
       }
@@ -1031,20 +1048,32 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       let updated = 0;
       for (const bale of orderBales) {
-        const codeKey = bale.articleCode?.toLowerCase();
-        // Priority 1: current catalogue price; Priority 2: proforma price
-        const newPrice = (codeKey && cataloguePriceMap.has(codeKey))
+        const codeKey = bale.articleCode?.toLowerCase().trim();
+        // Priority 1: catalogue price by article code
+        // Priority 2: catalogue price via bale→product chain (baleId lookup)
+        // Priority 3: proforma price
+        const rawPrice = (codeKey && cataloguePriceMap.has(codeKey))
           ? cataloguePriceMap.get(codeKey)!
-          : (codeKey && proformaMap.has(codeKey))
-            ? proformaMap.get(codeKey)!
-            : null;
+          : (bale.baleId && baleIdPriceMap.has(bale.baleId))
+            ? baleIdPriceMap.get(bale.baleId)!
+            : (codeKey && proformaMap.has(codeKey))
+              ? proformaMap.get(codeKey)!
+              : null;
 
-        if (newPrice !== null && newPrice !== bale.priceUsed) {
-          await db.update(customerOrderBales)
-            .set({ priceUsed: newPrice })
-            .where(eq(customerOrderBales.id, bale.id));
-          updated++;
-        }
+        if (rawPrice === null) continue;
+
+        // Normalise to 2-decimal string to avoid "40" vs "40.00" false-positives
+        const newPriceNum  = parseFloat(rawPrice);
+        const curPriceNum  = parseFloat(bale.priceUsed || "0");
+
+        // Skip if catalogue price is 0 (not yet set) or if already identical
+        if (newPriceNum <= 0) continue;
+        if (Math.abs(newPriceNum - curPriceNum) < 0.001) continue;
+
+        await db.update(customerOrderBales)
+          .set({ priceUsed: newPriceNum.toFixed(2) })
+          .where(eq(customerOrderBales.id, bale.id));
+        updated++;
       }
 
       await recalculateOrderTotals(db, orderId);
