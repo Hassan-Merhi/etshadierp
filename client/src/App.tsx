@@ -120,6 +120,7 @@ const NetProfitDetails = lazy(() => import("@/pages/NetProfitDetails"));
 const NetProfitReport = lazy(() => import("@/pages/NetProfitReport"));
 const FactoryNetProfitAnalytics = lazy(() => import("@/pages/factory/FactoryNetProfitAnalytics"));
 const FactoryNetPosition = lazy(() => import("@/pages/factory/FactoryNetPosition"));
+const FactoryNetPositionDetails = lazy(() => import("@/pages/factory/FactoryNetPositionDetails"));
 const FactoryFinancialSnapshot = lazy(() => import("@/pages/factory/FactoryFinancialSnapshot"));
 const CompanyDataReset = lazy(() => import("@/pages/CompanyDataReset"));
 const StockTransferOrder = lazy(() => import("@/pages/StockTransferOrder"));
@@ -844,7 +845,7 @@ function AuthenticatedApp() {
                     {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/import-cycle-diagnostics" component={ImportCycleDiagnostics} />}
                     {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/inventory-repair" component={InventoryRepair} />}
                     {user?.role === "Admin" && <Route path="/factory/company-data-reset" component={CompanyDataReset} />}
-                    <Route path="/factory/net-position-details" component={NetProfitDetails} />
+                    <Route path="/factory/net-position-details" component={FactoryNetPositionDetails} />
                     <Route path="/factory/net-profit-analytics" component={FactoryNetProfitAnalytics} />
                     <Route path="/factory/net-position" component={FactoryNetPosition} />
                     <Route path="/factory/financial-snapshot" component={FactoryFinancialSnapshot} />

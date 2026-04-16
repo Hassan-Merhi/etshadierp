@@ -200,16 +200,13 @@ export function registerStatsRoutes(app: Express) {
       const expensesBreakdown: { name: string; value: number }[] = [];
       const incomeBreakdown: { name: string; value: number }[] = [];
 
-      // Detect if this company is a factory company
-      const fsCheck = await db.execute(sql`SELECT id FROM factory_settings WHERE company_id = ${companyId} LIMIT 1`);
-      const fsRows: any[] = (fsCheck as any).rows ?? (fsCheck as any);
-      const isFactoryCompany = fsRows.length > 0;
-
-      if (isFactoryCompany) {
-        // Strip any factory-specific ledger accounts that classifyNetPositionAccounts
-        // may have already included — we replace them with direct SQL values below.
-        const factoryLedgerCodesToStrip = new Set(["FACTORY_RAW_MATERIAL_STOCK", "FACTORY_STOCK_IN_HAND"]);
-        const factoryLedgerNamesToStrip = ["factory raw material stock", "factory stock in hand"];
+      // ── ERP mode: always strip factory-specific ledger accounts (if any exist)
+      // and compute Stock In Hand from location inventory.
+      // Factory-specific bale/raw-material calculations belong exclusively in
+      // /api/factory/net-position — this endpoint is ERP-only.
+      const factoryLedgerCodesToStrip = new Set(["FACTORY_RAW_MATERIAL_STOCK", "FACTORY_STOCK_IN_HAND"]);
+      const factoryLedgerNamesToStrip = ["factory raw material stock", "factory stock in hand"];
+      {
         let i = forUsAccounts.length - 1;
         while (i >= 0) {
           const acc = forUsAccounts[i] as any;
@@ -223,88 +220,10 @@ export function registerStatsRoutes(app: Express) {
           }
           i--;
         }
+      }
 
-        // ── FACTORY mode: Stock In Hand = IN_STOCK bales × selling price ──
-        const baleInvResult = await db.execute(sql`
-          SELECT COALESCE(SUM(p.selling_price::numeric), 0) AS total
-          FROM   factory_bales   b
-          JOIN   factory_bale_products p ON p.id = b.product_id
-          WHERE  b.company_id = ${companyId}
-            AND  b.status     = 'IN_STOCK'
-            AND  p.company_id = ${companyId}
-        `);
-        const baleRow = ((baleInvResult as any).rows ?? (baleInvResult as any))[0] ?? {};
-        const baleInventoryValue = Math.round((parseFloat(String(baleRow?.total ?? "0")) + Number.EPSILON) * 100) / 100;
-        if (baleInventoryValue > 0) {
-          forUsTotal += baleInventoryValue;
-          categoryTotals["asset_Stock In Hand"] = baleInventoryValue;
-          forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: baleInventoryValue, category: "Inventory" });
-        }
-
-        // ── FACTORY mode: Raw Material Stock ─────────────────────────────
-        const rawStockResult = await db.execute(sql`
-          SELECT
-            fc.supplier_id,
-            SUM(frs.received_kg::numeric)                                               AS total_recv,
-            SUM(frs.used_kg::numeric)                                                   AS total_used,
-            SUM(frs.received_kg::numeric *
-                COALESCE(NULLIF(frs.cost_per_kg_usd::numeric, 0), frs.cost_per_kg::numeric, 0))
-              / NULLIF(SUM(frs.received_kg::numeric), 0)                               AS avg_cpk_usd
-          FROM   factory_raw_stock   frs
-          JOIN   factory_containers  fc  ON fc.id  = frs.container_id
-          WHERE  frs.company_id = ${companyId}
-            AND  fc.status     != 'DELETED'
-          GROUP  BY fc.supplier_id
-        `);
-        const rawStockRows: any[] = (rawStockResult as any).rows ?? (rawStockResult as any);
-
-        const rawAdjResult = await db.execute(sql`
-          SELECT supplier_id, type, kg::numeric AS kg, cost_per_kg::numeric AS cpk
-          FROM   factory_raw_material_adjustments
-          WHERE  company_id = ${companyId}
-        `);
-        const rawAdjRows: any[] = (rawAdjResult as any).rows ?? (rawAdjResult as any);
-
-        type RawSupEntry = { recv: number; used: number; cpkUsd: number };
-        const rawSupMap = new Map<string, RawSupEntry>();
-        for (const r of rawStockRows) {
-          const key    = r.supplier_id ? `s${r.supplier_id}` : `u`;
-          const recv   = parseFloat(String(r.total_recv  ?? "0")) || 0;
-          const used   = parseFloat(String(r.total_used  ?? "0")) || 0;
-          const cpkUsd = parseFloat(String(r.avg_cpk_usd ?? "0")) || 0;
-          rawSupMap.set(key, { recv, used, cpkUsd });
-        }
-        for (const a of rawAdjRows) {
-          const key   = a.supplier_id ? `s${a.supplier_id}` : `MANUAL`;
-          const kg    = parseFloat(String(a.kg  ?? "0")) || 0;
-          const cpk   = parseFloat(String(a.cpk ?? "0")) || 0;
-          const isAdd = a.type === "ADD";
-          const ex    = rawSupMap.get(key);
-          if (ex) {
-            if (isAdd) {
-              const prevVal = ex.recv * ex.cpkUsd;
-              ex.recv   += kg;
-              ex.cpkUsd  = ex.recv > 0 ? (prevVal + kg * cpk) / ex.recv : 0;
-            } else {
-              ex.used += kg;
-            }
-          } else if (isAdd) {
-            rawSupMap.set(key, { recv: kg, used: 0, cpkUsd: cpk });
-          }
-        }
-        let rawTotal = 0;
-        for (const s of rawSupMap.values()) {
-          const val = (s.recv - s.used) * s.cpkUsd;
-          if (val > 0) rawTotal += val;
-        }
-        const rawMaterialStockValue = Math.round((rawTotal + Number.EPSILON) * 100) / 100;
-        if (rawMaterialStockValue > 0) {
-          forUsTotal += rawMaterialStockValue;
-          categoryTotals["asset_Factory Raw Material Stock"] = rawMaterialStockValue;
-          forUsAccounts.push({ name: "Factory Raw Material Stock", code: "COMPUTED", value: rawMaterialStockValue, category: "Raw Material" });
-        }
-      } else {
-        // ── ERP mode: Stock In Hand — historical as of toDate (or current) ──
+      // ── ERP Stock In Hand — location inventory (weighted-average cost) ──
+      {
         const activeLocationsData = await db
           .select({ id: locations.id })
           .from(locations)
@@ -336,6 +255,7 @@ export function registerStatsRoutes(app: Express) {
             }
           }
         }
+        stockOnFloor = Math.round((stockOnFloor + Number.EPSILON) * 100) / 100;
         if (stockOnFloor > 0) {
           forUsTotal += stockOnFloor;
           categoryTotals["asset_Stock In Hand"] = stockOnFloor;

@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useAppMode } from "@/contexts/AppModeContext";
-import { getApiRequest } from "@/lib/factoryApi";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -230,8 +228,6 @@ function todayStr() {
 export default function NetProfitDetails() {
   const { formatAmount } = useCurrencyContext();
   const { toast } = useToast();
-  const appMode = useAppMode();
-  const modeApiRequest = getApiRequest(appMode);
   // Local input state — updates freely as user types (no API trigger)
   const [fromInput, setFromInput] = useState<string>("");
   const [toInput, setToInput] = useState<string>("");
@@ -254,9 +250,9 @@ export default function NetProfitDetails() {
   const queryParam = toDate ? `?toDate=${toDate}` : "";
 
   const { data, isLoading, error, refetch } = useQuery<NetProfitData>({
-    queryKey: ["/api/stats/net-profit", toDate, appMode],
+    queryKey: ["/api/stats/net-profit", toDate],
     queryFn: async () => {
-      const res = await modeApiRequest("GET", `/api/stats/net-profit${queryParam}`);
+      const res = await apiRequest("GET", `/api/stats/net-profit${queryParam}`);
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
