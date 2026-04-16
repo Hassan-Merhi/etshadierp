@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X, AlertTriangle, FileSpreadsheet, EyeOff, Eye } from "lucide-react";
+import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X, AlertTriangle, FileSpreadsheet, EyeOff, Eye, AlertCircle } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -75,6 +75,7 @@ export default function BaleProducts() {
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showHidden, setShowHidden] = useState(false);
+  const [showZeroPrice, setShowZeroPrice] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const appMode = useAppMode();
@@ -117,7 +118,10 @@ export default function BaleProducts() {
   const categoryMap = new Map<number, string>();
   categories?.forEach((c) => categoryMap.set(c.id, c.name));
 
-  const activeProducts = products?.filter((p) => p.active !== false);
+  const allActiveProducts = products?.filter((p) => p.active !== false);
+  const activeProducts = showZeroPrice
+    ? allActiveProducts?.filter((p) => parseFloat(p.sellingPrice || "0") === 0)
+    : allActiveProducts;
   const hiddenProducts = products?.filter((p) => p.active === false);
 
   const toggleSelectId = (id: number) => {
@@ -684,6 +688,17 @@ export default function BaleProducts() {
               )}
             </div>
             <div className="flex items-center gap-3 flex-wrap">
+              {!hideSellingPriceBP && (
+                <Button
+                  size="sm"
+                  variant={showZeroPrice ? "default" : "outline"}
+                  onClick={() => { setShowZeroPrice(v => !v); setSelectedIds(new Set()); }}
+                  data-testid="button-show-zero-price"
+                >
+                  <AlertCircle className="h-4 w-4 mr-1" />
+                  {showZeroPrice ? "Showing unpriced" : "Show unpriced"}
+                </Button>
+              )}
               {hiddenProducts && hiddenProducts.length > 0 && (
                 <Button
                   size="sm"
