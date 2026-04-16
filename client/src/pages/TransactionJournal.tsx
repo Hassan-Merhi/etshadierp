@@ -146,7 +146,7 @@ export default function TransactionJournal() {
   const { toast } = useToast();
 
   // ── Filter state ──
-  const [startDate,      setStartDate]      = useState(nDaysAgo(7));
+  const [startDate,      setStartDate]      = useState(nDaysAgo(30));
   const [endDate,        setEndDate]        = useState(todayStr());
   const [selectedCos,    setSelectedCos]    = useState<number[]>([]);   // empty = all
   const [voucherType,    setVoucherType]    = useState("all");
