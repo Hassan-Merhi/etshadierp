@@ -29,7 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import {
   Search, Filter, ExternalLink, Building2,
-  RefreshCw, X, FileText, Receipt, Factory,
+  RefreshCw, X, FileText, Receipt, Factory, Eye, Pencil,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -200,9 +200,6 @@ export default function TransactionJournal() {
     enabled: !!detailId,
   });
 
-  // ── Reset page when filters change ──
-  useEffect(() => { setPage(1); }, [startDate, endDate, selectedCos, voucherType, currency, optionalFilter, includeFactory, search]);
-
   const openDetail = (id: number) => {
     setDetailId(id);
     setDrawerOpen(true);
@@ -212,25 +209,6 @@ export default function TransactionJournal() {
     setSearch(searchInput);
     setPage(1);
   }, [searchInput]);
-
-  // ── Keyboard date navigation: '-' = prev day, 'Shift+=' (+) = next day ──
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement).tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      if (e.key === "-") {
-        e.preventDefault();
-        setStartDate(s => shiftDateStr(s, -1));
-        setEndDate(d => shiftDateStr(d, -1));
-      } else if (e.key === "+" || (e.shiftKey && e.key === "=")) {
-        e.preventDefault();
-        setStartDate(s => shiftDateStr(s, 1));
-        setEndDate(d => shiftDateStr(d, 1));
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
 
   // ── Switch company and navigate ──
   const openInCompany = async (companyId: number, path: string) => {
@@ -565,24 +543,22 @@ export default function TransactionJournal() {
                   <TableHead className="w-[150px]">Voucher #</TableHead>
                   <TableHead className="w-[120px]">Type</TableHead>
                   <TableHead>Narration</TableHead>
-                  <TableHead className="text-right w-[110px]">Debit</TableHead>
-                  <TableHead className="text-right w-[110px]">Credit</TableHead>
-                  <TableHead className="w-[60px]">Cur.</TableHead>
-                  <TableHead className="w-[60px]"></TableHead>
+                  <TableHead className="text-right w-[130px]">Amount</TableHead>
+                  <TableHead className="w-[90px] text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   Array.from({ length: 10 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 9 }).map((__, j) => (
+                      {Array.from({ length: 7 }).map((__, j) => (
                         <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : (data?.vouchers || []).length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                       No transactions found for the selected filters.
                     </TableCell>
                   </TableRow>
@@ -590,8 +566,6 @@ export default function TransactionJournal() {
                   (data?.vouchers || []).map((v) => (
                     <TableRow
                       key={v.id}
-                      className="cursor-pointer hover-elevate"
-                      onClick={() => openDetail(v.id)}
                       data-testid={`row-voucher-${v.id}`}
                     >
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
@@ -615,27 +589,30 @@ export default function TransactionJournal() {
                         {v.narration || "—"}
                       </TableCell>
                       <TableCell className="text-right text-sm font-mono">
-                        {v.voucherType === "Payment" || v.voucherType === "Purchase"
-                          ? formatAmount(v.totalAmount)
-                          : "—"}
-                      </TableCell>
-                      <TableCell className="text-right text-sm font-mono">
-                        {v.voucherType === "Receipt" || v.voucherType === "Sales"
-                          ? formatAmount(v.totalAmount)
-                          : "—"}
+                        <span className="text-xs text-muted-foreground mr-1">{v.currency}</span>
+                        {formatAmount(v.totalAmount)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs font-mono">{v.currency}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => { e.stopPropagation(); openDetail(v.id); }}
-                          data-testid={`button-view-voucher-${v.id}`}
-                        >
-                          <Receipt className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openDetail(v.id)}
+                            data-testid={`button-preview-voucher-${v.id}`}
+                            title="Preview"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => window.open(`/daybook?voucherId=${v.id}`, "_blank")}
+                            data-testid={`button-edit-voucher-${v.id}`}
+                            title="Open in Daybook"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
