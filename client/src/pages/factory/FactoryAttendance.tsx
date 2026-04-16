@@ -63,6 +63,7 @@ interface WorkerRow {
   department: string | null;
   position: string | null;
   shiftType: string | null;
+  active?: boolean;
 }
 
 interface AttendanceRecord {
@@ -276,10 +277,15 @@ export default function FactoryAttendance() {
     } else if (printDialog === "excel-results") {
       exportWeeklyExcel(data?.workers ?? [], weekDays, shift, lang, "results", attendanceMap, notesMap, selectedDate);
     }
+    // Note: data?.workers now contains all workers (active + inactive);
+    // exportWeeklyExcel splits them into two sheets internally.
     setPrintDialog(null);
   };
 
-  const workers = data?.workers ?? [];
+  // All workers (active + inactive) — used only by the Excel export
+  const allWorkers = data?.workers ?? [];
+  // UI only shows active workers in the attendance grid
+  const workers = allWorkers.filter((w) => w.active !== false);
 
   const counts = {
     total: workers.length,
@@ -1351,7 +1357,7 @@ function generateWeeklyResultsSheetHtml(
 </html>`;
 }
 
-function exportWeeklyExcel(
+function buildWeeklySheet(
   workers: WorkerRow[],
   weekDays: WeekDay[],
   shift: string,
@@ -1359,11 +1365,10 @@ function exportWeeklyExcel(
   type: "blank" | "results",
   attendanceMap: Record<number, AttendanceStatus>,
   notesMap: Record<number, string>,
-  selectedDate: string
+  selectedDate: string,
+  sheetLabel: string
 ) {
   const L = LABELS[lang];
-  const wb = XLSX.utils.book_new();
-
   const dayColHeaders = weekDays.map((d) =>
     `${lang === "ar" ? d.dayNameAr : d.dayName} ${d.dayNum}`
   );
@@ -1378,12 +1383,7 @@ function exportWeeklyExcel(
       return "";
     });
     const notes = type === "results" ? (notesMap[w.id] ?? "") : "";
-    return [
-      i + 1,
-      w.fullName,
-      ...dayCells,
-      notes,
-    ];
+    return [i + 1, w.fullName, ...dayCells, notes];
   });
 
   const totalCols = 2 + weekDays.length + 1;
@@ -1394,7 +1394,7 @@ function exportWeeklyExcel(
     { wch: 22 },
   ];
 
-  const subtitle = `${L.week}: ${weekLabel(weekDays)}${shift ? `  |  ${L.shift}: ${shift}` : ""}  |  ${L.totalWorkers}: ${workers.length}`;
+  const subtitle = `${sheetLabel}  |  ${L.week}: ${weekLabel(weekDays)}${shift ? `  |  ${L.shift}: ${shift}` : ""}  |  ${L.totalWorkers}: ${workers.length}`;
   const allRows = [[L.title], [subtitle], headers, ...dataRows];
   const ws = XLSX.utils.aoa_to_sheet(allRows);
   ws["!cols"] = colWidths;
@@ -1402,33 +1402,43 @@ function exportWeeklyExcel(
     { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } },
   ];
+  return ws;
+}
 
-  const sheetName = (type === "blank" ? L.title : L.resultTitle).substring(0, 31);
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+function exportWeeklyExcel(
+  workers: WorkerRow[],
+  weekDays: WeekDay[],
+  shift: string,
+  lang: PrintLang,
+  type: "blank" | "results",
+  attendanceMap: Record<number, AttendanceStatus>,
+  notesMap: Record<number, string>,
+  selectedDate: string
+) {
+  const wb = XLSX.utils.book_new();
+
+  const activeWorkers   = workers.filter((w) => w.active !== false);
+  const inactiveWorkers = workers.filter((w) => w.active === false);
+
+  const activeSheet = buildWeeklySheet(activeWorkers, weekDays, shift, lang, type, attendanceMap, notesMap, selectedDate, lang === "ar" ? "العمال النشطون" : "Active Workers");
+  XLSX.utils.book_append_sheet(wb, activeSheet, lang === "ar" ? "نشط" : "Active Workers");
+
+  const inactiveSheet = buildWeeklySheet(inactiveWorkers, weekDays, shift, lang, type, {}, {}, selectedDate, lang === "ar" ? "العمال غير النشطين" : "Inactive Workers");
+  XLSX.utils.book_append_sheet(wb, inactiveSheet, lang === "ar" ? "غير نشط" : "Inactive Workers");
 
   const weekRange = weekLabel(weekDays).replace(/[^a-z0-9]/gi, "-");
   XLSX.writeFile(wb, `attendance-${type}-${weekRange}.xlsx`);
 }
 
-function exportRangeExcel(
+function buildRangeSheet(
   workers: WorkerRow[],
-  attendance: AttendanceRecord[],
+  lookup: Map<number, Map<string, string>>,
   dates: string[],
   startDate: string,
   endDate: string,
-  lang: PrintLang
+  lang: PrintLang,
+  sheetTitle: string
 ) {
-  const L = LABELS[lang];
-  const wb = XLSX.utils.book_new();
-
-  // Build lookup: workerId -> date -> status
-  const lookup = new Map<number, Map<string, string>>();
-  for (const r of attendance) {
-    if (!lookup.has(r.workerId)) lookup.set(r.workerId, new Map());
-    lookup.get(r.workerId)!.set(r.attendanceDate, r.status);
-  }
-
-  // Date column headers (day number + abbreviated weekday)
   const dateHeaders = dates.map((d) => {
     const dt = new Date(d + "T00:00:00");
     const day = dt.getDate();
@@ -1436,20 +1446,18 @@ function exportRangeExcel(
     return `${day}\n${weekday}`;
   });
 
-  const titleLabel = lang === "ar" ? "كشف الحضور" : "Attendance Sheet";
   const workerLabel = lang === "ar" ? "اسم العامل" : "Worker Name";
   const totalPLabel = lang === "ar" ? "الحضور" : "Present";
   const totalALabel = lang === "ar" ? "الغياب" : "Absent";
-  const rangeLabel = `${startDate}  →  ${endDate}`;
+  const rangeLabel  = `${startDate}  →  ${endDate}  |  ${sheetTitle}  |  ${lang === "ar" ? "العمال" : "Workers"}: ${workers.length}`;
 
-  const headers = ["#", workerLabel, ...dateHeaders, totalPLabel, totalALabel];
-
+  const headers  = ["#", workerLabel, ...dateHeaders, totalPLabel, totalALabel];
   const dataRows = workers.map((w, i) => {
     const wMap = lookup.get(w.id) ?? new Map();
     let presentCount = 0;
-    let absentCount = 0;
+    let absentCount  = 0;
     const dayCells = dates.map((d) => {
-      const status = wMap.get(d) ?? "Present"; // no record = Present by default
+      const status = wMap.get(d) ?? "Present";
       const mark = STATUS_MARKS[status] ?? status.charAt(0);
       if (status === "Absent") absentCount++;
       else presentCount++;
@@ -1458,13 +1466,9 @@ function exportRangeExcel(
     return [i + 1, w.fullName, ...dayCells, presentCount, absentCount];
   });
 
-  const totalCols = 2 + dates.length + 2;
-  const allRows = [
-    [titleLabel],
-    [rangeLabel],
-    headers,
-    ...dataRows,
-  ];
+  const titleLabel = lang === "ar" ? "كشف الحضور" : "Attendance Sheet";
+  const totalCols  = 2 + dates.length + 2;
+  const allRows = [[titleLabel], [rangeLabel], headers, ...dataRows];
 
   const ws = XLSX.utils.aoa_to_sheet(allRows);
   ws["!cols"] = [
@@ -1478,9 +1482,38 @@ function exportRangeExcel(
     { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } },
   ];
+  return ws;
+}
 
-  const sheetName = titleLabel.substring(0, 31);
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+function exportRangeExcel(
+  workers: WorkerRow[],
+  attendance: AttendanceRecord[],
+  dates: string[],
+  startDate: string,
+  endDate: string,
+  lang: PrintLang
+) {
+  const wb = XLSX.utils.book_new();
+
+  // Build lookup: workerId -> date -> status
+  const lookup = new Map<number, Map<string, string>>();
+  for (const r of attendance) {
+    if (!lookup.has(r.workerId)) lookup.set(r.workerId, new Map());
+    lookup.get(r.workerId)!.set(r.attendanceDate, r.status);
+  }
+
+  const activeWorkers   = workers.filter((w) => w.active !== false);
+  const inactiveWorkers = workers.filter((w) => w.active === false);
+
+  const activeLabel   = lang === "ar" ? "العمال النشطون"      : "Active Workers";
+  const inactiveLabel = lang === "ar" ? "العمال غير النشطين" : "Inactive Workers";
+
+  const activeSheet   = buildRangeSheet(activeWorkers,   lookup, dates, startDate, endDate, lang, activeLabel);
+  const inactiveSheet = buildRangeSheet(inactiveWorkers, lookup, dates, startDate, endDate, lang, inactiveLabel);
+
+  XLSX.utils.book_append_sheet(wb, activeSheet,   lang === "ar" ? "نشط"      : "Active Workers");
+  XLSX.utils.book_append_sheet(wb, inactiveSheet, lang === "ar" ? "غير نشط" : "Inactive Workers");
+
   XLSX.writeFile(wb, `attendance-range-${startDate}-to-${endDate}.xlsx`);
 }
 

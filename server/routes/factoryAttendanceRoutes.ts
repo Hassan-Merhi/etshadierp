@@ -22,6 +22,9 @@ export function registerFactoryAttendanceRoutes(
       const { date, shift } = req.query as { date?: string; shift?: string };
       if (!date) return res.status(400).json({ message: "date is required" });
 
+      // Return ALL workers (active + inactive) with the active flag so the
+      // frontend can split them for the two-sheet Excel export while still
+      // only showing active workers in the UI.
       const workers = await db
         .select({
           id: factoryWorkers.id,
@@ -30,9 +33,10 @@ export function registerFactoryAttendanceRoutes(
           department: factoryWorkers.department,
           position: factoryWorkers.position,
           shiftType: factoryWorkers.shiftType,
+          active: factoryWorkers.active,
         })
         .from(factoryWorkers)
-        .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)))
+        .where(eq(factoryWorkers.companyId, companyId))
         .orderBy(factoryWorkers.fullName);
 
       if (workers.length === 0) return res.json({ workers: [], attendance: [] });
@@ -151,6 +155,8 @@ export function registerFactoryAttendanceRoutes(
       const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
       if (!startDate || !endDate) return res.status(400).json({ message: "startDate and endDate are required" });
 
+      // Include ALL workers (active + inactive) — the frontend will split them
+      // across two sheets in the Excel export.
       const workers = await db
         .select({
           id: factoryWorkers.id,
@@ -159,9 +165,10 @@ export function registerFactoryAttendanceRoutes(
           department: factoryWorkers.department,
           position: factoryWorkers.position,
           shiftType: factoryWorkers.shiftType,
+          active: factoryWorkers.active,
         })
         .from(factoryWorkers)
-        .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)))
+        .where(eq(factoryWorkers.companyId, companyId))
         .orderBy(factoryWorkers.fullName);
 
       if (workers.length === 0) return res.json({ workers: [], attendance: [] });
