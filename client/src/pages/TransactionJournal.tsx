@@ -4,12 +4,13 @@ import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { format, addDays, parseISO } from "date-fns";
+import { format } from "date-fns";
 import {
   Card, CardContent, CardHeader, CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -25,8 +26,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import {
-  Search, Filter, ChevronLeft, ChevronRight, ExternalLink, Building2,
+  Search, Filter, ExternalLink, Building2,
   RefreshCw, X, FileText, Receipt, Factory,
 } from "lucide-react";
 
@@ -130,14 +132,6 @@ function companyColor(id: number) {
   return COMPANY_COLORS[id % COMPANY_COLORS.length];
 }
 
-// ─── Today helpers ─────────────────────────────────────────────────────────────
-
-function todayStr() { return format(new Date(), "yyyy-MM-dd"); }
-function nDaysAgo(n: number) { return format(addDays(new Date(), -n), "yyyy-MM-dd"); }
-function shiftDateStr(dateStr: string, days: number) {
-  return format(addDays(parseISO(dateStr), days), "yyyy-MM-dd");
-}
-
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function TransactionJournal() {
@@ -146,8 +140,7 @@ export default function TransactionJournal() {
   const { toast } = useToast();
 
   // ── Filter state ──
-  const [startDate,      setStartDate]      = useState(nDaysAgo(30));
-  const [endDate,        setEndDate]        = useState(todayStr());
+  const [periodFilter,   setPeriodFilter]   = useState<PeriodFilterValue>(getDefaultPeriodValue("last_1_month"));
   const [selectedCos,    setSelectedCos]    = useState<number[]>([]);   // empty = all
   const [voucherType,    setVoucherType]    = useState("all");
   const [currency,       setCurrency]       = useState("all");
@@ -165,19 +158,19 @@ export default function TransactionJournal() {
   // ── Build query string (memoized to avoid spurious refetches) ──
   const queryParamsStr = useMemo(() => {
     const p = new URLSearchParams({
-      startDate,
-      endDate,
+      ...(periodFilter.fromDate ? { startDate: periodFilter.fromDate } : {}),
+      ...(periodFilter.toDate   ? { endDate:   periodFilter.toDate   } : {}),
       voucherType,
       currency,
       optional: optionalFilter,
       includeFactory: String(includeFactory),
       page:  String(page),
       limit: String(LIMIT),
-      ...(search             ? { search }                                : {}),
+      ...(search             ? { search }                            : {}),
       ...(selectedCos.length ? { companyIds: selectedCos.join(",") } : {}),
     });
     return p.toString();
-  }, [startDate, endDate, voucherType, currency, optionalFilter, includeFactory, page, search, selectedCos]);
+  }, [periodFilter, voucherType, currency, optionalFilter, includeFactory, page, search, selectedCos]);
 
   const { data, isLoading, isFetching, refetch } = useQuery<JournalResponse>({
     queryKey: ["/api/global/transactions", queryParamsStr],
@@ -305,54 +298,32 @@ export default function TransactionJournal() {
 
       {/* ── Filters ── */}
       <Card>
-        <CardContent className="pt-4">
-          <div className="flex flex-wrap gap-3 items-end">
-            {/* Date range with prev/next navigation */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground font-medium">From — To</label>
-              <div className="flex items-center gap-1">
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => { setStartDate(s => shiftDateStr(s, -1)); setEndDate(d => shiftDateStr(d, -1)); }}
-                  title="Previous day (−)"
-                  data-testid="button-prev-day"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="h-9 w-[135px]"
-                  data-testid="input-start-date"
-                />
-                <span className="text-muted-foreground text-sm px-0.5">–</span>
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="h-9 w-[135px]"
-                  data-testid="input-end-date"
-                />
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => { setStartDate(s => shiftDateStr(s, 1)); setEndDate(d => shiftDateStr(d, 1)); }}
-                  title="Next day (Shift +)"
-                  data-testid="button-next-day"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Filter className="w-5 h-5" />
+              <CardTitle>Filters</CardTitle>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-end gap-4">
+            {/* Period */}
+            <div className="space-y-2">
+              <Label>Period</Label>
+              <PeriodFilter
+                value={periodFilter}
+                onChange={(v) => { setPeriodFilter(v); setPage(1); }}
+                data-testid="period-filter"
+              />
             </div>
 
             {/* Company multi-select */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground font-medium">Companies</label>
+            <div className="space-y-2">
+              <Label>Companies</Label>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="h-9 min-w-[160px] justify-between" data-testid="button-company-filter">
+                  <Button variant="outline" className="min-w-[160px] justify-between" data-testid="button-company-filter">
                     <Building2 className="h-4 w-4 mr-2 shrink-0" />
                     <span className="flex-1 text-left truncate">
                       {selectedCos.length === 0
@@ -392,10 +363,10 @@ export default function TransactionJournal() {
             </div>
 
             {/* Voucher type */}
-            <div className="flex flex-col gap-1 min-w-[150px]">
-              <label className="text-xs text-muted-foreground font-medium">Type</label>
-              <Select value={voucherType} onValueChange={setVoucherType}>
-                <SelectTrigger className="h-9" data-testid="select-voucher-type">
+            <div className="space-y-2">
+              <Label htmlFor="voucher-type-tj">Voucher Type</Label>
+              <Select value={voucherType} onValueChange={(v) => { setVoucherType(v); setPage(1); }}>
+                <SelectTrigger id="voucher-type-tj" className="w-[150px]" data-testid="select-voucher-type">
                   <SelectValue placeholder="All Types" />
                 </SelectTrigger>
                 <SelectContent>
@@ -408,10 +379,10 @@ export default function TransactionJournal() {
             </div>
 
             {/* Currency */}
-            <div className="flex flex-col gap-1 min-w-[110px]">
-              <label className="text-xs text-muted-foreground font-medium">Currency</label>
-              <Select value={currency} onValueChange={setCurrency}>
-                <SelectTrigger className="h-9" data-testid="select-currency">
+            <div className="space-y-2">
+              <Label htmlFor="currency-tj">Currency</Label>
+              <Select value={currency} onValueChange={(v) => { setCurrency(v); setPage(1); }}>
+                <SelectTrigger id="currency-tj" className="w-[110px]" data-testid="select-currency">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -422,11 +393,11 @@ export default function TransactionJournal() {
               </Select>
             </div>
 
-            {/* Optional filter */}
-            <div className="flex flex-col gap-1 min-w-[130px]">
-              <label className="text-xs text-muted-foreground font-medium">Status</label>
-              <Select value={optionalFilter} onValueChange={setOptionalFilter}>
-                <SelectTrigger className="h-9" data-testid="select-optional">
+            {/* Status */}
+            <div className="space-y-2">
+              <Label htmlFor="status-tj">Status</Label>
+              <Select value={optionalFilter} onValueChange={(v) => { setOptionalFilter(v); setPage(1); }}>
+                <SelectTrigger id="status-tj" className="w-[130px]" data-testid="select-optional">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -438,35 +409,38 @@ export default function TransactionJournal() {
             </div>
 
             {/* Factory toggle */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground font-medium">Factory</label>
-              <Button
-                variant={includeFactory ? "default" : "outline"}
-                className="h-9 gap-2"
-                onClick={() => setIncludeFactory(v => !v)}
-                data-testid="button-toggle-factory"
-              >
-                <Factory className="h-4 w-4" />
-                {includeFactory ? "Included" : "Excluded"}
-              </Button>
+            <div className="space-y-2">
+              <Label>Factory</Label>
+              <div>
+                <Button
+                  variant={includeFactory ? "default" : "outline"}
+                  className="gap-2"
+                  onClick={() => { setIncludeFactory(v => !v); setPage(1); }}
+                  data-testid="button-toggle-factory"
+                >
+                  <Factory className="h-4 w-4" />
+                  {includeFactory ? "Included" : "Excluded"}
+                </Button>
+              </div>
             </div>
 
             {/* Search */}
-            <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
-              <label className="text-xs text-muted-foreground font-medium">Search</label>
+            <div className="space-y-2 flex-1 min-w-0 w-full md:min-w-[200px] md:w-auto">
+              <Label htmlFor="search-tj">Search</Label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
+                    id="search-tj"
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                     placeholder="Voucher # or narration…"
-                    className="pl-8 h-9"
+                    className="pl-8"
                     data-testid="input-search"
                   />
                 </div>
-                <Button variant="default" className="h-9 shrink-0" onClick={handleSearch} data-testid="button-search">
+                <Button variant="default" className="shrink-0" onClick={handleSearch} data-testid="button-search">
                   Search
                 </Button>
                 {search && (
