@@ -2636,6 +2636,48 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         ...(totalCustomerCr > 0 ? [{ name: "Customer", value: totalCustomerCr }] : []),
       ];
 
+      // ── 5. Pending & Verified orders (upcoming receivables) ──────────────────
+      const pendingVerifiedRows = await db
+        .select({
+          id: customerOrders.id,
+          status: customerOrders.status,
+          orderDate: customerOrders.orderDate,
+          grandTotal: customerOrders.grandTotal,
+          totalQtyBales: customerOrders.totalQtyBales,
+          customerId: customerOrders.customerId,
+          customerName: customers.legalName,
+        })
+        .from(customerOrders)
+        .innerJoin(customers, eq(customerOrders.customerId, customers.id))
+        .where(and(
+          eq(customerOrders.companyId, companyId),
+          inArray(customerOrders.status, ["PENDING", "VERIFIED"]),
+        ))
+        .orderBy(desc(customerOrders.orderDate));
+
+      const pendingOrders = (pendingVerifiedRows as any[])
+        .filter(r => r.status === "PENDING")
+        .map(r => ({
+          id: r.id,
+          customerName: r.customerName || `Customer #${r.customerId}`,
+          orderDate: r.orderDate,
+          grandTotal: round2(parseFloat(r.grandTotal || "0")),
+          totalQtyBales: r.totalQtyBales ?? 0,
+        }));
+
+      const verifiedOrders = (pendingVerifiedRows as any[])
+        .filter(r => r.status === "VERIFIED")
+        .map(r => ({
+          id: r.id,
+          customerName: r.customerName || `Customer #${r.customerId}`,
+          orderDate: r.orderDate,
+          grandTotal: round2(parseFloat(r.grandTotal || "0")),
+          totalQtyBales: r.totalQtyBales ?? 0,
+        }));
+
+      const pendingTotal = round2(pendingOrders.reduce((s, o) => s + o.grandTotal, 0));
+      const verifiedTotal = round2(verifiedOrders.reduce((s, o) => s + o.grandTotal, 0));
+
       res.json({
         forUsTotal,
         onUsTotal,
@@ -2647,6 +2689,10 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         inventoryValue: baleInventoryValue,
         rawMaterialValue: rawMaterialStockValue,
         ledgerAssets: cleanLedgerForUsTotal,
+        pendingOrders,
+        verifiedOrders,
+        pendingTotal,
+        verifiedTotal,
         ledgerLiabilities: round2(ledgerOnUsTotal),
       });
     } catch (error: any) {

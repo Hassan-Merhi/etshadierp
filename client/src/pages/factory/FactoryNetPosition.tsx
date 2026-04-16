@@ -13,6 +13,8 @@ import {
   Equal,
   RefreshCw,
   AlertCircle,
+  Clock,
+  CheckCircle2,
 } from "lucide-react";
 
 interface AccountItem {
@@ -27,6 +29,14 @@ interface BreakdownItem {
   value: number;
 }
 
+interface OrderItem {
+  id: number;
+  customerName: string;
+  orderDate: string;
+  grandTotal: number;
+  totalQtyBales: number;
+}
+
 interface NetPositionData {
   forUsTotal: number;
   onUsTotal: number;
@@ -39,6 +49,10 @@ interface NetPositionData {
   rawMaterialValue: number;
   ledgerAssets: number;
   ledgerLiabilities: number;
+  pendingOrders: OrderItem[];
+  verifiedOrders: OrderItem[];
+  pendingTotal: number;
+  verifiedTotal: number;
 }
 
 function fmt(n: number, currency = "USD"): string {
@@ -48,6 +62,11 @@ function fmt(n: number, currency = "USD"): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(n);
+}
+
+function fmtDate(d: string): string {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function CategoryGroup({
@@ -96,7 +115,7 @@ function CategoryGroup({
             >
               <div className="min-w-0">
                 <p className="font-medium truncate">{acc.name}</p>
-                {acc.code && acc.code !== "SUPPLIER" && (
+                {acc.code && acc.code !== "SUPPLIER" && acc.code !== "CUSTOMER_DR" && acc.code !== "CUSTOMER_CR" && (
                   <p className="text-xs text-muted-foreground font-mono">{acc.code}</p>
                 )}
               </div>
@@ -194,6 +213,69 @@ function Side({
   );
 }
 
+function OrderGroup({
+  label,
+  orders,
+  total,
+  icon,
+  accentClass,
+  badgeClass,
+}: {
+  label: string;
+  orders: OrderItem[];
+  total: number;
+  icon: React.ReactNode;
+  accentClass: string;
+  badgeClass: string;
+}) {
+  const [open, setOpen] = useState(true);
+  if (orders.length === 0) return null;
+
+  return (
+    <div className="border border-border rounded-md overflow-hidden">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-4 py-3 hover-elevate bg-muted/30"
+        onClick={() => setOpen((o) => !o)}
+        data-testid={`toggle-order-group-${label.toLowerCase()}`}
+      >
+        <div className="flex items-center gap-2">
+          {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+          {icon}
+          <span className="text-sm font-semibold">{label}</span>
+          <Badge className={`text-xs ${badgeClass}`}>{orders.length}</Badge>
+        </div>
+        <span className={`font-mono text-sm font-bold ${accentClass}`}>{fmt(total)}</span>
+      </button>
+      {open && (
+        <div className="divide-y divide-border">
+          {orders.map((o) => (
+            <div
+              key={o.id}
+              className="flex items-center justify-between px-4 py-2.5 text-sm"
+              data-testid={`row-order-${o.id}`}
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-xs text-muted-foreground">#{o.id}</span>
+                  <span className="font-medium truncate">{o.customerName}</span>
+                </div>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <span className="text-xs text-muted-foreground">{fmtDate(o.orderDate)}</span>
+                  <span className="text-xs text-muted-foreground">{o.totalQtyBales} bale{o.totalQtyBales !== 1 ? "s" : ""}</span>
+                </div>
+              </div>
+              <span className={`font-mono text-sm font-semibold ml-4 shrink-0 ${accentClass}`}>
+                {fmt(o.grandTotal)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FactoryNetPosition() {
   const { data, isLoading, error, refetch, isFetching } = useQuery<NetPositionData>({
     queryKey: ["/api/factory/net-position"],
@@ -202,10 +284,12 @@ export default function FactoryNetPosition() {
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    staleTime: 60_000,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
   });
 
   const isPositive = (data?.netPosition ?? 0) >= 0;
+  const hasPendingVerified = (data?.pendingOrders?.length ?? 0) + (data?.verifiedOrders?.length ?? 0) > 0;
 
   if (error) {
     return (
@@ -316,6 +400,58 @@ export default function FactoryNetPosition() {
           />
         </div>
       )}
+
+      {/* Upcoming Receivables — Pending & Verified Orders */}
+      {isLoading ? (
+        <Skeleton className="h-48 w-full rounded-md" />
+      ) : hasPendingVerified ? (
+        <Card data-testid="card-upcoming-receivables">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-amber-500" />
+                <CardTitle className="text-base">Upcoming Receivables</CardTitle>
+              </div>
+              <div className="flex items-center gap-3">
+                {(data?.pendingTotal ?? 0) > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    Pending: <span className="font-mono font-semibold text-amber-500 dark:text-amber-400">{fmt(data?.pendingTotal ?? 0)}</span>
+                  </span>
+                )}
+                {(data?.verifiedTotal ?? 0) > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    Verified: <span className="font-mono font-semibold text-blue-500 dark:text-blue-400">{fmt(data?.verifiedTotal ?? 0)}</span>
+                  </span>
+                )}
+                <span className="text-xs text-muted-foreground">
+                  Total: <span className="font-mono font-semibold text-foreground">{fmt((data?.pendingTotal ?? 0) + (data?.verifiedTotal ?? 0))}</span>
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Orders awaiting finalization — not yet counted in net position. Totals update live as bales are added.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <OrderGroup
+              label="Pending"
+              orders={data?.pendingOrders ?? []}
+              total={data?.pendingTotal ?? 0}
+              icon={<Clock className="h-4 w-4 text-amber-500" />}
+              accentClass="text-amber-500 dark:text-amber-400"
+              badgeClass="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+            />
+            <OrderGroup
+              label="Verified"
+              orders={data?.verifiedOrders ?? []}
+              total={data?.verifiedTotal ?? 0}
+              icon={<CheckCircle2 className="h-4 w-4 text-blue-500" />}
+              accentClass="text-blue-500 dark:text-blue-400"
+              badgeClass="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Sub-totals info */}
       {!isLoading && data && (data.supplierLiabilities > 0 || data.ledgerAssets > 0 || data.inventoryValue > 0 || data.rawMaterialValue > 0) && (
