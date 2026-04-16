@@ -1636,6 +1636,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
 
+      // Build preliminary article code set from loaded bales
       const loadedByArticle: Record<string, { articleCode: string; productName: string; qty: number; totalWeight: number; totalPrice: number }> = {};
       for (const b of orderBales) {
         const code = b.articleCode || "UNKNOWN";
@@ -1662,6 +1663,39 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
             pricePerBale: pl.pricePerBale,
           };
         }
+      }
+
+      // Look up authoritative product names from factoryBaleProducts.
+      // Some stored names are stale or were saved as the article code itself —
+      // use the catalogue name when available.
+      const allCodes = [...new Set([
+        ...Object.keys(loadedByArticle),
+        ...Object.keys(proformaByArticle),
+      ])].filter(c => c !== "UNKNOWN");
+
+      const productNameMap: Record<string, string> = {};
+      if (allCodes.length > 0) {
+        const rows = await db
+          .select({ articleCode: factoryBaleProducts.articleCode, name: factoryBaleProducts.name })
+          .from(factoryBaleProducts)
+          .where(and(
+            eq(factoryBaleProducts.companyId, companyId),
+            inArray(factoryBaleProducts.articleCode, allCodes),
+          ));
+        for (const r of rows) {
+          if (r.articleCode && r.name) productNameMap[r.articleCode] = r.name;
+        }
+      }
+
+      // Apply authoritative names — prefer catalogue name, fall back to stored name, last resort = code
+      const resolveName = (code: string, storedName: string) =>
+        productNameMap[code] || (storedName !== code ? storedName : null) || code;
+
+      for (const [code, entry] of Object.entries(loadedByArticle)) {
+        entry.productName = resolveName(code, entry.productName);
+      }
+      for (const [code, entry] of Object.entries(proformaByArticle)) {
+        entry.productName = resolveName(code, entry.productName);
       }
 
       const allArticles = new Set([...Object.keys(loadedByArticle), ...Object.keys(proformaByArticle)]);
