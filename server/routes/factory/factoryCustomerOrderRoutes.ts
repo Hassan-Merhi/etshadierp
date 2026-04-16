@@ -1267,27 +1267,27 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       // ── Logo row ──
       const logoRow = sheet.addRow([]);
-      logoRow.height = 80;
+      logoRow.height = 110;
       try {
         const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
         if (fs.existsSync(logoPath)) {
           const logoBuf = fs.readFileSync(logoPath);
           const logoId = workbook.addImage({ buffer: logoBuf as Buffer, extension: "jpeg" });
-          sheet.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 120, height: 80 } });
+          sheet.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 180, height: 110 } });
         }
       } catch {}
 
       // ── Company name ──
       const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
-      r1.height = 22;
-      r1.getCell(1).font = { bold: true, size: 14, color: { argb: DARK_BLUE } };
+      r1.height = 26;
+      r1.getCell(1).font = { bold: true, size: 16, color: { argb: DARK_BLUE } };
       r1.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
       merge(r1.number, 1, COL);
 
       // ── "Commercial Invoice" title ──
       const r2 = sheet.addRow(["Commercial Invoice"]);
-      r2.height = 20;
-      r2.getCell(1).font = { bold: true, size: 13, color: { argb: DARK_BLUE } };
+      r2.height = 22;
+      r2.getCell(1).font = { bold: true, size: 14, color: { argb: DARK_BLUE } };
       r2.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
       merge(r2.number, 1, COL);
       sheet.addRow([]);
@@ -1306,9 +1306,10 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       ];
       for (const [label, value] of details) {
         const dr = sheet.addRow(["", "", "", "", "", label, "", value]);
-        dr.getCell(6).font = { bold: true, size: 10 };
+        dr.height = 20;
+        dr.getCell(6).font = { bold: true, size: 11 };
         dr.getCell(6).alignment = { horizontal: "right" };
-        dr.getCell(8).font = { size: 10 };
+        dr.getCell(8).font = { size: 11 };
         dr.getCell(8).alignment = { horizontal: "left" };
         merge(dr.number, 6, 7);
       }
@@ -1316,9 +1317,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       // ── Table header ──
       const hdrRow = sheet.addRow(["#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt", "Price/Bale", "Total"]);
-      hdrRow.height = 18;
+      hdrRow.height = 24;
       hdrRow.eachCell((cell: any) => {
-        cell.font = { bold: true, color: { argb: WHITE }, size: 10 };
+        cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
         setFill(cell, DARK_BLUE);
         cell.alignment = { horizontal: "center", vertical: "middle" };
         cell.border = { top: { style: "thin", color: { argb: WHITE } }, bottom: { style: "thin", color: { argb: WHITE } }, left: { style: "thin", color: { argb: WHITE } }, right: { style: "thin", color: { argb: WHITE } } };
@@ -1340,7 +1341,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           fmtMoney(g.pricePerBale),
           fmtMoney(g.total),
         ]);
-        dr.height = 15;
+        dr.height = 20;
+        dr.eachCell((cell: any) => { cell.font = { size: 11 }; });
         if (idx % 2 === 1) {
           dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
         }
@@ -1355,9 +1357,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       // ── Totals row ──
       const totRow = sheet.addRow(["", "", "Totals", totalQty, "", fmtNum(totalWtAll), "", fmtMoney(totalAll)]);
-      totRow.height = 16;
+      totRow.height = 22;
       totRow.eachCell((cell: any) => {
-        cell.font = { bold: true, size: 10, color: { argb: WHITE } };
+        cell.font = { bold: true, size: 11, color: { argb: WHITE } };
         setFill(cell, DARK_BLUE);
         cell.alignment = { horizontal: "right" };
       });
@@ -1383,8 +1385,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       // Header row for summary
       const sumHdr = sheet.addRow(["", "", "", "", "", "", "Name", "Amount"]);
-      sumHdr.getCell(7).font = { bold: true, color: { argb: WHITE }, size: 10 };
-      sumHdr.getCell(8).font = { bold: true, color: { argb: WHITE }, size: 10 };
+      sumHdr.height = 22;
+      sumHdr.getCell(7).font = { bold: true, color: { argb: WHITE }, size: 11 };
+      sumHdr.getCell(8).font = { bold: true, color: { argb: WHITE }, size: 11 };
       setFill(sumHdr.getCell(7), DARK_BLUE);
       setFill(sumHdr.getCell(8), DARK_BLUE);
       sumHdr.getCell(7).alignment = { horizontal: "center" };
@@ -1392,13 +1395,14 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       summaryData.forEach(([label, amount], idx) => {
         const sr = sheet.addRow(["", "", "", "", "", "", label as string, fmtMoney(amount as number)]);
+        sr.height = 20;
         const isGrandTotal = idx === summaryData.length - 1;
         const bg = isGrandTotal ? DARK_BLUE : (idx % 2 === 0 ? WHITE : LIGHT_GRAY);
         const fg = isGrandTotal ? WHITE : "FF000000";
         setFill(sr.getCell(7), bg);
         setFill(sr.getCell(8), bg);
-        sr.getCell(7).font = { bold: isGrandTotal, size: 10, color: { argb: fg } };
-        sr.getCell(8).font = { bold: isGrandTotal, size: 10, color: { argb: fg } };
+        sr.getCell(7).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
+        sr.getCell(8).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
         sr.getCell(7).alignment = { horizontal: "left" };
         sr.getCell(8).alignment = { horizontal: "right" };
         sr.getCell(7).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
@@ -1957,27 +1961,27 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       // ── Logo row ──
       const logoRow = sheet.addRow([]);
-      logoRow.height = 80;
+      logoRow.height = 110;
       try {
         const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
         if (fs.existsSync(logoPath)) {
           const logoBuf = fs.readFileSync(logoPath);
           const logoId = workbook.addImage({ buffer: logoBuf as Buffer, extension: "jpeg" });
-          sheet.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 120, height: 80 } });
+          sheet.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 180, height: 110 } });
         }
       } catch {}
 
       // ── Company name ──
       const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
-      r1.height = 22;
-      r1.getCell(1).font = { bold: true, size: 14, color: { argb: DARK_BLUE } };
+      r1.height = 26;
+      r1.getCell(1).font = { bold: true, size: 16, color: { argb: DARK_BLUE } };
       r1.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
       merge(r1.number, 1, COL);
 
       // ── "Commercial Invoice" title ──
       const r2 = sheet.addRow(["Commercial Invoice"]);
-      r2.height = 20;
-      r2.getCell(1).font = { bold: true, size: 13, color: { argb: DARK_BLUE } };
+      r2.height = 22;
+      r2.getCell(1).font = { bold: true, size: 14, color: { argb: DARK_BLUE } };
       r2.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
       merge(r2.number, 1, COL);
       sheet.addRow([]);
@@ -1996,9 +2000,10 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       ];
       for (const [label, value] of details) {
         const dr = sheet.addRow(["", "", "", "", "", label, "", value]);
-        dr.getCell(6).font = { bold: true, size: 10 };
+        dr.height = 20;
+        dr.getCell(6).font = { bold: true, size: 11 };
         dr.getCell(6).alignment = { horizontal: "right" };
-        dr.getCell(8).font = { size: 10 };
+        dr.getCell(8).font = { size: 11 };
         dr.getCell(8).alignment = { horizontal: "left" };
         merge(dr.number, 6, 7);
       }
@@ -2006,9 +2011,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       // ── Table header ──
       const hdrRow = sheet.addRow(["#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt", "Price/Bale", "Total"]);
-      hdrRow.height = 18;
+      hdrRow.height = 24;
       hdrRow.eachCell((cell: any) => {
-        cell.font = { bold: true, color: { argb: WHITE }, size: 10 };
+        cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
         setFill(cell, DARK_BLUE);
         cell.alignment = { horizontal: "center", vertical: "middle" };
         cell.border = { top: { style: "thin", color: { argb: WHITE } }, bottom: { style: "thin", color: { argb: WHITE } }, left: { style: "thin", color: { argb: WHITE } }, right: { style: "thin", color: { argb: WHITE } } };
@@ -2030,7 +2035,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           fmtMoney(g.pricePerBale),
           fmtMoney(g.total),
         ]);
-        dr.height = 15;
+        dr.height = 20;
+        dr.eachCell((cell: any) => { cell.font = { size: 11 }; });
         if (idx % 2 === 1) {
           dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
         }
@@ -2045,9 +2051,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       // ── Totals row ──
       const totRow = sheet.addRow(["", "", "Totals", totalQty, "", fmtNum(totalWtAll), "", fmtMoney(totalAll)]);
-      totRow.height = 16;
+      totRow.height = 22;
       totRow.eachCell((cell: any) => {
-        cell.font = { bold: true, size: 10, color: { argb: WHITE } };
+        cell.font = { bold: true, size: 11, color: { argb: WHITE } };
         setFill(cell, DARK_BLUE);
         cell.alignment = { horizontal: "right" };
       });
@@ -2069,8 +2075,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       ];
 
       const sumHdr = sheet.addRow(["", "", "", "", "", "", "Name", "Amount"]);
-      sumHdr.getCell(7).font = { bold: true, color: { argb: WHITE }, size: 10 };
-      sumHdr.getCell(8).font = { bold: true, color: { argb: WHITE }, size: 10 };
+      sumHdr.height = 22;
+      sumHdr.getCell(7).font = { bold: true, color: { argb: WHITE }, size: 11 };
+      sumHdr.getCell(8).font = { bold: true, color: { argb: WHITE }, size: 11 };
       setFill(sumHdr.getCell(7), DARK_BLUE);
       setFill(sumHdr.getCell(8), DARK_BLUE);
       sumHdr.getCell(7).alignment = { horizontal: "center" };
@@ -2078,13 +2085,14 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       summaryData.forEach(([label, amount], idx) => {
         const sr = sheet.addRow(["", "", "", "", "", "", label, fmtMoney(amount)]);
+        sr.height = 20;
         const isGrandTotal = idx === summaryData.length - 1;
         const bg = isGrandTotal ? DARK_BLUE : (idx % 2 === 0 ? WHITE : LIGHT_GRAY);
         const fg = isGrandTotal ? WHITE : "FF000000";
         setFill(sr.getCell(7), bg);
         setFill(sr.getCell(8), bg);
-        sr.getCell(7).font = { bold: isGrandTotal, size: 10, color: { argb: fg } };
-        sr.getCell(8).font = { bold: isGrandTotal, size: 10, color: { argb: fg } };
+        sr.getCell(7).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
+        sr.getCell(8).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
         sr.getCell(7).alignment = { horizontal: "left" };
         sr.getCell(8).alignment = { horizontal: "right" };
         sr.getCell(7).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
