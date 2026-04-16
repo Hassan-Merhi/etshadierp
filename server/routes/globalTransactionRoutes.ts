@@ -6,6 +6,14 @@ import {
   ledgerAccounts,
   companies,
   userCompanyRoles,
+  salesItems,
+  stockItems,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  purchaseOrders,
+  poLineItems,
 } from "../../shared/schema";
 import {
   eq,
@@ -312,6 +320,170 @@ export function registerGlobalTransactionRoutes(
     } catch (err) {
       console.error("[GlobalTransactions/detail]", err);
       return res.status(500).json({ message: "Failed to fetch voucher detail" });
+    }
+  });
+
+  // GET /api/global/transactions/:voucherId/view-entries
+  // Returns rich entries (items for Sales/Purchase/StockTransfer/Mixed) — no company restriction.
+  app.get("/api/global/transactions/:voucherId/view-entries", requireAuth, async (req, res) => {
+    try {
+      const voucherId = parseInt(req.params.voucherId);
+      if (isNaN(voucherId)) return res.status(400).json({ message: "Invalid voucher ID" });
+
+      const [voucher] = await db
+        .select({ id: vouchers.id, companyId: vouchers.companyId, voucherType: vouchers.voucherType })
+        .from(vouchers)
+        .where(eq(vouchers.id, voucherId));
+      if (!voucher) return res.status(404).json({ message: "Voucher not found" });
+
+      const type = voucher.voucherType;
+
+      // Always fetch base ledger entries
+      const entries = await db
+        .select({
+          id:              voucherEntries.id,
+          ledgerAccountId: voucherEntries.ledgerAccountId,
+          accountName:     ledgerAccounts.name,
+          debitAmount:     voucherEntries.debitAmount,
+          creditAmount:    voucherEntries.creditAmount,
+          narration:       voucherEntries.narration,
+        })
+        .from(voucherEntries)
+        .leftJoin(ledgerAccounts, eq(ledgerAccounts.id, voucherEntries.ledgerAccountId))
+        .where(eq(voucherEntries.voucherId, voucherId))
+        .orderBy(voucherEntries.id);
+
+      // Sales: return ledger entries + sales item rows
+      if (type === "Sales" || type === "POS") {
+        const items = await db
+          .select({
+            id: salesItems.id, voucherId: salesItems.voucherId,
+            stockItemId: salesItems.stockItemId, quantity: salesItems.quantity,
+            sellingPrice: salesItems.sellingPrice, costPrice: salesItems.costPrice,
+            totalSales: salesItems.totalSales, profit: salesItems.profit,
+            configuredPrice: salesItems.configuredPrice,
+            stockItemName: stockItems.name, stockItemCode: stockItems.code,
+          })
+          .from(salesItems)
+          .leftJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
+          .where(eq(salesItems.voucherId, voucherId));
+
+        if (items.length > 0) {
+          const itemRows = items.map((item) => {
+            const qty = parseFloat(item.quantity) || 0;
+            const price = parseFloat(item.sellingPrice) || 0;
+            const cfg = parseFloat(item.configuredPrice || "0");
+            const hassansProfit = cfg > 0 ? (price - cfg) * qty : 0;
+            const hassansPercentage = cfg > 0 && cfg * qty > 0 ? (hassansProfit / (cfg * qty)) * 100 : 0;
+            return {
+              id: item.id, voucherId: item.voucherId, stockItemId: item.stockItemId,
+              stockItemName: item.stockItemName || "Unknown Item",
+              stockItemCode: item.stockItemCode || "-",
+              quantity: item.quantity, rate: item.sellingPrice,
+              sellingPrice: item.sellingPrice, costPrice: item.costPrice,
+              totalSales: item.totalSales, profit: item.profit,
+              hassansPrice: cfg > 0 ? cfg.toFixed(2) : null,
+              hassansProfit: cfg > 0 ? hassansProfit.toFixed(2) : null,
+              hassansPercentage: cfg > 0 ? hassansPercentage.toFixed(1) : null,
+              debitAmount: "0", creditAmount: item.totalSales,
+              accountName: item.stockItemName || "Unknown Item",
+              isStockItem: true,
+            };
+          });
+          return res.json([...entries, ...itemRows]);
+        }
+      }
+
+      // Stock Transfer
+      if (type === "Stock Transfer" || type === "StockTransfer") {
+        const tv = await db.query.stockTransferVouchers.findFirst({ where: eq(stockTransferVouchers.voucherId, voucherId) });
+        if (tv) {
+          const items = await db
+            .select({ id: stockTransferItems.id, transferId: stockTransferItems.transferId,
+              stockItemId: stockTransferItems.stockItemId, quantity: stockTransferItems.quantity,
+              rate: stockTransferItems.rate, totalAmount: stockTransferItems.totalAmount,
+              stockItemName: stockItems.name, stockItemCode: stockItems.code })
+            .from(stockTransferItems)
+            .leftJoin(stockItems, eq(stockTransferItems.stockItemId, stockItems.id))
+            .where(eq(stockTransferItems.transferId, tv.id));
+          if (items.length > 0) {
+            return res.json(items.map((item) => ({
+              id: item.id, voucherId: voucherId, stockItemId: item.stockItemId,
+              stockItemName: item.stockItemName || "Unknown Item",
+              stockItemCode: item.stockItemCode || "-",
+              quantity: item.quantity, rate: item.rate, totalAmount: item.totalAmount,
+              debitAmount: "0", creditAmount: item.totalAmount,
+              accountName: item.stockItemName || "Unknown Item",
+              isStockItem: true,
+            })));
+          }
+        }
+      }
+
+      // Production / Consumption / Mixed
+      if (type === "Production" || type === "Consumption" || type === "Mixed") {
+        const av = await db.query.stockAdjustmentVouchers.findFirst({ where: eq(stockAdjustmentVouchers.voucherId, voucherId) });
+        if (av) {
+          const items = await db
+            .select({ id: stockAdjustmentItems.id, adjustmentId: stockAdjustmentItems.adjustmentId,
+              stockItemId: stockAdjustmentItems.stockItemId, quantity: stockAdjustmentItems.quantity,
+              rate: stockAdjustmentItems.rate, totalAmount: stockAdjustmentItems.totalAmount,
+              stockItemName: stockItems.name, stockItemCode: stockItems.code })
+            .from(stockAdjustmentItems)
+            .leftJoin(stockItems, eq(stockAdjustmentItems.stockItemId, stockItems.id))
+            .where(eq(stockAdjustmentItems.adjustmentId, av.id));
+          if (items.length > 0) {
+            return res.json(items.map((item) => {
+              const qty = parseFloat(item.quantity || "0");
+              const isProduction = type === "Production" || (type === "Mixed" && qty > 0);
+              const label = type === "Mixed" ? (qty > 0 ? "Production" : "Consumption") : type;
+              return {
+                id: item.id, voucherId, stockItemId: item.stockItemId,
+                stockItemName: item.stockItemName || "Unknown Item",
+                stockItemCode: item.stockItemCode || "-",
+                quantity: item.quantity, rate: item.rate, totalAmount: item.totalAmount,
+                debitAmount: isProduction ? item.totalAmount : "0",
+                creditAmount: isProduction ? "0" : item.totalAmount,
+                accountName: item.stockItemName || "Unknown Item",
+                isStockItem: true, adjustmentType: label,
+              };
+            }));
+          }
+        }
+      }
+
+      // Purchase: return base entries + PO line items
+      if (type === "Purchase") {
+        const [po] = await db
+          .select({ id: purchaseOrders.id, poNumber: purchaseOrders.poNumber,
+            status: purchaseOrders.status, itemsTotal: purchaseOrders.itemsTotal })
+          .from(purchaseOrders)
+          .where(eq(purchaseOrders.voucherId, voucherId));
+        if (po) {
+          const lines = await db
+            .select({ id: poLineItems.id, poId: poLineItems.poId,
+              itemName: poLineItems.itemName, quantity: poLineItems.quantity,
+              rate: poLineItems.rate, lineTotal: poLineItems.lineTotal })
+            .from(poLineItems)
+            .where(eq(poLineItems.poId, po.id));
+          if (lines.length > 0) {
+            const lineRows = lines.map((l) => ({
+              id: l.id, voucherId, isPurchaseItem: true,
+              accountName: l.itemName, quantity: l.quantity,
+              rate: l.rate, totalAmount: l.lineTotal,
+              debitAmount: l.lineTotal, creditAmount: "0",
+              isStockItem: true,
+            }));
+            return res.json({ entries, purchaseOrder: po, items: lineRows });
+          }
+        }
+      }
+
+      // Default: return base entries
+      return res.json(entries);
+    } catch (err) {
+      console.error("[GlobalTransactions/view-entries]", err);
+      return res.status(500).json({ message: "Failed to fetch view entries" });
     }
   });
 }

@@ -202,13 +202,30 @@ export default function TransactionJournal() {
     enabled: !!detailId,
   });
 
+  const { data: viewEntriesRaw, isLoading: viewEntriesLoading } = useQuery<any>({
+    queryKey: ["/api/global/transactions", detailId, "view-entries"],
+    queryFn: async () => {
+      const res = await fetch(`/api/global/transactions/${detailId}/view-entries`);
+      if (!res.ok) throw new Error("Not found");
+      return res.json();
+    },
+    enabled: !!detailId && drawerOpen,
+  });
+
+  // Normalise view-entries response (may be array or { entries, purchaseOrder, items })
+  const viewEntries: any[] = Array.isArray(viewEntriesRaw)
+    ? viewEntriesRaw
+    : (viewEntriesRaw?.entries ?? []);
+  const viewPurchaseOrder: any | null = viewEntriesRaw?.purchaseOrder ?? null;
+  const viewPurchaseItems: any[] = viewEntriesRaw?.items ?? [];
+
   const openDetail = (id: number) => {
     setEntryBalances({});
     setDetailId(id);
     setDrawerOpen(true);
   };
 
-  // Fetch per-entry account balances when detail opens
+  // Fetch per-entry account balances for ledger entries when detail opens
   useEffect(() => {
     if (!drawerOpen || !detailData) return;
     const entries = detailData.entries.filter((e) => e.ledgerAccountId);
@@ -679,7 +696,7 @@ export default function TransactionJournal() {
             </div>
           ) : detailData ? (
             <div className="flex flex-col gap-4">
-              {/* Date + Type row */}
+              {/* Date + Type + Company row */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Date</p>
@@ -704,59 +721,308 @@ export default function TransactionJournal() {
                 </div>
               )}
 
-              {/* Entries */}
-              <div>
-                <p className="text-sm font-medium mb-2">Entries</p>
-                <div className="rounded-md border overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Account</TableHead>
-                        <TableHead className="text-right w-32">Amount</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {detailData.entries.map((e) => {
-                        const amount = Math.max(
-                          parseFloat(e.debitAmount  || "0"),
-                          parseFloat(e.creditAmount || "0"),
-                        );
-                        const bal = entryBalances[e.id];
-                        return (
-                          <TableRow key={e.id} data-testid={`row-entry-${e.id}`}>
-                            <TableCell className="py-2">
-                              <p className="text-sm font-medium">
-                                {e.accountName || `Account #${e.ledgerAccountId}`}
-                              </p>
-                              {bal !== undefined && (
-                                <p className="text-xs text-muted-foreground">
-                                  Balance: {detailData.voucher.currency} {parseFloat(bal).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                                </p>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right text-sm font-mono py-2">
-                              {detailData.voucher.currency} {amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                      {/* Total row */}
-                      {detailData.entries.length > 0 && (() => {
-                        const total = detailData.entries.reduce((s, e) =>
-                          s + Math.max(parseFloat(e.debitAmount || "0"), parseFloat(e.creditAmount || "0")), 0);
-                        return (
-                          <TableRow className="border-t font-semibold bg-muted/20">
-                            <TableCell className="py-2 text-sm">Total</TableCell>
-                            <TableCell className="text-right text-sm font-mono py-2">
-                              {detailData.voucher.currency} {total.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })()}
-                    </TableBody>
-                  </Table>
+              {/* Rich entries panel */}
+              {viewEntriesLoading ? (
+                <div className="flex flex-col gap-2">
+                  {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
                 </div>
-              </div>
+              ) : (() => {
+                const vtype = detailData.voucher.voucherType;
+                const cur = detailData.voucher.currency;
+
+                // ── Sales / POS ────────────────────────────────────────────────────────
+                const isSales = vtype === "Sales" || vtype === "POS";
+                const stockRows = viewEntries.filter((e) => e.isStockItem);
+                const ledgerRows = viewEntries.filter((e) => !e.isStockItem);
+
+                if (isSales && stockRows.length > 0) {
+                  const grandTotal = stockRows.reduce((s, r) => s + parseFloat(r.totalSales || r.totalAmount || "0"), 0);
+                  const grandProfit = stockRows.reduce((s, r) => s + parseFloat(r.profit || "0"), 0);
+                  return (
+                    <div className="flex flex-col gap-3">
+                      <p className="text-sm font-medium">Items Sold</p>
+                      <div className="rounded-md border overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Item</TableHead>
+                              <TableHead className="text-right w-16">Qty</TableHead>
+                              <TableHead className="text-right w-24">Price</TableHead>
+                              <TableHead className="text-right w-24">Total</TableHead>
+                              <TableHead className="text-right w-24">Profit</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {stockRows.map((r, i) => (
+                              <TableRow key={i} data-testid={`row-sales-item-${r.id}`}>
+                                <TableCell className="py-2">
+                                  <p className="text-sm font-medium">{r.stockItemName}</p>
+                                  {r.stockItemCode && r.stockItemCode !== "-" && (
+                                    <p className="text-xs text-muted-foreground">{r.stockItemCode}</p>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right text-sm font-mono py-2">
+                                  {parseFloat(r.quantity).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 3 })}
+                                </TableCell>
+                                <TableCell className="text-right text-sm font-mono py-2">
+                                  {cur} {parseFloat(r.sellingPrice || r.rate || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                </TableCell>
+                                <TableCell className="text-right text-sm font-mono py-2">
+                                  {cur} {parseFloat(r.totalSales || r.totalAmount || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                </TableCell>
+                                <TableCell className="text-right text-sm font-mono py-2">
+                                  <span className={parseFloat(r.profit || "0") >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                                    {cur} {parseFloat(r.profit || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                  </span>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="border-t font-semibold bg-muted/20">
+                              <TableCell className="py-2 text-sm" colSpan={3}>Total</TableCell>
+                              <TableCell className="text-right text-sm font-mono py-2">{cur} {grandTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                              <TableCell className="text-right text-sm font-mono py-2">
+                                <span className={grandProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                                  {cur} {grandProfit.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </div>
+                      {/* Ledger entries (payment side) */}
+                      {ledgerRows.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium mb-2 text-muted-foreground">Accounts</p>
+                          <div className="rounded-md border overflow-hidden">
+                            <Table>
+                              <TableBody>
+                                {ledgerRows.map((e) => {
+                                  const amount = Math.max(parseFloat(e.debitAmount || "0"), parseFloat(e.creditAmount || "0"));
+                                  const bal = entryBalances[e.id];
+                                  return (
+                                    <TableRow key={e.id}>
+                                      <TableCell className="py-2">
+                                        <p className="text-sm">{e.accountName || `Account #${e.ledgerAccountId}`}</p>
+                                        {bal !== undefined && <p className="text-xs text-muted-foreground">Balance: {cur} {parseFloat(bal).toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>}
+                                      </TableCell>
+                                      <TableCell className="text-right text-sm font-mono py-2">{cur} {amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                // ── Stock Transfer ─────────────────────────────────────────────────────
+                if ((vtype === "Stock Transfer" || vtype === "StockTransfer") && stockRows.length > 0) {
+                  const grandTotal = stockRows.reduce((s, r) => s + parseFloat(r.totalAmount || "0"), 0);
+                  return (
+                    <div>
+                      <p className="text-sm font-medium mb-2">Transfer Items</p>
+                      <div className="rounded-md border overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Item</TableHead>
+                              <TableHead className="text-right w-16">Qty</TableHead>
+                              <TableHead className="text-right w-24">Rate</TableHead>
+                              <TableHead className="text-right w-24">Total</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {stockRows.map((r, i) => (
+                              <TableRow key={i} data-testid={`row-transfer-item-${r.id}`}>
+                                <TableCell className="py-2">
+                                  <p className="text-sm font-medium">{r.stockItemName}</p>
+                                  {r.stockItemCode && r.stockItemCode !== "-" && <p className="text-xs text-muted-foreground">{r.stockItemCode}</p>}
+                                </TableCell>
+                                <TableCell className="text-right text-sm font-mono py-2">{parseFloat(r.quantity || "0").toLocaleString("en-US", { maximumFractionDigits: 3 })}</TableCell>
+                                <TableCell className="text-right text-sm font-mono py-2">{cur} {parseFloat(r.rate || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                                <TableCell className="text-right text-sm font-mono py-2">{cur} {parseFloat(r.totalAmount || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="border-t font-semibold bg-muted/20">
+                              <TableCell className="py-2 text-sm" colSpan={3}>Total</TableCell>
+                              <TableCell className="text-right text-sm font-mono py-2">{cur} {grandTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // ── Production / Consumption / Mixed ──────────────────────────────────
+                if ((vtype === "Production" || vtype === "Consumption" || vtype === "Mixed") && stockRows.length > 0) {
+                  const grandTotal = stockRows.reduce((s, r) => s + Math.abs(parseFloat(r.totalAmount || "0")), 0);
+                  return (
+                    <div>
+                      <p className="text-sm font-medium mb-2">Stock Items</p>
+                      <div className="rounded-md border overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Item</TableHead>
+                              {vtype === "Mixed" && <TableHead className="w-28">Direction</TableHead>}
+                              <TableHead className="text-right w-16">Qty</TableHead>
+                              <TableHead className="text-right w-24">Rate</TableHead>
+                              <TableHead className="text-right w-24">Total</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {stockRows.map((r, i) => (
+                              <TableRow key={i} data-testid={`row-adj-item-${r.id}`}>
+                                <TableCell className="py-2">
+                                  <p className="text-sm font-medium">{r.stockItemName}</p>
+                                  {r.stockItemCode && r.stockItemCode !== "-" && <p className="text-xs text-muted-foreground">{r.stockItemCode}</p>}
+                                </TableCell>
+                                {vtype === "Mixed" && (
+                                  <TableCell className="py-2">
+                                    <Badge variant={r.adjustmentType === "Production" ? "default" : "secondary"} className="text-xs">
+                                      {r.adjustmentType}
+                                    </Badge>
+                                  </TableCell>
+                                )}
+                                <TableCell className="text-right text-sm font-mono py-2">{Math.abs(parseFloat(r.quantity || "0")).toLocaleString("en-US", { maximumFractionDigits: 3 })}</TableCell>
+                                <TableCell className="text-right text-sm font-mono py-2">{cur} {parseFloat(r.rate || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                                <TableCell className="text-right text-sm font-mono py-2">{cur} {Math.abs(parseFloat(r.totalAmount || "0")).toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="border-t font-semibold bg-muted/20">
+                              <TableCell className="py-2 text-sm" colSpan={vtype === "Mixed" ? 4 : 3}>Total</TableCell>
+                              <TableCell className="text-right text-sm font-mono py-2">{cur} {grandTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // ── Purchase ──────────────────────────────────────────────────────────
+                if (vtype === "Purchase" && viewPurchaseOrder) {
+                  const grandTotal = viewPurchaseItems.reduce((s, r) => s + parseFloat(r.totalAmount || "0"), 0);
+                  return (
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm text-muted-foreground">PO:</span>
+                        <span className="text-sm font-semibold">{viewPurchaseOrder.poNumber}</span>
+                        <Badge variant="outline" className="text-xs">{viewPurchaseOrder.status}</Badge>
+                      </div>
+                      {viewPurchaseItems.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium mb-2">Line Items</p>
+                          <div className="rounded-md border overflow-hidden">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Item</TableHead>
+                                  <TableHead className="text-right w-16">Qty</TableHead>
+                                  <TableHead className="text-right w-24">Rate</TableHead>
+                                  <TableHead className="text-right w-24">Total</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {viewPurchaseItems.map((r, i) => (
+                                  <TableRow key={i} data-testid={`row-po-item-${r.id}`}>
+                                    <TableCell className="py-2 text-sm">{r.accountName}</TableCell>
+                                    <TableCell className="text-right text-sm font-mono py-2">{parseFloat(r.quantity || "0").toLocaleString("en-US", { maximumFractionDigits: 3 })}</TableCell>
+                                    <TableCell className="text-right text-sm font-mono py-2">{cur} {parseFloat(r.rate || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                                    <TableCell className="text-right text-sm font-mono py-2">{cur} {parseFloat(r.totalAmount || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                                  </TableRow>
+                                ))}
+                                <TableRow className="border-t font-semibold bg-muted/20">
+                                  <TableCell className="py-2 text-sm" colSpan={3}>Total</TableCell>
+                                  <TableCell className="text-right text-sm font-mono py-2">{cur} {grandTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      )}
+                      {/* Also show ledger entries for Purchase */}
+                      {viewEntries.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium mb-2 text-muted-foreground">Accounts</p>
+                          <div className="rounded-md border overflow-hidden">
+                            <Table>
+                              <TableBody>
+                                {viewEntries.map((e) => {
+                                  const amount = Math.max(parseFloat(e.debitAmount || "0"), parseFloat(e.creditAmount || "0"));
+                                  const bal = entryBalances[e.id];
+                                  return (
+                                    <TableRow key={e.id}>
+                                      <TableCell className="py-2">
+                                        <p className="text-sm">{e.accountName || `Account #${e.ledgerAccountId}`}</p>
+                                        {bal !== undefined && <p className="text-xs text-muted-foreground">Balance: {cur} {parseFloat(bal).toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>}
+                                      </TableCell>
+                                      <TableCell className="text-right text-sm font-mono py-2">{cur} {amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                // ── Default: ledger entries (Payment / Receipt / Journal / etc.) ──────
+                const entries = viewEntries.length > 0 ? viewEntries : detailData.entries;
+                const grandTotal = entries.reduce((s, e) =>
+                  s + Math.max(parseFloat(e.debitAmount || "0"), parseFloat(e.creditAmount || "0")), 0);
+                return (
+                  <div>
+                    <p className="text-sm font-medium mb-2">Entries</p>
+                    <div className="rounded-md border overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Account</TableHead>
+                            <TableHead className="text-right w-32">Amount</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {entries.map((e) => {
+                            const amount = Math.max(parseFloat(e.debitAmount || "0"), parseFloat(e.creditAmount || "0"));
+                            const bal = entryBalances[e.id];
+                            return (
+                              <TableRow key={e.id} data-testid={`row-entry-${e.id}`}>
+                                <TableCell className="py-2">
+                                  <p className="text-sm font-medium">{e.accountName || `Account #${e.ledgerAccountId}`}</p>
+                                  {bal !== undefined && (
+                                    <p className="text-xs text-muted-foreground">
+                                      Balance: {cur} {parseFloat(bal).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                    </p>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right text-sm font-mono py-2">
+                                  {cur} {amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                          {entries.length > 0 && (
+                            <TableRow className="border-t font-semibold bg-muted/20">
+                              <TableCell className="py-2 text-sm">Total</TableCell>
+                              <TableCell className="text-right text-sm font-mono py-2">
+                                {cur} {grandTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Footer actions */}
               <div className="flex justify-end gap-2 pt-1">
