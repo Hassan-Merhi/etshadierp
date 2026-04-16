@@ -27,7 +27,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Search, Filter, ChevronLeft, ChevronRight, ExternalLink, Building2,
-  RefreshCw, X, FileText, Receipt,
+  RefreshCw, X, FileText, Receipt, Factory,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -151,6 +151,7 @@ export default function TransactionJournal() {
   const [voucherType,    setVoucherType]    = useState("all");
   const [currency,       setCurrency]       = useState("all");
   const [optionalFilter, setOptionalFilter] = useState("active");
+  const [includeFactory, setIncludeFactory] = useState(false);
   const [searchInput,    setSearchInput]    = useState("");
   const [search,         setSearch]         = useState("");
   const [page,           setPage]           = useState(1);
@@ -167,6 +168,7 @@ export default function TransactionJournal() {
     voucherType,
     currency,
     optional: optionalFilter,
+    includeFactory: String(includeFactory),
     page:     String(page),
     limit:    String(LIMIT),
     ...(search         ? { search }                                : {}),
@@ -197,7 +199,7 @@ export default function TransactionJournal() {
   });
 
   // ── Reset page when filters change ──
-  useEffect(() => { setPage(1); }, [startDate, endDate, selectedCos, voucherType, currency, optionalFilter, search]);
+  useEffect(() => { setPage(1); }, [startDate, endDate, selectedCos, voucherType, currency, optionalFilter, includeFactory, search]);
 
   const openDetail = (id: number) => {
     setDetailId(id);
@@ -384,6 +386,20 @@ export default function TransactionJournal() {
                   <SelectItem value="optional">Optional Only</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Factory toggle */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground font-medium">Factory</label>
+              <Button
+                variant={includeFactory ? "default" : "outline"}
+                className="h-9 gap-2"
+                onClick={() => setIncludeFactory(v => !v)}
+                data-testid="button-toggle-factory"
+              >
+                <Factory className="h-4 w-4" />
+                {includeFactory ? "Included" : "Excluded"}
+              </Button>
             </div>
 
             {/* Search */}

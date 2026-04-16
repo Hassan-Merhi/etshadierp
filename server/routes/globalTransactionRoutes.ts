@@ -41,9 +41,12 @@ export function registerGlobalTransactionRoutes(
         currency,
         search,
         optional: optionalParam,
+        includeFactory: includeFactoryParam,
         page: pageParam,
         limit: limitParam,
       } = req.query as Record<string, string>;
+
+      const includeFactoryBool = includeFactoryParam === "true";
 
       const page  = Math.max(1, parseInt(pageParam  || "1"));
       const limit = Math.min(200, Math.max(1, parseInt(limitParam || "50")));
@@ -87,6 +90,21 @@ export function registerGlobalTransactionRoutes(
 
       if (allowedCompanyIds.length === 0) {
         return res.json({ vouchers: [], total: 0, page, totalPages: 0, summary: [] });
+      }
+
+      // 1b. Optionally exclude factory companies
+      if (!includeFactoryBool) {
+        const nonFactoryCompanies = await db
+          .select({ id: companies.id })
+          .from(companies)
+          .where(and(
+            inArray(companies.id, allowedCompanyIds),
+            or(eq(companies.companyType, "erp"), eq(companies.companyType, "properties"))
+          ));
+        allowedCompanyIds = nonFactoryCompanies.map((c) => c.id);
+        if (allowedCompanyIds.length === 0) {
+          return res.json({ vouchers: [], total: 0, page, totalPages: 0, summary: [], companies: [] });
+        }
       }
 
       // 2. Apply company filter from request (must be subset of allowed)
