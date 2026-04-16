@@ -141,7 +141,7 @@ export default function TransactionJournal() {
   const { toast } = useToast();
 
   // ── Filter state ──
-  const [periodFilter,   setPeriodFilter]   = useState<PeriodFilterValue>(getDefaultPeriodValue("last_1_month"));
+  const [periodFilter,   setPeriodFilter]   = useState<PeriodFilterValue>(getDefaultPeriodValue("today"));
   const [selectedCos,    setSelectedCos]    = useState<number[]>([]);   // empty = all
   const [voucherType,    setVoucherType]    = useState("all");
   const [currency,       setCurrency]       = useState("all");
