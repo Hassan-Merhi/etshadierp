@@ -29,7 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import {
   Search, Filter, ExternalLink, Building2,
-  RefreshCw, X, FileText, Receipt, Factory, Eye, Pencil, ChevronRight,
+  RefreshCw, X, FileText, Receipt, Factory, Eye, Pencil, ChevronLeft, ChevronRight,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
