@@ -1,12 +1,14 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   ChevronDown, ChevronRight, TrendingUp, Scale, DollarSign, Beaker, Tag,
 } from "lucide-react";
@@ -136,18 +138,19 @@ export default function DailyProductionReport() {
       </div>
 
       {/* Date filter */}
-      <div className="flex flex-wrap items-center gap-2">
-        {presets.map((p) => (
-          <Button
-            key={p.key}
-            size="sm"
-            variant={preset === p.key ? "default" : "outline"}
-            onClick={() => setPreset(p.key)}
-            data-testid={`button-preset-${p.key}`}
-          >
-            {p.label}
-          </Button>
-        ))}
+      <div className="flex flex-wrap items-center gap-3">
+        <Select value={preset} onValueChange={(v) => setPreset(v as Preset)}>
+          <SelectTrigger className="w-40" data-testid="select-preset">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {presets.map((p) => (
+              <SelectItem key={p.key} value={p.key} data-testid={`option-preset-${p.key}`}>
+                {p.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {preset === "custom" && (
           <div className="flex items-center gap-2 flex-wrap">
             <input
