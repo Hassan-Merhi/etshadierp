@@ -18,6 +18,7 @@ import {
   desc,
   sql,
   count,
+  isNull,
 } from "drizzle-orm";
 
 export function registerGlobalTransactionRoutes(
@@ -51,12 +52,18 @@ export function registerGlobalTransactionRoutes(
       // 1. Resolve which ERP company IDs this user may see
       let allowedCompanyIds: number[];
 
+      const allowedTypeFilter = or(
+        eq(companies.companyType, "erp"),
+        eq(companies.companyType, "properties"),
+        eq(companies.companyType, "factory"),
+      );
+
       if (isAdmin) {
-        // Admins see all ERP + properties companies
+        // Admins see all ERP + factory + properties companies
         const allErpCompanies = await db
           .select({ id: companies.id })
           .from(companies)
-          .where(or(eq(companies.companyType, "erp"), eq(companies.companyType, "properties")));
+          .where(allowedTypeFilter);
         allowedCompanyIds = allErpCompanies.map((c) => c.id);
       } else {
         // Regular users see only their assigned companies
@@ -70,16 +77,11 @@ export function registerGlobalTransactionRoutes(
           return res.json({ vouchers: [], total: 0, page, totalPages: 0, summary: [] });
         }
 
-        // Intersect with ERP companies only
+        // Intersect with allowed company types only
         const erpCompanies = await db
           .select({ id: companies.id })
           .from(companies)
-          .where(
-            and(
-              or(eq(companies.companyType, "erp"), eq(companies.companyType, "properties")),
-              inArray(companies.id, userCompanyIds)
-            )
-          );
+          .where(and(allowedTypeFilter, inArray(companies.id, userCompanyIds)));
         allowedCompanyIds = erpCompanies.map((c) => c.id);
       }
 
@@ -98,7 +100,10 @@ export function registerGlobalTransactionRoutes(
       }
 
       // 3. Build WHERE conditions
-      const conditions: any[] = [inArray(vouchers.companyId, targetCompanyIds)];
+      const conditions: any[] = [
+        inArray(vouchers.companyId, targetCompanyIds),
+        isNull(vouchers.deletedAt),
+      ];
 
       if (startDate) conditions.push(gte(vouchers.voucherDate, startDate));
       if (endDate)   conditions.push(lte(vouchers.voucherDate, endDate));
@@ -207,9 +212,13 @@ export function registerGlobalTransactionRoutes(
       const isAdmin = userRole === "Admin" || userRole === "Developer";
 
       let allowedCompanyIds: number[];
+      const typeFilter = or(
+        eq(companies.companyType, "erp"),
+        eq(companies.companyType, "properties"),
+        eq(companies.companyType, "factory"),
+      );
       if (isAdmin) {
-        const all = await db.select({ id: companies.id }).from(companies)
-          .where(or(eq(companies.companyType, "erp"), eq(companies.companyType, "properties")));
+        const all = await db.select({ id: companies.id }).from(companies).where(typeFilter);
         allowedCompanyIds = all.map((c) => c.id);
       } else {
         const userRoles = await db.select({ companyId: userCompanyRoles.companyId })
@@ -222,7 +231,7 @@ export function registerGlobalTransactionRoutes(
       const types = await db
         .selectDistinct({ voucherType: vouchers.voucherType })
         .from(vouchers)
-        .where(inArray(vouchers.companyId, allowedCompanyIds))
+        .where(and(inArray(vouchers.companyId, allowedCompanyIds), isNull(vouchers.deletedAt)))
         .orderBy(vouchers.voucherType);
 
       return res.json(types.map((t) => t.voucherType));

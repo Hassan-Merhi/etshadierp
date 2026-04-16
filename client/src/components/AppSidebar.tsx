@@ -52,11 +52,12 @@ interface NavSection {
 }
 
 const defaultPinnedItems: NavItem[] = [
-  { title: "Tracking",  url: "/",                  icon: Ship            },
-  { title: "Dashboard", url: "/financial-overview", icon: LayoutDashboard },
-  { title: "Agents",    url: "/agents",             icon: UserRound       },
-  { title: "Daybook",   url: "/daybook",            icon: Book            },
-  { title: "Vouchers",  url: "/vouchers",           icon: Receipt         },
+  { title: "Tracking",    url: "/",                    icon: Ship            },
+  { title: "Dashboard",   url: "/financial-overview",  icon: LayoutDashboard },
+  { title: "Agents",      url: "/agents",              icon: UserRound       },
+  { title: "Daybook",     url: "/daybook",             icon: Book            },
+  { title: "All Daybook", url: "/transaction-journal", icon: ScrollText      },
+  { title: "Vouchers",    url: "/vouchers",            icon: Receipt         },
 ];
 
 const PINNED_ORDER_KEY = "erp-pinned-order";
@@ -108,7 +109,6 @@ const navSections: NavSection[] = [
       { title: "Customers",             url: "/customers",            icon: Users          },
       { title: "Payroll",               url: "/payroll",              icon: UserCheck      },
       { title: "Company Transfer",      url: "/company-transfer",     icon: ArrowLeftRight },
-      { title: "Transaction Journal",   url: "/transaction-journal",  icon: ScrollText     },
     ],
   },
   {

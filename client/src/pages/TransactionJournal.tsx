@@ -133,9 +133,8 @@ function companyColor(id: number) {
 // ─── Today helpers ─────────────────────────────────────────────────────────────
 
 function todayStr() { return format(new Date(), "yyyy-MM-dd"); }
-function monthStart() {
-  const d = new Date();
-  return format(new Date(d.getFullYear(), d.getMonth(), 1), "yyyy-MM-dd");
+function yearStart() {
+  return format(new Date(new Date().getFullYear(), 0, 1), "yyyy-MM-dd");
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────────
@@ -146,7 +145,7 @@ export default function TransactionJournal() {
   const { toast } = useToast();
 
   // ── Filter state ──
-  const [startDate,      setStartDate]      = useState(monthStart());
+  const [startDate,      setStartDate]      = useState(yearStart());
   const [endDate,        setEndDate]        = useState(todayStr());
   const [selectedCos,    setSelectedCos]    = useState<number[]>([]);   // empty = all
   const [voucherType,    setVoucherType]    = useState("all");
@@ -259,10 +258,10 @@ export default function TransactionJournal() {
         <div>
           <h1 className="text-xl font-semibold flex items-center gap-2">
             <FileText className="h-5 w-5 text-muted-foreground" />
-            Transaction Journal
+            All Daybook
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            All vouchers across all companies — filtered, searchable, fully editable
+            All vouchers across all companies — filtered and searchable
           </p>
         </div>
         <Button variant="outline" size="default" onClick={() => refetch()} disabled={isFetching} data-testid="button-refresh-journal">
