@@ -370,7 +370,7 @@ export default function ProformaAddLine() {
                   placeholder="Qty"
                   value={qty}
                   onChange={(e) => setQty(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && qty && price) addMutation.mutate(); }}
+                  onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); if (e.key === "Enter" && qty && price) addMutation.mutate(); }}
                   data-testid="input-qty"
                 />
               </div>
@@ -382,7 +382,7 @@ export default function ProformaAddLine() {
                   placeholder="0.00"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && qty && price) addMutation.mutate(); }}
+                  onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); if (e.key === "Enter" && qty && price) addMutation.mutate(); }}
                   data-testid="input-price"
                 />
               </div>

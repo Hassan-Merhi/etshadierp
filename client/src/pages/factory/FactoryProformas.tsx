@@ -567,6 +567,7 @@ export default function FactoryProformas() {
                                         onChange={(e) => setInlineQtyValue(e.target.value)}
                                         onBlur={() => commitInlineQty(line.id)}
                                         onKeyDown={(e) => {
+                                          if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
                                           if (e.key === "Enter") commitInlineQty(line.id);
                                           if (e.key === "Escape") setInlineQtyLineId(null);
                                         }}
@@ -895,6 +896,7 @@ export default function FactoryProformas() {
                           placeholder="e.g. 10"
                           value={newLine.quantity}
                           onChange={(e) => setNewLine({ ...newLine, quantity: e.target.value })}
+                          onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); }}
                           autoFocus
                           data-testid="input-line-quantity"
                         />
@@ -907,6 +909,7 @@ export default function FactoryProformas() {
                           placeholder="e.g. 45.00"
                           value={newLine.pricePerBale}
                           onChange={(e) => setNewLine({ ...newLine, pricePerBale: e.target.value })}
+                          onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); }}
                           data-testid="input-line-price"
                         />
                       </div>
@@ -942,6 +945,7 @@ export default function FactoryProformas() {
                       type="number"
                       value={newLine.quantity}
                       onChange={(e) => setNewLine({ ...newLine, quantity: e.target.value })}
+                      onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); }}
                       data-testid="input-line-quantity"
                     />
                   </div>
@@ -952,6 +956,7 @@ export default function FactoryProformas() {
                       step="0.01"
                       value={newLine.pricePerBale}
                       onChange={(e) => setNewLine({ ...newLine, pricePerBale: e.target.value })}
+                      onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); }}
                       data-testid="input-line-price"
                     />
                   </div>
@@ -1005,6 +1010,7 @@ export default function FactoryProformas() {
                   type="number"
                   value={editLineValues.quantity}
                   onChange={(e) => setEditLineValues({ ...editLineValues, quantity: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); }}
                   data-testid="input-edit-line-quantity"
                 />
               </div>
@@ -1015,6 +1021,7 @@ export default function FactoryProformas() {
                   step="0.01"
                   value={editLineValues.pricePerBale}
                   onChange={(e) => setEditLineValues({ ...editLineValues, pricePerBale: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); }}
                   data-testid="input-edit-line-price"
                 />
               </div>
