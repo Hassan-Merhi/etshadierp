@@ -148,7 +148,7 @@ export default function OffloadDetail() {
   const id = params.id;
   const { toast } = useToast();
 
-  const { data: offload, isLoading } = useQuery<OffloadDetailData>({
+  const { data: offload, isLoading, isError, error } = useQuery<OffloadDetailData>({
     queryKey: [`/api/offloads/${id}`],
     enabled: !!id,
   });
@@ -521,8 +521,28 @@ export default function OffloadDetail() {
             </Button>
           </div>
         </>
+      ) : isLoading ? (
+        <div className="space-y-4">
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-48 w-full" />
+        </div>
+      ) : isError ? (
+        <div className="text-center py-12 space-y-2">
+          <p className="text-muted-foreground font-medium">Could not load offload #{id}</p>
+          <p className="text-sm text-muted-foreground">{(error as any)?.message || "Unknown error"}</p>
+          <Button variant="outline" className="mt-4" onClick={() => window.history.back()}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Go Back
+          </Button>
+        </div>
       ) : (
-        <p className="text-muted-foreground">Offload not found.</p>
+        <div className="text-center py-12 space-y-2">
+          <p className="text-muted-foreground font-medium">Offload #{id} not found.</p>
+          <Button variant="outline" className="mt-4" onClick={() => window.history.back()}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Go Back
+          </Button>
+        </div>
       )}
     </div>
   );
