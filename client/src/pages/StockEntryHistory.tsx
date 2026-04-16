@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
-import { ChevronDown, ChevronRight, Download, Search, RotateCcw, List, AlignJustify, FileDown, MoreVertical } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Search, RotateCcw, List, AlignJustify, FileDown, MoreVertical, CalendarRange } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -138,6 +138,7 @@ export default function StockEntryHistory() {
   const today = new Date().toLocaleDateString('en-CA');
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA');
 
+  const [useDateFilter, setUseDateFilter] = useState(false);
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -151,8 +152,10 @@ export default function StockEntryHistory() {
   const [viewMode, setViewMode] = useState<"condensed" | "detailed">("condensed");
 
   const params = new URLSearchParams();
-  params.set("startDate", fromDate);
-  params.set("endDate", toDate);
+  if (useDateFilter) {
+    params.set("startDate", fromDate);
+    params.set("endDate", toDate);
+  }
   if (workerIdFilter !== "all") params.set("workerId", workerIdFilter);
   if (productIdFilter !== "all") params.set("productId", productIdFilter);
   if (locationIdFilter !== "all") params.set("locationId", locationIdFilter);
@@ -251,7 +254,8 @@ export default function StockEntryHistory() {
   }
 
   function resetFilters() {
-    setFromDate(thirtyDaysAgo);
+    setUseDateFilter(false);
+    setFromDate(today);
     setToDate(today);
     setCategoryFilter("all");
     setWorkerIdFilter("all");
@@ -690,15 +694,7 @@ export default function StockEntryHistory() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">From Date</Label>
-          <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} data-testid="input-from-date" />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">To Date</Label>
-          <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} data-testid="input-to-date" />
-        </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Category</Label>
           <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setWorkerIdFilter("all"); }}>
@@ -759,7 +755,36 @@ export default function StockEntryHistory() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button
+          variant={useDateFilter ? "default" : "outline"}
+          size="sm"
+          onClick={() => setUseDateFilter(v => !v)}
+          data-testid="button-toggle-date-filter"
+          className="toggle-elevate shrink-0"
+        >
+          <CalendarRange className="w-3.5 h-3.5 mr-1.5" />
+          Date
+        </Button>
+        {useDateFilter && (
+          <>
+            <Input
+              type="date"
+              value={fromDate}
+              onChange={e => setFromDate(e.target.value)}
+              data-testid="input-from-date"
+              className="w-36 shrink-0"
+            />
+            <span className="text-muted-foreground text-xs shrink-0">to</span>
+            <Input
+              type="date"
+              value={toDate}
+              onChange={e => setToDate(e.target.value)}
+              data-testid="input-to-date"
+              className="w-36 shrink-0"
+            />
+          </>
+        )}
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
