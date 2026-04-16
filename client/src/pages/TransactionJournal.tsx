@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, addDays, parseISO } from "date-fns";
 import {
   Card, CardContent, CardHeader, CardTitle,
 } from "@/components/ui/card";
@@ -133,8 +133,8 @@ function companyColor(id: number) {
 // ─── Today helpers ─────────────────────────────────────────────────────────────
 
 function todayStr() { return format(new Date(), "yyyy-MM-dd"); }
-function yearStart() {
-  return format(new Date(new Date().getFullYear(), 0, 1), "yyyy-MM-dd");
+function shiftDateStr(dateStr: string, days: number) {
+  return format(addDays(parseISO(dateStr), days), "yyyy-MM-dd");
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ export default function TransactionJournal() {
   const { toast } = useToast();
 
   // ── Filter state ──
-  const [startDate,      setStartDate]      = useState(yearStart());
+  const [startDate,      setStartDate]      = useState(todayStr());
   const [endDate,        setEndDate]        = useState(todayStr());
   const [selectedCos,    setSelectedCos]    = useState<number[]>([]);   // empty = all
   const [voucherType,    setVoucherType]    = useState("all");
@@ -210,6 +210,25 @@ export default function TransactionJournal() {
     setSearch(searchInput);
     setPage(1);
   }, [searchInput]);
+
+  // ── Keyboard date navigation: '-' = prev day, 'Shift+=' (+) = next day ──
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.key === "-") {
+        e.preventDefault();
+        setStartDate(s => shiftDateStr(s, -1));
+        setEndDate(d => shiftDateStr(d, -1));
+      } else if (e.key === "+" || (e.shiftKey && e.key === "=")) {
+        e.preventDefault();
+        setStartDate(s => shiftDateStr(s, 1));
+        setEndDate(d => shiftDateStr(d, 1));
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   // ── Switch company and navigate ──
   const openInCompany = async (companyId: number, path: string) => {
@@ -276,26 +295,44 @@ export default function TransactionJournal() {
       <Card>
         <CardContent className="pt-4">
           <div className="flex flex-wrap gap-3 items-end">
-            {/* Date range */}
-            <div className="flex flex-col gap-1 min-w-[130px]">
-              <label className="text-xs text-muted-foreground font-medium">From</label>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="h-9"
-                data-testid="input-start-date"
-              />
-            </div>
-            <div className="flex flex-col gap-1 min-w-[130px]">
-              <label className="text-xs text-muted-foreground font-medium">To</label>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="h-9"
-                data-testid="input-end-date"
-              />
+            {/* Date range with prev/next navigation */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground font-medium">From — To</label>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => { setStartDate(s => shiftDateStr(s, -1)); setEndDate(d => shiftDateStr(d, -1)); }}
+                  title="Previous day (−)"
+                  data-testid="button-prev-day"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="h-9 w-[135px]"
+                  data-testid="input-start-date"
+                />
+                <span className="text-muted-foreground text-sm px-0.5">–</span>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="h-9 w-[135px]"
+                  data-testid="input-end-date"
+                />
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => { setStartDate(s => shiftDateStr(s, 1)); setEndDate(d => shiftDateStr(d, 1)); }}
+                  title="Next day (Shift +)"
+                  data-testid="button-next-day"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             {/* Company multi-select */}
