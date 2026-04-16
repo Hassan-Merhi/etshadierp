@@ -1956,9 +1956,8 @@
     return val % 1 === 0 ? val.toFixed(0) : parseFloat(val.toFixed(3)).toString();
   }
 
-  function DailyStockSummary() {
+  function DailyStockSummary({ date }: { date: string }) {
     const todayStr = new Date().toLocaleDateString('en-CA');
-    const [selectedDate, setSelectedDate] = useState<string>(todayStr);
 
     const { data: balesData } = useQuery<any[]>({
       queryKey: ["/api/factory/bales"],
@@ -1968,7 +1967,7 @@
     const dayAll = (balesData || []).filter((row: any) => {
       const bale = row.bale;
       // stockEntryDate is stored as "YYYY-MM-DD" string already
-      return (bale.stockEntryDate || "").slice(0, 10) === selectedDate;
+      return (bale.stockEntryDate || "").slice(0, 10) === date;
     });
 
     const getCategory = (row: any) => (row.bale.category || "").toLowerCase().trim();
@@ -1984,18 +1983,11 @@
     const wipersQty  = dayWipers.length;
     const wipersKg   = dayWipers.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
 
-    const isToday = selectedDate === todayStr;
+    const isToday = date === todayStr;
 
     return (
       <div className="flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/30 flex-wrap">
         <div className="flex items-center gap-2">
-          <Input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value || todayStr)}
-            className="h-7 w-36 text-xs"
-            data-testid="input-summary-date"
-          />
           <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
             {isToday ? "Today's Production" : "Production"}
           </span>
@@ -2039,6 +2031,9 @@
   }
 
   export default function BaleStockEntry() {
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    const [summaryDate, setSummaryDate] = useState<string>(todayStr);
+
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
@@ -2049,7 +2044,7 @@
           </div>
         </div>
 
-        <DailyStockSummary />
+        <DailyStockSummary date={summaryDate} />
 
         <Tabs defaultValue="entry">
           <TabsList>
@@ -2066,7 +2061,9 @@
             <StockEntryTab />
           </TabsContent>
           <TabsContent value="history" className="mt-0 p-0">
-            <StockEntryHistory />
+            <StockEntryHistory
+              onActiveDateChange={(d) => setSummaryDate(d ?? todayStr)}
+            />
           </TabsContent>
         </Tabs>
       </div>

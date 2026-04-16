@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { ChevronDown, ChevronRight, Download, Search, RotateCcw, List, AlignJustify, FileDown, MoreVertical, CalendarRange } from "lucide-react";
@@ -131,7 +131,11 @@ function formatDailyNum(val: number): string {
   return val % 1 === 0 ? val.toFixed(0) : parseFloat(val.toFixed(3)).toString();
 }
 
-export default function StockEntryHistory() {
+interface StockEntryHistoryProps {
+  onActiveDateChange?: (date: string | null) => void;
+}
+
+export default function StockEntryHistory({ onActiveDateChange }: StockEntryHistoryProps = {}) {
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -141,6 +145,12 @@ export default function StockEntryHistory() {
   const [useDateFilter, setUseDateFilter] = useState(false);
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
+
+  useEffect(() => {
+    if (!onActiveDateChange) return;
+    onActiveDateChange(useDateFilter ? fromDate : null);
+  }, [useDateFilter, fromDate]);
+
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [workerIdFilter, setWorkerIdFilter] = useState("all");
   const [productIdFilter, setProductIdFilter] = useState("all");
