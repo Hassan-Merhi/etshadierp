@@ -14,6 +14,8 @@ import {
   stockAdjustmentItems,
   purchaseOrders,
   poLineItems,
+  suppliers,
+  containers,
 } from "../../shared/schema";
 import {
   eq,
@@ -452,30 +454,82 @@ export function registerGlobalTransactionRoutes(
         }
       }
 
-      // Purchase: return base entries + PO line items
+      // Purchase: return base entries + PO line items + enriched PO header
       if (type === "Purchase") {
         const [po] = await db
-          .select({ id: purchaseOrders.id, poNumber: purchaseOrders.poNumber,
-            status: purchaseOrders.status, itemsTotal: purchaseOrders.itemsTotal })
+          .select({
+            id: purchaseOrders.id,
+            poNumber: purchaseOrders.poNumber,
+            supplierId: purchaseOrders.supplierId,
+            containerId: purchaseOrders.containerId,
+            currency: purchaseOrders.currency,
+            itemsTotal: purchaseOrders.itemsTotal,
+            freight: purchaseOrders.freight,
+            fumigation: purchaseOrders.fumigation,
+            surcharge: purchaseOrders.surcharge,
+            documentCharges: purchaseOrders.documentCharges,
+            otherCharges: purchaseOrders.otherCharges,
+            discount: purchaseOrders.discount,
+            status: purchaseOrders.status,
+          })
           .from(purchaseOrders)
           .where(eq(purchaseOrders.voucherId, voucherId));
         if (po) {
+          const [supplier] = await db
+            .select({ legalName: suppliers.legalName })
+            .from(suppliers)
+            .where(eq(suppliers.id, po.supplierId));
+          const [container] = await db
+            .select({ containerNumber: containers.containerNumber })
+            .from(containers)
+            .where(eq(containers.id, po.containerId));
+
           const lines = await db
-            .select({ id: poLineItems.id, poId: poLineItems.poId,
+            .select({
+              id: poLineItems.id, poId: poLineItems.poId,
+              stockItemId: poLineItems.stockItemId,
               itemName: poLineItems.itemName, quantity: poLineItems.quantity,
-              rate: poLineItems.rate, lineTotal: poLineItems.lineTotal })
+              rate: poLineItems.rate, lineTotal: poLineItems.lineTotal,
+              stockItemName: stockItems.name, stockItemCode: stockItems.code,
+            })
             .from(poLineItems)
+            .leftJoin(stockItems, eq(poLineItems.stockItemId, stockItems.id))
             .where(eq(poLineItems.poId, po.id));
-          if (lines.length > 0) {
-            const lineRows = lines.map((l) => ({
-              id: l.id, voucherId, isPurchaseItem: true,
-              accountName: l.itemName, quantity: l.quantity,
-              rate: l.rate, totalAmount: l.lineTotal,
-              debitAmount: l.lineTotal, creditAmount: "0",
-              isStockItem: true,
-            }));
-            return res.json({ entries, purchaseOrder: po, items: lineRows });
-          }
+
+          const lineRows = lines.map((l) => ({
+            id: l.id, voucherId, isPurchaseItem: true,
+            stockItemId: l.stockItemId,
+            stockItemName: l.stockItemName || l.itemName,
+            accountName: l.stockItemName || l.itemName,
+            quantity: l.quantity, rate: l.rate, totalAmount: l.lineTotal,
+            debitAmount: l.lineTotal, creditAmount: "0",
+            isStockItem: true,
+          }));
+
+          const purchaseOrderEnriched = {
+            id: po.id,
+            poNumber: po.poNumber,
+            supplierId: po.supplierId,
+            supplierName: supplier?.legalName || "Unknown Supplier",
+            containerId: po.containerId,
+            containerNumber: container?.containerNumber || "",
+            currency: po.currency,
+            itemsTotal: po.itemsTotal,
+            freight: po.freight,
+            fumigation: po.fumigation,
+            surcharge: po.surcharge,
+            documentCharges: po.documentCharges,
+            otherCharges: po.otherCharges,
+            discount: po.discount,
+            status: po.status,
+          };
+
+          // Combine: ledger entries + line items as a single array (mirrors /api/vouchers/:id/view-entries)
+          return res.json({
+            entries: [...entries, ...lineRows],
+            purchaseOrder: purchaseOrderEnriched,
+            items: lineRows,
+          });
         }
       }
 

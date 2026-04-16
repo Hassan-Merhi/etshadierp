@@ -684,7 +684,7 @@ export default function TransactionJournal() {
 
       {/* ── Voucher detail dialog ── */}
       <Dialog open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-full max-w-[95vw] md:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Voucher Details</DialogTitle>
             <DialogDescription>View voucher information</DialogDescription>
@@ -721,7 +721,7 @@ export default function TransactionJournal() {
                 </div>
               )}
 
-              {/* Rich entries panel */}
+              {/* Rich entries panel — mirrors normal Daybook view structure */}
               {viewEntriesLoading ? (
                 <div className="flex flex-col gap-2">
                   {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
@@ -729,83 +729,217 @@ export default function TransactionJournal() {
               ) : (() => {
                 const vtype = detailData.voucher.voucherType;
                 const cur = detailData.voucher.currency;
+                const fmt = (v: any) => {
+                  const n = typeof v === "number" ? v : parseFloat(v || "0");
+                  if (isNaN(n)) return `${cur} —`;
+                  return `${cur} ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                };
+                const fmtNum = (v: any) => {
+                  const n = typeof v === "number" ? v : parseFloat(v || "0");
+                  if (isNaN(n)) return "0";
+                  return Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 3 });
+                };
 
-                // ── Sales / POS ────────────────────────────────────────────────────────
-                const isSales = vtype === "Sales" || vtype === "POS";
+                // Categorise rows
                 const stockRows = viewEntries.filter((e) => e.isStockItem);
                 const ledgerRows = viewEntries.filter((e) => !e.isStockItem);
 
-                if (isSales && stockRows.length > 0) {
+                // ── PAYMENT / RECEIPT ────────────────────────────────────────────────
+                if (vtype === "Payment" || vtype === "Receipt") {
+                  const sourceEntry = vtype === "Payment"
+                    ? viewEntries.find((e) => parseFloat(e.creditAmount || "0") > 0)
+                    : viewEntries.find((e) => parseFloat(e.debitAmount  || "0") > 0);
+
+                  const total = vtype === "Payment"
+                    ? viewEntries.reduce((s, e) => s + parseFloat(e.debitAmount  || "0"), 0)
+                    : viewEntries.reduce((s, e) => s + parseFloat(e.creditAmount || "0"), 0);
+
+                  const displayEntries = viewEntries.filter((e) =>
+                    vtype === "Payment"
+                      ? parseFloat(e.debitAmount  || "0") > 0
+                      : parseFloat(e.creditAmount || "0") > 0
+                  );
+
+                  return (
+                    <div className="space-y-4">
+                      {sourceEntry && (
+                        <div className="p-3 md:p-4 bg-muted/50 rounded-md">
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                            <div>
+                              <p className="text-sm text-muted-foreground mb-1">
+                                {vtype === "Payment" ? "Paid From" : "Received In"}
+                              </p>
+                              <div className="font-medium text-base md:text-lg">{sourceEntry.accountName}</div>
+                              {entryBalances[sourceEntry.id] !== undefined && (
+                                <div className="text-sm font-mono mt-2">
+                                  Balance: {fmt(entryBalances[sourceEntry.id])}
+                                </div>
+                              )}
+                            </div>
+                            <div className="sm:text-right">
+                              <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
+                              <div className="text-xl md:text-2xl font-bold font-mono">{fmt(total)}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <h3 className="font-semibold mb-3">Entries</h3>
+                        <div className="border rounded-md">
+                          <Table>
+                            <TableHeader className="sticky top-0 z-10 bg-background">
+                              <TableRow>
+                                <TableHead>Account</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {displayEntries.map((entry) => {
+                                const amount = Math.max(parseFloat(entry.debitAmount || "0"), parseFloat(entry.creditAmount || "0"));
+                                return (
+                                  <TableRow key={entry.id} data-testid={`row-entry-${entry.id}`}>
+                                    <TableCell>
+                                      <div className="font-medium">{entry.accountName}</div>
+                                      {entryBalances[entry.id] !== undefined && (
+                                        <div className="text-xs text-muted-foreground mt-0.5">
+                                          Balance: {fmt(entryBalances[entry.id])}
+                                        </div>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono">{fmt(amount)}</TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                              <TableRow className="font-bold bg-muted/50">
+                                <TableCell>Total</TableCell>
+                                <TableCell className="text-right font-mono">{fmt(total)}</TableCell>
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // ── SALES / POS ──────────────────────────────────────────────────────
+                if ((vtype === "Sales" || vtype === "POS") && stockRows.length > 0) {
                   const grandTotal = stockRows.reduce((s, r) => s + parseFloat(r.totalSales || r.totalAmount || "0"), 0);
                   const grandProfit = stockRows.reduce((s, r) => s + parseFloat(r.profit || "0"), 0);
+                  const grandHassansProfit = stockRows.reduce((s, r) => s + parseFloat(r.hassansProfit || "0"), 0);
+                  const hasHassans = stockRows.some((r) => r.hassansPrice !== undefined && r.hassansPrice !== null);
+                  const hasCost = stockRows.some((r) => r.costPrice !== undefined && r.costPrice !== null && parseFloat(r.costPrice || "0") > 0);
+
+                  // Cash / receivable account = the debit entry
+                  const cashEntry = ledgerRows.find((e) => parseFloat(e.debitAmount || "0") > 0);
+
                   return (
-                    <div className="flex flex-col gap-3">
-                      <p className="text-sm font-medium">Items Sold</p>
-                      <div className="rounded-md border overflow-hidden">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Item</TableHead>
-                              <TableHead className="text-right w-16">Qty</TableHead>
-                              <TableHead className="text-right w-24">Price</TableHead>
-                              <TableHead className="text-right w-24">Total</TableHead>
-                              <TableHead className="text-right w-24">Profit</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {stockRows.map((r, i) => (
-                              <TableRow key={i} data-testid={`row-sales-item-${r.id}`}>
-                                <TableCell className="py-2">
-                                  <p className="text-sm font-medium">{r.stockItemName}</p>
-                                  {r.stockItemCode && r.stockItemCode !== "-" && (
-                                    <p className="text-xs text-muted-foreground">{r.stockItemCode}</p>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right text-sm font-mono py-2">
-                                  {parseFloat(r.quantity).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 3 })}
-                                </TableCell>
-                                <TableCell className="text-right text-sm font-mono py-2">
-                                  {cur} {parseFloat(r.sellingPrice || r.rate || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                                </TableCell>
-                                <TableCell className="text-right text-sm font-mono py-2">
-                                  {cur} {parseFloat(r.totalSales || r.totalAmount || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                                </TableCell>
-                                <TableCell className="text-right text-sm font-mono py-2">
-                                  <span className={parseFloat(r.profit || "0") >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-                                    {cur} {parseFloat(r.profit || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                                  </span>
-                                </TableCell>
+                    <div className="space-y-4">
+                      {cashEntry && (
+                        <div className="p-3 md:p-4 bg-muted/50 rounded-md">
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                            <div>
+                              <p className="text-sm text-muted-foreground mb-1">Received In</p>
+                              <div className="font-medium text-base md:text-lg">{cashEntry.accountName}</div>
+                              {entryBalances[cashEntry.id] !== undefined && (
+                                <div className="text-sm font-mono mt-2">
+                                  Balance: {fmt(entryBalances[cashEntry.id])}
+                                </div>
+                              )}
+                            </div>
+                            <div className="sm:text-right">
+                              <p className="text-sm text-muted-foreground mb-1">Total Sales</p>
+                              <div className="text-xl md:text-2xl font-bold font-mono">{fmt(grandTotal)}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <h3 className="font-semibold mb-3">Items Sold</h3>
+                        <div className="border rounded-md overflow-x-auto">
+                          <Table>
+                            <TableHeader className="sticky top-0 z-10 bg-background">
+                              <TableRow>
+                                <TableHead>Item</TableHead>
+                                <TableHead className="text-right w-16">Qty</TableHead>
+                                <TableHead className="text-right w-24">Price</TableHead>
+                                {hasCost && <TableHead className="text-right w-24">Cost</TableHead>}
+                                <TableHead className="text-right w-28">Total</TableHead>
+                                <TableHead className="text-right w-24">Profit</TableHead>
+                                {hasHassans && <TableHead className="text-right w-28">Hassan's Price</TableHead>}
+                                {hasHassans && <TableHead className="text-right w-28">Hassan's Profit</TableHead>}
                               </TableRow>
-                            ))}
-                            <TableRow className="border-t font-semibold bg-muted/20">
-                              <TableCell className="py-2 text-sm" colSpan={3}>Total</TableCell>
-                              <TableCell className="text-right text-sm font-mono py-2">{cur} {grandTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
-                              <TableCell className="text-right text-sm font-mono py-2">
-                                <span className={grandProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-                                  {cur} {grandProfit.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                                </span>
-                              </TableCell>
-                            </TableRow>
-                          </TableBody>
-                        </Table>
+                            </TableHeader>
+                            <TableBody>
+                              {stockRows.map((r) => {
+                                const profit = parseFloat(r.profit || "0");
+                                const hProfit = parseFloat(r.hassansProfit || "0");
+                                return (
+                                  <TableRow key={r.id} data-testid={`row-sales-item-${r.id}`}>
+                                    <TableCell className="py-2">
+                                      <div className="text-sm font-medium">{r.stockItemName}</div>
+                                      {r.stockItemCode && r.stockItemCode !== "-" && (
+                                        <div className="text-xs text-muted-foreground">{r.stockItemCode}</div>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-right text-sm font-mono py-2">{fmtNum(r.quantity)}</TableCell>
+                                    <TableCell className="text-right text-sm font-mono py-2">{fmt(r.sellingPrice || r.rate)}</TableCell>
+                                    {hasCost && (
+                                      <TableCell className="text-right text-sm font-mono py-2 text-muted-foreground">
+                                        {fmt(r.costPrice)}
+                                      </TableCell>
+                                    )}
+                                    <TableCell className="text-right text-sm font-mono py-2">{fmt(r.totalSales || r.totalAmount)}</TableCell>
+                                    <TableCell className={`text-right text-sm font-mono py-2 ${profit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                                      {fmt(profit)}
+                                    </TableCell>
+                                    {hasHassans && (
+                                      <TableCell className="text-right text-sm font-mono py-2">{fmt(r.hassansPrice)}</TableCell>
+                                    )}
+                                    {hasHassans && (
+                                      <TableCell className={`text-right text-sm font-mono py-2 ${hProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                                        {fmt(hProfit)}
+                                      </TableCell>
+                                    )}
+                                  </TableRow>
+                                );
+                              })}
+                              <TableRow className="font-bold bg-muted/50">
+                                <TableCell colSpan={hasCost ? 4 : 3}>Total</TableCell>
+                                <TableCell className="text-right font-mono">{fmt(grandTotal)}</TableCell>
+                                <TableCell className={`text-right font-mono ${grandProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                                  {fmt(grandProfit)}
+                                </TableCell>
+                                {hasHassans && <TableCell />}
+                                {hasHassans && (
+                                  <TableCell className={`text-right font-mono ${grandHassansProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                                    {fmt(grandHassansProfit)}
+                                  </TableCell>
+                                )}
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </div>
                       </div>
-                      {/* Ledger entries (payment side) */}
-                      {ledgerRows.length > 0 && (
+
+                      {ledgerRows.length > 1 && (
                         <div>
-                          <p className="text-sm font-medium mb-2 text-muted-foreground">Accounts</p>
-                          <div className="rounded-md border overflow-hidden">
+                          <h3 className="font-semibold mb-3">Accounts</h3>
+                          <div className="border rounded-md">
                             <Table>
                               <TableBody>
                                 {ledgerRows.map((e) => {
                                   const amount = Math.max(parseFloat(e.debitAmount || "0"), parseFloat(e.creditAmount || "0"));
-                                  const bal = entryBalances[e.id];
                                   return (
                                     <TableRow key={e.id}>
                                       <TableCell className="py-2">
-                                        <p className="text-sm">{e.accountName || `Account #${e.ledgerAccountId}`}</p>
-                                        {bal !== undefined && <p className="text-xs text-muted-foreground">Balance: {cur} {parseFloat(bal).toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>}
+                                        <div className="font-medium">{e.accountName}</div>
+                                        {entryBalances[e.id] !== undefined && (
+                                          <div className="text-xs text-muted-foreground">Balance: {fmt(entryBalances[e.id])}</div>
+                                        )}
                                       </TableCell>
-                                      <TableCell className="text-right text-sm font-mono py-2">{cur} {amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                                      <TableCell className="text-right font-mono">{fmt(amount)}</TableCell>
                                     </TableRow>
                                   );
                                 })}
@@ -818,37 +952,42 @@ export default function TransactionJournal() {
                   );
                 }
 
-                // ── Stock Transfer ─────────────────────────────────────────────────────
+                // ── STOCK TRANSFER ──────────────────────────────────────────────────
                 if ((vtype === "Stock Transfer" || vtype === "StockTransfer") && stockRows.length > 0) {
                   const grandTotal = stockRows.reduce((s, r) => s + parseFloat(r.totalAmount || "0"), 0);
+                  const grandQty   = stockRows.reduce((s, r) => s + parseFloat(r.quantity    || "0"), 0);
                   return (
                     <div>
-                      <p className="text-sm font-medium mb-2">Transfer Items</p>
-                      <div className="rounded-md border overflow-hidden">
+                      <h3 className="font-semibold mb-3">Transfer Items</h3>
+                      <div className="border rounded-md overflow-x-auto">
                         <Table>
-                          <TableHeader>
+                          <TableHeader className="sticky top-0 z-10 bg-background">
                             <TableRow>
-                              <TableHead>Item</TableHead>
-                              <TableHead className="text-right w-16">Qty</TableHead>
-                              <TableHead className="text-right w-24">Rate</TableHead>
-                              <TableHead className="text-right w-24">Total</TableHead>
+                              <TableHead>Item Name</TableHead>
+                              <TableHead className="text-right">Qty</TableHead>
+                              <TableHead className="text-right">Rate</TableHead>
+                              <TableHead className="text-right">Total Amount</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {stockRows.map((r, i) => (
-                              <TableRow key={i} data-testid={`row-transfer-item-${r.id}`}>
-                                <TableCell className="py-2">
-                                  <p className="text-sm font-medium">{r.stockItemName}</p>
-                                  {r.stockItemCode && r.stockItemCode !== "-" && <p className="text-xs text-muted-foreground">{r.stockItemCode}</p>}
+                            {stockRows.map((r) => (
+                              <TableRow key={r.id} data-testid={`row-transfer-item-${r.id}`}>
+                                <TableCell>
+                                  <div className="font-medium">{r.stockItemName}</div>
+                                  {r.stockItemCode && r.stockItemCode !== "-" && (
+                                    <div className="text-xs text-muted-foreground">{r.stockItemCode}</div>
+                                  )}
                                 </TableCell>
-                                <TableCell className="text-right text-sm font-mono py-2">{parseFloat(r.quantity || "0").toLocaleString("en-US", { maximumFractionDigits: 3 })}</TableCell>
-                                <TableCell className="text-right text-sm font-mono py-2">{cur} {parseFloat(r.rate || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
-                                <TableCell className="text-right text-sm font-mono py-2">{cur} {parseFloat(r.totalAmount || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                                <TableCell className="text-right font-mono">{fmtNum(r.quantity)}</TableCell>
+                                <TableCell className="text-right font-mono">{fmt(r.rate)}</TableCell>
+                                <TableCell className="text-right font-mono">{fmt(r.totalAmount)}</TableCell>
                               </TableRow>
                             ))}
-                            <TableRow className="border-t font-semibold bg-muted/20">
-                              <TableCell className="py-2 text-sm" colSpan={3}>Total</TableCell>
-                              <TableCell className="text-right text-sm font-mono py-2">{cur} {grandTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                            <TableRow className="font-bold bg-muted/50">
+                              <TableCell>Total</TableCell>
+                              <TableCell className="text-right font-mono">{fmtNum(grandQty)}</TableCell>
+                              <TableCell />
+                              <TableCell className="text-right font-mono">{fmt(grandTotal)}</TableCell>
                             </TableRow>
                           </TableBody>
                         </Table>
@@ -857,45 +996,50 @@ export default function TransactionJournal() {
                   );
                 }
 
-                // ── Production / Consumption / Mixed ──────────────────────────────────
+                // ── PRODUCTION / CONSUMPTION / MIXED ────────────────────────────────
                 if ((vtype === "Production" || vtype === "Consumption" || vtype === "Mixed") && stockRows.length > 0) {
                   const grandTotal = stockRows.reduce((s, r) => s + Math.abs(parseFloat(r.totalAmount || "0")), 0);
+                  const grandQty   = stockRows.reduce((s, r) => s + Math.abs(parseFloat(r.quantity    || "0")), 0);
                   return (
                     <div>
-                      <p className="text-sm font-medium mb-2">Stock Items</p>
-                      <div className="rounded-md border overflow-hidden">
+                      <h3 className="font-semibold mb-3">Stock Items</h3>
+                      <div className="border rounded-md overflow-x-auto">
                         <Table>
-                          <TableHeader>
+                          <TableHeader className="sticky top-0 z-10 bg-background">
                             <TableRow>
-                              <TableHead>Item</TableHead>
-                              {vtype === "Mixed" && <TableHead className="w-28">Direction</TableHead>}
-                              <TableHead className="text-right w-16">Qty</TableHead>
-                              <TableHead className="text-right w-24">Rate</TableHead>
-                              <TableHead className="text-right w-24">Total</TableHead>
+                              <TableHead>Item Name</TableHead>
+                              {vtype === "Mixed" && <TableHead>Type</TableHead>}
+                              <TableHead className="text-right">Qty</TableHead>
+                              <TableHead className="text-right">Rate</TableHead>
+                              <TableHead className="text-right">Total Amount</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {stockRows.map((r, i) => (
-                              <TableRow key={i} data-testid={`row-adj-item-${r.id}`}>
-                                <TableCell className="py-2">
-                                  <p className="text-sm font-medium">{r.stockItemName}</p>
-                                  {r.stockItemCode && r.stockItemCode !== "-" && <p className="text-xs text-muted-foreground">{r.stockItemCode}</p>}
+                            {stockRows.map((r) => (
+                              <TableRow key={r.id} data-testid={`row-adj-item-${r.id}`}>
+                                <TableCell>
+                                  <div className="font-medium">{r.stockItemName}</div>
+                                  {r.stockItemCode && r.stockItemCode !== "-" && (
+                                    <div className="text-xs text-muted-foreground">{r.stockItemCode}</div>
+                                  )}
                                 </TableCell>
                                 {vtype === "Mixed" && (
-                                  <TableCell className="py-2">
+                                  <TableCell>
                                     <Badge variant={r.adjustmentType === "Production" ? "default" : "secondary"} className="text-xs">
                                       {r.adjustmentType}
                                     </Badge>
                                   </TableCell>
                                 )}
-                                <TableCell className="text-right text-sm font-mono py-2">{Math.abs(parseFloat(r.quantity || "0")).toLocaleString("en-US", { maximumFractionDigits: 3 })}</TableCell>
-                                <TableCell className="text-right text-sm font-mono py-2">{cur} {parseFloat(r.rate || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
-                                <TableCell className="text-right text-sm font-mono py-2">{cur} {Math.abs(parseFloat(r.totalAmount || "0")).toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                                <TableCell className="text-right font-mono">{fmtNum(r.quantity)}</TableCell>
+                                <TableCell className="text-right font-mono">{fmt(r.rate)}</TableCell>
+                                <TableCell className="text-right font-mono">{fmt(Math.abs(parseFloat(r.totalAmount || "0")))}</TableCell>
                               </TableRow>
                             ))}
-                            <TableRow className="border-t font-semibold bg-muted/20">
-                              <TableCell className="py-2 text-sm" colSpan={vtype === "Mixed" ? 4 : 3}>Total</TableCell>
-                              <TableCell className="text-right text-sm font-mono py-2">{cur} {grandTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                            <TableRow className="font-bold bg-muted/50">
+                              <TableCell colSpan={vtype === "Mixed" ? 2 : 1}>Total</TableCell>
+                              <TableCell className="text-right font-mono">{fmtNum(grandQty)}</TableCell>
+                              <TableCell />
+                              <TableCell className="text-right font-mono">{fmt(grandTotal)}</TableCell>
                             </TableRow>
                           </TableBody>
                         </Table>
@@ -904,64 +1048,113 @@ export default function TransactionJournal() {
                   );
                 }
 
-                // ── Purchase ──────────────────────────────────────────────────────────
+                // ── PURCHASE ────────────────────────────────────────────────────────
                 if (vtype === "Purchase" && viewPurchaseOrder) {
-                  const grandTotal = viewPurchaseItems.reduce((s, r) => s + parseFloat(r.totalAmount || "0"), 0);
+                  const po = viewPurchaseOrder;
+                  const itemsTotal = viewPurchaseItems.reduce((s, r) => s + parseFloat(r.totalAmount || "0"), 0);
+                  const charges = [
+                    { label: "Freight",          value: po.freight },
+                    { label: "Fumigation",       value: po.fumigation },
+                    { label: "Surcharge",        value: po.surcharge },
+                    { label: "Document Charges", value: po.documentCharges },
+                    { label: "Other Charges",    value: po.otherCharges },
+                  ].filter((c) => c.value && parseFloat(c.value) !== 0);
+                  const discount = parseFloat(po.discount || "0");
+                  const chargesTotal = charges.reduce((s, c) => s + parseFloat(c.value || "0"), 0);
+                  const grandTotal = itemsTotal + chargesTotal - discount;
+
                   return (
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm text-muted-foreground">PO:</span>
-                        <span className="text-sm font-semibold">{viewPurchaseOrder.poNumber}</span>
-                        <Badge variant="outline" className="text-xs">{viewPurchaseOrder.status}</Badge>
+                    <div className="space-y-4">
+                      {/* PO header */}
+                      <div className="p-3 md:p-4 bg-muted/50 rounded-md space-y-2">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                          <div>
+                            <span className="text-xs text-muted-foreground">PO Number: </span>
+                            <span className="font-semibold">{po.poNumber}</span>
+                          </div>
+                          {po.status && <Badge variant="outline">{po.status}</Badge>}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                          {po.supplierName && (
+                            <div>
+                              <span className="text-muted-foreground">Supplier: </span>
+                              <span className="font-medium">{po.supplierName}</span>
+                            </div>
+                          )}
+                          {po.containerNumber && (
+                            <div>
+                              <span className="text-muted-foreground">Container: </span>
+                              <span className="font-medium">{po.containerNumber}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
+
                       {viewPurchaseItems.length > 0 && (
                         <div>
-                          <p className="text-sm font-medium mb-2">Line Items</p>
-                          <div className="rounded-md border overflow-hidden">
+                          <h3 className="font-semibold mb-3">Line Items</h3>
+                          <div className="border rounded-md overflow-x-auto">
                             <Table>
-                              <TableHeader>
+                              <TableHeader className="sticky top-0 z-10 bg-background">
                                 <TableRow>
                                   <TableHead>Item</TableHead>
-                                  <TableHead className="text-right w-16">Qty</TableHead>
-                                  <TableHead className="text-right w-24">Rate</TableHead>
-                                  <TableHead className="text-right w-24">Total</TableHead>
+                                  <TableHead className="text-right">Qty</TableHead>
+                                  <TableHead className="text-right">Rate</TableHead>
+                                  <TableHead className="text-right">Total</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {viewPurchaseItems.map((r, i) => (
-                                  <TableRow key={i} data-testid={`row-po-item-${r.id}`}>
-                                    <TableCell className="py-2 text-sm">{r.accountName}</TableCell>
-                                    <TableCell className="text-right text-sm font-mono py-2">{parseFloat(r.quantity || "0").toLocaleString("en-US", { maximumFractionDigits: 3 })}</TableCell>
-                                    <TableCell className="text-right text-sm font-mono py-2">{cur} {parseFloat(r.rate || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
-                                    <TableCell className="text-right text-sm font-mono py-2">{cur} {parseFloat(r.totalAmount || "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                                {viewPurchaseItems.map((r) => (
+                                  <TableRow key={r.id} data-testid={`row-po-item-${r.id}`}>
+                                    <TableCell className="font-medium">{r.accountName}</TableCell>
+                                    <TableCell className="text-right font-mono">{fmtNum(r.quantity)}</TableCell>
+                                    <TableCell className="text-right font-mono">{fmt(r.rate)}</TableCell>
+                                    <TableCell className="text-right font-mono">{fmt(r.totalAmount)}</TableCell>
                                   </TableRow>
                                 ))}
-                                <TableRow className="border-t font-semibold bg-muted/20">
-                                  <TableCell className="py-2 text-sm" colSpan={3}>Total</TableCell>
-                                  <TableCell className="text-right text-sm font-mono py-2">{cur} {grandTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                                <TableRow className="bg-muted/30">
+                                  <TableCell colSpan={3} className="text-right font-medium">Items Subtotal</TableCell>
+                                  <TableCell className="text-right font-mono font-semibold">{fmt(itemsTotal)}</TableCell>
+                                </TableRow>
+                                {charges.map((c) => (
+                                  <TableRow key={c.label}>
+                                    <TableCell colSpan={3} className="text-right text-muted-foreground">{c.label}</TableCell>
+                                    <TableCell className="text-right font-mono">{fmt(c.value)}</TableCell>
+                                  </TableRow>
+                                ))}
+                                {discount > 0 && (
+                                  <TableRow>
+                                    <TableCell colSpan={3} className="text-right text-muted-foreground">Discount</TableCell>
+                                    <TableCell className="text-right font-mono text-red-600 dark:text-red-400">- {fmt(discount)}</TableCell>
+                                  </TableRow>
+                                )}
+                                <TableRow className="font-bold bg-muted/50">
+                                  <TableCell colSpan={3} className="text-right">Grand Total</TableCell>
+                                  <TableCell className="text-right font-mono">{fmt(grandTotal)}</TableCell>
                                 </TableRow>
                               </TableBody>
                             </Table>
                           </div>
                         </div>
                       )}
-                      {/* Also show ledger entries for Purchase */}
+
                       {viewEntries.length > 0 && (
                         <div>
-                          <p className="text-sm font-medium mb-2 text-muted-foreground">Accounts</p>
-                          <div className="rounded-md border overflow-hidden">
+                          <h3 className="font-semibold mb-3">Accounts</h3>
+                          <div className="border rounded-md">
                             <Table>
                               <TableBody>
                                 {viewEntries.map((e) => {
                                   const amount = Math.max(parseFloat(e.debitAmount || "0"), parseFloat(e.creditAmount || "0"));
-                                  const bal = entryBalances[e.id];
                                   return (
                                     <TableRow key={e.id}>
-                                      <TableCell className="py-2">
-                                        <p className="text-sm">{e.accountName || `Account #${e.ledgerAccountId}`}</p>
-                                        {bal !== undefined && <p className="text-xs text-muted-foreground">Balance: {cur} {parseFloat(bal).toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>}
+                                      <TableCell>
+                                        <div className="font-medium">{e.accountName}</div>
+                                        {entryBalances[e.id] !== undefined && (
+                                          <div className="text-xs text-muted-foreground">Balance: {fmt(entryBalances[e.id])}</div>
+                                        )}
                                       </TableCell>
-                                      <TableCell className="text-right text-sm font-mono py-2">{cur} {amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}</TableCell>
+                                      <TableCell className="text-right font-mono">{fmt(amount)}</TableCell>
                                     </TableRow>
                                   );
                                 })}
