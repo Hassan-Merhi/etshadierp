@@ -125,7 +125,7 @@ export async function calculateNetPositionAsOf(
   stockFloorTotal = round2(stockFloorTotal);
   if (stockFloorTotal !== 0) {
     forUsTotal += stockFloorTotal;
-    forUsLines.push({ label: "Stock on Floor", value: stockFloorTotal, category: "Inventory", side: "forUs" });
+    forUsLines.push({ label: "Stock In Hand (Inventory)", value: stockFloorTotal, category: "Inventory", side: "forUs" });
   }
 
   // ── Employee advances / liabilities ──────────────────────────────────
