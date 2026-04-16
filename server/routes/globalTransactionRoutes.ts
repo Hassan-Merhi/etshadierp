@@ -143,6 +143,7 @@ export function registerGlobalTransactionRoutes(
         conditions.push(
           or(
             ilike(vouchers.voucherNumber, `%${search}%`),
+            ilike(vouchers.description, `%${search}%`),
             // narration search: check if any entry for this voucher matches
             sql`EXISTS (
               SELECT 1 FROM voucher_entries ve
@@ -176,6 +177,7 @@ export function registerGlobalTransactionRoutes(
           totalAmount:   vouchers.totalAmount,
           currency:      vouchers.currency,
           optional:      vouchers.optional,
+          description:   vouchers.description,
           narration: sql<string>`(
             SELECT ve.narration FROM voucher_entries ve
             WHERE ve.voucher_id = ${vouchers.id}

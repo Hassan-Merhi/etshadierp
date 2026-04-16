@@ -29,7 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import {
   Search, Filter, ExternalLink, Building2,
-  RefreshCw, X, FileText, Receipt, Factory, Eye, Pencil,
+  RefreshCw, X, FileText, Receipt, Factory, Eye, Pencil, ChevronRight,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -44,6 +44,7 @@ interface JournalVoucher {
   totalAmount: string;
   currency: "USD" | "CFA";
   optional: boolean;
+  description: string | null;
   narration: string | null;
 }
 
@@ -540,9 +541,8 @@ export default function TransactionJournal() {
                 <TableRow>
                   <TableHead className="w-[110px]">Date</TableHead>
                   <TableHead className="w-[150px]">Company</TableHead>
-                  <TableHead className="w-[150px]">Voucher #</TableHead>
-                  <TableHead className="w-[120px]">Type</TableHead>
-                  <TableHead>Narration</TableHead>
+                  <TableHead className="w-[160px]">Type</TableHead>
+                  <TableHead>Description</TableHead>
                   <TableHead className="text-right w-[130px]">Amount</TableHead>
                   <TableHead className="w-[90px] text-center">Actions</TableHead>
                 </TableRow>
@@ -551,14 +551,14 @@ export default function TransactionJournal() {
                 {isLoading ? (
                   Array.from({ length: 10 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 7 }).map((__, j) => (
+                      {Array.from({ length: 6 }).map((__, j) => (
                         <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : (data?.vouchers || []).length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                       No transactions found for the selected filters.
                     </TableCell>
                   </TableRow>
@@ -576,17 +576,19 @@ export default function TransactionJournal() {
                           {v.companyName}
                         </span>
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {v.voucherNumber}
-                      </TableCell>
                       <TableCell>
-                        <VoucherTypeBadge type={v.voucherType} />
-                        {v.optional && (
-                          <Badge variant="outline" className="ml-1 text-xs">Draft</Badge>
-                        )}
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <VoucherTypeBadge type={v.voucherType} />
+                          {v.optional && (
+                            <Badge variant="outline" className="text-xs">Optional</Badge>
+                          )}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-sm max-w-xs truncate text-muted-foreground">
-                        {v.narration || "—"}
+                      <TableCell className="text-sm max-w-xs text-muted-foreground">
+                        <div className="flex items-center gap-1 truncate">
+                          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                          <span className="truncate">{v.description || v.narration || "—"}</span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right text-sm font-mono">
                         <span className="text-xs text-muted-foreground mr-1">{v.currency}</span>
