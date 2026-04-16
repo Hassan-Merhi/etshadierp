@@ -8,7 +8,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  ChevronDown, ChevronRight, TrendingUp, Scale, DollarSign, Beaker,
+  ChevronDown, ChevronRight, TrendingUp, Scale, DollarSign, Beaker, Tag,
 } from "lucide-react";
 
 function todayStr() {
@@ -51,9 +51,16 @@ interface ReportData {
     byProduct: {
       articleCode: string;
       productName: string;
+      categoryName: string;
       qty: number;
       totalWeightKg: number;
       sellingPricePerBale: number;
+      totalValue: number;
+    }[];
+    byCategory: {
+      categoryName: string;
+      qty: number;
+      totalWeightKg: number;
       totalValue: number;
     }[];
   };
@@ -84,6 +91,7 @@ export default function DailyProductionReport() {
   const [customFrom, setCustomFrom] = useState(todayStr());
   const [customTo, setCustomTo] = useState(todayStr());
   const [productionExpanded, setProductionExpanded] = useState(false);
+  const [categoryExpanded, setCategoryExpanded] = useState(true);
   const [mixExpanded, setMixExpanded] = useState(false);
 
   const { from, to } = useMemo(() => {
@@ -263,6 +271,70 @@ export default function DailyProductionReport() {
         </Card>
       )}
 
+      {/* Production by Category (expandable, open by default) */}
+      <Card data-testid="card-category-breakdown">
+        <CardHeader
+          className="cursor-pointer pb-3 flex flex-row items-center justify-between gap-1"
+          onClick={() => setCategoryExpanded(!categoryExpanded)}
+          data-testid="button-toggle-category"
+        >
+          <CardTitle className="text-base flex items-center gap-2">
+            {categoryExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            Production by Category
+          </CardTitle>
+          {!isLoading && data && (
+            <Badge variant="secondary" data-testid="badge-category-count">
+              {data.production.byCategory.length} categories
+            </Badge>
+          )}
+        </CardHeader>
+        {categoryExpanded && (
+          <CardContent className="pt-0">
+            {isLoading ? (
+              <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
+            ) : !data || data.production.byCategory.length === 0 ? (
+              <p className="text-center text-muted-foreground py-6 text-sm" data-testid="text-no-categories">
+                No bales produced in this period
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Category</TableHead>
+                      <TableHead className="text-right">Qty (Bales)</TableHead>
+                      <TableHead className="text-right">Total Weight</TableHead>
+                      <TableHead className="text-right">Total Value</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.production.byCategory.map((row) => (
+                      <TableRow key={row.categoryName} data-testid={`row-category-${row.categoryName.replace(/\s+/g, "-").toLowerCase()}`}>
+                        <TableCell className="font-medium flex items-center gap-2">
+                          <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          {row.categoryName}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">{row.qty.toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">{fmtKg(row.totalWeightKg)}</TableCell>
+                        <TableCell className="text-right font-mono font-semibold">{fmtMoney(row.totalValue)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                  <tfoot>
+                    <tr className="border-t-2">
+                      <td className="px-4 py-2 text-sm font-semibold text-muted-foreground">Totals</td>
+                      <td className="px-4 py-2 text-right font-mono font-bold">{data.production.totalBales.toLocaleString()}</td>
+                      <td className="px-4 py-2 text-right font-mono font-bold text-sm">{fmtKg(data.production.totalWeightKg)}</td>
+                      <td className="px-4 py-2 text-right font-mono font-bold">{fmtMoney(data.production.totalValue)}</td>
+                    </tr>
+                  </tfoot>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
       {/* Production by product (expandable) */}
       <Card data-testid="card-production-breakdown">
         <CardHeader
@@ -295,6 +367,7 @@ export default function DailyProductionReport() {
                     <TableRow>
                       <TableHead>Article Code</TableHead>
                       <TableHead>Product</TableHead>
+                      <TableHead>Category</TableHead>
                       <TableHead className="text-right">Qty (Bales)</TableHead>
                       <TableHead className="text-right">Total Weight</TableHead>
                       <TableHead className="text-right">Price / Bale</TableHead>
@@ -306,6 +379,7 @@ export default function DailyProductionReport() {
                       <TableRow key={row.articleCode} data-testid={`row-product-${row.articleCode}`}>
                         <TableCell className="font-mono text-sm">{row.articleCode}</TableCell>
                         <TableCell className="text-sm">{row.productName}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{row.categoryName}</TableCell>
                         <TableCell className="text-right font-mono">{row.qty.toLocaleString()}</TableCell>
                         <TableCell className="text-right font-mono text-sm">{fmtKg(row.totalWeightKg)}</TableCell>
                         <TableCell className="text-right font-mono text-sm">{fmtMoney(row.sellingPricePerBale)}</TableCell>
@@ -315,7 +389,7 @@ export default function DailyProductionReport() {
                   </TableBody>
                   <tfoot>
                     <tr className="border-t-2">
-                      <td colSpan={2} className="px-4 py-2 text-sm font-semibold text-muted-foreground">Totals</td>
+                      <td colSpan={3} className="px-4 py-2 text-sm font-semibold text-muted-foreground">Totals</td>
                       <td className="px-4 py-2 text-right font-mono font-bold">{data.production.totalBales.toLocaleString()}</td>
                       <td className="px-4 py-2 text-right font-mono font-bold text-sm">{fmtKg(data.production.totalWeightKg)}</td>
                       <td />

@@ -756,19 +756,21 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       const to = req.query.to as string | undefined;
 
       // ── Build date range conditions ──
+      // Use COALESCE(stock_entry_date, DATE(created_at)) so bales without a stock_entry_date
+      // (e.g. wipers/garbage entered via stock import) are still included using their creation date.
       const baleConditions: any[] = [
         eq(factoryBales.companyId, companyId),
         // Only count bales that have been pressed (IN_STOCK, FINALIZED, or SOLD)
         sql`${factoryBales.status} IN ('IN_STOCK','FINALIZED','SOLD')`,
       ];
-      if (from) baleConditions.push(sql`DATE(${factoryBales.stockEntryDate}) >= ${from}`);
-      if (to)   baleConditions.push(sql`DATE(${factoryBales.stockEntryDate}) <= ${to}`);
+      if (from) baleConditions.push(sql`COALESCE(DATE(${factoryBales.stockEntryDate}), DATE(${factoryBales.createdAt})) >= ${from}`);
+      if (to)   baleConditions.push(sql`COALESCE(DATE(${factoryBales.stockEntryDate}), DATE(${factoryBales.createdAt})) <= ${to}`);
 
       const mixBatchConditions: any[] = [eq(factoryMixBatches.companyId, companyId)];
       if (from) mixBatchConditions.push(sql`DATE(${factoryMixBatches.createdAt}) >= ${from}`);
       if (to)   mixBatchConditions.push(sql`DATE(${factoryMixBatches.createdAt}) <= ${to}`);
 
-      // ── Fetch bales with product selling price ──
+      // ── Fetch bales with product selling price and category ──
       const baleRows = await db
         .select({
           id: factoryBales.id,
@@ -778,24 +780,37 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           stockEntryDate: factoryBales.stockEntryDate,
           sellingPrice: factoryBaleProducts.sellingPrice,
           productId: factoryBales.productId,
+          categoryId: factoryBaleProducts.categoryId,
+          categoryName: factoryCategories.name,
         })
         .from(factoryBales)
         .leftJoin(factoryBaleProducts, eq(factoryBales.productId, factoryBaleProducts.id))
+        .leftJoin(factoryCategories, eq(factoryBaleProducts.categoryId, factoryCategories.id))
         .where(and(...baleConditions));
 
       // ── Aggregate by article code ──
       const productMap = new Map<string, {
         articleCode: string;
         productName: string;
+        categoryName: string;
         qty: number;
         totalWeightKg: number;
         sellingPricePerBale: number;
         totalValue: number;
       }>();
 
+      // ── Aggregate by category ──
+      const categoryMap = new Map<string, {
+        categoryName: string;
+        qty: number;
+        totalWeightKg: number;
+        totalValue: number;
+      }>();
+
       for (const bale of baleRows) {
         const code = bale.articleCode || "UNKNOWN";
         const name = bale.productName || code;
+        const catName = bale.categoryName || "Uncategorized";
         const wt = parseFloat(bale.weightKg || "0");
         const price = parseFloat(bale.sellingPrice || "0");
         const value = price; // price is per bale (not per kg)
@@ -806,11 +821,21 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           existing.totalWeightKg += wt;
           existing.totalValue += value;
         } else {
-          productMap.set(code, { articleCode: code, productName: name, qty: 1, totalWeightKg: wt, sellingPricePerBale: price, totalValue: value });
+          productMap.set(code, { articleCode: code, productName: name, categoryName: catName, qty: 1, totalWeightKg: wt, sellingPricePerBale: price, totalValue: value });
+        }
+
+        const catExisting = categoryMap.get(catName);
+        if (catExisting) {
+          catExisting.qty += 1;
+          catExisting.totalWeightKg += wt;
+          catExisting.totalValue += value;
+        } else {
+          categoryMap.set(catName, { categoryName: catName, qty: 1, totalWeightKg: wt, totalValue: value });
         }
       }
 
       const productRows = [...productMap.values()].sort((a, b) => a.articleCode.localeCompare(b.articleCode));
+      const categoryRows = [...categoryMap.values()].sort((a, b) => a.categoryName.localeCompare(b.categoryName));
 
       const totalBales = productRows.reduce((s, r) => s + r.qty, 0);
       const totalBaleWeightKg = productRows.reduce((s, r) => s + r.totalWeightKg, 0);
@@ -845,6 +870,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           totalWeightKg: totalBaleWeightKg,
           totalValue: totalProductionValue,
           byProduct: productRows,
+          byCategory: categoryRows,
         },
         rawMaterial: {
           totalBatches: mixBatchRows.length,
