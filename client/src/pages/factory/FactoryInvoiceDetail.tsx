@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation, useRoute } from "wouter";
 import { useEscapeBack } from "@/hooks/use-escape-back";
-import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw } from "lucide-react";
+import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw, Container } from "lucide-react";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import {
   AlertDialog,
@@ -157,6 +157,14 @@ export default function FactoryInvoiceDetail() {
     if (!orderId) return;
     if (!navigator.onLine) { window.print(); return; }
     window.open(`/api/factory/customer-orders/${orderId}/export-pdf`, "_blank");
+  };
+
+  const handleExportLoadingStatus = () => {
+    if (!orderId) return;
+    const a = document.createElement("a");
+    a.href = `/api/factory/customer-orders/${orderId}/loading-status-export`;
+    a.download = "";
+    a.click();
   };
 
   if (isLoading) {
@@ -313,6 +321,14 @@ export default function FactoryInvoiceDetail() {
           >
             <FileDown className="mr-2 h-4 w-4" />
             Download PDF
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleExportLoadingStatus}
+            data-testid="button-export-loading-status"
+          >
+            <Container className="mr-2 h-4 w-4" />
+            Loading Status
           </Button>
           {order.status !== "FINALIZED" && (
             <AlertDialog>
