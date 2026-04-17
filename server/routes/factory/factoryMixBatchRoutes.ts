@@ -610,15 +610,29 @@ export function registerFactoryMixBatchRoutes(app: Express) {
 
           totalWeightKg += weight;
           totalCost += weight * costPerKg;
-          // Push one source record per raw stock container so deletion can correctly reverse each one
-          for (const d of perRsDeductions) {
+
+          if (supplierRawStocks.length === 0) {
+            // MANUAL supplier — no container raw-stock rows to deduct from.
+            // Record a source entry with supplierId only so the raw-stock API
+            // can count this kg as consumed from the manual stock.
+            const cost = srcCostPerKg ? parseFloat(srcCostPerKg) : 0;
             sourceRecords.push({
               supplierId,
-              containerId: d.containerId,
-              weightKg: String(d.deduct),
-              costPerKg: String(costPerKg),
-              totalCost: String(d.deduct * costPerKg),
+              weightKg: String(weight),
+              costPerKg: String(cost),
+              totalCost: String(weight * cost),
             });
+          } else {
+            // Push one source record per raw stock container so deletion can correctly reverse each one
+            for (const d of perRsDeductions) {
+              sourceRecords.push({
+                supplierId,
+                containerId: d.containerId,
+                weightKg: String(d.deduct),
+                costPerKg: String(costPerKg),
+                totalCost: String(d.deduct * costPerKg),
+              });
+            }
           }
         }
 
@@ -782,6 +796,8 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             .orderBy(factoryRawStock.offloadedAt, factoryRawStock.id)
             .for("update");
 
+          const isManualSupplier = supplierRawStocks.length === 0;
+
           let totalAvailable = 0;
           let weightedCostSum = 0;
           for (const rs of supplierRawStocks) {
@@ -790,29 +806,41 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             weightedCostSum += avail * parseFloat(rs.costPerKgUsd || rs.costPerKg || "0");
           }
 
-          if (weight > totalAvailable + 0.001) {
+          // Only check availability for container-backed suppliers; MANUAL suppliers
+          // have their stock tracked via adjustments, not factoryRawStock rows.
+          if (!isManualSupplier && weight > totalAvailable + 0.001) {
             throw new Error(`Not enough stock from this supplier. Available: ${totalAvailable.toFixed(3)} kg`);
           }
 
-          let toDeduct = weight;
-          for (const rs of supplierRawStocks) {
-            if (toDeduct <= 0.001) break;
-            const avail = Math.max(0, parseFloat(rs.receivedKg) - parseFloat(rs.usedKg));
-            if (avail <= 0) continue;
-            const take = Math.min(toDeduct, avail);
-            await tx.update(factoryRawStock)
-              .set({ usedKg: sql`${factoryRawStock.usedKg} + ${take}` })
-              .where(eq(factoryRawStock.id, rs.id));
-            toDeduct -= take;
+          if (isManualSupplier) {
+            // MANUAL supplier — no container raw-stock rows to update.
+            // Record a source entry with supplierId only so the raw-stock API
+            // can count this kg as consumed from the manual stock.
+            const cost = srcCostPerKg ? parseFloat(srcCostPerKg) : 0;
+            addedWeightKg += weight;
+            addedCost += weight * cost;
+            sourceRecords.push({ supplierId, weightKg: String(weight), costPerKg: String(cost), totalCost: String(weight * cost) });
+          } else {
+            let toDeduct = weight;
+            for (const rs of supplierRawStocks) {
+              if (toDeduct <= 0.001) break;
+              const avail = Math.max(0, parseFloat(rs.receivedKg) - parseFloat(rs.usedKg));
+              if (avail <= 0) continue;
+              const take = Math.min(toDeduct, avail);
+              await tx.update(factoryRawStock)
+                .set({ usedKg: sql`${factoryRawStock.usedKg} + ${take}` })
+                .where(eq(factoryRawStock.id, rs.id));
+              toDeduct -= take;
+            }
+
+            const costUsed = srcCostPerKg
+              ? parseFloat(srcCostPerKg)
+              : (totalAvailable > 0 ? weightedCostSum / totalAvailable : 0);
+
+            addedWeightKg += weight;
+            addedCost += weight * costUsed;
+            sourceRecords.push({ supplierId, weightKg: String(weight), costPerKg: String(costUsed), totalCost: String(weight * costUsed) });
           }
-
-          const costUsed = srcCostPerKg
-            ? parseFloat(srcCostPerKg)
-            : (totalAvailable > 0 ? weightedCostSum / totalAvailable : 0);
-
-          addedWeightKg += weight;
-          addedCost += weight * costUsed;
-          sourceRecords.push({ supplierId, weightKg: String(weight), costPerKg: String(costUsed), totalCost: String(weight * costUsed) });
         }
 
         for (const source of sources) {

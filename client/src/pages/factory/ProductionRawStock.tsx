@@ -1188,8 +1188,14 @@ export default function ProductionRawStock() {
                       <TableCell className="text-right font-mono">
                         {formatNumber(parseFloat(row.receivedKg))}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-green-600 dark:text-green-400 font-medium">
-                        {formatNumber(parseFloat(row.freeKg || "0"))}
+                      <TableCell className="text-right font-mono font-medium">
+                        {parseFloat(row.freeKg || "0") > 0.001 ? (
+                          <span className="text-green-600 dark:text-green-400">
+                            {formatNumber(parseFloat(row.freeKg || "0"))}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/50">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {row.supplierId && inlineCostEditId === row.supplierId ? (
