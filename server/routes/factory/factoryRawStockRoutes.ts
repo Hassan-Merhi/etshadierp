@@ -211,6 +211,45 @@ export function registerFactoryRawStockRoutes(app: Express) {
         if (r.supplierId) reservedBySupplierId.set(r.supplierId, parseFloat(r.reservedKg as string) || 0);
       }
 
+      // For MANUAL-only suppliers (no factoryRawStock container records), usedKg is never
+      // incremented on any DB row when a batch is created. We must count kg from
+      // COMPLETED/CLOSED batch sources so those show as consumed.
+      const completedBatchRows = await db
+        .select({
+          supplierId: factoryMixBatchSources.supplierId,
+          consumedKg: sql<string>`SUM(${factoryMixBatchSources.weightKg})`,
+        })
+        .from(factoryMixBatchSources)
+        .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
+        .where(and(
+          eq(factoryMixBatches.companyId, companyId),
+          sql`${factoryMixBatchSources.supplierId} IS NOT NULL`,
+          sql`${factoryMixBatches.status} IN ('CLOSED', 'COMPLETED')`,
+          isNull(factoryMixBatchSources.containerId),
+        ))
+        .groupBy(factoryMixBatchSources.supplierId);
+
+      // Map: supplierId → kg consumed in completed batches (only for container-less sources)
+      const completedUsedBySupplierId = new Map<number, number>();
+      for (const r of completedBatchRows) {
+        if (r.supplierId) completedUsedBySupplierId.set(r.supplierId, parseFloat(r.consumedKg as string) || 0);
+      }
+
+      // Track which supplierIds have actual container raw stock records (those already
+      // have usedKg properly maintained on the factoryRawStock rows).
+      const supplierIdsWithContainerStock = new Set<number>(
+        results.filter(r => r.supplierId).map(r => r.supplierId as number)
+      );
+
+      // Apply completed-batch consumption to MANUAL-only suppliers
+      for (const [suppId, consumed] of completedUsedBySupplierId) {
+        if (supplierIdsWithContainerStock.has(suppId)) continue; // container stock handles it
+        const key = `supplier-${suppId}`;
+        if (supplierMap.has(key)) {
+          supplierMap.get(key)!._totalUsed += consumed;
+        }
+      }
+
       // Build aggregated rows (reservedKg / freeKg will be fixed below for multi-row suppliers)
       const aggregated = Array.from(supplierMap.values()).map((s: any) => {
         const remainingKg = s._totalReceived - s._totalUsed;
@@ -550,6 +589,125 @@ export function registerFactoryRawStockRoutes(app: Express) {
         .orderBy(desc(factoryRawMaterialAdjustments.createdAt));
       res.json(rows);
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET combined history for a specific supplier's raw material
+  // Returns adjustments + mix batch usage sorted newest-first
+  app.get("/api/factory/raw-stock/history/:supplierId", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const supplierId = parseInt(req.params.supplierId);
+      if (!supplierId) return res.status(400).json({ message: "supplierId required" });
+
+      // 1. Manual adjustments for this supplier
+      const adjRows = await db.select({
+        id: factoryRawMaterialAdjustments.id,
+        date: factoryRawMaterialAdjustments.date,
+        type: factoryRawMaterialAdjustments.type,
+        kg: factoryRawMaterialAdjustments.kg,
+        costPerKg: factoryRawMaterialAdjustments.costPerKg,
+        currencyCode: factoryRawMaterialAdjustments.currencyCode,
+        notes: factoryRawMaterialAdjustments.notes,
+        materialLabel: factoryRawMaterialAdjustments.materialLabel,
+        createdAt: factoryRawMaterialAdjustments.createdAt,
+      })
+        .from(factoryRawMaterialAdjustments)
+        .where(and(
+          eq(factoryRawMaterialAdjustments.companyId, companyId),
+          eq(factoryRawMaterialAdjustments.supplierId, supplierId),
+        ))
+        .orderBy(desc(factoryRawMaterialAdjustments.createdAt));
+
+      const adjustments = adjRows.map(r => ({
+        kind: "adjustment" as const,
+        date: r.date || r.createdAt,
+        createdAt: r.createdAt,
+        type: r.type,
+        kg: parseFloat(r.kg as string) || 0,
+        costPerKg: parseFloat(r.costPerKg as string) || 0,
+        currencyCode: r.currencyCode || "USD",
+        notes: r.notes,
+        label: r.type === "ADD" ? "Manual Addition" : "Manual Deduction",
+        ref: `ADJ-${r.id}`,
+      }));
+
+      // 2. Mix batch usage: batch sources referencing this supplier
+      const batchSourceRows = await db.select({
+        batchId: factoryMixBatches.id,
+        batchCode: factoryMixBatches.batchCode,
+        batchName: factoryMixBatches.name,
+        batchStatus: factoryMixBatches.status,
+        batchDate: factoryMixBatches.batchDate,
+        createdAt: factoryMixBatches.createdAt,
+        weightKg: factoryMixBatchSources.weightKg,
+        costPerKg: factoryMixBatchSources.costPerKg,
+      })
+        .from(factoryMixBatchSources)
+        .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
+        .where(and(
+          eq(factoryMixBatches.companyId, companyId),
+          eq(factoryMixBatchSources.supplierId, supplierId),
+        ))
+        .orderBy(desc(factoryMixBatches.createdAt));
+
+      const batches = batchSourceRows.map(r => ({
+        kind: "batch" as const,
+        date: r.batchDate || r.createdAt,
+        createdAt: r.createdAt,
+        type: "USED",
+        kg: parseFloat(r.weightKg as string) || 0,
+        costPerKg: parseFloat(r.costPerKg as string) || 0,
+        currencyCode: "USD",
+        notes: null,
+        label: `Mix Batch — ${r.batchName || r.batchCode}`,
+        ref: r.batchCode,
+        batchStatus: r.batchStatus,
+        batchId: r.batchId,
+      }));
+
+      // 3. Container-based raw stock receipts for this supplier
+      const containerRows = await db.select({
+        id: factoryRawStock.id,
+        receivedKg: factoryRawStock.receivedKg,
+        costPerKg: factoryRawStock.costPerKg,
+        offloadedAt: factoryRawStock.offloadedAt,
+        containerNumber: factoryContainers.containerNumber,
+        origin: factoryContainers.origin,
+        currencyCode: factoryContainers.currencyCode,
+      })
+        .from(factoryRawStock)
+        .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
+        .where(and(
+          eq(factoryRawStock.companyId, companyId),
+          eq(factoryContainers.supplierId, supplierId),
+          sql`${factoryContainers.status} != 'DELETED'`,
+        ))
+        .orderBy(desc(factoryRawStock.offloadedAt));
+
+      const receipts = containerRows.map(r => ({
+        kind: "receipt" as const,
+        date: r.offloadedAt,
+        createdAt: r.offloadedAt,
+        type: "RECEIPT",
+        kg: parseFloat(r.receivedKg as string) || 0,
+        costPerKg: parseFloat(r.costPerKg as string) || 0,
+        currencyCode: r.currencyCode || "USD",
+        notes: r.origin ? `Origin: ${r.origin}` : null,
+        label: `Container Receipt — ${r.containerNumber || `#${r.id}`}`,
+        ref: r.containerNumber || `CONTAINER-${r.id}`,
+        batchStatus: null,
+        batchId: null,
+      }));
+
+      const all = [...adjustments, ...batches, ...receipts]
+        .sort((a, b) => new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime());
+
+      res.json(all);
+    } catch (error: any) {
+      console.error("Raw material history error:", error);
       res.status(500).json({ message: error.message });
     }
   });

@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from "react";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, FlaskConical, FileSpreadsheet, FileText, SlidersHorizontal, PlusCircle, MinusCircle } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, FlaskConical, FileSpreadsheet, FileText, SlidersHorizontal, PlusCircle, MinusCircle, History, ArrowUpCircle, ArrowDownCircle, FlaskRound } from "lucide-react";
 import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
 import { EditMixBatchDialog } from "@/components/EditMixBatchDialog";
 import type { FactoryMixBatch } from "@shared/schema";
@@ -361,6 +361,7 @@ export default function ProductionRawStock() {
   const [adjIsNewMaterial, setAdjIsNewMaterial] = useState(false);
   const [adjSupplierId, setAdjSupplierId] = useState<string>("");
   // Deduct from received dialog
+  const [historySupplier, setHistorySupplier] = useState<{ id: number; name: string } | null>(null);
   const [deductDialogOpen, setDeductDialogOpen] = useState(false);
   const [deductingRow, setDeductingRow] = useState<{ supplierId: number; supplierName: string; receivedKg: string; freeKg: string; costPerKgUsd: string; currencyCode: string } | null>(null);
   const [inlineCostEditId, setInlineCostEditId] = useState<number | null>(null);
@@ -439,6 +440,15 @@ export default function ProductionRawStock() {
       return res.json();
     },
     enabled: dailyReportOpen,
+  });
+
+  const { data: materialHistory = [], isLoading: materialHistoryLoading } = useQuery<any[]>({
+    queryKey: ["/api/factory/raw-stock/history", historySupplier?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/raw-stock/history/${historySupplier!.id}`, { credentials: "include" });
+      return res.json();
+    },
+    enabled: !!historySupplier,
   });
 
   const deleteBatchMutation = useMutation({
@@ -1153,7 +1163,19 @@ export default function ProductionRawStock() {
                   return (
                     <TableRow key={(row.supplierId || idx) + (isOB ? "_ob" : "_ct")} data-testid={`row-raw-stock-${row.supplierId || idx}${isOB ? "-ob" : "-ct"}`}>
                       <TableCell className="font-medium" data-testid={`text-supplier-${row.supplierId || idx}`}>
-                        {row.supplierName}
+                        {row.supplierId ? (
+                          <button
+                            type="button"
+                            className="text-left hover:underline hover:text-primary transition-colors flex items-center gap-1.5"
+                            onClick={() => setHistorySupplier({ id: row.supplierId!, name: row.supplierName })}
+                            data-testid={`button-history-${row.supplierId}`}
+                          >
+                            {row.supplierName}
+                            <History className="h-3 w-3 text-muted-foreground" />
+                          </button>
+                        ) : (
+                          row.supplierName
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -3224,6 +3246,87 @@ export default function ProductionRawStock() {
               {deductReceivedMutation.isPending ? "Deducting…" : "Confirm Deduct"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Material History Dialog ── */}
+      <Dialog open={!!historySupplier} onOpenChange={(open) => { if (!open) setHistorySupplier(null); }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              {historySupplier?.name} — Full History
+            </DialogTitle>
+            <DialogDescription>
+              All movements for this raw material: additions, batch usage, deductions, and container receipts.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1 -mx-1 px-1">
+            {materialHistoryLoading ? (
+              <div className="space-y-2 py-4">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="h-12 bg-muted/40 rounded-md animate-pulse" />
+                ))}
+              </div>
+            ) : materialHistory.length === 0 ? (
+              <p className="text-center text-muted-foreground py-10 text-sm">No history found for this material.</p>
+            ) : (
+              <div className="space-y-1 py-2">
+                {materialHistory.map((entry: any, i: number) => {
+                  const isAdd = entry.type === "ADD" || entry.type === "RECEIPT";
+                  const isUsed = entry.type === "USED";
+                  const isRemove = entry.type === "REMOVE";
+                  const dateStr = entry.date
+                    ? new Date(entry.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                    : "—";
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-start justify-between gap-3 px-3 py-2.5 rounded-md hover-elevate bg-muted/20"
+                      data-testid={`row-history-${i}`}
+                    >
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <div className="mt-0.5 shrink-0">
+                          {isAdd ? (
+                            <ArrowUpCircle className="h-4 w-4 text-green-500" />
+                          ) : isUsed ? (
+                            <FlaskRound className="h-4 w-4 text-blue-500" />
+                          ) : (
+                            <ArrowDownCircle className="h-4 w-4 text-destructive" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{entry.label}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs text-muted-foreground font-mono">{entry.ref}</span>
+                            <span className="text-xs text-muted-foreground">{dateStr}</span>
+                            {entry.batchStatus && (
+                              <Badge variant="outline" className="text-xs py-0">
+                                {entry.batchStatus}
+                              </Badge>
+                            )}
+                          </div>
+                          {entry.notes && (
+                            <p className="text-xs text-muted-foreground mt-0.5 italic">{entry.notes}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className={`text-sm font-mono font-semibold ${isAdd ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
+                          {isAdd ? "+" : "−"}{entry.kg.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg
+                        </p>
+                        {entry.costPerKg > 0 && (
+                          <p className="text-xs text-muted-foreground font-mono">
+                            ${entry.costPerKg.toFixed(4)}/kg
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
