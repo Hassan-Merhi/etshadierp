@@ -543,7 +543,7 @@ export default function DailyProductionReport() {
               {(() => {
                 const origKg = data?.rawMaterial.totalWeightKg ?? 0;
                 const productionsKg = (data?.production.totalWeightKg ?? 0) + (data?.wipersGarbage.totalWeightKg ?? 0);
-                const totalKg = origKg - productionsKg;
+                const totalKg = productionsKg - origKg;
                 const isPositive = totalKg >= 0;
                 return (
                   <div className="flex flex-wrap items-center gap-5 pt-2 border-t border-border">
