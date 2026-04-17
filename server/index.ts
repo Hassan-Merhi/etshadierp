@@ -889,6 +889,7 @@ let migrationsDone = false;
       delta decimal(15,3) NOT NULL,
       new_quantity decimal(15,3) NOT NULL
     )`,
+    `ALTER TABLE stock_transfer_revisions ADD COLUMN IF NOT EXISTS created_by varchar`,
     // Transport allowance on worker profile
     `ALTER TABLE factory_workers ADD COLUMN IF NOT EXISTS transport_allowance decimal(20,2) DEFAULT 0`,
     // Transport column on payroll records
