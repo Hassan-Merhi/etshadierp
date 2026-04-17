@@ -345,6 +345,7 @@ export default function FactoryPendingInvoiceVerify() {
   const orderStatus = verification?.order?.status || orderDetail?.status || "";
   const isPending = orderStatus === "PENDING_VERIFICATION";
   const isVerified = orderStatus === "VERIFIED";
+  const isLoadingStatus = orderStatus === "LOADING";
 
   if (isLoading) {
     return (
@@ -377,6 +378,11 @@ export default function FactoryPendingInvoiceVerify() {
           </div>
         </div>
         <div>
+          {isLoadingStatus && (
+            <Badge variant="outline" className="border-blue-300 text-blue-700 dark:border-blue-600 dark:text-blue-400" data-testid="badge-order-status">
+              Loading
+            </Badge>
+          )}
           {isPending && (
             <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800" data-testid="badge-order-status">
               Pending Verification
@@ -627,7 +633,7 @@ export default function FactoryPendingInvoiceVerify() {
         </CardContent>
       </Card>
 
-      {(isPending || isVerified) && (
+      {(isPending || isVerified || isLoadingStatus) && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="text-sm">Freight &amp; Charges</CardTitle>
