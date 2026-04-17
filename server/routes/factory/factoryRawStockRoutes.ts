@@ -299,6 +299,15 @@ export function registerFactoryRawStockRoutes(app: Express) {
             .where(eq(factoryRawStock.id, row.id));
         }
 
+        // 1b. Also update ADD adjustments for this supplier so the weighted avg isn't pulled back
+        await tx.update(factoryRawMaterialAdjustments)
+          .set({ costPerKg: String(newCost) })
+          .where(and(
+            eq(factoryRawMaterialAdjustments.companyId, companyId),
+            eq(factoryRawMaterialAdjustments.supplierId, Number(supplierId)),
+            eq(factoryRawMaterialAdjustments.type, "ADD"),
+          ));
+
         // 2. Update costPerKg + totalCost on factory_mix_batch_sources for this supplier
         const batchSources = await tx
           .select({
