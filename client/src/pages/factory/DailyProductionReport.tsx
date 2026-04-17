@@ -620,7 +620,7 @@ export default function DailyProductionReport() {
             </CardTitle>
             {!isLoading && data && (
               <Badge variant="secondary" className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 no-default-active-elevate">
-                QNTY
+                QTY
               </Badge>
             )}
           </CardHeader>
@@ -666,7 +666,7 @@ export default function DailyProductionReport() {
             </CardTitle>
             {!isLoading && data && (
               <Badge variant="secondary" className="text-xs bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 no-default-active-elevate">
-                QNTY
+                QTY
               </Badge>
             )}
           </CardHeader>
@@ -677,14 +677,14 @@ export default function DailyProductionReport() {
                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Wipers</span>
                   <span className="text-sm font-bold">
                     <span className="font-bold">{data?.wipersGarbage.totalWipersQty ?? 0}</span>
-                    <span className="text-xs font-normal text-muted-foreground ml-1">{fmtKg(data?.wipersGarbage.totalWipersKg ?? 0)}</span>
+                    <span className="text-xs font-normal text-muted-foreground ml-3">{fmtKg(data?.wipersGarbage.totalWipersKg ?? 0)}</span>
                   </span>
                 </div>
                 <div className="flex items-center justify-between py-1">
                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Garbage</span>
                   <span className="text-sm font-bold">
                     <span className="font-bold">{data?.wipersGarbage.totalGarbageQty ?? 0}</span>
-                    <span className="text-xs font-normal text-muted-foreground ml-1">{fmtKg(data?.wipersGarbage.totalGarbageKg ?? 0)}</span>
+                    <span className="text-xs font-normal text-muted-foreground ml-3">{fmtKg(data?.wipersGarbage.totalGarbageKg ?? 0)}</span>
                   </span>
                 </div>
                 <StatRow label="Value" value={fmtMoney(data?.wipersGarbage.totalValue ?? 0)} />
@@ -692,7 +692,7 @@ export default function DailyProductionReport() {
                   <span className="text-xs font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Total Wiper + Garbage</span>
                   <span className="text-sm font-extrabold tabular-nums">
                     {(data?.wipersGarbage.totalWipersQty ?? 0) + (data?.wipersGarbage.totalGarbageQty ?? 0)}
-                    <span className="text-xs font-normal text-muted-foreground ml-1">{fmtKg(data?.wipersGarbage.totalWeightKg ?? 0)}</span>
+                    <span className="text-xs font-normal text-muted-foreground ml-3">{fmtKg(data?.wipersGarbage.totalWeightKg ?? 0)}</span>
                   </span>
                 </div>
               </>
