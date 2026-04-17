@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import {
   ChevronDown, ChevronRight, FlaskConical, PackageCheck, Scale,
-  TrendingUp, TrendingDown, Minus, Tag,
+  TrendingUp, TrendingDown, Minus, Tag, Trash2,
 } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -608,43 +608,77 @@ export default function DailyProductionReport() {
           </CardContent>
         </Card>
 
-        {/* 2 — Productions (Bales + Wipers & Garbage) */}
+        {/* 2 — Bales Produced */}
         <Card
           className="border-blue-200 dark:border-blue-800/50 bg-blue-50/60 dark:bg-blue-950/20"
-          data-testid="card-productions"
+          data-testid="card-bales-produced"
         >
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase tracking-wide text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
               <PackageCheck className="h-3.5 w-3.5" />
-              Productions
+              Bales Produced
             </CardTitle>
             {!isLoading && data && (
               <Badge variant="secondary" className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 no-default-active-elevate">
-                {data.production.totalBales} {data.production.totalBales === 1 ? "bale" : "bales"}
+                QNTY
               </Badge>
             )}
           </CardHeader>
           <CardContent className="pt-0 space-y-0.5">
             {isLoading ? <SkeletonBox /> : (
               <>
-                <StatRow label="Bales Weight" value={fmtKg(data?.production.totalWeightKg ?? 0)} />
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"># Bales</span>
+                  <span className="text-sm font-bold">
+                    {data?.production.totalBales ?? 0}
+                  </span>
+                </div>
+                <StatRow label="Weight" value={fmtKg(data?.production.totalWeightKg ?? 0)} />
+                <StatRow label="Value" value={fmtMoney(data?.production.totalValue ?? 0)} />
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 3 — Wipers & Garbage */}
+        <Card
+          className="border-red-200 dark:border-red-800/50 bg-red-50/60 dark:bg-red-950/20"
+          data-testid="card-wipers-garbage"
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-xs font-bold uppercase tracking-wide text-red-700 dark:text-red-400 flex items-center gap-1.5">
+              <Trash2 className="h-3.5 w-3.5" />
+              Wipers &amp; Garbage
+            </CardTitle>
+            {!isLoading && data && (
+              <Badge variant="secondary" className="text-xs bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 no-default-active-elevate">
+                QNTY
+              </Badge>
+            )}
+          </CardHeader>
+          <CardContent className="pt-0 space-y-0.5">
+            {isLoading ? <SkeletonBox /> : (
+              <>
                 <div className="flex items-center justify-between py-1">
                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Wipers</span>
                   <span className="text-sm font-bold">
-                    {data?.wipersGarbage.totalWipersQty ?? 0}
+                    <span className="font-bold">{data?.wipersGarbage.totalWipersQty ?? 0}</span>
                     <span className="text-xs font-normal text-muted-foreground ml-1">{fmtKg(data?.wipersGarbage.totalWipersKg ?? 0)}</span>
                   </span>
                 </div>
                 <div className="flex items-center justify-between py-1">
                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Garbage</span>
                   <span className="text-sm font-bold">
-                    {data?.wipersGarbage.totalGarbageQty ?? 0}
+                    <span className="font-bold">{data?.wipersGarbage.totalGarbageQty ?? 0}</span>
                     <span className="text-xs font-normal text-muted-foreground ml-1">{fmtKg(data?.wipersGarbage.totalGarbageKg ?? 0)}</span>
                   </span>
                 </div>
-                <div className="border-t border-blue-200 dark:border-blue-800/40 pt-1 mt-1">
-                  <StatRow label="Total Weight" value={fmtKg((data?.production.totalWeightKg ?? 0) + (data?.wipersGarbage.totalWeightKg ?? 0))} />
-                  <StatRow label="Total Value" value={fmtMoney((data?.production.totalValue ?? 0) + (data?.wipersGarbage.totalValue ?? 0))} />
+                <StatRow label="Value" value={fmtMoney(data?.wipersGarbage.totalValue ?? 0)} />
+                <div className="mt-3 pt-1 flex justify-center">
+                  <div className="rounded-md bg-background/80 dark:bg-background/60 border border-border px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-foreground">
+                    Total Wiper + Garbage&ensp;
+                    <span className="font-mono">{fmtKg(data?.wipersGarbage.totalWeightKg ?? 0)}</span>
+                  </div>
                 </div>
               </>
             )}
