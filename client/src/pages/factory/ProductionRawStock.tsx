@@ -363,6 +363,8 @@ export default function ProductionRawStock() {
   // Deduct from received dialog
   const [deductDialogOpen, setDeductDialogOpen] = useState(false);
   const [deductingRow, setDeductingRow] = useState<{ supplierId: number; supplierName: string; receivedKg: string; freeKg: string; costPerKgUsd: string; currencyCode: string } | null>(null);
+  const [inlineCostEditId, setInlineCostEditId] = useState<number | null>(null);
+  const [inlineCostEditValue, setInlineCostEditValue] = useState("");
   const [deductKg, setDeductKg] = useState("");
   const [deductNotes, setDeductNotes] = useState("");
   // Add-to-batch quick dialog state
@@ -1166,7 +1168,53 @@ export default function ProductionRawStock() {
                         {formatNumber(parseFloat(row.freeKg || "0"))}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        ${parseFloat(row.costPerKgUsd || row.costPerKg).toFixed(4)}
+                        {row.supplierId && inlineCostEditId === row.supplierId ? (
+                          <input
+                            autoFocus
+                            type="number"
+                            step="0.0001"
+                            min="0"
+                            className="w-24 text-right font-mono text-sm border rounded-md px-1.5 py-0.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                            value={inlineCostEditValue}
+                            data-testid={`input-inline-cost-${row.supplierId}`}
+                            onChange={(e) => setInlineCostEditValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                const v = parseFloat(inlineCostEditValue);
+                                if (!isNaN(v) && v >= 0 && row.supplierId) {
+                                  updateCostMutation.mutate({ supplierId: row.supplierId, newCostPerKg: inlineCostEditValue });
+                                }
+                                setInlineCostEditId(null);
+                              } else if (e.key === "Escape") {
+                                setInlineCostEditId(null);
+                              }
+                            }}
+                            onBlur={() => {
+                              const v = parseFloat(inlineCostEditValue);
+                              if (!isNaN(v) && v >= 0 && row.supplierId) {
+                                const current = parseFloat(row.costPerKgUsd || row.costPerKg || "0");
+                                if (Math.abs(v - current) > 0.00001) {
+                                  updateCostMutation.mutate({ supplierId: row.supplierId, newCostPerKg: inlineCostEditValue });
+                                }
+                              }
+                              setInlineCostEditId(null);
+                            }}
+                          />
+                        ) : (
+                          <span
+                            className={row.supplierId ? "cursor-pointer hover-elevate rounded px-1 py-0.5 group" : ""}
+                            title={row.supplierId ? "Click to edit cost per kg" : undefined}
+                            data-testid={`text-cost-${row.supplierId || idx}`}
+                            onClick={() => {
+                              if (!row.supplierId) return;
+                              setInlineCostEditId(row.supplierId);
+                              setInlineCostEditValue(parseFloat(row.costPerKgUsd || row.costPerKg || "0").toFixed(4));
+                            }}
+                          >
+                            ${parseFloat(row.costPerKgUsd || row.costPerKg).toFixed(4)}
+                            {row.supplierId && <Pencil className="inline ml-1 h-2.5 w-2.5 opacity-0 group-hover:opacity-50" />}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         ${formatNumber(parseFloat(row.valueRemainingUsd || row.valueRemaining))}
