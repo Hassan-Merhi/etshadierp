@@ -41,6 +41,7 @@ interface TransferSummary {
   voucherNumber: string;
   voucherDate: string;
   sourceLocationName: string;
+  destinationLocationId: number;
   destinationLocationName: string;
   itemCount: number;
   totalAmount: number;
@@ -810,7 +811,6 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
 
   const transfers = useMemo(() => {
     return allTransfers.filter(t => {
-      if (!t.destinationLocationName?.toLowerCase().includes("kolwezi")) return false;
       if (statusFilter === "applied" && !t.inventoryApplied) return false;
       if (statusFilter === "pending" && t.inventoryApplied) return false;
       if (dateFilter) {

@@ -507,10 +507,9 @@ export function registerFiscalTransferRoutes(app: Express) {
         : [];
       const stockItemMap = new Map(stockItemRows.map(s => [s.id, s.name]));
 
-      // Group items by transfer — for POS users, only keep items from their location
+      // Group all items by transfer (no source-location filter — POS users are the destination)
       const itemsByTransfer = new Map<number, typeof itemRows>();
       for (const item of itemRows) {
-        if (posLocationIdList !== null && item.sourceLocationId !== posLocationIdList) continue;
         const arr = itemsByTransfer.get(item.transferId) || [];
         arr.push(item);
         itemsByTransfer.set(item.transferId, arr);
@@ -523,28 +522,28 @@ export function registerFiscalTransferRoutes(app: Express) {
           items.map(i => stockItemMap.get(i.stockItemId) ?? "").filter(Boolean)
         )];
         return {
-          transferId:           r.transferId,
-          voucherId:            r.voucherId,
-          voucherNumber:        r.voucherNumber,
-          voucherDate:          r.voucherDate,
-          notes:                r.notes,
-          inventoryApplied:     r.inventoryApplied,
-          sourceLocationName:   r.sourceLocationId ? (locationMap.get(r.sourceLocationId) ?? "Multi-source") : "Multi-source",
+          transferId:              r.transferId,
+          voucherId:               r.voucherId,
+          voucherNumber:           r.voucherNumber,
+          voucherDate:             r.voucherDate,
+          notes:                   r.notes,
+          inventoryApplied:        r.inventoryApplied,
+          sourceLocationName:      r.sourceLocationId ? (locationMap.get(r.sourceLocationId) ?? "Multi-source") : "Multi-source",
+          destinationLocationId:   r.destinationLocationId,
           destinationLocationName: locationMap.get(r.destinationLocationId) ?? "Unknown",
-          itemCount:            items.length,
-          totalAmount:          Math.round(totalAmount * 100) / 100,
+          itemCount:               items.length,
+          totalAmount:             Math.round(totalAmount * 100) / 100,
           stockItemNames,
-          _hasMyItems:          items.length > 0,
-          createdAt:            r.createdAt,
+          createdAt:               r.createdAt,
         };
       });
 
-      // For POS users: exclude transfers that have no items from their location
+      // For POS users: only show transfers destined for their location
       const result = posLocationIdList !== null
-        ? allResult.filter(r => r._hasMyItems)
+        ? allResult.filter(r => r.destinationLocationId === posLocationIdList)
         : allResult;
 
-      res.json(result.map(({ _hasMyItems, ...r }) => r));
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
