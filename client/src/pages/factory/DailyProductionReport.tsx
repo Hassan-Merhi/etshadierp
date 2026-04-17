@@ -299,9 +299,7 @@ function CategoryProductBreakdown({
 
 const PIE_COLORS = [
   "#6366f1", // indigo   — Summer
-  "#22d3ee", // cyan     — Summer (Crème group)
   "#f59e0b", // amber    — Winter
-  "#a78bfa", // violet   — Winter (Crème group)
   "#34d399", // emerald  — Bags
   "#fb923c", // orange   — Shoes
   "#f472b6", // pink     — Toys
@@ -309,18 +307,13 @@ const PIE_COLORS = [
   "#94a3b8", // gray     — Other
 ];
 
-const GROUP_ORDER = ["Summer 1–4", "Summer Crème / Big Size", "Winter 1–4", "Winter Crème", "Bags", "Shoes", "Toys", "Wipers & Garbage", "Other"];
+const GROUP_ORDER = ["Summer", "Winter", "Bags", "Shoes", "Toys", "Wipers & Garbage", "Other"];
 
 function classifyCategory(name: string): string {
   const u = name.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   if (/ABO\s*SAMAR/.test(u)) return "__skip__";
-  if (/CREME|CRÈME|BIG\s*SIZE/.test(u)) {
-    if (/SUMMER/.test(u)) return "Summer Crème / Big Size";
-    if (/WINTER/.test(u)) return "Winter Crème";
-    return "Summer Crème / Big Size";
-  }
-  if (/SUMMER/.test(u)) return "Summer 1–4";
-  if (/WINTER/.test(u)) return "Winter 1–4";
+  if (/SUMMER/.test(u)) return "Summer";
+  if (/WINTER/.test(u)) return "Winter";
   if (/BAG/.test(u)) return "Bags";
   if (/SHOE/.test(u)) return "Shoes";
   if (/TOY/.test(u)) return "Toys";
