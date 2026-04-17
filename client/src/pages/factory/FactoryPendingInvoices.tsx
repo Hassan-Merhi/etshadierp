@@ -44,7 +44,7 @@ export default function FactoryPendingInvoices() {
   const { formatDisplayDate } = useDateFormat();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
-  const [statusFilter, setStatusFilter] = useState<string>("PENDING_VERIFICATION");
+  const [statusFilter, setStatusFilter] = useState<string>("PENDING_VERIFIED");
   const { toast } = useToast();
 
   const { data: pendingOrders = [], isLoading: pendingLoading } = useQuery<CustomerOrder[]>({
@@ -81,9 +81,12 @@ export default function FactoryPendingInvoices() {
   const allOrders = [...pendingOrders, ...verifiedOrders, ...finalizedOrders];
   const isLoading = pendingLoading || verifiedLoading || finalizedLoading;
 
-  const filteredOrders = statusFilter === "ALL"
-    ? allOrders
-    : allOrders.filter((o) => o.status === statusFilter);
+  const filteredOrders =
+    statusFilter === "ALL"
+      ? allOrders
+      : statusFilter === "PENDING_VERIFIED"
+      ? allOrders.filter((o) => o.status === "PENDING_VERIFICATION" || o.status === "VERIFIED")
+      : allOrders.filter((o) => o.status === statusFilter);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -99,10 +102,9 @@ export default function FactoryPendingInvoices() {
   };
 
   const filters: { key: string; label: string; count: number }[] = [
-    { key: "PENDING_VERIFICATION", label: "Pending",    count: pendingOrders.length  },
-    { key: "VERIFIED",             label: "Verified",   count: verifiedOrders.length },
-    { key: "FINALIZED",            label: "Finalized",  count: finalizedOrders.length },
-    { key: "ALL",                  label: "All",        count: allOrders.length      },
+    { key: "PENDING_VERIFIED", label: "Pending + Verified", count: pendingOrders.length + verifiedOrders.length },
+    { key: "FINALIZED",        label: "Finalized",          count: finalizedOrders.length },
+    { key: "ALL",              label: "All",                count: allOrders.length },
   ];
 
   return (
