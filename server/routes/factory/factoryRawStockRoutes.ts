@@ -276,11 +276,14 @@ export function registerFactoryRawStockRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { supplierId, kg, notes } = req.body;
+      const { supplierId, kg, notes, costPerKg, currencyCode, txDate } = req.body;
       if (!supplierId) return res.status(400).json({ message: "supplierId is required" });
       if (!kg || parseFloat(kg) <= 0) return res.status(400).json({ message: "kg must be > 0" });
 
       const deductKg = parseFloat(kg);
+      const costPerKgNum = costPerKg ? parseFloat(costPerKg) : 0;
+      const ccy = currencyCode || "USD";
+      const today = txDate || getClientDate(req);
 
       // Find all raw_stock rows for this supplier, ordered newest first
       const rows = await db
@@ -298,12 +301,31 @@ export function registerFactoryRawStockRoutes(app: Express) {
         ))
         .orderBy(desc(factoryRawStock.offloadedAt));
 
-      if (rows.length === 0) return res.status(404).json({ message: "No raw stock rows found for this supplier" });
+      // Free kg from actual rows
+      const totalFreeFromRows = rows.reduce(
+        (sum, r) => sum + Math.max(0, parseFloat(r.receivedKg as string) - parseFloat(r.usedKg as string)),
+        0
+      );
 
-      // Validate: total free (received - used) across all rows must cover the deduction
-      const totalFree = rows.reduce((sum, r) => sum + parseFloat(r.receivedKg as string) - parseFloat(r.usedKg as string), 0);
-      if (deductKg > parseFloat(rows.reduce((sum, r) => sum + parseFloat(r.receivedKg as string), 0).toFixed(3))) {
-        return res.status(400).json({ message: `Cannot deduct ${deductKg} kg — total received is only ${rows.reduce((sum, r) => sum + parseFloat(r.receivedKg as string), 0).toFixed(3)} kg` });
+      // Free kg from ADD/REMOVE adjustments for this supplier
+      const adjRows = await db
+        .select({ type: factoryRawMaterialAdjustments.type, kg: factoryRawMaterialAdjustments.kg })
+        .from(factoryRawMaterialAdjustments)
+        .where(and(
+          eq(factoryRawMaterialAdjustments.companyId, companyId),
+          eq(factoryRawMaterialAdjustments.supplierId, Number(supplierId))
+        ));
+      const adjFree = adjRows.reduce((sum, a) => {
+        const k = parseFloat(a.kg as string) || 0;
+        return a.type === "ADD" ? sum + k : sum - k;
+      }, 0);
+
+      const totalFree = totalFreeFromRows + Math.max(0, adjFree);
+
+      if (deductKg > totalFree + 0.001) {
+        return res.status(400).json({
+          message: `Can only deduct up to ${totalFree.toFixed(3)} kg — the rest is already used in batches`,
+        });
       }
 
       // Deduct from rows newest-first, respecting that received can't go below used
@@ -313,7 +335,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
         if (remaining <= 0) break;
         const received = parseFloat(row.receivedKg as string);
         const used = parseFloat(row.usedKg as string);
-        const canDeduct = received - used; // can't go below used
+        const canDeduct = received - used;
         const take = Math.min(remaining, canDeduct);
         if (take > 0) {
           updates.push({ id: row.id, newReceived: received - take });
@@ -321,19 +343,63 @@ export function registerFactoryRawStockRoutes(app: Express) {
         }
       }
 
-      if (remaining > 0.001) {
-        return res.status(400).json({ message: `Can only deduct up to ${(deductKg - remaining).toFixed(3)} kg — the rest is already used in batches` });
+      // Any remaining kg (sourced from adjustments) → create a REMOVE adjustment
+      const adjDeductKg = remaining > 0.001 ? remaining : 0;
+
+      let fxRate = 1;
+      if (ccy !== "USD" && costPerKgNum > 0) {
+        try { fxRate = parseFloat(await getOrFetchFxRateToUsd(companyId, ccy, today)); } catch { fxRate = 1; }
       }
 
       await db.transaction(async (tx) => {
+        // 1. Update actual rows
         for (const u of updates) {
           await tx.update(factoryRawStock)
             .set({ receivedKg: String(u.newReceived.toFixed(3)) })
             .where(eq(factoryRawStock.id, u.id));
         }
+
+        // 2. REMOVE adjustment for any overflow (from adjustment-sourced free)
+        let insertedAdj: any = null;
+        if (adjDeductKg > 0) {
+          [insertedAdj] = await tx.insert(factoryRawMaterialAdjustments).values({
+            companyId,
+            date: today,
+            type: "REMOVE",
+            kg: adjDeductKg.toFixed(3),
+            costPerKg: costPerKgNum > 0 ? String(costPerKgNum) : "0",
+            currencyCode: ccy,
+            supplierId: Number(supplierId),
+            notes: notes ? `${notes} (auto-adj)` : "Deduct from received (auto-adj)",
+          }).returning();
+        }
+
+        // 3. Write daybook entry for the balance update (if costPerKg provided)
+        if (costPerKgNum > 0) {
+          const totalValue = deductKg * costPerKgNum;
+          const totalValueUsd = totalValue * fxRate;
+
+          const [sup] = await tx.select({ name: factorySuppliers.name })
+            .from(factorySuppliers)
+            .where(and(eq(factorySuppliers.id, Number(supplierId)), eq(factorySuppliers.companyId, companyId)))
+            .limit(1);
+          const supplierName = sup?.name || `Supplier #${supplierId}`;
+
+          await writeDaybookEntry(tx, {
+            companyId,
+            txDate: today,
+            txType: "RAW_DEDUCT_RECEIVED",
+            referenceId: Number(supplierId),
+            description: `Deduct from received: ${deductKg} kg @ ${costPerKgNum} ${ccy} — ${supplierName}${notes ? ` (${notes})` : ""}`,
+            currencyCode: ccy,
+            amountCurrency: -totalValue,
+            fxRateToUsd: fxRate,
+            amountUsd: -totalValueUsd,
+          });
+        }
       });
 
-      res.json({ deducted: deductKg, rowsUpdated: updates.length });
+      res.json({ deducted: deductKg, rowsUpdated: updates.length, adjCreated: adjDeductKg > 0 });
     } catch (error: any) {
       console.error("Error deducting received kg:", error);
       res.status(500).json({ message: error.message });

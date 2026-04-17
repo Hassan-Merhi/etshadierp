@@ -362,7 +362,7 @@ export default function ProductionRawStock() {
   const [adjSupplierId, setAdjSupplierId] = useState<string>("");
   // Deduct from received dialog
   const [deductDialogOpen, setDeductDialogOpen] = useState(false);
-  const [deductingRow, setDeductingRow] = useState<{ supplierId: number; supplierName: string; receivedKg: string } | null>(null);
+  const [deductingRow, setDeductingRow] = useState<{ supplierId: number; supplierName: string; receivedKg: string; freeKg: string; costPerKgUsd: string; currencyCode: string } | null>(null);
   const [deductKg, setDeductKg] = useState("");
   const [deductNotes, setDeductNotes] = useState("");
   // Add-to-batch quick dialog state
@@ -541,7 +541,7 @@ export default function ProductionRawStock() {
   });
 
   const deductReceivedMutation = useMutation({
-    mutationFn: async (payload: { supplierId: number; kg: string; notes?: string }) => {
+    mutationFn: async (payload: { supplierId: number; kg: string; notes?: string; costPerKg?: string; currencyCode?: string }) => {
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/deduct-received", payload);
       if (!res.ok) {
         const err = await res.json();
@@ -552,6 +552,7 @@ export default function ProductionRawStock() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/by-container"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
       setDeductDialogOpen(false);
       setDeductKg("");
       setDeductNotes("");
@@ -1178,7 +1179,14 @@ export default function ProductionRawStock() {
                             variant="outline"
                             data-testid={`button-deduct-received-${row.supplierId}`}
                             onClick={() => {
-                              setDeductingRow({ supplierId: row.supplierId!, supplierName: row.supplierName, receivedKg: row.receivedKg });
+                              setDeductingRow({
+                                supplierId: row.supplierId!,
+                                supplierName: row.supplierName,
+                                receivedKg: row.receivedKg,
+                                freeKg: row.freeKg || "0",
+                                costPerKgUsd: row.costPerKgUsd || row.costPerKg || "0",
+                                currencyCode: row.currencyCode || "USD",
+                              });
                               setDeductKg("");
                               setDeductNotes("");
                               setDeductDialogOpen(true);
@@ -3029,8 +3037,8 @@ export default function ProductionRawStock() {
               Deduct from Received — {deductingRow?.supplierName}
             </DialogTitle>
             <DialogDescription>
-              Directly reduces the received kg on the raw stock record. Free kg auto-adjusts.
-              Current received: <strong>{parseFloat(deductingRow?.receivedKg || "0").toLocaleString(undefined, { maximumFractionDigits: 3 })} kg</strong>
+              Reduces free kg and updates the supplier balance.
+              Available free: <strong>{parseFloat(deductingRow?.freeKg || "0").toLocaleString(undefined, { maximumFractionDigits: 3 })} kg</strong>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -3040,11 +3048,17 @@ export default function ProductionRawStock() {
                 type="number"
                 min="0.001"
                 step="0.001"
+                max={parseFloat(deductingRow?.freeKg || "0")}
                 placeholder="e.g. 500"
                 value={deductKg}
                 onChange={(e) => setDeductKg(e.target.value)}
                 data-testid="input-deduct-kg"
               />
+              {deductKg && parseFloat(deductKg) > parseFloat(deductingRow?.freeKg || "0") + 0.001 && (
+                <p className="text-xs text-destructive">
+                  Exceeds available free kg ({parseFloat(deductingRow?.freeKg || "0").toFixed(3)} kg)
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <Label>Notes (optional)</Label>
@@ -3062,10 +3076,21 @@ export default function ProductionRawStock() {
             </Button>
             <Button
               variant="destructive"
-              disabled={deductReceivedMutation.isPending || !deductKg || parseFloat(deductKg) <= 0}
+              disabled={
+                deductReceivedMutation.isPending ||
+                !deductKg ||
+                parseFloat(deductKg) <= 0 ||
+                parseFloat(deductKg) > parseFloat(deductingRow?.freeKg || "0") + 0.001
+              }
               onClick={() => {
                 if (!deductingRow || !deductKg || parseFloat(deductKg) <= 0) return;
-                deductReceivedMutation.mutate({ supplierId: deductingRow.supplierId, kg: deductKg, notes: deductNotes || undefined });
+                deductReceivedMutation.mutate({
+                  supplierId: deductingRow.supplierId,
+                  kg: deductKg,
+                  notes: deductNotes || undefined,
+                  costPerKg: deductingRow.costPerKgUsd || undefined,
+                  currencyCode: deductingRow.currencyCode || undefined,
+                });
               }}
               data-testid="button-deduct-confirm"
             >
