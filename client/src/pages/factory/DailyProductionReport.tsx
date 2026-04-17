@@ -717,24 +717,6 @@ export default function DailyProductionReport() {
                 <StatRow label="Weight" value={fmtKg(data?.balanceOnTable.weightKg ?? 0)} />
                 <StatRow label="Batch Rate" value={fmtRate(data?.balanceOnTable.costPerKg ?? 0)} sub="per kg" />
                 <StatRow label="Value" value={fmtMoney(data?.balanceOnTable.value ?? 0)} />
-                <div className="mt-2 pt-2 border-t border-violet-200 dark:border-violet-800/40 space-y-0.5">
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Original input</span>
-                    <span className="font-mono">{fmtKg(data?.rawMaterial.totalWeightKg ?? 0)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>&#8722; Bales produced</span>
-                    <span className="font-mono">{fmtKg(data?.production.totalWeightKg ?? 0)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>&#8722; Wipers/Garbage</span>
-                    <span className="font-mono">{fmtKg(data?.wipersGarbage.totalWeightKg ?? 0)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-semibold text-violet-700 dark:text-violet-300 pt-1 border-t border-violet-200 dark:border-violet-800/40">
-                    <span>= Balance</span>
-                    <span className="font-mono">{fmtKg(data?.balanceOnTable.weightKg ?? 0)}</span>
-                  </div>
-                </div>
               </>
             )}
           </CardContent>
