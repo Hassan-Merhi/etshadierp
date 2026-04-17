@@ -103,10 +103,7 @@ export default function WipersReEntry() {
   const wiperProducts = (baleProducts?.filter(p => p.active && isWipers(p, categories)) ?? []);
 
   const currentWipersBales = allBalesData
-    .filter(row => {
-      const status = (row.bale?.status || row.status || "");
-      return (status === "IN_STOCK" || status === "FINALIZED") && isWipersBale(row);
-    })
+    .filter(row => isWipersBale(row))
     .map(row => ({ ...row.bale, _product: row.product }));
 
   const filteredProducts = searchInput.trim().length > 0
@@ -593,6 +590,7 @@ export default function WipersReEntry() {
                           <TableHead className="w-10"></TableHead>
                           <TableHead>Reference</TableHead>
                           <TableHead>Product</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead className="text-right">Weight (kg)</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -613,6 +611,7 @@ export default function WipersReEntry() {
                             </TableCell>
                             <TableCell className="font-mono text-sm">{bale.referenceNumber}</TableCell>
                             <TableCell className="text-sm">{bale.productName || bale.category || "-"}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{(bale.status || "-").replace(/_/g, " ")}</TableCell>
                             <TableCell className="text-right font-mono text-sm">{formatLabelNum(parseFloat(bale.weightKg || "0"))}</TableCell>
                           </TableRow>
                         ))}
