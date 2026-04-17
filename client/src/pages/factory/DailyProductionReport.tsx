@@ -42,7 +42,7 @@ function fmtRate(n: number) {
 }
 function fmtKg(n: number) {
   const r = Math.round(n * 10) / 10;
-  return `${r.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} K`;
+  return `${r.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} kg`;
 }
 
 type Preset = "today" | "month" | "lastmonth" | "year" | "custom";
