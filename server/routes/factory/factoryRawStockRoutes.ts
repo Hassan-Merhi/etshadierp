@@ -211,9 +211,18 @@ export function registerFactoryRawStockRoutes(app: Express) {
         if (r.supplierId) reservedBySupplierId.set(r.supplierId, parseFloat(r.reservedKg as string) || 0);
       }
 
+      // Track which supplierIds have actual container raw stock records (those already
+      // have usedKg properly maintained on the factoryRawStock rows).
+      const supplierIdsWithContainerStock = new Set<number>(
+        results.filter(r => r.supplierId).map(r => r.supplierId as number)
+      );
+
       // For MANUAL-only suppliers (no factoryRawStock container records), usedKg is never
-      // incremented on any DB row when a batch is created. We must count kg from
-      // COMPLETED/CLOSED batch sources so those show as consumed.
+      // incremented on any DB row when a batch is completed. We must count kg from ALL
+      // COMPLETED/CLOSED batch sources for those suppliers.
+      // NOTE: do NOT filter by containerId here — a manual-supplier batch source may still
+      // store a containerId value even though the supplier has no container stock rows.
+      // We rely on supplierIdsWithContainerStock to skip suppliers already tracked.
       const completedBatchRows = await db
         .select({
           supplierId: factoryMixBatchSources.supplierId,
@@ -225,26 +234,15 @@ export function registerFactoryRawStockRoutes(app: Express) {
           eq(factoryMixBatches.companyId, companyId),
           sql`${factoryMixBatchSources.supplierId} IS NOT NULL`,
           sql`${factoryMixBatches.status} IN ('CLOSED', 'COMPLETED')`,
-          isNull(factoryMixBatchSources.containerId),
         ))
         .groupBy(factoryMixBatchSources.supplierId);
 
-      // Map: supplierId → kg consumed in completed batches (only for container-less sources)
-      const completedUsedBySupplierId = new Map<number, number>();
+      // Apply completed-batch consumption to MANUAL-only suppliers only
       for (const r of completedBatchRows) {
-        if (r.supplierId) completedUsedBySupplierId.set(r.supplierId, parseFloat(r.consumedKg as string) || 0);
-      }
-
-      // Track which supplierIds have actual container raw stock records (those already
-      // have usedKg properly maintained on the factoryRawStock rows).
-      const supplierIdsWithContainerStock = new Set<number>(
-        results.filter(r => r.supplierId).map(r => r.supplierId as number)
-      );
-
-      // Apply completed-batch consumption to MANUAL-only suppliers
-      for (const [suppId, consumed] of completedUsedBySupplierId) {
-        if (supplierIdsWithContainerStock.has(suppId)) continue; // container stock handles it
-        const key = `supplier-${suppId}`;
+        if (!r.supplierId) continue;
+        if (supplierIdsWithContainerStock.has(r.supplierId)) continue; // container stock handles it
+        const consumed = parseFloat(r.consumedKg as string) || 0;
+        const key = `supplier-${r.supplierId}`;
         if (supplierMap.has(key)) {
           supplierMap.get(key)!._totalUsed += consumed;
         }
