@@ -83,7 +83,8 @@ export function PeriodFilter({
 
   const handlePresetChange = (preset: PeriodPreset) => {
     if (preset === "custom") {
-      onChange({ ...value, preset: "custom" });
+      const dates = getPresetDates("custom");
+      onChange({ ...dates, preset: "custom" });
     } else {
       const dates = getPresetDates(preset);
       onChange({ ...dates, preset });
@@ -93,9 +94,9 @@ export function PeriodFilter({
   const fromDateObj = value.fromDate ? new Date(value.fromDate + "T12:00:00") : undefined;
   const toDateObj = value.toDate ? new Date(value.toDate + "T12:00:00") : undefined;
 
-  // Always show actual dates in the button label (not preset names)
   function buildLabel(): string {
     if (value.preset === "all_time") return "All Time";
+    if (value.preset === "custom") return "Custom Range";
     if (fromDateObj && toDateObj) {
       const from = formatDisplayDate(fromDateObj);
       const to = formatDisplayDate(toDateObj);
@@ -107,9 +108,10 @@ export function PeriodFilter({
   }
 
   const displayLabel = buildLabel();
+  const isCustom = value.preset === "custom";
 
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -171,6 +173,25 @@ export function PeriodFilter({
         </DropdownMenuContent>
       </DropdownMenu>
 
+      {isCustom && (
+        <div className="flex items-center gap-1.5">
+          <input
+            type="date"
+            value={value.fromDate}
+            data-testid="period-filter-from"
+            onChange={(e) => onChange({ ...value, fromDate: e.target.value })}
+            className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+          <span className="text-xs text-muted-foreground">–</span>
+          <input
+            type="date"
+            value={value.toDate}
+            data-testid="period-filter-to"
+            onChange={(e) => onChange({ ...value, toDate: e.target.value })}
+            className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+      )}
     </div>
   );
 }
