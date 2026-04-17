@@ -543,31 +543,31 @@ export default function DailyProductionReport() {
               {(() => {
                 const origKg = data?.rawMaterial.totalWeightKg ?? 0;
                 const productionsKg = (data?.production.totalWeightKg ?? 0) + (data?.wipersGarbage.totalWeightKg ?? 0);
-                const balanceKg = origKg - productionsKg;
-                const isPositive = balanceKg >= 0;
+                const totalKg = origKg - productionsKg;
+                const isPositive = totalKg >= 0;
                 return (
                   <div className="flex flex-wrap items-center gap-5 pt-2 border-t border-border">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-muted-foreground">Original Batches</span>
-                      <span className="text-base font-bold" data-testid="text-weight-batches">
-                        {fmtKg(origKg)}
-                      </span>
-                    </div>
-                    <span className="text-muted-foreground text-base font-semibold">&#8722;</span>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-muted-foreground">Productions</span>
                       <span className="text-base font-bold" data-testid="text-weight-productions">
                         {fmtKg(productionsKg)}
                       </span>
                     </div>
+                    <span className="text-muted-foreground text-base font-semibold">&#8722;</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-muted-foreground">Original Batches</span>
+                      <span className="text-base font-bold" data-testid="text-weight-batches">
+                        {fmtKg(origKg)}
+                      </span>
+                    </div>
                     <span className="text-muted-foreground text-base font-semibold">=</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-muted-foreground">Balance</span>
+                      <span className="text-sm font-semibold text-muted-foreground">Total</span>
                       <span
                         className={`text-base font-bold ${isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
                         data-testid="text-weight-total"
                       >
-                        {fmtKg(balanceKg)}
+                        {fmtKg(totalKg)}
                       </span>
                     </div>
                   </div>
