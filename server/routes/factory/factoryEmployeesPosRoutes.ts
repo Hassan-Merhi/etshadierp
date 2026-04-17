@@ -2622,84 +2622,13 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       }
       const rawMaterialStockValue = round2(rawTotal);
 
-      // ── 4. Combine and return ────────────────────────────────────────────
-      // Rename for clarity — these are the two factory-specific values.
-      const baleInventoryValue = round2(inventorySellValue);
-
-      // Guard: strip any ledger account whose category could collide with our
-      // factory-injected "Inventory" / "Stock" entries.  Accounts with type
-      // "Inventory" bypass the name-pattern exclusion in classifyNetPositionAccounts
-      // (that guard only runs for types in assetAccountTypes).  Removing them
-      // here guarantees ONE source of truth for both factory values.
-      const inventoryCategoryRx = /inventory|stock in hand|stock on hand|raw material/i;
-      const cleanLedgerForUs = ledgerForUs.filter(
-        a => !inventoryCategoryRx.test(a.category) && !inventoryCategoryRx.test(a.name),
-      );
-      const cleanLedgerForUsTotal = round2(
-        cleanLedgerForUs.reduce((s, a) => s + a.value, 0),
-      );
-
-      // ── Split customer items into DR (asset) and CR (liability) ──────────────
-      const customerDrItems = customerItems.filter(c => c.balanceUsd > 0);
-      const customerCrItems = customerItems.filter(c => c.balanceUsd < 0);
-      const totalCustomerDr = round2(customerDrItems.reduce((s, c) => s + c.balanceUsd, 0));
-      const totalCustomerCr = round2(customerCrItems.reduce((s, c) => s + Math.abs(c.balanceUsd), 0));
-
-      // forUsTotal: ledger assets + inventory + raw material + customer receivables (DR)
-      const forUsTotal = round2(cleanLedgerForUsTotal + baleInventoryValue + rawMaterialStockValue + totalCustomerDr);
-      // onUsTotal: ledger liabilities + supplier balances + customer credit balances (CR)
-      const onUsTotal = round2(ledgerOnUsTotal + totalSupplierLiabilities + totalCustomerCr);
-      const netPosition = round2(forUsTotal - onUsTotal);
-
-      // Inject factory-specific lines explicitly (always present so the UI
-      // always has a named row for both even when the value is 0).
-      const factoryInventoryEntry = { name: "Stock In Hand (Inventory)", code: "INVENTORY", value: baleInventoryValue, category: "Inventory" };
-      const factoryRawMaterialEntry = { name: "Factory Raw Material Stock", code: "RAW_MATERIAL", value: rawMaterialStockValue, category: "Raw Material" };
-
-      const forUsAccounts = [
-        factoryInventoryEntry,
-        factoryRawMaterialEntry,
-        ...cleanLedgerForUs.sort((a, b) => b.value - a.value).map(a => ({ ...a, value: round2(a.value) })),
-        ...customerDrItems
-          .sort((a, b) => b.balanceUsd - a.balanceUsd)
-          .map(c => ({ name: c.name, code: "CUSTOMER_DR", value: round2(c.balanceUsd), category: "Customer" })),
-      ];
-
-      // Group ledger on-us by category
-      const ledgerOnUsGrouped: Record<string, number> = {};
-      for (const a of ledgerOnUs) {
-        ledgerOnUsGrouped[a.category] = (ledgerOnUsGrouped[a.category] || 0) + a.value;
-      }
-
-      const onUsAccounts: { name: string; code: string; value: number; category: string }[] = [
-        ...supplierItems
-          .filter(s => s.balanceUsd > 0)
-          .sort((a, b) => b.balanceUsd - a.balanceUsd)
-          .map(s => ({ name: s.name, code: "SUPPLIER", value: round2(s.balanceUsd), category: "Supplier" })),
-        ...ledgerOnUs.sort((a, b) => b.value - a.value).map(a => ({ ...a, value: round2(a.value) })),
-        ...customerCrItems
-          .sort((a, b) => Math.abs(b.balanceUsd) - Math.abs(a.balanceUsd))
-          .map(c => ({ name: c.name, code: "CUSTOMER_CR", value: round2(Math.abs(c.balanceUsd)), category: "Customer" })),
-      ];
-
-      const forUsBreakdown = Object.entries(
-        forUsAccounts.reduce((m: Record<string,number>, a) => {
-          m[a.category] = (m[a.category] || 0) + a.value;
-          return m;
-        }, {})
-      ).map(([name, value]) => ({ name, value: round2(value) })).sort((a, b) => b.value - a.value);
-
-      const onUsBreakdown = [
-        ...(totalSupplierLiabilities > 0 ? [{ name: "Suppliers", value: round2(totalSupplierLiabilities) }] : []),
-        ...Object.entries(ledgerOnUsGrouped)
-          .map(([name, value]) => ({ name, value: round2(value) }))
-          .sort((a, b) => b.value - a.value),
-        ...(totalCustomerCr > 0 ? [{ name: "Customer", value: totalCustomerCr }] : []),
-      ];
-
-      // ── 5. Pending, Verified & Loading orders (upcoming receivables) ──────────
-      // LOADING orders are actively being packed — their grandTotal updates live
-      // as bales are scanned, which is exactly what the user wants to see here.
+      // ── 4. Pending, Verified & Loading orders (upcoming receivables) ──────────
+      // Fetched here (before forUsTotal) so PENDING/VERIFIED totals can be
+      // included in "What We Have". LOADING is shown for reference only.
+      //
+      // No double-counting risk: once an order is PENDING or VERIFIED the
+      // bales allocated to it are set to RESERVED_FOR_ORDER status, which
+      // means they are already excluded from the IN_STOCK baleInventoryValue.
       const pendingVerifiedRows = await db
         .select({
           id: customerOrders.id,
@@ -2733,6 +2662,88 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const pendingTotal  = round2(pendingOrders.reduce((s, o) => s + o.grandTotal, 0));
       const verifiedTotal = round2(verifiedOrders.reduce((s, o) => s + o.grandTotal, 0));
       const loadingTotal  = round2(loadingOrders.reduce((s, o) => s + o.grandTotal, 0));
+
+      // ── 5. Combine and return ────────────────────────────────────────────
+      // Rename for clarity — these are the two factory-specific values.
+      const baleInventoryValue = round2(inventorySellValue);
+
+      // Guard: strip any ledger account whose category could collide with our
+      // factory-injected "Inventory" / "Stock" entries.  Accounts with type
+      // "Inventory" bypass the name-pattern exclusion in classifyNetPositionAccounts
+      // (that guard only runs for types in assetAccountTypes).  Removing them
+      // here guarantees ONE source of truth for both factory values.
+      const inventoryCategoryRx = /inventory|stock in hand|stock on hand|raw material/i;
+      const cleanLedgerForUs = ledgerForUs.filter(
+        a => !inventoryCategoryRx.test(a.category) && !inventoryCategoryRx.test(a.name),
+      );
+      const cleanLedgerForUsTotal = round2(
+        cleanLedgerForUs.reduce((s, a) => s + a.value, 0),
+      );
+
+      // ── Split customer items into DR (asset) and CR (liability) ──────────────
+      const customerDrItems = customerItems.filter(c => c.balanceUsd > 0);
+      const customerCrItems = customerItems.filter(c => c.balanceUsd < 0);
+      const totalCustomerDr = round2(customerDrItems.reduce((s, c) => s + c.balanceUsd, 0));
+      const totalCustomerCr = round2(customerCrItems.reduce((s, c) => s + Math.abs(c.balanceUsd), 0));
+
+      // forUsTotal: ledger assets + inventory + raw material + customer receivables (DR)
+      //             + pending orders + verified orders (bales are RESERVED_FOR_ORDER,
+      //             so they are already excluded from baleInventoryValue — no double-count)
+      const forUsTotal = round2(
+        cleanLedgerForUsTotal + baleInventoryValue + rawMaterialStockValue +
+        totalCustomerDr + pendingTotal + verifiedTotal,
+      );
+      // onUsTotal: ledger liabilities + supplier balances + customer credit balances (CR)
+      const onUsTotal = round2(ledgerOnUsTotal + totalSupplierLiabilities + totalCustomerCr);
+      const netPosition = round2(forUsTotal - onUsTotal);
+
+      // Inject factory-specific lines explicitly (always present so the UI
+      // always has a named row for both even when the value is 0).
+      const factoryInventoryEntry = { name: "Stock In Hand (Inventory)", code: "INVENTORY", value: baleInventoryValue, category: "Inventory" };
+      const factoryRawMaterialEntry = { name: "Factory Raw Material Stock", code: "RAW_MATERIAL", value: rawMaterialStockValue, category: "Raw Material" };
+
+      const forUsAccounts = [
+        factoryInventoryEntry,
+        factoryRawMaterialEntry,
+        ...cleanLedgerForUs.sort((a, b) => b.value - a.value).map(a => ({ ...a, value: round2(a.value) })),
+        ...customerDrItems
+          .sort((a, b) => b.balanceUsd - a.balanceUsd)
+          .map(c => ({ name: c.name, code: "CUSTOMER_DR", value: round2(c.balanceUsd), category: "Customer" })),
+        ...(pendingTotal > 0 ? [{ name: "Pending Orders", code: "PENDING_ORDERS", value: pendingTotal, category: "Pending Orders" }] : []),
+        ...(verifiedTotal > 0 ? [{ name: "Verified Orders", code: "VERIFIED_ORDERS", value: verifiedTotal, category: "Verified Orders" }] : []),
+      ];
+
+      // Group ledger on-us by category
+      const ledgerOnUsGrouped: Record<string, number> = {};
+      for (const a of ledgerOnUs) {
+        ledgerOnUsGrouped[a.category] = (ledgerOnUsGrouped[a.category] || 0) + a.value;
+      }
+
+      const onUsAccounts: { name: string; code: string; value: number; category: string }[] = [
+        ...supplierItems
+          .filter(s => s.balanceUsd > 0)
+          .sort((a, b) => b.balanceUsd - a.balanceUsd)
+          .map(s => ({ name: s.name, code: "SUPPLIER", value: round2(s.balanceUsd), category: "Supplier" })),
+        ...ledgerOnUs.sort((a, b) => b.value - a.value).map(a => ({ ...a, value: round2(a.value) })),
+        ...customerCrItems
+          .sort((a, b) => Math.abs(b.balanceUsd) - Math.abs(a.balanceUsd))
+          .map(c => ({ name: c.name, code: "CUSTOMER_CR", value: round2(Math.abs(c.balanceUsd)), category: "Customer" })),
+      ];
+
+      const forUsBreakdown = Object.entries(
+        forUsAccounts.reduce((m: Record<string,number>, a) => {
+          m[a.category] = (m[a.category] || 0) + a.value;
+          return m;
+        }, {})
+      ).map(([name, value]) => ({ name, value: round2(value) })).sort((a, b) => b.value - a.value);
+
+      const onUsBreakdown = [
+        ...(totalSupplierLiabilities > 0 ? [{ name: "Suppliers", value: round2(totalSupplierLiabilities) }] : []),
+        ...Object.entries(ledgerOnUsGrouped)
+          .map(([name, value]) => ({ name, value: round2(value) }))
+          .sort((a, b) => b.value - a.value),
+        ...(totalCustomerCr > 0 ? [{ name: "Customer", value: totalCustomerCr }] : []),
+      ];
 
       res.json({
         forUsTotal,

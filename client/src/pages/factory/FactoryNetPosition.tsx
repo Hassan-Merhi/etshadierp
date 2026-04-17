@@ -442,7 +442,7 @@ export default function FactoryNetPosition() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Orders not yet finalized — not counted in net position. Loading orders update live as bales are scanned.
+              Pending and Verified orders are included in "What We Have." Loading orders update live as bales are scanned.
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
