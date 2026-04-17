@@ -307,7 +307,7 @@ const PIE_COLORS = [
   "#94a3b8", // gray     — Other
 ];
 
-const GROUP_ORDER = ["Summer", "Winter", "Bags", "Shoes", "Toys", "Wipers & Garbage", "Other"];
+const GROUP_ORDER = ["Summer", "Winter", "Bags", "Shoes", "Toys", "Wipers & Garbage"];
 
 function classifyCategory(name: string): string {
   const u = name.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -381,10 +381,10 @@ const GRADE_COLORS: Record<string, string> = {
 function classifyByGrade(name: string): string {
   const u = name.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   if (/ABO\s*SAMAR/.test(u)) return "__skip__";
+  if (/WIPER|GARBAGE|RAG/.test(u)) return "Wipers & Garbage";
   if (/BAG/.test(u)) return "Bags";
   if (/TOY/.test(u)) return "Toys";
   if (/SHOE/.test(u)) return "Shoes";
-  if (/WIPER|GARBAGE|RAG/.test(u)) return "Wipers & Garbage";
   if (/CREME|CRÈME|BIG\s*SIZE/.test(u)) return "Grade Crème";
   if (/\b4\b/.test(u)) return "Grade #4";
   if (/\b3\b/.test(u)) return "Grade #3";
