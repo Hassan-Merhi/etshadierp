@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -365,6 +365,8 @@ export default function ProductionRawStock() {
   const [deductingRow, setDeductingRow] = useState<{ supplierId: number; supplierName: string; receivedKg: string; freeKg: string; costPerKgUsd: string; currencyCode: string } | null>(null);
   const [inlineCostEditId, setInlineCostEditId] = useState<number | null>(null);
   const [inlineCostEditValue, setInlineCostEditValue] = useState("");
+  const inlineCostValueRef = useRef("");   // always-current value for blur/keydown
+  const inlineCostFiredRef = useRef(false); // prevent double-fire on Enter→blur
   const [deductKg, setDeductKg] = useState("");
   const [deductNotes, setDeductNotes] = useState("");
   // Add-to-batch quick dialog state
@@ -1177,24 +1179,37 @@ export default function ProductionRawStock() {
                             className="w-24 text-right font-mono text-sm border rounded-md px-1.5 py-0.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                             value={inlineCostEditValue}
                             data-testid={`input-inline-cost-${row.supplierId}`}
-                            onChange={(e) => setInlineCostEditValue(e.target.value)}
+                            onChange={(e) => {
+                              inlineCostValueRef.current = e.target.value;
+                              setInlineCostEditValue(e.target.value);
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
-                                const v = parseFloat(inlineCostEditValue);
+                                e.preventDefault();
+                                const val = inlineCostValueRef.current;
+                                const v = parseFloat(val);
                                 if (!isNaN(v) && v >= 0 && row.supplierId) {
-                                  updateCostMutation.mutate({ supplierId: row.supplierId, newCostPerKg: inlineCostEditValue });
+                                  inlineCostFiredRef.current = true;
+                                  updateCostMutation.mutate({ supplierId: row.supplierId, newCostPerKg: val });
                                 }
                                 setInlineCostEditId(null);
                               } else if (e.key === "Escape") {
+                                inlineCostFiredRef.current = true; // skip blur mutation
                                 setInlineCostEditId(null);
                               }
                             }}
                             onBlur={() => {
-                              const v = parseFloat(inlineCostEditValue);
+                              if (inlineCostFiredRef.current) {
+                                inlineCostFiredRef.current = false;
+                                setInlineCostEditId(null);
+                                return;
+                              }
+                              const val = inlineCostValueRef.current;
+                              const v = parseFloat(val);
                               if (!isNaN(v) && v >= 0 && row.supplierId) {
                                 const current = parseFloat(row.costPerKgUsd || row.costPerKg || "0");
                                 if (Math.abs(v - current) > 0.00001) {
-                                  updateCostMutation.mutate({ supplierId: row.supplierId, newCostPerKg: inlineCostEditValue });
+                                  updateCostMutation.mutate({ supplierId: row.supplierId, newCostPerKg: val });
                                 }
                               }
                               setInlineCostEditId(null);
@@ -1207,8 +1222,11 @@ export default function ProductionRawStock() {
                             data-testid={`text-cost-${row.supplierId || idx}`}
                             onClick={() => {
                               if (!row.supplierId) return;
+                              const initial = parseFloat(row.costPerKgUsd || row.costPerKg || "0").toFixed(4);
+                              inlineCostValueRef.current = initial;
+                              inlineCostFiredRef.current = false;
+                              setInlineCostEditValue(initial);
                               setInlineCostEditId(row.supplierId);
-                              setInlineCostEditValue(parseFloat(row.costPerKgUsd || row.costPerKg || "0").toFixed(4));
                             }}
                           >
                             ${parseFloat(row.costPerKgUsd || row.costPerKg).toFixed(4)}
