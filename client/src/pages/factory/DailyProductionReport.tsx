@@ -13,6 +13,7 @@ import {
   ChevronDown, ChevronRight, FlaskConical, PackageCheck, Scale,
   TrendingUp, TrendingDown, Minus, Tag,
 } from "lucide-react";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -296,6 +297,121 @@ function CategoryProductBreakdown({
   );
 }
 
+const PIE_COLORS = [
+  "#6366f1", // indigo   — Summer
+  "#22d3ee", // cyan     — Summer (Crème group)
+  "#f59e0b", // amber    — Winter
+  "#a78bfa", // violet   — Winter (Crème group)
+  "#34d399", // emerald  — Bags
+  "#fb923c", // orange   — Shoes
+  "#f472b6", // pink     — Toys
+  "#64748b", // slate    — Wipers/Garbage
+  "#94a3b8", // gray     — Other
+];
+
+const GROUP_ORDER = ["Summer 1–4", "Summer Crème / Big Size", "Winter 1–4", "Winter Crème", "Bags", "Shoes", "Toys", "Wipers & Garbage", "Other"];
+
+function classifyCategory(name: string): string {
+  const u = name.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (/ABO\s*SAMAR/.test(u)) return "__skip__";
+  if (/CREME|CRÈME|BIG\s*SIZE/.test(u)) {
+    if (/SUMMER/.test(u)) return "Summer Crème / Big Size";
+    if (/WINTER/.test(u)) return "Winter Crème";
+    return "Summer Crème / Big Size";
+  }
+  if (/SUMMER/.test(u)) return "Summer 1–4";
+  if (/WINTER/.test(u)) return "Winter 1–4";
+  if (/BAG/.test(u)) return "Bags";
+  if (/SHOE/.test(u)) return "Shoes";
+  if (/TOY/.test(u)) return "Toys";
+  return "Other";
+}
+
+function CategoryPieChart({
+  byCategory,
+  wipersGarbageKg,
+}: {
+  byCategory: { categoryName: string; totalWeightKg: number }[];
+  wipersGarbageKg: number;
+}) {
+  const grouped = useMemo(() => {
+    const acc: Record<string, number> = {};
+    for (const cat of byCategory) {
+      const group = classifyCategory(cat.categoryName);
+      if (group === "__skip__") continue;
+      acc[group] = (acc[group] ?? 0) + cat.totalWeightKg;
+    }
+    if (wipersGarbageKg > 0) {
+      acc["Wipers & Garbage"] = (acc["Wipers & Garbage"] ?? 0) + wipersGarbageKg;
+    }
+    return acc;
+  }, [byCategory, wipersGarbageKg]);
+
+  const slices = GROUP_ORDER
+    .filter((g) => (grouped[g] ?? 0) > 0)
+    .map((g, i) => ({ name: g, value: grouped[g] ?? 0, color: PIE_COLORS[GROUP_ORDER.indexOf(g) % PIE_COLORS.length] }));
+
+  const total = slices.reduce((s, x) => s + x.value, 0);
+  if (total === 0) return null;
+
+  return (
+    <Card data-testid="card-category-pie">
+      <CardHeader className="pb-2 pt-4 px-4">
+        <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+          <Tag className="h-3.5 w-3.5" />
+          Production by Group (kg)
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="px-4 pb-4">
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          {/* Legend on the left */}
+          <div className="flex flex-col gap-1.5 min-w-[200px] w-full sm:w-auto">
+            {slices.map((s) => {
+              const pct = ((s.value / total) * 100).toFixed(1);
+              return (
+                <div key={s.name} className="flex items-center gap-2">
+                  <span className="inline-block rounded-sm flex-shrink-0" style={{ width: 12, height: 12, background: s.color }} />
+                  <span className="text-xs text-muted-foreground flex-1 truncate">{s.name}</span>
+                  <span className="text-xs font-bold tabular-nums ml-1">{pct}%</span>
+                  <span className="text-xs text-muted-foreground tabular-nums w-20 text-right">
+                    {Math.round(s.value).toLocaleString()} kg
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Pie on the right */}
+          <div className="flex-1 flex justify-center items-center" style={{ minHeight: 220, minWidth: 220 }}>
+            <ResponsiveContainer width="100%" height={240}>
+              <PieChart>
+                <Pie
+                  data={slices}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={55}
+                  outerRadius={105}
+                  paddingAngle={2}
+                  dataKey="value"
+                  strokeWidth={0}
+                >
+                  {slices.map((s) => (
+                    <Cell key={s.name} fill={s.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(v: number) => [`${Math.round(v).toLocaleString()} kg`, ""]}
+                  contentStyle={{ fontSize: 12, borderRadius: 6 }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function DailyProductionReport() {
   const [preset, setPreset] = useState<Preset>("today");
   const [customFrom, setCustomFrom] = useState(todayStr());
@@ -575,6 +691,14 @@ export default function DailyProductionReport() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Category Pie Chart ── */}
+      {!isLoading && data && data.production.byCategory.length > 0 && (
+        <CategoryPieChart
+          byCategory={data.production.byCategory}
+          wipersGarbageKg={data.wipersGarbage.totalWeightKg}
+        />
+      )}
 
       {/* ── Expandable detail rows ── */}
 
