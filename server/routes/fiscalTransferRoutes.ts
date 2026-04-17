@@ -521,10 +521,15 @@ export function registerFiscalTransferRoutes(app: Express) {
       }
 
       const allResult = rows.map(r => {
-        const items = itemsByTransfer.get(r.transferId) || [];
-        const totalAmount = items.reduce((s, i) => s + parseFloat(i.totalAmount || "0"), 0);
+        const allItems = itemsByTransfer.get(r.transferId) || [];
+        // Destination-side POS users see all items; source-side see only their items
+        const isDestUser = posLocationIdList !== null && r.destinationLocationId === posLocationIdList;
+        const myItems = posLocationIdList !== null
+          ? (isDestUser ? allItems : allItems.filter(i => i.sourceLocationId === posLocationIdList))
+          : allItems;
+        const totalAmount = myItems.reduce((s, i) => s + parseFloat(i.totalAmount || "0"), 0);
         const stockItemNames = [...new Set(
-          items.map(i => stockItemMap.get(i.stockItemId) ?? "").filter(Boolean)
+          myItems.map(i => stockItemMap.get(i.stockItemId) ?? "").filter(Boolean)
         )];
         return {
           transferId:              r.transferId,
@@ -537,7 +542,7 @@ export function registerFiscalTransferRoutes(app: Express) {
           sourceLocationName:      r.sourceLocationId ? (locationMap.get(r.sourceLocationId) ?? "Multi-source") : "Multi-source",
           destinationLocationId:   r.destinationLocationId,
           destinationLocationName: locationMap.get(r.destinationLocationId) ?? "Unknown",
-          itemCount:               items.length,
+          itemCount:               myItems.length,
           totalAmount:             Math.round(totalAmount * 100) / 100,
           stockItemNames,
           createdAt:               r.createdAt,
@@ -1070,13 +1075,24 @@ export function registerFiscalTransferRoutes(app: Express) {
         .from(vouchers)
         .where(eq(vouchers.id, voucherId));
 
-      // POS users are the destination — show all items in the transfer
       const isPosUser = req.user?.role?.startsWith("POS");
+      const posLocationId = isPosUser
+        ? (req.user?.assignedLocationId ?? req.session?.currentLocationId ?? null)
+        : null;
 
-      const transferItems = await db
+      const allTransferItems = await db
         .select()
         .from(stockTransferItems)
         .where(eq(stockTransferItems.transferId, transferRow.id));
+
+      // Destination-side POS users see all items (they receive everything)
+      // Source-side POS users only see items from their own location
+      const isDestinationUser = posLocationId !== null && posLocationId === transferRow.destinationLocationId;
+      const transferItems = posLocationId
+        ? (isDestinationUser
+            ? allTransferItems
+            : allTransferItems.filter(i => i.sourceLocationId === posLocationId))
+        : allTransferItems;
 
       const stockItemIdSet = [...new Set(transferItems.map(i => i.stockItemId).filter(Boolean))] as number[];
       const stockItemRows = stockItemIdSet.length > 0
