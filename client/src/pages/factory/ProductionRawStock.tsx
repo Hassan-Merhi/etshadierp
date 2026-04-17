@@ -3371,7 +3371,7 @@ export default function ProductionRawStock() {
                   const dateStr = entry.date
                     ? new Date(entry.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                     : "—";
-                  const isEditingThis = historyEditTarget?.rawStockId === entry.rawStockId;
+                  const isEditingThis = historyEditTarget !== null && historyEditTarget.rawStockId === entry.rawStockId;
                   return (
                     <div
                       key={i}
