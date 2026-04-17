@@ -207,6 +207,7 @@ export function CreateMixBatchDialog({
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
+          txDate: batchDate || undefined,
           supplierSources: supplierSources.length > 0 ? supplierSources : undefined,
           batchSources: batchSources.length > 0 ? batchSources : undefined,
         }),
@@ -416,6 +417,22 @@ export function CreateMixBatchDialog({
                   data-testid="input-batch-date"
                 />
               </div>
+            </div>
+          )}
+
+          {/* Top-up: operation date */}
+          {mode === "topup" && (
+            <div className="space-y-2">
+              <Label>Operation Date</Label>
+              <Input
+                type="date"
+                value={batchDate}
+                onChange={(e) => setBatchDate(e.target.value)}
+                data-testid="input-topup-date"
+              />
+              <p className="text-xs text-muted-foreground">
+                The date this top-up is recorded on the daybook and supplier ledger.
+              </p>
             </div>
           )}
 

@@ -131,7 +131,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
           await writeDaybookEntry(db, {
             companyId,
-            txDate: getClientDate(req),
+            txDate: req.body.txDate || getClientDate(req),
             txType: "DOC_UPLOAD",
             referenceId: containerId,
             referenceTable: "containers",
@@ -176,7 +176,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       await writeDaybookEntry(db, {
         companyId: companyId || deleted.companyId,
-        txDate: getClientDate(req),
+        txDate: req.body?.txDate || getClientDate(req),
         txType: "DOC_DELETE",
         referenceId: containerId,
         referenceTable: "containers",
@@ -250,7 +250,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       await writeDaybookEntry(db, {
         companyId,
-        txDate: getClientDate(req),
+        txDate: req.body.txDate || getClientDate(req),
         txType: "FREIGHT_ADD",
         referenceId: containerId,
         referenceTable: "containers",
@@ -281,7 +281,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       await writeDaybookEntry(db, {
         companyId: companyId || deleted.companyId,
-        txDate: getClientDate(req),
+        txDate: req.body?.txDate || getClientDate(req),
         txType: "FREIGHT_DELETE",
         referenceId: containerId,
         referenceTable: "containers",
@@ -363,7 +363,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       await writeDaybookEntry(db, {
         companyId: companyId || deleted.companyId,
-        txDate: getClientDate(req),
+        txDate: req.body?.txDate || getClientDate(req),
         txType: "FREIGHT_PAYMENT_DELETE",
         referenceId: fr?.containerId,
         referenceTable: "containers",

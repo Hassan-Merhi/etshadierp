@@ -1463,7 +1463,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
         }
       }
 
-      const today = getClientDate(req);
+      const today = req.body.txDate || getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
@@ -1656,7 +1656,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
           })
           .returning();
 
-        const today = getClientDate(req);
+        const today = req.body.txDate || getClientDate(req);
         await writeDaybookEntry(tx, {
           companyId,
           txDate: today,

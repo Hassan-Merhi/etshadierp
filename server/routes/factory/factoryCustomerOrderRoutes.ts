@@ -909,7 +909,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         return { ...finalOrder, lines: finalLines, bales: finalBales, charges: finalCharges };
       });
 
-      const today = getClientDate(req);
+      const today = req.body.txDate || req.body.invoiceDate || getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
@@ -1529,7 +1529,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         // Daybook entry
         const [unfCustomer] = await tx.select({ legalName: customers.legalName })
           .from(customers).where(eq(customers.id, order.customerId));
-        const unfToday = getClientDate(req);
+        const unfToday = req.body.txDate || getClientDate(req);
         await writeDaybookEntry(tx, {
           companyId,
           txDate: unfToday,
@@ -1569,7 +1569,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       const [cancelCustomer] = await db.select({ legalName: customers.legalName })
         .from(customers).where(eq(customers.id, order.customerId));
-      const cancelToday = getClientDate(req);
+      const cancelToday = req.body.txDate || getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: cancelToday,
@@ -1609,7 +1609,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       }).returning();
 
       const [loadingCustomer] = await db.select({ legalName: customers.legalName }).from(customers).where(eq(customers.id, parseInt(customerId)));
-      const loadingToday = getClientDate(req);
+      const loadingToday = orderDate || getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: loadingToday,

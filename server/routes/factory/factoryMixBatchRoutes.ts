@@ -451,12 +451,12 @@ export function registerFactoryMixBatchRoutes(app: Express) {
           .delete(factoryMixBatchSources)
           .where(eq(factoryMixBatchSources.mixBatchId, id));
 
-        // 4. Delete daybook entries for this mix batch
+        // 4. Delete daybook entries for this mix batch (creation + any top-ups)
         await tx
           .delete(factoryDaybookEntries)
           .where(and(
             eq(factoryDaybookEntries.companyId, companyId),
-            eq(factoryDaybookEntries.txType, "MIX_BATCH_CREATED"),
+            inArray(factoryDaybookEntries.txType, ["MIX_BATCH_CREATED", "MIX_BATCH_TOPUP"]),
             eq(factoryDaybookEntries.referenceId, id)
           ));
 
@@ -744,7 +744,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid batch ID" });
 
-      const { supplierSources = [], sources = [], batchSources = [] } = req.body;
+      const { supplierSources = [], sources = [], batchSources = [], txDate } = req.body;
       const hasAnySources = supplierSources.length > 0 || sources.length > 0 || batchSources.length > 0;
       if (!hasAnySources) return res.status(400).json({ message: "At least one source is required" });
 
@@ -902,6 +902,17 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         }
 
         return updated;
+      });
+
+      const tuTxDate = txDate || getClientDate(req);
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: tuTxDate,
+        txType: "MIX_BATCH_TOPUP",
+        referenceId: result.id,
+        description: `Mix batch top-up: ${result.batchCode}${result.name ? ` – ${result.name}` : ""}`,
+        amountCurrency: parseFloat(result.totalCost || "0"),
+        amountUsd: parseFloat(result.totalCost || "0"),
       });
 
       res.json(result);

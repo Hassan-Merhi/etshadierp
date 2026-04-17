@@ -128,7 +128,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         return { pressingBatchId: pressingBatch.id, bales };
       });
 
-      const today = getClientDate(req);
+      const today = req.body.txDate || getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
@@ -226,7 +226,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         return { pressingBatchId: pressingBatch.id, bales };
       });
 
-      const today = getClientDate(req);
+      const today = req.body.txDate || getClientDate(req);
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
@@ -648,7 +648,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         };
       });
 
-      const today = getClientDate(req);
+      const today = req.body.txDate || getClientDate(req);
       const [finalizeLocation] = await db.select({ name: locations.name }).from(locations).where(eq(locations.id, erpLocationId));
       await writeDaybookEntry(db, {
         companyId,
@@ -1090,7 +1090,7 @@ export function registerFactoryBalesRoutes(app: Express) {
           return { count: createdBales.length, totalWeight };
         });
 
-        const today = getClientDate(req);
+        const today = req.body.txDate || getClientDate(req);
         await writeDaybookEntry(db, {
           companyId,
           txDate: today,
