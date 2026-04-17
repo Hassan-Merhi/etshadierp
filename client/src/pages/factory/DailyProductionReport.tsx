@@ -10,7 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  ChevronDown, ChevronRight, FlaskConical, PackageCheck, Trash2, Scale,
+  ChevronDown, ChevronRight, FlaskConical, PackageCheck, Scale,
   TrendingUp, TrendingDown, Minus, Tag,
 } from "lucide-react";
 
@@ -424,35 +424,39 @@ export default function DailyProductionReport() {
               </div>
 
               {/* Row 2 — weight breakdown */}
-              <div className="flex flex-wrap items-center gap-4 pt-1.5 border-t border-border">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-muted-foreground">Original Batches</span>
-                  <span className="text-xs font-semibold" data-testid="text-weight-batches">
-                    {fmtKg(data?.rawMaterial.totalWeightKg ?? 0)}
-                  </span>
-                </div>
-                <span className="text-muted-foreground text-xs">+</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-muted-foreground">Bales</span>
-                  <span className="text-xs font-semibold" data-testid="text-weight-bales">
-                    {fmtKg(data?.production.totalWeightKg ?? 0)}
-                  </span>
-                </div>
-                <span className="text-muted-foreground text-xs">+</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-muted-foreground">Wipers &amp; Garbage</span>
-                  <span className="text-xs font-semibold" data-testid="text-weight-wg">
-                    {fmtKg(data?.wipersGarbage.totalWeightKg ?? 0)}
-                  </span>
-                </div>
-                <span className="text-muted-foreground text-xs">=</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-muted-foreground">Total</span>
-                  <span className="text-xs font-bold" data-testid="text-weight-total">
-                    {fmtKg((data?.rawMaterial.totalWeightKg ?? 0) + (data?.production.totalWeightKg ?? 0) + (data?.wipersGarbage.totalWeightKg ?? 0))}
-                  </span>
-                </div>
-              </div>
+              {(() => {
+                const origKg = data?.rawMaterial.totalWeightKg ?? 0;
+                const productionsKg = (data?.production.totalWeightKg ?? 0) + (data?.wipersGarbage.totalWeightKg ?? 0);
+                const balanceKg = origKg - productionsKg;
+                const isPositive = balanceKg >= 0;
+                return (
+                  <div className="flex flex-wrap items-center gap-5 pt-2 border-t border-border">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-muted-foreground">Original Batches</span>
+                      <span className="text-base font-bold" data-testid="text-weight-batches">
+                        {fmtKg(origKg)}
+                      </span>
+                    </div>
+                    <span className="text-muted-foreground text-base font-semibold">&#8722;</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-muted-foreground">Productions</span>
+                      <span className="text-base font-bold" data-testid="text-weight-productions">
+                        {fmtKg(productionsKg)}
+                      </span>
+                    </div>
+                    <span className="text-muted-foreground text-base font-semibold">=</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-muted-foreground">Total</span>
+                      <span
+                        className={`text-base font-bold ${isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+                        data-testid="text-weight-total"
+                      >
+                        {fmtKg(balanceKg)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </CardContent>
@@ -488,52 +492,26 @@ export default function DailyProductionReport() {
           </CardContent>
         </Card>
 
-        {/* 2 — Bales Produced */}
+        {/* 2 — Productions (Bales + Wipers & Garbage) */}
         <Card
           className="border-blue-200 dark:border-blue-800/50 bg-blue-50/60 dark:bg-blue-950/20"
-          data-testid="card-bales-produced"
+          data-testid="card-productions"
         >
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase tracking-wide text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
               <PackageCheck className="h-3.5 w-3.5" />
-              Bales Produced
+              Productions
             </CardTitle>
             {!isLoading && data && (
               <Badge variant="secondary" className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 no-default-active-elevate">
-                QNTY
+                {data.production.totalBales} {data.production.totalBales === 1 ? "bale" : "bales"}
               </Badge>
             )}
           </CardHeader>
           <CardContent className="pt-0 space-y-0.5">
             {isLoading ? <SkeletonBox /> : (
               <>
-                <StatRow label="# Bales" value={String(data?.production.totalBales ?? 0)} />
-                <StatRow label="Weight" value={fmtKg(data?.production.totalWeightKg ?? 0)} />
-                <StatRow label="Value" value={fmtMoney(data?.production.totalValue ?? 0)} />
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* 3 — Wipers & Garbage */}
-        <Card
-          className="border-rose-200 dark:border-rose-800/50 bg-rose-50/60 dark:bg-rose-950/20"
-          data-testid="card-wipers-garbage"
-        >
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-wide text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
-              <Trash2 className="h-3.5 w-3.5" />
-              Wipers &amp; Garbage
-            </CardTitle>
-            {!isLoading && data && (
-              <Badge variant="secondary" className="text-xs bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 no-default-active-elevate">
-                QNTY
-              </Badge>
-            )}
-          </CardHeader>
-          <CardContent className="pt-0 space-y-0.5">
-            {isLoading ? <SkeletonBox /> : (
-              <>
+                <StatRow label="Bales Weight" value={fmtKg(data?.production.totalWeightKg ?? 0)} />
                 <div className="flex items-center justify-between py-1">
                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Wipers</span>
                   <span className="text-sm font-bold">
@@ -548,7 +526,10 @@ export default function DailyProductionReport() {
                     <span className="text-xs font-normal text-muted-foreground ml-1">{fmtKg(data?.wipersGarbage.totalGarbageKg ?? 0)}</span>
                   </span>
                 </div>
-                <StatRow label="Value" value={fmtMoney(data?.wipersGarbage.totalValue ?? 0)} />
+                <div className="border-t border-blue-200 dark:border-blue-800/40 pt-1 mt-1">
+                  <StatRow label="Total Weight" value={fmtKg((data?.production.totalWeightKg ?? 0) + (data?.wipersGarbage.totalWeightKg ?? 0))} />
+                  <StatRow label="Total Value" value={fmtMoney((data?.production.totalValue ?? 0) + (data?.wipersGarbage.totalValue ?? 0))} />
+                </div>
               </>
             )}
           </CardContent>
