@@ -52,6 +52,8 @@ interface CustomerOrder {
   totalQtyBales: number;
   totalWeightKg: string;
   customerName: string;
+  containerNumber?: string | null;
+  proformaName?: string | null;
 }
 
 export default function FactoryInvoices() {
@@ -201,6 +203,8 @@ export default function FactoryInvoices() {
               <TableRow>
                 <TableHead>Invoice #</TableHead>
                 <TableHead>Customer</TableHead>
+                <TableHead>Proforma</TableHead>
+                <TableHead>Container</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Total Bales</TableHead>
@@ -212,7 +216,7 @@ export default function FactoryInvoices() {
             <TableBody>
               {orders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8" data-testid="text-no-orders">
+                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8" data-testid="text-no-orders">
                     No invoices found
                   </TableCell>
                 </TableRow>
@@ -229,6 +233,12 @@ export default function FactoryInvoices() {
                     </TableCell>
                     <TableCell data-testid={`text-customer-name-${order.id}`}>
                       {order.customerName}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground" data-testid={`text-proforma-${order.id}`}>
+                      {order.proformaName || <span className="text-muted-foreground/50">—</span>}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm" data-testid={`text-container-${order.id}`}>
+                      {order.containerNumber || <span className="text-muted-foreground/50">—</span>}
                     </TableCell>
                     <TableCell className="font-mono text-sm" data-testid={`text-order-date-${order.id}`}>
                       {order.orderDate ? formatDisplayDate(order.orderDate) : "-"}
