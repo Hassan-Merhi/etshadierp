@@ -483,6 +483,16 @@ export function registerFiscalTransferRoutes(app: Express) {
         ? (req.user?.assignedLocationId ?? req.session?.currentLocationId ?? null)
         : null;
 
+      console.log("[stock-transfers/list] debug:", {
+        role: req.user?.role,
+        isPosUserList,
+        assignedLocationId: req.user?.assignedLocationId,
+        currentLocationId: req.session?.currentLocationId,
+        posLocationIdList,
+        totalRows: rows.length,
+        destinationIds: rows.map(r => r.destinationLocationId),
+      });
+
       // Batch-fetch item counts and totals per transfer
       const transferIds = rows.map(r => r.transferId);
       const itemRows = await db
