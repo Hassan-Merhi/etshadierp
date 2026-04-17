@@ -183,6 +183,119 @@ function ExpandableCard({
   );
 }
 
+function CategoryProductBreakdown({
+  categories,
+  products,
+  totalBales,
+  totalWeightKg,
+  totalValue,
+}: {
+  categories: { categoryName: string; qty: number; totalWeightKg: number; totalValue: number }[];
+  products: { articleCode: string; productName: string; categoryName: string; qty: number; totalWeightKg: number; sellingPricePerBale: number; totalValue: number }[];
+  totalBales: number;
+  totalWeightKg: number;
+  totalValue: number;
+}) {
+  const [openCats, setOpenCats] = useState<Set<string>>(new Set());
+
+  function toggle(cat: string) {
+    setOpenCats((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  }
+
+  const productsByCategory = useMemo(() => {
+    const map = new Map<string, typeof products>();
+    for (const p of products) {
+      const key = p.categoryName;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(p);
+    }
+    return map;
+  }, [products]);
+
+  return (
+    <div className="space-y-1">
+      {/* Header row */}
+      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-2 pb-1 border-b">
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category</span>
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide text-right w-16">Qty</span>
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide text-right w-24">Weight</span>
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide text-right w-24">Value</span>
+      </div>
+
+      {categories.map((cat) => {
+        const isOpen = openCats.has(cat.categoryName);
+        const catProducts = productsByCategory.get(cat.categoryName) ?? [];
+        return (
+          <div key={cat.categoryName} data-testid={`section-category-${cat.categoryName.replace(/\s+/g, "-").toLowerCase()}`}>
+            {/* Category row — clickable */}
+            <button
+              className="w-full grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-2 py-2 rounded-md hover-elevate text-left items-center"
+              onClick={() => toggle(cat.categoryName)}
+            >
+              <span className="flex items-center gap-1.5 font-medium text-sm">
+                {isOpen
+                  ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                {cat.categoryName}
+                <Badge variant="secondary" className="text-xs ml-1 no-default-active-elevate">
+                  {catProducts.length} products
+                </Badge>
+              </span>
+              <span className="text-sm font-mono text-right w-16">{cat.qty.toLocaleString()}</span>
+              <span className="text-sm font-mono text-right w-24">{fmtKg(cat.totalWeightKg)}</span>
+              <span className="text-sm font-mono font-semibold text-right w-24">{fmtMoney(cat.totalValue)}</span>
+            </button>
+
+            {/* Products sub-table */}
+            {isOpen && catProducts.length > 0 && (
+              <div className="ml-6 mb-2 overflow-x-auto border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">Article Code</TableHead>
+                      <TableHead className="text-xs">Product</TableHead>
+                      <TableHead className="text-xs text-right">Qty</TableHead>
+                      <TableHead className="text-xs text-right">Weight</TableHead>
+                      <TableHead className="text-xs text-right">Price / Bale</TableHead>
+                      <TableHead className="text-xs text-right">Value</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {catProducts.map((p) => (
+                      <TableRow key={p.articleCode} data-testid={`row-product-${p.articleCode}`}>
+                        <TableCell className="text-xs font-mono py-1.5">{p.articleCode}</TableCell>
+                        <TableCell className="text-xs py-1.5">{p.productName}</TableCell>
+                        <TableCell className="text-xs text-right font-mono py-1.5">{p.qty.toLocaleString()}</TableCell>
+                        <TableCell className="text-xs text-right font-mono py-1.5">{fmtKg(p.totalWeightKg)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono py-1.5">{fmtMoney(p.sellingPricePerBale)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono font-semibold py-1.5">{fmtMoney(p.totalValue)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Totals footer */}
+      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-2 pt-2 border-t">
+        <span className="text-sm font-semibold text-muted-foreground">Totals</span>
+        <span className="text-sm font-mono font-bold text-right w-16">{totalBales.toLocaleString()}</span>
+        <span className="text-sm font-mono font-bold text-right w-24">{fmtKg(totalWeightKg)}</span>
+        <span className="text-sm font-mono font-bold text-right w-24">{fmtMoney(totalValue)}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function DailyProductionReport() {
   const [preset, setPreset] = useState<Preset>("today");
   const [customFrom, setCustomFrom] = useState(todayStr());
@@ -450,100 +563,25 @@ export default function DailyProductionReport() {
 
       {/* ── Expandable detail rows ── */}
 
-      {/* Production by Category */}
+      {/* Production by Category (each category expands to show its products) */}
       <ExpandableCard
         title="Production by Category"
-        badge={isLoading ? undefined : `${data?.production.byCategory.length ?? 0} categories`}
+        badge={isLoading ? undefined : `${data?.production.byCategory.length ?? 0} categories · ${data?.production.byProduct.length ?? 0} products`}
         icon={Tag}
         testId="card-category-breakdown"
       >
         {isLoading ? (
-          <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
+          <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
         ) : !data || data.production.byCategory.length === 0 ? (
           <p className="text-center text-muted-foreground py-6 text-sm">No bales produced in this period</p>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Qty (Bales)</TableHead>
-                  <TableHead className="text-right">Total Weight</TableHead>
-                  <TableHead className="text-right">Total Value</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.production.byCategory.map((row) => (
-                  <TableRow key={row.categoryName} data-testid={`row-category-${row.categoryName.replace(/\s+/g, "-").toLowerCase()}`}>
-                    <TableCell className="font-medium">{row.categoryName}</TableCell>
-                    <TableCell className="text-right font-mono">{row.qty.toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">{fmtKg(row.totalWeightKg)}</TableCell>
-                    <TableCell className="text-right font-mono font-semibold">{fmtMoney(row.totalValue)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              <tfoot>
-                <tr className="border-t-2">
-                  <td className="px-4 py-2 text-sm font-semibold text-muted-foreground">Totals</td>
-                  <td className="px-4 py-2 text-right font-mono font-bold">{(data?.production.totalBales ?? 0).toLocaleString()}</td>
-                  <td className="px-4 py-2 text-right font-mono font-bold text-sm">{fmtKg(data?.production.totalWeightKg ?? 0)}</td>
-                  <td className="px-4 py-2 text-right font-mono font-bold">{fmtMoney(data?.production.totalValue ?? 0)}</td>
-                </tr>
-              </tfoot>
-            </Table>
-          </div>
-        )}
-      </ExpandableCard>
-
-      {/* Production by Product */}
-      <ExpandableCard
-        title="Production by Product"
-        badge={isLoading ? undefined : `${data?.production.byProduct.length ?? 0} products`}
-        icon={PackageCheck}
-        testId="card-product-breakdown"
-      >
-        {isLoading ? (
-          <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
-        ) : !data || data.production.byProduct.length === 0 ? (
-          <p className="text-center text-muted-foreground py-6 text-sm">No bales produced in this period</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Article Code</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Qty (Bales)</TableHead>
-                  <TableHead className="text-right">Total Weight</TableHead>
-                  <TableHead className="text-right">Price / Bale</TableHead>
-                  <TableHead className="text-right">Total Value</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.production.byProduct.map((row) => (
-                  <TableRow key={row.articleCode} data-testid={`row-product-${row.articleCode}`}>
-                    <TableCell className="font-mono text-sm">{row.articleCode}</TableCell>
-                    <TableCell className="text-sm">{row.productName}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{row.categoryName}</TableCell>
-                    <TableCell className="text-right font-mono">{row.qty.toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">{fmtKg(row.totalWeightKg)}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">{fmtMoney(row.sellingPricePerBale)}</TableCell>
-                    <TableCell className="text-right font-mono font-semibold">{fmtMoney(row.totalValue)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              <tfoot>
-                <tr className="border-t-2">
-                  <td colSpan={3} className="px-4 py-2 text-sm font-semibold text-muted-foreground">Totals</td>
-                  <td className="px-4 py-2 text-right font-mono font-bold">{(data?.production.totalBales ?? 0).toLocaleString()}</td>
-                  <td className="px-4 py-2 text-right font-mono font-bold text-sm">{fmtKg(data?.production.totalWeightKg ?? 0)}</td>
-                  <td />
-                  <td className="px-4 py-2 text-right font-mono font-bold">{fmtMoney(data?.production.totalValue ?? 0)}</td>
-                </tr>
-              </tfoot>
-            </Table>
-          </div>
+          <CategoryProductBreakdown
+            categories={data.production.byCategory}
+            products={data.production.byProduct}
+            totalBales={data.production.totalBales}
+            totalWeightKg={data.production.totalWeightKg}
+            totalValue={data.production.totalValue}
+          />
         )}
       </ExpandableCard>
 
