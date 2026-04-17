@@ -327,6 +327,76 @@ function classifyCategory(name: string): string {
   return "Other";
 }
 
+// ── Chart #1: detailed breakdown per sub-type ──────────────────────────────
+const DETAILED_ORDER = [
+  "Summer 1","Summer 2","Summer 3","Summer 4","Summer Crème",
+  "Winter 1","Winter 2","Winter 3","Winter 4","Winter Crème",
+  "Bags 1","Bags 2","Bags 3","Bags 4","Bags Crème",
+  "Toys 1","Toys 2","Toys 3","Toys 4","Toys Crème",
+  "Shoes 1","Shoes 2","Shoes 3","Shoes 4","Shoes Crème",
+  "Wipers 1","Wipers 2","Wipers 3","Wipers 4","Wipers Crème",
+  "Other",
+];
+const DETAILED_COLORS: Record<string, string> = {
+  "Summer 1":"#312e81","Summer 2":"#4338ca","Summer 3":"#6366f1","Summer 4":"#818cf8","Summer Crème":"#a5b4fc",
+  "Winter 1":"#92400e","Winter 2":"#b45309","Winter 3":"#d97706","Winter 4":"#f59e0b","Winter Crème":"#fcd34d",
+  "Bags 1":"#064e3b","Bags 2":"#047857","Bags 3":"#059669","Bags 4":"#34d399","Bags Crème":"#6ee7b7",
+  "Toys 1":"#831843","Toys 2":"#9d174d","Toys 3":"#db2777","Toys 4":"#ec4899","Toys Crème":"#f9a8d4",
+  "Shoes 1":"#4c1d95","Shoes 2":"#5b21b6","Shoes 3":"#7c3aed","Shoes 4":"#8b5cf6","Shoes Crème":"#c4b5fd",
+  "Wipers 1":"#0f172a","Wipers 2":"#1e293b","Wipers 3":"#334155","Wipers 4":"#64748b","Wipers Crème":"#94a3b8",
+  "Other":"#d1d5db",
+};
+
+function classifyDetailed(name: string): string {
+  const u = name.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (/ABO\s*SAMAR/.test(u)) return "__skip__";
+  let cat = "Other";
+  if (/SUMMER/.test(u)) cat = "Summer";
+  else if (/WINTER/.test(u)) cat = "Winter";
+  else if (/BAG/.test(u)) cat = "Bags";
+  else if (/TOY/.test(u)) cat = "Toys";
+  else if (/SHOE/.test(u)) cat = "Shoes";
+  else if (/WIPER|GARBAGE|RAG/.test(u)) cat = "Wipers";
+  else return "Other";
+
+  if (/CREME|CRÈME|BIG\s*SIZE/.test(u)) return `${cat} Crème`;
+  if (/\b4\b/.test(u)) return `${cat} 4`;
+  if (/\b3\b/.test(u)) return `${cat} 3`;
+  if (/\b2\b/.test(u)) return `${cat} 2`;
+  if (/\b1\b/.test(u)) return `${cat} 1`;
+  return cat === "Other" ? "Other" : `${cat} 1`;
+}
+
+// ── Chart #2: by grade (Summer+Winter merged into grade numbers) ────────────
+const GRADE_ORDER = ["Grade #1","Grade #2","Grade #3","Grade #4","Grade Crème","Bags","Toys","Shoes","Wipers","Other"];
+const GRADE_COLORS: Record<string, string> = {
+  "Grade #1":"#4338ca",
+  "Grade #2":"#d97706",
+  "Grade #3":"#0891b2",
+  "Grade #4":"#7c3aed",
+  "Grade Crème":"#a78bfa",
+  "Bags":"#059669",
+  "Toys":"#db2777",
+  "Shoes":"#ea580c",
+  "Wipers":"#64748b",
+  "Other":"#d1d5db",
+};
+
+function classifyByGrade(name: string): string {
+  const u = name.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (/ABO\s*SAMAR/.test(u)) return "__skip__";
+  if (/BAG/.test(u)) return "Bags";
+  if (/TOY/.test(u)) return "Toys";
+  if (/SHOE/.test(u)) return "Shoes";
+  if (/WIPER|GARBAGE|RAG/.test(u)) return "Wipers";
+  if (/CREME|CRÈME|BIG\s*SIZE/.test(u)) return "Grade Crème";
+  if (/\b4\b/.test(u)) return "Grade #4";
+  if (/\b3\b/.test(u)) return "Grade #3";
+  if (/\b2\b/.test(u)) return "Grade #2";
+  if (/\b1\b/.test(u)) return "Grade #1";
+  return "Other";
+}
+
 function CategoryPieChart({
   byCategory,
   wipersGarbageKg,
@@ -397,6 +467,73 @@ function CategoryPieChart({
             />
           </PieChart>
         </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+// ── Shared mini-pie renderer used by both new charts ──────────────────────
+function MiniPieChart({
+  title,
+  allRows,
+  classifyFn,
+  order,
+  colors,
+  testId,
+}: {
+  title: string;
+  allRows: { categoryName: string; totalWeightKg: number }[];
+  classifyFn: (name: string) => string;
+  order: string[];
+  colors: Record<string, string>;
+  testId: string;
+}) {
+  const grouped = useMemo(() => {
+    const acc: Record<string, number> = {};
+    for (const row of allRows) {
+      const group = classifyFn(row.categoryName);
+      if (group === "__skip__") continue;
+      acc[group] = (acc[group] ?? 0) + row.totalWeightKg;
+    }
+    return acc;
+  }, [allRows, classifyFn]);
+
+  const slices = order
+    .filter((g) => (grouped[g] ?? 0) > 0)
+    .map((g) => ({ name: g, value: grouped[g]!, color: colors[g] ?? "#94a3b8" }));
+
+  const total = slices.reduce((s, x) => s + x.value, 0);
+  if (total === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-2" data-testid={testId}>
+      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</span>
+      <div className="flex items-start gap-3">
+        {/* Legend */}
+        <div className="flex flex-col gap-1 min-w-0">
+          {slices.map((s) => {
+            const pct = ((s.value / total) * 100).toFixed(1);
+            return (
+              <div key={s.name} className="flex items-center gap-1.5">
+                <span className="inline-block rounded-sm flex-shrink-0" style={{ width: 9, height: 9, background: s.color }} />
+                <span className="text-xs text-muted-foreground whitespace-nowrap">{s.name}</span>
+                <span className="text-xs font-bold tabular-nums">{pct}%</span>
+                <span className="text-xs text-muted-foreground tabular-nums">{Math.round(s.value).toLocaleString()} kg</span>
+              </div>
+            );
+          })}
+        </div>
+        {/* Donut */}
+        <div style={{ width: 140, height: 140, flexShrink: 0 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={slices} cx="50%" cy="50%" innerRadius={38} outerRadius={62} paddingAngle={2} dataKey="value" strokeWidth={0}>
+                {slices.map((s) => <Cell key={s.name} fill={s.color} />)}
+              </Pie>
+              <Tooltip formatter={(v: number) => [`${Math.round(v).toLocaleString()} kg`, ""]} contentStyle={{ fontSize: 11, borderRadius: 6 }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );
@@ -491,6 +628,36 @@ export default function DailyProductionReport() {
           />
         )}
       </div>
+
+      {/* ── Chart #1 & Chart #2 row ── */}
+      {!isLoading && data && (() => {
+        const allRows: { categoryName: string; totalWeightKg: number }[] = [
+          ...data.production.byCategory.map(c => ({ categoryName: c.categoryName, totalWeightKg: c.totalWeightKg })),
+          ...data.wipersGarbage.rows.map(r => ({ categoryName: r.categoryName, totalWeightKg: r.totalWeightKg })),
+        ];
+        const hasData = allRows.some(r => r.totalWeightKg > 0);
+        if (!hasData) return null;
+        return (
+          <div className="flex flex-wrap gap-6">
+            <MiniPieChart
+              title="Chart #1 — By Sub-Type"
+              allRows={allRows}
+              classifyFn={classifyDetailed}
+              order={DETAILED_ORDER}
+              colors={DETAILED_COLORS}
+              testId="card-detailed-pie"
+            />
+            <MiniPieChart
+              title="Chart #2 — By Grade"
+              allRows={allRows}
+              classifyFn={classifyByGrade}
+              order={GRADE_ORDER}
+              colors={GRADE_COLORS}
+              testId="card-grade-pie"
+            />
+          </div>
+        );
+      })()}
 
       {/* ── Top Summary Bar ── */}
       <Card data-testid="card-summary-bar">
