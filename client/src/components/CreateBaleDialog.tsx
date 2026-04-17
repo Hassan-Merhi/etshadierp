@@ -41,6 +41,7 @@ const formSchema = z.object({
   mixBatchId: z.string().min(1, "Please select a mix batch"),
   productId: z.string().min(1, "Please select a product"),
   locationId: z.string().min(1, "Please select a location"),
+  pressDate: z.string().min(1, "Please select a date"),
   quantity: z.string().refine((val) => {
     const num = parseInt(val);
     return !isNaN(num) && num > 0 && num <= 1000;
@@ -319,6 +320,7 @@ export function CreateBaleDialog({
       mixBatchId: "",
       productId: "",
       locationId: "",
+      pressDate: new Date().toLocaleDateString("en-CA"),
       quantity: "100",
       weightPerBale: "25",
     },
@@ -337,6 +339,7 @@ export function CreateBaleDialog({
         locationId: parseInt(data.locationId),
         quantity: data.quantity,
         weightPerBale: data.weightPerBale,
+        txDate: data.pressDate,
       };
 
       const response = await factoryApiRequest("POST", "/api/factory/bales/create-batch", baleData);
@@ -544,6 +547,24 @@ export function CreateBaleDialog({
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="pressDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Pressing Date *</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="date"
+                        data-testid="input-press-date"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

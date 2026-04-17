@@ -89,6 +89,7 @@ export default function PressingBales() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [scanInput, setScanInput] = useState("");
   const [scanError, setScanError] = useState("");
+  const [pressDate, setPressDate] = useState(new Date().toLocaleDateString("en-CA"));
   const scanRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -240,7 +241,7 @@ export default function PressingBales() {
         weightPerBale: item.weightPerBaleKg.toString(),
       }));
 
-      const response = await apiRequest("POST", "/api/factory/pressing/create-multi", { items });
+      const response = await apiRequest("POST", "/api/factory/pressing/create-multi", { items, txDate: pressDate });
 
       if (!response.ok) {
         const err = await response.json();
@@ -446,6 +447,19 @@ export default function PressingBales() {
                 <div className="text-sm text-muted-foreground">Total Weight</div>
                 <div className="text-2xl font-bold" data-testid="text-total-weight">{formatNumber(totalKgToConsume)} kg</div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-4 space-y-1">
+              <label className="text-sm font-medium">Press Date</label>
+              <input
+                type="date"
+                value={pressDate}
+                onChange={(e) => setPressDate(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                data-testid="input-press-date"
+              />
             </CardContent>
           </Card>
 

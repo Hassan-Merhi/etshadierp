@@ -118,6 +118,7 @@ export default function FactoryContainerLoadingScan() {
   const [pendingBypassBaleRef, setPendingBypassBaleRef] = useState<string | null>(null);
   const [pendingBypassOverloadRef, setPendingBypassOverloadRef] = useState<string | null>(null);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
+  const [finalizeDate, setFinalizeDate] = useState(new Date().toLocaleDateString("en-CA"));
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">("detailed");
   const [lastScannedRef, setLastScannedRef] = useState<{ baleReference: string; baleName: string; articleCode: string } | null>(null);
@@ -409,10 +410,11 @@ export default function FactoryContainerLoadingScan() {
   });
 
   const finalizeMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (txDate?: string) => {
       await modeApiRequest(
         "POST",
         `/api/factory/customer-orders/${orderId}/finalize-loading`,
+        { txDate },
       );
     },
     onSuccess: () => {
@@ -1599,6 +1601,16 @@ export default function FactoryContainerLoadingScan() {
                 </div>
               </>
             )}
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Loading Date</label>
+              <input
+                type="date"
+                value={finalizeDate}
+                onChange={(e) => setFinalizeDate(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                data-testid="input-finalize-date"
+              />
+            </div>
             <div className="flex items-center justify-end gap-2">
               <Button
                 variant="outline"
@@ -1608,7 +1620,7 @@ export default function FactoryContainerLoadingScan() {
                 Cancel
               </Button>
               <Button
-                onClick={() => finalizeMutation.mutate()}
+                onClick={() => finalizeMutation.mutate(finalizeDate)}
                 disabled={finalizeMutation.isPending}
                 data-testid="button-confirm-finalize"
               >

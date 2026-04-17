@@ -1646,7 +1646,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       }).where(eq(customerOrders.id, orderId)).returning();
 
       const [lsCustomer] = await db.select({ legalName: customers.legalName }).from(customers).where(eq(customers.id, order.customerId));
-      const lsToday = getClientDate(req);
+      const lsToday = req.body?.txDate || getClientDate(req);
       const lsTotalValue = bales.reduce((s: number, b: any) => s + parseFloat(b.priceUsed || "0"), 0);
       await writeDaybookEntry(db, {
         companyId,

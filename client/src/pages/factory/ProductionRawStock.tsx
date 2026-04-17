@@ -326,6 +326,7 @@ export default function ProductionRawStock() {
   const [confirmDutyContainerId, setConfirmDutyContainerId] = useState<number | null>(null);
   const [confirmDutyAmount, setConfirmDutyAmount] = useState("");
   const [confirmDutyNotes, setConfirmDutyNotes] = useState("");
+  const [confirmDutyDate, setConfirmDutyDate] = useState(new Date().toLocaleDateString("en-CA"));
   const [obDialogOpen, setObDialogOpen] = useState(false);
   const [obSupplierName, setObSupplierName] = useState("");
   const [obSupplierId, setObSupplierId] = useState<number | null>(null);
@@ -339,6 +340,7 @@ export default function ProductionRawStock() {
   const [obCommissionAmount, setObCommissionAmount] = useState("");
   const [obCommissionCurrency, setObCommissionCurrency] = useState("USD");
   const [obCommissionFxRate, setObCommissionFxRate] = useState("1");
+  const [obTxDate, setObTxDate] = useState(new Date().toLocaleDateString("en-CA"));
   // Assign OB stock to bales
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assigningRawStock, setAssigningRawStock] = useState<{ rawStockId: number; supplierName: string; availableKg: number; costPerKg: string } | null>(null);
@@ -889,10 +891,11 @@ export default function ProductionRawStock() {
   };
 
   const confirmDutyMutation = useMutation({
-    mutationFn: async (data: { containerId: number; dutyAmount: string; dutyNotes: string }) => {
+    mutationFn: async (data: { containerId: number; dutyAmount: string; dutyNotes: string; txDate?: string }) => {
       const response = await modeApiRequest("PATCH", `/api/factory/containers/${data.containerId}/confirm-duty`, {
         dutyAmount: data.dutyAmount,
         dutyNotes: data.dutyNotes,
+        txDate: data.txDate,
       });
       if (!response.ok) {
         const err = await response.json();
@@ -908,6 +911,7 @@ export default function ProductionRawStock() {
       setConfirmDutyContainerId(null);
       setConfirmDutyAmount("");
       setConfirmDutyNotes("");
+      setConfirmDutyDate(new Date().toLocaleDateString("en-CA"));
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -957,6 +961,7 @@ export default function ProductionRawStock() {
     setObCommissionAmount("");
     setObCommissionCurrency("USD");
     setObCommissionFxRate("1");
+    setObTxDate(new Date().toLocaleDateString("en-CA"));
   };
 
 
@@ -983,6 +988,7 @@ export default function ProductionRawStock() {
       currencyCode: obCurrency,
       fxRateToUsd: obFxRate,
       notes: obNotes || undefined,
+      txDate: obTxDate || undefined,
       ...(commAmt > 0 ? {
         commissionAmount: obCommissionAmount,
         commissionCurrencyCode: obCommissionCurrency,
@@ -2378,6 +2384,16 @@ export default function ProductionRawStock() {
               )}
             </div>
 
+            <div className="space-y-2">
+              <Label>Operation Date</Label>
+              <Input
+                type="date"
+                value={obTxDate}
+                onChange={(e) => setObTxDate(e.target.value)}
+                data-testid="input-ob-date"
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Weight (KG)</Label>
@@ -2553,6 +2569,7 @@ export default function ProductionRawStock() {
           setConfirmDutyContainerId(null);
           setConfirmDutyAmount("");
           setConfirmDutyNotes("");
+          setConfirmDutyDate(new Date().toLocaleDateString("en-CA"));
         }
       }}>
         <DialogContent className="max-w-sm">
@@ -2566,6 +2583,15 @@ export default function ProductionRawStock() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="space-y-1">
+              <Label>Operation Date</Label>
+              <Input
+                type="date"
+                value={confirmDutyDate}
+                onChange={(e) => setConfirmDutyDate(e.target.value)}
+                data-testid="input-confirm-duty-date"
+              />
+            </div>
             <div className="space-y-1">
               <Label>Duty Amount ($)</Label>
               <Input
@@ -2598,6 +2624,7 @@ export default function ProductionRawStock() {
                       containerId: confirmDutyContainerId,
                       dutyAmount: confirmDutyAmount,
                       dutyNotes: confirmDutyNotes,
+                      txDate: confirmDutyDate,
                     });
                   }
                 }}

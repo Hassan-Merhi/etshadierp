@@ -133,6 +133,7 @@ export default function FactoryPendingInvoiceVerify() {
   const [finalizePreview, setFinalizePreview] = useState<FinalizePreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [showFixBalesDialog, setShowFixBalesDialog] = useState(false);
+  const [invoiceDate, setInvoiceDate] = useState(new Date().toLocaleDateString("en-CA"));
 
   const { data: verification, isLoading: verificationLoading } = useQuery<VerificationSummary>({
     queryKey: ["/api/factory/customer-orders", orderId, "verification"],
@@ -249,8 +250,8 @@ export default function FactoryPendingInvoiceVerify() {
   });
 
   const finalizeMutation = useMutation({
-    mutationFn: async () => {
-      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/finalize`);
+    mutationFn: async (txDate?: string) => {
+      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/finalize`, { txDate });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
@@ -885,21 +886,32 @@ export default function FactoryPendingInvoiceVerify() {
                 </p>
               )}
 
-              <div className="flex items-center justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowFinalizePreview(false)} data-testid="button-cancel-finalize">
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => {
-                    setShowFinalizePreview(false);
-                    finalizeMutation.mutate();
-                  }}
-                  disabled={finalizeMutation.isPending}
-                  data-testid="button-confirm-finalize"
-                >
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Confirm & Finalize
-                </Button>
+              <div className="space-y-3 pt-1">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Invoice Date</label>
+                  <Input
+                    type="date"
+                    value={invoiceDate}
+                    onChange={(e) => setInvoiceDate(e.target.value)}
+                    data-testid="input-invoice-date"
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <Button variant="outline" onClick={() => setShowFinalizePreview(false)} data-testid="button-cancel-finalize">
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setShowFinalizePreview(false);
+                      finalizeMutation.mutate(invoiceDate);
+                    }}
+                    disabled={finalizeMutation.isPending}
+                    data-testid="button-confirm-finalize"
+                  >
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Confirm & Finalize
+                  </Button>
+                </div>
               </div>
             </div>
           )}
