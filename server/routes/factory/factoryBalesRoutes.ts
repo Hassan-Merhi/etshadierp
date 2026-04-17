@@ -1020,7 +1020,7 @@ export function registerFactoryBalesRoutes(app: Express) {
           const stockItemCache = new Map<string, number>();
 
           for (const bale of createdBales) {
-            if (bale.status === "REMOVED") continue;
+            if (bale.status === "REMOVED" || bale.status === "DELETED") continue;
 
             const itemCode: string = bale.articleCode || bale.baleCode;
             if (!itemCode) continue;
@@ -1296,7 +1296,7 @@ export function registerFactoryBalesRoutes(app: Express) {
       if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: "ids must be a non-empty array" });
       if (!status || typeof status !== "string") return res.status(400).json({ message: "status is required" });
 
-      const ALLOWED = ["PENDING_PRESSING","LABEL_PRINTED","PRESSED","FINALIZED","IN_STOCK","RESERVED","RESERVED_FOR_ORDER","SOLD","REPACKED","REMOVED"];
+      const ALLOWED = ["PENDING_PRESSING","LABEL_PRINTED","PRESSED","FINALIZED","IN_STOCK","RESERVED","RESERVED_FOR_ORDER","SOLD","REPACKED","REMOVED","DELETED"];
       if (!ALLOWED.includes(status)) return res.status(400).json({ message: `Invalid status. Allowed: ${ALLOWED.join(", ")}` });
 
       const result = await db
@@ -1322,7 +1322,7 @@ export function registerFactoryBalesRoutes(app: Express) {
       const { status } = req.body;
       if (!status || typeof status !== "string") return res.status(400).json({ message: "status is required" });
 
-      const ALLOWED = ["PENDING_PRESSING","LABEL_PRINTED","PRESSED","FINALIZED","IN_STOCK","RESERVED","RESERVED_FOR_ORDER","SOLD","REPACKED","REMOVED"];
+      const ALLOWED = ["PENDING_PRESSING","LABEL_PRINTED","PRESSED","FINALIZED","IN_STOCK","RESERVED","RESERVED_FOR_ORDER","SOLD","REPACKED","REMOVED","DELETED"];
       if (!ALLOWED.includes(status)) return res.status(400).json({ message: `Invalid status. Allowed: ${ALLOWED.join(", ")}` });
 
       const [updated] = await db
@@ -1348,12 +1348,12 @@ export function registerFactoryBalesRoutes(app: Express) {
 
       const [updated] = await db
         .update(factoryBales)
-        .set({ status: "REMOVED", updatedAt: new Date() })
+        .set({ status: "DELETED", updatedAt: new Date() })
         .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)))
         .returning({ id: factoryBales.id });
 
       if (!updated) return res.status(404).json({ message: "Bale not found" });
-      res.json({ message: "Bale removed" });
+      res.json({ message: "Bale deleted" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

@@ -546,18 +546,10 @@ export function registerFactoryStockRoutes(app: Express) {
         const stockItemCache = new Map<string, number>();
 
         for (const bale of balesToRemove) {
-          if (bale.status !== "IN_STOCK" && bale.status !== "FINALIZED") {
-            throw new Error(`Bale ${bale.referenceNumber} is not in stock (status: ${bale.status})`);
-          }
-
-          if (!bale.erpLocationId) {
-            throw new Error(`Bale ${bale.referenceNumber} has no location assigned`);
-          }
-
           const [updated] = await tx
             .update(factoryBales)
             .set({
-              status: "REMOVED",
+              status: "DELETED",
               updatedAt: now,
             })
             .where(eq(factoryBales.id, bale.id))
@@ -566,24 +558,27 @@ export function registerFactoryStockRoutes(app: Express) {
           const factoryProductForBale = productMap.get(bale.productId as number);
           removedBales.push({ ...updated, productName: factoryProductForBale?.name || factoryProductForBale?.articleCode || "Unknown" });
 
-          const factoryProduct = productMap.get(bale.productId as number);
-          const itemCode = factoryProduct?.articleCode || factoryProduct?.code || bale.articleCode || bale.baleCode;
+          // Only adjust ERP inventory for bales that were actually counted in stock
+          if ((bale.status === "IN_STOCK" || bale.status === "FINALIZED") && bale.erpLocationId) {
+            const factoryProduct = productMap.get(bale.productId as number);
+            const itemCode = factoryProduct?.articleCode || factoryProduct?.code || bale.articleCode || bale.baleCode;
 
-          if (itemCode) {
-            let erpStockItemId = stockItemCache.get(itemCode);
-            if (!erpStockItemId) {
-              const [existing] = await tx
-                .select({ id: stockItems.id })
-                .from(stockItems)
-                .where(and(eq(stockItems.companyId, companyId), eq(stockItems.code, itemCode)));
-              if (existing) {
-                erpStockItemId = existing.id;
-                stockItemCache.set(itemCode, erpStockItemId!);
+            if (itemCode) {
+              let erpStockItemId = stockItemCache.get(itemCode);
+              if (!erpStockItemId) {
+                const [existing] = await tx
+                  .select({ id: stockItems.id })
+                  .from(stockItems)
+                  .where(and(eq(stockItems.companyId, companyId), eq(stockItems.code, itemCode)));
+                if (existing) {
+                  erpStockItemId = existing.id;
+                  stockItemCache.set(itemCode, erpStockItemId!);
+                }
               }
-            }
 
-            if (erpStockItemId) {
-              await adjustInventory(tx, bale.erpLocationId!, erpStockItemId, -1, companyId);
+              if (erpStockItemId) {
+                await adjustInventory(tx, bale.erpLocationId!, erpStockItemId, -1, companyId);
+              }
             }
           }
         }
@@ -598,7 +593,7 @@ export function registerFactoryStockRoutes(app: Express) {
           ref: b.referenceNumber,
           productName: b.productName || "Unknown",
           weightKg: b.weightKg,
-          status: "REMOVED",
+          status: "DELETED",
         })),
       });
       await writeDaybookEntry(db, {
@@ -681,7 +676,7 @@ export function registerFactoryStockRoutes(app: Express) {
 
         for (const bale of balesToRemove) {
           const [updated] = await tx.update(factoryBales)
-            .set({ status: "REMOVED", updatedAt: now })
+            .set({ status: "DELETED", updatedAt: now })
             .where(eq(factoryBales.id, bale.id))
             .returning();
           removedBales.push({ ...updated, productName: factoryProduct?.name || factoryProduct?.articleCode || "Unknown" });
@@ -699,7 +694,7 @@ export function registerFactoryStockRoutes(app: Express) {
           ref: b.referenceNumber,
           productName: b.productName || "Unknown",
           weightKg: b.weightKg,
-          status: "REMOVED",
+          status: "DELETED",
         })),
       });
       await writeDaybookEntry(db, {

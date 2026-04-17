@@ -215,7 +215,7 @@ export function registerFactoryProductsRoutes(app: Express) {
           fbp.name,
           fbp.active,
           fbp.category_id AS "categoryId",
-          COUNT(fb.id) FILTER (WHERE fb.status NOT IN ('REMOVED')) AS "totalBales",
+          COUNT(fb.id) FILTER (WHERE fb.status NOT IN ('REMOVED','DELETED')) AS "totalBales",
           COUNT(fb.id) FILTER (WHERE fb.status IN ('IN_STOCK','FINALIZED')) AS "inStockBales"
         FROM factory_bale_products fbp
         LEFT JOIN factory_bales fb ON fb.product_id = fbp.id AND fb.company_id = ${companyId}
@@ -274,7 +274,7 @@ export function registerFactoryProductsRoutes(app: Express) {
         .where(and(
           eq(factoryBales.companyId, companyId),
           eq(factoryBales.productId, productId),
-          inArray(factoryBales.status, ['IN_STOCK', 'FINALIZED', 'SOLD', 'REMOVED'])
+          inArray(factoryBales.status, ['IN_STOCK', 'FINALIZED', 'SOLD', 'REMOVED', 'DELETED'])
         ))
         .orderBy(factoryBales.createdAt);
 
@@ -721,10 +721,10 @@ export function registerFactoryProductsRoutes(app: Express) {
         .select({
           month: sql<number>`EXTRACT(MONTH FROM ${factoryBales.createdAt})`.as("month"),
           balesIn: sql<number>`COUNT(*)::int`.as("bales_in"),
-          balesOut: sql<number>`SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED') THEN 1 ELSE 0 END)::int`.as("bales_out"),
+          balesOut: sql<number>`SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED','DELETED') THEN 1 ELSE 0 END)::int`.as("bales_out"),
           balesPending: sql<number>`SUM(CASE WHEN ${factoryBales.status} = 'FINALIZED' THEN 1 ELSE 0 END)::int`.as("bales_pending"),
           totalWeightIn: sql<number>`COALESCE(SUM(${factoryBales.weightKg}::numeric), 0)`.as("total_weight_in"),
-          totalWeightOut: sql<number>`COALESCE(SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED') THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_out"),
+          totalWeightOut: sql<number>`COALESCE(SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED','DELETED') THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_out"),
           totalCost: sql<number>`COALESCE(SUM(${factoryBales.totalCost}::numeric), 0)`.as("total_cost"),
         })
         .from(factoryBales)
