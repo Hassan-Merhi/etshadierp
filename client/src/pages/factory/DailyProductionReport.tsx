@@ -335,6 +335,7 @@ const DETAILED_ORDER = [
   "Toys 1","Toys 2","Toys 3","Toys 4","Toys Crème",
   "Shoes 1","Shoes 2","Shoes 3","Shoes 4","Shoes Crème",
   "Wipers 1","Wipers 2","Wipers 3","Wipers 4","Wipers Crème",
+  "Garbage 1","Garbage 2","Garbage 3","Garbage 4","Garbage Crème",
   "Other",
 ];
 const DETAILED_COLORS: Record<string, string> = {
@@ -344,6 +345,7 @@ const DETAILED_COLORS: Record<string, string> = {
   "Toys 1":"#831843","Toys 2":"#9d174d","Toys 3":"#db2777","Toys 4":"#ec4899","Toys Crème":"#f9a8d4",
   "Shoes 1":"#4c1d95","Shoes 2":"#5b21b6","Shoes 3":"#7c3aed","Shoes 4":"#8b5cf6","Shoes Crème":"#c4b5fd",
   "Wipers 1":"#0f172a","Wipers 2":"#1e293b","Wipers 3":"#334155","Wipers 4":"#64748b","Wipers Crème":"#94a3b8",
+  "Garbage 1":"#713f12","Garbage 2":"#854d0e","Garbage 3":"#a16207","Garbage 4":"#ca8a04","Garbage Crème":"#eab308",
   "Other":"#d1d5db",
 };
 
@@ -356,7 +358,8 @@ function classifyDetailed(name: string): string {
   else if (/BAG/.test(u)) cat = "Bags";
   else if (/TOY/.test(u)) cat = "Toys";
   else if (/SHOE/.test(u)) cat = "Shoes";
-  else if (/WIPER|GARBAGE|RAG/.test(u)) cat = "Wipers";
+  else if (/WIPER/.test(u)) cat = "Wipers";
+  else if (/GARBAGE|RAG/.test(u)) cat = "Garbage";
   else return "Other";
 
   if (/CREME|CRÈME|BIG\s*SIZE/.test(u)) return `${cat} Crème`;
@@ -368,7 +371,7 @@ function classifyDetailed(name: string): string {
 }
 
 // ── Chart #2: by grade (Summer+Winter merged into grade numbers) ────────────
-const GRADE_ORDER = ["Grade #1","Grade #2","Grade #3","Grade #4","Grade Crème","Bags","Toys","Shoes","Wipers","Other"];
+const GRADE_ORDER = ["Grade #1","Grade #2","Grade #3","Grade #4","Grade Crème","Bags","Toys","Shoes","Wipers","Garbage","Other"];
 const GRADE_COLORS: Record<string, string> = {
   "Grade #1":"#4338ca",
   "Grade #2":"#d97706",
@@ -379,6 +382,7 @@ const GRADE_COLORS: Record<string, string> = {
   "Toys":"#db2777",
   "Shoes":"#ea580c",
   "Wipers":"#64748b",
+  "Garbage":"#a16207",
   "Other":"#d1d5db",
 };
 
@@ -388,7 +392,8 @@ function classifyByGrade(name: string): string {
   if (/BAG/.test(u)) return "Bags";
   if (/TOY/.test(u)) return "Toys";
   if (/SHOE/.test(u)) return "Shoes";
-  if (/WIPER|GARBAGE|RAG/.test(u)) return "Wipers";
+  if (/WIPER/.test(u)) return "Wipers";
+  if (/GARBAGE|RAG/.test(u)) return "Garbage";
   if (/CREME|CRÈME|BIG\s*SIZE/.test(u)) return "Grade Crème";
   if (/\b4\b/.test(u)) return "Grade #4";
   if (/\b3\b/.test(u)) return "Grade #3";
