@@ -483,16 +483,6 @@ export function registerFiscalTransferRoutes(app: Express) {
         ? (req.user?.assignedLocationId ?? req.session?.currentLocationId ?? null)
         : null;
 
-      console.log("[stock-transfers/list] debug:", {
-        role: req.user?.role,
-        isPosUserList,
-        assignedLocationId: req.user?.assignedLocationId,
-        currentLocationId: req.session?.currentLocationId,
-        posLocationIdList,
-        totalRows: rows.length,
-        destinationIds: rows.map(r => r.destinationLocationId),
-      });
-
       // Batch-fetch item counts and totals per transfer
       const transferIds = rows.map(r => r.transferId);
       const itemRows = await db
@@ -1069,18 +1059,13 @@ export function registerFiscalTransferRoutes(app: Express) {
         .from(vouchers)
         .where(eq(vouchers.id, voucherId));
 
-      // For POS users: only return items sourced from their assigned location
+      // POS users are the destination — show all items in the transfer
       const isPosUser = req.user?.role?.startsWith("POS");
-      const posLocationId = isPosUser ? (req.user?.assignedLocationId ?? req.session?.currentLocationId ?? null) : null;
 
-      const allTransferItems = await db
+      const transferItems = await db
         .select()
         .from(stockTransferItems)
         .where(eq(stockTransferItems.transferId, transferRow.id));
-
-      const transferItems = posLocationId
-        ? allTransferItems.filter(i => i.sourceLocationId === posLocationId)
-        : allTransferItems;
 
       const stockItemIdSet = [...new Set(transferItems.map(i => i.stockItemId).filter(Boolean))] as number[];
       const stockItemRows = stockItemIdSet.length > 0
@@ -1091,7 +1076,6 @@ export function registerFiscalTransferRoutes(app: Express) {
       const locationIds = new Set<number>();
       if (transferRow.sourceLocationId) locationIds.add(transferRow.sourceLocationId);
       if (transferRow.destinationLocationId) locationIds.add(transferRow.destinationLocationId);
-      if (posLocationId) locationIds.add(posLocationId);
       for (const item of transferItems) {
         if (item.sourceLocationId) locationIds.add(item.sourceLocationId);
       }
@@ -1136,9 +1120,7 @@ export function registerFiscalTransferRoutes(app: Express) {
         sourceLocationId: transferRow.sourceLocationId,
         sourceLocationName: transferRow.sourceLocationId
           ? (locationMap.get(transferRow.sourceLocationId) ?? "Unknown")
-          : posLocationId
-            ? (locationMap.get(posLocationId) ?? "Unknown")
-            : "Multi-source",
+          : "Multi-source",
         destinationLocationId: transferRow.destinationLocationId,
         destinationLocationName: locationMap.get(transferRow.destinationLocationId) ?? "Unknown",
         notes: transferRow.notes,

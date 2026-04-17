@@ -797,7 +797,7 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "applied" | "pending">("all");
-  const [dateFilter, setDateFilter] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [dateFilter, setDateFilter] = useState("");
 
   const { data: allTransfers = [], isLoading } = useQuery<TransferSummary[]>({
     queryKey: ["/api/stock-transfers/list", dateFilter],
@@ -829,9 +829,8 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
     setViewDialogOpen(true);
   };
 
-  const todayStr = format(new Date(), "yyyy-MM-dd");
-  const clearFilters = () => { setSearch(""); setStatusFilter("all"); setDateFilter(todayStr); };
-  const hasFilters = !!search || statusFilter !== "all" || dateFilter !== todayStr;
+  const clearFilters = () => { setSearch(""); setStatusFilter("all"); setDateFilter(""); };
+  const hasFilters = !!search || statusFilter !== "all" || !!dateFilter;
 
   // Edit view — full page, no extra padding (the component handles its own layout)
   if (editVoucherId !== null) {
