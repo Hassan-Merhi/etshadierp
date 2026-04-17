@@ -1000,6 +1000,8 @@ let migrationsDone = false;
     `ALTER TABLE container_offloads ADD COLUMN IF NOT EXISTS optional BOOLEAN NOT NULL DEFAULT false`,
     // Rename waste-dispatched bale status from REMOVED → DISPATCHED (Apr 2026)
     `UPDATE factory_bales SET status = 'DISPATCHED' WHERE status = 'REMOVED' AND waste_dispatch_id IS NOT NULL`,
+    // Any remaining REMOVED bales (manual deletions, no waste dispatch) → DELETED (Apr 2026)
+    `UPDATE factory_bales SET status = 'DELETED' WHERE status = 'REMOVED'`,
     // Rename bale status FINALIZED → IN_STOCK (Apr 2026) — pressing finalization now sets IN_STOCK directly
     `UPDATE factory_bales SET status = 'IN_STOCK' WHERE status = 'FINALIZED'`,
   ];

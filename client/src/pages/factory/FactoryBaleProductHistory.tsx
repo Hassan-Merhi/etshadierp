@@ -586,7 +586,13 @@ export function FactoryBaleProductMonthDetail() {
                       </TableCell>
                     )}
                     <TableCell data-testid={`text-status-${bale.id}`}>
-                      <Badge variant="secondary">{bale.status}</Badge>
+                      {bale.status === "DELETED" || bale.status === "REMOVED" ? (
+                        <Badge variant="destructive">Deleted</Badge>
+                      ) : bale.status === "DISPATCHED" ? (
+                        <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">Dispatched</Badge>
+                      ) : (
+                        <Badge variant="secondary">{bale.status}</Badge>
+                      )}
                     </TableCell>
                     <TableCell data-testid={`text-date-${bale.id}`}>
                       {formatDateTime(bale.createdAt)}

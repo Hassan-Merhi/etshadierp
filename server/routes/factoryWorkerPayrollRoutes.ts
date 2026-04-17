@@ -2327,7 +2327,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       if (isNaN(id)) return res.status(400).json({ message: "Invalid worker ID" });
 
       // Check if the worker has any bale entries
-      const baleCheck = await db.execute(sql`SELECT COUNT(*) as cnt FROM factory_bales WHERE worker_id = ${id} AND company_id = ${companyId} AND status != 'REMOVED'`);
+      const baleCheck = await db.execute(sql`SELECT COUNT(*) as cnt FROM factory_bales WHERE worker_id = ${id} AND company_id = ${companyId} AND status NOT IN ('REMOVED','DELETED')`);
       const baleCount = parseInt((baleCheck.rows[0] as any)?.cnt || "0");
       if (baleCount > 0) {
         return res.status(400).json({ message: `Cannot delete: this worker has ${baleCount} bale entries. Remove all bale entries first.` });

@@ -2769,7 +2769,7 @@ export const insertFactoryBaleSchema = createInsertSchema(factoryBales).omit({
   weightKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Weight must be positive"),
   costPerKg: z.string().optional(),
   totalCost: z.string().optional(),
-  status: z.enum(["PENDING_PRESSING", "IN_STOCK", "FINALIZED", "SOLD", "REMOVED"]).optional(),
+  status: z.enum(["PENDING_PRESSING", "IN_STOCK", "FINALIZED", "SOLD", "DISPATCHED", "DELETED"]).optional(),
   pressedAt: z.string().optional().nullable(),
   finalizedAt: z.string().optional().nullable(),
   finalizedBy: z.number().optional().nullable(),

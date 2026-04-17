@@ -27,7 +27,9 @@ function BaleStatusBadge({ status }: { status: string }) {
     IN_STOCK:         { label: "In Stock",         variant: "default",     icon: CheckCircle2 },
     SOLD:             { label: "Sold",              variant: "secondary",   icon: ArchiveX },
     FINALIZED:        { label: "Finalized",         variant: "secondary",   icon: CheckCircle2 },
-    REMOVED:          { label: "Removed",           variant: "destructive", icon: XCircle },
+    DISPATCHED:       { label: "Dispatched",        variant: "secondary",   icon: XCircle },
+    DELETED:          { label: "Deleted",           variant: "destructive", icon: XCircle },
+    REMOVED:          { label: "Deleted",           variant: "destructive", icon: XCircle },
     PENDING_PRESSING: { label: "Pending Pressing",  variant: "outline",     icon: AlertCircle },
   };
   const info = map[status] || { label: status, variant: "outline" as const, icon: AlertCircle };

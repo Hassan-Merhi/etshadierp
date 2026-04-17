@@ -275,8 +275,8 @@ export default function BalesHistory() {
     const product = row.product;
     const batch = row.mixBatch;
 
-    // Always hide removed/deleted bales
-    if (bale.status === "REMOVED") return false;
+    // Always hide deleted bales
+    if (bale.status === "REMOVED" || bale.status === "DELETED") return false;
 
     if (batchFilter !== "all" && String(bale.mixBatchId) !== batchFilter) return false;
     if (statusFilter !== "all" && bale.status !== statusFilter) return false;
