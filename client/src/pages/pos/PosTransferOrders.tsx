@@ -955,12 +955,6 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
                       <ArrowRight className="h-3 w-3 shrink-0" />
                       <span>{t.destinationLocationName}</span>
                     </div>
-                    {(t.stockItemNames?.length ?? 0) > 0 && (
-                      <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">
-                        {t.stockItemNames.slice(0, 3).join(", ")}
-                        {t.stockItemNames.length > 3 ? ` +${t.stockItemNames.length - 3} more` : ""}
-                      </div>
-                    )}
                   </TableCell>
                   <TableCell className="text-right text-sm font-mono py-3 align-top">{t.itemCount}</TableCell>
                   <TableCell className="text-right py-3 align-top">
