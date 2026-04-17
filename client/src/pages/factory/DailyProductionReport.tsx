@@ -634,6 +634,20 @@ export default function DailyProductionReport() {
                   </span>
                 </div>
                 <StatRow label="Weight" value={fmtKg(data?.production.totalWeightKg ?? 0)} />
+                {/* Big rate display */}
+                {(() => {
+                  const kg = data?.production.totalWeightKg ?? 0;
+                  const val = data?.production.totalValue ?? 0;
+                  const rate = kg > 0 ? val / kg : 0;
+                  return (
+                    <div className="flex flex-col items-center justify-center py-3 my-1">
+                      <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">Rate / kg</span>
+                      <span className="text-3xl font-extrabold text-blue-600 dark:text-blue-400 tabular-nums">
+                        {fmtRate(rate)}
+                      </span>
+                    </div>
+                  );
+                })()}
                 <StatRow label="Value" value={fmtMoney(data?.production.totalValue ?? 0)} />
               </>
             )}
