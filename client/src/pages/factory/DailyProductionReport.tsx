@@ -379,6 +379,7 @@ const GRADE_COLORS: Record<string, string> = {
 };
 
 function classifyByGrade(name: string): string {
+  if (name === "__WIPERS_GARBAGE__") return "Wipers & Garbage";
   const u = name.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   if (/ABO\s*SAMAR/.test(u)) return "__skip__";
   if (/WIPER|GARBAGE|RAG/.test(u)) return "Wipers & Garbage";
@@ -618,11 +619,17 @@ export default function DailyProductionReport() {
 
         {/* Compact pie charts — same row as date picker */}
         {!isLoading && data && (() => {
-          const allRows: { categoryName: string; totalWeightKg: number }[] = [
+          // For the Grade chart, use production.byCategory rows + ONE synthetic
+          // "__WIPERS_GARBAGE__" row whose weight equals wipersGarbage.totalWeightKg.
+          // This guarantees both charts show the identical Wipers & Garbage total,
+          // regardless of the actual category names inside wipersGarbage.rows.
+          const gradeRows: { categoryName: string; totalWeightKg: number }[] = [
             ...data.production.byCategory.map(c => ({ categoryName: c.categoryName, totalWeightKg: c.totalWeightKg })),
-            ...data.wipersGarbage.rows.map(r => ({ categoryName: r.categoryName, totalWeightKg: r.totalWeightKg })),
+            ...(data.wipersGarbage.totalWeightKg > 0
+              ? [{ categoryName: "__WIPERS_GARBAGE__", totalWeightKg: data.wipersGarbage.totalWeightKg }]
+              : []),
           ];
-          const hasData = allRows.some(r => r.totalWeightKg > 0);
+          const hasData = gradeRows.some(r => r.totalWeightKg > 0);
           if (!hasData) return null;
           return (
             <div className="flex flex-wrap gap-6">
@@ -632,7 +639,7 @@ export default function DailyProductionReport() {
               />
               <MiniPieChart
                 title="By Grade"
-                allRows={allRows}
+                allRows={gradeRows}
                 classifyFn={classifyByGrade}
                 order={GRADE_ORDER}
                 colors={GRADE_COLORS}
