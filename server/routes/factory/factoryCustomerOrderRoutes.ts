@@ -325,7 +325,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const [bale] = await db.select().from(factoryBales)
         .where(and(
           eq(factoryBales.companyId, companyId),
-          or(eq(factoryBales.status, "FINALIZED"), eq(factoryBales.status, "IN_STOCK")),
+          eq(factoryBales.status, "IN_STOCK"),
           eq(factoryBales.erpLocationId, parseInt(locationId)),
           nameConditions
         ))
@@ -462,7 +462,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
             .where(and(
               eq(factoryBales.companyId, companyId),
               eq(factoryBales.referenceNumber, refNum),
-              or(eq(factoryBales.status, "FINALIZED"), eq(factoryBales.status, "IN_STOCK"))
+              eq(factoryBales.status, "IN_STOCK")
             ));
 
           if (!bale) {
@@ -470,7 +470,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
               .where(and(
                 eq(factoryBales.companyId, companyId),
                 eq(factoryBales.baleCode, refNum),
-                or(eq(factoryBales.status, "FINALIZED"), eq(factoryBales.status, "IN_STOCK"))
+                eq(factoryBales.status, "IN_STOCK")
               ));
           }
 
@@ -546,7 +546,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         const availableBales = await db.select().from(factoryBales)
           .where(and(
             eq(factoryBales.companyId, companyId),
-            or(eq(factoryBales.status, "FINALIZED"), eq(factoryBales.status, "IN_STOCK")),
+            eq(factoryBales.status, "IN_STOCK"),
             eq(factoryBales.erpLocationId, parsedLocationId),
             matchConditions
           ))
@@ -631,7 +631,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.id, baleId)));
 
       if (orderBale) {
-        await db.update(factoryBales).set({ status: "FINALIZED", updatedAt: new Date() }).where(eq(factoryBales.id, orderBale.baleId));
+        await db.update(factoryBales).set({ status: "IN_STOCK", updatedAt: new Date() }).where(eq(factoryBales.id, orderBale.baleId));
       }
 
       await recalculateOrderTotals(db, orderId);
@@ -760,7 +760,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
         const bales = await tx.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
         for (const b of bales) {
-          await tx.update(factoryBales).set({ status: "FINALIZED", updatedAt: new Date() }).where(eq(factoryBales.id, b.baleId));
+          await tx.update(factoryBales).set({ status: "IN_STOCK", updatedAt: new Date() }).where(eq(factoryBales.id, b.baleId));
         }
 
         await tx.delete(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
@@ -794,7 +794,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
         for (const b of bales) {
           const [factoryBale] = await tx.select().from(factoryBales)
-            .where(and(eq(factoryBales.id, b.baleId), or(eq(factoryBales.status, "FINALIZED"), eq(factoryBales.status, "RESERVED_FOR_ORDER")), eq(factoryBales.erpLocationId, b.locationId)));
+            .where(and(eq(factoryBales.id, b.baleId), eq(factoryBales.status, "RESERVED_FOR_ORDER"), eq(factoryBales.erpLocationId, b.locationId)));
           if (!factoryBale) throw new Error(`Bale ${b.baleReference} is no longer available`);
         }
 
@@ -958,7 +958,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const locationMap = new Map(locationRecords.map((l: any) => [l.id, l.name]));
 
       const availableBales = baleRows.filter((b: any) =>
-        ["IN_STOCK", "FINALIZED", "RESERVED_FOR_ORDER"].includes(b.status)
+        ["IN_STOCK", "RESERVED_FOR_ORDER"].includes(b.status)
       );
 
       res.json({
@@ -1511,11 +1511,11 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           }
         }
 
-        // Revert bales from SOLD → FINALIZED
+        // Revert bales from SOLD → RESERVED_FOR_ORDER (order still exists, just un-finalized)
         const bales = await tx.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
         for (const b of bales) {
           await tx.update(factoryBales)
-            .set({ status: "FINALIZED", updatedAt: new Date() })
+            .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
             .where(and(eq(factoryBales.id, b.baleId), eq(factoryBales.status, "SOLD")));
         }
 
@@ -1559,7 +1559,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
       for (const ob of orderBales) {
-        await db.update(factoryBales).set({ status: "FINALIZED", updatedAt: new Date() }).where(eq(factoryBales.id, ob.baleId));
+        await db.update(factoryBales).set({ status: "IN_STOCK", updatedAt: new Date() }).where(eq(factoryBales.id, ob.baleId));
       }
 
       const [updated] = await db.update(customerOrders)
@@ -1908,7 +1908,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       const conditions: any[] = [
         eq(factoryBales.companyId, companyId),
-        eq(factoryBales.status, "FINALIZED"),
+        eq(factoryBales.status, "IN_STOCK"),
         or(
           eq(factoryBales.referenceNumber, code),
           eq(factoryBales.baleCode, code),

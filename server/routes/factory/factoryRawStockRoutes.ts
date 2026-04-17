@@ -1922,7 +1922,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
           and(
             eq(factoryBales.companyId, companyId),
             sql`${factoryBales.mixBatchId} IS NULL`,
-            inArray(factoryBales.status, ["IN_STOCK", "FINALIZED"]),
+            eq(factoryBales.status, "IN_STOCK"),
           ),
         )
         .orderBy(desc(factoryBales.pressedAt));

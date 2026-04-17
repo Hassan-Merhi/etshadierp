@@ -259,7 +259,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         const available = await db.select().from(factoryBales)
           .where(and(
             eq(factoryBales.companyId, companyId),
-            or(eq(factoryBales.status, "FINALIZED"), eq(factoryBales.status, "IN_STOCK")),
+            eq(factoryBales.status, "IN_STOCK"),
             eq(factoryBales.erpLocationId, parseInt(locationId)),
             eq(factoryBales.articleCode, line.articleCode),
           ))

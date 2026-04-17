@@ -361,7 +361,7 @@ export function registerFactoryBalesRoutes(app: Express) {
             .orderBy(factoryBales.referenceNumber);
 
           const pendingCount = balesForBatch.filter((b: any) => b.status === "PENDING_PRESSING").length;
-          const finalizedCount = balesForBatch.filter((b: any) => b.status === "FINALIZED").length;
+          const finalizedCount = balesForBatch.filter((b: any) => b.status === "IN_STOCK").length;
 
           return { ...batch, pendingCount, finalizedCount, bales: balesForBatch };
         })
@@ -509,7 +509,7 @@ export function registerFactoryBalesRoutes(app: Express) {
           const [updated] = await tx
             .update(factoryBales)
             .set({
-              status: "FINALIZED",
+              status: "IN_STOCK",
               erpLocationId,
               mixBatchId,
               costPerKg: String(costPerKg),
@@ -682,7 +682,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         .from(factoryBales)
         .where(and(
           eq(factoryBales.companyId, companyId),
-          eq(factoryBales.status, "FINALIZED"),
+          eq(factoryBales.status, "IN_STOCK"),
           sql`${factoryBales.mixBatchId} IS NOT NULL`
         ));
 
@@ -1296,7 +1296,7 @@ export function registerFactoryBalesRoutes(app: Express) {
       if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: "ids must be a non-empty array" });
       if (!status || typeof status !== "string") return res.status(400).json({ message: "status is required" });
 
-      const ALLOWED = ["PENDING_PRESSING","LABEL_PRINTED","PRESSED","FINALIZED","IN_STOCK","RESERVED","RESERVED_FOR_ORDER","SOLD","REPACKED","REMOVED","DELETED","DISPATCHED"];
+      const ALLOWED = ["PENDING_PRESSING","LABEL_PRINTED","PRESSED","IN_STOCK","RESERVED","RESERVED_FOR_ORDER","SOLD","REPACKED","REMOVED","DELETED","DISPATCHED"];
       if (!ALLOWED.includes(status)) return res.status(400).json({ message: `Invalid status. Allowed: ${ALLOWED.join(", ")}` });
 
       const result = await db
@@ -1322,7 +1322,7 @@ export function registerFactoryBalesRoutes(app: Express) {
       const { status } = req.body;
       if (!status || typeof status !== "string") return res.status(400).json({ message: "status is required" });
 
-      const ALLOWED = ["PENDING_PRESSING","LABEL_PRINTED","PRESSED","FINALIZED","IN_STOCK","RESERVED","RESERVED_FOR_ORDER","SOLD","REPACKED","REMOVED","DELETED","DISPATCHED"];
+      const ALLOWED = ["PENDING_PRESSING","LABEL_PRINTED","PRESSED","IN_STOCK","RESERVED","RESERVED_FOR_ORDER","SOLD","REPACKED","REMOVED","DELETED","DISPATCHED"];
       if (!ALLOWED.includes(status)) return res.status(400).json({ message: `Invalid status. Allowed: ${ALLOWED.join(", ")}` });
 
       const [updated] = await db
@@ -1862,7 +1862,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         if (bale.status === "PENDING_PRESSING") {
           pendingCount++;
           pendingWeight += weight;
-        } else if (bale.status === "FINALIZED") {
+        } else if (bale.status === "IN_STOCK") {
           finalizedCount++;
           finalizedWeight += weight;
         }
@@ -2186,7 +2186,7 @@ export function registerFactoryBalesRoutes(app: Express) {
             costPerKg,
             totalCost,
             status,
-            finalizedAt: status === "FINALIZED" ? new Date() : null,
+            finalizedAt: status === "IN_STOCK" ? new Date() : null,
           });
           imported++;
           nextRef++;

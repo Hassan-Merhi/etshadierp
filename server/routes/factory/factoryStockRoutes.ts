@@ -559,7 +559,7 @@ export function registerFactoryStockRoutes(app: Express) {
           removedBales.push({ ...updated, productName: factoryProductForBale?.name || factoryProductForBale?.articleCode || "Unknown" });
 
           // Only adjust ERP inventory for bales that were actually counted in stock
-          if ((bale.status === "IN_STOCK" || bale.status === "FINALIZED") && bale.erpLocationId) {
+          if (bale.status === "IN_STOCK" && bale.erpLocationId) {
             const factoryProduct = productMap.get(bale.productId as number);
             const itemCode = factoryProduct?.articleCode || factoryProduct?.code || bale.articleCode || bale.baleCode;
 
@@ -654,7 +654,7 @@ export function registerFactoryStockRoutes(app: Express) {
               eq(factoryBales.companyId, companyId),
               eq(factoryBales.productId, productId),
               eq(factoryBales.erpLocationId, locationId),
-              or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED"))
+              eq(factoryBales.status, "IN_STOCK")
             )
           )
           .limit(qty);
@@ -727,7 +727,7 @@ export function registerFactoryStockRoutes(app: Express) {
           and(
             eq(factoryBales.companyId, companyId),
             eq(factoryBales.erpLocationId, locationId),
-            or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+            eq(factoryBales.status, "IN_STOCK"),
           )
         );
 
@@ -825,7 +825,7 @@ export function registerFactoryStockRoutes(app: Express) {
           and(
             eq(factoryBales.companyId, companyId),
             eq(factoryBales.erpLocationId, locationId),
-            or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+            eq(factoryBales.status, "IN_STOCK"),
           )
         );
 
@@ -1412,7 +1412,7 @@ export function registerFactoryStockRoutes(app: Express) {
 
       const conditions: any[] = [
         eq(factoryBales.companyId, companyId),
-        or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+        eq(factoryBales.status, "IN_STOCK"),
       ];
 
       if (locationId) {

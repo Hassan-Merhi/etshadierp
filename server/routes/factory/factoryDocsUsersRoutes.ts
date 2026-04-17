@@ -2027,7 +2027,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         .from(factoryBales)
         .where(and(
           eq(factoryBales.companyId, companyId),
-          or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+          eq(factoryBales.status, "IN_STOCK"),
         ));
 
       const openingStock = parseFloat(rawReceived?.totalCost || "0");

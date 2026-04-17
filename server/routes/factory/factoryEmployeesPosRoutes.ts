@@ -1089,7 +1089,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
             fb.waste_dispatch_id AS "wasteDispatchId"
           FROM factory_bales fb
           WHERE fb.company_id = ${companyId}
-          AND fb.status IN ('IN_STOCK', 'FINALIZED', 'SOLD', 'DISPATCHED')
+          AND fb.status IN ('IN_STOCK', 'SOLD', 'DISPATCHED')
         `),
         db.select({ id: factoryBaleProducts.id, name: factoryBaleProducts.name, articleCode: factoryBaleProducts.articleCode, categoryId: factoryBaleProducts.categoryId }).from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId)),
         db.select({ id: factoryCategories.id, name: factoryCategories.name }).from(factoryCategories).where(eq(factoryCategories.companyId, companyId)),
@@ -1164,7 +1164,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           addToBucket(buckets.sold, key, label, bale);
         } else if (bale.status === "DISPATCHED" && bale.wasteDispatchId) {
           addToBucket(buckets.wasteDispatched, key, label, bale);
-        } else if (bale.status === "IN_STOCK" || bale.status === "FINALIZED") {
+        } else if (bale.status === "IN_STOCK") {
           if (waste) {
             addToBucket(buckets.wasteStock, key, label, bale);
           } else {
@@ -1252,7 +1252,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         .where(
           and(
             eq(factoryBales.companyId, companyId),
-            inArray(factoryBales.status, ["IN_STOCK", "FINALIZED"]),
+            eq(factoryBales.status, "IN_STOCK"),
             inArray(factoryBales.productId, Array.from(wasteProductIds) as number[])
           )
         )
@@ -1392,7 +1392,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         if (balesToDispose.length === 0) throw new Error("No valid bales found");
 
         for (const bale of balesToDispose) {
-          if (bale.status !== "IN_STOCK" && bale.status !== "FINALIZED") {
+          if (bale.status !== "IN_STOCK") {
             throw new Error(`Bale ${bale.referenceNumber} is not available (status: ${bale.status})`);
           }
         }
@@ -1600,7 +1600,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
                 eq(factoryBales.companyId, companyId),
                 eq(factoryBales.productId, item.productId),
                 eq(factoryBales.erpLocationId, locationId),
-                or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+                eq(factoryBales.status, "IN_STOCK"),
               ))
               .orderBy(factoryBales.id)
               .limit(qty);
@@ -1850,7 +1850,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
                 eq(factoryBales.companyId, companyId),
                 eq(factoryBales.productId, item.productId),
                 eq(factoryBales.erpLocationId, locationId),
-                or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+                eq(factoryBales.status, "IN_STOCK"),
               ))
               .orderBy(factoryBales.id)
               .limit(qty);
