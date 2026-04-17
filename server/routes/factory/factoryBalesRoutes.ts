@@ -1296,7 +1296,7 @@ export function registerFactoryBalesRoutes(app: Express) {
       if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: "ids must be a non-empty array" });
       if (!status || typeof status !== "string") return res.status(400).json({ message: "status is required" });
 
-      const ALLOWED = ["PENDING_PRESSING","LABEL_PRINTED","PRESSED","FINALIZED","IN_STOCK","RESERVED","RESERVED_FOR_ORDER","SOLD","REPACKED","REMOVED","DELETED"];
+      const ALLOWED = ["PENDING_PRESSING","LABEL_PRINTED","PRESSED","FINALIZED","IN_STOCK","RESERVED","RESERVED_FOR_ORDER","SOLD","REPACKED","REMOVED","DELETED","DISPATCHED"];
       if (!ALLOWED.includes(status)) return res.status(400).json({ message: `Invalid status. Allowed: ${ALLOWED.join(", ")}` });
 
       const result = await db
@@ -1322,7 +1322,7 @@ export function registerFactoryBalesRoutes(app: Express) {
       const { status } = req.body;
       if (!status || typeof status !== "string") return res.status(400).json({ message: "status is required" });
 
-      const ALLOWED = ["PENDING_PRESSING","LABEL_PRINTED","PRESSED","FINALIZED","IN_STOCK","RESERVED","RESERVED_FOR_ORDER","SOLD","REPACKED","REMOVED","DELETED"];
+      const ALLOWED = ["PENDING_PRESSING","LABEL_PRINTED","PRESSED","FINALIZED","IN_STOCK","RESERVED","RESERVED_FOR_ORDER","SOLD","REPACKED","REMOVED","DELETED","DISPATCHED"];
       if (!ALLOWED.includes(status)) return res.status(400).json({ message: `Invalid status. Allowed: ${ALLOWED.join(", ")}` });
 
       const [updated] = await db

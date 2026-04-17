@@ -1089,7 +1089,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
             fb.waste_dispatch_id AS "wasteDispatchId"
           FROM factory_bales fb
           WHERE fb.company_id = ${companyId}
-          AND fb.status IN ('IN_STOCK', 'FINALIZED', 'SOLD', 'REMOVED')
+          AND fb.status IN ('IN_STOCK', 'FINALIZED', 'SOLD', 'DISPATCHED')
         `),
         db.select({ id: factoryBaleProducts.id, name: factoryBaleProducts.name, articleCode: factoryBaleProducts.articleCode, categoryId: factoryBaleProducts.categoryId }).from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId)),
         db.select({ id: factoryCategories.id, name: factoryCategories.name }).from(factoryCategories).where(eq(factoryCategories.companyId, companyId)),
@@ -1162,7 +1162,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
 
         if (bale.status === "SOLD") {
           addToBucket(buckets.sold, key, label, bale);
-        } else if (bale.status === "REMOVED" && bale.wasteDispatchId) {
+        } else if (bale.status === "DISPATCHED" && bale.wasteDispatchId) {
           addToBucket(buckets.wasteDispatched, key, label, bale);
         } else if (bale.status === "IN_STOCK" || bale.status === "FINALIZED") {
           if (waste) {
@@ -1425,7 +1425,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         const stockItemCache = new Map<string, number>();
 
         for (const bale of balesToDispose) {
-          await tx.execute(sql`UPDATE factory_bales SET status = 'REMOVED', waste_dispatch_id = ${dispatch.id}, updated_at = ${now} WHERE id = ${bale.id}`);
+          await tx.execute(sql`UPDATE factory_bales SET status = 'DISPATCHED', waste_dispatch_id = ${dispatch.id}, updated_at = ${now} WHERE id = ${bale.id}`);
 
           const product = productMap.get(bale.productId as number);
           const itemCode = product?.articleCode || product?.code || bale.articleCode || bale.baleCode;

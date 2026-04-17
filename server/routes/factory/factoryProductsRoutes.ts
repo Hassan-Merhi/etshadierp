@@ -274,7 +274,7 @@ export function registerFactoryProductsRoutes(app: Express) {
         .where(and(
           eq(factoryBales.companyId, companyId),
           eq(factoryBales.productId, productId),
-          inArray(factoryBales.status, ['IN_STOCK', 'FINALIZED', 'SOLD', 'REMOVED', 'DELETED'])
+          inArray(factoryBales.status, ['IN_STOCK', 'FINALIZED', 'SOLD', 'REMOVED', 'DELETED', 'DISPATCHED'])
         ))
         .orderBy(factoryBales.createdAt);
 
@@ -721,10 +721,10 @@ export function registerFactoryProductsRoutes(app: Express) {
         .select({
           month: sql<number>`EXTRACT(MONTH FROM ${factoryBales.createdAt})`.as("month"),
           balesIn: sql<number>`COUNT(*)::int`.as("bales_in"),
-          balesOut: sql<number>`SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED','DELETED') THEN 1 ELSE 0 END)::int`.as("bales_out"),
+          balesOut: sql<number>`SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED','DELETED','DISPATCHED') THEN 1 ELSE 0 END)::int`.as("bales_out"),
           balesPending: sql<number>`SUM(CASE WHEN ${factoryBales.status} = 'FINALIZED' THEN 1 ELSE 0 END)::int`.as("bales_pending"),
           totalWeightIn: sql<number>`COALESCE(SUM(${factoryBales.weightKg}::numeric), 0)`.as("total_weight_in"),
-          totalWeightOut: sql<number>`COALESCE(SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED','DELETED') THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_out"),
+          totalWeightOut: sql<number>`COALESCE(SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED','DELETED','DISPATCHED') THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_out"),
           totalCost: sql<number>`COALESCE(SUM(${factoryBales.totalCost}::numeric), 0)`.as("total_cost"),
         })
         .from(factoryBales)

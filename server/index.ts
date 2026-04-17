@@ -998,6 +998,8 @@ let migrationsDone = false;
     )`,
     // container_offloads.optional — marks optional bale lines (added Apr 2026)
     `ALTER TABLE container_offloads ADD COLUMN IF NOT EXISTS optional BOOLEAN NOT NULL DEFAULT false`,
+    // Rename waste-dispatched bale status from REMOVED → DISPATCHED (Apr 2026)
+    `UPDATE factory_bales SET status = 'DISPATCHED' WHERE status = 'REMOVED' AND waste_dispatch_id IS NOT NULL`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

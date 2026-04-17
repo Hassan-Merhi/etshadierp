@@ -760,8 +760,8 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       // (e.g. wipers/garbage entered via stock import) are still included using their creation date.
       const baleConditions: any[] = [
         eq(factoryBales.companyId, companyId),
-        // Only count bales that have been pressed (IN_STOCK, FINALIZED, or SOLD)
-        sql`${factoryBales.status} IN ('IN_STOCK','FINALIZED','SOLD')`,
+        // Only count bales that have been pressed (IN_STOCK, FINALIZED, SOLD, or DISPATCHED to waste)
+        sql`${factoryBales.status} IN ('IN_STOCK','FINALIZED','SOLD','DISPATCHED')`,
       ];
       if (from) baleConditions.push(sql`COALESCE(DATE(${factoryBales.stockEntryDate}), DATE(${factoryBales.createdAt})) >= ${from}`);
       if (to)   baleConditions.push(sql`COALESCE(DATE(${factoryBales.stockEntryDate}), DATE(${factoryBales.createdAt})) <= ${to}`);
