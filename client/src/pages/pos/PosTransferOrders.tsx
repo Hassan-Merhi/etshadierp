@@ -591,7 +591,7 @@ function EditableTransferDetail({
                         <span className="text-right">Now</span>
                         <span className="text-right">Change</span>
                       </div>
-                      {rev.items.map((ri, i) => {
+                      {rev.items.filter((ri) => parseFloat(ri.delta) !== 0).map((ri, i) => {
                         const delta = parseFloat(ri.delta);
                         return (
                           <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] items-center px-3 py-2 text-xs gap-x-4 bg-card border-b last:border-b-0" data-testid={`text-rev-item-${rev.id}-${i}`}>
@@ -762,7 +762,7 @@ function ViewTransferDialog({
                           <span>Item</span>
                           <span className="text-right">Was</span><span className="text-right">Now</span><span className="text-right">Change</span>
                         </div>
-                        {rev.items.map((ri, i) => {
+                        {rev.items.filter((ri) => parseFloat(ri.delta) !== 0).map((ri, i) => {
                           const delta = parseFloat(ri.delta);
                           return (
                             <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] items-center px-3 py-2 text-xs gap-x-4 bg-card border-b last:border-b-0">
