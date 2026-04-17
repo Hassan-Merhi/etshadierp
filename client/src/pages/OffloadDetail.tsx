@@ -321,27 +321,6 @@ export default function OffloadDetail() {
                   <p className="text-muted-foreground">Total Bales</p>
                   <p className="font-medium font-mono">{formatNumber(Number(offload.totalBales))}</p>
                 </div>
-                <div>
-                  <p className="text-muted-foreground">Additional Cost / Bale</p>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-medium font-mono text-amber-600 dark:text-amber-400">
-                      {formatAmount(displayCostPerBale)}
-                    </p>
-                    {live?.hasVouchers && Math.abs(live.additionalCostPerBale - Number(offload.additionalCostPerBale)) >= 0.01 && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Badge variant="outline" className="text-amber-600 border-amber-500 bg-amber-500/10 gap-1 text-[10px]">
-                            <Zap className="w-2.5 h-2.5" />
-                            updated
-                          </Badge>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          Original at offload: {formatAmount(Number(offload.additionalCostPerBale))}
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                  </div>
-                </div>
               </div>
             </div>
           )}
@@ -419,11 +398,6 @@ export default function OffloadDetail() {
                       <td className="p-3 text-right font-mono">{formatAmount(displayAddlCharges)}</td>
                     </tr>
                   )}
-                  <tr className="border-b border-t bg-muted/10 font-medium">
-                    <td className="p-3 pl-5 text-muted-foreground">Landing Subtotal</td>
-                    <td className="p-3 text-right font-mono">{formatAmount(displayOffloadTotal)}</td>
-                  </tr>
-
                   {/* ── Grand Total + Cost/Bale ── */}
                   <tr className="bg-muted/30 font-semibold border-t-2">
                     <td className="p-3">Total Charges</td>
