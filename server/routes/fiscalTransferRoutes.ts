@@ -523,9 +523,14 @@ export function registerFiscalTransferRoutes(app: Express) {
       const allResult = rows.map(r => {
         const allItems = itemsByTransfer.get(r.transferId) || [];
         // Destination-side POS users see all items; source-side see only their items
-        const isDestUser = posLocationIdList !== null && r.destinationLocationId === posLocationIdList;
+        // For single-source transfers the source is on the voucher (items have null sourceLocationId)
+        // For multi-source transfers the source is on each item
+        const isDestUser     = posLocationIdList !== null && r.destinationLocationId === posLocationIdList;
+        const isSingleSource = posLocationIdList !== null && r.sourceLocationId === posLocationIdList;
         const myItems = posLocationIdList !== null
-          ? (isDestUser ? allItems : allItems.filter(i => i.sourceLocationId === posLocationIdList))
+          ? (isDestUser || isSingleSource
+              ? allItems
+              : allItems.filter(i => i.sourceLocationId === posLocationIdList))
           : allItems;
         const totalAmount = myItems.reduce((s, i) => s + parseFloat(i.totalAmount || "0"), 0);
         const stockItemNames = [...new Set(
@@ -1086,10 +1091,12 @@ export function registerFiscalTransferRoutes(app: Express) {
         .where(eq(stockTransferItems.transferId, transferRow.id));
 
       // Destination-side POS users see all items (they receive everything)
-      // Source-side POS users only see items from their own location
-      const isDestinationUser = posLocationId !== null && posLocationId === transferRow.destinationLocationId;
+      // Single-source POS users see all items (source is on the voucher, not item level)
+      // Multi-source POS users see only items from their own location
+      const isDestinationUser  = posLocationId !== null && posLocationId === transferRow.destinationLocationId;
+      const isSingleSourceUser = posLocationId !== null && posLocationId === transferRow.sourceLocationId;
       const transferItems = posLocationId
-        ? (isDestinationUser
+        ? (isDestinationUser || isSingleSourceUser
             ? allTransferItems
             : allTransferItems.filter(i => i.sourceLocationId === posLocationId))
         : allTransferItems;
