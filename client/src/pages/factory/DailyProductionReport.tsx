@@ -355,60 +355,50 @@ function CategoryPieChart({
   if (total === 0) return null;
 
   return (
-    <Card data-testid="card-category-pie">
-      <CardHeader className="pb-2 pt-4 px-4">
-        <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
-          <Tag className="h-3.5 w-3.5" />
-          Production by Group (kg)
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="px-4 pb-4">
-        <div className="flex flex-col sm:flex-row items-center gap-4">
-          {/* Legend on the left */}
-          <div className="flex flex-col gap-1.5 min-w-[200px] w-full sm:w-auto">
-            {slices.map((s) => {
-              const pct = ((s.value / total) * 100).toFixed(1);
-              return (
-                <div key={s.name} className="flex items-center gap-2">
-                  <span className="inline-block rounded-sm flex-shrink-0" style={{ width: 12, height: 12, background: s.color }} />
-                  <span className="text-xs text-muted-foreground flex-1 truncate">{s.name}</span>
-                  <span className="text-xs font-bold tabular-nums ml-1">{pct}%</span>
-                  <span className="text-xs text-muted-foreground tabular-nums w-20 text-right">
-                    {Math.round(s.value).toLocaleString()} kg
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+    <div className="flex items-center gap-1" data-testid="card-category-pie">
+      {/* Legend — tight left of pie */}
+      <div className="flex flex-col gap-1">
+        {slices.map((s) => {
+          const pct = ((s.value / total) * 100).toFixed(1);
+          return (
+            <div key={s.name} className="flex items-center gap-1.5">
+              <span className="inline-block rounded-sm flex-shrink-0" style={{ width: 10, height: 10, background: s.color }} />
+              <span className="text-xs text-muted-foreground whitespace-nowrap">{s.name}</span>
+              <span className="text-xs font-bold tabular-nums">{pct}%</span>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {Math.round(s.value).toLocaleString()} kg
+              </span>
+            </div>
+          );
+        })}
+      </div>
 
-          {/* Pie on the right */}
-          <div className="flex-1 flex justify-center items-center" style={{ minHeight: 220, minWidth: 220 }}>
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie
-                  data={slices}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={105}
-                  paddingAngle={2}
-                  dataKey="value"
-                  strokeWidth={0}
-                >
-                  {slices.map((s) => (
-                    <Cell key={s.name} fill={s.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(v: number) => [`${Math.round(v).toLocaleString()} kg`, ""]}
-                  contentStyle={{ fontSize: 12, borderRadius: 6 }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+      {/* Pie — right of legend */}
+      <div style={{ width: 160, height: 160, flexShrink: 0 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={slices}
+              cx="50%"
+              cy="50%"
+              innerRadius={42}
+              outerRadius={72}
+              paddingAngle={2}
+              dataKey="value"
+              strokeWidth={0}
+            >
+              {slices.map((s) => (
+                <Cell key={s.name} fill={s.color} />
+              ))}
+            </Pie>
+            <Tooltip
+              formatter={(v: number) => [`${Math.round(v).toLocaleString()} kg`, ""]}
+              contentStyle={{ fontSize: 11, borderRadius: 6 }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
 }
 
@@ -457,38 +447,48 @@ export default function DailyProductionReport() {
         <p className="text-xs text-muted-foreground mt-0.5">Raw material vs output summary</p>
       </div>
 
-      {/* Date filter */}
-      <div className="flex flex-wrap items-center gap-3">
-        <Select value={preset} onValueChange={(v) => setPreset(v as Preset)}>
-          <SelectTrigger className="w-40" data-testid="select-preset">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {presets.map((p) => (
-              <SelectItem key={p.key} value={p.key} data-testid={`option-preset-${p.key}`}>
-                {p.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {preset === "custom" && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <input
-              type="date"
-              value={customFrom}
-              onChange={(e) => setCustomFrom(e.target.value)}
-              className="border rounded-md px-2 py-1 text-sm bg-background text-foreground"
-              data-testid="input-custom-from"
-            />
-            <span className="text-muted-foreground text-sm">to</span>
-            <input
-              type="date"
-              value={customTo}
-              onChange={(e) => setCustomTo(e.target.value)}
-              className="border rounded-md px-2 py-1 text-sm bg-background text-foreground"
-              data-testid="input-custom-to"
-            />
-          </div>
+      {/* Date filter + Pie chart row */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={preset} onValueChange={(v) => setPreset(v as Preset)}>
+            <SelectTrigger className="w-40" data-testid="select-preset">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {presets.map((p) => (
+                <SelectItem key={p.key} value={p.key} data-testid={`option-preset-${p.key}`}>
+                  {p.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {preset === "custom" && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="border rounded-md px-2 py-1 text-sm bg-background text-foreground"
+                data-testid="input-custom-from"
+              />
+              <span className="text-muted-foreground text-sm">to</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="border rounded-md px-2 py-1 text-sm bg-background text-foreground"
+                data-testid="input-custom-to"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Compact pie chart — same row as date picker */}
+        {!isLoading && data && data.production.byCategory.length > 0 && (
+          <CategoryPieChart
+            byCategory={data.production.byCategory}
+            wipersGarbageKg={data.wipersGarbage.totalWeightKg}
+          />
         )}
       </div>
 
@@ -740,14 +740,6 @@ export default function DailyProductionReport() {
           </CardContent>
         </Card>
       </div>
-
-      {/* ── Category Pie Chart ── */}
-      {!isLoading && data && data.production.byCategory.length > 0 && (
-        <CategoryPieChart
-          byCategory={data.production.byCategory}
-          wipersGarbageKg={data.wipersGarbage.totalWeightKg}
-        />
-      )}
 
       {/* ── Expandable detail rows ── */}
 
