@@ -26,6 +26,7 @@ import {
   ChevronRight,
   RefreshCw,
   Layers,
+  Truck,
 } from "lucide-react";
 
 interface BaleDetail {
@@ -56,11 +57,13 @@ interface LedgerData {
   wasteStock: BucketRow[];
   sold: BucketRow[];
   wasteDispatched: BucketRow[];
+  pendingLoading: BucketRow[];
   totals: {
     currentStock: SectionTotal;
     wasteStock: SectionTotal;
     sold: SectionTotal;
     wasteDispatched: SectionTotal;
+    pendingLoading: SectionTotal;
     grand: SectionTotal;
   };
 }
@@ -169,8 +172,8 @@ function SectionTable({ title, subtitle, icon, badgeColor, rows, total, defaultO
                     <TableHead className="text-xs py-2 px-3">Product</TableHead>
                     <TableHead className="text-xs py-2 px-3 text-right">Bales</TableHead>
                     <TableHead className="text-xs py-2 px-3 text-right">Weight (kg)</TableHead>
-                    <TableHead className="text-xs py-2 px-3 text-right">Avg Cost/Bale</TableHead>
-                    <TableHead className="text-xs py-2 px-3 text-right">Total Cost</TableHead>
+                    <TableHead className="text-xs py-2 px-3 text-right">Avg Sell/Bale</TableHead>
+                    <TableHead className="text-xs py-2 px-3 text-right">Total Sell Value</TableHead>
                     {showSoldPrice && (
                       <>
                         <TableHead className="text-xs py-2 px-3 text-right">Avg Sold Rate</TableHead>
@@ -407,6 +410,16 @@ export default function BaleLedger() {
             />
 
             <SectionTable
+              title="Pending Loading / Verified"
+              subtitle="Bales reserved for orders currently in Loading, Pending Verification, or Verified status"
+              icon={<Truck className="w-4 h-4 text-purple-500" />}
+              badgeColor="text-purple-700 border-purple-200"
+              rows={data?.pendingLoading || []}
+              total={data?.totals.pendingLoading || { baleCount: 0, totalWeightKg: 0, totalCost: 0 }}
+              defaultOpen={false}
+            />
+
+            <SectionTable
               title="Waste Dispatched"
               subtitle="Bales removed from stock via waste disposal (Waste Dispatch records)"
               icon={<Trash2 className="w-4 h-4 text-destructive" />}
@@ -443,7 +456,7 @@ export default function BaleLedger() {
                         <p className="text-xl font-bold" data-testid="grand-total-cost">
                           {fmtMoney(grand.totalCost)}
                         </p>
-                        <p className="text-xs text-muted-foreground">total cost</p>
+                        <p className="text-xs text-muted-foreground">total sell value</p>
                       </div>
                       {grand.baleCount > 0 && grand.totalCost > 0 && (
                         <div className="text-center">
@@ -457,7 +470,7 @@ export default function BaleLedger() {
                   </div>
 
                   {data && (
-                    <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 border-t pt-4 sm:grid-cols-4">
+                    <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 border-t pt-4 sm:grid-cols-5">
                       {[
                         {
                           label: "In Hand (Regular)",
@@ -472,6 +485,13 @@ export default function BaleLedger() {
                           kg: data.totals.wasteStock.totalWeightKg,
                           cost: data.totals.wasteStock.totalCost,
                           color: "text-amber-600",
+                        },
+                        {
+                          label: "Pending Loading / Verified",
+                          bales: data.totals.pendingLoading.baleCount,
+                          kg: data.totals.pendingLoading.totalWeightKg,
+                          cost: data.totals.pendingLoading.totalCost,
+                          color: "text-purple-600",
                         },
                         {
                           label: "Sold",

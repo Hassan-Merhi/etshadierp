@@ -1075,7 +1075,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Load all relevant data
-      const [allBalesRaw, allProducts, allCategories] = await Promise.all([
+      const [allBalesRaw, allProducts, allCategories, pendingOrderBaleIdsRaw] = await Promise.all([
         db.execute(sql`
           SELECT
             fb.id,
@@ -1091,11 +1091,23 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           WHERE fb.company_id = ${companyId}
           AND fb.status IN ('IN_STOCK', 'SOLD', 'DISPATCHED')
         `),
-        db.select({ id: factoryBaleProducts.id, name: factoryBaleProducts.name, articleCode: factoryBaleProducts.articleCode, categoryId: factoryBaleProducts.categoryId }).from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId)),
+        db.select({ id: factoryBaleProducts.id, name: factoryBaleProducts.name, articleCode: factoryBaleProducts.articleCode, categoryId: factoryBaleProducts.categoryId, sellingPrice: factoryBaleProducts.sellingPrice }).from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId)),
         db.select({ id: factoryCategories.id, name: factoryCategories.name }).from(factoryCategories).where(eq(factoryCategories.companyId, companyId)),
+        // Bale IDs linked to orders currently in LOADING / PENDING_VERIFICATION / VERIFIED
+        db.execute(sql`
+          SELECT DISTINCT cob.bale_id AS "baleId"
+          FROM customer_order_bales cob
+          INNER JOIN customer_orders co ON co.id = cob.order_id
+          WHERE co.company_id = ${companyId}
+          AND co.status IN ('LOADING', 'PENDING_VERIFICATION', 'VERIFIED')
+        `),
       ]);
 
       const allBales: any[] = Array.isArray(allBalesRaw) ? allBalesRaw : (allBalesRaw as any).rows || [];
+      const pendingOrderBaleIds = new Set<number>(
+        (Array.isArray(pendingOrderBaleIdsRaw) ? pendingOrderBaleIdsRaw : (pendingOrderBaleIdsRaw as any).rows || [])
+          .map((r: any) => Number(r.baleId))
+      );
 
       // Identify waste categories (garbage or wiper)
       const wasteCategories = new Set<number>(
@@ -1129,20 +1141,27 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         };
       }
 
+      // Use selling price per bale (from product) instead of raw cost
+      function getSellingPrice(bale: any): number {
+        const p = bale.productId ? productMap.get(bale.productId) : null;
+        return parseFloat(p?.sellingPrice || "0") || 0;
+      }
+
       // Group bales into buckets
       type BaleDetail = { ref: string; weightKg: number; totalCost: number };
       type BucketRow = { productId: number | null; productName: string; articleCode: string; categoryName: string; baleCount: number; totalWeightKg: number; totalCost: number; baleDetails: BaleDetail[] };
-      const buckets: { currentStock: Map<string, BucketRow>; wasteStock: Map<string, BucketRow>; sold: Map<string, BucketRow>; wasteDispatched: Map<string, BucketRow> } = {
+      const buckets: { currentStock: Map<string, BucketRow>; wasteStock: Map<string, BucketRow>; sold: Map<string, BucketRow>; wasteDispatched: Map<string, BucketRow>; pendingLoading: Map<string, BucketRow> } = {
         currentStock: new Map(),
         wasteStock: new Map(),
         sold: new Map(),
         wasteDispatched: new Map(),
+        pendingLoading: new Map(),
       };
 
       function addToBucket(bucket: Map<string, BucketRow>, key: string, label: ReturnType<typeof getProductLabel>, bale: any) {
         const existing = bucket.get(key);
         const w = parseFloat(bale.weightKg) || 0;
-        const c = parseFloat(bale.totalCost) || 0;
+        const c = getSellingPrice(bale); // selling price replaces cost
         const ref: string = bale.referenceNumber || "";
         const detail: BaleDetail = { ref, weightKg: w, totalCost: c };
         if (existing) {
@@ -1165,7 +1184,10 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         } else if (bale.status === "DISPATCHED" && bale.wasteDispatchId) {
           addToBucket(buckets.wasteDispatched, key, label, bale);
         } else if (bale.status === "IN_STOCK") {
-          if (waste) {
+          if (pendingOrderBaleIds.has(Number(bale.id))) {
+            // Bale is reserved for a LOADING/PENDING_VERIFICATION/VERIFIED order
+            addToBucket(buckets.pendingLoading, key, label, bale);
+          } else if (waste) {
             addToBucket(buckets.wasteStock, key, label, bale);
           } else {
             addToBucket(buckets.currentStock, key, label, bale);
@@ -1193,18 +1215,21 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const wasteStock = bucketToArray(buckets.wasteStock);
       const sold = bucketToArray(buckets.sold);
       const wasteDispatched = bucketToArray(buckets.wasteDispatched);
+      const pendingLoading = bucketToArray(buckets.pendingLoading);
 
       res.json({
         currentStock,
         wasteStock,
         sold,
         wasteDispatched,
+        pendingLoading,
         totals: {
           currentStock: sumBucket(currentStock),
           wasteStock: sumBucket(wasteStock),
           sold: sumBucket(sold),
           wasteDispatched: sumBucket(wasteDispatched),
-          grand: sumBucket([...currentStock, ...wasteStock, ...sold, ...wasteDispatched]),
+          pendingLoading: sumBucket(pendingLoading),
+          grand: sumBucket([...currentStock, ...wasteStock, ...sold, ...wasteDispatched, ...pendingLoading]),
         },
       });
     } catch (error: any) {
