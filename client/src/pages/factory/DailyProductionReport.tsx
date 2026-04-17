@@ -674,12 +674,6 @@ export default function DailyProductionReport() {
                   </span>
                 </div>
                 <StatRow label="Value" value={fmtMoney(data?.wipersGarbage.totalValue ?? 0)} />
-                <div className="mt-3 pt-1 flex justify-center">
-                  <div className="rounded-md bg-background/80 dark:bg-background/60 border border-border px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-foreground">
-                    Total Wiper + Garbage&ensp;
-                    <span className="font-mono">{fmtKg(data?.wipersGarbage.totalWeightKg ?? 0)}</span>
-                  </div>
-                </div>
               </>
             )}
           </CardContent>
