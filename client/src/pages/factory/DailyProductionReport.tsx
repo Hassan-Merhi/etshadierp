@@ -364,7 +364,7 @@ function classifyDetailed(name: string): string {
 }
 
 // ── Chart #2: by grade (Summer+Winter merged into grade numbers) ────────────
-const GRADE_ORDER = ["Grade #1","Grade #2","Grade #3","Grade #4","Grade Crème","Bags","Toys","Shoes","Wipers","Garbage","Other"];
+const GRADE_ORDER = ["Grade #1","Grade #2","Grade #3","Grade #4","Grade Crème","Bags","Toys","Shoes","Wipers & Garbage","Other"];
 const GRADE_COLORS: Record<string, string> = {
   "Grade #1":"#4338ca",
   "Grade #2":"#d97706",
@@ -374,8 +374,7 @@ const GRADE_COLORS: Record<string, string> = {
   "Bags":"#059669",
   "Toys":"#db2777",
   "Shoes":"#ea580c",
-  "Wipers":"#64748b",
-  "Garbage":"#a16207",
+  "Wipers & Garbage":"#64748b",
   "Other":"#d1d5db",
 };
 
@@ -385,8 +384,7 @@ function classifyByGrade(name: string): string {
   if (/BAG/.test(u)) return "Bags";
   if (/TOY/.test(u)) return "Toys";
   if (/SHOE/.test(u)) return "Shoes";
-  if (/WIPER/.test(u)) return "Wipers";
-  if (/GARBAGE|RAG/.test(u)) return "Garbage";
+  if (/WIPER|GARBAGE|RAG/.test(u)) return "Wipers & Garbage";
   if (/CREME|CRÈME|BIG\s*SIZE/.test(u)) return "Grade Crème";
   if (/\b4\b/.test(u)) return "Grade #4";
   if (/\b3\b/.test(u)) return "Grade #3";
