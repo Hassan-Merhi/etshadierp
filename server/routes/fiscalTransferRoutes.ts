@@ -507,12 +507,17 @@ export function registerFiscalTransferRoutes(app: Express) {
         : [];
       const stockItemMap = new Map(stockItemRows.map(s => [s.id, s.name]));
 
-      // Group all items by transfer (no source-location filter — POS users are the destination)
+      // Group all items by transfer
       const itemsByTransfer = new Map<number, typeof itemRows>();
+      // Track which transfers have at least one item sourced from the POS user's location
+      const transfersWithMySourceItem = new Set<number>();
       for (const item of itemRows) {
         const arr = itemsByTransfer.get(item.transferId) || [];
         arr.push(item);
         itemsByTransfer.set(item.transferId, arr);
+        if (posLocationIdList !== null && item.sourceLocationId === posLocationIdList) {
+          transfersWithMySourceItem.add(item.transferId);
+        }
       }
 
       const allResult = rows.map(r => {
@@ -528,6 +533,7 @@ export function registerFiscalTransferRoutes(app: Express) {
           voucherDate:             r.voucherDate,
           notes:                   r.notes,
           inventoryApplied:        r.inventoryApplied,
+          sourceLocationId:        r.sourceLocationId,
           sourceLocationName:      r.sourceLocationId ? (locationMap.get(r.sourceLocationId) ?? "Multi-source") : "Multi-source",
           destinationLocationId:   r.destinationLocationId,
           destinationLocationName: locationMap.get(r.destinationLocationId) ?? "Unknown",
@@ -538,9 +544,14 @@ export function registerFiscalTransferRoutes(app: Express) {
         };
       });
 
-      // For POS users: only show transfers destined for their location
+      // For POS users: show transfers where their location is destination OR source
+      // (Kolwezi/Kolwezi 2 are destinations; Hadi 1/2/3/4 are sources)
       const result = posLocationIdList !== null
-        ? allResult.filter(r => r.destinationLocationId === posLocationIdList)
+        ? allResult.filter(r =>
+            r.destinationLocationId === posLocationIdList ||
+            r.sourceLocationId === posLocationIdList ||
+            transfersWithMySourceItem.has(r.transferId)
+          )
         : allResult;
 
       res.json(result);

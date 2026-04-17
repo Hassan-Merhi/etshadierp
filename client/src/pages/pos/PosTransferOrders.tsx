@@ -40,6 +40,7 @@ interface TransferSummary {
   voucherId: number;
   voucherNumber: string;
   voucherDate: string;
+  sourceLocationId?: number;
   sourceLocationName: string;
   destinationLocationId: number;
   destinationLocationName: string;
@@ -948,7 +949,11 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
                   </TableCell>
                   <TableCell className="py-3 align-top">
                     <div className="font-medium text-sm font-mono" data-testid={`text-voucher-${t.voucherId}`}>{t.voucherNumber}</div>
-                    <div className="text-xs text-muted-foreground">{t.destinationLocationName}</div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                      <span>{t.sourceLocationName}</span>
+                      <ArrowRight className="h-3 w-3 shrink-0" />
+                      <span>{t.destinationLocationName}</span>
+                    </div>
                     {(t.stockItemNames?.length ?? 0) > 0 && (
                       <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">
                         {t.stockItemNames.slice(0, 3).join(", ")}
