@@ -36,7 +36,10 @@ interface CustomerOrder {
   otherChargesTotal: string;
   grandTotal: string;
   totalQtyBales: number;
+  totalWeightKg: string;
   customerName: string;
+  containerNumber?: string | null;
+  proformaName?: string | null;
 }
 
 export default function FactoryPendingInvoices() {
@@ -145,6 +148,8 @@ export default function FactoryPendingInvoices() {
               <TableRow>
                 <TableHead>Order #</TableHead>
                 <TableHead>Customer</TableHead>
+                <TableHead>Proforma</TableHead>
+                <TableHead>Container</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead className="text-right">Bales</TableHead>
                 <TableHead className="text-right">Total</TableHead>
@@ -155,7 +160,7 @@ export default function FactoryPendingInvoices() {
             <TableBody>
               {filteredOrders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8" data-testid="text-no-orders">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8" data-testid="text-no-orders">
                     <div className="flex flex-col items-center gap-2">
                       <Package className="h-10 w-10 opacity-40" />
                       <p>No invoices found</p>
@@ -175,6 +180,12 @@ export default function FactoryPendingInvoices() {
                     </TableCell>
                     <TableCell data-testid={`text-customer-name-${order.id}`}>
                       {order.customerName}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground" data-testid={`text-proforma-${order.id}`}>
+                      {order.proformaName || <span className="text-muted-foreground/50">—</span>}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm" data-testid={`text-container-${order.id}`}>
+                      {order.containerNumber || <span className="text-muted-foreground/50">—</span>}
                     </TableCell>
                     <TableCell className="font-mono text-sm" data-testid={`text-order-date-${order.id}`}>
                       {order.orderDate ? formatDisplayDate(order.orderDate) : "-"}
