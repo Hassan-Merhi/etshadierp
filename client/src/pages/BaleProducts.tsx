@@ -70,6 +70,7 @@ export default function BaleProducts() {
   const [condensedView, setCondensedView] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showCategories, setShowCategories] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingCategory, setEditingCategory] = useState<{ id: number; name: string } | null>(null);
   const [editingProduct, setEditingProduct] = useState<FactoryBaleProduct | null>(null);
@@ -598,64 +599,126 @@ export default function BaleProducts() {
               </Button>
             </div>
             {categories && categories.length > 0 ? (
-              <div className="space-y-2">
-                {categories.map((cat) => (
-                  <div key={cat.id} className="flex items-center justify-between gap-2 p-2 rounded-md border">
-                    {editingCategory?.id === cat.id ? (
-                      <div className="flex items-center gap-2 flex-1">
-                        <Input
-                          value={editingCategory.name}
-                          onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
-                          data-testid={`input-edit-category-${cat.id}`}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && editingCategory.name.trim()) {
-                              updateCategoryMutation.mutate({ id: cat.id, name: editingCategory.name.trim() });
-                            }
-                            if (e.key === "Escape") setEditingCategory(null);
-                          }}
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => updateCategoryMutation.mutate({ id: cat.id, name: editingCategory.name.trim() })}
-                          disabled={!editingCategory.name.trim()}
-                          data-testid={`button-save-category-${cat.id}`}
-                        >
-                          Save
-                        </Button>
-                        <Button size="icon" variant="ghost" onClick={() => setEditingCategory(null)}>
-                          <X className="h-4 w-4" />
-                        </Button>
+              <div className="space-y-1">
+                {categories.map((cat) => {
+                  const catProducts = (products ?? []).filter((p) => p.categoryId === cat.id);
+                  const isExpanded = expandedCategories.has(cat.id);
+                  return (
+                    <div key={cat.id} className="rounded-md border overflow-hidden">
+                      {/* Category header row */}
+                      <div className="flex items-center justify-between gap-2 p-2 bg-muted/30">
+                        {editingCategory?.id === cat.id ? (
+                          <div className="flex items-center gap-2 flex-1">
+                            <Input
+                              value={editingCategory.name}
+                              onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
+                              data-testid={`input-edit-category-${cat.id}`}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && editingCategory.name.trim()) {
+                                  updateCategoryMutation.mutate({ id: cat.id, name: editingCategory.name.trim() });
+                                }
+                                if (e.key === "Escape") setEditingCategory(null);
+                              }}
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => updateCategoryMutation.mutate({ id: cat.id, name: editingCategory.name.trim() })}
+                              disabled={!editingCategory.name.trim()}
+                              data-testid={`button-save-category-${cat.id}`}
+                            >
+                              Save
+                            </Button>
+                            <Button size="icon" variant="ghost" onClick={() => setEditingCategory(null)}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              className="flex items-center gap-2 flex-1 text-left min-w-0"
+                              onClick={() => setExpandedCategories((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(cat.id)) next.delete(cat.id); else next.add(cat.id);
+                                return next;
+                              })}
+                              data-testid={`button-expand-category-${cat.id}`}
+                            >
+                              {isExpanded
+                                ? <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                : <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />}
+                              <span className="font-medium" data-testid={`text-category-${cat.id}`}>{cat.name}</span>
+                              {!cat.isActive && <Badge variant="outline">Inactive</Badge>}
+                              <span className="text-xs text-muted-foreground ml-1">({catProducts.length})</span>
+                            </button>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setEditingCategory({ id: cat.id, name: cat.name })}
+                                data-testid={`button-edit-category-${cat.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setPendingDelete(() => () => deleteCategoryMutation.mutate(cat.id))}
+                                data-testid={`button-delete-category-${cat.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </>
+                        )}
                       </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium" data-testid={`text-category-${cat.id}`}>{cat.name}</span>
-                          {!cat.isActive && <Badge variant="outline">Inactive</Badge>}
+
+                      {/* Expanded products list */}
+                      {isExpanded && (
+                        <div className="border-t">
+                          {catProducts.length === 0 ? (
+                            <p className="text-xs text-muted-foreground px-4 py-2">No products in this category.</p>
+                          ) : (
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b bg-muted/10">
+                                  <th className="text-left px-4 py-1.5 text-xs font-medium text-muted-foreground">Code</th>
+                                  <th className="text-left px-4 py-1.5 text-xs font-medium text-muted-foreground">Name</th>
+                                  {!hideAvgRate && <th className="text-right px-4 py-1.5 text-xs font-medium text-muted-foreground">Prod. Price</th>}
+                                  {!hideSellingPriceBP && <th className="text-right px-4 py-1.5 text-xs font-medium text-muted-foreground">Sell Price</th>}
+                                  <th className="text-right px-4 py-1.5 text-xs font-medium text-muted-foreground">Wt/Bale</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {catProducts.map((p) => (
+                                  <tr key={p.id} className="border-b last:border-0 hover-elevate" data-testid={`row-cat-product-${p.id}`}>
+                                    <td className="px-4 py-1.5 font-mono text-xs text-muted-foreground">{p.articleCode}</td>
+                                    <td className="px-4 py-1.5 font-medium">
+                                      {p.name}
+                                      {p.active === false && <Badge variant="outline" className="ml-2 text-xs">Hidden</Badge>}
+                                    </td>
+                                    {!hideAvgRate && (
+                                      <td className="px-4 py-1.5 text-right tabular-nums text-xs">
+                                        {parseFloat(p.productionPrice || "0") > 0 ? `$${parseFloat(p.productionPrice!).toFixed(2)}` : <span className="text-muted-foreground">—</span>}
+                                      </td>
+                                    )}
+                                    {!hideSellingPriceBP && (
+                                      <td className="px-4 py-1.5 text-right tabular-nums text-xs">
+                                        {parseFloat(p.sellingPrice || "0") > 0 ? `$${parseFloat(p.sellingPrice!).toFixed(2)}` : <span className="text-muted-foreground">—</span>}
+                                      </td>
+                                    )}
+                                    <td className="px-4 py-1.5 text-right tabular-nums text-xs text-muted-foreground">
+                                      {p.weightPerBaleKg ? `${p.weightPerBaleKg} kg` : "—"}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => setEditingCategory({ id: cat.id, name: cat.name })}
-                            data-testid={`button-edit-category-${cat.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => {
-                              setPendingDelete(() => () => deleteCategoryMutation.mutate(cat.id));
-                            }}
-                            data-testid={`button-delete-category-${cat.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))}
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No categories yet. Create one above.</p>
