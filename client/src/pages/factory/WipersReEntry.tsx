@@ -55,13 +55,15 @@ function isWipers(product: FactoryBaleProduct, categories: FactoryCategory[]): b
   const cat = categories.find(c => c.id === product.categoryId);
   const catName = cat?.name?.toLowerCase() || "";
   const prodName = product.name?.toLowerCase() || "";
-  return catName.includes("wiper") || prodName.includes("wiper");
+  return catName.includes("wiper") || prodName.includes("wiper")
+    || catName.includes("garbage") || prodName.includes("garbage");
 }
 
 function isWipersBale(bale: any): boolean {
   const cat = (bale.bale?.category || bale.category || "").toLowerCase();
   const name = (bale.bale?.productName || bale.productName || "").toLowerCase();
-  return cat.includes("wiper") || name.includes("wiper");
+  return cat.includes("wiper") || name.includes("wiper")
+    || cat.includes("garbage") || name.includes("garbage");
 }
 
 export default function WipersReEntry() {
@@ -339,7 +341,7 @@ export default function WipersReEntry() {
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Wipers Re-Entry by Date</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Create new wipers bales under a chosen entry date and print labels
+            Create new wipers / garbage bales under a chosen entry date and print labels
           </p>
         </div>
 
@@ -414,7 +416,7 @@ export default function WipersReEntry() {
             <div className="relative">
               <Input
                 ref={scanRef}
-                placeholder="Search wipers product by name or article code..."
+                placeholder="Search wipers / garbage product by name or article code..."
                 value={searchInput}
                 onChange={e => { setSearchInput(e.target.value); setShowDropdown(true); setSearchError(""); }}
                 onFocus={() => setShowDropdown(true)}
@@ -440,7 +442,7 @@ export default function WipersReEntry() {
               )}
               {productsLoading && <p className="text-xs text-muted-foreground mt-1">Loading products...</p>}
               {!productsLoading && wiperProducts.length === 0 && (
-                <p className="text-xs text-muted-foreground mt-1">No wipers products found. Ensure products are categorized as wipers.</p>
+                <p className="text-xs text-muted-foreground mt-1">No wipers/garbage products found. Ensure products are categorized as Wipers or Garbage.</p>
               )}
             </div>
 
@@ -519,7 +521,7 @@ export default function WipersReEntry() {
               </div>
             ) : (
               <div className="py-8 text-center text-muted-foreground text-sm">
-                Search and add wipers products above
+                Search and add wipers / garbage products above
               </div>
             )}
 
@@ -562,13 +564,13 @@ export default function WipersReEntry() {
           {cleanupOpen && (
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Use this panel to remove current wipers bales before re-entering with the new date.
+                Use this panel to remove current wipers / garbage bales before re-entering with the new date.
                 Supervisor credentials are required.
               </p>
               {balesLoading ? (
                 <Skeleton className="h-32 w-full" />
               ) : currentWipersBales.length === 0 ? (
-                <div className="py-6 text-center text-muted-foreground text-sm">No wipers bales currently in stock</div>
+                <div className="py-6 text-center text-muted-foreground text-sm">No wipers / garbage bales currently in stock</div>
               ) : (
                 <>
                   <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
