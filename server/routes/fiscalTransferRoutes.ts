@@ -469,6 +469,14 @@ export function registerFiscalTransferRoutes(app: Express) {
         if (r.sourceLocationId)      locationIds.add(r.sourceLocationId);
         if (r.destinationLocationId) locationIds.add(r.destinationLocationId);
       }
+      // Determine if this is a POS user and their assigned location
+      const isPosUserList = req.user?.role?.startsWith("POS");
+      const posLocationIdList = isPosUserList
+        ? (req.user?.assignedLocationId ?? req.session?.currentLocationId ?? null)
+        : null;
+
+      if (posLocationIdList) locationIds.add(posLocationIdList);
+
       const locationRows = locationIds.size > 0
         ? await db.select({ id: locations.id, name: locations.name })
             .from(locations)
@@ -476,12 +484,6 @@ export function registerFiscalTransferRoutes(app: Express) {
             .execute()
         : [];
       const locationMap = new Map(locationRows.map(l => [l.id, l.name]));
-
-      // Determine if this is a POS user and their assigned location
-      const isPosUserList = req.user?.role?.startsWith("POS");
-      const posLocationIdList = isPosUserList
-        ? (req.user?.assignedLocationId ?? req.session?.currentLocationId ?? null)
-        : null;
 
       // Batch-fetch item counts and totals per transfer
       const transferIds = rows.map(r => r.transferId);
@@ -543,8 +545,10 @@ export function registerFiscalTransferRoutes(app: Express) {
           voucherDate:             r.voucherDate,
           notes:                   r.notes,
           inventoryApplied:        r.inventoryApplied,
-          sourceLocationId:        r.sourceLocationId,
-          sourceLocationName:      r.sourceLocationId ? (locationMap.get(r.sourceLocationId) ?? "Multi-source") : "Multi-source",
+          sourceLocationId:        isDestUser ? r.sourceLocationId : (posLocationIdList ?? r.sourceLocationId),
+          sourceLocationName:      isDestUser
+            ? (r.sourceLocationId ? (locationMap.get(r.sourceLocationId) ?? "Multi-source") : "Multi-source")
+            : (posLocationIdList ? (locationMap.get(posLocationIdList) ?? "Unknown") : (r.sourceLocationId ? (locationMap.get(r.sourceLocationId) ?? "Multi-source") : "Multi-source")),
           destinationLocationId:   r.destinationLocationId,
           destinationLocationName: locationMap.get(r.destinationLocationId) ?? "Unknown",
           itemCount:               myItems.length,
@@ -1110,6 +1114,7 @@ export function registerFiscalTransferRoutes(app: Express) {
       const locationIds = new Set<number>();
       if (transferRow.sourceLocationId) locationIds.add(transferRow.sourceLocationId);
       if (transferRow.destinationLocationId) locationIds.add(transferRow.destinationLocationId);
+      if (posLocationId) locationIds.add(posLocationId);
       for (const item of transferItems) {
         if (item.sourceLocationId) locationIds.add(item.sourceLocationId);
       }
@@ -1151,10 +1156,10 @@ export function registerFiscalTransferRoutes(app: Express) {
         voucherDate: voucherRow?.voucherDate,
         optional: voucherRow?.optional,
         inventoryApplied: transferRow.inventoryApplied,
-        sourceLocationId: transferRow.sourceLocationId,
-        sourceLocationName: transferRow.sourceLocationId
-          ? (locationMap.get(transferRow.sourceLocationId) ?? "Unknown")
-          : "Multi-source",
+        sourceLocationId: isDestinationUser ? transferRow.sourceLocationId : (posLocationId ?? transferRow.sourceLocationId),
+        sourceLocationName: isDestinationUser
+          ? (transferRow.sourceLocationId ? (locationMap.get(transferRow.sourceLocationId) ?? "Unknown") : "Multi-source")
+          : (posLocationId ? (locationMap.get(posLocationId) ?? "Unknown") : (transferRow.sourceLocationId ? (locationMap.get(transferRow.sourceLocationId) ?? "Unknown") : "Multi-source")),
         destinationLocationId: transferRow.destinationLocationId,
         destinationLocationName: locationMap.get(transferRow.destinationLocationId) ?? "Unknown",
         notes: transferRow.notes,
