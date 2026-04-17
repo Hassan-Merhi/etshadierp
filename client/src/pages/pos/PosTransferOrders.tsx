@@ -799,9 +799,11 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
   const [dateFilter, setDateFilter] = useState(format(new Date(), "yyyy-MM-dd"));
 
   const { data: allTransfers = [], isLoading } = useQuery<TransferSummary[]>({
-    queryKey: ["/api/stock-transfers/list"],
+    queryKey: ["/api/stock-transfers/list", dateFilter],
     queryFn: async () => {
-      const res = await fetch("/api/stock-transfers/list", { credentials: "include" });
+      const params = new URLSearchParams();
+      if (dateFilter) { params.set("startDate", dateFilter); params.set("endDate", dateFilter); }
+      const res = await fetch(`/api/stock-transfers/list?${params}`, { credentials: "include" });
       return res.ok ? res.json() : [];
     },
   });
@@ -812,10 +814,8 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
       if (statusFilter === "applied" && !t.inventoryApplied) return false;
       if (statusFilter === "pending" && t.inventoryApplied) return false;
       if (dateFilter) {
-        try {
-          const tDate = format(parseISO(t.voucherDate), "yyyy-MM-dd");
-          if (tDate !== dateFilter) return false;
-        } catch { return false; }
+        const tDate = String(t.voucherDate ?? "").slice(0, 10);
+        if (tDate !== dateFilter) return false;
       }
       const s = search.toLowerCase().trim();
       if (!s) return true;
