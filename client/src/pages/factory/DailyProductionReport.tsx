@@ -386,38 +386,72 @@ export default function DailyProductionReport() {
               <Skeleton className="h-5 w-40" />
             </div>
           ) : (
-            <div className="flex flex-wrap items-center gap-6">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Batch Cost</span>
-                <span className="text-base font-bold" data-testid="text-batch-cost">
-                  {fmtMoney(data?.summary.batchCost ?? 0)}
-                </span>
+            <div className="flex flex-col gap-2">
+              {/* Row 1 — money summary */}
+              <div className="flex flex-wrap items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Batch Cost</span>
+                  <span className="text-base font-bold" data-testid="text-batch-cost">
+                    {fmtMoney(data?.summary.batchCost ?? 0)}
+                  </span>
+                </div>
+                <div className="w-px h-5 bg-border" />
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Production Value</span>
+                  <span className="text-base font-bold text-blue-600 dark:text-blue-400" data-testid="text-production-value">
+                    {fmtMoney(data?.summary.productionValue ?? 0)}
+                  </span>
+                </div>
+                <div className="w-px h-5 bg-border" />
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</span>
+                  <span
+                    className={`text-base font-bold px-3 py-0.5 rounded-md ${
+                      statusPositive
+                        ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                        : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                    }`}
+                    data-testid="text-status-value"
+                  >
+                    {statusPositive ? "+" : ""}{fmtMoney(statusValue)}
+                  </span>
+                  {statusPositive
+                    ? <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    : statusValue === 0
+                      ? <Minus className="h-4 w-4 text-muted-foreground" />
+                      : <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />}
+                </div>
               </div>
-              <div className="w-px h-5 bg-border" />
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Production Value</span>
-                <span className="text-base font-bold text-blue-600 dark:text-blue-400" data-testid="text-production-value">
-                  {fmtMoney(data?.summary.productionValue ?? 0)}
-                </span>
-              </div>
-              <div className="w-px h-5 bg-border" />
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</span>
-                <span
-                  className={`text-base font-bold px-3 py-0.5 rounded-md ${
-                    statusPositive
-                      ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-                      : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
-                  }`}
-                  data-testid="text-status-value"
-                >
-                  {statusPositive ? "+" : ""}{fmtMoney(statusValue)}
-                </span>
-                {statusPositive
-                  ? <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  : statusValue === 0
-                    ? <Minus className="h-4 w-4 text-muted-foreground" />
-                    : <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />}
+
+              {/* Row 2 — weight breakdown */}
+              <div className="flex flex-wrap items-center gap-4 pt-1.5 border-t border-border">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">Original Batches</span>
+                  <span className="text-xs font-semibold" data-testid="text-weight-batches">
+                    {fmtKg(data?.rawMaterial.totalWeightKg ?? 0)}
+                  </span>
+                </div>
+                <span className="text-muted-foreground text-xs">+</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">Bales</span>
+                  <span className="text-xs font-semibold" data-testid="text-weight-bales">
+                    {fmtKg(data?.production.totalWeightKg ?? 0)}
+                  </span>
+                </div>
+                <span className="text-muted-foreground text-xs">+</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">Wipers &amp; Garbage</span>
+                  <span className="text-xs font-semibold" data-testid="text-weight-wg">
+                    {fmtKg(data?.wipersGarbage.totalWeightKg ?? 0)}
+                  </span>
+                </div>
+                <span className="text-muted-foreground text-xs">=</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">Total</span>
+                  <span className="text-xs font-bold" data-testid="text-weight-total">
+                    {fmtKg((data?.rawMaterial.totalWeightKg ?? 0) + (data?.production.totalWeightKg ?? 0) + (data?.wipersGarbage.totalWeightKg ?? 0))}
+                  </span>
+                </div>
               </div>
             </div>
           )}
