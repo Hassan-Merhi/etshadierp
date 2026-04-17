@@ -767,8 +767,8 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       if (to)   baleConditions.push(sql`COALESCE(DATE(${factoryBales.stockEntryDate}), DATE(${factoryBales.createdAt})) <= ${to}`);
 
       const mixBatchConditions: any[] = [eq(factoryMixBatches.companyId, companyId)];
-      if (from) mixBatchConditions.push(sql`DATE(${factoryMixBatches.createdAt}) >= ${from}`);
-      if (to)   mixBatchConditions.push(sql`DATE(${factoryMixBatches.createdAt}) <= ${to}`);
+      if (from) mixBatchConditions.push(sql`COALESCE(${factoryMixBatches.batchDate}, DATE(${factoryMixBatches.createdAt})) >= ${from}`);
+      if (to)   mixBatchConditions.push(sql`COALESCE(${factoryMixBatches.batchDate}, DATE(${factoryMixBatches.createdAt})) <= ${to}`);
 
       // ── Fetch bales with product selling price and category ──
       const baleRows = await db
@@ -850,11 +850,12 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           totalWeightKg: factoryMixBatches.totalWeightKg,
           costPerKg: factoryMixBatches.costPerKg,
           totalCost: factoryMixBatches.totalCost,
+          batchDate: factoryMixBatches.batchDate,
           createdAt: factoryMixBatches.createdAt,
         })
         .from(factoryMixBatches)
         .where(and(...mixBatchConditions))
-        .orderBy(factoryMixBatches.createdAt);
+        .orderBy(sql`COALESCE(${factoryMixBatches.batchDate}, DATE(${factoryMixBatches.createdAt}))`);
 
       const totalMixWeightKg = mixBatchRows.reduce((s: number, r: any) => s + parseFloat(r.totalWeightKg || "0"), 0);
       const totalMixCost = mixBatchRows.reduce((s: number, r: any) => s + parseFloat(r.totalCost || "0"), 0);
