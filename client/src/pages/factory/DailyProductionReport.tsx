@@ -506,16 +506,16 @@ export default function DailyProductionReport() {
               {/* Row 1 — money summary */}
               <div className="flex flex-wrap items-center gap-6">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Batch Cost</span>
-                  <span className="text-base font-bold" data-testid="text-batch-cost">
-                    {fmtMoney(data?.summary.batchCost ?? 0)}
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Production Value</span>
+                  <span className="text-base font-bold text-blue-600 dark:text-blue-400" data-testid="text-production-value">
+                    {fmtMoney(data?.summary.productionValue ?? 0)}
                   </span>
                 </div>
                 <div className="w-px h-5 bg-border" />
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Production Value</span>
-                  <span className="text-base font-bold text-blue-600 dark:text-blue-400" data-testid="text-production-value">
-                    {fmtMoney(data?.summary.productionValue ?? 0)}
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Batch Cost</span>
+                  <span className="text-base font-bold" data-testid="text-batch-cost">
+                    {fmtMoney(data?.summary.batchCost ?? 0)}
                   </span>
                 </div>
                 <div className="w-px h-5 bg-border" />
