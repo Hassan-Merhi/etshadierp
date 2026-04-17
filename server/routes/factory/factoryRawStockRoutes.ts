@@ -619,20 +619,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
         ))
         .orderBy(desc(factoryRawMaterialAdjustments.createdAt));
 
-      const adjustments = adjRows.map(r => ({
-        kind: "adjustment" as const,
-        date: r.date || r.createdAt,
-        createdAt: r.createdAt,
-        type: r.type,
-        kg: parseFloat(r.kg as string) || 0,
-        costPerKg: parseFloat(r.costPerKg as string) || 0,
-        currencyCode: r.currencyCode || "USD",
-        notes: r.notes,
-        label: r.type === "ADD" ? "Manual Addition" : "Manual Deduction",
-        ref: `ADJ-${r.id}`,
-      }));
-
-      // 2. Mix batch usage: batch sources referencing this supplier
+      // 2. Mix batch usage: batch sources referencing this supplier (aggregate per batch)
       const batchSourceRows = await db.select({
         batchId: factoryMixBatches.id,
         batchCode: factoryMixBatches.batchCode,
@@ -651,25 +638,35 @@ export function registerFactoryRawStockRoutes(app: Express) {
         ))
         .orderBy(desc(factoryMixBatches.createdAt));
 
-      const batches = batchSourceRows.map(r => ({
-        kind: "batch" as const,
-        date: r.batchDate || r.createdAt,
-        createdAt: r.createdAt,
-        type: "USED",
-        kg: parseFloat(r.weightKg as string) || 0,
-        costPerKg: parseFloat(r.costPerKg as string) || 0,
-        currencyCode: "USD",
-        notes: null,
-        label: `Mix Batch — ${r.batchName || r.batchCode}`,
-        ref: r.batchCode,
-        batchStatus: r.batchStatus,
-        batchId: r.batchId,
-      }));
+      // Aggregate multiple source rows for the same batch into one timeline entry
+      const batchAggMap = new Map<number, any>();
+      for (const r of batchSourceRows) {
+        if (batchAggMap.has(r.batchId)) {
+          batchAggMap.get(r.batchId).kg += parseFloat(r.weightKg as string) || 0;
+        } else {
+          batchAggMap.set(r.batchId, {
+            kind: "batch" as const,
+            date: r.batchDate || r.createdAt,
+            createdAt: r.createdAt,
+            type: "USED",
+            kg: parseFloat(r.weightKg as string) || 0,
+            costPerKg: parseFloat(r.costPerKg as string) || 0,
+            currencyCode: "USD",
+            notes: null,
+            label: `Mix Batch — ${r.batchName || r.batchCode}`,
+            ref: r.batchCode,
+            batchStatus: r.batchStatus,
+            batchId: r.batchId,
+          });
+        }
+      }
+      const batches = Array.from(batchAggMap.values());
 
       // 3. Container-based raw stock receipts for this supplier
       const containerRows = await db.select({
         id: factoryRawStock.id,
         receivedKg: factoryRawStock.receivedKg,
+        usedKg: factoryRawStock.usedKg,
         costPerKg: factoryRawStock.costPerKg,
         offloadedAt: factoryRawStock.offloadedAt,
         containerNumber: factoryContainers.containerNumber,
@@ -691,6 +688,8 @@ export function registerFactoryRawStockRoutes(app: Express) {
         createdAt: r.offloadedAt,
         type: "RECEIPT",
         kg: parseFloat(r.receivedKg as string) || 0,
+        usedKg: parseFloat(r.usedKg as string) || 0,
+        rawStockId: r.id,
         costPerKg: parseFloat(r.costPerKg as string) || 0,
         currencyCode: r.currencyCode || "USD",
         notes: r.origin ? `Origin: ${r.origin}` : null,
@@ -700,7 +699,22 @@ export function registerFactoryRawStockRoutes(app: Express) {
         batchId: null,
       }));
 
-      const all = [...adjustments, ...batches, ...receipts]
+      // Also expose adjId on adjustments
+      const adjustmentsWithId = adjRows.map(r => ({
+        kind: "adjustment" as const,
+        adjId: r.id,
+        date: r.date || r.createdAt,
+        createdAt: r.createdAt,
+        type: r.type,
+        kg: parseFloat(r.kg as string) || 0,
+        costPerKg: parseFloat(r.costPerKg as string) || 0,
+        currencyCode: r.currencyCode || "USD",
+        notes: r.notes,
+        label: r.type === "ADD" ? "Manual Addition" : "Manual Deduction",
+        ref: `ADJ-${r.id}`,
+      }));
+
+      const all = [...adjustmentsWithId, ...batches, ...receipts]
         .sort((a, b) => new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime());
 
       res.json(all);
@@ -856,6 +870,147 @@ export function registerFactoryRawStockRoutes(app: Express) {
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting raw stock adjustment:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DELETE a batch source entry for a supplier from a batch (reverses usedKg on raw stock)
+  app.delete("/api/factory/raw-stock/batch-source", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const batchId = parseInt(req.body.batchId);
+      const supplierId = parseInt(req.body.supplierId);
+      if (isNaN(batchId) || isNaN(supplierId)) return res.status(400).json({ message: "batchId and supplierId are required" });
+
+      await db.transaction(async (tx: any) => {
+        // Verify batch belongs to this company
+        const [batch] = await tx.select().from(factoryMixBatches)
+          .where(and(eq(factoryMixBatches.id, batchId), eq(factoryMixBatches.companyId, companyId)))
+          .limit(1);
+        if (!batch) throw new Error("Batch not found");
+
+        // Find all source records for this supplier in this batch
+        const sources = await tx.select().from(factoryMixBatchSources)
+          .where(and(
+            eq(factoryMixBatchSources.mixBatchId, batchId),
+            eq(factoryMixBatchSources.supplierId, supplierId),
+          ));
+        if (sources.length === 0) throw new Error("No source records found for this supplier in this batch");
+
+        let totalKgToReverse = 0;
+        let totalCostToReverse = 0;
+
+        for (const src of sources) {
+          const srcKg = parseFloat(src.weightKg as string) || 0;
+          const srcCost = parseFloat(src.totalCost as string) || 0;
+          totalKgToReverse += srcKg;
+          totalCostToReverse += srcCost;
+
+          // If this source references a container raw stock row, reverse usedKg
+          if (src.containerId) {
+            await tx.update(factoryRawStock)
+              .set({ usedKg: sql`GREATEST(0, ${factoryRawStock.usedKg} - ${srcKg})` })
+              .where(and(
+                eq(factoryRawStock.companyId, companyId),
+                eq(factoryRawStock.containerId, src.containerId),
+              ));
+          }
+        }
+
+        // Delete all source records for this supplier in this batch
+        await tx.delete(factoryMixBatchSources)
+          .where(and(
+            eq(factoryMixBatchSources.mixBatchId, batchId),
+            eq(factoryMixBatchSources.supplierId, supplierId),
+          ));
+
+        // Update the batch totals
+        const newTotalKg = Math.max(0, parseFloat(batch.totalWeightKg as string) - totalKgToReverse);
+        const newTotalCost = Math.max(0, parseFloat(batch.totalCost as string) - totalCostToReverse);
+        const newCostPerKg = newTotalKg > 0 ? newTotalCost / newTotalKg : 0;
+
+        await tx.update(factoryMixBatches)
+          .set({
+            totalWeightKg: String(newTotalKg),
+            totalCost: String(newTotalCost),
+            costPerKg: String(newCostPerKg),
+            updatedAt: new Date(),
+          })
+          .where(eq(factoryMixBatches.id, batchId));
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting batch source:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DELETE a container raw stock receipt (only if no kg has been used yet)
+  app.delete("/api/factory/raw-stock/receipts/:rawStockId", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rawStockId = parseInt(req.params.rawStockId);
+      if (isNaN(rawStockId)) return res.status(400).json({ message: "Invalid rawStockId" });
+
+      const [row] = await db.select().from(factoryRawStock)
+        .where(and(eq(factoryRawStock.id, rawStockId), eq(factoryRawStock.companyId, companyId)))
+        .limit(1);
+      if (!row) return res.status(404).json({ message: "Raw stock record not found" });
+
+      const usedKg = parseFloat(row.usedKg as string) || 0;
+      if (usedKg > 0.001) {
+        return res.status(400).json({
+          message: `Cannot delete: ${usedKg.toFixed(3)} kg have already been used from this receipt in batches. Delete the batch sources first or edit the balance instead.`,
+        });
+      }
+
+      await db.delete(factoryRawStock)
+        .where(and(eq(factoryRawStock.id, rawStockId), eq(factoryRawStock.companyId, companyId)));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting raw stock receipt:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PATCH update receivedKg on a container raw stock record (fixes balance going forward)
+  app.patch("/api/factory/raw-stock/receipts/:rawStockId", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rawStockId = parseInt(req.params.rawStockId);
+      if (isNaN(rawStockId)) return res.status(400).json({ message: "Invalid rawStockId" });
+
+      const { receivedKg } = req.body;
+      const newKg = parseFloat(receivedKg);
+      if (isNaN(newKg) || newKg < 0) return res.status(400).json({ message: "receivedKg must be a non-negative number" });
+
+      const [row] = await db.select().from(factoryRawStock)
+        .where(and(eq(factoryRawStock.id, rawStockId), eq(factoryRawStock.companyId, companyId)))
+        .limit(1);
+      if (!row) return res.status(404).json({ message: "Raw stock record not found" });
+
+      const usedKg = parseFloat(row.usedKg as string) || 0;
+      if (newKg < usedKg - 0.001) {
+        return res.status(400).json({
+          message: `Cannot set receivedKg below already-used amount (${usedKg.toFixed(3)} kg used). Delete the batch sources first or set a higher value.`,
+        });
+      }
+
+      await db.update(factoryRawStock)
+        .set({ receivedKg: String(newKg) })
+        .where(and(eq(factoryRawStock.id, rawStockId), eq(factoryRawStock.companyId, companyId)));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error updating raw stock receipt:", error);
       res.status(500).json({ message: error.message });
     }
   });

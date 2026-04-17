@@ -377,6 +377,11 @@ export default function ProductionRawStock() {
   const [addToBatchKg, setAddToBatchKg] = useState("");
   const [addToBatchCost, setAddToBatchCost] = useState("");
 
+  // History dialog action state
+  const [historyDeleteTarget, setHistoryDeleteTarget] = useState<{ kind: string; label: string; adjId?: number; batchId?: number; rawStockId?: number } | null>(null);
+  const [historyEditTarget, setHistoryEditTarget] = useState<{ rawStockId: number; currentKg: number; usedKg: number } | null>(null);
+  const [historyEditKg, setHistoryEditKg] = useState("");
+
   // Mix batch section state
   const [createMixBatchOpen, setCreateMixBatchOpen] = useState(false);
   const [dailyReportOpen, setDailyReportOpen] = useState(false);
@@ -463,6 +468,78 @@ export default function ProductionRawStock() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
       setDeleteBatchId(null);
       toast({ title: "Batch deleted", description: "Mix batch deleted. Bales have been unlinked." });
+    },
+    onError: (err: any) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteAdjMutation = useMutation({
+    mutationFn: async (adjId: number) => {
+      const res = await modeApiRequest("DELETE", `/api/factory/raw-stock/adjustments/${adjId}`);
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/history", historySupplier?.id] });
+      setHistoryDeleteTarget(null);
+      toast({ title: "Deleted", description: "Adjustment removed." });
+    },
+    onError: (err: any) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteBatchSourceMutation = useMutation({
+    mutationFn: async ({ batchId, supplierId }: { batchId: number; supplierId: number }) => {
+      const res = await modeApiRequest("DELETE", `/api/factory/raw-stock/batch-source`, { batchId, supplierId });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/history", historySupplier?.id] });
+      setHistoryDeleteTarget(null);
+      toast({ title: "Deleted", description: "Batch source removed and stock restored." });
+    },
+    onError: (err: any) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateReceiptMutation = useMutation({
+    mutationFn: async ({ rawStockId, receivedKg }: { rawStockId: number; receivedKg: string }) => {
+      const res = await modeApiRequest("PATCH", `/api/factory/raw-stock/receipts/${rawStockId}`, { receivedKg });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/by-container"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/history", historySupplier?.id] });
+      setHistoryEditTarget(null);
+      setHistoryEditKg("");
+      toast({ title: "Updated", description: "Received balance updated." });
+    },
+    onError: (err: any) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteReceiptMutation = useMutation({
+    mutationFn: async (rawStockId: number) => {
+      const res = await modeApiRequest("DELETE", `/api/factory/raw-stock/receipts/${rawStockId}`);
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/by-container"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/history", historySupplier?.id] });
+      setHistoryDeleteTarget(null);
+      toast({ title: "Deleted", description: "Container receipt removed." });
     },
     onError: (err: any) => {
       if (err?._handledGlobally) return;
@@ -3256,7 +3333,7 @@ export default function ProductionRawStock() {
       </Dialog>
 
       {/* ── Material History Dialog ── */}
-      <Dialog open={!!historySupplier} onOpenChange={(open) => { if (!open) setHistorySupplier(null); }}>
+      <Dialog open={!!historySupplier} onOpenChange={(open) => { if (!open) { setHistorySupplier(null); setHistoryEditTarget(null); setHistoryEditKg(""); } }}>
         <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -3281,17 +3358,17 @@ export default function ProductionRawStock() {
                 {materialHistory.map((entry: any, i: number) => {
                   const isAdd = entry.type === "ADD" || entry.type === "RECEIPT";
                   const isUsed = entry.type === "USED";
-                  const isRemove = entry.type === "REMOVE";
                   const dateStr = entry.date
                     ? new Date(entry.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                     : "—";
+                  const isEditingThis = historyEditTarget?.rawStockId === entry.rawStockId;
                   return (
                     <div
                       key={i}
-                      className="flex items-start justify-between gap-3 px-3 py-2.5 rounded-md hover-elevate bg-muted/20"
+                      className="flex items-start justify-between gap-3 px-3 py-2.5 rounded-md bg-muted/20"
                       data-testid={`row-history-${i}`}
                     >
-                      <div className="flex items-start gap-2.5 min-w-0">
+                      <div className="flex items-start gap-2.5 min-w-0 flex-1">
                         <div className="mt-0.5 shrink-0">
                           {isAdd ? (
                             <ArrowUpCircle className="h-4 w-4 text-green-500" />
@@ -3301,7 +3378,7 @@ export default function ProductionRawStock() {
                             <ArrowDownCircle className="h-4 w-4 text-destructive" />
                           )}
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium truncate">{entry.label}</p>
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs text-muted-foreground font-mono">{entry.ref}</span>
@@ -3315,17 +3392,78 @@ export default function ProductionRawStock() {
                           {entry.notes && (
                             <p className="text-xs text-muted-foreground mt-0.5 italic">{entry.notes}</p>
                           )}
+                          {isEditingThis && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <input
+                                type="number"
+                                step="0.001"
+                                min={historyEditTarget.usedKg}
+                                className="w-32 text-right font-mono text-sm border rounded-md px-2 py-1 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                                value={historyEditKg}
+                                onChange={(e) => setHistoryEditKg(e.target.value)}
+                                data-testid="input-history-edit-kg"
+                                autoFocus
+                              />
+                              <span className="text-xs text-muted-foreground">kg</span>
+                              <Button
+                                size="sm"
+                                disabled={!historyEditKg || parseFloat(historyEditKg) < historyEditTarget.usedKg || updateReceiptMutation.isPending}
+                                onClick={() => updateReceiptMutation.mutate({ rawStockId: historyEditTarget.rawStockId, receivedKg: historyEditKg })}
+                                data-testid="button-history-save-edit"
+                              >
+                                {updateReceiptMutation.isPending ? "Saving..." : "Save"}
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => { setHistoryEditTarget(null); setHistoryEditKg(""); }} data-testid="button-history-cancel-edit">
+                                Cancel
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className={`text-sm font-mono font-semibold ${isAdd ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
-                          {isAdd ? "+" : "−"}{entry.kg.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg
-                        </p>
-                        {entry.costPerKg > 0 && (
-                          <p className="text-xs text-muted-foreground font-mono">
-                            ${entry.costPerKg.toFixed(4)}/kg
+                      <div className="flex items-start gap-1 shrink-0">
+                        <div className="text-right mr-1">
+                          <p className={`text-sm font-mono font-semibold ${isAdd ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
+                            {isAdd ? "+" : "−"}{entry.kg.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg
                           </p>
+                          {entry.costPerKg > 0 && (
+                            <p className="text-xs text-muted-foreground font-mono">
+                              ${entry.costPerKg.toFixed(4)}/kg
+                            </p>
+                          )}
+                        </div>
+                        {entry.kind === "receipt" && !isEditingThis && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 shrink-0"
+                            title="Edit received balance"
+                            data-testid={`button-history-edit-${i}`}
+                            onClick={() => {
+                              setHistoryEditTarget({ rawStockId: entry.rawStockId, currentKg: entry.kg, usedKg: entry.usedKg });
+                              setHistoryEditKg(String(entry.kg));
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
                         )}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 shrink-0"
+                          title="Delete this entry"
+                          data-testid={`button-history-delete-${i}`}
+                          onClick={() => {
+                            if (entry.kind === "adjustment") {
+                              setHistoryDeleteTarget({ kind: "adjustment", label: entry.label, adjId: entry.adjId });
+                            } else if (entry.kind === "batch") {
+                              setHistoryDeleteTarget({ kind: "batch", label: entry.label, batchId: entry.batchId });
+                            } else if (entry.kind === "receipt") {
+                              setHistoryDeleteTarget({ kind: "receipt", label: entry.label, rawStockId: entry.rawStockId });
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
                       </div>
                     </div>
                   );
@@ -3335,6 +3473,44 @@ export default function ProductionRawStock() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── History entry delete confirmation ── */}
+      <AlertDialog open={!!historyDeleteTarget} onOpenChange={(open) => { if (!open) setHistoryDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {historyDeleteTarget?.kind === "batch" ? "Remove Batch Source" :
+               historyDeleteTarget?.kind === "receipt" ? "Delete Receipt Entry" :
+               "Delete Adjustment"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {historyDeleteTarget?.kind === "batch"
+                ? `This will remove "${historyDeleteTarget?.label}" as a source for this supplier and restore the consumed kg back to free stock. The batch itself is not deleted.`
+                : historyDeleteTarget?.kind === "receipt"
+                ? `This will delete the container receipt entry "${historyDeleteTarget?.label}". This cannot be undone.`
+                : `This will permanently delete the adjustment "${historyDeleteTarget?.label}".`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-history-delete-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="button-history-delete-confirm"
+              onClick={() => {
+                if (!historyDeleteTarget) return;
+                if (historyDeleteTarget.kind === "adjustment" && historyDeleteTarget.adjId) {
+                  deleteAdjMutation.mutate(historyDeleteTarget.adjId);
+                } else if (historyDeleteTarget.kind === "batch" && historyDeleteTarget.batchId && historySupplier) {
+                  deleteBatchSourceMutation.mutate({ batchId: historyDeleteTarget.batchId, supplierId: historySupplier.id });
+                } else if (historyDeleteTarget.kind === "receipt" && historyDeleteTarget.rawStockId) {
+                  deleteReceiptMutation.mutate(historyDeleteTarget.rawStockId);
+                }
+              }}
+            >
+              {(deleteAdjMutation.isPending || deleteBatchSourceMutation.isPending || deleteReceiptMutation.isPending) ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Create Mix Batch Dialog ── */}
       <CreateMixBatchDialog
