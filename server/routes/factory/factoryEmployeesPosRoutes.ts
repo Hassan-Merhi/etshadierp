@@ -2712,11 +2712,11 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const totalCustomerCr = round2(customerCrItems.reduce((s, c) => s + Math.abs(c.balanceUsd), 0));
 
       // forUsTotal: ledger assets + inventory + raw material + customer receivables (DR)
-      //             + pending orders + verified orders (bales are RESERVED_FOR_ORDER,
-      //             so they are already excluded from baleInventoryValue — no double-count)
+      //             + pending orders + verified orders + loading orders
+      //             (bales are reserved/excluded from baleInventoryValue — no double-count)
       const forUsTotal = round2(
         cleanLedgerForUsTotal + baleInventoryValue + rawMaterialStockValue +
-        totalCustomerDr + pendingTotal + verifiedTotal,
+        totalCustomerDr + pendingTotal + verifiedTotal + loadingTotal,
       );
       // onUsTotal: ledger liabilities + supplier balances + customer credit balances (CR)
       const onUsTotal = round2(ledgerOnUsTotal + totalSupplierLiabilities + totalCustomerCr);
@@ -2736,6 +2736,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           .map(c => ({ name: c.name, code: "CUSTOMER_DR", value: round2(c.balanceUsd), category: "Customer" })),
         ...(pendingTotal > 0 ? [{ name: "Pending Orders", code: "PENDING_ORDERS", value: pendingTotal, category: "Pending Orders" }] : []),
         ...(verifiedTotal > 0 ? [{ name: "Verified Orders", code: "VERIFIED_ORDERS", value: verifiedTotal, category: "Verified Orders" }] : []),
+        ...(loadingTotal > 0 ? [{ name: "Loading Orders", code: "LOADING_ORDERS", value: loadingTotal, category: "Loading Orders" }] : []),
       ];
 
       // Group ledger on-us by category
