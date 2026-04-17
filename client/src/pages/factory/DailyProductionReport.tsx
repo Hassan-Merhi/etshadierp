@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import {
   ChevronDown, ChevronRight, FlaskConical, PackageCheck, Trash2, Scale,
-  TrendingUp, TrendingDown, Minus,
+  TrendingUp, TrendingDown, Minus, Tag,
 } from "lucide-react";
 
 function todayStr() {
@@ -131,43 +131,55 @@ function StatRow({ label, value, sub }: { label: string; value: string; sub?: st
   );
 }
 
-function ExpandableSection({
-  title, badge, icon: Icon, children, defaultOpen = false,
+function SkeletonBox() {
+  return (
+    <div className="space-y-2">
+      <Skeleton className="h-4 w-24" />
+      <Skeleton className="h-6 w-32" />
+      <Skeleton className="h-3 w-20" />
+    </div>
+  );
+}
+
+function ExpandableCard({
+  title,
+  badge,
+  icon: Icon,
+  children,
+  testId,
 }: {
   title: string;
   badge?: string;
   icon: React.ElementType;
   children: React.ReactNode;
-  defaultOpen?: boolean;
+  testId?: string;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [open, setOpen] = useState(false);
   return (
-    <div className="mt-3">
-      <button
-        className="flex items-center gap-2 w-full text-left py-1"
+    <Card data-testid={testId}>
+      <CardHeader
+        className="cursor-pointer py-3 px-4 flex flex-row items-center justify-between gap-2"
         onClick={() => setOpen(!open)}
       >
-        {open ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</span>
-        {badge && (
-          <Badge variant="secondary" className="ml-auto text-xs">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          {open
+            ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+          <Icon className="h-4 w-4 text-muted-foreground" />
+          {title}
+        </CardTitle>
+        {badge !== undefined && (
+          <Badge variant="secondary" className="text-xs">
             {badge}
           </Badge>
         )}
-      </button>
-      {open && <div className="mt-2">{children}</div>}
-    </div>
-  );
-}
-
-function SkeletonBox() {
-  return (
-    <div className="space-y-2 p-4">
-      <Skeleton className="h-4 w-24" />
-      <Skeleton className="h-6 w-32" />
-      <Skeleton className="h-3 w-20" />
-    </div>
+      </CardHeader>
+      {open && (
+        <CardContent className="pt-0 px-4 pb-4">
+          {children}
+        </CardContent>
+      )}
+    </Card>
   );
 }
 
@@ -213,9 +225,7 @@ export default function DailyProductionReport() {
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold">Production Report</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Raw material vs output summary
-        </p>
+        <p className="text-xs text-muted-foreground mt-0.5">Raw material vs output summary</p>
       </div>
 
       {/* Date filter */}
@@ -304,7 +314,7 @@ export default function DailyProductionReport() {
       {/* ── Four colored boxes ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
 
-        {/* 1 — Original Batches (amber/gold tones) */}
+        {/* 1 — Original Batches */}
         <Card
           className="border-amber-200 dark:border-amber-800/50 bg-amber-50/60 dark:bg-amber-950/20"
           data-testid="card-original-batches"
@@ -315,7 +325,7 @@ export default function DailyProductionReport() {
               Original Batches
             </CardTitle>
             {!isLoading && data && (
-              <Badge variant="secondary" className="text-xs bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+              <Badge variant="secondary" className="text-xs bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 no-default-active-elevate">
                 {data.rawMaterial.totalBatches} {data.rawMaterial.totalBatches === 1 ? "batch" : "batches"}
               </Badge>
             )}
@@ -323,47 +333,15 @@ export default function DailyProductionReport() {
           <CardContent className="pt-0 space-y-0.5">
             {isLoading ? <SkeletonBox /> : (
               <>
-                <StatRow
-                  label="Weight"
-                  value={fmtKg(data?.rawMaterial.totalWeightKg ?? 0)}
-                />
-                <StatRow
-                  label="Batch Rate"
-                  value={fmtRate(data?.rawMaterial.blendedCostPerKg ?? 0)}
-                  sub="per kg"
-                />
-                <StatRow
-                  label="Value"
-                  value={fmtMoney(data?.rawMaterial.totalCost ?? 0)}
-                />
-                <ExpandableSection title="Mix Batches" icon={FlaskConical} badge={String(data?.rawMaterial.batches.length ?? 0)}>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-xs">Code</TableHead>
-                          <TableHead className="text-xs text-right">Kg</TableHead>
-                          <TableHead className="text-xs text-right">Cost</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {(data?.rawMaterial.batches ?? []).map((b) => (
-                          <TableRow key={b.id} data-testid={`row-batch-${b.id}`}>
-                            <TableCell className="text-xs font-mono py-1">{b.batchCode}</TableCell>
-                            <TableCell className="text-xs text-right font-mono py-1">{fmtKg(parseFloat(b.totalWeightKg))}</TableCell>
-                            <TableCell className="text-xs text-right font-mono py-1">{fmtMoney(parseFloat(b.totalCost))}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </ExpandableSection>
+                <StatRow label="Weight" value={fmtKg(data?.rawMaterial.totalWeightKg ?? 0)} />
+                <StatRow label="Batch Rate" value={fmtRate(data?.rawMaterial.blendedCostPerKg ?? 0)} sub="per kg" />
+                <StatRow label="Value" value={fmtMoney(data?.rawMaterial.totalCost ?? 0)} />
               </>
             )}
           </CardContent>
         </Card>
 
-        {/* 2 — Bales Produced (blue/indigo tones) */}
+        {/* 2 — Bales Produced */}
         <Card
           className="border-blue-200 dark:border-blue-800/50 bg-blue-50/60 dark:bg-blue-950/20"
           data-testid="card-bales-produced"
@@ -374,7 +352,7 @@ export default function DailyProductionReport() {
               Bales Produced
             </CardTitle>
             {!isLoading && data && (
-              <Badge variant="secondary" className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+              <Badge variant="secondary" className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 no-default-active-elevate">
                 QNTY
               </Badge>
             )}
@@ -382,72 +360,15 @@ export default function DailyProductionReport() {
           <CardContent className="pt-0 space-y-0.5">
             {isLoading ? <SkeletonBox /> : (
               <>
-                <StatRow
-                  label="# Bales"
-                  value={String(data?.production.totalBales ?? 0)}
-                />
-                <StatRow
-                  label="Weight"
-                  value={fmtKg(data?.production.totalWeightKg ?? 0)}
-                />
-                <StatRow
-                  label="Value"
-                  value={fmtMoney(data?.production.totalValue ?? 0)}
-                />
-                <ExpandableSection title="By Category" icon={PackageCheck} badge={String(data?.production.byCategory.length ?? 0)} defaultOpen>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-xs">Category</TableHead>
-                          <TableHead className="text-xs text-right">Qty</TableHead>
-                          <TableHead className="text-xs text-right">Kg</TableHead>
-                          <TableHead className="text-xs text-right">Value</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {(data?.production.byCategory ?? []).map((row) => (
-                          <TableRow key={row.categoryName} data-testid={`row-category-${row.categoryName.replace(/\s+/g, "-").toLowerCase()}`}>
-                            <TableCell className="text-xs py-1">{row.categoryName}</TableCell>
-                            <TableCell className="text-xs text-right font-mono py-1">{row.qty}</TableCell>
-                            <TableCell className="text-xs text-right font-mono py-1">{fmtKg(row.totalWeightKg)}</TableCell>
-                            <TableCell className="text-xs text-right font-mono py-1">{fmtMoney(row.totalValue)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </ExpandableSection>
-                <ExpandableSection title="By Product" icon={PackageCheck} badge={String(data?.production.byProduct.length ?? 0)}>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-xs">Code</TableHead>
-                          <TableHead className="text-xs">Product</TableHead>
-                          <TableHead className="text-xs text-right">Qty</TableHead>
-                          <TableHead className="text-xs text-right">Value</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {(data?.production.byProduct ?? []).map((row) => (
-                          <TableRow key={row.articleCode} data-testid={`row-product-${row.articleCode}`}>
-                            <TableCell className="text-xs font-mono py-1">{row.articleCode}</TableCell>
-                            <TableCell className="text-xs py-1 max-w-[80px] truncate">{row.productName}</TableCell>
-                            <TableCell className="text-xs text-right font-mono py-1">{row.qty}</TableCell>
-                            <TableCell className="text-xs text-right font-mono py-1">{fmtMoney(row.totalValue)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </ExpandableSection>
+                <StatRow label="# Bales" value={String(data?.production.totalBales ?? 0)} />
+                <StatRow label="Weight" value={fmtKg(data?.production.totalWeightKg ?? 0)} />
+                <StatRow label="Value" value={fmtMoney(data?.production.totalValue ?? 0)} />
               </>
             )}
           </CardContent>
         </Card>
 
-        {/* 3 — Wipers & Garbage (rose/pink tones) */}
+        {/* 3 — Wipers & Garbage */}
         <Card
           className="border-rose-200 dark:border-rose-800/50 bg-rose-50/60 dark:bg-rose-950/20"
           data-testid="card-wipers-garbage"
@@ -458,7 +379,7 @@ export default function DailyProductionReport() {
               Wipers &amp; Garbage
             </CardTitle>
             {!isLoading && data && (
-              <Badge variant="secondary" className="text-xs bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300">
+              <Badge variant="secondary" className="text-xs bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 no-default-active-elevate">
                 QNTY
               </Badge>
             )}
@@ -468,52 +389,25 @@ export default function DailyProductionReport() {
               <>
                 <div className="flex items-center justify-between py-1">
                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Wipers</span>
-                  <span className="text-sm font-bold text-right">
+                  <span className="text-sm font-bold">
                     {data?.wipersGarbage.totalWipersQty ?? 0}
                     <span className="text-xs font-normal text-muted-foreground ml-1">{fmtKg(data?.wipersGarbage.totalWipersKg ?? 0)}</span>
                   </span>
                 </div>
                 <div className="flex items-center justify-between py-1">
                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Garbage</span>
-                  <span className="text-sm font-bold text-right">
+                  <span className="text-sm font-bold">
                     {data?.wipersGarbage.totalGarbageQty ?? 0}
                     <span className="text-xs font-normal text-muted-foreground ml-1">{fmtKg(data?.wipersGarbage.totalGarbageKg ?? 0)}</span>
                   </span>
                 </div>
-                <StatRow
-                  label="Value"
-                  value={fmtMoney(data?.wipersGarbage.totalValue ?? 0)}
-                />
-                {(data?.wipersGarbage.rows ?? []).length > 0 && (
-                  <ExpandableSection title="Breakdown" icon={Trash2} badge={String(data?.wipersGarbage.rows.length ?? 0)}>
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs">Category</TableHead>
-                            <TableHead className="text-xs text-right">Qty</TableHead>
-                            <TableHead className="text-xs text-right">Kg</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {(data?.wipersGarbage.rows ?? []).map((row) => (
-                            <TableRow key={row.categoryName}>
-                              <TableCell className="text-xs py-1">{row.categoryName}</TableCell>
-                              <TableCell className="text-xs text-right font-mono py-1">{row.qty}</TableCell>
-                              <TableCell className="text-xs text-right font-mono py-1">{fmtKg(row.totalWeightKg)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </ExpandableSection>
-                )}
+                <StatRow label="Value" value={fmtMoney(data?.wipersGarbage.totalValue ?? 0)} />
               </>
             )}
           </CardContent>
         </Card>
 
-        {/* 4 — Balance on Table (violet/purple tones) */}
+        {/* 4 — Balance on Table */}
         <Card
           className="border-violet-200 dark:border-violet-800/50 bg-violet-50/60 dark:bg-violet-950/20"
           data-testid="card-balance-on-table"
@@ -527,31 +421,20 @@ export default function DailyProductionReport() {
           <CardContent className="pt-0 space-y-0.5">
             {isLoading ? <SkeletonBox /> : (
               <>
-                <StatRow
-                  label="Weight"
-                  value={fmtKg(data?.balanceOnTable.weightKg ?? 0)}
-                />
-                <StatRow
-                  label="Batch Rate"
-                  value={fmtRate(data?.balanceOnTable.costPerKg ?? 0)}
-                  sub="per kg"
-                />
-                <StatRow
-                  label="Value"
-                  value={fmtMoney(data?.balanceOnTable.value ?? 0)}
-                />
-                {/* Mini breakdown: how balance is derived */}
-                <div className="mt-3 pt-2 border-t border-violet-200 dark:border-violet-800/40 space-y-1">
+                <StatRow label="Weight" value={fmtKg(data?.balanceOnTable.weightKg ?? 0)} />
+                <StatRow label="Batch Rate" value={fmtRate(data?.balanceOnTable.costPerKg ?? 0)} sub="per kg" />
+                <StatRow label="Value" value={fmtMoney(data?.balanceOnTable.value ?? 0)} />
+                <div className="mt-2 pt-2 border-t border-violet-200 dark:border-violet-800/40 space-y-0.5">
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Original input</span>
                     <span className="font-mono">{fmtKg(data?.rawMaterial.totalWeightKg ?? 0)}</span>
                   </div>
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>− Bales produced</span>
+                    <span>&#8722; Bales produced</span>
                     <span className="font-mono">{fmtKg(data?.production.totalWeightKg ?? 0)}</span>
                   </div>
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>− Wipers/Garbage</span>
+                    <span>&#8722; Wipers/Garbage</span>
                     <span className="font-mono">{fmtKg(data?.wipersGarbage.totalWeightKg ?? 0)}</span>
                   </div>
                   <div className="flex justify-between text-xs font-semibold text-violet-700 dark:text-violet-300 pt-1 border-t border-violet-200 dark:border-violet-800/40">
@@ -564,6 +447,154 @@ export default function DailyProductionReport() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Expandable detail rows ── */}
+
+      {/* Production by Category */}
+      <ExpandableCard
+        title="Production by Category"
+        badge={isLoading ? undefined : `${data?.production.byCategory.length ?? 0} categories`}
+        icon={Tag}
+        testId="card-category-breakdown"
+      >
+        {isLoading ? (
+          <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
+        ) : !data || data.production.byCategory.length === 0 ? (
+          <p className="text-center text-muted-foreground py-6 text-sm">No bales produced in this period</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="text-right">Qty (Bales)</TableHead>
+                  <TableHead className="text-right">Total Weight</TableHead>
+                  <TableHead className="text-right">Total Value</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.production.byCategory.map((row) => (
+                  <TableRow key={row.categoryName} data-testid={`row-category-${row.categoryName.replace(/\s+/g, "-").toLowerCase()}`}>
+                    <TableCell className="font-medium">{row.categoryName}</TableCell>
+                    <TableCell className="text-right font-mono">{row.qty.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmtKg(row.totalWeightKg)}</TableCell>
+                    <TableCell className="text-right font-mono font-semibold">{fmtMoney(row.totalValue)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+              <tfoot>
+                <tr className="border-t-2">
+                  <td className="px-4 py-2 text-sm font-semibold text-muted-foreground">Totals</td>
+                  <td className="px-4 py-2 text-right font-mono font-bold">{(data?.production.totalBales ?? 0).toLocaleString()}</td>
+                  <td className="px-4 py-2 text-right font-mono font-bold text-sm">{fmtKg(data?.production.totalWeightKg ?? 0)}</td>
+                  <td className="px-4 py-2 text-right font-mono font-bold">{fmtMoney(data?.production.totalValue ?? 0)}</td>
+                </tr>
+              </tfoot>
+            </Table>
+          </div>
+        )}
+      </ExpandableCard>
+
+      {/* Production by Product */}
+      <ExpandableCard
+        title="Production by Product"
+        badge={isLoading ? undefined : `${data?.production.byProduct.length ?? 0} products`}
+        icon={PackageCheck}
+        testId="card-product-breakdown"
+      >
+        {isLoading ? (
+          <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
+        ) : !data || data.production.byProduct.length === 0 ? (
+          <p className="text-center text-muted-foreground py-6 text-sm">No bales produced in this period</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Article Code</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="text-right">Qty (Bales)</TableHead>
+                  <TableHead className="text-right">Total Weight</TableHead>
+                  <TableHead className="text-right">Price / Bale</TableHead>
+                  <TableHead className="text-right">Total Value</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.production.byProduct.map((row) => (
+                  <TableRow key={row.articleCode} data-testid={`row-product-${row.articleCode}`}>
+                    <TableCell className="font-mono text-sm">{row.articleCode}</TableCell>
+                    <TableCell className="text-sm">{row.productName}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{row.categoryName}</TableCell>
+                    <TableCell className="text-right font-mono">{row.qty.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmtKg(row.totalWeightKg)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmtMoney(row.sellingPricePerBale)}</TableCell>
+                    <TableCell className="text-right font-mono font-semibold">{fmtMoney(row.totalValue)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+              <tfoot>
+                <tr className="border-t-2">
+                  <td colSpan={3} className="px-4 py-2 text-sm font-semibold text-muted-foreground">Totals</td>
+                  <td className="px-4 py-2 text-right font-mono font-bold">{(data?.production.totalBales ?? 0).toLocaleString()}</td>
+                  <td className="px-4 py-2 text-right font-mono font-bold text-sm">{fmtKg(data?.production.totalWeightKg ?? 0)}</td>
+                  <td />
+                  <td className="px-4 py-2 text-right font-mono font-bold">{fmtMoney(data?.production.totalValue ?? 0)}</td>
+                </tr>
+              </tfoot>
+            </Table>
+          </div>
+        )}
+      </ExpandableCard>
+
+      {/* Mix Batches */}
+      <ExpandableCard
+        title="Mix Batches"
+        badge={isLoading ? undefined : `${data?.rawMaterial.totalBatches ?? 0} ${(data?.rawMaterial.totalBatches ?? 0) === 1 ? "batch" : "batches"}`}
+        icon={FlaskConical}
+        testId="card-mix-breakdown"
+      >
+        {isLoading ? (
+          <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
+        ) : !data || data.rawMaterial.batches.length === 0 ? (
+          <p className="text-center text-muted-foreground py-6 text-sm">No mix batches in this period</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Batch Code</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Weight (kg)</TableHead>
+                  <TableHead className="text-right">Cost / kg</TableHead>
+                  <TableHead className="text-right">Total Cost</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.rawMaterial.batches.map((b) => (
+                  <TableRow key={b.id} data-testid={`row-batch-${b.id}`}>
+                    <TableCell className="font-mono text-sm">{b.batchCode}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{b.name || "—"}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{b.batchDate || b.createdAt?.slice(0, 10) || "—"}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmtKg(parseFloat(b.totalWeightKg))}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmtRate(parseFloat(b.costPerKg))}</TableCell>
+                    <TableCell className="text-right font-mono font-semibold">{fmtMoney(parseFloat(b.totalCost))}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+              <tfoot>
+                <tr className="border-t-2">
+                  <td colSpan={3} className="px-4 py-2 text-sm font-semibold text-muted-foreground">Totals</td>
+                  <td className="px-4 py-2 text-right font-mono font-bold">{fmtKg(data?.rawMaterial.totalWeightKg ?? 0)}</td>
+                  <td />
+                  <td className="px-4 py-2 text-right font-mono font-bold">{fmtMoney(data?.rawMaterial.totalCost ?? 0)}</td>
+                </tr>
+              </tfoot>
+            </Table>
+          </div>
+        )}
+      </ExpandableCard>
     </div>
   );
 }
