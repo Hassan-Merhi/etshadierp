@@ -5842,7 +5842,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 </tr>
                               </thead>
                               <tbody>
-                                {rev.items.map((item: any, idx: number) => {
+                                {rev.items.filter((item: any) => parseFloat(item.delta) !== 0).map((item: any, idx: number) => {
                                   const delta = parseFloat(item.delta);
                                   return (
                                     <tr key={idx} className="border-t">
