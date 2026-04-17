@@ -788,7 +788,13 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         .leftJoin(factoryCategories, eq(factoryBaleProducts.categoryId, factoryCategories.id))
         .where(and(...baleConditions));
 
-      // ── Aggregate by article code ──
+      // ── Helper: detect wipers/garbage by category name ──
+      function isWiperOrGarbage(catName: string): boolean {
+        const lower = (catName || "").toLowerCase();
+        return lower.includes("wiper") || lower.includes("garbage") || lower.includes("rag");
+      }
+
+      // ── Aggregate by article code (regular bales only) ──
       const productMap = new Map<string, {
         articleCode: string;
         productName: string;
@@ -799,9 +805,17 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         totalValue: number;
       }>();
 
-      // ── Aggregate by category ──
+      // ── Aggregate by category (regular bales only) ──
       const categoryMap = new Map<string, {
         categoryName: string;
+        qty: number;
+        totalWeightKg: number;
+        totalValue: number;
+      }>();
+
+      // ── Wipers & Garbage aggregation (separate) ──
+      const wgMap = new Map<string, {
+        subType: "wiper" | "garbage" | "other";
         qty: number;
         totalWeightKg: number;
         totalValue: number;
@@ -815,22 +829,37 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         const price = parseFloat(bale.sellingPrice || "0");
         const value = price; // price is per bale (not per kg)
 
-        const existing = productMap.get(code);
-        if (existing) {
-          existing.qty += 1;
-          existing.totalWeightKg += wt;
-          existing.totalValue += value;
+        if (isWiperOrGarbage(catName)) {
+          // Route to wipers/garbage bucket
+          const lower = catName.toLowerCase();
+          const subType: "wiper" | "garbage" | "other" = lower.includes("wiper") ? "wiper" : lower.includes("garbage") ? "garbage" : "other";
+          const existing = wgMap.get(catName);
+          if (existing) {
+            existing.qty += 1;
+            existing.totalWeightKg += wt;
+            existing.totalValue += value;
+          } else {
+            wgMap.set(catName, { subType, qty: 1, totalWeightKg: wt, totalValue: value });
+          }
         } else {
-          productMap.set(code, { articleCode: code, productName: name, categoryName: catName, qty: 1, totalWeightKg: wt, sellingPricePerBale: price, totalValue: value });
-        }
+          // Regular bale
+          const existing = productMap.get(code);
+          if (existing) {
+            existing.qty += 1;
+            existing.totalWeightKg += wt;
+            existing.totalValue += value;
+          } else {
+            productMap.set(code, { articleCode: code, productName: name, categoryName: catName, qty: 1, totalWeightKg: wt, sellingPricePerBale: price, totalValue: value });
+          }
 
-        const catExisting = categoryMap.get(catName);
-        if (catExisting) {
-          catExisting.qty += 1;
-          catExisting.totalWeightKg += wt;
-          catExisting.totalValue += value;
-        } else {
-          categoryMap.set(catName, { categoryName: catName, qty: 1, totalWeightKg: wt, totalValue: value });
+          const catExisting = categoryMap.get(catName);
+          if (catExisting) {
+            catExisting.qty += 1;
+            catExisting.totalWeightKg += wt;
+            catExisting.totalValue += value;
+          } else {
+            categoryMap.set(catName, { categoryName: catName, qty: 1, totalWeightKg: wt, totalValue: value });
+          }
         }
       }
 
@@ -840,6 +869,15 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       const totalBales = productRows.reduce((s, r) => s + r.qty, 0);
       const totalBaleWeightKg = productRows.reduce((s, r) => s + r.totalWeightKg, 0);
       const totalProductionValue = productRows.reduce((s, r) => s + r.totalValue, 0);
+
+      // ── Wipers/garbage totals ──
+      const wgRows = [...wgMap.entries()].map(([catName, v]) => ({ categoryName: catName, ...v }));
+      const totalWipersQty = wgRows.filter(r => r.subType === "wiper").reduce((s, r) => s + r.qty, 0);
+      const totalWipersKg = wgRows.filter(r => r.subType === "wiper").reduce((s, r) => s + r.totalWeightKg, 0);
+      const totalGarbageQty = wgRows.filter(r => r.subType === "garbage" || r.subType === "other").reduce((s, r) => s + r.qty, 0);
+      const totalGarbageKg = wgRows.filter(r => r.subType === "garbage" || r.subType === "other").reduce((s, r) => s + r.totalWeightKg, 0);
+      const totalWgValue = wgRows.reduce((s, r) => s + r.totalValue, 0);
+      const totalWgWeightKg = wgRows.reduce((s, r) => s + r.totalWeightKg, 0);
 
       // ── Fetch mix batches ──
       const mixBatchRows = await db
@@ -860,6 +898,15 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       const totalMixWeightKg = mixBatchRows.reduce((s: number, r: any) => s + parseFloat(r.totalWeightKg || "0"), 0);
       const totalMixCost = mixBatchRows.reduce((s: number, r: any) => s + parseFloat(r.totalCost || "0"), 0);
 
+      // ── Balance on table ──
+      // Original batch weight − regular bales produced − wipers/garbage weight
+      const blendedCostPerKg = totalMixWeightKg > 0 ? totalMixCost / totalMixWeightKg : 0;
+      const balanceWeightKg = totalMixWeightKg - totalBaleWeightKg - totalWgWeightKg;
+      const balanceValue = balanceWeightKg * blendedCostPerKg;
+
+      // ── STATUS = Production value − Batch cost ──
+      const statusValue = totalProductionValue - totalMixCost;
+
       // ── Kg comparison ──
       const kgDiff = totalBaleWeightKg - totalMixWeightKg;
 
@@ -873,11 +920,31 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           byProduct: productRows,
           byCategory: categoryRows,
         },
+        wipersGarbage: {
+          totalWipersQty,
+          totalWipersKg,
+          totalGarbageQty,
+          totalGarbageKg,
+          totalWeightKg: totalWgWeightKg,
+          totalValue: totalWgValue,
+          rows: wgRows,
+        },
         rawMaterial: {
           totalBatches: mixBatchRows.length,
           totalWeightKg: totalMixWeightKg,
           totalCost: totalMixCost,
+          blendedCostPerKg,
           batches: mixBatchRows,
+        },
+        balanceOnTable: {
+          weightKg: balanceWeightKg,
+          costPerKg: blendedCostPerKg,
+          value: balanceValue,
+        },
+        summary: {
+          batchCost: totalMixCost,
+          productionValue: totalProductionValue,
+          statusValue,
         },
         kgComparison: {
           producedKg: totalBaleWeightKg,

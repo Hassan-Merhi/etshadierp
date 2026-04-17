@@ -10,7 +10,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  ChevronDown, ChevronRight, TrendingUp, Scale, DollarSign, Beaker, Tag,
+  ChevronDown, ChevronRight, FlaskConical, PackageCheck, Trash2, Scale,
+  TrendingUp, TrendingDown, Minus,
 } from "lucide-react";
 
 function todayStr() {
@@ -36,9 +37,12 @@ function fmtMoney(n: number) {
   if (Math.abs(r - Math.round(r)) < 0.005) return `$${Math.round(r).toLocaleString("en-US")}`;
   return `$${r.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+function fmtRate(n: number) {
+  return `$${(Math.round(n * 1000) / 1000).toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
+}
 function fmtKg(n: number) {
   const r = Math.round(n * 10) / 10;
-  return `${r.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} kg`;
+  return `${r.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} K`;
 }
 
 type Preset = "today" | "month" | "lastmonth" | "year" | "custom";
@@ -46,6 +50,11 @@ type Preset = "today" | "month" | "lastmonth" | "year" | "custom";
 interface ReportData {
   from: string | null;
   to: string | null;
+  summary: {
+    batchCost: number;
+    productionValue: number;
+    statusValue: number;
+  };
   production: {
     totalBales: number;
     totalWeightKg: number;
@@ -66,10 +75,26 @@ interface ReportData {
       totalValue: number;
     }[];
   };
+  wipersGarbage: {
+    totalWipersQty: number;
+    totalWipersKg: number;
+    totalGarbageQty: number;
+    totalGarbageKg: number;
+    totalWeightKg: number;
+    totalValue: number;
+    rows: {
+      categoryName: string;
+      subType: "wiper" | "garbage" | "other";
+      qty: number;
+      totalWeightKg: number;
+      totalValue: number;
+    }[];
+  };
   rawMaterial: {
     totalBatches: number;
     totalWeightKg: number;
     totalCost: number;
+    blendedCostPerKg: number;
     batches: {
       id: number;
       batchCode: string;
@@ -77,8 +102,14 @@ interface ReportData {
       totalWeightKg: string;
       costPerKg: string;
       totalCost: string;
+      batchDate: string | null;
       createdAt: string;
     }[];
+  };
+  balanceOnTable: {
+    weightKg: number;
+    costPerKg: number;
+    value: number;
   };
   kgComparison: {
     producedKg: number;
@@ -88,13 +119,62 @@ interface ReportData {
   };
 }
 
+function StatRow({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="flex items-center justify-between py-1">
+      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
+      <div className="text-right">
+        <div className="text-sm font-bold">{value}</div>
+        {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+function ExpandableSection({
+  title, badge, icon: Icon, children, defaultOpen = false,
+}: {
+  title: string;
+  badge?: string;
+  icon: React.ElementType;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="mt-3">
+      <button
+        className="flex items-center gap-2 w-full text-left py-1"
+        onClick={() => setOpen(!open)}
+      >
+        {open ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</span>
+        {badge && (
+          <Badge variant="secondary" className="ml-auto text-xs">
+            {badge}
+          </Badge>
+        )}
+      </button>
+      {open && <div className="mt-2">{children}</div>}
+    </div>
+  );
+}
+
+function SkeletonBox() {
+  return (
+    <div className="space-y-2 p-4">
+      <Skeleton className="h-4 w-24" />
+      <Skeleton className="h-6 w-32" />
+      <Skeleton className="h-3 w-20" />
+    </div>
+  );
+}
+
 export default function DailyProductionReport() {
   const [preset, setPreset] = useState<Preset>("today");
   const [customFrom, setCustomFrom] = useState(todayStr());
   const [customTo, setCustomTo] = useState(todayStr());
-  const [productionExpanded, setProductionExpanded] = useState(false);
-  const [categoryExpanded, setCategoryExpanded] = useState(true);
-  const [mixExpanded, setMixExpanded] = useState(false);
 
   const { from, to } = useMemo(() => {
     if (preset === "today") return { from: todayStr(), to: todayStr() };
@@ -125,15 +205,16 @@ export default function DailyProductionReport() {
     { key: "custom", label: "Custom" },
   ];
 
-  const kgDiff = data?.kgComparison.diffKg ?? 0;
-  const kgDiffPositive = kgDiff >= 0;
+  const statusValue = data?.summary.statusValue ?? 0;
+  const statusPositive = statusValue >= 0;
 
   return (
-    <div className="flex flex-col h-full p-6 overflow-y-auto gap-6">
+    <div className="flex flex-col h-full p-4 overflow-y-auto gap-4">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Daily Production Report</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Compare what was pressed vs what was mixed in any period
+        <h1 className="text-xl font-bold">Production Report</h1>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Raw material vs output summary
         </p>
       </div>
 
@@ -172,302 +253,317 @@ export default function DailyProductionReport() {
         )}
       </div>
 
-      {/* Summary stat cards */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Card data-testid="card-total-bales">
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Bales Produced</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-24" /> : (
-              <div className="text-2xl font-bold" data-testid="text-total-bales">
-                {data?.production.totalBales.toLocaleString() ?? "0"}
+      {/* ── Top Summary Bar ── */}
+      <Card data-testid="card-summary-bar">
+        <CardContent className="py-3 px-4">
+          {isLoading ? (
+            <div className="flex gap-6 flex-wrap">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-5 w-40" />
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-6">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Batch Cost</span>
+                <span className="text-base font-bold" data-testid="text-batch-cost">
+                  {fmtMoney(data?.summary.batchCost ?? 0)}
+                </span>
               </div>
+              <div className="w-px h-5 bg-border" />
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Production Value</span>
+                <span className="text-base font-bold text-blue-600 dark:text-blue-400" data-testid="text-production-value">
+                  {fmtMoney(data?.summary.productionValue ?? 0)}
+                </span>
+              </div>
+              <div className="w-px h-5 bg-border" />
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</span>
+                <span
+                  className={`text-base font-bold px-3 py-0.5 rounded-md ${
+                    statusPositive
+                      ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                      : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                  }`}
+                  data-testid="text-status-value"
+                >
+                  {statusPositive ? "+" : ""}{fmtMoney(statusValue)}
+                </span>
+                {statusPositive
+                  ? <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  : statusValue === 0
+                    ? <Minus className="h-4 w-4 text-muted-foreground" />
+                    : <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Four colored boxes ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+
+        {/* 1 — Original Batches (amber/gold tones) */}
+        <Card
+          className="border-amber-200 dark:border-amber-800/50 bg-amber-50/60 dark:bg-amber-950/20"
+          data-testid="card-original-batches"
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+              <FlaskConical className="h-3.5 w-3.5" />
+              Original Batches
+            </CardTitle>
+            {!isLoading && data && (
+              <Badge variant="secondary" className="text-xs bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+                {data.rawMaterial.totalBatches} {data.rawMaterial.totalBatches === 1 ? "batch" : "batches"}
+              </Badge>
             )}
-            {!isLoading && (
-              <p className="text-xs text-muted-foreground mt-1">{fmtKg(data?.production.totalWeightKg ?? 0)}</p>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-0.5">
+            {isLoading ? <SkeletonBox /> : (
+              <>
+                <StatRow
+                  label="Weight"
+                  value={fmtKg(data?.rawMaterial.totalWeightKg ?? 0)}
+                />
+                <StatRow
+                  label="Batch Rate"
+                  value={fmtRate(data?.rawMaterial.blendedCostPerKg ?? 0)}
+                  sub="per kg"
+                />
+                <StatRow
+                  label="Value"
+                  value={fmtMoney(data?.rawMaterial.totalCost ?? 0)}
+                />
+                <ExpandableSection title="Mix Batches" icon={FlaskConical} badge={String(data?.rawMaterial.batches.length ?? 0)}>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Code</TableHead>
+                          <TableHead className="text-xs text-right">Kg</TableHead>
+                          <TableHead className="text-xs text-right">Cost</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(data?.rawMaterial.batches ?? []).map((b) => (
+                          <TableRow key={b.id} data-testid={`row-batch-${b.id}`}>
+                            <TableCell className="text-xs font-mono py-1">{b.batchCode}</TableCell>
+                            <TableCell className="text-xs text-right font-mono py-1">{fmtKg(parseFloat(b.totalWeightKg))}</TableCell>
+                            <TableCell className="text-xs text-right font-mono py-1">{fmtMoney(parseFloat(b.totalCost))}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </ExpandableSection>
+              </>
             )}
           </CardContent>
         </Card>
 
-        <Card data-testid="card-production-value">
+        {/* 2 — Bales Produced (blue/indigo tones) */}
+        <Card
+          className="border-blue-200 dark:border-blue-800/50 bg-blue-50/60 dark:bg-blue-950/20"
+          data-testid="card-bales-produced"
+        >
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Production Value</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-24" /> : (
-              <div className="text-2xl font-bold" data-testid="text-production-value">
-                {fmtMoney(data?.production.totalValue ?? 0)}
-              </div>
+            <CardTitle className="text-xs font-bold uppercase tracking-wide text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
+              <PackageCheck className="h-3.5 w-3.5" />
+              Bales Produced
+            </CardTitle>
+            {!isLoading && data && (
+              <Badge variant="secondary" className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                QNTY
+              </Badge>
             )}
-            <p className="text-xs text-muted-foreground mt-1">at current selling prices</p>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-0.5">
+            {isLoading ? <SkeletonBox /> : (
+              <>
+                <StatRow
+                  label="# Bales"
+                  value={String(data?.production.totalBales ?? 0)}
+                />
+                <StatRow
+                  label="Weight"
+                  value={fmtKg(data?.production.totalWeightKg ?? 0)}
+                />
+                <StatRow
+                  label="Value"
+                  value={fmtMoney(data?.production.totalValue ?? 0)}
+                />
+                <ExpandableSection title="By Category" icon={PackageCheck} badge={String(data?.production.byCategory.length ?? 0)} defaultOpen>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Category</TableHead>
+                          <TableHead className="text-xs text-right">Qty</TableHead>
+                          <TableHead className="text-xs text-right">Kg</TableHead>
+                          <TableHead className="text-xs text-right">Value</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(data?.production.byCategory ?? []).map((row) => (
+                          <TableRow key={row.categoryName} data-testid={`row-category-${row.categoryName.replace(/\s+/g, "-").toLowerCase()}`}>
+                            <TableCell className="text-xs py-1">{row.categoryName}</TableCell>
+                            <TableCell className="text-xs text-right font-mono py-1">{row.qty}</TableCell>
+                            <TableCell className="text-xs text-right font-mono py-1">{fmtKg(row.totalWeightKg)}</TableCell>
+                            <TableCell className="text-xs text-right font-mono py-1">{fmtMoney(row.totalValue)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </ExpandableSection>
+                <ExpandableSection title="By Product" icon={PackageCheck} badge={String(data?.production.byProduct.length ?? 0)}>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Code</TableHead>
+                          <TableHead className="text-xs">Product</TableHead>
+                          <TableHead className="text-xs text-right">Qty</TableHead>
+                          <TableHead className="text-xs text-right">Value</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(data?.production.byProduct ?? []).map((row) => (
+                          <TableRow key={row.articleCode} data-testid={`row-product-${row.articleCode}`}>
+                            <TableCell className="text-xs font-mono py-1">{row.articleCode}</TableCell>
+                            <TableCell className="text-xs py-1 max-w-[80px] truncate">{row.productName}</TableCell>
+                            <TableCell className="text-xs text-right font-mono py-1">{row.qty}</TableCell>
+                            <TableCell className="text-xs text-right font-mono py-1">{fmtMoney(row.totalValue)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </ExpandableSection>
+              </>
+            )}
           </CardContent>
         </Card>
 
-        <Card data-testid="card-mix-cost">
+        {/* 3 — Wipers & Garbage (rose/pink tones) */}
+        <Card
+          className="border-rose-200 dark:border-rose-800/50 bg-rose-50/60 dark:bg-rose-950/20"
+          data-testid="card-wipers-garbage"
+        >
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Raw Material Cost</CardTitle>
-            <Beaker className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-24" /> : (
-              <div className="text-2xl font-bold" data-testid="text-mix-cost">
-                {fmtMoney(data?.rawMaterial.totalCost ?? 0)}
-              </div>
+            <CardTitle className="text-xs font-bold uppercase tracking-wide text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+              <Trash2 className="h-3.5 w-3.5" />
+              Wipers &amp; Garbage
+            </CardTitle>
+            {!isLoading && data && (
+              <Badge variant="secondary" className="text-xs bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300">
+                QNTY
+              </Badge>
             )}
-            {!isLoading && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {data?.rawMaterial.totalBatches ?? 0} mix {(data?.rawMaterial.totalBatches ?? 0) === 1 ? "batch" : "batches"} — {fmtKg(data?.rawMaterial.totalWeightKg ?? 0)}
-              </p>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-0.5">
+            {isLoading ? <SkeletonBox /> : (
+              <>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Wipers</span>
+                  <span className="text-sm font-bold text-right">
+                    {data?.wipersGarbage.totalWipersQty ?? 0}
+                    <span className="text-xs font-normal text-muted-foreground ml-1">{fmtKg(data?.wipersGarbage.totalWipersKg ?? 0)}</span>
+                  </span>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Garbage</span>
+                  <span className="text-sm font-bold text-right">
+                    {data?.wipersGarbage.totalGarbageQty ?? 0}
+                    <span className="text-xs font-normal text-muted-foreground ml-1">{fmtKg(data?.wipersGarbage.totalGarbageKg ?? 0)}</span>
+                  </span>
+                </div>
+                <StatRow
+                  label="Value"
+                  value={fmtMoney(data?.wipersGarbage.totalValue ?? 0)}
+                />
+                {(data?.wipersGarbage.rows ?? []).length > 0 && (
+                  <ExpandableSection title="Breakdown" icon={Trash2} badge={String(data?.wipersGarbage.rows.length ?? 0)}>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Category</TableHead>
+                            <TableHead className="text-xs text-right">Qty</TableHead>
+                            <TableHead className="text-xs text-right">Kg</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(data?.wipersGarbage.rows ?? []).map((row) => (
+                            <TableRow key={row.categoryName}>
+                              <TableCell className="text-xs py-1">{row.categoryName}</TableCell>
+                              <TableCell className="text-xs text-right font-mono py-1">{row.qty}</TableCell>
+                              <TableCell className="text-xs text-right font-mono py-1">{fmtKg(row.totalWeightKg)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </ExpandableSection>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
 
-        <Card data-testid="card-kg-diff">
+        {/* 4 — Balance on Table (violet/purple tones) */}
+        <Card
+          className="border-violet-200 dark:border-violet-800/50 bg-violet-50/60 dark:bg-violet-950/20"
+          data-testid="card-balance-on-table"
+        >
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Kg Difference</CardTitle>
-            <Scale className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs font-bold uppercase tracking-wide text-violet-700 dark:text-violet-400 flex items-center gap-1.5">
+              <Scale className="h-3.5 w-3.5" />
+              Balance on Table
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-24" /> : (
-              <div className={`text-2xl font-bold ${kgDiffPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-kg-diff">
-                {kgDiffPositive ? "+" : ""}{fmtKg(kgDiff)}
-              </div>
-            )}
-            {!isLoading && (
-              <p className="text-xs text-muted-foreground mt-1">{data?.kgComparison.diffLabel ?? ""}</p>
+          <CardContent className="pt-0 space-y-0.5">
+            {isLoading ? <SkeletonBox /> : (
+              <>
+                <StatRow
+                  label="Weight"
+                  value={fmtKg(data?.balanceOnTable.weightKg ?? 0)}
+                />
+                <StatRow
+                  label="Batch Rate"
+                  value={fmtRate(data?.balanceOnTable.costPerKg ?? 0)}
+                  sub="per kg"
+                />
+                <StatRow
+                  label="Value"
+                  value={fmtMoney(data?.balanceOnTable.value ?? 0)}
+                />
+                {/* Mini breakdown: how balance is derived */}
+                <div className="mt-3 pt-2 border-t border-violet-200 dark:border-violet-800/40 space-y-1">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Original input</span>
+                    <span className="font-mono">{fmtKg(data?.rawMaterial.totalWeightKg ?? 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>− Bales produced</span>
+                    <span className="font-mono">{fmtKg(data?.production.totalWeightKg ?? 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>− Wipers/Garbage</span>
+                    <span className="font-mono">{fmtKg(data?.wipersGarbage.totalWeightKg ?? 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold text-violet-700 dark:text-violet-300 pt-1 border-t border-violet-200 dark:border-violet-800/40">
+                    <span>= Balance</span>
+                    <span className="font-mono">{fmtKg(data?.balanceOnTable.weightKg ?? 0)}</span>
+                  </div>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
       </div>
-
-      {/* Kg Comparison bar */}
-      {!isLoading && data && (
-        <Card data-testid="card-kg-comparison">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Kg Comparison</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground w-28 shrink-0">Produced</span>
-              <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 rounded-full transition-all"
-                  style={{ width: `${data.kgComparison.mixedKg > 0 ? Math.min(100, (data.kgComparison.producedKg / Math.max(data.kgComparison.producedKg, data.kgComparison.mixedKg)) * 100) : 100}%` }}
-                />
-              </div>
-              <span className="text-sm font-semibold w-24 text-right shrink-0">{fmtKg(data.kgComparison.producedKg)}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground w-28 shrink-0">Mixed</span>
-              <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
-                <div
-                  className="h-full bg-amber-500 rounded-full transition-all"
-                  style={{ width: `${data.kgComparison.producedKg > 0 ? Math.min(100, (data.kgComparison.mixedKg / Math.max(data.kgComparison.producedKg, data.kgComparison.mixedKg)) * 100) : 100}%` }}
-                />
-              </div>
-              <span className="text-sm font-semibold w-24 text-right shrink-0">{fmtKg(data.kgComparison.mixedKg)}</span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Production by Category (expandable, open by default) */}
-      <Card data-testid="card-category-breakdown">
-        <CardHeader
-          className="cursor-pointer pb-3 flex flex-row items-center justify-between gap-1"
-          onClick={() => setCategoryExpanded(!categoryExpanded)}
-          data-testid="button-toggle-category"
-        >
-          <CardTitle className="text-base flex items-center gap-2">
-            {categoryExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            Production by Category
-          </CardTitle>
-          {!isLoading && data && (
-            <Badge variant="secondary" data-testid="badge-category-count">
-              {data.production.byCategory.length} categories
-            </Badge>
-          )}
-        </CardHeader>
-        {categoryExpanded && (
-          <CardContent className="pt-0">
-            {isLoading ? (
-              <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
-            ) : !data || data.production.byCategory.length === 0 ? (
-              <p className="text-center text-muted-foreground py-6 text-sm" data-testid="text-no-categories">
-                No bales produced in this period
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Qty (Bales)</TableHead>
-                      <TableHead className="text-right">Total Weight</TableHead>
-                      <TableHead className="text-right">Total Value</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.production.byCategory.map((row) => (
-                      <TableRow key={row.categoryName} data-testid={`row-category-${row.categoryName.replace(/\s+/g, "-").toLowerCase()}`}>
-                        <TableCell className="font-medium flex items-center gap-2">
-                          <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                          {row.categoryName}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">{row.qty.toLocaleString()}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">{fmtKg(row.totalWeightKg)}</TableCell>
-                        <TableCell className="text-right font-mono font-semibold">{fmtMoney(row.totalValue)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                  <tfoot>
-                    <tr className="border-t-2">
-                      <td className="px-4 py-2 text-sm font-semibold text-muted-foreground">Totals</td>
-                      <td className="px-4 py-2 text-right font-mono font-bold">{data.production.totalBales.toLocaleString()}</td>
-                      <td className="px-4 py-2 text-right font-mono font-bold text-sm">{fmtKg(data.production.totalWeightKg)}</td>
-                      <td className="px-4 py-2 text-right font-mono font-bold">{fmtMoney(data.production.totalValue)}</td>
-                    </tr>
-                  </tfoot>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        )}
-      </Card>
-
-      {/* Production by product (expandable) */}
-      <Card data-testid="card-production-breakdown">
-        <CardHeader
-          className="cursor-pointer pb-3 flex flex-row items-center justify-between gap-1"
-          onClick={() => setProductionExpanded(!productionExpanded)}
-          data-testid="button-toggle-production"
-        >
-          <CardTitle className="text-base flex items-center gap-2">
-            {productionExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            Production by Product
-          </CardTitle>
-          {!isLoading && data && (
-            <Badge variant="secondary" data-testid="badge-product-count">
-              {data.production.byProduct.length} products
-            </Badge>
-          )}
-        </CardHeader>
-        {productionExpanded && (
-          <CardContent className="pt-0">
-            {isLoading ? (
-              <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
-            ) : !data || data.production.byProduct.length === 0 ? (
-              <p className="text-center text-muted-foreground py-6 text-sm" data-testid="text-no-production">
-                No bales produced in this period
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Article Code</TableHead>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Qty (Bales)</TableHead>
-                      <TableHead className="text-right">Total Weight</TableHead>
-                      <TableHead className="text-right">Price / Bale</TableHead>
-                      <TableHead className="text-right">Total Value</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.production.byProduct.map((row) => (
-                      <TableRow key={row.articleCode} data-testid={`row-product-${row.articleCode}`}>
-                        <TableCell className="font-mono text-sm">{row.articleCode}</TableCell>
-                        <TableCell className="text-sm">{row.productName}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{row.categoryName}</TableCell>
-                        <TableCell className="text-right font-mono">{row.qty.toLocaleString()}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">{fmtKg(row.totalWeightKg)}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">{fmtMoney(row.sellingPricePerBale)}</TableCell>
-                        <TableCell className="text-right font-mono font-semibold">{fmtMoney(row.totalValue)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                  <tfoot>
-                    <tr className="border-t-2">
-                      <td colSpan={3} className="px-4 py-2 text-sm font-semibold text-muted-foreground">Totals</td>
-                      <td className="px-4 py-2 text-right font-mono font-bold">{data.production.totalBales.toLocaleString()}</td>
-                      <td className="px-4 py-2 text-right font-mono font-bold text-sm">{fmtKg(data.production.totalWeightKg)}</td>
-                      <td />
-                      <td className="px-4 py-2 text-right font-mono font-bold">{fmtMoney(data.production.totalValue)}</td>
-                    </tr>
-                  </tfoot>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        )}
-      </Card>
-
-      {/* Mix batches (expandable) */}
-      <Card data-testid="card-mix-breakdown">
-        <CardHeader
-          className="cursor-pointer pb-3 flex flex-row items-center justify-between gap-1"
-          onClick={() => setMixExpanded(!mixExpanded)}
-          data-testid="button-toggle-mix"
-        >
-          <CardTitle className="text-base flex items-center gap-2">
-            {mixExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            Raw Material Mix Batches
-          </CardTitle>
-          {!isLoading && data && (
-            <Badge variant="secondary" data-testid="badge-batch-count">
-              {data.rawMaterial.totalBatches} batches
-            </Badge>
-          )}
-        </CardHeader>
-        {mixExpanded && (
-          <CardContent className="pt-0">
-            {isLoading ? (
-              <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
-            ) : !data || data.rawMaterial.batches.length === 0 ? (
-              <p className="text-center text-muted-foreground py-6 text-sm" data-testid="text-no-batches">
-                No mix batches created in this period
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Batch Code</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead className="text-right">Weight (kg)</TableHead>
-                      <TableHead className="text-right">Cost / kg</TableHead>
-                      <TableHead className="text-right">Total Cost</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.rawMaterial.batches.map((b) => (
-                      <TableRow key={b.id} data-testid={`row-batch-${b.id}`}>
-                        <TableCell className="font-mono text-sm">{b.batchCode}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{b.name || "—"}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">{fmtKg(parseFloat(b.totalWeightKg))}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">{fmtMoney(parseFloat(b.costPerKg))}</TableCell>
-                        <TableCell className="text-right font-mono font-semibold">{fmtMoney(parseFloat(b.totalCost))}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                  <tfoot>
-                    <tr className="border-t-2">
-                      <td colSpan={2} className="px-4 py-2 text-sm font-semibold text-muted-foreground">Totals</td>
-                      <td className="px-4 py-2 text-right font-mono font-bold">{fmtKg(data.rawMaterial.totalWeightKg)}</td>
-                      <td />
-                      <td className="px-4 py-2 text-right font-mono font-bold">{fmtMoney(data.rawMaterial.totalCost)}</td>
-                    </tr>
-                  </tfoot>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        )}
-      </Card>
     </div>
   );
 }
