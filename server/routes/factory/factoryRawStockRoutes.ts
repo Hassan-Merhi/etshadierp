@@ -270,6 +270,113 @@ export function registerFactoryRawStockRoutes(app: Express) {
     }
   });
 
+  // POST update cost per kg for a supplier and cascade to mix batches + bales
+  app.post("/api/factory/raw-stock/update-cost", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { supplierId, newCostPerKg } = req.body;
+      if (!supplierId) return res.status(400).json({ message: "supplierId is required" });
+      const newCost = parseFloat(newCostPerKg);
+      if (isNaN(newCost) || newCost < 0) return res.status(400).json({ message: "newCostPerKg must be a non-negative number" });
+
+      await db.transaction(async (tx) => {
+        // 1. Update costPerKg on all factory_raw_stock rows for this supplier
+        const rawStockRows = await tx
+          .select({ id: factoryRawStock.id })
+          .from(factoryRawStock)
+          .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
+          .where(and(
+            eq(factoryRawStock.companyId, companyId),
+            eq(factoryContainers.supplierId, Number(supplierId)),
+            sql`${factoryContainers.status} != 'DELETED'`
+          ));
+
+        for (const row of rawStockRows) {
+          await tx.update(factoryRawStock)
+            .set({ costPerKg: String(newCost), costPerKgUsd: String(newCost) })
+            .where(eq(factoryRawStock.id, row.id));
+        }
+
+        // 2. Update costPerKg + totalCost on factory_mix_batch_sources for this supplier
+        const batchSources = await tx
+          .select({
+            id: factoryMixBatchSources.id,
+            mixBatchId: factoryMixBatchSources.mixBatchId,
+            weightKg: factoryMixBatchSources.weightKg,
+          })
+          .from(factoryMixBatchSources)
+          .where(eq(factoryMixBatchSources.supplierId, Number(supplierId)));
+
+        const affectedBatchIds = new Set<number>();
+        for (const src of batchSources) {
+          const wt = parseFloat(src.weightKg as string) || 0;
+          await tx.update(factoryMixBatchSources)
+            .set({
+              costPerKg: String(newCost),
+              totalCost: String((wt * newCost).toFixed(2)),
+            })
+            .where(eq(factoryMixBatchSources.id, src.id));
+          affectedBatchIds.add(src.mixBatchId);
+        }
+
+        // 3. Recalculate blended cost for each affected mix batch
+        for (const batchId of affectedBatchIds) {
+          const allSources = await tx
+            .select({
+              weightKg: factoryMixBatchSources.weightKg,
+              costPerKg: factoryMixBatchSources.costPerKg,
+            })
+            .from(factoryMixBatchSources)
+            .where(eq(factoryMixBatchSources.mixBatchId, batchId));
+
+          const totalWt = allSources.reduce((s, r) => s + (parseFloat(r.weightKg as string) || 0), 0);
+          const totalCostSum = allSources.reduce((s, r) => {
+            const wt = parseFloat(r.weightKg as string) || 0;
+            const c = parseFloat(r.costPerKg as string) || 0;
+            return s + wt * c;
+          }, 0);
+          const blendedCost = totalWt > 0 ? totalCostSum / totalWt : 0;
+
+          await tx.update(factoryMixBatches)
+            .set({
+              costPerKg: String(blendedCost.toFixed(4)),
+              totalCost: String(totalCostSum.toFixed(2)),
+              updatedAt: new Date(),
+            })
+            .where(and(eq(factoryMixBatches.id, batchId), eq(factoryMixBatches.companyId, companyId)));
+
+          // 4. Update costPerKg + totalCost on all bales belonging to this batch
+          const balesInBatch = await tx
+            .select({ id: factoryBales.id, weightKg: factoryBales.weightKg })
+            .from(factoryBales)
+            .where(and(
+              eq(factoryBales.mixBatchId, batchId),
+              eq(factoryBales.companyId, companyId),
+              sql`${factoryBales.status} NOT IN ('DELETED','REMOVED')`
+            ));
+
+          for (const bale of balesInBatch) {
+            const baleWt = parseFloat(bale.weightKg as string) || 0;
+            await tx.update(factoryBales)
+              .set({
+                costPerKg: String(blendedCost.toFixed(2)),
+                totalCost: String((baleWt * blendedCost).toFixed(2)),
+                updatedAt: new Date(),
+              })
+              .where(eq(factoryBales.id, bale.id));
+          }
+        }
+      });
+
+      res.json({ success: true, message: "Cost updated and cascaded to mix batches and bales" });
+    } catch (error: any) {
+      console.error("Error updating raw stock cost:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // POST deduct from received_kg directly on factory_raw_stock rows for a supplier
   app.post("/api/factory/raw-stock/deduct-received", requireAuth, async (req: any, res: any) => {
     try {

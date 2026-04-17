@@ -351,7 +351,7 @@ export default function ProductionRawStock() {
   // Raw stock adjustment dialog
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [adjustingRow, setAdjustingRow] = useState<{ supplierId: number | null; supplierName: string } | null>(null);
-  const [adjType, setAdjType] = useState<"ADD" | "REMOVE">("ADD");
+  const [adjType, setAdjType] = useState<"ADD" | "REMOVE" | "COST">("ADD");
   const [adjKg, setAdjKg] = useState("");
   const [adjCostPerKg, setAdjCostPerKg] = useState("");
   const [adjCurrency, setAdjCurrency] = useState("USD");
@@ -557,6 +557,29 @@ export default function ProductionRawStock() {
       setDeductKg("");
       setDeductNotes("");
       toast({ title: "Deducted", description: `${data.deducted} kg removed from received stock.` });
+    },
+    onError: (err: any) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateCostMutation = useMutation({
+    mutationFn: async (payload: { supplierId: number; newCostPerKg: string }) => {
+      const res = await modeApiRequest("POST", "/api/factory/raw-stock/update-cost", payload);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to update cost");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      setAdjustDialogOpen(false);
+      setAdjCostPerKg("");
+      toast({ title: "Cost Updated", description: "Cost per kg updated and cascaded to all linked mix batches and bales." });
     },
     onError: (err: any) => {
       if (err?._handledGlobally) return;
@@ -2906,45 +2929,27 @@ export default function ProductionRawStock() {
 
             <div className="space-y-1">
               <Label>Adjustment Type</Label>
-              <Select value={adjType} onValueChange={(v) => setAdjType(v as "ADD" | "REMOVE")}>
+              <Select value={adjType} onValueChange={(v) => setAdjType(v as "ADD" | "REMOVE" | "COST")}>
                 <SelectTrigger data-testid="select-adj-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ADD">Add Stock (increase received kg)</SelectItem>
                   <SelectItem value="REMOVE">Remove Stock (increase used kg)</SelectItem>
+                  {!adjIsNewMaterial && adjustingRow?.supplierId && (
+                    <SelectItem value="COST">Adjust Cost Only (update $/kg everywhere)</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>Quantity (kg)</Label>
-                <Input
-                  type="number"
-                  min="0.001"
-                  step="0.001"
-                  value={adjKg}
-                  onChange={(e) => setAdjKg(e.target.value)}
-                  placeholder="0.000"
-                  data-testid="input-adj-kg"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Date</Label>
-                <Input
-                  type="date"
-                  value={adjDate}
-                  onChange={(e) => setAdjDate(e.target.value)}
-                  data-testid="input-adj-date"
-                />
-              </div>
-            </div>
-
-            {adjType === "ADD" && (
-              <div className="grid grid-cols-2 gap-3">
+            {adjType === "COST" ? (
+              <div className="space-y-3">
+                <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                  This will update the cost per kg for all raw stock rows, mix batches, and bales linked to this supplier.
+                </div>
                 <div className="space-y-1">
-                  <Label>Cost / kg (optional)</Label>
+                  <Label>New Cost / kg (USD)</Label>
                   <Input
                     type="number"
                     min="0"
@@ -2952,38 +2957,81 @@ export default function ProductionRawStock() {
                     value={adjCostPerKg}
                     onChange={(e) => setAdjCostPerKg(e.target.value)}
                     placeholder="0.0000"
-                    data-testid="input-adj-cost-per-kg"
+                    data-testid="input-adj-new-cost"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label>Currency</Label>
-                  <Select value={adjCurrency} onValueChange={setAdjCurrency}>
-                    <SelectTrigger data-testid="select-adj-currency">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="PKR">PKR</SelectItem>
-                      <SelectItem value="EUR">EUR</SelectItem>
-                      <SelectItem value="GBP">GBP</SelectItem>
-                      <SelectItem value="AED">AED</SelectItem>
-                      <SelectItem value="CNY">CNY</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
-            )}
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Quantity (kg)</Label>
+                    <Input
+                      type="number"
+                      min="0.001"
+                      step="0.001"
+                      value={adjKg}
+                      onChange={(e) => setAdjKg(e.target.value)}
+                      placeholder="0.000"
+                      data-testid="input-adj-kg"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Date</Label>
+                    <Input
+                      type="date"
+                      value={adjDate}
+                      onChange={(e) => setAdjDate(e.target.value)}
+                      data-testid="input-adj-date"
+                    />
+                  </div>
+                </div>
 
-            <div className="space-y-1">
-              <Label>Notes (optional)</Label>
-              <Textarea
-                value={adjNotes}
-                onChange={(e) => setAdjNotes(e.target.value)}
-                placeholder="Reason for adjustment..."
-                rows={2}
-                data-testid="input-adj-notes"
-              />
-            </div>
+                {adjType === "ADD" && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label>Cost / kg (optional)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.0001"
+                        value={adjCostPerKg}
+                        onChange={(e) => setAdjCostPerKg(e.target.value)}
+                        placeholder="0.0000"
+                        data-testid="input-adj-cost-per-kg"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Currency</Label>
+                      <Select value={adjCurrency} onValueChange={setAdjCurrency}>
+                        <SelectTrigger data-testid="select-adj-currency">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD">USD</SelectItem>
+                          <SelectItem value="PKR">PKR</SelectItem>
+                          <SelectItem value="EUR">EUR</SelectItem>
+                          <SelectItem value="GBP">GBP</SelectItem>
+                          <SelectItem value="AED">AED</SelectItem>
+                          <SelectItem value="CNY">CNY</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <Label>Notes (optional)</Label>
+                  <Textarea
+                    value={adjNotes}
+                    onChange={(e) => setAdjNotes(e.target.value)}
+                    placeholder="Reason for adjustment..."
+                    rows={2}
+                    data-testid="input-adj-notes"
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           <DialogFooter className="flex gap-2 flex-wrap">
@@ -2991,7 +3039,21 @@ export default function ProductionRawStock() {
               Cancel
             </Button>
             <Button
+              disabled={adjType === "COST" ? updateCostMutation.isPending : createAdjustmentMutation.isPending}
               onClick={() => {
+                if (adjType === "COST") {
+                  if (!adjCostPerKg || parseFloat(adjCostPerKg) < 0) {
+                    toast({ title: "Error", description: "Please enter a valid cost per kg.", variant: "destructive" });
+                    return;
+                  }
+                  const supplierId = adjustingRow?.supplierId;
+                  if (!supplierId) {
+                    toast({ title: "Error", description: "Supplier is required for cost adjustment.", variant: "destructive" });
+                    return;
+                  }
+                  updateCostMutation.mutate({ supplierId, newCostPerKg: adjCostPerKg });
+                  return;
+                }
                 if (!adjKg || parseFloat(adjKg) <= 0) {
                   toast({ title: "Error", description: "Please enter a valid kg amount.", variant: "destructive" });
                   return;
@@ -3008,7 +3070,7 @@ export default function ProductionRawStock() {
                   ? (adjSupplierId && adjSupplierId !== "__none__" ? parseInt(adjSupplierId) : null)
                   : (adjustingRow?.supplierId ?? null);
                 createAdjustmentMutation.mutate({
-                  type: adjType,
+                  type: adjType as "ADD" | "REMOVE",
                   kg: adjKg,
                   costPerKg: adjCostPerKg || "0",
                   currencyCode: adjCurrency,
@@ -3019,10 +3081,11 @@ export default function ProductionRawStock() {
                   createVoucher: adjIsNewMaterial && !!adjSupplierId && adjSupplierId !== "__none__" && adjType === "ADD" && parseFloat(adjCostPerKg || "0") > 0,
                 });
               }}
-              disabled={createAdjustmentMutation.isPending}
               data-testid="button-adj-confirm"
             >
-              {createAdjustmentMutation.isPending ? "Saving..." : "Save Adjustment"}
+              {adjType === "COST"
+                ? (updateCostMutation.isPending ? "Updating..." : "Update Cost")
+                : (createAdjustmentMutation.isPending ? "Saving..." : "Save Adjustment")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3088,8 +3151,6 @@ export default function ProductionRawStock() {
                   supplierId: deductingRow.supplierId,
                   kg: deductKg,
                   notes: deductNotes || undefined,
-                  costPerKg: deductingRow.costPerKgUsd || undefined,
-                  currencyCode: deductingRow.currencyCode || undefined,
                 });
               }}
               data-testid="button-deduct-confirm"
