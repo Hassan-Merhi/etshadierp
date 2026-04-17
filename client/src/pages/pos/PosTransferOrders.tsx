@@ -949,8 +949,7 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
                     )}
                   </TableCell>
                   <TableCell className="py-3 align-top">
-                    <div className="font-medium text-sm font-mono" data-testid={`text-voucher-${t.voucherId}`}>{t.voucherNumber}</div>
-                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <div className="text-sm text-muted-foreground flex items-center gap-1">
                       <span>{t.sourceLocationName}</span>
                       <ArrowRight className="h-3 w-3 shrink-0" />
                       <span>{t.destinationLocationName}</span>
