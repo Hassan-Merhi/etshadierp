@@ -1188,19 +1188,24 @@ export function registerFiscalTransferRoutes(app: Express) {
 
       const isOptional = optionalFlag === true;
 
-      // If this is an optional (POS) revision, check if there is already one pending
-      // and update it in-place rather than creating a new revision
+      // If this is an optional (POS) revision, check if the SAME USER already has one pending
+      // and update it in-place rather than creating a new revision.
+      // Each POS user gets their own optional revision so multiple locations can coexist.
       let revision: any = null;
-      if (isOptional) {
+      if (isOptional && req.user?.id) {
         const [existingOptional] = await db
           .select()
           .from(stockTransferRevisions)
-          .where(and(eq(stockTransferRevisions.transferId, transferId), eq(stockTransferRevisions.optional, true)))
+          .where(and(
+            eq(stockTransferRevisions.transferId, transferId),
+            eq(stockTransferRevisions.optional, true),
+            eq(stockTransferRevisions.createdBy, req.user.id),
+          ))
           .orderBy(asc(stockTransferRevisions.revisionNumber))
           .limit(1);
 
         if (existingOptional) {
-          // Replace items on the existing revision
+          // Replace only this user's items on their existing revision
           await db.delete(stockTransferRevisionItems).where(eq(stockTransferRevisionItems.revisionId, existingOptional.id));
           await db
             .update(stockTransferRevisions)
