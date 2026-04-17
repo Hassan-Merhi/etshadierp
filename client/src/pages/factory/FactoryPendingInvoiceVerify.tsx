@@ -627,7 +627,7 @@ export default function FactoryPendingInvoiceVerify() {
         </CardContent>
       </Card>
 
-      {isVerified && (
+      {(isPending || isVerified) && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="text-sm">Freight &amp; Charges</CardTitle>
