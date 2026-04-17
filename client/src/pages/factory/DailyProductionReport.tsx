@@ -618,44 +618,32 @@ export default function DailyProductionReport() {
           )}
         </div>
 
-        {/* Compact pie chart — same row as date picker */}
-        {!isLoading && data && data.production.byCategory.length > 0 && (
-          <CategoryPieChart
-            byCategory={data.production.byCategory}
-            wipersGarbageKg={data.wipersGarbage.totalWeightKg}
-          />
-        )}
+        {/* Compact pie charts — same row as date picker */}
+        {!isLoading && data && (() => {
+          const allRows: { categoryName: string; totalWeightKg: number }[] = [
+            ...data.production.byCategory.map(c => ({ categoryName: c.categoryName, totalWeightKg: c.totalWeightKg })),
+            ...data.wipersGarbage.rows.map(r => ({ categoryName: r.categoryName, totalWeightKg: r.totalWeightKg })),
+          ];
+          const hasData = allRows.some(r => r.totalWeightKg > 0);
+          if (!hasData) return null;
+          return (
+            <div className="flex flex-wrap gap-6">
+              <CategoryPieChart
+                byCategory={data.production.byCategory}
+                wipersGarbageKg={data.wipersGarbage.totalWeightKg}
+              />
+              <MiniPieChart
+                title="By Grade"
+                allRows={allRows}
+                classifyFn={classifyByGrade}
+                order={GRADE_ORDER}
+                colors={GRADE_COLORS}
+                testId="card-grade-pie"
+              />
+            </div>
+          );
+        })()}
       </div>
-
-      {/* ── Chart #1 & Chart #2 row ── */}
-      {!isLoading && data && (() => {
-        const allRows: { categoryName: string; totalWeightKg: number }[] = [
-          ...data.production.byCategory.map(c => ({ categoryName: c.categoryName, totalWeightKg: c.totalWeightKg })),
-          ...data.wipersGarbage.rows.map(r => ({ categoryName: r.categoryName, totalWeightKg: r.totalWeightKg })),
-        ];
-        const hasData = allRows.some(r => r.totalWeightKg > 0);
-        if (!hasData) return null;
-        return (
-          <div className="flex flex-wrap gap-6">
-            <MiniPieChart
-              title="Chart #1 — By Sub-Type"
-              allRows={allRows}
-              classifyFn={classifyDetailed}
-              order={DETAILED_ORDER}
-              colors={DETAILED_COLORS}
-              testId="card-detailed-pie"
-            />
-            <MiniPieChart
-              title="Chart #2 — By Grade"
-              allRows={allRows}
-              classifyFn={classifyByGrade}
-              order={GRADE_ORDER}
-              colors={GRADE_COLORS}
-              testId="card-grade-pie"
-            />
-          </div>
-        );
-      })()}
 
       {/* ── Top Summary Bar ── */}
       <Card data-testid="card-summary-bar">
