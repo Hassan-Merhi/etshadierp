@@ -101,7 +101,7 @@ export function registerRentalRoutes(
   app.get(`${urlPrefix}/units`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ error: "No company selected" });
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const unitType = (req.query.unitType as string) || "WAREHOUSE";
 
       await ensureMonthlyForCompany(companyId, module);
@@ -148,7 +148,7 @@ export function registerRentalRoutes(
       }));
     } catch (e: any) {
       console.error(`${tag} units:`, e);
-      res.status(500).json({ error: e.message });
+      res.status(500).json({ message: e.message });
     }
   });
 
@@ -156,13 +156,13 @@ export function registerRentalRoutes(
   app.post(`${urlPrefix}/units`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ error: "No company selected" });
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const data = insertPropertyUnitSchema.parse({ ...req.body, companyId });
       const [created] = await db.insert(propertyUnits).values({ ...data, module } as any).returning();
       res.json(created);
     } catch (e: any) {
-      if (e instanceof z.ZodError) return res.status(400).json({ error: e.errors });
-      res.status(500).json({ error: e.message });
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+      res.status(500).json({ message: e.message });
     }
   });
 
@@ -170,7 +170,7 @@ export function registerRentalRoutes(
   app.patch(`${urlPrefix}/units/:id`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ error: "No company selected" });
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       const allowed = ["unitNumber", "size", "dimensions", "locationGroup", "notes", "sortOrder", "active"];
       const updates: any = {};
@@ -180,7 +180,7 @@ export function registerRentalRoutes(
         .returning();
       res.json(updated);
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      res.status(500).json({ message: e.message });
     }
   });
 
@@ -188,7 +188,7 @@ export function registerRentalRoutes(
   app.delete(`${urlPrefix}/units/:id`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ error: "No company selected" });
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       const [active] = await db.select().from(propertyContracts).where(and(
         eq(propertyContracts.companyId, companyId),
@@ -196,12 +196,12 @@ export function registerRentalRoutes(
         eq(propertyContracts.unitId, id),
         eq(propertyContracts.status, "ACTIVE"),
       ));
-      if (active) return res.status(400).json({ error: "Cannot delete: unit has active contract. End contract first." });
+      if (active) return res.status(400).json({ message: "Cannot delete: unit has active contract. End contract first." });
       await db.update(propertyUnits).set({ active: false })
         .where(and(eq(propertyUnits.id, id), eq(propertyUnits.companyId, companyId), eq(propertyUnits.module, module)));
       res.json({ ok: true });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      res.status(500).json({ message: e.message });
     }
   });
 
@@ -209,7 +209,7 @@ export function registerRentalRoutes(
   app.post(`${urlPrefix}/contracts`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ error: "No company selected" });
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const data = insertPropertyContractSchema.parse({ ...req.body, companyId });
 
       const [unit] = await db.select().from(propertyUnits).where(and(
@@ -217,7 +217,7 @@ export function registerRentalRoutes(
         eq(propertyUnits.companyId, companyId),
         eq(propertyUnits.module, module),
       ));
-      if (!unit) return res.status(404).json({ error: "Unit not found" });
+      if (!unit) return res.status(404).json({ message: "Unit not found" });
 
       const [existing] = await db.select().from(propertyContracts).where(and(
         eq(propertyContracts.companyId, companyId),
@@ -225,15 +225,15 @@ export function registerRentalRoutes(
         eq(propertyContracts.unitId, data.unitId),
         eq(propertyContracts.status, "ACTIVE"),
       ));
-      if (existing) return res.status(400).json({ error: "Unit already has an active contract" });
+      if (existing) return res.status(400).json({ message: "Unit already has an active contract" });
 
       const [created] = await db.insert(propertyContracts).values({ ...data, module } as any).returning();
       await ensureMonthlyLedgerRows(created.id);
       res.json(created);
     } catch (e: any) {
-      if (e instanceof z.ZodError) return res.status(400).json({ error: e.errors });
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
       console.error(`${tag} contracts:`, e);
-      res.status(500).json({ error: e.message });
+      res.status(500).json({ message: e.message });
     }
   });
 
@@ -241,7 +241,7 @@ export function registerRentalRoutes(
   app.patch(`${urlPrefix}/contracts/:id/rent`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ error: "No company selected" });
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       const { newAmount, effectiveFrom } = z.object({
         newAmount: z.union([z.string(), z.number()]).transform(v => String(v)),
@@ -251,7 +251,7 @@ export function registerRentalRoutes(
       const [contract] = await db.select().from(propertyContracts).where(and(
         eq(propertyContracts.id, id), eq(propertyContracts.companyId, companyId), eq(propertyContracts.module, module),
       ));
-      if (!contract) return res.status(404).json({ error: "Contract not found" });
+      if (!contract) return res.status(404).json({ message: "Contract not found" });
 
       await db.update(propertyContracts).set({ rentalAmount: newAmount }).where(eq(propertyContracts.id, id));
 
@@ -267,8 +267,8 @@ export function registerRentalRoutes(
       `);
       res.json({ ok: true });
     } catch (e: any) {
-      if (e instanceof z.ZodError) return res.status(400).json({ error: e.errors });
-      res.status(500).json({ error: e.message });
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+      res.status(500).json({ message: e.message });
     }
   });
 
@@ -276,7 +276,7 @@ export function registerRentalRoutes(
   app.post(`${urlPrefix}/contracts/:id/end`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ error: "No company selected" });
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       const { endDate, notes } = z.object({
         endDate: z.string().min(1),
@@ -286,7 +286,7 @@ export function registerRentalRoutes(
       const [contract] = await db.select().from(propertyContracts).where(and(
         eq(propertyContracts.id, id), eq(propertyContracts.companyId, companyId), eq(propertyContracts.module, module),
       ));
-      if (!contract) return res.status(404).json({ error: "Contract not found" });
+      if (!contract) return res.status(404).json({ message: "Contract not found" });
 
       await db.update(propertyContracts).set({
         status: "ENDED", endDate: endDate as any,
@@ -302,8 +302,8 @@ export function registerRentalRoutes(
       `);
       res.json({ ok: true });
     } catch (e: any) {
-      if (e instanceof z.ZodError) return res.status(400).json({ error: e.errors });
-      res.status(500).json({ error: e.message });
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+      res.status(500).json({ message: e.message });
     }
   });
 
@@ -311,7 +311,7 @@ export function registerRentalRoutes(
   app.post(`${urlPrefix}/contracts/:id/guarantee-to-statement`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ error: "No company selected" });
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       const { amount, cashAccountId, paymentDate, notes } = z.object({
         amount: z.union([z.string(), z.number()]).transform(v => String(v)),
@@ -323,7 +323,7 @@ export function registerRentalRoutes(
       const [contract] = await db.select().from(propertyContracts).where(and(
         eq(propertyContracts.id, id), eq(propertyContracts.companyId, companyId), eq(propertyContracts.module, module),
       ));
-      if (!contract) return res.status(404).json({ error: "Contract not found" });
+      if (!contract) return res.status(404).json({ message: "Contract not found" });
 
       const [unit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, contract.unitId));
       const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
@@ -352,8 +352,8 @@ export function registerRentalRoutes(
       });
       res.json({ ok: true });
     } catch (e: any) {
-      if (e instanceof z.ZodError) return res.status(400).json({ error: e.errors });
-      res.status(500).json({ error: e.message });
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+      res.status(500).json({ message: e.message });
     }
   });
 
@@ -361,7 +361,7 @@ export function registerRentalRoutes(
   app.post(`${urlPrefix}/payments`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ error: "No company selected" });
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const data = z.object({
         contractId: z.number(),
         cashAccountId: z.number().nullable().optional(),
@@ -376,7 +376,7 @@ export function registerRentalRoutes(
         eq(propertyContracts.companyId, companyId),
         eq(propertyContracts.module, module),
       ));
-      if (!contract) return res.status(404).json({ error: "Contract not found" });
+      if (!contract) return res.status(404).json({ message: "Contract not found" });
 
       await ensureMonthlyLedgerRows(contract.id);
 
@@ -432,9 +432,9 @@ export function registerRentalRoutes(
 
       res.json(payment);
     } catch (e: any) {
-      if (e instanceof z.ZodError) return res.status(400).json({ error: e.errors });
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
       console.error(`${tag} payments:`, e);
-      res.status(500).json({ error: e.message });
+      res.status(500).json({ message: e.message });
     }
   });
 
@@ -442,13 +442,13 @@ export function registerRentalRoutes(
   app.get(`${urlPrefix}/units/:id/detail`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ error: "No company selected" });
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const unitId = parseInt(req.params.id);
 
       const [unit] = await db.select().from(propertyUnits).where(and(
         eq(propertyUnits.id, unitId), eq(propertyUnits.companyId, companyId), eq(propertyUnits.module, module),
       ));
-      if (!unit) return res.status(404).json({ error: "Unit not found" });
+      if (!unit) return res.status(404).json({ message: "Unit not found" });
 
       const [contract] = await db.select().from(propertyContracts).where(and(
         eq(propertyContracts.companyId, companyId),
@@ -480,7 +480,7 @@ export function registerRentalRoutes(
       res.json({ unit, contract: contract ?? null, ledger, payments, pastContracts });
     } catch (e: any) {
       console.error(`${tag} detail:`, e);
-      res.status(500).json({ error: e.message });
+      res.status(500).json({ message: e.message });
     }
   });
 
@@ -488,7 +488,7 @@ export function registerRentalRoutes(
   app.get(`${urlPrefix}/cash-accounts`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ error: "No company selected" });
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const accts = await db.select().from(ledgerAccounts).where(and(
         eq(ledgerAccounts.companyId, companyId),
         eq(ledgerAccounts.active, true),
@@ -497,7 +497,7 @@ export function registerRentalRoutes(
       res.json(accts.filter(a => a.accountType === "Cash" || a.accountType === "Bank")
         .sort((a, b) => a.name.localeCompare(b.name)));
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      res.status(500).json({ message: e.message });
     }
   });
 
@@ -505,7 +505,7 @@ export function registerRentalRoutes(
   app.get(`${urlPrefix}/payments`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ error: "No company selected" });
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const payments = await db
         .select({
@@ -533,7 +533,7 @@ export function registerRentalRoutes(
       res.json(payments);
     } catch (e: any) {
       console.error(`${tag} payments-log:`, e);
-      res.status(500).json({ error: e.message });
+      res.status(500).json({ message: e.message });
     }
   });
 
@@ -541,11 +541,11 @@ export function registerRentalRoutes(
   app.post(`${urlPrefix}/run-monthly`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ error: "No company selected" });
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       await ensureMonthlyForCompany(companyId, module);
       res.json({ ok: true });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      res.status(500).json({ message: e.message });
     }
   });
 }
