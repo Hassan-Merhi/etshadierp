@@ -1322,7 +1322,7 @@ export default function ProductionRawStock() {
                               const val = inlineCostValueRef.current;
                               const v = parseFloat(val);
                               if (!isNaN(v) && v >= 0 && row.supplierId) {
-                                const current = parseFloat(row.costPerKgUsd || row.costPerKg || "0");
+                                const current = parseFloat(row.costPerKgUsd) || parseFloat(row.costPerKg) || 0;
                                 if (Math.abs(v - current) > 0.00001) {
                                   updateCostMutation.mutate({ supplierId: row.supplierId, newCostPerKg: val });
                                 }
@@ -1337,14 +1337,14 @@ export default function ProductionRawStock() {
                             data-testid={`text-cost-${row.supplierId || idx}`}
                             onClick={() => {
                               if (!row.supplierId) return;
-                              const initial = parseFloat(row.costPerKgUsd || row.costPerKg || "0").toFixed(4);
+                              const initial = (parseFloat(row.costPerKgUsd) || parseFloat(row.costPerKg) || 0).toFixed(4);
                               inlineCostValueRef.current = initial;
                               inlineCostFiredRef.current = false;
                               setInlineCostEditValue(initial);
                               setInlineCostEditId(row.supplierId);
                             }}
                           >
-                            ${parseFloat(row.costPerKgUsd || row.costPerKg).toFixed(4)}
+                            ${(parseFloat(row.costPerKgUsd) || parseFloat(row.costPerKg) || 0).toFixed(4)}
                             {row.supplierId && <Pencil className="inline ml-1 h-2.5 w-2.5 opacity-0 group-hover:opacity-50" />}
                           </span>
                         )}
@@ -1366,7 +1366,7 @@ export default function ProductionRawStock() {
                             setAdjustingRow({ supplierId: row.supplierId ?? null, supplierName: row.supplierName });
                             setAdjType("ADD");
                             setAdjKg("");
-                            setAdjCostPerKg(row.costPerKgUsd || row.costPerKg || "");
+                            setAdjCostPerKg(String(parseFloat(row.costPerKgUsd) || parseFloat(row.costPerKg) || 0));
                             setAdjCurrency(row.currencyCode || "USD");
                             setAdjNotes("");
                             setAdjMaterialLabel("");
@@ -1388,7 +1388,7 @@ export default function ProductionRawStock() {
                                 supplierName: row.supplierName,
                                 receivedKg: row.receivedKg,
                                 freeKg: row.freeKg || "0",
-                                costPerKgUsd: row.costPerKgUsd || row.costPerKg || "0",
+                                costPerKgUsd: String(parseFloat(row.costPerKgUsd) || parseFloat(row.costPerKg) || 0),
                                 currencyCode: row.currencyCode || "USD",
                               });
                               setDeductKg("");
@@ -1409,12 +1409,12 @@ export default function ProductionRawStock() {
                               setAddToBatchSource({
                                 supplierId: row.supplierId!,
                                 supplierName: row.supplierName,
-                                costPerKg: row.costPerKgUsd || row.costPerKg || "0",
+                                costPerKg: String(parseFloat(row.costPerKgUsd) || parseFloat(row.costPerKg) || 0),
                                 remainingKg: row.freeKg || row.remainingKg || "0",
                               });
                               setAddToBatchTargetId("");
                               setAddToBatchKg("");
-                              setAddToBatchCost(row.costPerKgUsd || row.costPerKg || "");
+                              setAddToBatchCost(String(parseFloat(row.costPerKgUsd) || parseFloat(row.costPerKg) || 0));
                               setAddToBatchOpen(true);
                             }}
                           >
@@ -1802,10 +1802,10 @@ export default function ProductionRawStock() {
               setAddToBatchSource({
                 supplierId: found.supplierId,
                 supplierName: found.supplierName,
-                costPerKg: found.costPerKgUsd || found.costPerKg || "0",
+                costPerKg: String(parseFloat(found.costPerKgUsd) || parseFloat(found.costPerKg) || 0),
                 remainingKg: found.freeKg || found.remainingKg || "0",
               });
-              setAddToBatchCost(found.costPerKgUsd || found.costPerKg || "");
+              setAddToBatchCost(String(parseFloat(found.costPerKgUsd) || parseFloat(found.costPerKg) || 0));
             }
           },
         ];

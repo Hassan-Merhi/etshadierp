@@ -182,7 +182,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
 
           const receivedKg = parseFloat(rs.receivedKg || "0");
           const usedKg = parseFloat(rs.usedKg || "0");
-          const cpk = parseFloat(rs.costPerKgUsd || rs.costPerKg || "0");
+          const cpk = parseFloat(rs.costPerKgUsd) || parseFloat(rs.costPerKg) || 0;
 
           if (rsDate < startDate) {
             openingReceivedKg += receivedKg;

@@ -207,7 +207,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
           let weightedCostSum = 0, weightedCostWeight = 0;
           for (const rs of supplierRawStocks) {
             const avail = Math.max(0, parseFloat(rs.receivedKg) - parseFloat(rs.usedKg));
-            const rsCost = parseFloat(rs.costPerKgUsd || rs.costPerKg);
+            const rsCost = parseFloat(rs.costPerKgUsd) || parseFloat(rs.costPerKg) || 0;
             weightedCostSum += avail * rsCost;
             weightedCostWeight += avail;
           }
@@ -570,7 +570,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
           for (const rs of supplierRawStocks) {
             const avail = Math.max(0, parseFloat(rs.receivedKg) - parseFloat(rs.usedKg));
             totalAvailable += avail;
-            const rsCost = parseFloat(rs.costPerKgUsd || rs.costPerKg);
+            const rsCost = parseFloat(rs.costPerKgUsd) || parseFloat(rs.costPerKg) || 0;
             weightedCostSum += avail * rsCost;
             weightedCostWeight += avail;
           }
@@ -652,7 +652,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             throw new Error(`Not enough raw stock for container ${containerId}. Available: ${containerRemaining.toFixed(3)} kg`);
           }
 
-          const costUsd = srcCostPerKg ? parseFloat(srcCostPerKg) : parseFloat(rawStock.costPerKgUsd || rawStock.costPerKg);
+          const costUsd = srcCostPerKg ? parseFloat(srcCostPerKg) : (parseFloat(rawStock.costPerKgUsd) || parseFloat(rawStock.costPerKg) || 0);
 
           await tx
             .update(factoryRawStock)
@@ -803,7 +803,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
           for (const rs of supplierRawStocks) {
             const avail = Math.max(0, parseFloat(rs.receivedKg) - parseFloat(rs.usedKg));
             totalAvailable += avail;
-            weightedCostSum += avail * parseFloat(rs.costPerKgUsd || rs.costPerKg || "0");
+            weightedCostSum += avail * (parseFloat(rs.costPerKgUsd) || parseFloat(rs.costPerKg) || 0);
           }
 
           // Only check availability for container-backed suppliers; MANUAL suppliers
@@ -861,7 +861,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
 
           const costUsd = srcCostPerKg
             ? parseFloat(srcCostPerKg)
-            : parseFloat(rawStockRow.costPerKgUsd || rawStockRow.costPerKg);
+            : (parseFloat(rawStockRow.costPerKgUsd) || parseFloat(rawStockRow.costPerKg) || 0);
 
           await tx.update(factoryRawStock)
             .set({ usedKg: sql`${factoryRawStock.usedKg} + ${weight}` })
@@ -1040,7 +1040,54 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         .leftJoin(factorySuppliers, eq(factoryMixBatchSources.supplierId, factorySuppliers.id))
         .where(eq(factoryMixBatchSources.mixBatchId, id));
 
-      res.json(results);
+      // For any source row with a stored costPerKg of 0 (or null), look up the
+      // actual weighted-average cost from factoryRawStock so the breakdown
+      // display always shows a meaningful number.
+      const enriched = await Promise.all(results.map(async (src) => {
+        const storedCost = parseFloat(src.costPerKg) || 0;
+        if (storedCost > 0) return src;
+
+        // Try to find a raw stock cost via containerId first, then supplierId.
+        let fallbackCost = 0;
+        if (src.containerId) {
+          const rows = await db
+            .select({ costPerKgUsd: factoryRawStock.costPerKgUsd, costPerKg: factoryRawStock.costPerKg, receivedKg: factoryRawStock.receivedKg })
+            .from(factoryRawStock)
+            .where(and(eq(factoryRawStock.containerId, src.containerId), eq(factoryRawStock.companyId, companyId)));
+          let wSum = 0, wWeight = 0;
+          for (const r of rows) {
+            const kg = parseFloat(r.receivedKg) || 0;
+            const c = parseFloat(r.costPerKgUsd) || parseFloat(r.costPerKg) || 0;
+            wSum += kg * c;
+            wWeight += kg;
+          }
+          fallbackCost = wWeight > 0 ? wSum / wWeight : 0;
+        } else if (src.supplierId) {
+          const rows = await db
+            .select({ costPerKgUsd: factoryRawStock.costPerKgUsd, costPerKg: factoryRawStock.costPerKg, receivedKg: factoryRawStock.receivedKg })
+            .from(factoryRawStock)
+            .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
+            .where(and(eq(factoryContainers.supplierId, src.supplierId), eq(factoryRawStock.companyId, companyId)));
+          let wSum = 0, wWeight = 0;
+          for (const r of rows) {
+            const kg = parseFloat(r.receivedKg) || 0;
+            const c = parseFloat(r.costPerKgUsd) || parseFloat(r.costPerKg) || 0;
+            wSum += kg * c;
+            wWeight += kg;
+          }
+          fallbackCost = wWeight > 0 ? wSum / wWeight : 0;
+        }
+
+        if (fallbackCost <= 0) return src;
+        const weightKg = parseFloat(src.weightKg) || 0;
+        return {
+          ...src,
+          costPerKg: String(fallbackCost),
+          totalCost: String(weightKg * fallbackCost),
+        };
+      }));
+
+      res.json(enriched);
     } catch (error: any) {
       console.error("Error fetching mix batch sources:", error);
       res.status(500).json({ message: error.message });
