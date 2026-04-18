@@ -1508,7 +1508,7 @@ export default function FactorySuppliers() {
                       const typeLabel: Record<string, string> = {
                         container: "Container", payment: "Payment",
                         fx_out: "FX Out", fx_in: "FX In", commission: "Commission", other_charge: "Other Charge",
-                        freight: "Freight",
+                        freight: "Freight", opening_balance: "Opening Bal",
                       };
                       const typeBadgeVariant = (t: string): "outline"|"secondary"|"default"|"destructive" => {
                         if (t === "payment") return "secondary";

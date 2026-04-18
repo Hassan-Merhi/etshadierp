@@ -2219,7 +2219,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
 
     type LedgerRow = {
       date: string | null;
-      type: "container" | "payment" | "fx_out" | "fx_in" | "commission" | "freight" | "other_charge";
+      type: "container" | "payment" | "fx_out" | "fx_in" | "commission" | "freight" | "other_charge" | "opening_balance";
       description: string;
       ref: string;
       amount: number;
@@ -2451,6 +2451,23 @@ export function registerFactorySuppliersRoutes(app: Express) {
         commissionAmount: null,
         commissionCurrency: null,
       });
+    }
+
+    // Inject opening balance rows (always USD) for broker and all linked suppliers
+    for (const s of allSuppliers as any[]) {
+      const ob = parseFloat(s.openingBalance || "0");
+      if (ob !== 0) {
+        if (!ledgerByCurrency["USD"]) ledgerByCurrency["USD"] = [];
+        ledgerByCurrency["USD"].unshift({
+          date: null,
+          type: "opening_balance" as const,
+          description: `Opening Balance — ${s.name}`,
+          ref: "OB",
+          amount: ob,
+          commissionAmount: null,
+          commissionCurrency: null,
+        });
+      }
     }
 
     // Sort rows by date within each section
