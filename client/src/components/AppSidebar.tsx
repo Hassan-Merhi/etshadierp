@@ -29,6 +29,7 @@ import {
   ScrollText,
   Building2,
   Store,
+  ClipboardList,
 } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
@@ -126,8 +127,9 @@ const navSections: NavSection[] = [
     label: "Rentals",
     color: "#8b5cf6",
     items: [
-      { title: "Warehouses", url: "/erp/rental/warehouses", icon: Building2 },
-      { title: "Shops",      url: "/erp/rental/shops",      icon: Store     },
+      { title: "Warehouses",    url: "/erp/rental/warehouses", icon: Building2     },
+      { title: "Shops",         url: "/erp/rental/shops",      icon: Store         },
+      { title: "Payments Log",  url: "/erp/rental/payments",   icon: ClipboardList },
     ],
   },
 ];

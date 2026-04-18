@@ -143,8 +143,9 @@ const navSections: NavSection[] = [
     label: "Rentals",
     color: "#8b5cf6",
     items: [
-      { title: "Warehouses", url: "/factory/rental/warehouses", icon: Building2 },
-      { title: "Shops",      url: "/factory/rental/shops",      icon: Store     },
+      { title: "Warehouses",   url: "/factory/rental/warehouses", icon: Building2     },
+      { title: "Shops",        url: "/factory/rental/shops",      icon: Store         },
+      { title: "Payments Log", url: "/factory/rental/payments",   icon: ClipboardList },
     ],
   },
   {

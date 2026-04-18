@@ -187,8 +187,11 @@ const PropertiesRentalWarehouses = lazy(() => import("@/pages/properties/Propert
 const PropertiesRentalShops = lazy(() => import("@/pages/properties/PropertiesRentalShops"));
 const ErpRentalWarehouses = lazy(() => import("@/pages/erp/ErpRentalWarehouses"));
 const ErpRentalShops = lazy(() => import("@/pages/erp/ErpRentalShops"));
+const ErpRentalPayments = lazy(() => import("@/pages/erp/ErpRentalPayments"));
 const FactoryRentalWarehouses = lazy(() => import("@/pages/factory/FactoryRentalWarehouses"));
 const FactoryRentalShops = lazy(() => import("@/pages/factory/FactoryRentalShops"));
+const FactoryRentalPayments = lazy(() => import("@/pages/factory/FactoryRentalPayments"));
+const PropertiesRentalPayments = lazy(() => import("@/pages/properties/PropertiesRentalPayments"));
 import { CommandPalette } from "@/components/CommandPalette";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowLeft } from "lucide-react";
@@ -314,6 +317,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/sold-containers"><Redirect to="/containers" /></Route>
       <Route path="/erp/rental/warehouses" component={ErpRentalWarehouses} />
       <Route path="/erp/rental/shops" component={ErpRentalShops} />
+      <Route path="/erp/rental/payments" component={ErpRentalPayments} />
       <Route path="/conflicts" component={ConflictCenter} />
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/settings" component={Settings} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/orphaned-records" component={OrphanedRecords} />}
@@ -686,6 +690,7 @@ function AuthenticatedApp() {
                         <Route path="/properties/daybook" component={PropertiesDaybook} />
                         <Route path="/properties/rental/warehouses" component={PropertiesRentalWarehouses} />
                         <Route path="/properties/rental/shops" component={PropertiesRentalShops} />
+                        <Route path="/properties/rental/payments" component={PropertiesRentalPayments} />
                         <Route path="/properties/ledger-monthly/:accountId" component={PropertiesLedgerMonthly} />
                         <Route path="/properties/ledger-vouchers/:accountId/:year/:month" component={PropertiesLedgerVouchers} />
                         {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/settings" component={PropertiesSettings} />}
@@ -865,6 +870,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/production-report" component={DailyProductionReport} />
                     <Route path="/factory/rental/warehouses" component={FactoryRentalWarehouses} />
                     <Route path="/factory/rental/shops" component={FactoryRentalShops} />
+                    <Route path="/factory/rental/payments" component={FactoryRentalPayments} />
                     <Route><Redirect to={factoryDefaultPage} /></Route>
                   </Switch>
                   </Suspense>

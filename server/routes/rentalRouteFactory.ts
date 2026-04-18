@@ -501,6 +501,42 @@ export function registerRentalRoutes(
     }
   });
 
+  // ── GLOBAL PAYMENTS LOG ──
+  app.get(`${urlPrefix}/payments`, requireAuth, async (req: Request, res: Response) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ error: "No company selected" });
+
+      const payments = await db
+        .select({
+          id: propertyPayments.id,
+          paymentDate: propertyPayments.paymentDate,
+          amount: propertyPayments.amount,
+          forYear: propertyPayments.forYear,
+          forMonth: propertyPayments.forMonth,
+          notes: propertyPayments.notes,
+          contractId: propertyPayments.contractId,
+          unitId: propertyPayments.unitId,
+          tenantName: propertyContracts.tenantName,
+          unitNumber: propertyUnits.unitNumber,
+          locationGroup: propertyUnits.locationGroup,
+        })
+        .from(propertyPayments)
+        .leftJoin(propertyContracts, eq(propertyContracts.id, propertyPayments.contractId))
+        .leftJoin(propertyUnits, eq(propertyUnits.id, propertyPayments.unitId))
+        .where(and(
+          eq(propertyPayments.companyId, companyId),
+          eq(propertyPayments.module, module),
+        ))
+        .orderBy(desc(propertyPayments.paymentDate));
+
+      res.json(payments);
+    } catch (e: any) {
+      console.error(`${tag} payments-log:`, e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // ── MANUAL MONTHLY ROLLOVER ──
   app.post(`${urlPrefix}/run-monthly`, requireAuth, async (req: Request, res: Response) => {
     try {
