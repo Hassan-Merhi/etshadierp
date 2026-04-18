@@ -2329,9 +2329,11 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const allFxTransfersF = await db.select().from(factorySupplierFxTransfers)
         .where(eq(factorySupplierFxTransfers.companyId, companyId));
 
-      // Voucher-based payments (exclude auto-generated FACTORY-PAY-* to avoid double-count)
+      // Voucher-based payments (exclude auto-generated FACTORY-PAY-* and optional vouchers)
       const allSupplierIds = (suppliersList as any[]).map((s: any) => s.id);
       const voucherPaidBySupplier: Record<number, number> = {};
+      // Per-currency voucher amounts needed for broker consolidated calculation
+      const voucherPaidByCurrencyBySupplierId: Record<number, Record<string, number>> = {};
       if (allSupplierIds.length > 0) {
         const voucherRows = await db
           .select({
@@ -2339,6 +2341,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
             debitAmount: voucherEntries.debitAmount,
             currency: vouchers.currency,
             exchangeRate: vouchers.exchangeRate,
+            optional: vouchers.optional,
           })
           .from(voucherEntries)
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
@@ -2350,18 +2353,111 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         for (const row of voucherRows as any[]) {
           const sid = row.factorySupplierId;
           if (!sid) continue;
+          if (row.optional) continue; // optional vouchers don't affect the balance
+          const amt = parseFloat(row.debitAmount || "0");
           const fx = parseFloat(row.exchangeRate || "1") || 1;
-          const usd = row.currency === "USD"
-            ? parseFloat(row.debitAmount || "0")
-            : parseFloat(row.debitAmount || "0") / fx;
+          const cc = row.currency || "USD";
+          const usd = cc === "USD" ? amt : amt / fx;
           voucherPaidBySupplier[sid] = (voucherPaidBySupplier[sid] || 0) + usd;
+          if (!voucherPaidByCurrencyBySupplierId[sid]) voucherPaidByCurrencyBySupplierId[sid] = {};
+          voucherPaidByCurrencyBySupplierId[sid][cc] = (voucherPaidByCurrencyBySupplierId[sid][cc] || 0) + amt;
         }
       }
+
+      // Identify brokers (suppliers that have children linked via parentId)
+      // and linked suppliers (those with parentId set pointing to a broker)
+      const brokerIds = new Set<number>();
+      const linkedSupplierParent = new Map<number, number>(); // childId → brokerId
+      for (const s of suppliersList as any[]) {
+        if (s.parentId) {
+          linkedSupplierParent.set(s.id, s.parentId);
+          brokerIds.add(s.parentId);
+        }
+      }
+
+      // Pre-group children IDs for each broker
+      const brokerChildren = new Map<number, number[]>(); // brokerId → [childIds]
+      for (const [childId, brokerId] of linkedSupplierParent) {
+        if (!brokerChildren.has(brokerId)) brokerChildren.set(brokerId, []);
+        brokerChildren.get(brokerId)!.push(childId);
+      }
+
+      // Broker consolidated balance: calculate per-currency running balance for the
+      // broker + all linked suppliers, then apply approximate FX rates to get one USD total.
+      // Formula: USD_balance + (EUR_balance × 1.16) + (AUD_balance × 0.71)
+      const calcBrokerApproxUsd = (brokerId: number): number => {
+        const groupIds = [brokerId, ...(brokerChildren.get(brokerId) || [])];
+        const buckets: Record<string, number> = {};
+        const add = (cc: string, amt: number) => { buckets[cc] = (buckets[cc] || 0) + amt; };
+
+        // Containers (goods + freight per currency)
+        for (const c of allContainersF as any[]) {
+          if (!groupIds.includes(c.supplierId)) continue;
+          const cc = c.currencyCode || "USD";
+          const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+          const rate = parseFloat(c.ratePerKg || "0");
+          add(cc, kg * rate);
+          const freight = parseFloat(c.freight || "0");
+          const freightCc = c.freightCurrencyCode || cc;
+          if (freight > 0) add(freightCc, freight);
+        }
+
+        // Direct payments (reduce balance in payment currency)
+        for (const p of allPaymentsF as any[]) {
+          if (!groupIds.includes(p.supplierId)) continue;
+          const cc = p.currencyCode || "USD";
+          add(cc, -parseFloat(p.amount || "0"));
+        }
+
+        // Voucher payments per currency
+        for (const sid of groupIds) {
+          const currMap = voucherPaidByCurrencyBySupplierId[sid] || {};
+          for (const [cc, amt] of Object.entries(currMap)) {
+            add(cc, -amt);
+          }
+        }
+
+        // FX transfers: non-USD foreign currency out from group → USD in to broker pool
+        for (const t of allFxTransfersF as any[]) {
+          const fromCc = t.fromCurrencyCode || "USD";
+          const fromAmt = parseFloat(t.fromAmount || "0");
+          const toUsd = parseFloat(t.toAmountUsd || "0");
+          if (groupIds.includes(t.fromSupplierId) && fromCc !== "USD") {
+            add(fromCc, -fromAmt);
+          }
+          if (t.toSupplierId === brokerId) {
+            add("USD", toUsd);
+          }
+        }
+
+        const usdBal = buckets["USD"] || 0;
+        const eurBal = buckets["EUR"] || 0;
+        const audBal = buckets["AUD"] || 0;
+        return usdBal + (eurBal * 1.16) + (audBal * 0.71);
+      };
 
       const supplierItems: { name: string; balanceUsd: number }[] = [];
       let totalSupplierLiabilities = 0;
 
+      // Track which broker entries have already been added (avoid duplicates)
+      const processedBrokers = new Set<number>();
+
       for (const s of suppliersList as any[]) {
+        // Linked suppliers: their balances are rolled into their parent broker — skip individually
+        if (linkedSupplierParent.has(s.id)) continue;
+
+        // Brokers: use consolidated multi-currency approximate USD balance
+        if (brokerIds.has(s.id) && !processedBrokers.has(s.id)) {
+          processedBrokers.add(s.id);
+          const approxUsd = round2(calcBrokerApproxUsd(s.id));
+          if (Math.abs(approxUsd) > 0.01) {
+            supplierItems.push({ name: s.name, balanceUsd: approxUsd });
+            if (approxUsd > 0) totalSupplierLiabilities += approxUsd;
+          }
+          continue;
+        }
+
+        // Standalone (non-broker) suppliers: use existing USD-converted calculation
         const sc = allContainersF.filter((c: any) => c.supplierId === s.id);
         const containerValue = sc.reduce((sum: number, c: any) => {
           const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
