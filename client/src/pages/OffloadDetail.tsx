@@ -172,7 +172,7 @@ export default function OffloadDetail() {
   const displayOfficeCharges  = live?.hasVouchers ? live.officeCharges   : Number(offload?.officeCharges || 0);
   const displayTransportFees  = live?.hasVouchers ? live.transportFees   : Number(offload?.transportFees || 0);
   const displayTransferCharges= live?.hasVouchers ? live.transferCharges : Number(offload?.transferCharges || 0);
-  const displayAddlCharges    = live?.hasVouchers ? live.additionalCharges : 0;
+  const displayAddlCharges    = live?.hasVouchers ? live.additionalCharges : (offload?.additionalCharges || []).reduce((s, c) => s + Number(c.amount || 0), 0);
   const displayOffloadTotal   = live?.hasVouchers ? live.totalOffloadCharges
     : (displayDuties + displayOfficeCharges + displayTransportFees + displayTransferCharges + displayAddlCharges);
 
