@@ -1089,7 +1089,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
             fb.waste_dispatch_id AS "wasteDispatchId"
           FROM factory_bales fb
           WHERE fb.company_id = ${companyId}
-          AND fb.status IN ('IN_STOCK', 'SOLD', 'DISPATCHED')
+          AND fb.status IN ('IN_STOCK', 'SOLD', 'DISPATCHED', 'RESERVED_FOR_ORDER')
         `),
         db.select({ id: factoryBaleProducts.id, name: factoryBaleProducts.name, articleCode: factoryBaleProducts.articleCode, categoryId: factoryBaleProducts.categoryId, sellingPrice: factoryBaleProducts.sellingPrice }).from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId)),
         db.select({ id: factoryCategories.id, name: factoryCategories.name }).from(factoryCategories).where(eq(factoryCategories.companyId, companyId)),
@@ -1183,9 +1183,12 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           addToBucket(buckets.sold, key, label, bale);
         } else if (bale.status === "DISPATCHED" && bale.wasteDispatchId) {
           addToBucket(buckets.wasteDispatched, key, label, bale);
+        } else if (bale.status === "RESERVED_FOR_ORDER") {
+          // Bale is physically reserved/scanned into a loading order
+          addToBucket(buckets.pendingLoading, key, label, bale);
         } else if (bale.status === "IN_STOCK") {
           if (pendingOrderBaleIds.has(Number(bale.id))) {
-            // Bale is reserved for a LOADING/PENDING_VERIFICATION/VERIFIED order
+            // Bale is linked to a LOADING/PENDING_VERIFICATION/VERIFIED order but not yet reserved
             addToBucket(buckets.pendingLoading, key, label, bale);
           } else if (waste) {
             addToBucket(buckets.wasteStock, key, label, bale);
