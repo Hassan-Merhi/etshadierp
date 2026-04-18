@@ -1350,6 +1350,25 @@ export function registerFiscalTransferRoutes(app: Express) {
               await adjustInventory(tx, netItem.sourceLocationId, netItem.stockItemId, -netDelta, companyId!);
               await adjustInventory(tx, transfer.destinationLocationId, netItem.stockItemId, netDelta, companyId!, rate);
             }
+          } else if (newQty > 0) {
+            // New item added by POS user that doesn't exist in the original transfer — insert it.
+            // Rate is not stored in revision data; default to 0 so the row is visible and the admin
+            // can update the rate on the transfer after approval.
+            const rate = 0;
+            await tx.insert(stockTransferItems).values({
+              transferId: transfer.id,
+              stockItemId: netItem.stockItemId,
+              sourceLocationId: netItem.sourceLocationId ?? undefined,
+              quantity: String(newQty),
+              rate: "0",
+              totalAmount: "0.00",
+            });
+
+            // Apply inventory adjustment for the new item if inventory was already applied
+            if (transfer.inventoryApplied && netItem.sourceLocationId) {
+              await adjustInventory(tx, netItem.sourceLocationId, netItem.stockItemId, -newQty, companyId!);
+              await adjustInventory(tx, transfer.destinationLocationId, netItem.stockItemId, newQty, companyId!, rate);
+            }
           }
         }
 
