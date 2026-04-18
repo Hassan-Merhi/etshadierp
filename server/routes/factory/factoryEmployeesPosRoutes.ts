@@ -2390,6 +2390,13 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         const buckets: Record<string, number> = {};
         const add = (cc: string, amt: number) => { buckets[cc] = (buckets[cc] || 0) + amt; };
 
+        // Opening balances for all group members (stored in USD)
+        for (const s of suppliersList as any[]) {
+          if (!groupIds.includes(s.id)) continue;
+          const ob = parseFloat(s.openingBalance || "0");
+          if (ob !== 0) add("USD", ob);
+        }
+
         // Containers (goods + freight per currency)
         for (const c of allContainersF as any[]) {
           if (!groupIds.includes(c.supplierId)) continue;
