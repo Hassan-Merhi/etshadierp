@@ -4181,3 +4181,122 @@ export const proformaStockReservations = pgTable("proforma_stock_reservations", 
 export const insertProformaStockReservationSchema = createInsertSchema(proformaStockReservations).omit({ id: true, createdAt: true });
 export type InsertProformaStockReservation = z.infer<typeof insertProformaStockReservationSchema>;
 export type ProformaStockReservation = typeof proformaStockReservations.$inferSelect;
+
+// ============================================================
+// PROPERTIES RENTAL MANAGEMENT
+// ============================================================
+
+// Property Units — catalogue of warehouses/shops that can be rented
+export const propertyUnits = pgTable("property_units", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  unitType: text("unit_type").notNull(), // 'WAREHOUSE' | 'SHOP'
+  locationGroup: text("location_group").notNull(), // 'KOLWEZI' | 'LSHI' | 'KIWELE' | 'KINSAHSA' | 'MALI' | etc.
+  unitNumber: text("unit_number").notNull(), // 'KOLWEZI A1', 'HADI 1', etc.
+  size: text("size"), // free text e.g. "420" or "420 m²"
+  dimensions: text("dimensions"), // free text e.g. "35 X 12"
+  notes: text("notes"),
+  active: boolean("active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqCompanyUnit: uniqueIndex("property_units_company_unit_unique").on(t.companyId, t.unitNumber),
+  byCompany: index("property_units_company_idx").on(t.companyId, t.unitType),
+}));
+
+export const insertPropertyUnitSchema = createInsertSchema(propertyUnits).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  unitType: z.enum(["WAREHOUSE", "SHOP"]),
+  unitNumber: z.string().min(1, "Unit number required"),
+  locationGroup: z.string().min(1, "Location group required"),
+});
+export type InsertPropertyUnit = z.infer<typeof insertPropertyUnitSchema>;
+export type PropertyUnit = typeof propertyUnits.$inferSelect;
+
+// Property Contracts — active leases for a unit
+export const propertyContracts = pgTable("property_contracts", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  unitId: integer("unit_id").notNull(),
+  tenantName: text("tenant_name").notNull(),
+  guaranteePeriod: text("guarantee_period"), // e.g. "3 MONTHS"
+  guaranteeAmount: decimal("guarantee_amount", { precision: 20, scale: 2 }).notNull().default("0"),
+  rentalAmount: decimal("rental_amount", { precision: 20, scale: 2 }).notNull().default("0"),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"),
+  status: text("status").notNull().default("ACTIVE"), // 'ACTIVE' | 'ENDED'
+  notes: text("notes"),
+  guaranteePostedToStatement: boolean("guarantee_posted_to_statement").notNull().default(false),
+  guaranteePostedAmount: decimal("guarantee_posted_amount", { precision: 20, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  byUnit: index("property_contracts_unit_idx").on(t.unitId, t.status),
+  byCompany: index("property_contracts_company_idx").on(t.companyId, t.status),
+}));
+
+export const insertPropertyContractSchema = createInsertSchema(propertyContracts).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  tenantName: z.string().min(1, "Tenant name required"),
+  rentalAmount: z.union([z.string(), z.number()]).transform(v => String(v)),
+  guaranteeAmount: z.union([z.string(), z.number()]).transform(v => String(v)).optional(),
+  startDate: z.string().min(1, "Start date required"),
+});
+export type InsertPropertyContract = z.infer<typeof insertPropertyContractSchema>;
+export type PropertyContract = typeof propertyContracts.$inferSelect;
+
+// Property Monthly Ledger — auto-generated row per month per active contract
+export const propertyMonthlyLedger = pgTable("property_monthly_ledger", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  contractId: integer("contract_id").notNull(),
+  unitId: integer("unit_id").notNull(),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(), // 1-12
+  expectedAmount: decimal("expected_amount", { precision: 20, scale: 2 }).notNull().default("0"),
+  paidAmount: decimal("paid_amount", { precision: 20, scale: 2 }).notNull().default("0"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqContractPeriod: uniqueIndex("property_monthly_ledger_unique").on(t.contractId, t.year, t.month),
+  byUnit: index("property_monthly_ledger_unit_idx").on(t.unitId),
+}));
+
+export const insertPropertyMonthlyLedgerSchema = createInsertSchema(propertyMonthlyLedger).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertPropertyMonthlyLedger = z.infer<typeof insertPropertyMonthlyLedgerSchema>;
+export type PropertyMonthlyLedger = typeof propertyMonthlyLedger.$inferSelect;
+
+// Property Payments — individual payment transactions (one row per payment received)
+export const propertyPayments = pgTable("property_payments", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  contractId: integer("contract_id").notNull(),
+  unitId: integer("unit_id").notNull(),
+  ledgerRowId: integer("ledger_row_id"), // FK to propertyMonthlyLedger - which month it was applied to
+  cashAccountId: integer("cash_account_id"), // FK to ledgerAccounts (the cash box used)
+  amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
+  paymentDate: date("payment_date").notNull(),
+  forYear: integer("for_year").notNull(),
+  forMonth: integer("for_month").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  byContract: index("property_payments_contract_idx").on(t.contractId),
+  byCompany: index("property_payments_company_idx").on(t.companyId, t.paymentDate),
+}));
+
+export const insertPropertyPaymentSchema = createInsertSchema(propertyPayments).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  amount: z.union([z.string(), z.number()]).transform(v => String(v)),
+  paymentDate: z.string().min(1, "Payment date required"),
+});
+export type InsertPropertyPayment = z.infer<typeof insertPropertyPaymentSchema>;
+export type PropertyPayment = typeof propertyPayments.$inferSelect;

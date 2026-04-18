@@ -183,6 +183,8 @@ const PropertiesDaybook = lazy(() => import("@/pages/properties/PropertiesDayboo
 const PropertiesLedgerMonthly = lazy(() => import("@/pages/properties/PropertiesLedgerMonthly"));
 const PropertiesLedgerVouchers = lazy(() => import("@/pages/properties/PropertiesLedgerVouchers"));
 const PropertiesSettings = lazy(() => import("@/pages/properties/PropertiesSettings"));
+const PropertiesRentalWarehouses = lazy(() => import("@/pages/properties/PropertiesRentalWarehouses"));
+const PropertiesRentalShops = lazy(() => import("@/pages/properties/PropertiesRentalShops"));
 import { CommandPalette } from "@/components/CommandPalette";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowLeft } from "lucide-react";
@@ -676,6 +678,8 @@ function AuthenticatedApp() {
                         <Route path="/properties/create" component={PropertiesCreate} />
                         <Route path="/properties/analytics" component={PropertiesAnalytics} />
                         <Route path="/properties/daybook" component={PropertiesDaybook} />
+                        <Route path="/properties/rental/warehouses" component={PropertiesRentalWarehouses} />
+                        <Route path="/properties/rental/shops" component={PropertiesRentalShops} />
                         <Route path="/properties/ledger-monthly/:accountId" component={PropertiesLedgerMonthly} />
                         <Route path="/properties/ledger-vouchers/:accountId/:year/:month" component={PropertiesLedgerVouchers} />
                         {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/settings" component={PropertiesSettings} />}

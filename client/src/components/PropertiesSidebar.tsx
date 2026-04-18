@@ -6,6 +6,7 @@ import {
   BookOpen,
   Settings,
   Building2,
+  Store,
   ChevronDown,
 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
@@ -27,6 +28,14 @@ interface NavSection {
 }
 
 const navSections: NavSection[] = [
+  {
+    label: "Rentals",
+    color: "#10b981",
+    items: [
+      { title: "Properties (Warehouses)", url: "/properties/rental/warehouses", icon: Building2 },
+      { title: "Shops Rented", url: "/properties/rental/shops", icon: Store },
+    ],
+  },
   {
     label: "Accounting",
     color: "#6366f1",
