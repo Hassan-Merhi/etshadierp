@@ -2753,6 +2753,39 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       }
       const rawMaterialStockValue = round2(rawTotal);
 
+      // ── 3c. Balance on Table — material in process (mix batch input minus bale output) ──
+      // Mirrors the production-value-report formula: all-time totals, no date filter.
+      const mixSumResult = await db.execute(sql`
+        SELECT
+          COALESCE(SUM(total_weight_kg::numeric), 0) AS total_mix_kg,
+          COALESCE(SUM(total_cost::numeric),      0) AS total_mix_cost
+        FROM factory_mix_batches
+        WHERE company_id = ${companyId}
+      `);
+      const mixSumRow = ((mixSumResult as any).rows ?? (mixSumResult as any))[0] ?? {};
+      const totalMixKg   = parseFloat(String(mixSumRow.total_mix_kg   ?? "0")) || 0;
+      const totalMixCost = parseFloat(String(mixSumRow.total_mix_cost  ?? "0")) || 0;
+      const blendedCpk   = totalMixKg > 0 ? totalMixCost / totalMixKg : 0;
+
+      // Split bales: wipers/garbage (by category name) vs regular
+      const baleSumResult = await db.execute(sql`
+        SELECT
+          COALESCE(SUM(b.weight_kg::numeric), 0)                                          AS total_kg,
+          COALESCE(SUM(CASE WHEN lower(c.name) ~ '(wiper|garbage|rag)'
+                            THEN b.weight_kg::numeric ELSE 0 END), 0)                     AS wg_kg
+        FROM   factory_bales        b
+        LEFT   JOIN factory_bale_products  p ON p.id = b.product_id
+        LEFT   JOIN factory_categories     c ON c.id = p.category_id
+        WHERE  b.company_id = ${companyId}
+          AND  b.status NOT IN ('DELETED', 'REMOVED')
+      `);
+      const baleSumRow  = ((baleSumResult as any).rows ?? (baleSumResult as any))[0] ?? {};
+      const totalBaleKg = parseFloat(String(baleSumRow.total_kg ?? "0")) || 0;
+      const totalWgKg   = parseFloat(String(baleSumRow.wg_kg    ?? "0")) || 0;
+
+      const botWeightKg = totalMixKg - totalBaleKg;
+      const balanceOnTableValue = round2(Math.max(botWeightKg, 0) * blendedCpk);
+
       // ── 4. Pending, Verified & Loading orders (upcoming receivables) ──────────
       // Fetched here (before forUsTotal) so PENDING/VERIFIED totals can be
       // included in "What We Have". LOADING is shown for reference only.
@@ -2817,11 +2850,11 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const totalCustomerDr = round2(customerDrItems.reduce((s, c) => s + c.balanceUsd, 0));
       const totalCustomerCr = round2(customerCrItems.reduce((s, c) => s + Math.abs(c.balanceUsd), 0));
 
-      // forUsTotal: ledger assets + inventory + raw material + customer receivables (DR)
-      //             + pending orders + verified orders + loading orders
+      // forUsTotal: ledger assets + inventory + raw material + balance on table
+      //             + customer receivables (DR) + pending orders + verified orders + loading orders
       //             (bales are reserved/excluded from baleInventoryValue — no double-count)
       const forUsTotal = round2(
-        cleanLedgerForUsTotal + baleInventoryValue + rawMaterialStockValue +
+        cleanLedgerForUsTotal + baleInventoryValue + rawMaterialStockValue + balanceOnTableValue +
         totalCustomerDr + pendingTotal + verifiedTotal + loadingTotal,
       );
       // onUsTotal: ledger liabilities + supplier balances + customer credit balances (CR)
@@ -2832,10 +2865,12 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       // always has a named row for both even when the value is 0).
       const factoryInventoryEntry = { name: "Stock In Hand (Inventory)", code: "INVENTORY", value: baleInventoryValue, category: "Inventory" };
       const factoryRawMaterialEntry = { name: "Factory Raw Material Stock", code: "RAW_MATERIAL", value: rawMaterialStockValue, category: "Raw Material" };
+      const factoryBalanceOnTableEntry = { name: "Balance on Table", code: "BALANCE_ON_TABLE", value: balanceOnTableValue, category: "Production" };
 
       const forUsAccounts = [
         factoryInventoryEntry,
         factoryRawMaterialEntry,
+        ...(balanceOnTableValue > 0 ? [factoryBalanceOnTableEntry] : []),
         ...cleanLedgerForUs.sort((a, b) => b.value - a.value).map(a => ({ ...a, value: round2(a.value) })),
         ...customerDrItems
           .sort((a, b) => b.balanceUsd - a.balanceUsd)
