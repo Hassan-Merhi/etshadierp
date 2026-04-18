@@ -136,7 +136,7 @@ export function registerFactoryProductsRoutes(app: Express) {
         .select()
         .from(factoryBaleProducts)
         .where(eq(factoryBaleProducts.companyId, companyId))
-        .orderBy(factoryBaleProducts.name);
+        .orderBy(factoryBaleProducts.id);
 
       res.json(results);
     } catch (error: any) {
@@ -221,7 +221,7 @@ export function registerFactoryProductsRoutes(app: Express) {
         LEFT JOIN factory_bales fb ON fb.product_id = fbp.id AND fb.company_id = ${companyId}
         WHERE fbp.company_id = ${companyId}
         GROUP BY fbp.id, fbp.code, fbp.article_code, fbp.name, fbp.active, fbp.category_id
-        ORDER BY fbp.name ASC
+        ORDER BY fbp.id ASC
       `);
 
       res.json(rows.rows);
@@ -884,7 +884,7 @@ export function registerFactoryProductsRoutes(app: Express) {
             ilike(factoryBaleProducts.articleCode, `${codePrefix}%`)
           )
         ))
-        .orderBy(factoryBaleProducts.name);
+        .orderBy(factoryBaleProducts.id);
 
       const matches = products
         .filter((p) => p.name.includes(find))

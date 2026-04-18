@@ -499,7 +499,7 @@ export default function BaleProducts() {
       groups[key].count++;
       groups[key].items.push(p);
     }
-    return Object.values(groups).sort((a, b) => (a.articleCode || "").localeCompare(b.articleCode || ""));
+    return Object.values(groups).sort((a, b) => (a.items[0]?.id ?? 0) - (b.items[0]?.id ?? 0));
   })();
 
   return (
