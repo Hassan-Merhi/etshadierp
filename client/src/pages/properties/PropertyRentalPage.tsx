@@ -380,7 +380,7 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
               <ModifyRentForm contract={contract} testIdPrefix={testIdPrefix} unitId={unit.id} />
             </TabsContent>
             <TabsContent value="guarantee">
-              <GuaranteeForm contract={contract} testIdPrefix={testIdPrefix} unitId={unit.id} />
+              <GuaranteeForm contract={contract} cashAccounts={cashAccounts} testIdPrefix={testIdPrefix} unitId={unit.id} />
             </TabsContent>
             <TabsContent value="end">
               <EndContractForm contract={contract} testIdPrefix={testIdPrefix} onClose={onClose} unitId={unit.id} />
@@ -592,15 +592,22 @@ function ModifyRentForm({ contract, testIdPrefix, unitId }: { contract: Contract
 // ──────────────────────────────────────────────────────────
 // TAB 3: GUARANTEE TO STATEMENT
 // ──────────────────────────────────────────────────────────
-function GuaranteeForm({ contract, testIdPrefix, unitId }: { contract: Contract; testIdPrefix: string; unitId: number }) {
+function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contract: Contract; cashAccounts: CashAccount[]; testIdPrefix: string; unitId: number }) {
   const { toast } = useToast();
   const [amount, setAmount] = useState(contract.guaranteeAmount);
+  const [cashAccountId, setCashAccountId] = useState<string>("");
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
 
   const post = useMutation({
     mutationFn: () => apiRequest(`/api/properties/rental/contracts/${contract.id}/guarantee-to-statement`, {
       method: "POST",
-      body: JSON.stringify({ amount, notes }),
+      body: JSON.stringify({
+        amount,
+        cashAccountId: cashAccountId ? parseInt(cashAccountId) : null,
+        paymentDate,
+        notes,
+      }),
       headers: { "Content-Type": "application/json" },
     }),
     onSuccess: () => {
@@ -621,6 +628,24 @@ function GuaranteeForm({ contract, testIdPrefix, unitId }: { contract: Contract;
       <div>
         <Label>Amount to Post to Statement ($) *</Label>
         <Input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} data-testid={`input-${testIdPrefix}-guarantee-post`} />
+      </div>
+      <div>
+        <Label>Cash Box / Bank Account</Label>
+        <Select value={cashAccountId} onValueChange={setCashAccountId}>
+          <SelectTrigger data-testid={`select-${testIdPrefix}-guarantee-cash`}>
+            <SelectValue placeholder="Select where the deposit is held…" />
+          </SelectTrigger>
+          <SelectContent>
+            {cashAccounts.map(a => (
+              <SelectItem key={a.id} value={String(a.id)}>{a.name} ({a.accountType})</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground mt-1">If selected, a Receipt voucher (Dr Cash / Cr Tenant Deposits) will be posted into the main accounting ledger.</p>
+      </div>
+      <div>
+        <Label>Date</Label>
+        <Input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} data-testid={`input-${testIdPrefix}-guarantee-date`} />
       </div>
       <div>
         <Label>Notes</Label>

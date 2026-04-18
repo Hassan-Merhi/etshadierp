@@ -10,12 +10,40 @@ import {
   insertPropertyContractSchema,
   insertPropertyPaymentSchema,
   ledgerAccounts,
+  vouchers,
+  voucherEntries,
 } from "@shared/schema";
-import { eq, and, sql, desc, inArray } from "drizzle-orm";
+import { eq, and, sql, desc, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 function getCompanyId(req: Request): number | null {
   return req.session.currentCompanyId ?? null;
+}
+
+// Find or auto-create a ledger account by name+type for the company.
+// Used for "Rental Income" (Income) and "Tenant Deposits" (Liability).
+async function findOrCreateLedgerAccount(
+  tx: any,
+  companyId: number,
+  name: string,
+  accountType: "Income" | "Liability",
+  codePrefix: string,
+): Promise<number> {
+  const [existing] = await tx.select().from(ledgerAccounts).where(and(
+    eq(ledgerAccounts.companyId, companyId),
+    eq(ledgerAccounts.name, name),
+    isNull(ledgerAccounts.deletedAt),
+  ));
+  if (existing) return existing.id;
+  const code = `${codePrefix}-${Date.now()}`;
+  const [created] = await tx.insert(ledgerAccounts).values({
+    companyId,
+    code,
+    name,
+    accountType,
+    active: true,
+  }).returning();
+  return created.id;
 }
 
 // Generate monthly ledger rows from contract.startDate (or last existing) up to current month
@@ -328,20 +356,50 @@ export function registerPropertiesRentalRoutes(app: Express) {
 
       const schema = z.object({
         amount: z.union([z.string(), z.number()]).transform(v => String(v)),
+        cashAccountId: z.number().nullable().optional(),
+        paymentDate: z.string().optional(),
         notes: z.string().optional(),
       });
-      const { amount, notes } = schema.parse(req.body);
+      const { amount, cashAccountId, paymentDate, notes } = schema.parse(req.body);
 
       const [contract] = await db.select().from(propertyContracts).where(and(
         eq(propertyContracts.id, id), eq(propertyContracts.companyId, companyId),
       ));
       if (!contract) return res.status(404).json({ error: "Contract not found" });
 
-      await db.update(propertyContracts).set({
-        guaranteePostedToStatement: true,
-        guaranteePostedAmount: amount,
-        notes: notes ? `${contract.notes ? contract.notes + "\n" : ""}GUARANTEE→STMT: ${amount} (${notes})` : contract.notes,
-      }).where(eq(propertyContracts.id, id));
+      const [unit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, contract.unitId));
+      const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
+      const dateStr = paymentDate || new Date().toISOString().slice(0, 10);
+
+      await db.transaction(async (tx) => {
+        await tx.update(propertyContracts).set({
+          guaranteePostedToStatement: true,
+          guaranteePostedAmount: amount,
+          notes: notes ? `${contract.notes ? contract.notes + "\n" : ""}GUARANTEE→STMT: ${amount} (${notes})` : contract.notes,
+        }).where(eq(propertyContracts.id, id));
+
+        // Post guarantee voucher: Dr Cash, Cr Tenant Deposits (Liability)
+        if (cashAccountId) {
+          const depositAccountId = await findOrCreateLedgerAccount(
+            tx, companyId, "Tenant Deposits", "Liability", "TENANT-DEP"
+          );
+          const narration = `Guarantee deposit - ${unitLabel}`;
+          const [v] = await tx.insert(vouchers).values({
+            companyId,
+            voucherNumber: `GUAR-${Date.now()}-${id}`,
+            voucherType: "Receipt",
+            voucherDate: dateStr as any,
+            description: narration,
+            totalAmount: amount,
+            currency: "USD",
+            sourceModule: "ERP",
+          }).returning();
+          await tx.insert(voucherEntries).values([
+            { voucherId: v.id, ledgerAccountId: cashAccountId, debitAmount: amount, creditAmount: "0", narration },
+            { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: "0", creditAmount: amount, narration },
+          ]);
+        }
+      });
 
       res.json({ ok: true });
     } catch (e: any) {
@@ -384,7 +442,10 @@ export function registerPropertiesRentalRoutes(app: Express) {
         if (m > 12) { m = 1; y++; }
       }
 
-      // Wrap payment + ledger update in a transaction for atomicity
+      // Lookup unit (for narration / location)
+      const [unit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, contract.unitId));
+
+      // Wrap payment + ledger update + voucher posting in a transaction for atomicity
       const payment = await db.transaction(async (tx) => {
         // Find or create the ledger row (race-safe via onConflictDoNothing)
         await tx.insert(propertyMonthlyLedger).values({
@@ -403,12 +464,52 @@ export function registerPropertiesRentalRoutes(app: Express) {
           eq(propertyMonthlyLedger.month, m),
         ));
 
+        // ── Post a Receipt voucher into the main accounting ledger ──
+        // (only when a cash account is selected; otherwise this is a "dry" record)
+        let voucherId: number | null = null;
+        if (data.cashAccountId) {
+          const incomeAccountId = await findOrCreateLedgerAccount(
+            tx, companyId, "Rental Income", "Income", "RENT-INC"
+          );
+          const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
+          const narration = `Rent received - ${unitLabel} - ${String(m).padStart(2, "0")}/${y}`;
+          const voucherNumber = `RENT-${Date.now()}-${contract.id}`;
+          const [v] = await tx.insert(vouchers).values({
+            companyId,
+            voucherNumber,
+            voucherType: "Receipt",
+            voucherDate: data.paymentDate as any,
+            description: narration,
+            totalAmount: data.amount,
+            currency: "USD",
+            sourceModule: "ERP",
+          }).returning();
+          voucherId = v.id;
+          await tx.insert(voucherEntries).values([
+            {
+              voucherId: v.id,
+              ledgerAccountId: data.cashAccountId,
+              debitAmount: data.amount,
+              creditAmount: "0",
+              narration,
+            },
+            {
+              voucherId: v.id,
+              ledgerAccountId: incomeAccountId,
+              debitAmount: "0",
+              creditAmount: data.amount,
+              narration,
+            },
+          ]);
+        }
+
         const [created] = await tx.insert(propertyPayments).values({
           companyId,
           contractId: contract.id,
           unitId: contract.unitId,
           ledgerRowId: row.id,
           cashAccountId: data.cashAccountId ?? null,
+          voucherId: voucherId ?? null,
           amount: data.amount,
           paymentDate: data.paymentDate as any,
           forYear: y,

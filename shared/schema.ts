@@ -4280,6 +4280,7 @@ export const propertyPayments = pgTable("property_payments", {
   unitId: integer("unit_id").notNull(),
   ledgerRowId: integer("ledger_row_id"), // FK to propertyMonthlyLedger - which month it was applied to
   cashAccountId: integer("cash_account_id"), // FK to ledgerAccounts (the cash box used)
+  voucherId: integer("voucher_id"), // FK to vouchers - the Receipt voucher posted to main accounting
   amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
   paymentDate: date("payment_date").notNull(),
   forYear: integer("for_year").notNull(),
