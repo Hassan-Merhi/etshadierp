@@ -2382,26 +2382,6 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         brokerChildren.get(brokerId)!.push(childId);
       }
 
-      // Fetch additional USD charges for broker attribution (linked suppliers' charges flow to broker)
-      const allOffloadChargesForPos = allSupplierIds.length > 0
-        ? await db.select({
-            supplierId: (factoryOffloadAdditionalCharges as any).supplierId,
-            amount: factoryOffloadAdditionalCharges.amount,
-            currencyCode: factoryOffloadAdditionalCharges.currencyCode,
-          }).from(factoryOffloadAdditionalCharges)
-            .where(eq(factoryOffloadAdditionalCharges.companyId, companyId))
-        : [];
-
-      const allContainerTableChargesForPos = allSupplierIds.length > 0
-        ? await db.select({
-            supplierId: factoryContainers.supplierId,
-            amount: factoryContainerOtherCharges.amount,
-            currencyCode: factoryContainerOtherCharges.currencyCode,
-          }).from(factoryContainerOtherCharges)
-            .innerJoin(factoryContainers, eq(factoryContainerOtherCharges.containerId, factoryContainers.id))
-            .where(eq(factoryContainerOtherCharges.companyId, companyId))
-        : [];
-
       // Broker consolidated balance: calculate per-currency running balance for the
       // broker + all linked suppliers, then apply approximate FX rates to get one USD total.
       // Formula: USD_balance + (EUR_balance × 1.16) + (AUD_balance × 0.71)
@@ -2471,34 +2451,6 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           if (isFromBroker && fromCc === "USD") {
             add("USD", -fromAmt);
           }
-        }
-
-        // USD offload additional charges from linked (child) suppliers → broker USD bucket
-        for (const oc of allOffloadChargesForPos as any[]) {
-          if (!linkedSupplierParent.has(oc.supplierId)) continue;
-          if (linkedSupplierParent.get(oc.supplierId) !== brokerId) continue;
-          if ((oc.currencyCode || "USD") !== "USD") continue;
-          add("USD", parseFloat(oc.amount || "0"));
-        }
-
-        // USD container other charges (table rows) from linked suppliers → broker USD bucket
-        for (const oc of allContainerTableChargesForPos as any[]) {
-          if (!linkedSupplierParent.has(oc.supplierId)) continue;
-          if (linkedSupplierParent.get(oc.supplierId) !== brokerId) continue;
-          if ((oc.currencyCode || "USD") !== "USD") continue;
-          add("USD", parseFloat(oc.amount || "0"));
-        }
-
-        // USD container column other charges (factoryContainers.otherCharges) where the
-        // recipient (otherChargesSupplierId) is a linked child supplier → broker USD bucket
-        for (const c of allContainersF as any[]) {
-          const ocSuppId = c.otherChargesSupplierId;
-          if (!ocSuppId) continue;
-          if (!linkedSupplierParent.has(ocSuppId)) continue;
-          if (linkedSupplierParent.get(ocSuppId) !== brokerId) continue;
-          if ((c.otherChargesCurrencyCode || "USD") !== "USD") continue;
-          const oc = parseFloat(c.otherCharges || "0");
-          if (oc > 0) add("USD", oc);
         }
 
         const usdBal = buckets["USD"] || 0;
