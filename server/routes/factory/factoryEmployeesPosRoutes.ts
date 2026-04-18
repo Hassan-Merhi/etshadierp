@@ -2384,7 +2384,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
 
       // Broker consolidated balance: calculate per-currency running balance for the
       // broker + all linked suppliers, then apply approximate FX rates to get one USD total.
-      // Formula: USD_balance + (EUR_balance × 1.16) + (AUD_balance × 0.71)
+      // Formula: USD_balance + (EUR_balance × 1.6) + (AUD_balance × 0.71)
       const calcBrokerApproxUsd = (brokerId: number): number => {
         const groupIds = [brokerId, ...(brokerChildren.get(brokerId) || [])];
         const buckets: Record<string, number> = {};
@@ -2397,7 +2397,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           if (ob !== 0) add("USD", ob);
         }
 
-        // Containers (goods + freight per currency)
+        // Containers (goods + freight + commission per currency)
         for (const c of allContainersF as any[]) {
           if (!groupIds.includes(c.supplierId)) continue;
           const cc = c.currencyCode || "USD";
@@ -2407,6 +2407,12 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           const freight = parseFloat(c.freight || "0");
           const freightCc = c.freightCurrencyCode || cc;
           if (freight > 0) add(freightCc, freight);
+          // Commission from own containers accumulates under the supplier
+          const commAmt = parseFloat(c.commissionAmount || "0");
+          if (commAmt > 0) {
+            const commCc = c.commissionCurrencyCode || cc;
+            add(commCc, commAmt);
+          }
         }
 
         // Direct payments (reduce balance in payment currency)
@@ -2440,7 +2446,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         const usdBal = buckets["USD"] || 0;
         const eurBal = buckets["EUR"] || 0;
         const audBal = buckets["AUD"] || 0;
-        return usdBal + (eurBal * 1.16) + (audBal * 0.71);
+        return usdBal + (eurBal * 1.6) + (audBal * 0.71);
       };
 
       const supplierItems: { name: string; balanceUsd: number }[] = [];
