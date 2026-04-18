@@ -21,7 +21,6 @@ import {
   factoryWorkers,
   factoryPayrolls,
   factoryDaybookEntries,
-  factoryAttendance,
   containerFreight,
   containerFreightPayments,
   containerDocuments,
@@ -182,15 +181,15 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         .from(factoryWorkers)
         .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)));
 
-      // Attendance today (workers marked present on selected date)
-      const attendanceToday = await db
-        .select()
-        .from(factoryAttendance)
-        .where(and(
-          eq(factoryAttendance.companyId, companyId),
-          eq(factoryAttendance.attendanceDate, dateStr),
-          sql`LOWER(${factoryAttendance.status}) != 'absent'`
-        ));
+      // Attendance today — query employee_attendance (the table managed by the attendance page)
+      const attendanceTodayResult = await db.execute(sql`
+        SELECT COUNT(*)::int AS count
+        FROM employee_attendance
+        WHERE company_id = ${companyId}
+          AND attendance_date = ${dateStr}::date
+          AND LOWER(status) != 'absent'
+      `);
+      const attendanceTodayCount = parseInt(String((attendanceTodayResult.rows[0] as any)?.count ?? "0"), 10);
 
       // Loaded customer containers: finalized orders with containerNumber
       const loadedOrders = await db
@@ -203,7 +202,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       res.json({
         waste: { totalKg: Math.round(wasteTotalKg * 1000) / 1000, breakdown: wasteBreakdown },
-        workers: { active: activeWorkers.length, attendanceToday: attendanceToday.length },
+        workers: { active: activeWorkers.length, attendanceToday: attendanceTodayCount },
         containers: { loaded: loadedOrders.length },
       });
     } catch (error: any) {
