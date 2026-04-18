@@ -225,11 +225,11 @@ export default function FactoryStockAllocation() {
               ) : proformaComputed.articleRows.length === 0 ? (
                 <Card><CardContent className="p-8 text-center text-muted-foreground">No article codes found. Add lines to your proformas or enter bales into stock.</CardContent></Card>
               ) : (
-                <div className="overflow-auto rounded-md border flex-1">
+                <div className="overflow-auto rounded-md border max-h-[calc(100vh-310px)]">
                   <table className="w-full text-sm border-collapse min-w-max">
                     <thead>
-                      <tr className="bg-muted/50 sticky top-0 z-10">
-                        <th className="text-left px-3 py-2.5 font-medium border-b border-r whitespace-nowrap sticky left-0 bg-muted/80 backdrop-blur-sm z-20 min-w-[200px]">Product</th>
+                      <tr className="bg-muted sticky top-0 z-10">
+                        <th className="text-left px-3 py-2.5 font-medium border-b border-r whitespace-nowrap sticky left-0 bg-muted z-20 min-w-[200px]">Product</th>
                         <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[90px]">In Stock</th>
                         <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[90px] text-green-700 dark:text-green-400">Available</th>
                         {proformaComputed.visibleProformas.map(p => (
@@ -318,11 +318,11 @@ export default function FactoryStockAllocation() {
                 <span className="text-xs text-muted-foreground">{loadingComputed.loadings.length} active loading{loadingComputed.loadings.length !== 1 ? "s" : ""}</span>
               </div>
 
-              <div className="overflow-auto rounded-md border flex-1">
+              <div className="overflow-auto rounded-md border max-h-[calc(100vh-250px)]">
                 <table className="w-full text-sm border-collapse min-w-max">
                   <thead>
-                    <tr className="bg-muted/50 sticky top-0 z-10">
-                      <th className="text-left px-3 py-2.5 font-medium border-b border-r whitespace-nowrap sticky left-0 bg-muted/80 backdrop-blur-sm z-20 min-w-[200px]">
+                    <tr className="bg-muted sticky top-0 z-10">
+                      <th className="text-left px-3 py-2.5 font-medium border-b border-r whitespace-nowrap sticky left-0 bg-muted z-20 min-w-[200px]">
                         Product
                       </th>
                       <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[90px]">
