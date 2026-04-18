@@ -18,11 +18,18 @@ import {
   PackageOpen,
 } from "lucide-react";
 
+interface BrokerBreakdownLine {
+  label: string;
+  native: string;
+  usd: number;
+}
+
 interface AccountItem {
   name: string;
   code: string;
   value: number;
   category: string;
+  breakdown?: BrokerBreakdownLine[];
 }
 
 interface BreakdownItem {
@@ -72,6 +79,65 @@ function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function SupplierRow({ acc, accentClass, index }: { acc: AccountItem; accentClass: string; index: number }) {
+  const [open, setOpen] = useState(false);
+  const hasBreakdown = acc.breakdown && acc.breakdown.length > 0;
+
+  return (
+    <div className="divide-y divide-border" data-testid={`row-account-${index}`}>
+      <div className="flex items-center justify-between px-4 py-2 text-sm">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1">
+            {hasBreakdown && (
+              <button
+                type="button"
+                onClick={() => setOpen(o => !o)}
+                className="shrink-0 text-muted-foreground hover:text-foreground"
+                data-testid={`button-breakdown-${index}`}
+              >
+                {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              </button>
+            )}
+            <p className="font-medium truncate">{acc.name}</p>
+          </div>
+          {acc.code && acc.code !== "SUPPLIER" && acc.code !== "CUSTOMER_DR" && acc.code !== "CUSTOMER_CR" && (
+            <p className="text-xs text-muted-foreground font-mono">{acc.code}</p>
+          )}
+        </div>
+        <span className={`font-mono text-sm ml-4 shrink-0 ${accentClass}`}>
+          {fmt(acc.value)}
+        </span>
+      </div>
+      {hasBreakdown && open && (
+        <div className="bg-muted/20 px-4 py-2 space-y-1">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Calculation Breakdown</p>
+          {acc.breakdown!.map((line, j) => {
+            const isNegative = line.usd < 0;
+            const isFx = line.label.includes("FX") || line.label.includes("Net Balance");
+            return (
+              <div key={j} className="flex items-center justify-between text-xs gap-4">
+                <div className="min-w-0">
+                  <span className="text-foreground/80">{line.label}</span>
+                  {line.native && (
+                    <span className="ml-2 font-mono text-muted-foreground">({line.native})</span>
+                  )}
+                </div>
+                <span className={`font-mono shrink-0 ${isNegative ? "text-destructive" : isFx ? "text-muted-foreground" : accentClass}`}>
+                  {line.usd !== 0 ? fmt(line.usd) : "—"}
+                </span>
+              </div>
+            );
+          })}
+          <div className="border-t border-border mt-1 pt-1 flex justify-between text-xs font-semibold">
+            <span>Total</span>
+            <span className={`font-mono ${accentClass}`}>{fmt(acc.value)}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CategoryGroup({
   title,
   accounts,
@@ -111,21 +177,7 @@ function CategoryGroup({
       {open && (
         <div className="divide-y divide-border">
           {accounts.map((acc, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between px-4 py-2 text-sm"
-              data-testid={`row-account-${i}`}
-            >
-              <div className="min-w-0">
-                <p className="font-medium truncate">{acc.name}</p>
-                {acc.code && acc.code !== "SUPPLIER" && acc.code !== "CUSTOMER_DR" && acc.code !== "CUSTOMER_CR" && (
-                  <p className="text-xs text-muted-foreground font-mono">{acc.code}</p>
-                )}
-              </div>
-              <span className={`font-mono text-sm ml-4 shrink-0 ${accentClass}`}>
-                {fmt(acc.value)}
-              </span>
-            </div>
+            <SupplierRow key={i} acc={acc} accentClass={accentClass} index={i} />
           ))}
         </div>
       )}

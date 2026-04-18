@@ -2459,7 +2459,126 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         return usdBal + (eurBal * 1.16) + (audBal * 0.71);
       };
 
-      const supplierItems: { name: string; balanceUsd: number }[] = [];
+      // Extended broker calculation that returns both the total and a line-by-line breakdown
+      const calcBrokerDetail = (brokerId: number): {
+        total: number;
+        breakdown: { label: string; native: string; usd: number }[];
+      } => {
+        const groupIds = [brokerId, ...(brokerChildren.get(brokerId) || [])];
+        const buckets: Record<string, number> = {};
+        const add = (cc: string, amt: number) => { buckets[cc] = (buckets[cc] || 0) + amt; };
+        const lines: { label: string; native: string; usd: number }[] = [];
+
+        // Opening balances
+        let obTotal = 0;
+        for (const s of suppliersList as any[]) {
+          if (!groupIds.includes(s.id)) continue;
+          const ob = parseFloat(s.openingBalance || "0");
+          if (ob !== 0) { add("USD", ob); obTotal += ob; }
+        }
+        if (obTotal !== 0) lines.push({ label: "Opening Balance", native: `$${obTotal.toFixed(2)}`, usd: obTotal });
+
+        // Containers: goods + freight per currency + USD commission from children
+        const containersByCurrency: Record<string, number> = {};
+        let commTotal = 0;
+        let usdFreightTotal = 0;
+        for (const c of allContainersF as any[]) {
+          if (!groupIds.includes(c.supplierId)) continue;
+          const cc = c.currencyCode || "USD";
+          const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+          const rate = parseFloat(c.ratePerKg || "0");
+          const goodsAmt = kg * rate;
+          add(cc, goodsAmt);
+          containersByCurrency[cc] = (containersByCurrency[cc] || 0) + goodsAmt;
+
+          const freight = parseFloat(c.freight || "0");
+          const freightCc = c.freightCurrencyCode || cc;
+          if (freight > 0) {
+            add(freightCc, freight);
+            containersByCurrency[freightCc] = (containersByCurrency[freightCc] || 0) + freight;
+          }
+
+          if (c.supplierId !== brokerId && linkedSupplierParent.has(c.supplierId) && linkedSupplierParent.get(c.supplierId) === brokerId) {
+            const commAmt = parseFloat(c.commissionAmount || "0");
+            if (commAmt > 0 && (c.commissionCurrencyCode || "USD") === "USD") {
+              add("USD", commAmt);
+              commTotal += commAmt;
+              usdFreightTotal += 0; // tracked separately below
+            }
+          }
+        }
+        for (const [cc, amt] of Object.entries(containersByCurrency)) {
+          if (Math.abs(amt) > 0.01) lines.push({ label: `Container Goods + Freight (${cc})`, native: `${amt.toFixed(2)} ${cc}`, usd: cc === "USD" ? amt : 0 });
+        }
+        if (commTotal > 0) lines.push({ label: "Commission from Linked Suppliers", native: `$${commTotal.toFixed(2)}`, usd: commTotal });
+
+        // Direct payments
+        let payTotal: Record<string, number> = {};
+        for (const p of allPaymentsF as any[]) {
+          if (!groupIds.includes(p.supplierId)) continue;
+          const cc = p.currencyCode || "USD";
+          const amt = parseFloat(p.amount || "0");
+          add(cc, -amt);
+          payTotal[cc] = (payTotal[cc] || 0) + amt;
+        }
+        for (const [cc, amt] of Object.entries(payTotal)) {
+          if (amt > 0.01) lines.push({ label: `Payments Made (${cc})`, native: `-${amt.toFixed(2)} ${cc}`, usd: cc === "USD" ? -amt : 0 });
+        }
+
+        // Voucher payments
+        let voucherTotals: Record<string, number> = {};
+        for (const sid of groupIds) {
+          const currMap = voucherPaidByCurrencyBySupplierId[sid] || {};
+          for (const [cc, amt] of Object.entries(currMap)) {
+            add(cc, -amt);
+            voucherTotals[cc] = (voucherTotals[cc] || 0) + amt;
+          }
+        }
+        for (const [cc, amt] of Object.entries(voucherTotals)) {
+          if (amt > 0.01) lines.push({ label: `Voucher Payments (${cc})`, native: `-${amt.toFixed(2)} ${cc}`, usd: cc === "USD" ? -amt : 0 });
+        }
+
+        // FX transfers
+        let fxInTotal = 0;
+        let fxOutUsd = 0;
+        const fxOutNative: Record<string, number> = {};
+        for (const t of allFxTransfersF as any[]) {
+          const fromCc = t.fromCurrencyCode || "USD";
+          const fromAmt = parseFloat(t.fromAmount || "0");
+          const toUsd = parseFloat(t.toAmountUsd || "0");
+          const isFromBroker = t.fromSupplierId === brokerId;
+          if (groupIds.includes(t.fromSupplierId) && fromCc !== "USD") {
+            add(fromCc, -fromAmt);
+            fxOutNative[fromCc] = (fxOutNative[fromCc] || 0) + fromAmt;
+          }
+          if (t.toSupplierId === brokerId) {
+            add("USD", toUsd);
+            fxInTotal += toUsd;
+          }
+          if (isFromBroker && fromCc === "USD") {
+            add("USD", -fromAmt);
+            fxOutUsd += fromAmt;
+          }
+        }
+        if (fxInTotal > 0) lines.push({ label: "FX Received (USD)", native: `$${fxInTotal.toFixed(2)}`, usd: fxInTotal });
+        if (fxOutUsd > 0) lines.push({ label: "FX Sent Out (USD)", native: `-$${fxOutUsd.toFixed(2)}`, usd: -fxOutUsd });
+        for (const [cc, amt] of Object.entries(fxOutNative)) {
+          if (amt > 0.01) lines.push({ label: `FX Converted Out (${cc})`, native: `-${amt.toFixed(2)} ${cc}`, usd: 0 });
+        }
+
+        const usdBal = buckets["USD"] || 0;
+        const eurBal = buckets["EUR"] || 0;
+        const audBal = buckets["AUD"] || 0;
+
+        if (Math.abs(eurBal) > 0.01) lines.push({ label: `EUR Net Balance × 1.16`, native: `${eurBal.toFixed(2)} EUR`, usd: eurBal * 1.16 });
+        if (Math.abs(audBal) > 0.01) lines.push({ label: `AUD Net Balance × 0.71`, native: `${audBal.toFixed(2)} AUD`, usd: audBal * 0.71 });
+        lines.push({ label: "USD Net Balance", native: `$${usdBal.toFixed(2)}`, usd: usdBal });
+
+        const total = usdBal + (eurBal * 1.16) + (audBal * 0.71);
+        return { total, breakdown: lines };
+      };
+
+      const supplierItems: { name: string; balanceUsd: number; breakdown?: { label: string; native: string; usd: number }[] }[] = [];
       let totalSupplierLiabilities = 0;
 
       // Track which broker entries have already been added (avoid duplicates)
@@ -2472,10 +2591,11 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         // Brokers: use consolidated multi-currency approximate USD balance
         if (brokerIds.has(s.id) && !processedBrokers.has(s.id)) {
           processedBrokers.add(s.id);
-          const approxUsd = round2(calcBrokerApproxUsd(s.id));
-          if (Math.abs(approxUsd) > 0.01) {
-            supplierItems.push({ name: s.name, balanceUsd: approxUsd });
-            if (approxUsd > 0) totalSupplierLiabilities += approxUsd;
+          const { total: approxUsd, breakdown } = calcBrokerDetail(s.id);
+          const rounded = round2(approxUsd);
+          if (Math.abs(rounded) > 0.01) {
+            supplierItems.push({ name: s.name, balanceUsd: rounded, breakdown });
+            if (rounded > 0) totalSupplierLiabilities += rounded;
           }
           continue;
         }
@@ -2934,11 +3054,11 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         ledgerOnUsGrouped[a.category] = (ledgerOnUsGrouped[a.category] || 0) + a.value;
       }
 
-      const onUsAccounts: { name: string; code: string; value: number; category: string }[] = [
+      const onUsAccounts: { name: string; code: string; value: number; category: string; breakdown?: { label: string; native: string; usd: number }[] }[] = [
         ...supplierItems
           .filter(s => s.balanceUsd > 0)
           .sort((a, b) => b.balanceUsd - a.balanceUsd)
-          .map(s => ({ name: s.name, code: "SUPPLIER", value: round2(s.balanceUsd), category: "Supplier" })),
+          .map(s => ({ name: s.name, code: "SUPPLIER", value: round2(s.balanceUsd), category: "Supplier", breakdown: s.breakdown })),
         ...ledgerOnUs.sort((a, b) => b.value - a.value).map(a => ({ ...a, value: round2(a.value) })),
         ...customerCrItems
           .sort((a, b) => Math.abs(b.balanceUsd) - Math.abs(a.balanceUsd))
