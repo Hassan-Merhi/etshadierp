@@ -360,13 +360,13 @@ function EditableTransferDetail({
           {/* Table */}
           <div className="border rounded-md overflow-hidden">
             {/* Column header */}
-            <div className="grid grid-cols-[2rem_1fr_5.5rem_6.5rem_5.5rem_2rem] bg-muted/40 border-b px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide gap-2">
+            <div className="grid grid-cols-[1.5rem_1fr_5rem_5rem] sm:grid-cols-[2rem_1fr_5.5rem_6.5rem_5.5rem_2rem] bg-muted/40 border-b px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide gap-2">
               <span>#</span>
               <span>Item</span>
-              <span className="text-right">Original</span>
-              <span className="text-center">Adjustment</span>
+              <span className="hidden sm:block text-right">Original</span>
+              <span className="text-center">Adj</span>
               <span className="text-right">New Qty</span>
-              <span />
+              <span className="hidden sm:block" />
             </div>
 
             {/* Existing items */}
@@ -379,7 +379,7 @@ function EditableTransferDetail({
                 <div
                   key={item.id}
                   className={cn(
-                    "grid grid-cols-[2rem_1fr_5.5rem_6.5rem_5.5rem_2rem] items-center px-3 py-1.5 gap-2 border-b last:border-b-0 group",
+                    "grid grid-cols-[1.5rem_1fr_5rem_5rem] sm:grid-cols-[2rem_1fr_5.5rem_6.5rem_5.5rem_2rem] items-center px-3 py-1.5 gap-2 border-b last:border-b-0 group",
                     changed && "bg-primary/5"
                   )}
                   data-testid={`row-item-${item.id}`}
@@ -397,7 +397,7 @@ function EditableTransferDetail({
                     {item.stockItemName}
                   </button>
 
-                  <span className="text-sm font-mono text-right tabular-nums">{fmtQty(original)}</span>
+                  <span className="hidden sm:block text-sm font-mono text-right tabular-nums">{fmtQty(original)}</span>
 
                   <div className="flex justify-center">
                     <input
@@ -413,7 +413,7 @@ function EditableTransferDetail({
                           // move to next adjustment input
                         }
                       }}
-                      className="w-16 text-center text-sm border rounded-md bg-background px-1 py-1 font-mono outline-none focus:ring-1 focus:ring-ring"
+                      className="w-full text-center text-sm border rounded-md bg-background px-1 py-1 font-mono outline-none focus:ring-1 focus:ring-ring"
                       data-testid={`input-delta-${item.id}`}
                     />
                   </div>
@@ -427,7 +427,7 @@ function EditableTransferDetail({
                     {fmtQty(newQty)}
                   </span>
 
-                  <div />
+                  <div className="hidden sm:block" />
                 </div>
               );
             })}
@@ -438,14 +438,25 @@ function EditableTransferDetail({
               return (
                 <div
                   key={`extra-${item.stockItemId}`}
-                  className="grid grid-cols-[2rem_1fr_5.5rem_6.5rem_5.5rem_2rem] items-center px-3 py-1.5 gap-2 border-b last:border-b-0 bg-primary/5"
+                  className="grid grid-cols-[1.5rem_1fr_5rem_5rem] sm:grid-cols-[2rem_1fr_5.5rem_6.5rem_5.5rem_2rem] items-center px-3 py-1.5 gap-2 border-b last:border-b-0 bg-primary/5"
                   data-testid={`row-extra-${item.stockItemId}`}
                 >
                   <span className="text-xs text-muted-foreground tabular-nums">{myItems.length + idx + 1}</span>
 
-                  <span className="text-sm font-medium truncate" title={item.stockItemName}>{item.stockItemName}</span>
+                  <div className="flex items-center gap-1 min-w-0">
+                    <span className="text-sm font-medium truncate flex-1" title={item.stockItemName}>{item.stockItemName}</span>
+                    {/* Delete button: visible inline on mobile, hidden on sm+ (uses its own grid cell there) */}
+                    <button
+                      type="button"
+                      onClick={() => removeExtra(idx)}
+                      className="sm:hidden shrink-0 h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-destructive transition-colors"
+                      data-testid={`button-remove-extra-mobile-${item.stockItemId}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
 
-                  <span className="text-sm font-mono text-right text-muted-foreground">0</span>
+                  <span className="hidden sm:block text-sm font-mono text-right text-muted-foreground">0</span>
 
                   <div className="flex justify-center">
                     <input
@@ -455,7 +466,7 @@ function EditableTransferDetail({
                       placeholder="0"
                       value={item.qtyDraft}
                       onChange={e => updateExtraQty(idx, e.target.value)}
-                      className="w-16 text-center text-sm border rounded-md bg-background px-1 py-1 font-mono outline-none focus:ring-1 focus:ring-ring"
+                      className="w-full text-center text-sm border rounded-md bg-background px-1 py-1 font-mono outline-none focus:ring-1 focus:ring-ring"
                       data-testid={`input-extra-qty-${item.stockItemId}`}
                     />
                   </div>
@@ -467,10 +478,11 @@ function EditableTransferDetail({
                     {qty > 0 ? fmtQty(qty) : "—"}
                   </span>
 
+                  {/* Delete button: only in its own grid cell on sm+ */}
                   <button
                     type="button"
                     onClick={() => removeExtra(idx)}
-                    className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-destructive transition-colors"
+                    className="hidden sm:flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-destructive transition-colors"
                     data-testid={`button-remove-extra-${item.stockItemId}`}
                   >
                     <X className="h-3.5 w-3.5" />
