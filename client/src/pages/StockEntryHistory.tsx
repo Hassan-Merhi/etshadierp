@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { ChevronDown, ChevronRight, Download, Search, RotateCcw, List, AlignJustify, FileDown, MoreVertical, CalendarRange } from "lucide-react";
+import ProductionPlannerDialog from "./factory/ProductionPlannerDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -655,6 +656,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-base font-semibold">Stock Entry History</h2>
         <div className="flex items-center gap-2">
+          <ProductionPlannerDialog />
           {/* View toggle */}
           <div className="flex rounded-md border overflow-hidden">
             <Button

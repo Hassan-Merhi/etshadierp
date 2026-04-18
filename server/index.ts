@@ -1085,6 +1085,25 @@ let migrationsDone = false;
        ON property_payments (contract_id)`,
     `CREATE INDEX IF NOT EXISTS property_payments_company_idx
        ON property_payments (company_id, payment_date)`,
+
+    // ── Production Planner tables (Apr 2026) ──────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS factory_production_plans (
+      id           SERIAL PRIMARY KEY,
+      company_id   INTEGER NOT NULL,
+      plan_date    DATE NOT NULL,
+      category_ids TEXT NOT NULL DEFAULT '[]',
+      notes        TEXT,
+      created_at   TIMESTAMP NOT NULL DEFAULT NOW(),
+      UNIQUE (company_id, plan_date)
+    )`,
+    `CREATE TABLE IF NOT EXISTS factory_production_plan_entries (
+      id           SERIAL PRIMARY KEY,
+      plan_id      INTEGER NOT NULL,
+      worker_id    INTEGER NOT NULL,
+      role         TEXT NOT NULL DEFAULT 'WORKER',
+      target_bales INTEGER NOT NULL DEFAULT 0,
+      created_at   TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
