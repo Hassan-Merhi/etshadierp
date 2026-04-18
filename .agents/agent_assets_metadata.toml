@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "ASSGPKgeprBnyyYRk5FZJ"
+uri = "file://properties_rental_mockup.xlsx"
+type = "table"
+title = "Properties Rental Page — Mockup & Plan"
