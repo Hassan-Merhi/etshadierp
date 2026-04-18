@@ -1,15 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ClipboardList, Plus, Trash2, CheckCircle2, XCircle, Copy, Save, Loader2, ChevronDown } from "lucide-react";
+import { ClipboardList, Plus, Trash2, CheckCircle2, XCircle, Copy, Save, Loader2, ChevronDown, Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { cn } from "@/lib/utils";
 
 interface Worker { id: number; full_name: string; position: string; active: boolean; }
 interface WorkerCategory { id: number; name: string; workerIds?: number[]; }
@@ -27,6 +29,64 @@ const ROLE_COLORS: Record<string, string> = {
   HELPER: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
   WORKER: "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200",
 };
+
+function WorkerCombobox({
+  value,
+  onChange,
+  workers,
+  entryKey,
+}: {
+  value: number;
+  onChange: (workerId: number, workerName: string) => void;
+  workers: Worker[];
+  entryKey: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = workers.find(w => w.id === value);
+  const displayName = selected?.full_name ?? (value ? `Worker #${value}` : "Select worker…");
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 w-full justify-between font-normal text-sm"
+          data-testid={`select-worker-${entryKey}`}
+        >
+          <span className="truncate">{displayName}</span>
+          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground ml-1" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search worker…" className="h-9" />
+          <CommandList>
+            <CommandEmpty>No workers found.</CommandEmpty>
+            <CommandGroup>
+              {workers.map(w => (
+                <CommandItem
+                  key={w.id}
+                  value={w.full_name}
+                  onSelect={() => {
+                    onChange(w.id, w.full_name);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", w.id === value ? "opacity-100" : "opacity-0")} />
+                  <span className={cn("truncate", !w.active && "text-muted-foreground")}>
+                    {w.full_name}
+                    {!w.active && <span className="ml-1 text-xs">(inactive)</span>}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 function TeamSelector({ value, onChange, categories }: { value: number[]; onChange: (v: number[]) => void; categories: WorkerCategory[]; }) {
   const toggle = (id: number) => onChange(value.includes(id) ? value.filter(x => x !== id) : [...value, id]);
@@ -65,8 +125,14 @@ export default function ProductionPlannerDialog() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ["/api/factory/workers"] });
-  const { data: workerCategories = [] } = useQuery<WorkerCategory[]>({ queryKey: ["/api/factory/worker-categories"] });
+  const { data: workers = [] } = useQuery<Worker[]>({
+    queryKey: ["/api/factory/workers"],
+    enabled: open,
+  });
+  const { data: workerCategories = [] } = useQuery<WorkerCategory[]>({
+    queryKey: ["/api/factory/worker-categories"],
+    enabled: open,
+  });
 
   const { data: planData, isLoading: planLoading, refetch: refetchPlan } = useQuery<PlanData>({
     queryKey: ["/api/factory/production-planner", date],
@@ -110,11 +176,10 @@ export default function ProductionPlannerDialog() {
   });
 
   const addRow = useCallback(() => {
-    const activeWorkers = workers.filter(w => w.active !== false);
-    if (activeWorkers.length === 0) return;
+    if (workers.length === 0) return;
     const usedIds = new Set(entries.map(e => e.workerId));
-    const available = activeWorkers.filter(w => !usedIds.has(w.id));
-    const worker = available[0] ?? activeWorkers[0];
+    const available = workers.filter(w => !usedIds.has(w.id));
+    const worker = available[0] ?? workers[0];
     setEntries(prev => [...prev, {
       workerId: worker.id,
       workerName: worker.full_name,
@@ -126,13 +191,12 @@ export default function ProductionPlannerDialog() {
 
   const removeRow = (key: string) => setEntries(prev => prev.filter(e => e._key !== key));
 
+  const updateWorker = (key: string, workerId: number, workerName: string) =>
+    setEntries(prev => prev.map(e => e._key !== key ? e : { ...e, workerId, workerName }));
+
   const updateEntry = (key: string, field: string, value: any) =>
     setEntries(prev => prev.map(e => {
       if (e._key !== key) return e;
-      if (field === "workerId") {
-        const w = workers.find(w => w.id === Number(value));
-        return { ...e, workerId: Number(value), workerName: w?.full_name ?? "" };
-      }
       return { ...e, [field]: field === "targetBales" ? (parseInt(value) || 0) : value };
     }));
 
@@ -256,20 +320,13 @@ export default function ProductionPlannerDialog() {
                     const notMet = entry.targetBales > 0 && actual < entry.targetBales;
                     return (
                       <tr key={entry._key} className="border-b last:border-0 hover:bg-muted/30">
-                        <td className="px-3 py-2">
-                          <Select
-                            value={String(entry.workerId)}
-                            onValueChange={v => updateEntry(entry._key, "workerId", v)}
-                          >
-                            <SelectTrigger className="h-8 text-sm" data-testid={`select-worker-${entry._key}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {workers.filter(w => w.active !== false).map(w => (
-                                <SelectItem key={w.id} value={String(w.id)}>{w.full_name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                        <td className="px-3 py-2 min-w-[180px]">
+                          <WorkerCombobox
+                            value={entry.workerId}
+                            onChange={(id, name) => updateWorker(entry._key, id, name)}
+                            workers={workers}
+                            entryKey={entry._key}
+                          />
                         </td>
                         <td className="px-3 py-2">
                           <Select value={entry.role} onValueChange={v => updateEntry(entry._key, "role", v)}>
@@ -316,7 +373,13 @@ export default function ProductionPlannerDialog() {
 
           {/* Add worker + role summary */}
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant="outline" size="sm" onClick={addRow} disabled={workers.length === 0} data-testid="button-add-worker-row">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addRow}
+              disabled={workers.length === 0}
+              data-testid="button-add-worker-row"
+            >
               <Plus className="h-4 w-4 mr-1" /> Add Worker
             </Button>
             {visibleEntries.length > 0 && (
