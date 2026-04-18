@@ -4190,6 +4190,7 @@ export type ProformaStockReservation = typeof proformaStockReservations.$inferSe
 export const propertyUnits = pgTable("property_units", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
+  module: text("module").notNull().default("PROPERTIES"), // 'PROPERTIES' | 'ERP' | 'FACTORY'
   unitType: text("unit_type").notNull(), // 'WAREHOUSE' | 'SHOP'
   locationGroup: text("location_group").notNull(), // 'KOLWEZI' | 'LSHI' | 'KIWELE' | 'KINSAHSA' | 'MALI' | etc.
   unitNumber: text("unit_number").notNull(), // 'KOLWEZI A1', 'HADI 1', etc.
@@ -4200,8 +4201,8 @@ export const propertyUnits = pgTable("property_units", {
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
-  uniqCompanyUnit: uniqueIndex("property_units_company_unit_unique").on(t.companyId, t.unitNumber),
-  byCompany: index("property_units_company_idx").on(t.companyId, t.unitType),
+  uniqCompanyModuleUnit: uniqueIndex("property_units_company_module_unit_unique").on(t.companyId, t.module, t.unitNumber),
+  byCompany: index("property_units_company_idx").on(t.companyId, t.module, t.unitType),
 }));
 
 export const insertPropertyUnitSchema = createInsertSchema(propertyUnits).omit({
@@ -4219,6 +4220,7 @@ export type PropertyUnit = typeof propertyUnits.$inferSelect;
 export const propertyContracts = pgTable("property_contracts", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
+  module: text("module").notNull().default("PROPERTIES"),
   unitId: integer("unit_id").notNull(),
   tenantName: text("tenant_name").notNull(),
   guaranteePeriod: text("guarantee_period"), // e.g. "3 MONTHS"
@@ -4252,6 +4254,7 @@ export type PropertyContract = typeof propertyContracts.$inferSelect;
 export const propertyMonthlyLedger = pgTable("property_monthly_ledger", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
+  module: text("module").notNull().default("PROPERTIES"),
   contractId: integer("contract_id").notNull(),
   unitId: integer("unit_id").notNull(),
   year: integer("year").notNull(),
@@ -4276,6 +4279,7 @@ export type PropertyMonthlyLedger = typeof propertyMonthlyLedger.$inferSelect;
 export const propertyPayments = pgTable("property_payments", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
+  module: text("module").notNull().default("PROPERTIES"),
   contractId: integer("contract_id").notNull(),
   unitId: integer("unit_id").notNull(),
   ledgerRowId: integer("ledger_row_id"), // FK to propertyMonthlyLedger - which month it was applied to

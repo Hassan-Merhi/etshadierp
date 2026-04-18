@@ -36,6 +36,8 @@ import {
   ChevronDown,
   LayoutGrid,
   Scale,
+  Building2,
+  Store,
 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
 import { useLocation } from "wouter";
@@ -135,6 +137,14 @@ const navSections: NavSection[] = [
     items: [
       { title: "Analytics",           url: "/factory/analytics",          icon: TrendingUp },
       { title: "Financial Snapshot",  url: "/factory/financial-snapshot", icon: LayoutGrid  },
+    ],
+  },
+  {
+    label: "Rentals",
+    color: "#8b5cf6",
+    items: [
+      { title: "Warehouses", url: "/factory/rental/warehouses", icon: Building2 },
+      { title: "Shops",      url: "/factory/rental/shops",      icon: Store     },
     ],
   },
   {

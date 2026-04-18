@@ -49,6 +49,8 @@ import { registerDebugRoutes } from "./routes/debugRoutes";
 import { registerExportRoutes } from "./routes/exportRoutes";
 import { registerGlobalTransactionRoutes } from "./routes/globalTransactionRoutes";
 import { registerPropertiesRentalRoutes } from "./routes/propertiesRentalRoutes";
+import { registerErpRentalRoutes } from "./routes/erpRentalRoutes";
+import { registerFactoryRentalRoutes } from "./routes/factoryRentalRoutes";
 import {
   requireAuth,
   requireRole,
@@ -1069,6 +1071,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerSupplierProformaRoutes(app, requireAuth);
   registerGlobalTransactionRoutes(app, requireAuth);
   registerPropertiesRentalRoutes(app);
+  registerErpRentalRoutes(app);
+  registerFactoryRentalRoutes(app);
 
   // Lightweight health check for offline ping detection
   app.get("/api/health", (_req, res) => {

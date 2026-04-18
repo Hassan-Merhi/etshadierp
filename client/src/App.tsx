@@ -185,6 +185,10 @@ const PropertiesLedgerVouchers = lazy(() => import("@/pages/properties/Propertie
 const PropertiesSettings = lazy(() => import("@/pages/properties/PropertiesSettings"));
 const PropertiesRentalWarehouses = lazy(() => import("@/pages/properties/PropertiesRentalWarehouses"));
 const PropertiesRentalShops = lazy(() => import("@/pages/properties/PropertiesRentalShops"));
+const ErpRentalWarehouses = lazy(() => import("@/pages/erp/ErpRentalWarehouses"));
+const ErpRentalShops = lazy(() => import("@/pages/erp/ErpRentalShops"));
+const FactoryRentalWarehouses = lazy(() => import("@/pages/factory/FactoryRentalWarehouses"));
+const FactoryRentalShops = lazy(() => import("@/pages/factory/FactoryRentalShops"));
 import { CommandPalette } from "@/components/CommandPalette";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowLeft } from "lucide-react";
@@ -308,6 +312,8 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/production-bales"><Redirect to="/factory/stock-entry" /></Route>
       <Route path="/bale-products"><Redirect to="/factory/bale-products" /></Route>
       <Route path="/sold-containers"><Redirect to="/containers" /></Route>
+      <Route path="/erp/rental/warehouses" component={ErpRentalWarehouses} />
+      <Route path="/erp/rental/shops" component={ErpRentalShops} />
       <Route path="/conflicts" component={ConflictCenter} />
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/settings" component={Settings} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/orphaned-records" component={OrphanedRecords} />}
@@ -857,6 +863,8 @@ function AuthenticatedApp() {
                     <Route path="/factory/net-position" component={FactoryNetPosition} />
                     <Route path="/factory/financial-snapshot" component={FactoryFinancialSnapshot} />
                     <Route path="/factory/production-report" component={DailyProductionReport} />
+                    <Route path="/factory/rental/warehouses" component={FactoryRentalWarehouses} />
+                    <Route path="/factory/rental/shops" component={FactoryRentalShops} />
                     <Route><Redirect to={factoryDefaultPage} /></Route>
                   </Switch>
                   </Suspense>

@@ -27,6 +27,8 @@ import {
   GripVertical,
   ArrowLeftRight,
   ScrollText,
+  Building2,
+  Store,
 } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
@@ -118,6 +120,14 @@ const navSections: NavSection[] = [
       { title: "Sales Report",      url: "/sales-report",      icon: PieChart   },
       { title: "Analytics",         url: "/analytics",         icon: BarChart3  },
       { title: "Net Profit Report", url: "/net-profit-report", icon: TrendingUp },
+    ],
+  },
+  {
+    label: "Rentals",
+    color: "#8b5cf6",
+    items: [
+      { title: "Warehouses", url: "/erp/rental/warehouses", icon: Building2 },
+      { title: "Shops",      url: "/erp/rental/shops",      icon: Store     },
     ],
   },
 ];
