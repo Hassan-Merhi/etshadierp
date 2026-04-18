@@ -1659,6 +1659,13 @@ export function registerFactorySuppliersRoutes(app: Express) {
         byCurrency[ocCc].totalValue += parseFloat(oc.amount || "0");
       }
 
+      // Opening balance (always stored in USD) — add to USD bucket so it appears in netPayable
+      const supplierOpeningBal = parseFloat((supplier as any).openingBalance || "0");
+      if (supplierOpeningBal !== 0) {
+        if (!byCurrency["USD"]) byCurrency["USD"] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0, totalFreight: 0, totalOtherCharges: 0 };
+        byCurrency["USD"].totalValue += supplierOpeningBal;
+      }
+
       // Fetch FX transfers involving this supplier (as source or destination)
       const fxTransfers = await db
         .select()
