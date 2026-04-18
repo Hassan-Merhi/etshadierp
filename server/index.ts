@@ -1004,6 +1004,87 @@ let migrationsDone = false;
     `UPDATE factory_bales SET status = 'DELETED' WHERE status = 'REMOVED'`,
     // Rename bale status FINALIZED → IN_STOCK (Apr 2026) — pressing finalization now sets IN_STOCK directly
     `UPDATE factory_bales SET status = 'IN_STOCK' WHERE status = 'FINALIZED'`,
+
+    // ── Rental Management tables (Apr 2026) ───────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS property_units (
+      id             SERIAL PRIMARY KEY,
+      company_id     INTEGER NOT NULL,
+      module         TEXT NOT NULL DEFAULT 'PROPERTIES',
+      unit_type      TEXT NOT NULL,
+      location_group TEXT NOT NULL,
+      unit_number    TEXT NOT NULL,
+      size           TEXT,
+      dimensions     TEXT,
+      notes          TEXT,
+      active         BOOLEAN NOT NULL DEFAULT TRUE,
+      sort_order     INTEGER NOT NULL DEFAULT 0,
+      created_at     TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS property_units_company_module_unit_unique
+       ON property_units (company_id, module, unit_number)`,
+    `CREATE INDEX IF NOT EXISTS property_units_company_idx
+       ON property_units (company_id, module, unit_type)`,
+
+    `CREATE TABLE IF NOT EXISTS property_contracts (
+      id                            SERIAL PRIMARY KEY,
+      company_id                    INTEGER NOT NULL,
+      module                        TEXT NOT NULL DEFAULT 'PROPERTIES',
+      unit_id                       INTEGER NOT NULL,
+      tenant_name                   TEXT NOT NULL,
+      guarantee_period              TEXT,
+      guarantee_amount              NUMERIC(20,2) NOT NULL DEFAULT 0,
+      rental_amount                 NUMERIC(20,2) NOT NULL DEFAULT 0,
+      start_date                    DATE NOT NULL,
+      end_date                      DATE,
+      status                        TEXT NOT NULL DEFAULT 'ACTIVE',
+      notes                         TEXT,
+      guarantee_posted_to_statement BOOLEAN NOT NULL DEFAULT FALSE,
+      guarantee_posted_amount       NUMERIC(20,2) DEFAULT 0,
+      created_at                    TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS property_contracts_unit_idx
+       ON property_contracts (unit_id, status)`,
+    `CREATE INDEX IF NOT EXISTS property_contracts_company_idx
+       ON property_contracts (company_id, status)`,
+
+    `CREATE TABLE IF NOT EXISTS property_monthly_ledger (
+      id              SERIAL PRIMARY KEY,
+      company_id      INTEGER NOT NULL,
+      module          TEXT NOT NULL DEFAULT 'PROPERTIES',
+      contract_id     INTEGER NOT NULL,
+      unit_id         INTEGER NOT NULL,
+      year            INTEGER NOT NULL,
+      month           INTEGER NOT NULL,
+      expected_amount NUMERIC(20,2) NOT NULL DEFAULT 0,
+      paid_amount     NUMERIC(20,2) NOT NULL DEFAULT 0,
+      notes           TEXT,
+      created_at      TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS property_monthly_ledger_unique
+       ON property_monthly_ledger (contract_id, year, month)`,
+    `CREATE INDEX IF NOT EXISTS property_monthly_ledger_unit_idx
+       ON property_monthly_ledger (unit_id)`,
+
+    `CREATE TABLE IF NOT EXISTS property_payments (
+      id              SERIAL PRIMARY KEY,
+      company_id      INTEGER NOT NULL,
+      module          TEXT NOT NULL DEFAULT 'PROPERTIES',
+      contract_id     INTEGER NOT NULL,
+      unit_id         INTEGER NOT NULL,
+      ledger_row_id   INTEGER,
+      cash_account_id INTEGER,
+      voucher_id      INTEGER,
+      amount          NUMERIC(20,2) NOT NULL,
+      payment_date    DATE NOT NULL,
+      for_year        INTEGER NOT NULL,
+      for_month       INTEGER NOT NULL,
+      notes           TEXT,
+      created_at      TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS property_payments_contract_idx
+       ON property_payments (contract_id)`,
+    `CREATE INDEX IF NOT EXISTS property_payments_company_idx
+       ON property_payments (company_id, payment_date)`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
