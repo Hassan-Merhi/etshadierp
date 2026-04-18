@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
 interface Worker { id: number; full_name: string; position: string; active: boolean; }
-interface Category { id: number; name: string; }
+interface WorkerCategory { id: number; name: string; workerIds?: number[]; }
 interface PlanEntry { id?: number; workerId: number; workerName: string; role: string; targetBales: number; }
 interface PlanData { plan: { id: number; planDate: string; categoryIds: number[]; notes: string } | null; entries: PlanEntry[]; actuals: Record<number, number>; }
 
@@ -28,9 +28,9 @@ const ROLE_COLORS: Record<string, string> = {
   WORKER: "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200",
 };
 
-function CategorySelector({ value, onChange, categories }: { value: number[]; onChange: (v: number[]) => void; categories: Category[]; }) {
+function TeamSelector({ value, onChange, categories }: { value: number[]; onChange: (v: number[]) => void; categories: WorkerCategory[]; }) {
   const toggle = (id: number) => onChange(value.includes(id) ? value.filter(x => x !== id) : [...value, id]);
-  const label = value.length === 0 ? "All categories" : value.length === 1 ? (categories.find(c => c.id === value[0])?.name ?? "1 selected") : `${value.length} categories`;
+  const label = value.length === 0 ? "All teams" : value.length === 1 ? (categories.find(c => c.id === value[0])?.name ?? "1 selected") : `${value.length} teams`;
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -40,10 +40,10 @@ function CategorySelector({ value, onChange, categories }: { value: number[]; on
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-56 p-2 max-h-64 overflow-y-auto">
-        <div className="text-xs font-medium text-muted-foreground mb-2 px-1">Filter actuals by category</div>
+        <div className="text-xs font-medium text-muted-foreground mb-2 px-1">Filter by team</div>
         <label className="flex items-center gap-2 px-1 py-1 rounded hover-elevate cursor-pointer text-sm">
           <Checkbox checked={value.length === 0} onCheckedChange={() => onChange([])} />
-          <span>All categories</span>
+          <span>All teams</span>
         </label>
         {categories.map(c => (
           <label key={c.id} className="flex items-center gap-2 px-1 py-1 rounded hover-elevate cursor-pointer text-sm">
@@ -66,7 +66,7 @@ export default function ProductionPlannerDialog() {
   const queryClient = useQueryClient();
 
   const { data: workers = [] } = useQuery<Worker[]>({ queryKey: ["/api/factory/workers"] });
-  const { data: categories = [] } = useQuery<Category[]>({ queryKey: ["/api/factory/categories"] });
+  const { data: workerCategories = [] } = useQuery<WorkerCategory[]>({ queryKey: ["/api/factory/worker-categories"] });
 
   const { data: planData, isLoading: planLoading, refetch: refetchPlan } = useQuery<PlanData>({
     queryKey: ["/api/factory/production-planner", date],
@@ -138,8 +138,21 @@ export default function ProductionPlannerDialog() {
 
   const actuals = planData?.actuals ?? {};
 
-  const totalTarget = entries.reduce((s, e) => s + (e.targetBales || 0), 0);
-  const totalActual = entries.reduce((s, e) => s + (actuals[e.workerId] ?? 0), 0);
+  // When teams are selected, build the set of allowed worker IDs for display filtering
+  const allowedWorkerIds: Set<number> | null = categoryIds.length === 0 ? null : (() => {
+    const ids = new Set<number>();
+    for (const catId of categoryIds) {
+      const cat = workerCategories.find(c => c.id === catId);
+      const workerIds = cat?.workerIds;
+      if (Array.isArray(workerIds)) workerIds.forEach(id => ids.add(Number(id)));
+    }
+    return ids;
+  })();
+
+  const visibleEntries = allowedWorkerIds ? entries.filter(e => allowedWorkerIds.has(e.workerId)) : entries;
+
+  const totalTarget = visibleEntries.reduce((s, e) => s + (e.targetBales || 0), 0);
+  const totalActual = visibleEntries.reduce((s, e) => s + (actuals[e.workerId] ?? 0), 0);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -170,7 +183,7 @@ export default function ProductionPlannerDialog() {
                 data-testid="input-plan-date"
               />
             </div>
-            <CategorySelector value={categoryIds} onChange={setCategoryIds} categories={categories} />
+            <TeamSelector value={categoryIds} onChange={setCategoryIds} categories={workerCategories} />
             <Button
               variant="outline"
               size="sm"
@@ -190,7 +203,7 @@ export default function ProductionPlannerDialog() {
           </div>
 
           {/* Summary strip */}
-          {entries.length > 0 && (
+          {visibleEntries.length > 0 && (
             <div className="flex gap-4 p-3 rounded-md bg-muted/50 text-sm">
               <div>
                 <span className="text-muted-foreground">Total Target: </span>
@@ -229,13 +242,15 @@ export default function ProductionPlannerDialog() {
                   </tr>
                 </thead>
                 <tbody>
-                  {entries.length === 0 ? (
+                  {visibleEntries.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">
-                        No workers in plan. Add workers below or copy from a previous plan.
+                        {entries.length === 0
+                          ? "No workers in plan. Add workers below or copy from a previous plan."
+                          : "No workers match the selected team filter."}
                       </td>
                     </tr>
-                  ) : entries.map(entry => {
+                  ) : visibleEntries.map(entry => {
                     const actual = actuals[entry.workerId] ?? 0;
                     const met = entry.targetBales > 0 && actual >= entry.targetBales;
                     const notMet = entry.targetBales > 0 && actual < entry.targetBales;
@@ -304,10 +319,10 @@ export default function ProductionPlannerDialog() {
             <Button variant="outline" size="sm" onClick={addRow} disabled={workers.length === 0} data-testid="button-add-worker-row">
               <Plus className="h-4 w-4 mr-1" /> Add Worker
             </Button>
-            {entries.length > 0 && (
+            {visibleEntries.length > 0 && (
               <div className="flex gap-2 flex-wrap">
                 {ROLES.map(r => {
-                  const count = entries.filter(e => e.role === r.value).length;
+                  const count = visibleEntries.filter(e => e.role === r.value).length;
                   if (!count) return null;
                   return <Badge key={r.value} className={ROLE_COLORS[r.value]}>{r.label}: {count}</Badge>;
                 })}

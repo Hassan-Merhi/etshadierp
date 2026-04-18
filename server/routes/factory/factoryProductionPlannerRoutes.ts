@@ -43,24 +43,43 @@ export function registerProductionPlannerRoutes(app: Express) {
 
       let actuals: Record<number, number> = {};
       if (workerIds.length > 0) {
-        const catFilter = categoryIds.length > 0
-          ? sql`AND fbp.category_id = ANY(ARRAY[${sql.raw(categoryIds.join(","))}]::integer[])`
-          : sql``;
+        // Resolve worker category IDs → worker IDs for the team filter
+        let teamWorkerFilter = sql``;
+        let skipActuals = false;
+        if (categoryIds.length > 0) {
+          const wcResult = await db.execute(sql`
+            SELECT worker_ids FROM factory_worker_categories
+            WHERE company_id = ${companyId}
+              AND id = ANY(ARRAY[${sql.raw(categoryIds.join(","))}]::integer[])
+          `);
+          const wcRows: any[] = Array.isArray(wcResult) ? wcResult : (wcResult as any).rows ?? [];
+          const teamWorkerIds = wcRows.flatMap((r: any) => {
+            const ids = r.worker_ids;
+            if (Array.isArray(ids)) return ids.map(Number);
+            try { return JSON.parse(ids || "[]").map(Number); } catch { return []; }
+          });
+          if (teamWorkerIds.length > 0) {
+            teamWorkerFilter = sql`AND fb.finalized_by = ANY(ARRAY[${sql.raw(teamWorkerIds.join(","))}]::integer[])`;
+          } else {
+            skipActuals = true;
+          }
+        }
 
-        const actualResult = await db.execute(sql`
-          SELECT fb.finalized_by AS worker_id, COUNT(*)::integer AS bale_count
-          FROM factory_bales fb
-          LEFT JOIN factory_bale_products fbp ON fbp.id = fb.product_id
-          WHERE fb.company_id = ${companyId}
-            AND fb.stock_entry_date = ${date}
-            AND fb.finalized_by = ANY(ARRAY[${sql.raw(workerIds.join(","))}]::integer[])
-            AND fb.status IN ('IN_STOCK','SOLD','RESERVED_FOR_ORDER','DISPATCHED','FINALIZED')
-            ${catFilter}
-          GROUP BY fb.finalized_by
-        `);
-        const actualRows: any[] = Array.isArray(actualResult) ? actualResult : (actualResult as any).rows ?? [];
-        for (const row of actualRows) {
-          actuals[Number(row.worker_id)] = Number(row.bale_count);
+        if (!skipActuals) {
+          const actualResult = await db.execute(sql`
+            SELECT fb.finalized_by AS worker_id, COUNT(*)::integer AS bale_count
+            FROM factory_bales fb
+            WHERE fb.company_id = ${companyId}
+              AND fb.stock_entry_date = ${date}
+              AND fb.finalized_by = ANY(ARRAY[${sql.raw(workerIds.join(","))}]::integer[])
+              AND fb.status IN ('IN_STOCK','SOLD','RESERVED_FOR_ORDER','DISPATCHED','FINALIZED')
+              ${teamWorkerFilter}
+            GROUP BY fb.finalized_by
+          `);
+          const actualRows: any[] = Array.isArray(actualResult) ? actualResult : (actualResult as any).rows ?? [];
+          for (const row of actualRows) {
+            actuals[Number(row.worker_id)] = Number(row.bale_count);
+          }
         }
       }
 
