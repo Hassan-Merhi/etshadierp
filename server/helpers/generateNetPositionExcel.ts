@@ -178,41 +178,39 @@ export async function generateNetPositionExcel(
 
   const kpiHdrRow = wsOv.addRow(["Money Owed TO US", "", "Money WE OWE", "", "Net Position"]);
   kpiHdrRow.height = 22;
-  ["A5","C5","E5"].forEach(addr => {
-    const cell = wsOv.getCell(addr);
+  const hdrRowNum = kpiHdrRow.number;
+  wsOv.mergeCells(hdrRowNum, 1, hdrRowNum, 2);
+  wsOv.mergeCells(hdrRowNum, 3, hdrRowNum, 4);
+  [1, 3, 5].forEach(col => {
+    const cell = kpiHdrRow.getCell(col);
     cell.font      = { bold: true, color: { argb: C.WHITE }, size: 10 };
     cell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: C.DARK_BLUE } };
     cell.alignment = { horizontal: "center", vertical: "middle" };
   });
 
-  wsOv.mergeCells("A5:B5");
-  wsOv.mergeCells("C5:D5");
-
   const kpiValRow = wsOv.addRow([lastSnap.forUsTotal, "", lastSnap.onUsTotal, "", Math.abs(lastSnap.netPosition)]);
   kpiValRow.height = 36;
-  wsOv.mergeCells(`A6:B6`);
-  wsOv.mergeCells(`C6:D6`);
-  const kpiCells: [string, string, boolean][] = [
-    ["A6", C.GREEN, true],
-    ["C6", C.RED,   true],
-    ["E6", isFinalPos ? C.GREEN : C.RED, true],
-  ];
-  kpiCells.forEach(([addr, color]) => {
-    const cell = wsOv.getCell(addr);
+  const valRowNum = kpiValRow.number;
+  wsOv.mergeCells(valRowNum, 1, valRowNum, 2);
+  wsOv.mergeCells(valRowNum, 3, valRowNum, 4);
+  [[1, C.GREEN], [3, C.RED], [5, isFinalPos ? C.GREEN : C.RED]].forEach(([col, color]) => {
+    const cell = kpiValRow.getCell(col as number);
     cell.numFmt    = currencyFmt;
-    cell.font      = { bold: true, size: 16, color: { argb: color } };
+    cell.font      = { bold: true, size: 16, color: { argb: color as string } };
     cell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: C.LIGHT_BLUE } };
     cell.alignment = { horizontal: "center", vertical: "middle" };
     cell.border    = { bottom: { style: "medium", color: { argb: C.DARK_BLUE } } };
   });
 
   const statusRow = wsOv.addRow(["", "", "", "", lastSnap.netPositionLabel]);
-  wsOv.mergeCells("A7:B7");
-  wsOv.mergeCells("C7:D7");
-  statusRow.getCell("E7").font      = { bold: true, size: 12, color: { argb: isFinalPos ? C.GREEN : C.RED } };
-  statusRow.getCell("E7").alignment = { horizontal: "center" };
-  statusRow.getCell("E7").fill      = { type: "pattern", pattern: "solid", fgColor: { argb: C.LIGHT_BLUE } };
-  wsOv.getRow(7).height = 22;
+  statusRow.height = 22;
+  const stRowNum = statusRow.number;
+  wsOv.mergeCells(stRowNum, 1, stRowNum, 2);
+  wsOv.mergeCells(stRowNum, 3, stRowNum, 4);
+  const stCell = statusRow.getCell(5);
+  stCell.font      = { bold: true, size: 12, color: { argb: isFinalPos ? C.GREEN : C.RED } };
+  stCell.alignment = { horizontal: "center" };
+  stCell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: C.LIGHT_BLUE } };
 
   wsOv.addRow([]);
 
