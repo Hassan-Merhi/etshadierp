@@ -20,10 +20,11 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-type Period = "today" | "this_week" | "this_month" | "this_year" | "all_time" | "specific_month" | "custom_range";
+type Period = "today" | "yesterday" | "this_week" | "this_month" | "this_year" | "all_time" | "specific_month" | "custom_range";
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
   { value: "this_week", label: "This Week" },
   { value: "this_month", label: "This Month" },
   { value: "this_year", label: "This Year" },
@@ -50,6 +51,13 @@ function getDateRange(
   const today = fmt(now);
 
   if (period === "today") return { startDate: today, endDate: today };
+
+  if (period === "yesterday") {
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const y = fmt(yesterday);
+    return { startDate: y, endDate: y };
+  }
 
   if (period === "this_week") {
     const day = now.getDay();

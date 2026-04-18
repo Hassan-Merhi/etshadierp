@@ -9,9 +9,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
-import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from "date-fns";
+import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, subDays } from "date-fns";
 
-export type PeriodPreset = "all_time" | "today" | "this_month" | "last_1_month" | "last_6_months" | "this_year" | "custom";
+export type PeriodPreset = "all_time" | "today" | "yesterday" | "this_month" | "last_1_month" | "last_6_months" | "this_year" | "custom";
 
 export interface PeriodFilterValue {
   fromDate: string;
@@ -39,6 +39,13 @@ function getPresetDates(preset: PeriodPreset): { fromDate: string; toDate: strin
         fromDate: formatDate(startOfDay(today)),
         toDate: formatDate(endOfDay(today)),
       };
+    case "yesterday": {
+      const yesterday = subDays(today, 1);
+      return {
+        fromDate: formatDate(startOfDay(yesterday)),
+        toDate: formatDate(endOfDay(yesterday)),
+      };
+    }
     case "this_month":
       return {
         fromDate: formatDate(startOfMonth(today)),
@@ -96,6 +103,7 @@ export function PeriodFilter({
 
   function buildLabel(): string {
     if (value.preset === "all_time") return "All Time";
+    if (value.preset === "yesterday") return "Yesterday";
     if (value.preset === "custom") return "Custom Range";
     if (fromDateObj && toDateObj) {
       const from = formatDisplayDate(fromDateObj);
@@ -138,6 +146,12 @@ export function PeriodFilter({
             data-testid="period-preset-today"
           >
             Today
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => handlePresetChange("yesterday")}
+            data-testid="period-preset-yesterday"
+          >
+            Yesterday
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => handlePresetChange("this_month")}
