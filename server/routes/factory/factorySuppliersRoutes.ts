@@ -1167,13 +1167,14 @@ export function registerFactorySuppliersRoutes(app: Express) {
           const freightDirectUsd = freightCc === "USD" && freightCc !== containerCc ? freight : 0;
           return sum + (kg * rate + freightInContainerCurr) * fx + freightDirectUsd;
         }, 0);
-        // TRUE BROKER BALANCE MODEL:
-        // Commission from this supplier's OWN containers accumulates under the SUPPLIER (not the broker).
-        // The broker's balance starts at 0 and only increases via explicit FX-in transfers or direct entries.
+        // Commission accumulates under the supplier, EXCEPT:
+        // if this supplier is linked to a broker (has parentId), USD commission flows to the broker.
         const commissionValue = supplierContainers.reduce((sum: number, c: any) => {
           const commAmt = parseFloat(c.commissionAmount || "0");
           if (commAmt <= 0) return sum;
           const commCurr = c.commissionCurrencyCode || c.currencyCode || "USD";
+          // Linked supplier: USD commission is absorbed by the parent broker — skip here
+          if (s.parentId && commCurr === "USD") return sum;
           const commFx = parseFloat(c.fxRateToUsd || "1");
           return sum + (commCurr === "USD" ? commAmt : commAmt * commFx);
         }, 0);
@@ -1202,13 +1203,14 @@ export function registerFactorySuppliersRoutes(app: Express) {
             fxNetUsd -= parseFloat((t as any).toAmountUsd || "0");
           }
         }
-        // Other charges from containers where this supplier is the charge recipient
-        // (other_charges_supplier_id points to the supplier owed these charges)
+        // Other charges from containers where this supplier is the charge recipient.
+        // Linked suppliers: USD other charges flow to the parent broker — exclude from own balance.
         const otherChargesValue = containers.reduce((sum: number, c: any) => {
           if (c.otherChargesSupplierId !== s.id) return sum;
           const oc = parseFloat(c.otherCharges || "0");
           if (oc <= 0) return sum;
           const ocCcy = (c as any).otherChargesCurrencyCode || "USD";
+          if (s.parentId && ocCcy === "USD") return sum;
           const fx = ocCcy === "USD" ? 1 : parseFloat(c.fxRateToUsd || "1");
           return sum + oc * fx;
         }, 0);
@@ -1228,11 +1230,14 @@ export function registerFactorySuppliersRoutes(app: Express) {
           if (freightAmt > 0) {
             byCurrency[freightCc] = (byCurrency[freightCc] || 0) + freightAmt;
           }
-          // Commission from own containers goes into supplier's currency bucket (true broker balance model)
+          // Commission from own containers goes into supplier's currency bucket.
+          // Exception: linked suppliers' USD commission flows to the parent broker.
           const commAmt = parseFloat(c.commissionAmount || "0");
           if (commAmt > 0) {
             const commCc = c.commissionCurrencyCode || cc;
-            byCurrency[commCc] = (byCurrency[commCc] || 0) + commAmt;
+            if (!(s.parentId && commCc === "USD")) {
+              byCurrency[commCc] = (byCurrency[commCc] || 0) + commAmt;
+            }
           }
         }
         // Subtract regular payments by currency
@@ -1257,11 +1262,13 @@ export function registerFactorySuppliersRoutes(app: Express) {
         }
         // Other charges from other suppliers' containers attributed to this supplier
         // (e.g. broker-linked charges where other_charges_supplier_id = s.id)
+        // Linked suppliers: USD other charges flow to the parent broker — skip in own currency bucket.
         for (const c of containers) {
           if ((c as any).otherChargesSupplierId !== s.id) continue;
           const oc = parseFloat((c as any).otherCharges || "0");
           if (oc <= 0) continue;
           const cc = (c as any).otherChargesCurrencyCode || "USD";
+          if (s.parentId && cc === "USD") continue;
           byCurrency[cc] = (byCurrency[cc] || 0) + oc;
         }
         const currencyBalances = Object.entries(byCurrency)
@@ -2283,8 +2290,19 @@ export function registerFactorySuppliersRoutes(app: Express) {
           commissionCurrency: null,
         });
       }
-      // Commission is intentionally excluded from the broker statement until explicitly transferred.
-      // When transferred, it arrives as an FX In entry and appears naturally in the ledger.
+      // USD commission from linked (child) suppliers goes directly to the broker's USD ledger.
+      // Commission from the broker's own containers and any non-USD commission stay excluded.
+      if (commAmt > 0 && commCc === "USD" && c.supplierId !== brokerId) {
+        addRow("USD", {
+          date: dateVal,
+          type: "commission",
+          description: `Commission from ${supplierName} — ${c.containerNumber}`,
+          ref: c.containerNumber,
+          amount: commAmt,
+          commissionAmount: commAmt,
+          commissionCurrency: commCc,
+        });
+      }
     }
 
     // Payment rows
