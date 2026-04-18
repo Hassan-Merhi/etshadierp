@@ -996,6 +996,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           debitAmount: voucherEntries.debitAmount,
           currency: vouchers.currency,
           exchangeRate: vouchers.exchangeRate,
+          optional: vouchers.optional,
         })
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
@@ -1007,6 +1008,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
       for (const row of voucherPaymentRows as any[]) {
         const sid = row.factorySupplierId;
         if (!sid) continue;
+        if (row.optional) continue; // optional vouchers don't affect the balance
         const amt = parseFloat(row.debitAmount || "0");
         const fx = parseFloat(row.exchangeRate || "1") || 1;
         const curr = row.currency || "USD";
@@ -1122,6 +1124,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
             debitAmount: voucherEntries.debitAmount,
             currency: vouchers.currency,
             exchangeRate: vouchers.exchangeRate,
+            optional: vouchers.optional,
           })
           .from(voucherEntries)
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
@@ -1133,6 +1136,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         for (const row of voucherPaymentRows as any[]) {
           const suppId = row.factorySupplierId;
           if (!suppId) continue;
+          if (row.optional) continue; // optional vouchers don't affect the balance
           const amt = parseFloat(row.debitAmount || "0");
           const fx = parseFloat(row.exchangeRate || "1") || 1;
           const curr = row.currency || "USD";
@@ -2142,6 +2146,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           description: vouchers.description,
           voucherNumber: vouchers.voucherNumber,
           currency: vouchers.currency,
+          optional: vouchers.optional,
         })
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
@@ -2291,7 +2296,9 @@ export function registerFactorySuppliersRoutes(app: Express) {
     }
 
     // Voucher-based payment rows (general accounting payments linked to factory suppliers)
+    // Skip optional vouchers — they are informational only and don't affect the balance.
     for (const p of allVoucherPayments as any[]) {
+      if (p.optional) continue;
       const cc = p.currency || "USD";
       const suppId = p.supplierId;
       const supplierName = suppId ? (supplierNameMap[suppId] || "Unknown") : "Unknown";
@@ -2724,7 +2731,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
       if (to)   fxQuery = fxQuery.where(sql`${factorySupplierFxTransfers.date} <= ${to}`);
       const fxTransfers = await fxQuery.orderBy(factorySupplierFxTransfers.date);
 
-      // Voucher payments
+      // Voucher payments (non-optional only)
       let vpayRows: any[] = [];
       if (allSupplierIds.length > 0) {
         let vpayQ = db.select({
@@ -2735,13 +2742,15 @@ export function registerFactorySuppliersRoutes(app: Express) {
           description: vouchers.description,
           voucherNumber: vouchers.voucherNumber,
           currency: vouchers.currency,
+          optional: vouchers.optional,
         })
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
         .where(and(
           inArray(voucherEntries.factorySupplierId as any, allSupplierIds),
           sql`${voucherEntries.debitAmount}::numeric > 0`,
-          sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`
+          sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`,
+          eq(vouchers.optional, false)
         ))
         .$dynamic();
         if (from) vpayQ = vpayQ.where(sql`${vouchers.voucherDate} >= ${from}`);
