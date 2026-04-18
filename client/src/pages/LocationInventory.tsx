@@ -943,6 +943,297 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     await writeFile(wb, "negative_stock_all_locations.xlsx");
   };
 
+  // ────────────────────────────────────────────────────────────
+  // Export "All Stock — All Locations" view to Excel / PDF
+  // ────────────────────────────────────────────────────────────
+  const handleExportAllStockExcel = async (includeCost: boolean) => {
+    if (filteredCombinedRows.length === 0) {
+      toast({ title: "Nothing to export", description: "No stock rows available.", variant: "destructive" });
+      return;
+    }
+    try {
+      const ExcelJSLib = (await import("exceljs")).default;
+      const wb = new ExcelJSLib.Workbook();
+      wb.creator = "ERP";
+      wb.created = new Date();
+      const ws = wb.addWorksheet("All Stock", {
+        views: [{ state: "frozen", ySplit: 4, xSplit: 1 }],
+      });
+
+      const dateLabel = new Date().toLocaleDateString();
+      const locCols = allInventoryLocations.map(l => l.name);
+      const headers = ["Item Name", ...locCols, "Total Qty"];
+      if (includeCost) headers.push("Avg Cost", "Total Value");
+      const colCount = headers.length;
+
+      // Title row
+      ws.mergeCells(1, 1, 1, colCount);
+      const title = ws.getCell(1, 1);
+      title.value = "All Stock — All Locations";
+      title.font = { name: "Calibri", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
+      title.alignment = { vertical: "middle", horizontal: "center" };
+      title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F4E78" } };
+      ws.getRow(1).height = 26;
+
+      // Subtitle row
+      ws.mergeCells(2, 1, 2, colCount);
+      const sub = ws.getCell(2, 1);
+      sub.value = `${filteredCombinedRows.length} items · ${allInventoryLocations.length} locations · Generated ${dateLabel}`;
+      sub.font = { name: "Calibri", size: 10, italic: true, color: { argb: "FF555555" } };
+      sub.alignment = { vertical: "middle", horizontal: "center" };
+      ws.getRow(2).height = 18;
+
+      ws.addRow([]); // spacer
+
+      // Header row
+      const headerRow = ws.addRow(headers);
+      headerRow.eachCell(cell => {
+        cell.font = { name: "Calibri", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF305496" } };
+        cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+        cell.border = {
+          top: { style: "thin", color: { argb: "FF8EA9DB" } },
+          bottom: { style: "thin", color: { argb: "FF8EA9DB" } },
+          left: { style: "thin", color: { argb: "FF8EA9DB" } },
+          right: { style: "thin", color: { argb: "FF8EA9DB" } },
+        };
+      });
+      headerRow.height = 22;
+
+      // Data rows, with group separators
+      let lastGroup = "";
+      let zebra = false;
+      for (const row of filteredCombinedRows) {
+        if (!allStockGroupFilter && row.stockGroupName !== lastGroup) {
+          lastGroup = row.stockGroupName;
+          const gr = ws.addRow([row.stockGroupName || "(Ungrouped)"]);
+          ws.mergeCells(gr.number, 1, gr.number, colCount);
+          const gc = gr.getCell(1);
+          gc.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FF1F4E78" } };
+          gc.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9E1F2" } };
+          gc.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+          gr.height = 18;
+          zebra = false;
+        }
+        const dataRow: (string | number)[] = [row.stockItemName];
+        for (const loc of allInventoryLocations) {
+          const q = row.qtyByLocation[loc.id];
+          dataRow.push(q && q > 0 ? Number(q) : "");
+        }
+        dataRow.push(Number(row.totalQty));
+        if (includeCost) {
+          dataRow.push(row.avgCost > 0 ? Number(row.avgCost) : "");
+          dataRow.push(row.totalValue > 0 ? Number(row.totalValue) : "");
+        }
+        const r = ws.addRow(dataRow);
+        const fillColor = zebra ? "FFF2F2F2" : "FFFFFFFF";
+        zebra = !zebra;
+        r.eachCell((cell, colNum) => {
+          cell.font = { name: "Calibri", size: 10 };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fillColor } };
+          cell.border = { bottom: { style: "hair", color: { argb: "FFDDDDDD" } } };
+          if (colNum === 1) {
+            cell.alignment = { vertical: "middle", horizontal: "left" };
+          } else {
+            cell.alignment = { vertical: "middle", horizontal: "right" };
+            const isCurrency = includeCost && (colNum === colCount || colNum === colCount - 1);
+            cell.numFmt = isCurrency ? "#,##0.00" : "#,##0.##";
+          }
+          // Bold "Total Qty" col
+          const totalQtyCol = 1 + locCols.length + 1;
+          if (colNum === totalQtyCol) {
+            cell.font = { name: "Calibri", size: 10, bold: true };
+          }
+        });
+      }
+
+      // Grand total footer
+      const totalsRowData: (string | number)[] = [`TOTAL (${filteredCombinedRows.length} items)`];
+      for (const loc of allInventoryLocations) {
+        const t = filteredCombinedRows.reduce((s, r) => s + (r.qtyByLocation[loc.id] || 0), 0);
+        totalsRowData.push(t > 0 ? Number(t) : "");
+      }
+      totalsRowData.push(Number(filteredCombinedRows.reduce((s, r) => s + r.totalQty, 0)));
+      if (includeCost) {
+        totalsRowData.push("");
+        totalsRowData.push(Number(filteredCombinedRows.reduce((s, r) => s + r.totalValue, 0)));
+      }
+      const totalRow = ws.addRow(totalsRowData);
+      totalRow.eachCell((cell, colNum) => {
+        cell.font = { name: "Calibri", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF305496" } };
+        cell.alignment = { vertical: "middle", horizontal: colNum === 1 ? "left" : "right" };
+        if (colNum > 1) {
+          const isCurrency = includeCost && colNum === colCount;
+          cell.numFmt = isCurrency ? "#,##0.00" : "#,##0.##";
+        }
+      });
+      totalRow.height = 22;
+
+      // Column widths
+      ws.getColumn(1).width = 38;
+      for (let i = 2; i <= colCount; i++) ws.getColumn(i).width = 14;
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `all_stock_${new Date().toISOString().slice(0, 10)}${includeCost ? "" : "_no_cost"}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "Excel exported", description: `${filteredCombinedRows.length} items exported.` });
+    } catch (e: any) {
+      toast({ title: "Export failed", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const handleExportAllStockPDF = async (includeCost: boolean) => {
+    if (filteredCombinedRows.length === 0) {
+      toast({ title: "Nothing to export", description: "No stock rows available.", variant: "destructive" });
+      return;
+    }
+    try {
+      const { jsPDF } = await import("jspdf");
+      const autoTable = (await import("jspdf-autotable")).default;
+
+      const locCols = allInventoryLocations.map(l => l.name);
+      const head: string[] = ["Item Name", ...locCols, "Total Qty"];
+      if (includeCost) head.push("Avg Cost", "Total Value");
+
+      // Choose orientation based on column count for a prettier fit
+      const orientation = head.length > 6 ? "landscape" : "portrait";
+      const doc = new jsPDF({ orientation, unit: "pt", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      // Pretty title block
+      doc.setFillColor(31, 78, 120);
+      doc.rect(0, 0, pageWidth, 60, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text("All Stock — All Locations", 36, 28);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.text(
+        `${filteredCombinedRows.length} items · ${allInventoryLocations.length} locations · Generated ${new Date().toLocaleString()}`,
+        36, 46
+      );
+      if (includeCost) {
+        const grandTotal = filteredCombinedRows.reduce((s, r) => s + r.totalValue, 0);
+        const txt = `Total value: ${formatAmount(grandTotal)}`;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.text(txt, pageWidth - 36 - doc.getTextWidth(txt), 36);
+      }
+
+      const fmt = (n: number, decimals = 2) =>
+        n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: decimals });
+
+      // Build rows with group separators
+      const body: any[] = [];
+      let lastGroup = "";
+      for (const row of filteredCombinedRows) {
+        if (!allStockGroupFilter && row.stockGroupName !== lastGroup) {
+          lastGroup = row.stockGroupName;
+          const groupRow: any[] = [{
+            content: row.stockGroupName || "(Ungrouped)",
+            colSpan: head.length,
+            styles: {
+              fillColor: [217, 225, 242],
+              textColor: [31, 78, 120],
+              fontStyle: "bold",
+              fontSize: 9,
+              halign: "left",
+            },
+          }];
+          body.push(groupRow);
+        }
+        const r: any[] = [row.stockItemName];
+        for (const loc of allInventoryLocations) {
+          const q = row.qtyByLocation[loc.id];
+          r.push(q && q > 0 ? fmt(q) : "—");
+        }
+        r.push({ content: fmt(row.totalQty), styles: { fontStyle: "bold" } });
+        if (includeCost) {
+          r.push(row.avgCost > 0 ? fmt(row.avgCost) : "—");
+          r.push(row.totalValue > 0 ? fmt(row.totalValue) : "—");
+        }
+        body.push(r);
+      }
+
+      // Footer totals row
+      const footerCells: any[] = [{
+        content: `TOTAL (${filteredCombinedRows.length} items)`,
+        styles: { fontStyle: "bold", halign: "left", fillColor: [48, 84, 150], textColor: [255, 255, 255] },
+      }];
+      for (const loc of allInventoryLocations) {
+        const t = filteredCombinedRows.reduce((s, r) => s + (r.qtyByLocation[loc.id] || 0), 0);
+        footerCells.push({
+          content: t > 0 ? fmt(t) : "—",
+          styles: { fontStyle: "bold", halign: "right", fillColor: [48, 84, 150], textColor: [255, 255, 255] },
+        });
+      }
+      footerCells.push({
+        content: fmt(filteredCombinedRows.reduce((s, r) => s + r.totalQty, 0)),
+        styles: { fontStyle: "bold", halign: "right", fillColor: [48, 84, 150], textColor: [255, 255, 255] },
+      });
+      if (includeCost) {
+        footerCells.push({
+          content: "",
+          styles: { fillColor: [48, 84, 150], textColor: [255, 255, 255] },
+        });
+        footerCells.push({
+          content: fmt(filteredCombinedRows.reduce((s, r) => s + r.totalValue, 0)),
+          styles: { fontStyle: "bold", halign: "right", fillColor: [48, 84, 150], textColor: [255, 255, 255] },
+        });
+      }
+      body.push(footerCells);
+
+      autoTable(doc, {
+        head: [head],
+        body,
+        startY: 76,
+        theme: "grid",
+        styles: {
+          font: "helvetica",
+          fontSize: 8,
+          cellPadding: 4,
+          lineColor: [221, 221, 221],
+          lineWidth: 0.4,
+          textColor: [40, 40, 40],
+        },
+        headStyles: {
+          fillColor: [48, 84, 150],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+          halign: "center",
+          fontSize: 9,
+        },
+        alternateRowStyles: { fillColor: [248, 249, 251] },
+        columnStyles: (() => {
+          const styles: any = { 0: { halign: "left", cellWidth: "auto" } };
+          for (let i = 1; i < head.length; i++) styles[i] = { halign: "right" };
+          return styles;
+        })(),
+        margin: { left: 24, right: 24, top: 76, bottom: 30 },
+        didDrawPage: (data: any) => {
+          const str = `Page ${doc.getNumberOfPages()}`;
+          doc.setFontSize(8);
+          doc.setTextColor(120, 120, 120);
+          doc.text(str, pageWidth - 36, doc.internal.pageSize.getHeight() - 14, { align: "right" });
+        },
+      });
+
+      doc.save(`all_stock_${new Date().toISOString().slice(0, 10)}${includeCost ? "" : "_no_cost"}.pdf`);
+      toast({ title: "PDF exported", description: `${filteredCombinedRows.length} items exported.` });
+    } catch (e: any) {
+      toast({ title: "Export failed", description: e.message, variant: "destructive" });
+    }
+  };
+
   const handleExportInventory = async () => {
     if (!selectedLocationLocal) return;
     if (!navigator.onLine) { toast({ title: "Not available offline", description: "Exports require a connection", variant: "destructive" }); return; }
@@ -1356,15 +1647,68 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 </p>
               )}
             </div>
-            <Button
-              variant="outline"
-              onClick={() => setShowAllStock(false)}
-              data-testid="button-back-from-all-stock-header"
-              className="gap-2 shrink-0"
-            >
-              <X className="w-4 h-4" />
-              Back to Locations
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    disabled={filteredCombinedRows.length === 0}
+                    data-testid="button-allstock-export"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export
+                    <ChevronDown className="w-4 h-4 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-60">
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Excel (.xlsx)
+                  </div>
+                  <DropdownMenuItem
+                    onClick={() => handleExportAllStockExcel(true)}
+                    data-testid="menu-export-excel-with-cost"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 mr-2 text-green-600" />
+                    With cost values
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleExportAllStockExcel(false)}
+                    data-testid="menu-export-excel-no-cost"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 mr-2 text-green-600/60" />
+                    Without cost (qty only)
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    PDF (.pdf)
+                  </div>
+                  <DropdownMenuItem
+                    onClick={() => handleExportAllStockPDF(true)}
+                    data-testid="menu-export-pdf-with-cost"
+                  >
+                    <Printer className="w-4 h-4 mr-2 text-red-600" />
+                    With cost values
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleExportAllStockPDF(false)}
+                    data-testid="menu-export-pdf-no-cost"
+                  >
+                    <Printer className="w-4 h-4 mr-2 text-red-600/60" />
+                    Without cost (qty only)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button
+                variant="outline"
+                onClick={() => setShowAllStock(false)}
+                data-testid="button-back-from-all-stock-header"
+                className="gap-2"
+              >
+                <X className="w-4 h-4" />
+                Back to Locations
+              </Button>
+            </div>
           </div>
 
           <Card className="w-full">
