@@ -111,7 +111,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
   }, [units]);
 
   const runMonthly = useMutation({
-    mutationFn: () => apiRequest(apiBase + "/run-monthly", { method: "POST" }),
+    mutationFn: () => apiRequest("POST", apiBase + "/run-monthly"),
     onSuccess: () => {
       toast({ title: "Monthly ledger updated" });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
@@ -261,11 +261,7 @@ function CreateUnitDialog({ unitType, onClose, testIdPrefix }: { unitType: "WARE
   const [form, setForm] = useState({ unitNumber: "", locationGroup: "", size: "", dimensions: "", notes: "" });
 
   const create = useMutation({
-    mutationFn: () => apiRequest(apiBase + "/units", {
-      method: "POST",
-      body: JSON.stringify({ ...form, unitType }),
-      headers: { "Content-Type": "application/json" },
-    }),
+    mutationFn: () => apiRequest("POST", apiBase + "/units", { ...form, unitType }),
     onSuccess: () => {
       toast({ title: "Unit created" });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
@@ -389,11 +385,7 @@ function StartContractForm({ unitId, testIdPrefix, onClose }: { unitId: number; 
   });
 
   const start = useMutation({
-    mutationFn: () => apiRequest(apiBase + "/contracts", {
-      method: "POST",
-      body: JSON.stringify({ ...form, unitId }),
-      headers: { "Content-Type": "application/json" },
-    }),
+    mutationFn: () => apiRequest("POST", apiBase + "/contracts", { ...form, unitId }),
     onSuccess: () => {
       toast({ title: "Contract started" });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
@@ -456,17 +448,13 @@ function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId }: { contrac
   });
 
   const pay = useMutation({
-    mutationFn: () => apiRequest(apiBase + "/payments", {
-      method: "POST",
-      body: JSON.stringify({
-        contractId: contract.id,
-        cashAccountId: form.cashAccountId ? parseInt(form.cashAccountId) : null,
-        amount: form.amount,
-        paymentDate: form.paymentDate,
-        forMonth: form.forMonth,
-        notes: form.notes,
-      }),
-      headers: { "Content-Type": "application/json" },
+    mutationFn: () => apiRequest("POST", apiBase + "/payments", {
+      contractId: contract.id,
+      cashAccountId: form.cashAccountId ? parseInt(form.cashAccountId) : null,
+      amount: form.amount,
+      paymentDate: form.paymentDate,
+      forMonth: form.forMonth,
+      notes: form.notes,
     }),
     onSuccess: () => {
       toast({ title: "Payment recorded" });
@@ -530,11 +518,7 @@ function ModifyRentForm({ contract, testIdPrefix, unitId }: { contract: Contract
   const [effectiveFrom, setEffectiveFrom] = useState<"current" | "next">("next");
 
   const modify = useMutation({
-    mutationFn: () => apiRequest(`${apiBase}/contracts/${contract.id}/rent`, {
-      method: "PATCH",
-      body: JSON.stringify({ newAmount, effectiveFrom }),
-      headers: { "Content-Type": "application/json" },
-    }),
+    mutationFn: () => apiRequest("PATCH", `${apiBase}/contracts/${contract.id}/rent`, { newAmount, effectiveFrom }),
     onSuccess: () => {
       toast({ title: "Rental amount updated" });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
@@ -585,11 +569,7 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
   const [notes, setNotes] = useState("");
 
   const post = useMutation({
-    mutationFn: () => apiRequest(`${apiBase}/contracts/${contract.id}/guarantee-to-statement`, {
-      method: "POST",
-      body: JSON.stringify({ amount, cashAccountId: cashAccountId ? parseInt(cashAccountId) : null, paymentDate, notes }),
-      headers: { "Content-Type": "application/json" },
-    }),
+    mutationFn: () => apiRequest("POST", `${apiBase}/contracts/${contract.id}/guarantee-to-statement`, { amount, cashAccountId: cashAccountId ? parseInt(cashAccountId) : null, paymentDate, notes }),
     onSuccess: () => {
       toast({ title: "Guarantee posted to statement" });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
@@ -649,11 +629,7 @@ function EndContractForm({ contract, testIdPrefix, onClose, unitId }: { contract
   const [confirm, setConfirm] = useState(false);
 
   const end = useMutation({
-    mutationFn: () => apiRequest(`${apiBase}/contracts/${contract.id}/end`, {
-      method: "POST",
-      body: JSON.stringify({ endDate, notes }),
-      headers: { "Content-Type": "application/json" },
-    }),
+    mutationFn: () => apiRequest("POST", `${apiBase}/contracts/${contract.id}/end`, { endDate, notes }),
     onSuccess: () => {
       toast({ title: "Contract ended", description: "Unit is now vacant." });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
