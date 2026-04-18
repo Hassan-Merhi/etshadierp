@@ -2329,6 +2329,34 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const allFxTransfersF = await db.select().from(factorySupplierFxTransfers)
         .where(eq(factorySupplierFxTransfers.companyId, companyId));
 
+      // Additional charge sources — must match buildBrokerStatement exactly
+      const allOffloadChargesF = await db.select({
+        supplierId: factoryOffloadAdditionalCharges.supplierId,
+        amount: factoryOffloadAdditionalCharges.amount,
+        currencyCode: factoryOffloadAdditionalCharges.currencyCode,
+      }).from(factoryOffloadAdditionalCharges)
+        .where(eq(factoryOffloadAdditionalCharges.companyId, companyId));
+
+      const allContainerOtherChargesF = await db.select({
+        supplierId: factoryContainers.supplierId,
+        amount: factoryContainerOtherCharges.amount,
+        currencyCode: factoryContainerOtherCharges.currencyCode,
+        containerCurrencyCode: factoryContainers.currencyCode,
+      }).from(factoryContainerOtherCharges)
+        .innerJoin(factoryContainers, eq(factoryContainerOtherCharges.containerId, factoryContainers.id))
+        .where(eq(factoryContainerOtherCharges.companyId, companyId));
+
+      const allColOtherChargesF = await db.select({
+        otherChargesSupplierId: factoryContainers.otherChargesSupplierId,
+        otherCharges: factoryContainers.otherCharges,
+        otherChargesCurrencyCode: factoryContainers.otherChargesCurrencyCode,
+      }).from(factoryContainers)
+        .where(and(
+          eq(factoryContainers.companyId, companyId),
+          sql`${factoryContainers.otherChargesSupplierId} IS NOT NULL`,
+          sql`CAST(COALESCE(${factoryContainers.otherCharges}, '0') AS numeric) > 0`
+        ));
+
       // Voucher-based payments (exclude auto-generated FACTORY-PAY-* and optional vouchers)
       const allSupplierIds = (suppliersList as any[]).map((s: any) => s.id);
       const voucherPaidBySupplier: Record<number, number> = {};
@@ -2416,6 +2444,27 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
               add("USD", commAmt);
             }
           }
+        }
+
+        // Offload additional charges (per-supplier, in their own currency)
+        for (const oc of allOffloadChargesF as any[]) {
+          if (!groupIds.includes(oc.supplierId)) continue;
+          const cc = oc.currencyCode || "USD";
+          add(cc, parseFloat(oc.amount || "0"));
+        }
+
+        // Container other charges table (linked via containerId → supplierId)
+        for (const oc of allContainerOtherChargesF as any[]) {
+          if (!groupIds.includes(oc.supplierId)) continue;
+          const cc = oc.currencyCode || oc.containerCurrencyCode || "USD";
+          add(cc, parseFloat(oc.amount || "0"));
+        }
+
+        // Container column other_charges (where otherChargesSupplierId is in group)
+        for (const oc of allColOtherChargesF as any[]) {
+          if (!groupIds.includes(oc.otherChargesSupplierId)) continue;
+          const cc = oc.otherChargesCurrencyCode || "USD";
+          add(cc, parseFloat(oc.otherCharges || "0"));
         }
 
         // Direct payments (reduce balance in payment currency)
@@ -2511,6 +2560,45 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           if (Math.abs(amt) > 0.01) lines.push({ label: `Container Goods + Freight (${cc})`, native: `${amt.toFixed(2)} ${cc}`, usd: cc === "USD" ? amt : 0 });
         }
         if (commTotal > 0) lines.push({ label: "Commission from Linked Suppliers", native: `$${commTotal.toFixed(2)}`, usd: commTotal });
+
+        // Offload additional charges (match buildBrokerStatement)
+        const offloadByCurrency: Record<string, number> = {};
+        for (const oc of allOffloadChargesF as any[]) {
+          if (!groupIds.includes(oc.supplierId)) continue;
+          const cc = oc.currencyCode || "USD";
+          const amt = parseFloat(oc.amount || "0");
+          add(cc, amt);
+          offloadByCurrency[cc] = (offloadByCurrency[cc] || 0) + amt;
+        }
+        for (const [cc, amt] of Object.entries(offloadByCurrency)) {
+          if (amt > 0.01) lines.push({ label: `Offload Additional Charges (${cc})`, native: `${amt.toFixed(2)} ${cc}`, usd: cc === "USD" ? amt : 0 });
+        }
+
+        // Container other charges table (linked via containerId → supplierId)
+        const containerOcByCurrency: Record<string, number> = {};
+        for (const oc of allContainerOtherChargesF as any[]) {
+          if (!groupIds.includes(oc.supplierId)) continue;
+          const cc = oc.currencyCode || oc.containerCurrencyCode || "USD";
+          const amt = parseFloat(oc.amount || "0");
+          add(cc, amt);
+          containerOcByCurrency[cc] = (containerOcByCurrency[cc] || 0) + amt;
+        }
+        for (const [cc, amt] of Object.entries(containerOcByCurrency)) {
+          if (amt > 0.01) lines.push({ label: `Container Other Charges (${cc})`, native: `${amt.toFixed(2)} ${cc}`, usd: cc === "USD" ? amt : 0 });
+        }
+
+        // Container column other_charges (otherChargesSupplierId in group)
+        const colOcByCurrency: Record<string, number> = {};
+        for (const oc of allColOtherChargesF as any[]) {
+          if (!groupIds.includes(oc.otherChargesSupplierId)) continue;
+          const cc = oc.otherChargesCurrencyCode || "USD";
+          const amt = parseFloat(oc.otherCharges || "0");
+          add(cc, amt);
+          colOcByCurrency[cc] = (colOcByCurrency[cc] || 0) + amt;
+        }
+        for (const [cc, amt] of Object.entries(colOcByCurrency)) {
+          if (amt > 0.01) lines.push({ label: `Other Charges — Column (${cc})`, native: `${amt.toFixed(2)} ${cc}`, usd: cc === "USD" ? amt : 0 });
+        }
 
         // Direct payments
         let payTotal: Record<string, number> = {};
