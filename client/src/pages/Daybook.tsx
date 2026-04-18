@@ -3552,7 +3552,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                  {rev.items.map((item: any, idx: number) => {
+                                  {rev.items.filter((item: any) => parseFloat(item.delta ?? "0") !== 0).map((item: any, idx: number) => {
                                     const delta = parseFloat(item.delta ?? "0");
                                     return (
                                       <TableRow key={idx}>
