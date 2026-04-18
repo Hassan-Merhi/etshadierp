@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { InvoiceSummaryBar } from "@/components/InvoiceSummaryBar";
 
 interface Customer {
   id: number;
@@ -189,6 +190,8 @@ export default function FactoryInvoices() {
           Failed to load data. Please check your connection or try refreshing the page.
         </div>
       )}
+
+      {!isLoading && orders.length > 0 && <InvoiceSummaryBar orders={orders} />}
 
       {isLoading ? (
         <div className="space-y-3">

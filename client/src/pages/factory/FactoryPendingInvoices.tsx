@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { InvoiceSummaryBar } from "@/components/InvoiceSummaryBar";
 
 interface CustomerOrder {
   id: number;
@@ -134,6 +135,8 @@ export default function FactoryPendingInvoices() {
           ))}
         </div>
       </div>
+
+      {!isLoading && allOrders.length > 0 && <InvoiceSummaryBar orders={allOrders} />}
 
       {isLoading ? (
         <div className="space-y-3">
