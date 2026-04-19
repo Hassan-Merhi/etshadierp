@@ -1104,6 +1104,131 @@ let migrationsDone = false;
       target_bales INTEGER NOT NULL DEFAULT 0,
       created_at   TIMESTAMP NOT NULL DEFAULT NOW()
     )`,
+
+    // ── Tables missing from prior migrations (added Apr 2026) ─────────────────
+
+    // Offload additional charges (broker/extra costs logged at offload time)
+    `CREATE TABLE IF NOT EXISTS factory_offload_additional_charges (
+      id               SERIAL PRIMARY KEY,
+      company_id       INTEGER NOT NULL,
+      container_id     INTEGER NOT NULL,
+      description      TEXT NOT NULL,
+      amount           NUMERIC(20,2) NOT NULL,
+      currency_code    TEXT DEFAULT 'USD',
+      fx_rate_to_usd   NUMERIC(20,6) DEFAULT 1,
+      ledger_account_id INTEGER,
+      supplier_id      INTEGER,
+      created_at       TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS factory_offload_addl_charges_container_idx
+       ON factory_offload_additional_charges (container_id)`,
+
+    // FX allocations — links fx transfers to specific containers
+    `CREATE TABLE IF NOT EXISTS factory_fx_allocations (
+      id               SERIAL PRIMARY KEY,
+      company_id       INTEGER NOT NULL,
+      fx_transfer_id   INTEGER NOT NULL,
+      container_id     INTEGER NOT NULL,
+      source_type      VARCHAR(20) NOT NULL DEFAULT 'supplier',
+      allocated_amount NUMERIC(20,4) NOT NULL,
+      currency_code    VARCHAR(10) NOT NULL,
+      created_at       TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS factory_fx_alloc_transfer_idx ON factory_fx_allocations (fx_transfer_id)`,
+    `CREATE INDEX IF NOT EXISTS factory_fx_alloc_container_idx ON factory_fx_allocations (container_id)`,
+    `CREATE INDEX IF NOT EXISTS factory_fx_alloc_company_idx ON factory_fx_allocations (company_id)`,
+
+    // Duty audit log — change history for container duty amounts/status
+    `CREATE TABLE IF NOT EXISTS factory_duty_audit_log (
+      id                  SERIAL PRIMARY KEY,
+      company_id          INTEGER NOT NULL,
+      container_id        INTEGER NOT NULL,
+      old_duty_amount     NUMERIC(20,2),
+      new_duty_amount     NUMERIC(20,2) NOT NULL,
+      old_duty_status     TEXT,
+      new_duty_status     TEXT NOT NULL,
+      notes               TEXT,
+      updated_by_user_id  TEXT NOT NULL,
+      created_at          TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+
+    // POS Shifts — open/close shift records per location/user
+    `CREATE TABLE IF NOT EXISTS pos_shifts (
+      id             SERIAL PRIMARY KEY,
+      company_id     INTEGER NOT NULL,
+      location_id    INTEGER NOT NULL,
+      user_id        VARCHAR NOT NULL,
+      username       TEXT NOT NULL,
+      cash_account_id INTEGER,
+      pos_station    INTEGER,
+      status         TEXT NOT NULL DEFAULT 'open',
+      opened_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+      closed_at      TIMESTAMP,
+      opening_cash   NUMERIC(20,2) NOT NULL DEFAULT 0,
+      closing_cash   NUMERIC(20,2),
+      expected_cash  NUMERIC(20,2),
+      variance       NUMERIC(20,2),
+      sales_count    INTEGER DEFAULT 0,
+      sales_total    NUMERIC(20,2) DEFAULT 0,
+      notes          TEXT,
+      created_at     TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+
+    // POS Offline Queue — holds unsynced sales from offline POS clients
+    `CREATE TABLE IF NOT EXISTS pos_offline_queue (
+      id            SERIAL PRIMARY KEY,
+      client_id     VARCHAR(100) NOT NULL,
+      company_id    INTEGER NOT NULL,
+      location_id   INTEGER NOT NULL,
+      user_id       VARCHAR NOT NULL,
+      payload       JSONB NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'pending',
+      error_message TEXT,
+      retries       INTEGER NOT NULL DEFAULT 0,
+      created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+      processed_at  TIMESTAMP
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS pos_offline_queue_client_unique ON pos_offline_queue (client_id)`,
+
+    // Dashboard account selections — saved cash/payable account groups per company
+    `CREATE TABLE IF NOT EXISTS dashboard_account_selections (
+      id              SERIAL PRIMARY KEY,
+      company_id      INTEGER NOT NULL,
+      selection_type  TEXT NOT NULL,
+      account_ids     INTEGER[] NOT NULL DEFAULT '{}',
+      created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at      TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS dashboard_account_selections_company_type_unique
+       ON dashboard_account_selections (company_id, selection_type)`,
+
+    // ERP user page access — per-company page permission grants
+    `CREATE TABLE IF NOT EXISTS erp_user_page_access (
+      id         SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL,
+      user_id    VARCHAR NOT NULL,
+      page_key   TEXT NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS erp_user_page_access_unique
+       ON erp_user_page_access (company_id, user_id, page_key)`,
+
+    // ERP worker docs — employee document store (base64 file data)
+    `CREATE TABLE IF NOT EXISTS erp_worker_docs (
+      id          SERIAL PRIMARY KEY,
+      company_id  INTEGER NOT NULL,
+      employee_id INTEGER NOT NULL,
+      file_name   TEXT NOT NULL,
+      file_type   TEXT NOT NULL,
+      file_size   INTEGER NOT NULL,
+      file_data   TEXT NOT NULL,
+      description TEXT,
+      uploaded_by TEXT,
+      uploaded_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+
+    // factory_worker_advances — voucher_id column (Drizzle migration 0101)
+    `ALTER TABLE factory_worker_advances ADD COLUMN IF NOT EXISTS voucher_id INTEGER`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
