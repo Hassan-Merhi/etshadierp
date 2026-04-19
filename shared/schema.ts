@@ -4305,3 +4305,28 @@ export const insertPropertyPaymentSchema = createInsertSchema(propertyPayments).
 });
 export type InsertPropertyPayment = z.infer<typeof insertPropertyPaymentSchema>;
 export type PropertyPayment = typeof propertyPayments.$inferSelect;
+
+// Rental Auto-Transfer Config — one row per company+module, triggers a transfer on every payment
+export const rentalAutoTransferConfigs = pgTable("rental_auto_transfer_configs", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),       // source company (where rent lands)
+  module: text("module").notNull(),                  // PROPERTIES | ERP | FACTORY
+  destCompanyId: integer("dest_company_id").notNull(),
+  destLedgerAccountId: integer("dest_ledger_account_id").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyModule: uniqueIndex("rental_auto_transfer_unique").on(t.companyId, t.module),
+}));
+
+export const insertRentalAutoTransferConfigSchema = createInsertSchema(rentalAutoTransferConfigs).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1),
+  destCompanyId: z.number().min(1),
+  destLedgerAccountId: z.number().min(1),
+  module: z.enum(["PROPERTIES", "ERP", "FACTORY"]),
+});
+export type InsertRentalAutoTransferConfig = z.infer<typeof insertRentalAutoTransferConfigSchema>;
+export type RentalAutoTransferConfig = typeof rentalAutoTransferConfigs.$inferSelect;

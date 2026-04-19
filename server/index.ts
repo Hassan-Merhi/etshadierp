@@ -1229,6 +1229,19 @@ let migrationsDone = false;
 
     // factory_worker_advances — voucher_id column (Drizzle migration 0101)
     `ALTER TABLE factory_worker_advances ADD COLUMN IF NOT EXISTS voucher_id INTEGER`,
+
+    // ── Rental Auto-Transfer Config (Apr 2026) ────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS rental_auto_transfer_configs (
+      id                    SERIAL PRIMARY KEY,
+      company_id            INTEGER NOT NULL,
+      module                TEXT NOT NULL,
+      dest_company_id       INTEGER NOT NULL,
+      dest_ledger_account_id INTEGER NOT NULL,
+      enabled               BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at            TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS rental_auto_transfer_unique
+       ON rental_auto_transfer_configs (company_id, module)`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
