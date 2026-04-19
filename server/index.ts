@@ -1242,6 +1242,7 @@ let migrationsDone = false;
     )`,
     `CREATE UNIQUE INDEX IF NOT EXISTS rental_auto_transfer_unique
        ON rental_auto_transfer_configs (company_id, module)`,
+    `ALTER TABLE rental_auto_transfer_configs ADD COLUMN IF NOT EXISTS source_cash_account_ids INTEGER[] NOT NULL DEFAULT '{}'`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

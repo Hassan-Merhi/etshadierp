@@ -64,6 +64,10 @@ async function maybeRunAutoTransfer(
     ));
     if (!cfg) return;
 
+    // If specific cash accounts are configured, only fire for those
+    const filterIds = (cfg.sourceCashAccountIds ?? []) as number[];
+    if (filterIds.length > 0 && !filterIds.includes(fromLedgerAccountId)) return;
+
     const [fromCompany] = await db.select().from(companies).where(eq(companies.id, companyId));
     const [toCompany]   = await db.select().from(companies).where(eq(companies.id, cfg.destCompanyId));
     if (!fromCompany || !toCompany) return;
@@ -850,10 +854,20 @@ export function registerRentalRoutes(
       const [destCompany] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, cfg.destCompanyId));
       const [destAccount] = await db.select({ name: ledgerAccounts.name }).from(ledgerAccounts).where(eq(ledgerAccounts.id, cfg.destLedgerAccountId));
 
+      const sourceIds = (cfg.sourceCashAccountIds ?? []) as number[];
+      let sourceAccountNames: { id: number; name: string }[] = [];
+      if (sourceIds.length > 0) {
+        sourceAccountNames = await db
+          .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+          .from(ledgerAccounts)
+          .where(inArray(ledgerAccounts.id, sourceIds));
+      }
+
       res.json({
         ...cfg,
         destCompanyName: destCompany?.name ?? null,
         destAccountName: destAccount?.name ?? null,
+        sourceAccountNames,
       });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
@@ -868,6 +882,7 @@ export function registerRentalRoutes(
       const data = z.object({
         destCompanyId: z.number().min(1),
         destLedgerAccountId: z.number().min(1),
+        sourceCashAccountIds: z.array(z.number()).default([]),
         enabled: z.boolean().default(true),
       }).parse(req.body);
 
@@ -880,6 +895,7 @@ export function registerRentalRoutes(
         const [updated] = await db.update(rentalAutoTransferConfigs).set({
           destCompanyId: data.destCompanyId,
           destLedgerAccountId: data.destLedgerAccountId,
+          sourceCashAccountIds: data.sourceCashAccountIds,
           enabled: data.enabled,
         }).where(eq(rentalAutoTransferConfigs.id, existing.id)).returning();
         return res.json(updated);

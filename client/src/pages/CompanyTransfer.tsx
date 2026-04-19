@@ -64,9 +64,11 @@ interface AutoTransferConfig {
   module: string;
   destCompanyId: number;
   destLedgerAccountId: number;
+  sourceCashAccountIds: number[];
   enabled: boolean;
   destCompanyName?: string | null;
   destAccountName?: string | null;
+  sourceAccountNames?: { id: number; name: string }[];
 }
 
 const MODULE_LABELS: Record<string, string> = {
@@ -102,6 +104,7 @@ export default function CompanyTransfer() {
   const [editingModule, setEditingModule] = useState<string | null>(null);
   const [ruleDestCompanyId, setRuleDestCompanyId] = useState<string>("");
   const [ruleDestAccountId, setRuleDestAccountId] = useState<string>("");
+  const [ruleCashAccountIds, setRuleCashAccountIds] = useState<number[]>([]);
   const [ruleEnabled, setRuleEnabled] = useState(true);
   const [deleteConfirmModule, setDeleteConfirmModule] = useState<string | null>(null);
 
@@ -234,7 +237,14 @@ export default function CompanyTransfer() {
     setEditingModule(module);
     setRuleDestCompanyId(existing ? String(existing.destCompanyId) : "");
     setRuleDestAccountId(existing ? String(existing.destLedgerAccountId) : "");
+    setRuleCashAccountIds(existing?.sourceCashAccountIds ?? []);
     setRuleEnabled(existing ? existing.enabled : true);
+  };
+
+  const toggleCashAccount = (id: number) => {
+    setRuleCashAccountIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
   };
 
   const handleSaveRule = () => {
@@ -247,6 +257,7 @@ export default function CompanyTransfer() {
       body: {
         destCompanyId: parseInt(ruleDestCompanyId),
         destLedgerAccountId: parseInt(ruleDestAccountId),
+        sourceCashAccountIds: ruleCashAccountIds,
         enabled: ruleEnabled,
       },
     });
@@ -423,10 +434,18 @@ export default function CompanyTransfer() {
 
                   {/* Summary when not editing */}
                   {cfg && !isEditing && (
-                    <p className="text-sm text-muted-foreground">
-                      Transfers to <strong>{destCompanyName ?? `Company #${cfg.destCompanyId}`}</strong>
-                      {destAccountName ? <> — <strong>{destAccountName}</strong></> : ` — account #${cfg.destLedgerAccountId}`}
-                    </p>
+                    <div className="text-sm text-muted-foreground space-y-0.5">
+                      <p>
+                        Transfers to <strong>{destCompanyName ?? `Company #${cfg.destCompanyId}`}</strong>
+                        {destAccountName ? <> — <strong>{destAccountName}</strong></> : ` — account #${cfg.destLedgerAccountId}`}
+                      </p>
+                      <p>
+                        Triggers on:{" "}
+                        {cfg.sourceCashAccountIds?.length > 0
+                          ? (cfg.sourceAccountNames ?? []).map(a => a.name).join(", ") || `${cfg.sourceCashAccountIds.length} account(s)`
+                          : <em>all cash accounts</em>}
+                      </p>
+                    </div>
                   )}
 
                   {/* Inline editor */}
@@ -472,13 +491,50 @@ export default function CompanyTransfer() {
                           </Select>
                         </div>
                       </div>
+
+                      {/* Cash account filter */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">
+                          Trigger on cash accounts
+                          <span className="text-muted-foreground font-normal ml-1">(leave all unchecked = every cash account)</span>
+                        </Label>
+                        <div className="rounded-md border p-2 flex flex-wrap gap-x-4 gap-y-1.5">
+                          {accountOptions(fromAccounts).map(a => (
+                            <label
+                              key={a.id}
+                              className="flex items-center gap-1.5 cursor-pointer text-sm select-none"
+                              data-testid={`checkbox-cash-account-${a.id}`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={ruleCashAccountIds.includes(a.id)}
+                                onChange={() => toggleCashAccount(a.id)}
+                                className="accent-primary"
+                              />
+                              {a.name}
+                            </label>
+                          ))}
+                          {accountOptions(fromAccounts).length === 0 && (
+                            <span className="text-xs text-muted-foreground">No accounts found</span>
+                          )}
+                        </div>
+                        {ruleCashAccountIds.length === 0 && (
+                          <p className="text-xs text-muted-foreground">All cash accounts will trigger this rule.</p>
+                        )}
+                        {ruleCashAccountIds.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            Only transfers when payment uses: <strong>{accountOptions(fromAccounts).filter(a => ruleCashAccountIds.includes(a.id)).map(a => a.name).join(", ")}</strong>
+                          </p>
+                        )}
+                      </div>
+
                       <div className="flex items-center gap-2">
                         <Switch
                           checked={ruleEnabled}
                           onCheckedChange={setRuleEnabled}
                           data-testid={`switch-rule-enabled-${mod}`}
                         />
-                        <Label className="text-sm">{ruleEnabled ? "Enabled — will fire on every payment" : "Paused — rule saved but inactive"}</Label>
+                        <Label className="text-sm">{ruleEnabled ? "Enabled — will fire on matching payments" : "Paused — rule saved but inactive"}</Label>
                       </div>
                       <Button
                         size="sm"

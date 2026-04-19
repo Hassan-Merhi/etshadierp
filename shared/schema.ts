@@ -4313,6 +4313,7 @@ export const rentalAutoTransferConfigs = pgTable("rental_auto_transfer_configs",
   module: text("module").notNull(),                  // PROPERTIES | ERP | FACTORY
   destCompanyId: integer("dest_company_id").notNull(),
   destLedgerAccountId: integer("dest_ledger_account_id").notNull(),
+  sourceCashAccountIds: integer("source_cash_account_ids").array().notNull().default([]), // empty = all
   enabled: boolean("enabled").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
