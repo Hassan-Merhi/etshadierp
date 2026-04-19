@@ -1,4 +1,4 @@
-import { useState, useMemo, createContext, useContext } from "react";
+import { useState, useMemo, createContext, useContext, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw } from "lucide-react";
+import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X } from "lucide-react";
 import { format } from "date-fns";
 
 // ── Types ──────────────────────────────────────────────────
@@ -54,6 +54,87 @@ const fmtMoney = (v: string | number | null | undefined) => {
 // ── Context (avoids prop-drilling apiBase through every sub-component) ──
 const ApiBaseCtx = createContext<string>("/api/properties/rental");
 const useApiBase = () => useContext(ApiBaseCtx);
+
+// ── Inline Note Cell ─────────────────────────────────────
+function NoteCell({ contractId, note, testId }: { contractId: number; note: string | null; testId: string }) {
+  const apiBase = useApiBase();
+  const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(note ?? "");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (editing) {
+      setValue(note ?? "");
+      setTimeout(() => textareaRef.current?.focus(), 0);
+    }
+  }, [editing, note]);
+
+  const save = useMutation({
+    mutationFn: () => apiRequest("PATCH", `${apiBase}/contracts/${contractId}/note`, { notes: value }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
+      setEditing(false);
+      toast({ title: "Note saved" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  if (editing) {
+    return (
+      <div
+        className="flex flex-col gap-1 min-w-[160px]"
+        onClick={e => e.stopPropagation()}
+      >
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          rows={3}
+          className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+          placeholder="Add a note…"
+          data-testid={`${testId}-note-input`}
+        />
+        <div className="flex gap-1">
+          <Button
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => save.mutate()}
+            disabled={save.isPending}
+            data-testid={`${testId}-note-save`}
+          >
+            <Check className="h-3 w-3 mr-1" />
+            {save.isPending ? "Saving…" : "Save"}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-xs"
+            onClick={() => setEditing(false)}
+            data-testid={`${testId}-note-cancel`}
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="group flex items-start gap-1 cursor-pointer min-w-[100px] max-w-[220px]"
+      onClick={e => { e.stopPropagation(); setEditing(true); }}
+      data-testid={`${testId}-note-display`}
+    >
+      {note ? (
+        <span className="text-xs text-foreground leading-snug line-clamp-2 whitespace-pre-wrap">{note}</span>
+      ) : (
+        <span className="text-xs text-muted-foreground italic">Add note…</span>
+      )}
+      <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 shrink-0 mt-0.5 transition-opacity" />
+    </div>
+  );
+}
 
 // ── Props ──────────────────────────────────────────────────
 interface Props {
@@ -178,6 +259,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                     <tr>
                       <th className="text-left px-3 py-2 font-semibold">Unit</th>
                       <th className="text-left px-3 py-2 font-semibold">Tenant</th>
+                      <th className="text-left px-3 py-2 font-semibold">Note</th>
                       <th className="text-right px-3 py-2 font-semibold">Monthly Rent</th>
                       <th className="text-right px-3 py-2 font-semibold">Guarantee</th>
                       <th className="text-right px-3 py-2 font-semibold">Outstanding</th>
@@ -189,7 +271,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                     {grouped.map(([group, groupUnits]) => (
                       <>
                         <tr key={`grp-${group}`} className="bg-muted/30 border-t">
-                          <td colSpan={7} className="px-3 py-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">{group}</td>
+                          <td colSpan={8} className="px-3 py-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">{group}</td>
                         </tr>
                         {groupUnits.map(u => (
                           <tr
@@ -203,6 +285,11 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                               {u.contract
                                 ? <span className="font-medium">{u.contract.tenantName}</span>
                                 : <Badge variant="secondary" className="text-xs">Vacant</Badge>}
+                            </td>
+                            <td className="px-3 py-2">
+                              {u.contract
+                                ? <NoteCell contractId={u.contract.id} note={u.contract.notes} testId={`unit-${u.id}`} />
+                                : <span className="text-xs text-muted-foreground">—</span>}
                             </td>
                             <td className="px-3 py-2 text-right tabular-nums">
                               {u.contract ? `$${fmtMoney(u.contract.rentalAmount)}` : "—"}

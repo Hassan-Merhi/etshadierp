@@ -272,6 +272,25 @@ export function registerRentalRoutes(
     }
   });
 
+  // ── UPDATE CONTRACT NOTE ──
+  app.patch(`${urlPrefix}/contracts/:id/note`, requireAuth, async (req: Request, res: Response) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      const { notes } = z.object({ notes: z.string() }).parse(req.body);
+      const [contract] = await db.select().from(propertyContracts).where(and(
+        eq(propertyContracts.id, id), eq(propertyContracts.companyId, companyId), eq(propertyContracts.module, module),
+      ));
+      if (!contract) return res.status(404).json({ message: "Contract not found" });
+      await db.update(propertyContracts).set({ notes: notes || null }).where(eq(propertyContracts.id, id));
+      res.json({ ok: true });
+    } catch (e: any) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // ── END CONTRACT ──
   app.post(`${urlPrefix}/contracts/:id/end`, requireAuth, async (req: Request, res: Response) => {
     try {
