@@ -9,6 +9,7 @@ import {
   Store,
   ChevronDown,
   ClipboardList,
+  ArrowLeftRight,
 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
 import { useLocation } from "wouter";
@@ -33,9 +34,10 @@ const navSections: NavSection[] = [
     label: "Rentals",
     color: "#10b981",
     items: [
-      { title: "Properties (Warehouses)", url: "/properties/rental/warehouses", icon: Building2 },
-      { title: "Shops Rented",            url: "/properties/rental/shops",      icon: Store         },
-      { title: "Payments Log",            url: "/properties/rental/payments",   icon: ClipboardList },
+      { title: "Properties (Warehouses)", url: "/properties/rental/warehouses", icon: Building2      },
+      { title: "Shops Rented",            url: "/properties/rental/shops",      icon: Store          },
+      { title: "Payments Log",            url: "/properties/rental/payments",   icon: ClipboardList  },
+      { title: "Cash Transfer",           url: "/properties/transfer",          icon: ArrowLeftRight },
     ],
   },
   {

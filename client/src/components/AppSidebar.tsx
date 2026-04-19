@@ -127,9 +127,10 @@ const navSections: NavSection[] = [
     label: "Rentals",
     color: "#8b5cf6",
     items: [
-      { title: "Warehouses",    url: "/erp/rental/warehouses", icon: Building2     },
-      { title: "Shops",         url: "/erp/rental/shops",      icon: Store         },
-      { title: "Payments Log",  url: "/erp/rental/payments",   icon: ClipboardList },
+      { title: "Warehouses",    url: "/erp/rental/warehouses", icon: Building2      },
+      { title: "Shops",         url: "/erp/rental/shops",      icon: Store          },
+      { title: "Payments Log",  url: "/erp/rental/payments",   icon: ClipboardList  },
+      { title: "Cash Transfer", url: "/company-transfer",      icon: ArrowLeftRight },
     ],
   },
 ];

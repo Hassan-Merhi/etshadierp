@@ -691,6 +691,7 @@ function AuthenticatedApp() {
                         <Route path="/properties/rental/warehouses" component={PropertiesRentalWarehouses} />
                         <Route path="/properties/rental/shops" component={PropertiesRentalShops} />
                         <Route path="/properties/rental/payments" component={PropertiesRentalPayments} />
+                        <Route path="/properties/transfer" component={CompanyTransfer} />
                         <Route path="/properties/ledger-monthly/:accountId" component={PropertiesLedgerMonthly} />
                         <Route path="/properties/ledger-vouchers/:accountId/:year/:month" component={PropertiesLedgerVouchers} />
                         {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/settings" component={PropertiesSettings} />}
