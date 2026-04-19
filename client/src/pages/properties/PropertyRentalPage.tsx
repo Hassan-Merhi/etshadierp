@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X } from "lucide-react";
+import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog } from "lucide-react";
 import { format } from "date-fns";
 
 // ── Types ──────────────────────────────────────────────────
@@ -431,9 +431,10 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
           <StartContractForm unitId={unit.id} testIdPrefix={testIdPrefix} onClose={onClose} />
         ) : (
           <Tabs defaultValue="payment" className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="payment" data-testid={`tab-${testIdPrefix}-payment`}><DollarSign className="h-4 w-4 mr-1" />Payment</TabsTrigger>
-              <TabsTrigger value="ledger" data-testid={`tab-${testIdPrefix}-ledger`}>Ledger</TabsTrigger>
+              <TabsTrigger value="ledger" data-testid={`tab-${testIdPrefix}-ledger`}>Statement</TabsTrigger>
+              <TabsTrigger value="edit" data-testid={`tab-${testIdPrefix}-edit`}><UserCog className="h-4 w-4 mr-1" />Edit Info</TabsTrigger>
               <TabsTrigger value="modify" data-testid={`tab-${testIdPrefix}-modify`}><FileEdit className="h-4 w-4 mr-1" />Modify Rent</TabsTrigger>
               <TabsTrigger value="guarantee" data-testid={`tab-${testIdPrefix}-guarantee`}><Send className="h-4 w-4 mr-1" />Guarantee</TabsTrigger>
               <TabsTrigger value="end" data-testid={`tab-${testIdPrefix}-end`}><XCircle className="h-4 w-4 mr-1" />End Contract</TabsTrigger>
@@ -442,7 +443,10 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
               <PaymentForm contract={contract} cashAccounts={cashAccounts} testIdPrefix={testIdPrefix} unitId={unit.id} />
             </TabsContent>
             <TabsContent value="ledger">
-              <LedgerView ledger={detail?.ledger ?? []} payments={detail?.payments ?? []} contract={contract} />
+              <LedgerView ledger={detail?.ledger ?? []} payments={detail?.payments ?? []} contract={contract} unitId={unit.id} />
+            </TabsContent>
+            <TabsContent value="edit">
+              <EditInfoForm contract={contract} testIdPrefix={testIdPrefix} unitId={unit.id} />
             </TabsContent>
             <TabsContent value="modify">
               <ModifyRentForm contract={contract} testIdPrefix={testIdPrefix} unitId={unit.id} />
@@ -758,21 +762,170 @@ function EndContractForm({ contract, testIdPrefix, onClose, unitId }: { contract
 }
 
 // ──────────────────────────────────────────────────────────
-// LEDGER VIEW
+// TAB: EDIT CONTRACT INFO
 // ──────────────────────────────────────────────────────────
-function LedgerView({ ledger, payments, contract }: { ledger: LedgerRow[]; payments: Payment[]; contract: Contract }) {
+function EditInfoForm({ contract, testIdPrefix, unitId }: { contract: Contract; testIdPrefix: string; unitId: number }) {
+  const apiBase = useApiBase();
+  const { toast } = useToast();
+  const [tenantName, setTenantName] = useState(contract.tenantName);
+  const [startDate, setStartDate] = useState(
+    contract.startDate ? new Date(contract.startDate).toISOString().slice(0, 10) : ""
+  );
+
+  const save = useMutation({
+    mutationFn: () => apiRequest("PATCH", `${apiBase}/contracts/${contract.id}/info`, { tenantName, startDate }),
+    onSuccess: () => {
+      toast({ title: "Contract info updated" });
+      queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
+      queryClient.invalidateQueries({ queryKey: [apiBase + "/units", unitId, "detail"] });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const changed = tenantName !== contract.tenantName ||
+    startDate !== (contract.startDate ? new Date(contract.startDate).toISOString().slice(0, 10) : "");
+
+  return (
+    <div className="space-y-4 pt-3">
+      <p className="text-sm text-muted-foreground">Update the tenant name and/or contract start date.</p>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Tenant Name *</Label>
+          <Input
+            value={tenantName}
+            onChange={e => setTenantName(e.target.value)}
+            data-testid={`input-${testIdPrefix}-edit-tenant`}
+          />
+        </div>
+        <div>
+          <Label>Start Date *</Label>
+          <Input
+            type="date"
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+            data-testid={`input-${testIdPrefix}-edit-start-date`}
+          />
+        </div>
+      </div>
+      <DialogFooter>
+        <Button
+          onClick={() => save.mutate()}
+          disabled={!changed || !tenantName || !startDate || save.isPending}
+          data-testid={`button-${testIdPrefix}-save-info`}
+        >
+          {save.isPending ? "Saving…" : "Save Changes"}
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// LEDGER VIEW / STATEMENT
+// ──────────────────────────────────────────────────────────
+function LedgerView({ ledger, payments, contract, unitId }: { ledger: LedgerRow[]; payments: Payment[]; contract: Contract; unitId: number }) {
+  const apiBase = useApiBase();
+  const { toast } = useToast();
   const totalExpected = ledger.reduce((s, r) => s + Number(r.expectedAmount), 0);
   const totalPaid = ledger.reduce((s, r) => s + Number(r.paidAmount), 0);
   const balance = totalExpected - totalPaid;
 
+  const handlePrint = () => {
+    const rows = ledger.map(r => {
+      const out = Number(r.expectedAmount) - Number(r.paidAmount);
+      const outColor = out > 0 ? "#cc0000" : out < 0 ? "#006600" : "#888888";
+      return `<tr>
+        <td>${MONTH_NAMES[r.month]} ${r.year}</td>
+        <td class="num">$${fmtMoney(r.expectedAmount)}</td>
+        <td class="num">$${fmtMoney(r.paidAmount)}</td>
+        <td class="num" style="color:${outColor};font-weight:600">$${fmtMoney(out)}</td>
+        <td class="note">${r.notes || ""}</td>
+      </tr>`;
+    }).join("");
+
+    const payRows = payments.map(p => `<tr>
+      <td>${format(new Date(p.paymentDate), "dd MMM yyyy")}</td>
+      <td>${MONTH_NAMES[p.forMonth]} ${p.forYear}</td>
+      <td class="num">$${fmtMoney(p.amount)}</td>
+      <td class="note">${p.notes || ""}</td>
+    </tr>`).join("");
+
+    const balColor = balance > 0 ? "#cc0000" : balance < 0 ? "#006600" : "#000";
+    const startStr = contract.startDate ? format(new Date(contract.startDate as any), "dd MMM yyyy") : "—";
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Rental Statement — ${contract.tenantName}</title>
+    <style>
+      body { font-family: Arial, sans-serif; font-size: 11px; color: #111; margin: 0; padding: 20px; }
+      h1 { font-size: 18px; margin: 0 0 2px 0; color: #1a3a6b; }
+      .subtitle { font-size: 12px; color: #555; margin-bottom: 16px; }
+      .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; margin-bottom: 16px; background: #f4f6fb; border: 1px solid #dde3f0; border-radius: 6px; padding: 12px 16px; }
+      .info-grid .lbl { font-weight: 700; color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+      .info-grid .val { font-size: 12px; font-weight: 600; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+      th { background: #1a3a6b; color: #fff; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; text-align: left; padding: 6px 10px; }
+      th.num { text-align: right; }
+      td { padding: 5px 10px; border-bottom: 1px solid #eee; }
+      td.num { text-align: right; font-variant-numeric: tabular-nums; }
+      td.note { color: #666; }
+      tr.total td { background: #e9ecf5; font-weight: 700; border-top: 2px solid #aaa; }
+      h2 { font-size: 13px; margin: 20px 0 6px 0; color: #1a3a6b; }
+      @media print { body { padding: 0; } }
+    </style></head><body>
+    <h1>Rental Statement</h1>
+    <div class="subtitle">Generated ${format(new Date(), "dd MMM yyyy")}</div>
+    <div class="info-grid">
+      <div><div class="lbl">Tenant</div><div class="val">${contract.tenantName}</div></div>
+      <div><div class="lbl">Start Date</div><div class="val">${startStr}</div></div>
+      <div><div class="lbl">Monthly Rent</div><div class="val">$${fmtMoney(contract.rentalAmount)}</div></div>
+      ${contract.guaranteeAmount && Number(contract.guaranteeAmount) > 0 ? `<div><div class="lbl">Guarantee</div><div class="val">$${fmtMoney(contract.guaranteeAmount)}</div></div>` : ""}
+    </div>
+    <table>
+      <thead><tr>
+        <th>Month</th><th class="num">Expected</th><th class="num">Paid</th><th class="num">Outstanding</th><th>Notes</th>
+      </tr></thead>
+      <tbody>${rows}<tr class="total">
+        <td>TOTALS</td>
+        <td class="num">$${fmtMoney(totalExpected)}</td>
+        <td class="num">$${fmtMoney(totalPaid)}</td>
+        <td class="num" style="color:${balColor}">$${fmtMoney(balance)}</td>
+        <td></td>
+      </tr></tbody>
+    </table>
+    ${payments.length > 0 ? `<h2>Payment History</h2>
+    <table><thead><tr><th>Date</th><th>For</th><th class="num">Amount</th><th>Notes</th></tr></thead>
+    <tbody>${payRows}</tbody></table>` : ""}
+    </body></html>`;
+
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) { toast({ title: "Pop-up blocked", description: "Allow pop-ups for this site and try again.", variant: "destructive" }); return; }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 300);
+  };
+
+  const handleExcel = () => {
+    window.open(`${apiBase}/units/${unitId}/statement/export`, "_blank");
+  };
+
   return (
     <div className="space-y-3 pt-3">
-      <div className="grid grid-cols-3 gap-3 text-sm">
-        <div className="bg-muted/40 rounded p-2"><div className="text-xs text-muted-foreground">Tenant</div><div className="font-semibold">{contract.tenantName}</div></div>
-        <div className="bg-muted/40 rounded p-2"><div className="text-xs text-muted-foreground">Monthly Rent</div><div className="font-semibold">${fmtMoney(contract.rentalAmount)}</div></div>
-        <div className="bg-muted/40 rounded p-2">
-          <div className="text-xs text-muted-foreground">Balance</div>
-          <div className={`font-bold ${balance > 0 ? "text-red-600 dark:text-red-400" : balance < 0 ? "text-green-600 dark:text-green-400" : ""}`}>${fmtMoney(balance)}</div>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="grid grid-cols-3 gap-3 text-sm flex-1 min-w-0">
+          <div className="bg-muted/40 rounded p-2"><div className="text-xs text-muted-foreground">Tenant</div><div className="font-semibold truncate">{contract.tenantName}</div></div>
+          <div className="bg-muted/40 rounded p-2"><div className="text-xs text-muted-foreground">Monthly Rent</div><div className="font-semibold">${fmtMoney(contract.rentalAmount)}</div></div>
+          <div className="bg-muted/40 rounded p-2">
+            <div className="text-xs text-muted-foreground">Balance</div>
+            <div className={`font-bold ${balance > 0 ? "text-red-600 dark:text-red-400" : balance < 0 ? "text-green-600 dark:text-green-400" : ""}`}>${fmtMoney(balance)}</div>
+          </div>
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={handleExcel} data-testid="button-export-excel">
+            <Download className="h-4 w-4 mr-1" />Excel
+          </Button>
+          <Button variant="outline" size="sm" onClick={handlePrint} data-testid="button-print-statement">
+            <Printer className="h-4 w-4 mr-1" />Print / PDF
+          </Button>
         </div>
       </div>
       <div className="border rounded-md overflow-hidden">

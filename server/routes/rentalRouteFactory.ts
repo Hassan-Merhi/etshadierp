@@ -272,6 +272,182 @@ export function registerRentalRoutes(
     }
   });
 
+  // ── EDIT CONTRACT INFO (tenant name + start date) ──
+  app.patch(`${urlPrefix}/contracts/:id/info`, requireAuth, async (req: Request, res: Response) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      const { tenantName, startDate } = z.object({
+        tenantName: z.string().min(1, "Tenant name required"),
+        startDate: z.string().min(1, "Start date required"),
+      }).parse(req.body);
+      const [contract] = await db.select().from(propertyContracts).where(and(
+        eq(propertyContracts.id, id), eq(propertyContracts.companyId, companyId), eq(propertyContracts.module, module),
+      ));
+      if (!contract) return res.status(404).json({ message: "Contract not found" });
+      await db.update(propertyContracts).set({ tenantName, startDate: startDate as any }).where(eq(propertyContracts.id, id));
+      res.json({ ok: true });
+    } catch (e: any) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // ── STATEMENT EXCEL EXPORT ──
+  app.get(`${urlPrefix}/units/:id/statement/export`, requireAuth, async (req: Request, res: Response) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const unitId = parseInt(req.params.id);
+
+      const [unit] = await db.select().from(propertyUnits).where(and(
+        eq(propertyUnits.id, unitId), eq(propertyUnits.companyId, companyId), eq(propertyUnits.module, module),
+      ));
+      if (!unit) return res.status(404).json({ message: "Unit not found" });
+
+      const [contract] = await db.select().from(propertyContracts).where(and(
+        eq(propertyContracts.companyId, companyId),
+        eq(propertyContracts.module, module),
+        eq(propertyContracts.unitId, unitId),
+        eq(propertyContracts.status, "ACTIVE"),
+      ));
+      if (!contract) return res.status(404).json({ message: "No active contract" });
+
+      await ensureMonthlyLedgerRows(contract.id);
+      const ledger = await db.select().from(propertyMonthlyLedger)
+        .where(eq(propertyMonthlyLedger.contractId, contract.id))
+        .orderBy(propertyMonthlyLedger.year, propertyMonthlyLedger.month);
+      const payments = await db.select().from(propertyPayments)
+        .where(eq(propertyPayments.contractId, contract.id))
+        .orderBy(desc(propertyPayments.paymentDate));
+
+      const monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const fmtNum = (v: any) => Number(v || 0);
+
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      wb.creator = "Rental Management";
+      wb.created = new Date();
+
+      const ws = wb.addWorksheet("Statement");
+      ws.pageSetup = { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.5, right: 0.5, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 } };
+
+      const titleFont = { bold: true, size: 14 };
+      const headerFont = { bold: true, size: 10 };
+      const bodyFont = { size: 10 };
+      const grayFill: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEEEEEE" } };
+      const blueFill: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1A56DB" } };
+      const totalFill: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
+
+      ws.columns = [
+        { key: "month", width: 16 },
+        { key: "expected", width: 16 },
+        { key: "paid", width: 16 },
+        { key: "outstanding", width: 16 },
+        { key: "notes", width: 28 },
+      ];
+
+      // Title row
+      const titleRow = ws.addRow(["RENTAL STATEMENT", "", "", "", ""]);
+      ws.mergeCells(`A${titleRow.number}:E${titleRow.number}`);
+      titleRow.getCell(1).font = { ...titleFont, color: { argb: "FFFFFFFF" } };
+      titleRow.getCell(1).fill = blueFill;
+      titleRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+      titleRow.height = 28;
+
+      // Info rows
+      const addInfo = (label: string, value: string) => {
+        const r = ws.addRow([label, value, "", "", ""]);
+        ws.mergeCells(`B${r.number}:E${r.number}`);
+        r.getCell(1).font = { bold: true, size: 10 };
+        r.getCell(2).font = bodyFont;
+        r.getCell(1).fill = grayFill;
+        r.height = 16;
+      };
+      addInfo("Unit", `${unit.locationGroup} / ${unit.unitNumber}`);
+      addInfo("Tenant", contract.tenantName);
+      addInfo("Start Date", contract.startDate ? new Date(contract.startDate as any).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "");
+      addInfo("Monthly Rent", `$${fmtNum(contract.rentalAmount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+      if (contract.guaranteeAmount && Number(contract.guaranteeAmount) > 0) {
+        addInfo("Guarantee", `$${fmtNum(contract.guaranteeAmount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+      }
+      ws.addRow([]);
+
+      // Table header
+      const hdr = ws.addRow(["Month", "Expected ($)", "Paid ($)", "Outstanding ($)", "Notes"]);
+      hdr.eachCell(c => {
+        c.font = { ...headerFont, color: { argb: "FFFFFFFF" } };
+        c.fill = blueFill;
+        c.alignment = { horizontal: "center" };
+        c.border = { bottom: { style: "thin", color: { argb: "FFAAAAAA" } } };
+      });
+      hdr.height = 18;
+
+      // Data rows
+      let totalExpected = 0, totalPaid = 0;
+      for (const row of ledger) {
+        const exp = fmtNum(row.expectedAmount);
+        const paid = fmtNum(row.paidAmount);
+        const out = exp - paid;
+        totalExpected += exp; totalPaid += paid;
+        const r = ws.addRow([`${monthNames[row.month]} ${row.year}`, exp, paid, out, row.notes || ""]);
+        r.getCell(1).font = bodyFont;
+        r.getCell(2).font = bodyFont; r.getCell(2).numFmt = "#,##0.00"; r.getCell(2).alignment = { horizontal: "right" };
+        r.getCell(3).font = bodyFont; r.getCell(3).numFmt = "#,##0.00"; r.getCell(3).alignment = { horizontal: "right" };
+        r.getCell(4).numFmt = "#,##0.00"; r.getCell(4).alignment = { horizontal: "right" };
+        r.getCell(4).font = { ...bodyFont, color: { argb: out > 0 ? "FFCC0000" : out < 0 ? "FF006600" : "FF666666" } };
+        r.getCell(5).font = { ...bodyFont, color: { argb: "FF666666" } };
+        r.height = 15;
+      }
+
+      // Totals row
+      const balance = totalExpected - totalPaid;
+      const tot = ws.addRow(["TOTALS", totalExpected, totalPaid, balance, ""]);
+      tot.eachCell((c, i) => {
+        c.font = { bold: true, size: 10 };
+        c.fill = totalFill;
+        if (i >= 2 && i <= 4) { c.numFmt = "#,##0.00"; c.alignment = { horizontal: "right" }; }
+        if (i === 4) c.font = { bold: true, size: 10, color: { argb: balance > 0 ? "FFCC0000" : balance < 0 ? "FF006600" : "FF000000" } };
+      });
+      tot.height = 18;
+
+      if (payments.length > 0) {
+        ws.addRow([]);
+        const ph = ws.addRow(["PAYMENT HISTORY", "", "", "", ""]);
+        ws.mergeCells(`A${ph.number}:E${ph.number}`);
+        ph.getCell(1).font = { bold: true, size: 10 };
+        ph.getCell(1).fill = grayFill;
+        ph.height = 16;
+
+        const ph2 = ws.addRow(["Date", "For", "Amount ($)", "Notes", ""]);
+        ph2.eachCell(c => { c.font = headerFont; c.fill = grayFill; });
+        ph2.height = 15;
+
+        for (const p of payments) {
+          const r = ws.addRow([
+            new Date(p.paymentDate as any).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+            `${monthNames[p.forMonth]} ${p.forYear}`,
+            Number(p.amount || 0),
+            p.notes || "",
+            "",
+          ]);
+          r.getCell(3).numFmt = "#,##0.00"; r.getCell(3).alignment = { horizontal: "right" };
+          r.height = 15;
+        }
+      }
+
+      const buf = await wb.xlsx.writeBuffer();
+      const filename = `Rental_${unit.unitNumber.replace(/\s+/g, "_")}_${contract.tenantName.replace(/\s+/g, "_")}.xlsx`;
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(buf);
+    } catch (e: any) {
+      console.error(`${tag} statement export:`, e);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // ── UPDATE CONTRACT NOTE ──
   app.patch(`${urlPrefix}/contracts/:id/note`, requireAuth, async (req: Request, res: Response) => {
     try {
