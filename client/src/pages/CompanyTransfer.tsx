@@ -35,7 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
-import { ArrowRight, Undo2, Building2, Zap, Pencil, Trash2, Plus } from "lucide-react";
+import { ArrowRight, Undo2, Building2, Zap, Trash2, Plus } from "lucide-react";
 
 interface LedgerAccount {
   id: number;
@@ -100,13 +100,13 @@ export default function CompanyTransfer() {
   const [description, setDescription] = useState("");
   const [undoTarget, setUndoTarget] = useState<Transfer | null>(null);
 
-  // Auto-rule editor state
-  const [editingModule, setEditingModule] = useState<string | null>(null);
+  // Auto-rule editor state (one "add" form at a time per module)
+  const [addingModule, setAddingModule] = useState<string | null>(null);
   const [ruleDestCompanyId, setRuleDestCompanyId] = useState<string>("");
   const [ruleDestAccountId, setRuleDestAccountId] = useState<string>("");
   const [ruleCashAccountIds, setRuleCashAccountIds] = useState<number[]>([]);
   const [ruleEnabled, setRuleEnabled] = useState(true);
-  const [deleteConfirmModule, setDeleteConfirmModule] = useState<string | null>(null);
+  const [deleteConfirmRuleId, setDeleteConfirmRuleId] = useState<{ id: number; module: string } | null>(null);
 
   const fromCompanyId = currentCompany?.id;
 
@@ -138,16 +138,16 @@ export default function CompanyTransfer() {
     queryKey: ["/api/simple-company-transfers"],
   });
 
-  // Auto-transfer configs — one query per module (hooks cannot be in .map)
-  const cfgProperties = useQuery<AutoTransferConfig | null>({
+  // Auto-transfer configs — one query per module returning arrays (hooks cannot be in .map)
+  const cfgProperties = useQuery<AutoTransferConfig[]>({
     queryKey: [`/api/properties/rental/auto-transfer-config`],
     enabled: !!fromCompanyId,
   });
-  const cfgErp = useQuery<AutoTransferConfig | null>({
+  const cfgErp = useQuery<AutoTransferConfig[]>({
     queryKey: [`/api/erp/rental/auto-transfer-config`],
     enabled: !!fromCompanyId,
   });
-  const cfgFactory = useQuery<AutoTransferConfig | null>({
+  const cfgFactory = useQuery<AutoTransferConfig[]>({
     queryKey: [`/api/factory/rental/auto-transfer-config`],
     enabled: !!fromCompanyId,
   });
@@ -192,8 +192,12 @@ export default function CompanyTransfer() {
     onSuccess: (_, { module }) => {
       const prefix = MODULE_PREFIXES[module];
       queryClient.invalidateQueries({ queryKey: [`${prefix}/auto-transfer-config`] });
-      toast({ title: "Rule saved", description: "Auto-transfer rule is now active." });
-      setEditingModule(null);
+      toast({ title: "Rule added", description: "Auto-transfer rule is now active." });
+      setAddingModule(null);
+      setRuleDestCompanyId("");
+      setRuleDestAccountId("");
+      setRuleCashAccountIds([]);
+      setRuleEnabled(true);
     },
     onError: (e: any) => {
       toast({ title: "Save failed", description: e.message, variant: "destructive" });
@@ -201,19 +205,19 @@ export default function CompanyTransfer() {
   });
 
   const deleteRuleMutation = useMutation({
-    mutationFn: (module: string) => {
+    mutationFn: ({ module, id }: { module: string; id: number }) => {
       const prefix = MODULE_PREFIXES[module];
-      return apiRequest("DELETE", `${prefix}/auto-transfer-config`);
+      return apiRequest("DELETE", `${prefix}/auto-transfer-config/${id}`);
     },
-    onSuccess: (_, module) => {
+    onSuccess: (_, { module }) => {
       const prefix = MODULE_PREFIXES[module];
       queryClient.invalidateQueries({ queryKey: [`${prefix}/auto-transfer-config`] });
       toast({ title: "Rule removed", description: "Auto-transfer rule deleted." });
-      setDeleteConfirmModule(null);
+      setDeleteConfirmRuleId(null);
     },
     onError: (e: any) => {
       toast({ title: "Delete failed", description: e.message, variant: "destructive" });
-      setDeleteConfirmModule(null);
+      setDeleteConfirmRuleId(null);
     },
   });
 
@@ -233,12 +237,12 @@ export default function CompanyTransfer() {
     });
   };
 
-  const openRuleEditor = (module: string, existing: AutoTransferConfig | null | undefined) => {
-    setEditingModule(module);
-    setRuleDestCompanyId(existing ? String(existing.destCompanyId) : "");
-    setRuleDestAccountId(existing ? String(existing.destLedgerAccountId) : "");
-    setRuleCashAccountIds(existing?.sourceCashAccountIds ?? []);
-    setRuleEnabled(existing ? existing.enabled : true);
+  const openAddRule = (module: string) => {
+    setAddingModule(module);
+    setRuleDestCompanyId("");
+    setRuleDestAccountId("");
+    setRuleCashAccountIds([]);
+    setRuleEnabled(true);
   };
 
   const toggleCashAccount = (id: number) => {
@@ -248,12 +252,12 @@ export default function CompanyTransfer() {
   };
 
   const handleSaveRule = () => {
-    if (!editingModule || !ruleDestCompanyId || !ruleDestAccountId) {
+    if (!addingModule || !ruleDestCompanyId || !ruleDestAccountId) {
       toast({ title: "Missing fields", description: "Select destination company and account.", variant: "destructive" });
       return;
     }
     saveRuleMutation.mutate({
-      module: editingModule,
+      module: addingModule,
       body: {
         destCompanyId: parseInt(ruleDestCompanyId),
         destLedgerAccountId: parseInt(ruleDestAccountId),
@@ -380,77 +384,85 @@ export default function CompanyTransfer() {
               Automatic Transfer Rules
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Configure once — every time a rental payment is recorded, the same amount is automatically transferred to the destination company.
+              When a rental payment is recorded, all matching rules fire automatically. Add multiple rules per module to route different cash accounts to different destinations.
             </p>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             {MODULES.map((mod, idx) => {
-              const cfg = autoConfigQueries[idx].data;
-              const isEditing = editingModule === mod;
-              const destCompanyName = cfg?.destCompanyName ?? companies.find(c => c.id === cfg?.destCompanyId)?.name ?? null;
-              const destAccountName = cfg?.destAccountName ?? null;
+              const rules = autoConfigQueries[idx].data ?? [];
+              const isAdding = addingModule === mod;
 
               return (
-                <div key={mod} className="rounded-md border p-3 space-y-3" data-testid={`rule-row-${mod}`}>
+                <div key={mod} className="rounded-md border p-3 space-y-2" data-testid={`rule-section-${mod}`}>
+                  {/* Module header */}
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm">{MODULE_LABELS[mod]}</span>
-                      {cfg ? (
-                        <Badge variant={cfg.enabled ? "default" : "secondary"} className="text-xs">
-                          {cfg.enabled ? "Active" : "Paused"}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs">Not configured</Badge>
-                      )}
+                      <Badge variant={rules.length > 0 ? "default" : "outline"} className="text-xs">
+                        {rules.length === 0 ? "No rules" : `${rules.length} rule${rules.length > 1 ? "s" : ""}`}
+                      </Badge>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {cfg && !isEditing && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setDeleteConfirmModule(mod)}
-                          data-testid={`button-delete-rule-${mod}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      )}
-                      {!isEditing && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openRuleEditor(mod, cfg)}
-                          data-testid={`button-edit-rule-${mod}`}
-                        >
-                          {cfg ? <><Pencil className="h-3.5 w-3.5 mr-1" />Edit</> : <><Plus className="h-3.5 w-3.5 mr-1" />Configure</>}
-                        </Button>
-                      )}
-                      {isEditing && (
-                        <Button size="sm" variant="ghost" onClick={() => setEditingModule(null)}>
-                          Cancel
-                        </Button>
-                      )}
-                    </div>
+                    {!isAdding && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openAddRule(mod)}
+                        data-testid={`button-add-rule-${mod}`}
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1" />Add Rule
+                      </Button>
+                    )}
+                    {isAdding && (
+                      <Button size="sm" variant="ghost" onClick={() => setAddingModule(null)}>
+                        Cancel
+                      </Button>
+                    )}
                   </div>
 
-                  {/* Summary when not editing */}
-                  {cfg && !isEditing && (
-                    <div className="text-sm text-muted-foreground space-y-0.5">
-                      <p>
-                        Transfers to <strong>{destCompanyName ?? `Company #${cfg.destCompanyId}`}</strong>
-                        {destAccountName ? <> — <strong>{destAccountName}</strong></> : ` — account #${cfg.destLedgerAccountId}`}
-                      </p>
-                      <p>
-                        Triggers on:{" "}
-                        {cfg.sourceCashAccountIds?.length > 0
-                          ? (cfg.sourceAccountNames ?? []).map(a => a.name).join(", ") || `${cfg.sourceCashAccountIds.length} account(s)`
-                          : <em>all cash accounts</em>}
-                      </p>
+                  {/* Existing rules list */}
+                  {rules.length > 0 && (
+                    <div className="space-y-1.5">
+                      {rules.map(rule => (
+                        <div
+                          key={rule.id}
+                          className="flex flex-wrap items-start justify-between gap-2 rounded-md bg-muted/40 px-3 py-2"
+                          data-testid={`rule-item-${rule.id}`}
+                        >
+                          <div className="space-y-0.5 text-sm min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <Badge variant={rule.enabled ? "default" : "secondary"} className="text-xs">
+                                {rule.enabled ? "Active" : "Paused"}
+                              </Badge>
+                              <span className="text-muted-foreground">→</span>
+                              <span className="font-medium">{rule.destCompanyName ?? `Company #${rule.destCompanyId}`}</span>
+                              {rule.destAccountName && (
+                                <span className="text-muted-foreground">/ {rule.destAccountName}</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Triggers on:{" "}
+                              {(rule.sourceCashAccountIds ?? []).length > 0
+                                ? (rule.sourceAccountNames ?? []).map(a => a.name).join(", ") || `${rule.sourceCashAccountIds.length} account(s)`
+                                : <em>all cash accounts</em>}
+                            </p>
+                          </div>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setDeleteConfirmRuleId({ id: rule.id, module: mod })}
+                            data-testid={`button-delete-rule-${rule.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      ))}
                     </div>
                   )}
 
-                  {/* Inline editor */}
-                  {isEditing && (
-                    <div className="space-y-3 pt-1">
+                  {/* Add-rule form */}
+                  {isAdding && (
+                    <div className="space-y-3 pt-1 border-t mt-2">
+                      <p className="text-xs font-medium text-muted-foreground pt-1">New rule</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                           <Label className="text-xs">Destination Company</Label>
@@ -523,7 +535,8 @@ export default function CompanyTransfer() {
                         )}
                         {ruleCashAccountIds.length > 0 && (
                           <p className="text-xs text-muted-foreground">
-                            Only transfers when payment uses: <strong>{accountOptions(fromAccounts).filter(a => ruleCashAccountIds.includes(a.id)).map(a => a.name).join(", ")}</strong>
+                            Only when payment uses:{" "}
+                            <strong>{accountOptions(fromAccounts).filter(a => ruleCashAccountIds.includes(a.id)).map(a => a.name).join(", ")}</strong>
                           </p>
                         )}
                       </div>
@@ -534,7 +547,7 @@ export default function CompanyTransfer() {
                           onCheckedChange={setRuleEnabled}
                           data-testid={`switch-rule-enabled-${mod}`}
                         />
-                        <Label className="text-sm">{ruleEnabled ? "Enabled — will fire on matching payments" : "Paused — rule saved but inactive"}</Label>
+                        <Label className="text-sm">{ruleEnabled ? "Enabled" : "Paused"}</Label>
                       </div>
                       <Button
                         size="sm"
@@ -542,7 +555,7 @@ export default function CompanyTransfer() {
                         disabled={saveRuleMutation.isPending}
                         data-testid={`button-save-rule-${mod}`}
                       >
-                        {saveRuleMutation.isPending ? "Saving…" : "Save Rule"}
+                        {saveRuleMutation.isPending ? "Saving…" : "Add Rule"}
                       </Button>
                     </div>
                   )}
@@ -637,21 +650,19 @@ export default function CompanyTransfer() {
       </AlertDialog>
 
       {/* Delete rule confirmation */}
-      <AlertDialog open={!!deleteConfirmModule} onOpenChange={open => { if (!open) setDeleteConfirmModule(null); }}>
+      <AlertDialog open={!!deleteConfirmRuleId} onOpenChange={open => { if (!open) setDeleteConfirmRuleId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove auto-transfer rule?</AlertDialogTitle>
+            <AlertDialogTitle>Remove this auto-transfer rule?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will delete the auto-transfer rule for{" "}
-              <strong>{deleteConfirmModule ? MODULE_LABELS[deleteConfirmModule] : ""}</strong>.
-              Payments already made are not affected.
+              This rule will be deleted. Payments already processed are not affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground"
-              onClick={() => deleteConfirmModule && deleteRuleMutation.mutate(deleteConfirmModule)}
+              onClick={() => deleteConfirmRuleId && deleteRuleMutation.mutate(deleteConfirmRuleId)}
               data-testid="button-confirm-delete-rule"
             >
               {deleteRuleMutation.isPending ? "Removing…" : "Remove Rule"}

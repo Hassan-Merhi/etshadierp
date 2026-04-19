@@ -1240,8 +1240,8 @@ let migrationsDone = false;
       enabled               BOOLEAN NOT NULL DEFAULT TRUE,
       created_at            TIMESTAMP NOT NULL DEFAULT NOW()
     )`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS rental_auto_transfer_unique
-       ON rental_auto_transfer_configs (company_id, module)`,
+    // Dropped unique index so multiple rules per company+module are supported
+    `DROP INDEX IF EXISTS rental_auto_transfer_unique`,
     `ALTER TABLE rental_auto_transfer_configs ADD COLUMN IF NOT EXISTS source_cash_account_ids INTEGER[] NOT NULL DEFAULT '{}'`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.

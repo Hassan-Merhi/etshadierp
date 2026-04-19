@@ -57,24 +57,18 @@ async function maybeRunAutoTransfer(
   unitLabel: string,
 ) {
   try {
-    const [cfg] = await db.select().from(rentalAutoTransferConfigs).where(and(
+    // Fetch ALL active rules for this company+module
+    const configs = await db.select().from(rentalAutoTransferConfigs).where(and(
       eq(rentalAutoTransferConfigs.companyId, companyId),
       eq(rentalAutoTransferConfigs.module, module),
       eq(rentalAutoTransferConfigs.enabled, true),
     ));
-    if (!cfg) return;
-
-    // If specific cash accounts are configured, only fire for those
-    const filterIds = (cfg.sourceCashAccountIds ?? []) as number[];
-    if (filterIds.length > 0 && !filterIds.includes(fromLedgerAccountId)) return;
+    if (configs.length === 0) return;
 
     const [fromCompany] = await db.select().from(companies).where(eq(companies.id, companyId));
-    const [toCompany]   = await db.select().from(companies).where(eq(companies.id, cfg.destCompanyId));
-    if (!fromCompany || !toCompany) return;
+    if (!fromCompany) return;
 
-    const desc = `Auto rent transfer - ${unitLabel}`;
-
-    // Get or create TRANSFER-CLEARING account in each company
+    // Get or create TRANSFER-CLEARING account in a company
     async function getOrCreateClearing(cid: number) {
       const [existing] = await db.select().from(ledgerAccounts).where(and(
         eq(ledgerAccounts.companyId, cid),
@@ -90,39 +84,51 @@ async function maybeRunAutoTransfer(
     }
 
     const fromClearing = await getOrCreateClearing(companyId);
-    const toClearing   = await getOrCreateClearing(cfg.destCompanyId);
 
-    // Voucher in FROM company (Payment — money leaves)
-    const [fromVoucher] = await db.insert(vouchers).values({
-      companyId, voucherNumber: `TR-OUT-${Date.now()}`,
-      voucherType: "Payment", voucherDate: transferDate as any,
-      description: `${desc} → ${toCompany.name}`, totalAmount: amount, optional: false,
-    }).returning();
-    await db.insert(voucherEntries).values([
-      { voucherId: fromVoucher.id, ledgerAccountId: fromClearing.id, debitAmount: amount,  creditAmount: "0", narration: `Transfer out to ${toCompany.name}` },
-      { voucherId: fromVoucher.id, ledgerAccountId: fromLedgerAccountId, debitAmount: "0", creditAmount: amount, narration: `Transfer out to ${toCompany.name}` },
-    ]);
+    for (const cfg of configs) {
+      // Filter: if specific source accounts are set, only fire for those
+      const filterIds = (cfg.sourceCashAccountIds ?? []) as number[];
+      if (filterIds.length > 0 && !filterIds.includes(fromLedgerAccountId)) continue;
 
-    // Voucher in TO company (Receipt — money arrives)
-    const [toVoucher] = await db.insert(vouchers).values({
-      companyId: cfg.destCompanyId, voucherNumber: `TR-IN-${Date.now() + 1}`,
-      voucherType: "Receipt", voucherDate: transferDate as any,
-      description: `Transfer from ${fromCompany.name}`, totalAmount: amount, optional: false,
-    }).returning();
-    await db.insert(voucherEntries).values([
-      { voucherId: toVoucher.id, ledgerAccountId: cfg.destLedgerAccountId, debitAmount: amount, creditAmount: "0", narration: `Transfer in from ${fromCompany.name}` },
-      { voucherId: toVoucher.id, ledgerAccountId: toClearing.id,           debitAmount: "0",   creditAmount: amount, narration: `Transfer in from ${fromCompany.name}` },
-    ]);
+      const [toCompany] = await db.select().from(companies).where(eq(companies.id, cfg.destCompanyId));
+      if (!toCompany) continue;
 
-    // Record link
-    await db.insert(interCompanyTransfers).values({
-      transferType: "Cash",
-      fromCompanyId: companyId, toCompanyId: cfg.destCompanyId,
-      transferDate: transferDate as any, amount,
-      fromLedgerAccountId, toLedgerAccountId: cfg.destLedgerAccountId,
-      fromVoucherId: fromVoucher.id, toVoucherId: toVoucher.id,
-      description: desc,
-    });
+      const toClearing = await getOrCreateClearing(cfg.destCompanyId);
+      const desc = `Auto rent transfer - ${unitLabel}`;
+      const ts = Date.now();
+
+      // Voucher in FROM company (Payment — money leaves)
+      const [fromVoucher] = await db.insert(vouchers).values({
+        companyId, voucherNumber: `TR-OUT-${ts}`,
+        voucherType: "Payment", voucherDate: transferDate as any,
+        description: `${desc} → ${toCompany.name}`, totalAmount: amount, optional: false,
+      }).returning();
+      await db.insert(voucherEntries).values([
+        { voucherId: fromVoucher.id, ledgerAccountId: fromClearing.id, debitAmount: amount,  creditAmount: "0", narration: `Transfer out to ${toCompany.name}` },
+        { voucherId: fromVoucher.id, ledgerAccountId: fromLedgerAccountId, debitAmount: "0", creditAmount: amount, narration: `Transfer out to ${toCompany.name}` },
+      ]);
+
+      // Voucher in TO company (Receipt — money arrives)
+      const [toVoucher] = await db.insert(vouchers).values({
+        companyId: cfg.destCompanyId, voucherNumber: `TR-IN-${ts + 1}`,
+        voucherType: "Receipt", voucherDate: transferDate as any,
+        description: `Transfer from ${fromCompany.name}`, totalAmount: amount, optional: false,
+      }).returning();
+      await db.insert(voucherEntries).values([
+        { voucherId: toVoucher.id, ledgerAccountId: cfg.destLedgerAccountId, debitAmount: amount, creditAmount: "0", narration: `Transfer in from ${fromCompany.name}` },
+        { voucherId: toVoucher.id, ledgerAccountId: toClearing.id,           debitAmount: "0",   creditAmount: amount, narration: `Transfer in from ${fromCompany.name}` },
+      ]);
+
+      // Record link
+      await db.insert(interCompanyTransfers).values({
+        transferType: "Cash",
+        fromCompanyId: companyId, toCompanyId: cfg.destCompanyId,
+        transferDate: transferDate as any, amount,
+        fromLedgerAccountId, toLedgerAccountId: cfg.destLedgerAccountId,
+        fromVoucherId: fromVoucher.id, toVoucherId: toVoucher.id,
+        description: desc,
+      });
+    }
   } catch (err) {
     console.error("[RentalAutoTransfer] failed:", err);
   }
@@ -844,31 +850,27 @@ export function registerRentalRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const [cfg] = await db.select().from(rentalAutoTransferConfigs).where(and(
+      // Return all configs for this company+module, enriched with names
+      const allCfgs = await db.select().from(rentalAutoTransferConfigs).where(and(
         eq(rentalAutoTransferConfigs.companyId, companyId),
         eq(rentalAutoTransferConfigs.module, module),
       ));
-      if (!cfg) return res.json(null);
 
-      // Enrich with names for the UI
-      const [destCompany] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, cfg.destCompanyId));
-      const [destAccount] = await db.select({ name: ledgerAccounts.name }).from(ledgerAccounts).where(eq(ledgerAccounts.id, cfg.destLedgerAccountId));
+      const enriched = await Promise.all(allCfgs.map(async cfg => {
+        const [destCompany] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, cfg.destCompanyId));
+        const [destAccount] = await db.select({ name: ledgerAccounts.name }).from(ledgerAccounts).where(eq(ledgerAccounts.id, cfg.destLedgerAccountId));
+        const sourceIds = (cfg.sourceCashAccountIds ?? []) as number[];
+        let sourceAccountNames: { id: number; name: string }[] = [];
+        if (sourceIds.length > 0) {
+          sourceAccountNames = await db
+            .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+            .from(ledgerAccounts)
+            .where(inArray(ledgerAccounts.id, sourceIds));
+        }
+        return { ...cfg, destCompanyName: destCompany?.name ?? null, destAccountName: destAccount?.name ?? null, sourceAccountNames };
+      }));
 
-      const sourceIds = (cfg.sourceCashAccountIds ?? []) as number[];
-      let sourceAccountNames: { id: number; name: string }[] = [];
-      if (sourceIds.length > 0) {
-        sourceAccountNames = await db
-          .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
-          .from(ledgerAccounts)
-          .where(inArray(ledgerAccounts.id, sourceIds));
-      }
-
-      res.json({
-        ...cfg,
-        destCompanyName: destCompany?.name ?? null,
-        destAccountName: destAccount?.name ?? null,
-        sourceAccountNames,
-      });
+      res.json(enriched);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -886,21 +888,7 @@ export function registerRentalRoutes(
         enabled: z.boolean().default(true),
       }).parse(req.body);
 
-      const [existing] = await db.select().from(rentalAutoTransferConfigs).where(and(
-        eq(rentalAutoTransferConfigs.companyId, companyId),
-        eq(rentalAutoTransferConfigs.module, module),
-      ));
-
-      if (existing) {
-        const [updated] = await db.update(rentalAutoTransferConfigs).set({
-          destCompanyId: data.destCompanyId,
-          destLedgerAccountId: data.destLedgerAccountId,
-          sourceCashAccountIds: data.sourceCashAccountIds,
-          enabled: data.enabled,
-        }).where(eq(rentalAutoTransferConfigs.id, existing.id)).returning();
-        return res.json(updated);
-      }
-
+      // Always insert a new rule (multiple rules per company+module are supported)
       const [created] = await db.insert(rentalAutoTransferConfigs).values({
         companyId, module, ...data,
       }).returning();
@@ -911,14 +899,16 @@ export function registerRentalRoutes(
     }
   });
 
-  // DELETE — remove auto-transfer config
-  app.delete(`${urlPrefix}/auto-transfer-config`, requireAuth, async (req: Request, res: Response) => {
+  // DELETE — remove a specific auto-transfer rule by ID
+  app.delete(`${urlPrefix}/auto-transfer-config/:id`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
       await db.delete(rentalAutoTransferConfigs).where(and(
+        eq(rentalAutoTransferConfigs.id, id),
         eq(rentalAutoTransferConfigs.companyId, companyId),
-        eq(rentalAutoTransferConfigs.module, module),
       ));
       res.json({ ok: true });
     } catch (e: any) {
