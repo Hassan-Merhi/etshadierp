@@ -86,7 +86,7 @@ const MODULE_PREFIXES: Record<string, string> = {
 const MODULES = ["PROPERTIES", "ERP", "FACTORY"] as const;
 
 export default function CompanyTransfer() {
-  const { companies, currentCompany } = useCompany();
+  const { companies, selectedCompany: currentCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
   const { toast } = useToast();
 
