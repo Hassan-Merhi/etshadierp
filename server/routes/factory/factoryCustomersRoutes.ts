@@ -492,6 +492,25 @@ export function registerFactoryCustomersRoutes(app: Express) {
     }
   });
 
+  // ── Save Statement Note ─────────────────────────────────────────────────
+  app.patch("/api/factory/customers/:id/statement-note", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const customerId = parseInt(req.params.id);
+      if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
+      const { statementNote } = req.body;
+      if (typeof statementNote !== "string") return res.status(400).json({ message: "statementNote must be a string" });
+      const [customer] = await db.select().from(customers)
+        .where(and(eq(customers.id, customerId), eq(customers.companyId, companyId)));
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      await db.update(customers).set({ statementNote: statementNote || null }).where(eq(customers.id, customerId));
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ── Customer Statement: PDF Export ──────────────────────────────────────
   app.get("/api/factory/customers/:id/statement/export-pdf", requireAuth, async (req: any, res: any) => {
     try {
@@ -715,6 +734,25 @@ export function registerFactoryCustomersRoutes(app: Express) {
       } else {
         doc.text(closingStr, colX[4] + 2, y + 4, { width: colW[4] - 4, align: "right" });
       }
+      y += 20;
+
+      // Statement note (if set)
+      if (customer.statementNote) {
+        if (y > 740) { doc.addPage(); y = 40; }
+        doc.rect(40, y, 515, 13).fill("#F4F6FB");
+        doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8);
+        doc.text("Note:", 42, y + 3, { width: 38 });
+        doc.font("Helvetica").fontSize(8);
+        const noteLines = doc.heightOfString(customer.statementNote, { width: 468 });
+        const noteH = Math.max(13, noteLines + 6);
+        if (noteH > 13) {
+          doc.rect(40, y, 515, noteH).fill("#F4F6FB");
+          doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8);
+          doc.text("Note:", 42, y + 3, { width: 38 });
+          doc.font("Helvetica").fontSize(8);
+        }
+        doc.fillColor("#333333").text(customer.statementNote, 82, y + 3, { width: 468, lineBreak: true });
+      }
 
       doc.end();
     } catch (error: any) {
@@ -909,6 +947,17 @@ export function registerFactoryCustomersRoutes(app: Express) {
       cbRow.getCell(5).numFmt = numFmt;
       cbRow.getCell(4).alignment = { horizontal: "right" };
       cbRow.getCell(5).alignment = { horizontal: "right" };
+
+      // Statement note (if set)
+      if (customer.statementNote) {
+        sheet.addRow([]);
+        const noteRow = sheet.addRow(["Note:", customer.statementNote, "", "", ""]);
+        sheet.mergeCells(`B${noteRow.number}:E${noteRow.number}`);
+        noteRow.getCell(1).font = { bold: true, size: 10 };
+        noteRow.getCell(2).font = { italic: true, size: 10 };
+        noteRow.getCell(2).alignment = { wrapText: true, vertical: "top" };
+        noteRow.height = Math.max(18, Math.ceil(customer.statementNote.length / 60) * 15);
+      }
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename=statement_${(customer.legalName || "customer").replace(/\s+/g, "_")}.xlsx`);

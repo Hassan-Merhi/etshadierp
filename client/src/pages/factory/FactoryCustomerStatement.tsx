@@ -1,15 +1,18 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, FileText, User, Download, FileSpreadsheet } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { drCrClass } from "@/lib/formatNumber";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface CustomerInfo {
   id: number;
@@ -19,6 +22,7 @@ interface CustomerInfo {
   openingBalance: string | null;
   openingBalanceSide: string | null;
   active: boolean;
+  statementNote: string | null;
 }
 
 interface Invoice {
@@ -71,15 +75,37 @@ function fmtMoney(value: number): string {
 
 export default function FactoryCustomerStatement() {
   const { formatDisplayDate } = useDateFormat();
+  const { toast } = useToast();
   const [, navigate] = useLocation();
   useEscapeBack(() => navigate("/factory/customers"));
   const params = useParams<{ id: string }>();
   const customerId = params.id;
   const [activeTab, setActiveTab] = useState<"invoices" | "statement">("invoices");
+  const [draftNote, setDraftNote] = useState<string | null>(null); // null = not yet loaded
 
   const { data: statement, isLoading } = useQuery<StatementData>({
     queryKey: [`/api/factory/customers/${customerId}/statement`],
     enabled: !!customerId,
+  });
+
+  // Initialise draft note once data loads
+  useEffect(() => {
+    if (statement?.customer && draftNote === null) {
+      setDraftNote(statement.customer.statementNote ?? "");
+    }
+  }, [statement]);
+
+  const saveNoteMutation = useMutation({
+    mutationFn: async (note: string) => {
+      await apiRequest("PATCH", `/api/factory/customers/${customerId}/statement-note`, { statementNote: note });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customers/${customerId}/statement`] });
+      toast({ title: "Note saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save note", variant: "destructive" });
+    },
   });
 
   if (isLoading) {
@@ -324,6 +350,29 @@ export default function FactoryCustomerStatement() {
           </Table>
         </Card>
       )}
+
+      {/* Statement Note */}
+      <Card className="mt-4">
+        <CardContent className="p-4 space-y-2">
+          <p className="text-sm font-semibold">Statement Note</p>
+          <p className="text-xs text-muted-foreground">This note appears on exported PDF and Excel statements.</p>
+          <Textarea
+            value={draftNote ?? ""}
+            onChange={(e) => setDraftNote(e.target.value)}
+            placeholder="Add a note for this customer's statement..."
+            rows={3}
+            data-testid="textarea-statement-note"
+          />
+          <Button
+            size="sm"
+            onClick={() => saveNoteMutation.mutate(draftNote ?? "")}
+            disabled={saveNoteMutation.isPending}
+            data-testid="button-save-statement-note"
+          >
+            {saveNoteMutation.isPending ? "Saving…" : "Save Note"}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

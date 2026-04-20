@@ -1133,6 +1133,7 @@ export const customers = pgTable("customers", {
   openingBalance: decimal("opening_balance", { precision: 15, scale: 2 }).default("0"),
   openingBalanceSide: varchar("opening_balance_side", { length: 2 }).default("Dr"),
   active: boolean("active").notNull().default(true),
+  statementNote: text("statement_note"),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
