@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,12 +16,6 @@ interface Worker { id: number; fullName: string; position: string; active: boole
 interface WorkerCategory { id: number; name: string; workerIds?: number[]; }
 interface PlanEntry { id?: number; workerId: number; workerName: string; role: string; targetBales: number; }
 interface PlanData { plan: { id: number; planDate: string; categoryIds: number[]; notes: string } | null; entries: PlanEntry[]; actuals: Record<number, number>; }
-
-const ROLES = [
-  { value: "TEAM_LEADER", label: "Team Leader" },
-  { value: "HELPER", label: "Helper" },
-  { value: "WORKER", label: "Worker" },
-];
 
 
 function WorkerCombobox({
@@ -293,7 +286,6 @@ export default function ProductionPlannerDialog() {
                 <thead className="bg-muted/50 border-b">
                   <tr>
                     <th className="text-left px-3 py-2 font-semibold">Worker</th>
-                    <th className="text-left px-3 py-2 font-semibold w-36">Role</th>
                     <th className="text-right px-3 py-2 font-semibold w-28">Target</th>
                     <th className="text-right px-3 py-2 font-semibold w-24">Actual</th>
                     <th className="text-center px-3 py-2 font-semibold w-24">Status</th>
@@ -303,7 +295,7 @@ export default function ProductionPlannerDialog() {
                 <tbody>
                   {visibleEntries.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">
+                      <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
                         {entries.length === 0
                           ? "No workers in plan. Add workers below or copy from a previous plan."
                           : "No workers match the selected team filter."}
@@ -322,18 +314,6 @@ export default function ProductionPlannerDialog() {
                             workers={workers}
                             entryKey={entry._key}
                           />
-                        </td>
-                        <td className="px-3 py-2">
-                          <Select value={entry.role} onValueChange={v => updateEntry(entry._key, "role", v)}>
-                            <SelectTrigger className="h-8 text-sm" data-testid={`select-role-${entry._key}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ROLES.map(r => (
-                                <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
                         </td>
                         <td className="px-3 py-2">
                           <Input
