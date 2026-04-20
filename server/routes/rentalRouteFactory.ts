@@ -889,6 +889,8 @@ export function registerRentalRoutes(
         }
 
         // 3. Reverse any auto-transfers that were created for this payment
+        //    Hard-delete both sides (entries + voucher) so the destination company's
+        //    books are fully clean — matching the simple-company-transfer pattern.
         const linkedTransfers = await tx
           .select()
           .from(interCompanyTransfers)
@@ -896,14 +898,12 @@ export function registerRentalRoutes(
 
         for (const transfer of linkedTransfers) {
           if (transfer.fromVoucherId) {
-            await tx.execute(sql`
-              UPDATE vouchers SET deleted_at = NOW() WHERE id = ${transfer.fromVoucherId}
-            `);
+            await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, transfer.fromVoucherId));
+            await tx.delete(vouchers).where(eq(vouchers.id, transfer.fromVoucherId));
           }
           if (transfer.toVoucherId) {
-            await tx.execute(sql`
-              UPDATE vouchers SET deleted_at = NOW() WHERE id = ${transfer.toVoucherId}
-            `);
+            await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, transfer.toVoucherId));
+            await tx.delete(vouchers).where(eq(vouchers.id, transfer.toVoucherId));
           }
           await tx.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, transfer.id));
         }

@@ -1243,7 +1243,23 @@ let migrationsDone = false;
     // Dropped unique index so multiple rules per company+module are supported
     `DROP INDEX IF EXISTS rental_auto_transfer_unique`,
     `ALTER TABLE rental_auto_transfer_configs ADD COLUMN IF NOT EXISTS source_cash_account_ids INTEGER[] NOT NULL DEFAULT '{}'`,
-    // Link auto-transfers back to their originating payment for cascade reversal
+    // Ensure inter_company_transfers table exists (may not exist on fresh DBs where Drizzle push was never run)
+    `CREATE TABLE IF NOT EXISTS inter_company_transfers (
+      id                    SERIAL PRIMARY KEY,
+      transfer_type         TEXT NOT NULL,
+      from_company_id       INTEGER NOT NULL,
+      to_company_id         INTEGER NOT NULL,
+      transfer_date         DATE NOT NULL,
+      amount                NUMERIC(15,2) NOT NULL,
+      from_ledger_account_id INTEGER NOT NULL,
+      to_ledger_account_id  INTEGER NOT NULL,
+      from_voucher_id       INTEGER,
+      to_voucher_id         INTEGER,
+      description           TEXT,
+      source_payment_id     INTEGER,
+      created_at            TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    // Link auto-transfers back to their originating payment for cascade reversal (for older DBs)
     `ALTER TABLE inter_company_transfers ADD COLUMN IF NOT EXISTS source_payment_id INTEGER`,
     // Free-form note shown on statement PDF/Excel per customer
     `ALTER TABLE property_contracts ADD COLUMN IF NOT EXISTS statement_note TEXT`,
