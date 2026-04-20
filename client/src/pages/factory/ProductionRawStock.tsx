@@ -66,6 +66,7 @@ import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
+const fmtKg = (n: number) => formatNumber(n, 3);
 import { cn } from "@/lib/utils";
 
 function parseAccountValue(val: string): { type: "ledger" | "supplier"; id: number } | null {
@@ -1410,7 +1411,7 @@ export default function ProductionRawStock() {
           <CardContent className="pt-4">
             <p className="text-sm text-muted-foreground">Total Received</p>
             <p className="text-xl font-bold font-mono" data-testid="text-total-received">
-              {formatNumber(totalReceived)} kg
+              {fmtKg(totalReceived)} kg
             </p>
           </CardContent>
         </Card>
@@ -1418,7 +1419,7 @@ export default function ProductionRawStock() {
           <CardContent className="pt-4">
             <p className="text-sm text-muted-foreground">Total Used</p>
             <p className="text-xl font-bold font-mono" data-testid="text-total-used">
-              {formatNumber(totalUsed)} kg
+              {fmtKg(totalUsed)} kg
             </p>
           </CardContent>
         </Card>
@@ -1426,7 +1427,7 @@ export default function ProductionRawStock() {
           <CardContent className="pt-4">
             <p className="text-sm text-muted-foreground">Remaining Stock</p>
             <p className="text-xl font-bold font-mono" data-testid="text-total-remaining">
-              {formatNumber(totalRemaining)} kg
+              {fmtKg(totalRemaining)} kg
             </p>
           </CardContent>
         </Card>
@@ -1434,7 +1435,7 @@ export default function ProductionRawStock() {
           <CardContent className="pt-4">
             <p className="text-sm text-muted-foreground">Free Available</p>
             <p className="text-xl font-bold font-mono text-green-600 dark:text-green-400" data-testid="text-total-free">
-              {formatNumber(totalFree)} kg
+              {fmtKg(totalFree)} kg
             </p>
           </CardContent>
         </Card>
@@ -1565,10 +1566,10 @@ export default function ProductionRawStock() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm py-2">
-                          {formatNumber(groupTotalReceived)}
+                          {fmtKg(groupTotalReceived)}
                         </TableCell>
                         <TableCell className={`text-right font-mono text-sm py-2 font-medium ${groupTotalFree > 0.001 ? "text-green-600 dark:text-green-400" : "text-muted-foreground/50"}`}>
-                          {groupTotalFree > 0.001 ? formatNumber(groupTotalFree) : "—"}
+                          {groupTotalFree > 0.001 ? fmtKg(groupTotalFree) : "—"}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm py-2 text-muted-foreground">
                           {groupAvgCost != null ? `$${groupAvgCost.toFixed(4)}` : "—"}
@@ -1611,12 +1612,12 @@ export default function ProductionRawStock() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatNumber(parseFloat(row.receivedKg))}
+                        {fmtKg(parseFloat(row.receivedKg))}
                       </TableCell>
                       <TableCell className="text-right font-mono font-medium">
                         {parseFloat(row.freeKg || "0") > 0.001 ? (
                           <span className="text-green-600 dark:text-green-400">
-                            {formatNumber(parseFloat(row.freeKg || "0"))}
+                            {fmtKg(parseFloat(row.freeKg || "0"))}
                           </span>
                         ) : (
                           <span className="text-muted-foreground/50">—</span>
@@ -1799,7 +1800,7 @@ export default function ProductionRawStock() {
                 Mix Batches
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                {mixBatchKpis.activeCount} open {mixBatchKpis.activeCount === 1 ? "batch" : "batches"} · {formatNumber(mixBatchKpis.totalMixKg)} kg remaining
+                {mixBatchKpis.activeCount} open {mixBatchKpis.activeCount === 1 ? "batch" : "batches"} · {fmtKg(mixBatchKpis.totalMixKg)} kg remaining
               </p>
             </div>
             <div className="flex gap-2 flex-wrap">
@@ -1866,7 +1867,7 @@ export default function ProductionRawStock() {
                           <TableCell className="font-mono text-sm">{u.batchCode}</TableCell>
                           <TableCell className="text-sm">{u.batchName || "—"}</TableCell>
                           <TableCell className="text-sm">{u.operatorUser || "—"}</TableCell>
-                          <TableCell className="text-right font-mono font-medium">{formatNumber(parseFloat(u.kgUsed))} kg</TableCell>
+                          <TableCell className="text-right font-mono font-medium">{fmtKg(parseFloat(u.kgUsed))} kg</TableCell>
                           <TableCell className="text-right font-mono">{parseFloat(u.costPerKg).toFixed(4)}/kg</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{u.notes || "—"}</TableCell>
                         </TableRow>
@@ -1979,9 +1980,9 @@ export default function ProductionRawStock() {
                         Combined Total
                         <div className="text-xs text-muted-foreground font-normal">{filteredMixBatches.length} batch{filteredMixBatches.length !== 1 ? "es" : ""}</div>
                       </td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-total">{formatNumber(sumTotal)}</td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-used">{formatNumber(sumUsed)}</td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-remaining">{formatNumber(sumRemaining)}</td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-total">{fmtKg(sumTotal)}</td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-used">{fmtKg(sumUsed)}</td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-remaining">{fmtKg(sumRemaining)}</td>
                       <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-cost">${blendedCost.toFixed(4)}/kg</td>
                       <td colSpan={2} />
                     </tr>
