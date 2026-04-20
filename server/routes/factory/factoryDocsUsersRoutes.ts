@@ -762,6 +762,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
           hasErpAccess: profile?.hasErpAccess ?? true,
           hasFactoryAccess: profile?.hasFactoryAccess ?? true,
           hiddenCostFields: profile?.hiddenCostFields ?? [],
+          hideAllCosts: profile?.hideAllCosts ?? false,
           pageAccess: accessMap.get(u.id) || [],
         };
       });
@@ -853,7 +854,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       }
 
       const { userId } = req.params;
-      const { displayName, pageAccess, password, hasErpAccess, hasFactoryAccess, hiddenCostFields, username } = req.body;
+      const { displayName, pageAccess, password, hasErpAccess, hasFactoryAccess, hiddenCostFields, hideAllCosts, username } = req.body;
 
       await db.transaction(async (tx: any) => {
         const userUpdates: any = {};
@@ -876,6 +877,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         if (hasErpAccess !== undefined) profileUpdates.hasErpAccess = hasErpAccess;
         if (hasFactoryAccess !== undefined) profileUpdates.hasFactoryAccess = hasFactoryAccess;
         if (Array.isArray(hiddenCostFields)) profileUpdates.hiddenCostFields = hiddenCostFields;
+        if (hideAllCosts !== undefined) profileUpdates.hideAllCosts = !!hideAllCosts;
 
         const existingProfile = await tx.select()
           .from(factoryUserProfiles)
@@ -893,6 +895,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             hasErpAccess: hasErpAccess ?? true,
             hasFactoryAccess: hasFactoryAccess ?? true,
             hiddenCostFields: Array.isArray(hiddenCostFields) ? hiddenCostFields : [],
+            hideAllCosts: !!hideAllCosts,
           });
         }
 
@@ -1006,27 +1009,34 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       const role = (req.session as any).currentRole;
       if (role === "Admin" || role === "Owner") {
-        return res.json({ fullAccess: true, pageKeys: [], hasErpAccess: true, hasFactoryAccess: true, hiddenCostFields: [], companyId, companyName });
+        return res.json({ fullAccess: true, pageKeys: [], hasErpAccess: true, hasFactoryAccess: true, hiddenCostFields: [], hideAllCosts: false, companyId, companyName });
       }
 
       const [profile] = await db.select({
         hasErpAccess: factoryUserProfiles.hasErpAccess,
         hasFactoryAccess: factoryUserProfiles.hasFactoryAccess,
         hiddenCostFields: factoryUserProfiles.hiddenCostFields,
+        hideAllCosts: factoryUserProfiles.hideAllCosts,
       })
         .from(factoryUserProfiles)
         .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
 
       const hasErpAccess = profile ? profile.hasErpAccess : true;
       const hasFactoryAccess = profile ? profile.hasFactoryAccess : true;
-      const hiddenCostFields = profile?.hiddenCostFields ?? [];
+      const hideAllCosts = profile?.hideAllCosts ?? false;
+      // When hideAllCosts is set, treat all cost field keys as hidden
+      const ALL_COST_KEYS = [
+        "inventory_avg_rate", "inventory_total_value", "inventory_sell_price", "inventory_sell_value",
+        "bale_history_cost_per_kg", "bale_history_total_cost", "bales_list_cost_per_kg",
+      ];
+      const hiddenCostFields = hideAllCosts ? ALL_COST_KEYS : (profile?.hiddenCostFields ?? []);
 
       const access = await db.select({ pageKey: factoryUserPageAccess.pageKey })
         .from(factoryUserPageAccess)
         .where(and(eq(factoryUserPageAccess.companyId, companyId), eq(factoryUserPageAccess.userId, userId)));
 
       if (access.length === 0) {
-        return res.json({ fullAccess: true, pageKeys: [], hasErpAccess, hasFactoryAccess, hiddenCostFields, companyId, companyName });
+        return res.json({ fullAccess: true, pageKeys: [], hasErpAccess, hasFactoryAccess, hiddenCostFields, hideAllCosts, companyId, companyName });
       }
 
       res.json({
@@ -1035,6 +1045,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         hasErpAccess,
         hasFactoryAccess,
         hiddenCostFields,
+        hideAllCosts,
         companyId,
         companyName,
       });

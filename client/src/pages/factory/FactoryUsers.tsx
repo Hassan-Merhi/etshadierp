@@ -39,6 +39,7 @@ interface FactoryUser {
   hasErpAccess: boolean;
   hasFactoryAccess: boolean;
   hiddenCostFields: string[];
+  hideAllCosts: boolean;
   createdAt: string;
   role?: string;
 }
@@ -70,6 +71,7 @@ export default function FactoryUsers() {
   });
   const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set());
   const [hiddenCostFields, setHiddenCostFields] = useState<string[]>([]);
+  const [hideAllCosts, setHideAllCosts] = useState(false);
   const { toast } = useToast();
 
   const { data: factoryUsers, isLoading } = useQuery<FactoryUser[]>({
@@ -122,6 +124,7 @@ export default function FactoryUsers() {
     setFormData({ username: "", password: "", displayName: "", hasErpAccess: true, hasFactoryAccess: true });
     setSelectedPages(new Set());
     setHiddenCostFields([]);
+    setHideAllCosts(false);
   };
 
   const openEdit = (user: FactoryUser) => {
@@ -135,6 +138,7 @@ export default function FactoryUsers() {
     });
     setSelectedPages(new Set(user.pageAccess));
     setHiddenCostFields(user.hiddenCostFields ?? []);
+    setHideAllCosts(user.hideAllCosts ?? false);
   };
 
   const toggleCostField = (key: string) => {
@@ -200,6 +204,7 @@ export default function FactoryUsers() {
           hasErpAccess: isPrivileged ? true : formData.hasErpAccess,
           hasFactoryAccess: isPrivileged ? true : formData.hasFactoryAccess,
           hiddenCostFields: isPrivileged ? [] : hiddenCostFields,
+          hideAllCosts: isPrivileged ? false : hideAllCosts,
         },
       });
     } else {
@@ -211,6 +216,7 @@ export default function FactoryUsers() {
         hasErpAccess: formData.hasErpAccess,
         hasFactoryAccess: formData.hasFactoryAccess,
         hiddenCostFields,
+        hideAllCosts,
       });
     }
   };
@@ -287,6 +293,7 @@ export default function FactoryUsers() {
                   <TableHead>ERP Access</TableHead>
                   <TableHead>Factory Access</TableHead>
                   <TableHead>Pages Access</TableHead>
+                  <TableHead>Cost Access</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-28">Actions</TableHead>
                 </TableRow>
@@ -340,6 +347,17 @@ export default function FactoryUsers() {
                             </Badge>
                           )}
                         </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Full access</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {isAdminOrOwner(user) ? (
+                        <span className="text-xs text-muted-foreground">Full access</span>
+                      ) : user.hideAllCosts ? (
+                        <Badge variant="secondary">No cost access</Badge>
+                      ) : user.hiddenCostFields.length > 0 ? (
+                        <Badge variant="secondary">{user.hiddenCostFields.length} hidden</Badge>
                       ) : (
                         <span className="text-xs text-muted-foreground">Full access</span>
                       )}
@@ -534,17 +552,35 @@ export default function FactoryUsers() {
                     Toggle off to hide cost pricing fields from this user. On = visible, Off = hidden.
                   </p>
                 </div>
-                <div className="border rounded-md divide-y">
-                  {COST_FIELDS.map(field => (
-                    <div key={field.key} className="flex items-center justify-between px-4 py-3">
-                      <span className="text-sm">{field.label}</span>
-                      <Switch
-                        checked={!hiddenCostFields.includes(field.key)}
-                        onCheckedChange={() => toggleCostField(field.key)}
-                        data-testid={`switch-cost-field-${field.key}`}
-                      />
+                {/* User mode — hides all costs in UI and in any downloaded files */}
+                <div className="border rounded-md">
+                  <div className="flex items-center justify-between px-4 py-3 bg-muted/40 rounded-t-md">
+                    <div>
+                      <span className="text-sm font-semibold">User</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">Hide all costs in the app and in any downloaded/exported files</p>
                     </div>
-                  ))}
+                    <Switch
+                      checked={hideAllCosts}
+                      onCheckedChange={val => {
+                        setHideAllCosts(val);
+                        if (val) setHiddenCostFields(COST_FIELDS.map(f => f.key));
+                        else setHiddenCostFields([]);
+                      }}
+                      data-testid="switch-hide-all-costs"
+                    />
+                  </div>
+                  <div className={`divide-y ${hideAllCosts ? "opacity-40 pointer-events-none" : ""}`}>
+                    {COST_FIELDS.map(field => (
+                      <div key={field.key} className="flex items-center justify-between px-4 py-3">
+                        <span className="text-sm">{field.label}</span>
+                        <Switch
+                          checked={!hiddenCostFields.includes(field.key)}
+                          onCheckedChange={() => toggleCostField(field.key)}
+                          data-testid={`switch-cost-field-${field.key}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

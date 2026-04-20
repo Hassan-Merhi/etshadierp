@@ -8,6 +8,7 @@ import {
   customerOrderLines,
   customerOrderCharges,
   customerOrders,
+  factoryUserProfiles,
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -172,4 +173,25 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
     totalQtyBales: bales.length,
     updatedAt: new Date(),
   }).where(eq(customerOrders.id, orderId));
+}
+
+/**
+ * Returns true if the logged-in user has "hideAllCosts" enabled.
+ * Admins and owners always return false (they always see costs).
+ */
+export async function getUserHideAllCosts(req: any): Promise<boolean> {
+  try {
+    const userId = req.session?.userId;
+    if (!userId) return false;
+    const role = req.session?.currentRole?.toLowerCase?.();
+    if (role === "admin" || role === "owner") return false;
+    const [profile] = await db
+      .select({ hideAllCosts: factoryUserProfiles.hideAllCosts })
+      .from(factoryUserProfiles)
+      .where(eq(factoryUserProfiles.userId, userId))
+      .limit(1);
+    return profile?.hideAllCosts ?? false;
+  } catch {
+    return false;
+  }
 }

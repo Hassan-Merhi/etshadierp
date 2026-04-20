@@ -6,7 +6,7 @@ import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
 import {
   writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword,
+  isLegacySHA256Hash, verifySupervisorPassword, getUserHideAllCosts,
 } from "./_helpers";
 import {
   factorySuppliers, factoryCategories, factoryBaleProducts,
@@ -784,7 +784,8 @@ export function registerFactoryBalesRoutes(app: Express) {
       const locMap = new Map(locs.map((l: any) => [l.id, l]));
 
       const [fCfgBale] = await db.select({ hideAvgCost: factorySettings.hideAvgCost }).from(factorySettings).where(eq(factorySettings.companyId, companyId)).limit(1);
-      const showCostBale = !fCfgBale?.hideAvgCost;
+      const userHideAllCosts = await getUserHideAllCosts(req);
+      const showCostBale = !fCfgBale?.hideAvgCost && !userHideAllCosts;
 
       const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();

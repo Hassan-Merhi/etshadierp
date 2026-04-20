@@ -3711,6 +3711,7 @@ export const factoryUserProfiles = pgTable("factory_user_profiles", {
   hasErpAccess: boolean("has_erp_access").notNull().default(true),
   hasFactoryAccess: boolean("has_factory_access").notNull().default(true),
   hiddenCostFields: text("hidden_cost_fields").array().notNull().default([]),
+  hideAllCosts: boolean("hide_all_costs").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({

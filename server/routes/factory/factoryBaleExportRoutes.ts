@@ -5,7 +5,7 @@ import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
 import {
   writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword,
+  isLegacySHA256Hash, verifySupervisorPassword, getUserHideAllCosts,
 } from "./_helpers";
 import {
   factorySuppliers, factoryCategories, factoryBaleProducts,
@@ -124,7 +124,8 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       const totalKgUsed = usages.reduce((s: number, u: any) => s + (parseFloat(u.kgUsed) || 0), 0);
 
       const [fCfgDR] = await db.select({ hideAvgCost: factorySettings.hideAvgCost }).from(factorySettings).where(eq(factorySettings.companyId, companyId)).limit(1);
-      const showCostDR = !fCfgDR?.hideAvgCost;
+      const userHideAllCostsDR = await getUserHideAllCosts(req);
+      const showCostDR = !fCfgDR?.hideAvgCost && !userHideAllCostsDR;
 
       if (format === "excel") {
         const ExcelJS = (await import("exceljs")).default;

@@ -15,6 +15,7 @@ import {
   factoryDaybookEntries,
   companies,
 } from "@shared/schema";
+import { getUserHideAllCosts } from "./factory/_helpers";
 
 export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: any) {
 
@@ -39,6 +40,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
 
   app.post("/api/factory/reports/supplier-usage", requireAuth, async (req: any, res: any) => {
     try {
+      const hideAllCosts = await getUserHideAllCosts(req);
       const { companyId, supplierId, startDate, endDate, format } = req.body;
 
       if (!companyId || !startDate || !endDate) {
