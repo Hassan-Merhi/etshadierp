@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 
-interface Worker { id: number; full_name: string; position: string; active: boolean; }
+interface Worker { id: number; fullName: string; position: string; active: boolean; }
 interface WorkerCategory { id: number; name: string; workerIds?: number[]; }
 interface PlanEntry { id?: number; workerId: number; workerName: string; role: string; targetBales: number; }
 interface PlanData { plan: { id: number; planDate: string; categoryIds: number[]; notes: string } | null; entries: PlanEntry[]; actuals: Record<number, number>; }
@@ -43,7 +43,7 @@ function WorkerCombobox({
 }) {
   const [open, setOpen] = useState(false);
   const selected = workers.find(w => w.id === value);
-  const displayName = selected?.full_name ?? (value ? `Worker #${value}` : "Select worker…");
+  const displayName = selected?.fullName ?? (value ? `Worker #${value}` : "Select worker…");
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -67,15 +67,15 @@ function WorkerCombobox({
               {workers.map(w => (
                 <CommandItem
                   key={w.id}
-                  value={w.full_name}
+                  value={w.fullName}
                   onSelect={() => {
-                    onChange(w.id, w.full_name);
+                    onChange(w.id, w.fullName);
                     setOpen(false);
                   }}
                 >
                   <Check className={cn("mr-2 h-4 w-4", w.id === value ? "opacity-100" : "opacity-0")} />
                   <span className={cn("truncate", !w.active && "text-muted-foreground")}>
-                    {w.full_name}
+                    {w.fullName}
                     {!w.active && <span className="ml-1 text-xs">(inactive)</span>}
                   </span>
                 </CommandItem>
@@ -182,7 +182,7 @@ export default function ProductionPlannerDialog() {
     const worker = available[0] ?? workers[0];
     setEntries(prev => [...prev, {
       workerId: worker.id,
-      workerName: worker.full_name,
+      workerName: worker.fullName,
       role: "WORKER",
       targetBales: 0,
       _key: `new-${Date.now()}`,
