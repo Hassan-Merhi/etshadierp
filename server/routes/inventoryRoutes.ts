@@ -14,7 +14,7 @@ import {
   insertLocationSchema, insertLedgerAccountSchema, updateLedgerAccountSchema,
   insertEmployeeSchema, insertEmployeeGroupSchema, insertSupplierSchema, insertCustomerSchema,
   userLocations, userCompanyRoles, companies, bankAccounts, fixedAssets,
-  agentAccounts, auditLog, users, FEATURE_KEYS,
+  agentAccounts, auditLog, users, FEATURE_KEYS, stockItemCodeAliases,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -382,6 +382,22 @@ export function registerInventoryRoutes(app: Express) {
 
             // If stock item doesn't exist, create it
             if (!stockItem) {
+              // ── Name-match check: if an existing item has the same name as the
+              //    uploaded barcode, register the barcode as an alias and reuse
+              //    that item instead of creating a duplicate. ──────────────────
+              const nameMatch = allStockItems.find(
+                (si) => si.name.trim().toLowerCase() === item.Item_barcode.trim().toLowerCase(),
+              );
+
+              if (nameMatch) {
+                // Add the new barcode as a code alias on the existing item
+                await db.insert(stockItemCodeAliases).values({
+                  stockItemId: nameMatch.id,
+                  aliasCode: item.Item_barcode.trim(),
+                  companyId: req.session.currentCompanyId!,
+                }).onConflictDoNothing();
+                stockItem = nameMatch;
+              } else {
               // Auto-detect stock group from item code prefix (first 2-3 uppercase letters)
               let stockGroupId: number | null = null;
 
@@ -440,6 +456,7 @@ export function registerInventoryRoutes(app: Express) {
 
               stockItem = newStockItem;
               allStockItems.push(newStockItem); // Add to cache for subsequent rows
+              } // end else (no name match → create new)
             }
 
             const quantity = parseFloat(item.quantity || "0");
