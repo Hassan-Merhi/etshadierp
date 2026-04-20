@@ -531,6 +531,16 @@ export function registerRentalRoutes(
       });
       tot.height = 18;
 
+      if (contract.statementNote) {
+        ws.addRow([]);
+        const nr = ws.addRow(["NOTE:", contract.statementNote, "", "", ""]);
+        ws.mergeCells(`B${nr.number}:E${nr.number}`);
+        nr.getCell(1).font = { bold: true, size: 10 };
+        nr.getCell(2).font = { italic: true, size: 10 };
+        nr.getCell(2).alignment = { wrapText: true, vertical: "top" };
+        nr.height = Math.max(18, Math.ceil(contract.statementNote.length / 60) * 15);
+      }
+
       if (payments.length > 0) {
         ws.addRow([]);
         const ph = ws.addRow(["PAYMENT HISTORY", "", "", "", ""]);
@@ -579,6 +589,25 @@ export function registerRentalRoutes(
       ));
       if (!contract) return res.status(404).json({ message: "Contract not found" });
       await db.update(propertyContracts).set({ notes: notes || null }).where(eq(propertyContracts.id, id));
+      res.json({ ok: true });
+    } catch (e: any) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // ── SAVE STATEMENT NOTE ──
+  app.patch(`${urlPrefix}/contracts/:id/statement-note`, requireAuth, async (req: Request, res: Response) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      const { statementNote } = z.object({ statementNote: z.string() }).parse(req.body);
+      const [contract] = await db.select().from(propertyContracts).where(and(
+        eq(propertyContracts.id, id), eq(propertyContracts.companyId, companyId), eq(propertyContracts.module, module),
+      ));
+      if (!contract) return res.status(404).json({ message: "Contract not found" });
+      await db.update(propertyContracts).set({ statementNote: statementNote || null }).where(eq(propertyContracts.id, id));
       res.json({ ok: true });
     } catch (e: any) {
       if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });

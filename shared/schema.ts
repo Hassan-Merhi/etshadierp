@@ -4258,6 +4258,7 @@ export const propertyContracts = pgTable("property_contracts", {
   endDate: date("end_date"),
   status: text("status").notNull().default("ACTIVE"), // 'ACTIVE' | 'ENDED'
   notes: text("notes"),
+  statementNote: text("statement_note"),
   guaranteePostedToStatement: boolean("guarantee_posted_to_statement").notNull().default(false),
   guaranteePostedAmount: decimal("guarantee_posted_amount", { precision: 20, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

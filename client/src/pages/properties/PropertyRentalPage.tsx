@@ -40,6 +40,7 @@ type Contract = {
   startDate: string;
   status: string;
   notes: string | null;
+  statementNote: string | null;
   guaranteePostedToStatement: boolean;
 };
 type CashAccount = { id: number; name: string; code: string; accountType: string };
@@ -454,7 +455,13 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
               <PaymentForm contract={contract} cashAccounts={cashAccounts} testIdPrefix={testIdPrefix} unitId={unit.id} />
             </TabsContent>
             <TabsContent value="ledger">
-              <LedgerView ledger={detail?.ledger ?? []} payments={detail?.payments ?? []} contract={contract} unitId={unit.id} />
+              <LedgerView
+                ledger={detail?.ledger ?? []}
+                payments={detail?.payments ?? []}
+                contract={contract}
+                unitId={unit.id}
+                onNoteUpdated={() => queryClient.invalidateQueries({ queryKey: [apiBase + "/units", unit.id, "detail"] })}
+              />
             </TabsContent>
             <TabsContent value="edit">
               <EditInfoForm contract={contract} testIdPrefix={testIdPrefix} unitId={unit.id} />
@@ -918,9 +925,21 @@ function EditInfoForm({ contract, testIdPrefix, unitId }: { contract: Contract; 
 // ──────────────────────────────────────────────────────────
 // LEDGER VIEW / STATEMENT
 // ──────────────────────────────────────────────────────────
-function LedgerView({ ledger, payments, contract, unitId }: { ledger: LedgerRow[]; payments: Payment[]; contract: Contract; unitId: number }) {
+function LedgerView({ ledger, payments, contract, unitId, onNoteUpdated }: { ledger: LedgerRow[]; payments: Payment[]; contract: Contract; unitId: number; onNoteUpdated?: () => void }) {
   const apiBase = useApiBase();
   const { toast } = useToast();
+  const [draftNote, setDraftNote] = useState(contract.statementNote ?? "");
+  const noteChanged = draftNote !== (contract.statementNote ?? "");
+
+  const saveNote = useMutation({
+    mutationFn: () => apiRequest("PATCH", `${apiBase}/contracts/${contract.id}/statement-note`, { statementNote: draftNote }),
+    onSuccess: () => {
+      toast({ title: "Note saved" });
+      onNoteUpdated?.();
+    },
+    onError: () => toast({ title: "Failed to save note", variant: "destructive" }),
+  });
+
   const now = new Date();
   const nowYear = now.getFullYear();
   const nowMonth = now.getMonth() + 1; // 1-based
@@ -996,6 +1015,10 @@ function LedgerView({ ledger, payments, contract, unitId }: { ledger: LedgerRow[
         <td></td>
       </tr></tbody>
     </table>
+    ${draftNote.trim() ? `<div style="margin:16px 0;padding:10px 14px;background:#f4f6fb;border:1px solid #dde3f0;border-radius:6px;font-size:11px;">
+      <div style="font-weight:700;color:#555;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;">Note</div>
+      <div style="white-space:pre-wrap;color:#111">${draftNote.trim().replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+    </div>` : ""}
     ${payments.length > 0 ? `<h2>Payment History</h2>
     <table><thead><tr><th>Date</th><th>For</th><th class="num">Amount</th><th>Notes</th></tr></thead>
     <tbody>${payRows}</tbody></table>` : ""}
@@ -1100,6 +1123,29 @@ function LedgerView({ ledger, payments, contract, unitId }: { ledger: LedgerRow[
           </table>
         </details>
       )}
+
+      {/* ── Statement note ── */}
+      <div className="border rounded-md p-3 space-y-2">
+        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Statement Note</div>
+        <Textarea
+          placeholder="Add a note that will appear on the printed statement and Excel export…"
+          value={draftNote}
+          onChange={e => setDraftNote(e.target.value)}
+          rows={3}
+          className="text-sm resize-none"
+          data-testid="textarea-statement-note"
+        />
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            onClick={() => saveNote.mutate()}
+            disabled={!noteChanged || saveNote.isPending}
+            data-testid="button-save-statement-note"
+          >
+            {saveNote.isPending ? "Saving…" : "Save Note"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
