@@ -1,7 +1,8 @@
 import { useState, lazy, Suspense } from "react";
+import * as XLSX from "xlsx";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Package, CheckCircle, PlayCircle, Link2, AlertTriangle, Pencil, Trash2 } from "lucide-react";
+import { Plus, Package, CheckCircle, PlayCircle, Link2, AlertTriangle, Pencil, Trash2, BarChart2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -159,6 +160,59 @@ export default function MixBatches() {
     }
   };
 
+  const handleExportReport = () => {
+    if (!batches || batches.length === 0) {
+      toast({ title: "No data to export" });
+      return;
+    }
+
+    // Unique batch names (columns), sorted
+    const batchNames = Array.from(
+      new Set(batches.map(b => (b.name || b.batchCode).toUpperCase()))
+    ).sort();
+
+    // Unique dates, sorted
+    const dates = Array.from(
+      new Set(batches.filter(b => b.batchDate).map(b => b.batchDate as string))
+    ).sort();
+
+    // Build date × name → kg map
+    const matrix: Record<string, Record<string, number>> = {};
+    for (const b of batches) {
+      if (!b.batchDate) continue;
+      const name = (b.name || b.batchCode).toUpperCase();
+      const kg = parseFloat(b.totalWeightKg || "0");
+      if (!matrix[b.batchDate]) matrix[b.batchDate] = {};
+      matrix[b.batchDate][name] = (matrix[b.batchDate][name] || 0) + kg;
+    }
+
+    // Build row data
+    const totals: Record<string, number> = {};
+    const rows: any[] = dates.map(date => {
+      const row: any = { DATE: date };
+      for (const name of batchNames) {
+        const val = matrix[date]?.[name] || 0;
+        row[name] = val > 0 ? val : "";
+        totals[name] = (totals[name] || 0) + val;
+      }
+      return row;
+    });
+
+    // Total row
+    const totalRow: any = { DATE: "TOTAL" };
+    for (const name of batchNames) {
+      totalRow[name] = totals[name] || "";
+    }
+    rows.push(totalRow);
+
+    const ws = XLSX.utils.json_to_sheet(rows, { header: ["DATE", ...batchNames] });
+    ws["!cols"] = [{ wch: 14 }, ...batchNames.map(() => ({ wch: 14 }))];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Mix Batches");
+    XLSX.writeFile(wb, `mix-batches-${new Date().toLocaleDateString("en-CA")}.xlsx`);
+  };
+
   if (selectedBatchId !== null) {
     return (
       <Suspense fallback={<div className="space-y-2"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>}>
@@ -181,6 +235,14 @@ export default function MixBatches() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleExportReport}
+            data-testid="button-report"
+          >
+            <BarChart2 className="h-4 w-4 mr-2" />
+            Report
+          </Button>
           <Button
             variant="outline"
             onClick={() => { setSourceBatchId(""); setSelectedBaleIds(new Set()); setAssignDialogOpen(true); }}
