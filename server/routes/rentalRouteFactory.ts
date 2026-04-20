@@ -831,8 +831,7 @@ export function registerRentalRoutes(
         eq(ledgerAccounts.active, true),
         isNull(ledgerAccounts.deletedAt),
       ));
-      res.json(accts.filter(a => a.accountType === "Cash" || a.accountType === "Bank")
-        .sort((a, b) => a.name.localeCompare(b.name)));
+      res.json(accts.sort((a, b) => a.name.localeCompare(b.name)));
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }

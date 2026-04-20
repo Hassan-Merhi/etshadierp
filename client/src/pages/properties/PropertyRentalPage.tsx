@@ -12,8 +12,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog } from "lucide-react";
+import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog, ChevronsUpDown } from "lucide-react";
 import { format } from "date-fns";
 
 // ── Types ──────────────────────────────────────────────────
@@ -525,6 +527,45 @@ function StartContractForm({ unitId, testIdPrefix, onClose }: { unitId: number; 
 }
 
 // ──────────────────────────────────────────────────────────
+// REUSABLE: ACCOUNT SEARCH SELECT
+// ──────────────────────────────────────────────────────────
+function AccountSearchSelect({ accounts, value, onChange, placeholder, testId }: {
+  accounts: CashAccount[]; value: string; onChange: (v: string) => void; placeholder?: string; testId?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = accounts.find(a => String(a.id) === value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="w-full justify-between font-normal" data-testid={testId}>
+          {selected ? (
+            <span className="truncate">{selected.name} <span className="text-xs text-muted-foreground">({selected.accountType})</span></span>
+          ) : (
+            <span className="text-muted-foreground">{placeholder ?? "Select account…"}</span>
+          )}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[320px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search accounts…" />
+          <CommandList>
+            <CommandEmpty>No accounts found.</CommandEmpty>
+            {accounts.map(a => (
+              <CommandItem key={a.id} value={`${a.name} ${a.accountType}`} onSelect={() => { onChange(String(a.id)); setOpen(false); }}>
+                <span className="flex-1 truncate">{a.name}</span>
+                <span className="text-xs text-muted-foreground ml-2">{a.accountType}</span>
+                {String(a.id) === value && <Check className="ml-2 h-4 w-4 shrink-0" />}
+              </CommandItem>
+            ))}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
 // TAB 1: PAYMENT
 // ──────────────────────────────────────────────────────────
 function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId }: { contract: Contract; cashAccounts: CashAccount[]; testIdPrefix: string; unitId: number }) {
@@ -560,15 +601,14 @@ function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId }: { contrac
     <div className="space-y-3 pt-3">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label>Cash Box</Label>
-          <Select value={form.cashAccountId} onValueChange={v => setForm(f => ({ ...f, cashAccountId: v }))}>
-            <SelectTrigger data-testid={`select-${testIdPrefix}-cash-box`}><SelectValue placeholder="Choose cash box…" /></SelectTrigger>
-            <SelectContent>
-              {cashAccounts.map(a => (
-                <SelectItem key={a.id} value={String(a.id)}>{a.name} <span className="text-xs text-muted-foreground">({a.accountType})</span></SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>Account</Label>
+          <AccountSearchSelect
+            accounts={cashAccounts}
+            value={form.cashAccountId}
+            onChange={v => setForm(f => ({ ...f, cashAccountId: v }))}
+            placeholder="Choose account…"
+            testId={`select-${testIdPrefix}-cash-box`}
+          />
         </div>
         <div>
           <Label>Payment Date</Label>
@@ -681,15 +721,14 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
         <Input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} data-testid={`input-${testIdPrefix}-guarantee-post`} />
       </div>
       <div>
-        <Label>Cash Box / Bank Account</Label>
-        <Select value={cashAccountId} onValueChange={setCashAccountId}>
-          <SelectTrigger data-testid={`select-${testIdPrefix}-guarantee-cash`}><SelectValue placeholder="Select where the deposit is held…" /></SelectTrigger>
-          <SelectContent>
-            {cashAccounts.map(a => (
-              <SelectItem key={a.id} value={String(a.id)}>{a.name} ({a.accountType})</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Label>Account (where deposit is held)</Label>
+        <AccountSearchSelect
+          accounts={cashAccounts}
+          value={cashAccountId}
+          onChange={setCashAccountId}
+          placeholder="Select account…"
+          testId={`select-${testIdPrefix}-guarantee-cash`}
+        />
         <p className="text-xs text-muted-foreground mt-1">If selected, a Receipt voucher (Dr Cash / Cr Tenant Deposits) will be posted into the main accounting ledger.</p>
       </div>
       <div>
