@@ -598,7 +598,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   const handleStockPrint = useReactToPrint({
     contentRef: stockPrintRef,
-    documentTitle: `Stock_${(activeLocation?.name || "Location").replace(/\s+/g, "_")}_${new Date().toLocaleDateString('en-CA')}`,
+    documentTitle: `STK_${(activeLocation?.name || "Location").replace(/\s+/g, "_")}_${new Date().toLocaleDateString('en-CA')}`,
   });
 
   // Save draft mutation
