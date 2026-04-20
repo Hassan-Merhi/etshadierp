@@ -1745,6 +1745,7 @@ export const customerBalances = pgTable("customer_balances", {
   balance: decimal("balance", { precision: 20, scale: 2 }).notNull(),
   currency: text("currency").notNull().default("USD"),
   description: text("description"),
+  rowNote: text("row_note"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   customerCompanyIdx: index("customer_balances_customer_company_idx").on(t.customerId, t.companyId),

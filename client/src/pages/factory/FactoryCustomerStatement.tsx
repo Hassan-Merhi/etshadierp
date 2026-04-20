@@ -53,6 +53,7 @@ interface BalanceEntry {
   containerNumber: string | null;
   runningBalance: number;
   runningBalanceSide: string;
+  rowNote: string | null;
 }
 
 interface StatementData {
@@ -82,16 +83,29 @@ export default function FactoryCustomerStatement() {
   const customerId = params.id;
   const [activeTab, setActiveTab] = useState<"invoices" | "statement">("invoices");
   const [draftNote, setDraftNote] = useState<string | null>(null); // null = not yet loaded
+  const [rowNotes, setRowNotes] = useState<Record<number, string>>({}); // per-entry draft notes
+  const [savingRowNote, setSavingRowNote] = useState<number | null>(null);
 
   const { data: statement, isLoading } = useQuery<StatementData>({
     queryKey: [`/api/factory/customers/${customerId}/statement`],
     enabled: !!customerId,
   });
 
-  // Initialise draft note once data loads
+  // Initialise draft note and row notes once data loads
   useEffect(() => {
     if (statement?.customer && draftNote === null) {
       setDraftNote(statement.customer.statementNote ?? "");
+    }
+    if (statement?.balanceHistory) {
+      setRowNotes((prev) => {
+        const next = { ...prev };
+        for (const entry of statement.balanceHistory) {
+          if (!(entry.id in next)) {
+            next[entry.id] = entry.rowNote ?? "";
+          }
+        }
+        return next;
+      });
     }
   }, [statement]);
 
@@ -107,6 +121,20 @@ export default function FactoryCustomerStatement() {
       toast({ title: "Failed to save note", variant: "destructive" });
     },
   });
+
+  const saveRowNote = async (entryId: number, note: string) => {
+    const original = statement?.balanceHistory.find((e) => e.id === entryId)?.rowNote ?? "";
+    if (note === original) return;
+    setSavingRowNote(entryId);
+    try {
+      await apiRequest("PATCH", `/api/factory/customers/${customerId}/balance/${entryId}/note`, { rowNote: note });
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customers/${customerId}/statement`] });
+    } catch {
+      toast({ title: "Failed to save row note", variant: "destructive" });
+    } finally {
+      setSavingRowNote(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -303,12 +331,13 @@ export default function FactoryCustomerStatement() {
                 <TableHead className="text-right">Credit</TableHead>
                 <TableHead className="text-right">Balance</TableHead>
                 <TableHead>Side</TableHead>
+                <TableHead className="min-w-[160px]">Note</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {balanceHistory.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8" data-testid="text-no-transactions">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8" data-testid="text-no-transactions">
                     No transactions yet
                   </TableCell>
                 </TableRow>
@@ -342,6 +371,18 @@ export default function FactoryCustomerStatement() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={`text-xs font-semibold ${drCrClass(entry.runningBalanceSide)}`}>{entry.runningBalanceSide}</Badge>
+                    </TableCell>
+                    <TableCell className="min-w-[160px]">
+                      <input
+                        type="text"
+                        value={rowNotes[entry.id] ?? ""}
+                        onChange={(e) => setRowNotes((prev) => ({ ...prev, [entry.id]: e.target.value }))}
+                        onBlur={() => saveRowNote(entry.id, rowNotes[entry.id] ?? "")}
+                        placeholder="Add note…"
+                        disabled={savingRowNote === entry.id}
+                        className="w-full text-xs bg-transparent border border-border rounded px-2 py-1 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                        data-testid={`input-row-note-${entry.id}`}
+                      />
                     </TableCell>
                   </TableRow>
                 ))

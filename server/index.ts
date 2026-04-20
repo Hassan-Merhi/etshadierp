@@ -1249,6 +1249,8 @@ let migrationsDone = false;
     `ALTER TABLE property_contracts ADD COLUMN IF NOT EXISTS statement_note TEXT`,
     // Free-form note shown on factory customer statement PDF/Excel
     `ALTER TABLE customers ADD COLUMN IF NOT EXISTS statement_note TEXT`,
+    // Per-row note on each transaction in the customer balance/statement
+    `ALTER TABLE customer_balances ADD COLUMN IF NOT EXISTS row_note TEXT`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

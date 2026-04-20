@@ -511,6 +511,26 @@ export function registerFactoryCustomersRoutes(app: Express) {
     }
   });
 
+  // ── Save Row Note on a balance entry ────────────────────────────────────
+  app.patch("/api/factory/customers/:customerId/balance/:entryId/note", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const customerId = parseInt(req.params.customerId);
+      const entryId = parseInt(req.params.entryId);
+      if (isNaN(customerId) || isNaN(entryId)) return res.status(400).json({ message: "Invalid IDs" });
+      const { rowNote } = req.body;
+      if (typeof rowNote !== "string") return res.status(400).json({ message: "rowNote must be a string" });
+      const [entry] = await db.select().from(customerBalances)
+        .where(and(eq(customerBalances.id, entryId), eq(customerBalances.customerId, customerId), eq(customerBalances.companyId, companyId)));
+      if (!entry) return res.status(404).json({ message: "Entry not found" });
+      await db.update(customerBalances).set({ rowNote: rowNote || null }).where(eq(customerBalances.id, entryId));
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ── Customer Statement: PDF Export ──────────────────────────────────────
   app.get("/api/factory/customers/:id/statement/export-pdf", requireAuth, async (req: any, res: any) => {
     try {
@@ -699,8 +719,9 @@ export function registerFactoryCustomersRoutes(app: Express) {
       let y = tableTop + 16;
 
       rows.forEach((row: any, idx: number) => {
+        const rowH = row.rowNote ? 21 : 13;
         if (y > 760) { doc.addPage(); y = 40; }
-        if (idx % 2 === 1) { doc.rect(40, y, 515, 13).fill("#F8F8F8"); doc.fillColor("#000000"); }
+        if (idx % 2 === 1) { doc.rect(40, y, 515, rowH).fill("#F8F8F8"); doc.fillColor("#000000"); }
         doc.font("Helvetica").fontSize(8);
         doc.text(fmtDate(row.transactionDate), colX[0] + 2, y + 3, { width: colW[0] - 4 });
         doc.text(txLabel(row.transactionType), colX[1] + 2, y + 3, { width: colW[1] - 4 });
@@ -708,7 +729,12 @@ export function registerFactoryCustomersRoutes(app: Express) {
         doc.font("Helvetica").fontSize(8);
         if (row.debit > 0) doc.text(fmtAmt(row.debit), colX[3] + 2, y + 3, { width: colW[3] - 4, align: "right" });
         if (row.credit > 0) doc.text(fmtAmt(row.credit), colX[4] + 2, y + 3, { width: colW[4] - 4, align: "right" });
-        y += 13;
+        if (row.rowNote) {
+          doc.fillColor("#555555").font("Helvetica-Oblique").fontSize(6.5)
+            .text(`↳ ${row.rowNote}`, colX[2] + 4, y + 13, { width: colW[2] + colW[3] + colW[4] - 8 });
+          doc.fillColor("#000000");
+        }
+        y += rowH;
       });
 
       // Separator
@@ -849,6 +875,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
         { key: "desc",  width: 36 },
         { key: "dr",    width: 16 },
         { key: "cr",    width: 16 },
+        { key: "note",  width: 30 },
       ];
 
       // Rows 1–5+: Customer info block with HMD branding
@@ -859,26 +886,26 @@ export function registerFactoryCustomersRoutes(app: Express) {
           const slId = workbook.addImage({ buffer: slBuf as Buffer, extension: "jpeg" });
           const slRow = sheet.addRow([]); slRow.height = 90;
           sheet.addImage(slId, { tl: { col: 1.9, row: 0 }, ext: { width: 300, height: 90 } });
-          sheet.mergeCells(`A1:E1`);
+          sheet.mergeCells(`A1:F1`);
         }
       } catch {}
       const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
       r1.getCell(1).font = { bold: true, size: 14, color: { argb: "FF1F3864" } };
-      sheet.mergeCells(`A${r1.number}:E${r1.number}`);
+      sheet.mergeCells(`A${r1.number}:F${r1.number}`);
       const r2 = sheet.addRow(["Account Statement"]);
       r2.getCell(1).font = { bold: true, size: 11 };
-      sheet.mergeCells(`A${r2.number}:E${r2.number}`);
+      sheet.mergeCells(`A${r2.number}:F${r2.number}`);
       const r3 = sheet.addRow([`Customer: ${customer.legalName}   |   Code: ${customer.code || "—"}   |   Phone: ${customer.phone || "—"}`]);
-      sheet.mergeCells(`A${r3.number}:E${r3.number}`);
+      sheet.mergeCells(`A${r3.number}:F${r3.number}`);
       const r4 = sheet.addRow([`Opening Balance: ${openingBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${openingSide}`]);
-      sheet.mergeCells(`A${r4.number}:E${r4.number}`);
+      sheet.mergeCells(`A${r4.number}:F${r4.number}`);
       const r5 = sheet.addRow([`Printed: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`]);
-      sheet.mergeCells(`A${r5.number}:E${r5.number}`);
+      sheet.mergeCells(`A${r5.number}:F${r5.number}`);
       // spacer
       sheet.addRow([]);
 
       // Column headers
-      const hdrRow = sheet.addRow(["Date", "Type", "Description", "Debit (Dr)", "Credit (Cr)"]);
+      const hdrRow = sheet.addRow(["Date", "Type", "Description", "Debit (Dr)", "Credit (Cr)", "Note"]);
       hdrRow.eachCell((cell) => {
         cell.fill = navyFill;
         cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
@@ -910,7 +937,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
         const dateVal = row.transactionDate
           ? new Date(row.transactionDate + "T00:00:00")
           : "";
-        const dr2 = sheet.addRow([dateVal, txLabel(row.transactionType), row.description || "—", dr, cr]);
+        const dr2 = sheet.addRow([dateVal, txLabel(row.transactionType), row.description || "—", dr, cr, row.rowNote || ""]);
         dr2.eachCell((cell) => { cell.border = allBorders; });
         if (idx % 2 === 0) {
           dr2.eachCell((cell) => { cell.fill = greyFill; });
@@ -920,10 +947,12 @@ export function registerFactoryCustomersRoutes(app: Express) {
         dr2.getCell(5).numFmt = numFmt;
         dr2.getCell(4).alignment = { horizontal: "right" };
         dr2.getCell(5).alignment = { horizontal: "right" };
+        dr2.getCell(6).alignment = { wrapText: true, vertical: "top" };
+        if (row.rowNote) dr2.height = Math.max(18, Math.ceil(row.rowNote.length / 30) * 15);
       });
 
       // Totals row
-      const totRow = sheet.addRow(["", "", "TOTAL", totalDr, totalCr]);
+      const totRow = sheet.addRow(["", "", "TOTAL", totalDr, totalCr, ""]);
       totRow.eachCell((cell) => {
         cell.fill = navyFill;
         cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
@@ -937,7 +966,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
       // Closing balance row
       const closingDr = closingBalanceSide === "Dr" ? closingBalance : null;
       const closingCr = closingBalanceSide === "Cr" ? closingBalance : null;
-      const cbRow = sheet.addRow(["", "", "Closing Balance", closingDr, closingCr]);
+      const cbRow = sheet.addRow(["", "", "Closing Balance", closingDr, closingCr, ""]);
       cbRow.eachCell((cell) => {
         cell.fill = lightBlueFill;
         cell.font = { bold: true };
