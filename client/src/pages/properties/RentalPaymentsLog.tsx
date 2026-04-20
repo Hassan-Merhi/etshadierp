@@ -1,10 +1,23 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ClipboardList, Search } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ClipboardList, Search, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -42,16 +55,33 @@ export default function RentalPaymentsLog({
   apiBase = "/api/properties/rental",
 }: Props) {
   const { selectedCompany } = useCompany();
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<PaymentRow | null>(null);
+
+  const queryKey = [apiBase + "/payments", selectedCompany?.id];
 
   const { data: payments = [], isLoading } = useQuery<PaymentRow[]>({
-    queryKey: [apiBase + "/payments", selectedCompany?.id],
+    queryKey,
     queryFn: async () => {
       const res = await fetch(`${apiBase}/payments`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load payments");
       return res.json();
     },
     enabled: !!selectedCompany,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `${apiBase}/payments/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      toast({ title: "Payment deleted", description: "The payment and its accounting entry have been removed." });
+      setDeleteTarget(null);
+    },
+    onError: (e: any) => {
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+      setDeleteTarget(null);
+    },
   });
 
   const filtered = useMemo(() => {
@@ -129,6 +159,7 @@ export default function RentalPaymentsLog({
                     <th className="text-right px-3 py-2 font-semibold">Amount</th>
                     <th className="text-left px-3 py-2 font-semibold">For Month</th>
                     <th className="text-left px-3 py-2 font-semibold">Notes</th>
+                    <th className="w-10"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -151,6 +182,16 @@ export default function RentalPaymentsLog({
                         {MONTH_NAMES[p.forMonth]} {p.forYear}
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{p.notes ?? ""}</td>
+                      <td className="px-2 py-1 text-right">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setDeleteTarget(p)}
+                          data-testid={`button-delete-payment-${p.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -160,7 +201,7 @@ export default function RentalPaymentsLog({
                     <td className="px-3 py-2 text-right tabular-nums font-bold text-green-700 dark:text-green-400">
                       ${fmtMoney(total)}
                     </td>
-                    <td colSpan={2}></td>
+                    <td colSpan={3}></td>
                   </tr>
                 </tfoot>
               </table>
@@ -168,6 +209,35 @@ export default function RentalPaymentsLog({
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this payment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget && (
+                <>
+                  This will permanently remove the <strong>${fmtMoney(deleteTarget.amount)}</strong> payment
+                  from <strong>{deleteTarget.tenantName ?? "—"}</strong>{" "}
+                  ({MONTH_NAMES[deleteTarget.forMonth]} {deleteTarget.forYear}) and reverse its accounting entry.
+                  This cannot be undone.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground"
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              data-testid="button-confirm-delete-payment"
+            >
+              {deleteMutation.isPending ? "Deleting…" : "Yes, Delete Payment"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

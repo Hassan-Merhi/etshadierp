@@ -732,6 +732,49 @@ export function registerRentalRoutes(
     }
   });
 
+  // ── DELETE PAYMENT (full reversal) ──
+  app.delete(`${urlPrefix}/payments/:id`, requireAuth, async (req: Request, res: Response) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const paymentId = parseInt(req.params.id);
+      if (isNaN(paymentId)) return res.status(400).json({ message: "Invalid payment id" });
+
+      const [payment] = await db.select().from(propertyPayments).where(and(
+        eq(propertyPayments.id, paymentId),
+        eq(propertyPayments.companyId, companyId),
+        eq(propertyPayments.module, module),
+      ));
+      if (!payment) return res.status(404).json({ message: "Payment not found" });
+
+      await db.transaction(async tx => {
+        // 1. Reverse the monthly ledger paid_amount
+        if (payment.ledgerRowId) {
+          await tx.execute(sql`
+            UPDATE property_monthly_ledger
+            SET paid_amount = GREATEST(0, paid_amount - ${payment.amount}::numeric)
+            WHERE id = ${payment.ledgerRowId}
+          `);
+        }
+
+        // 2. Soft-delete the linked voucher (and its entries stay for audit)
+        if (payment.voucherId) {
+          await tx.execute(sql`
+            UPDATE vouchers SET deleted_at = NOW() WHERE id = ${payment.voucherId}
+          `);
+        }
+
+        // 3. Delete the payment row itself
+        await tx.delete(propertyPayments).where(eq(propertyPayments.id, paymentId));
+      });
+
+      res.json({ ok: true });
+    } catch (e: any) {
+      console.error(`${tag} delete-payment:`, e);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // ── UNIT DETAIL (ledger view) ──
   app.get(`${urlPrefix}/units/:id/detail`, requireAuth, async (req: Request, res: Response) => {
     try {
