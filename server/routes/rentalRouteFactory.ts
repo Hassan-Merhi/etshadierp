@@ -187,6 +187,7 @@ export function registerRentalRoutes(
   module: RentalModule,
   urlPrefix: string,
   incomeAccountName: string,
+  shopExpenseAccountName: string = "Rent Expense - Shops",
 ) {
   const tag = `[${module}/rental]`;
 
@@ -690,19 +691,38 @@ export function registerRentalRoutes(
 
         let voucherId: number | null = null;
         if (data.cashAccountId) {
-          const incomeAccountId = await findOrCreateLedgerAccount(tx, companyId, incomeAccountName, "Income", "RENT-INC");
+          const isShop = unit?.unitType === "SHOP";
           const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
-          const narration = `Rent received - ${unitLabel} - ${String(m).padStart(2, "0")}/${y}`;
-          const [v] = await tx.insert(vouchers).values({
-            companyId, voucherNumber: `RENT-${Date.now()}-${contract.id}`,
-            voucherType: "Receipt", voucherDate: data.paymentDate as any,
-            description: narration, totalAmount: data.amount, currency: "USD", sourceModule: "ERP",
-          }).returning();
-          voucherId = v.id;
-          await tx.insert(voucherEntries).values([
-            { voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: data.amount, creditAmount: "0", narration },
-            { voucherId: v.id, ledgerAccountId: incomeAccountId, debitAmount: "0", creditAmount: data.amount, narration },
-          ]);
+
+          if (isShop) {
+            // SHOP rentals: company is paying rent OUT → Payment voucher (DR Expense / CR Cash)
+            const expenseAccountId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Expense", "SHOP-RENT-EXP");
+            const narration = `Rent paid - ${unitLabel} - ${String(m).padStart(2, "0")}/${y}`;
+            const [v] = await tx.insert(vouchers).values({
+              companyId, voucherNumber: `RENT-${Date.now()}-${contract.id}`,
+              voucherType: "Payment", voucherDate: data.paymentDate as any,
+              description: narration, totalAmount: data.amount, currency: "USD", sourceModule: "ERP",
+            }).returning();
+            voucherId = v.id;
+            await tx.insert(voucherEntries).values([
+              { voucherId: v.id, ledgerAccountId: expenseAccountId, debitAmount: data.amount, creditAmount: "0", narration },
+              { voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: "0", creditAmount: data.amount, narration },
+            ]);
+          } else {
+            // WAREHOUSE/other rentals: company is receiving rent IN → Receipt voucher (DR Cash / CR Income)
+            const incomeAccountId = await findOrCreateLedgerAccount(tx, companyId, incomeAccountName, "Income", "RENT-INC");
+            const narration = `Rent received - ${unitLabel} - ${String(m).padStart(2, "0")}/${y}`;
+            const [v] = await tx.insert(vouchers).values({
+              companyId, voucherNumber: `RENT-${Date.now()}-${contract.id}`,
+              voucherType: "Receipt", voucherDate: data.paymentDate as any,
+              description: narration, totalAmount: data.amount, currency: "USD", sourceModule: "ERP",
+            }).returning();
+            voucherId = v.id;
+            await tx.insert(voucherEntries).values([
+              { voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: data.amount, creditAmount: "0", narration },
+              { voucherId: v.id, ledgerAccountId: incomeAccountId, debitAmount: "0", creditAmount: data.amount, narration },
+            ]);
+          }
         }
 
         const [created] = await tx.insert(propertyPayments).values({
