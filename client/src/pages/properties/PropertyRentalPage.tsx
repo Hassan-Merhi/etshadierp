@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog, ChevronsUpDown } from "lucide-react";
+import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog, ChevronsUpDown, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 // ── Types ──────────────────────────────────────────────────
@@ -153,6 +153,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
   const { toast } = useToast();
   const [openUnitId, setOpenUnitId] = useState<number | null>(null);
   const [createUnitOpen, setCreateUnitOpen] = useState(false);
+  const [confirmDeleteUnitId, setConfirmDeleteUnitId] = useState<number | null>(null);
 
   const { data: units = [], isLoading } = useQuery<Unit[]>({
     queryKey: [apiBase + "/units", { unitType, companyId: selectedCompany?.id }],
@@ -203,7 +204,21 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
     },
   });
 
+  const deleteUnit = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `${apiBase}/units/${id}`),
+    onSuccess: () => {
+      toast({ title: "Unit deleted" });
+      queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
+      setConfirmDeleteUnitId(null);
+    },
+    onError: (e: any) => {
+      toast({ title: "Cannot delete", description: e.message, variant: "destructive" });
+      setConfirmDeleteUnitId(null);
+    },
+  });
+
   const openUnit = units.find(u => u.id === openUnitId) ?? null;
+  const confirmDeleteUnit = confirmDeleteUnitId ? units.find(u => u.id === confirmDeleteUnitId) ?? null : null;
 
   return (
     <ApiBaseCtx.Provider value={apiBase}>
@@ -315,8 +330,19 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                             <td className="px-3 py-2 text-xs text-muted-foreground">
                               {u.contract ? format(new Date(u.contract.startDate), "dd MMM yyyy") : "—"}
                             </td>
-                            <td className="px-2 py-2 text-right">
-                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            <td className="px-2 py-2 text-right" onClick={e => e.stopPropagation()}>
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="text-muted-foreground hover:text-destructive"
+                                  onClick={e => { e.stopPropagation(); setConfirmDeleteUnitId(u.id); }}
+                                  data-testid={`button-delete-unit-${u.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -345,6 +371,34 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
             onClose={() => setCreateUnitOpen(false)}
             testIdPrefix={testIdPrefix}
           />
+        )}
+
+        {/* Confirm delete unit dialog */}
+        {confirmDeleteUnit && (
+          <Dialog open onOpenChange={(o) => !o && setConfirmDeleteUnitId(null)}>
+            <DialogContent data-testid={`dialog-${testIdPrefix}-confirm-delete`}>
+              <DialogHeader>
+                <DialogTitle>Delete Unit {confirmDeleteUnit.unitNumber}?</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                This will permanently remove unit <span className="font-semibold text-foreground">{confirmDeleteUnit.unitNumber}</span> from the list.
+                {confirmDeleteUnit.contract
+                  ? <span className="block mt-1 text-destructive font-medium">This unit has an active contract — end it first before deleting.</span>
+                  : <span className="block mt-1">The unit is currently vacant and can be safely deleted.</span>}
+              </p>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setConfirmDeleteUnitId(null)}>Cancel</Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => deleteUnit.mutate(confirmDeleteUnit.id)}
+                  disabled={deleteUnit.isPending || !!confirmDeleteUnit.contract}
+                  data-testid={`button-${testIdPrefix}-confirm-delete-submit`}
+                >
+                  {deleteUnit.isPending ? "Deleting…" : "Delete Unit"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
     </ApiBaseCtx.Provider>
