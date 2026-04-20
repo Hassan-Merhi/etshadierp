@@ -1213,6 +1213,7 @@ export const interCompanyTransfers = pgTable("inter_company_transfers", {
   fromVoucherId: integer("from_voucher_id"),
   toVoucherId: integer("to_voucher_id"),
   description: text("description"),
+  sourcePaymentId: integer("source_payment_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

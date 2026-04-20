@@ -1243,6 +1243,8 @@ let migrationsDone = false;
     // Dropped unique index so multiple rules per company+module are supported
     `DROP INDEX IF EXISTS rental_auto_transfer_unique`,
     `ALTER TABLE rental_auto_transfer_configs ADD COLUMN IF NOT EXISTS source_cash_account_ids INTEGER[] NOT NULL DEFAULT '{}'`,
+    // Link auto-transfers back to their originating payment for cascade reversal
+    `ALTER TABLE inter_company_transfers ADD COLUMN IF NOT EXISTS source_payment_id INTEGER`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

@@ -55,6 +55,7 @@ async function maybeRunAutoTransfer(
   amount: string,
   transferDate: string,
   unitLabel: string,
+  sourcePaymentId?: number,
 ) {
   try {
     // Fetch ALL active rules for this company+module
@@ -119,7 +120,7 @@ async function maybeRunAutoTransfer(
         { voucherId: toVoucher.id, ledgerAccountId: toClearing.id,           debitAmount: "0",   creditAmount: amount, narration: `Transfer in from ${fromCompany.name}` },
       ]);
 
-      // Record link
+      // Record link (sourcePaymentId links this transfer back to the originating payment)
       await db.insert(interCompanyTransfers).values({
         transferType: "Cash",
         fromCompanyId: companyId, toCompanyId: cfg.destCompanyId,
@@ -127,6 +128,7 @@ async function maybeRunAutoTransfer(
         fromLedgerAccountId, toLedgerAccountId: cfg.destLedgerAccountId,
         fromVoucherId: fromVoucher.id, toVoucherId: toVoucher.id,
         description: desc,
+        sourcePaymentId: sourcePaymentId ?? null,
       });
     }
   } catch (err) {
@@ -792,7 +794,7 @@ export function registerRentalRoutes(
       // Fire auto-transfer if configured (outside transaction — best-effort)
       if (data.cashAccountId) {
         const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
-        await maybeRunAutoTransfer(companyId, module, data.cashAccountId, data.amount, data.paymentDate, unitLabel);
+        await maybeRunAutoTransfer(companyId, module, data.cashAccountId, data.amount, data.paymentDate, unitLabel, payment.id);
       }
 
       res.json(payment);
@@ -828,14 +830,34 @@ export function registerRentalRoutes(
           `);
         }
 
-        // 2. Soft-delete the linked voucher (and its entries stay for audit)
+        // 2. Soft-delete the linked payment voucher (entries stay for audit)
         if (payment.voucherId) {
           await tx.execute(sql`
             UPDATE vouchers SET deleted_at = NOW() WHERE id = ${payment.voucherId}
           `);
         }
 
-        // 3. Delete the payment row itself
+        // 3. Reverse any auto-transfers that were created for this payment
+        const linkedTransfers = await tx
+          .select()
+          .from(interCompanyTransfers)
+          .where(eq(interCompanyTransfers.sourcePaymentId, paymentId));
+
+        for (const transfer of linkedTransfers) {
+          if (transfer.fromVoucherId) {
+            await tx.execute(sql`
+              UPDATE vouchers SET deleted_at = NOW() WHERE id = ${transfer.fromVoucherId}
+            `);
+          }
+          if (transfer.toVoucherId) {
+            await tx.execute(sql`
+              UPDATE vouchers SET deleted_at = NOW() WHERE id = ${transfer.toVoucherId}
+            `);
+          }
+          await tx.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, transfer.id));
+        }
+
+        // 4. Delete the payment row itself
         await tx.delete(propertyPayments).where(eq(propertyPayments.id, paymentId));
       });
 
