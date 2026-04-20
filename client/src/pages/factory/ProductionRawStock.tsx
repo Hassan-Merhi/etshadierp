@@ -1530,6 +1530,9 @@ export default function ProductionRawStock() {
                     const groupTotalReceived = groupRows.reduce((s, r) => s + parseFloat(r.receivedKg), 0);
                     const groupTotalFree = groupRows.reduce((s, r) => s + parseFloat(r.freeKg || "0"), 0);
                     const groupTotalValue = groupRows.reduce((s, r) => s + parseFloat(r.valueRemainingUsd || r.valueRemaining), 0);
+                    const groupAvgCost = groupTotalFree > 0.001
+                      ? groupTotalValue / groupTotalFree
+                      : groupTotalReceived > 0.001 ? groupTotalValue / groupTotalReceived : null;
                     const toggleGroup = () => setCollapsedCategories(prev => {
                       const next = new Set(prev);
                       if (next.has(groupKey)) next.delete(groupKey); else next.add(groupKey);
@@ -1567,7 +1570,9 @@ export default function ProductionRawStock() {
                         <TableCell className={`text-right font-mono text-sm py-2 font-medium ${groupTotalFree > 0.001 ? "text-green-600 dark:text-green-400" : "text-muted-foreground/50"}`}>
                           {groupTotalFree > 0.001 ? formatNumber(groupTotalFree) : "—"}
                         </TableCell>
-                        <TableCell className="py-2" />
+                        <TableCell className="text-right font-mono text-sm py-2 text-muted-foreground">
+                          {groupAvgCost != null ? `$${groupAvgCost.toFixed(4)}` : "—"}
+                        </TableCell>
                         <TableCell className="text-right font-mono text-sm py-2 font-medium">
                           ${formatNumber(groupTotalValue)}
                         </TableCell>
