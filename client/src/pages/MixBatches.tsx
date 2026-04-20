@@ -230,7 +230,6 @@ export default function MixBatches() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead className="text-right">Total (kg)</TableHead>
-                  <TableHead className="text-right">Remaining (kg)</TableHead>
                   <TableHead className="text-right">Cost/kg</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
@@ -253,9 +252,6 @@ export default function MixBatches() {
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatNumber(total)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatNumber(remaining)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         ${parseFloat(batch.costPerKg).toFixed(4)}
