@@ -2407,6 +2407,7 @@ export const factoryContainers = pgTable("factory_containers", {
   ratePerKgUsd: decimal("rate_per_kg_usd", { precision: 20, scale: 4 }),
   finalPayableAmountUsd: decimal("final_payable_amount_usd", { precision: 20, scale: 4 }),
   arrivalDate: date("arrival_date"),
+  destination: text("destination"),
   notes: text("notes"),
   status: text("status").notNull().default("PENDING"),
   freight: decimal("freight", { precision: 20, scale: 2 }).default("0"),

@@ -1251,6 +1251,8 @@ let migrationsDone = false;
     `ALTER TABLE customers ADD COLUMN IF NOT EXISTS statement_note TEXT`,
     // Per-row note on each transaction in the customer balance/statement
     `ALTER TABLE customer_balances ADD COLUMN IF NOT EXISTS row_note TEXT`,
+    // Destination field on incoming containers (where the goods are going/warehouse)
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS destination TEXT`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

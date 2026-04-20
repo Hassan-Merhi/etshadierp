@@ -555,6 +555,7 @@ export default function ProductionRawStock() {
   const { formatDisplayDate } = useDateFormat();
   const [offloadDialogOpen, setOffloadDialogOpen] = useState(false);
   const [offloadDate, setOffloadDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
+  const [offloadDestination, setOffloadDestination] = useState("");
   const [selectedContainerId, setSelectedContainerId] = useState("");
   const [actualReceivedKg, setActualReceivedKg] = useState("");
   const [costPerKg, setCostPerKg] = useState("");
@@ -1184,6 +1185,7 @@ export default function ProductionRawStock() {
     const payload: any = {
       containerId: selectedContainerId,
       offloadDate,
+      destination: offloadDestination.trim() || null,
       receivedKg: actualReceivedKg,
       costPerKg,
       currencyCode,
@@ -1245,6 +1247,7 @@ export default function ProductionRawStock() {
   const handleCloseDialog = () => {
     setOffloadDialogOpen(false);
     setOffloadDate(new Date().toLocaleDateString('en-CA'));
+    setOffloadDestination("");
     setSelectedContainerId("");
     setActualReceivedKg("");
     setCostPerKg("");
@@ -2286,6 +2289,15 @@ export default function ProductionRawStock() {
                   value={offloadDate}
                   onChange={(e) => setOffloadDate(e.target.value)}
                   data-testid="input-offload-date"
+                />
+              </div>
+              <div className="space-y-1 col-span-2">
+                <Label>Destination <span className="text-muted-foreground text-xs font-normal">(optional — e.g. Beirut Factory, Cyprus Warehouse)</span></Label>
+                <Input
+                  value={offloadDestination}
+                  onChange={(e) => setOffloadDestination(e.target.value)}
+                  placeholder="e.g. Beirut Factory"
+                  data-testid="input-offload-destination"
                 />
               </div>
               <div className="space-y-1">

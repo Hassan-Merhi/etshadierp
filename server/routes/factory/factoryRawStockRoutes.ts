@@ -1140,6 +1140,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
         additionalCharges: reqAdditionalCharges,
         offloadDate: reqOffloadDate,
         mixBatchAllocations: reqMixBatchAllocations,
+        destination: reqDestination,
       } = req.body;
       if (!containerId) return res.status(400).json({ message: "Container ID is required" });
 
@@ -1354,6 +1355,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
             preOffloadOtherCharges: container.otherCharges || "0",
             preOffloadOtherChargesAccountId: (container as any).otherChargesAccountId || null,
             preOffloadOtherChargesSupplierId: (container as any).otherChargesSupplierId || null,
+            destination: reqDestination ? String(reqDestination).trim() : (container.destination || null),
             updatedAt: new Date(),
           })
           .where(eq(factoryContainers.id, containerId));
