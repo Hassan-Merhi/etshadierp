@@ -921,19 +921,29 @@ function EditInfoForm({ contract, testIdPrefix, unitId }: { contract: Contract; 
 function LedgerView({ ledger, payments, contract, unitId }: { ledger: LedgerRow[]; payments: Payment[]; contract: Contract; unitId: number }) {
   const apiBase = useApiBase();
   const { toast } = useToast();
-  const totalExpected = ledger.reduce((s, r) => s + Number(r.expectedAmount), 0);
+  const now = new Date();
+  const nowYear = now.getFullYear();
+  const nowMonth = now.getMonth() + 1; // 1-based
+  // Only count expected amounts for months up to the current calendar month.
+  // All paid amounts are counted so advance payments show as credit (negative balance).
+  const totalExpected = ledger.reduce((s, r) => {
+    const isFuture = r.year > nowYear || (r.year === nowYear && r.month > nowMonth);
+    return s + (isFuture ? 0 : Number(r.expectedAmount));
+  }, 0);
   const totalPaid = ledger.reduce((s, r) => s + Number(r.paidAmount), 0);
   const balance = totalExpected - totalPaid;
 
   const handlePrint = () => {
     const rows = ledger.map(r => {
-      const out = Number(r.expectedAmount) - Number(r.paidAmount);
+      const isFutureRow = r.year > nowYear || (r.year === nowYear && r.month > nowMonth);
+      const out = isFutureRow ? 0 - Number(r.paidAmount) : Number(r.expectedAmount) - Number(r.paidAmount);
       const outColor = out > 0 ? "#cc0000" : out < 0 ? "#006600" : "#888888";
+      const expDisplay = isFutureRow ? "—" : `$${fmtMoney(r.expectedAmount)}`;
       return `<tr>
-        <td>${MONTH_NAMES[r.month]} ${r.year}</td>
-        <td class="num">$${fmtMoney(r.expectedAmount)}</td>
+        <td>${MONTH_NAMES[r.month]} ${r.year}${isFutureRow ? " <em style='color:#888;font-size:9px'>prepaid</em>" : ""}</td>
+        <td class="num">${expDisplay}</td>
         <td class="num">$${fmtMoney(r.paidAmount)}</td>
-        <td class="num" style="color:${outColor};font-weight:600">$${fmtMoney(out)}</td>
+        <td class="num" style="color:${outColor};font-weight:600">$${fmtMoney(Math.abs(out))}${out < 0 ? " CR" : ""}</td>
         <td class="note">${r.notes || ""}</td>
       </tr>`;
     }).join("");
@@ -1011,7 +1021,9 @@ function LedgerView({ ledger, payments, contract, unitId }: { ledger: LedgerRow[
           <div className="bg-muted/40 rounded p-2"><div className="text-xs text-muted-foreground">Monthly Rent</div><div className="font-semibold">${fmtMoney(contract.rentalAmount)}</div></div>
           <div className="bg-muted/40 rounded p-2">
             <div className="text-xs text-muted-foreground">Balance</div>
-            <div className={`font-bold ${balance > 0 ? "text-red-600 dark:text-red-400" : balance < 0 ? "text-green-600 dark:text-green-400" : ""}`}>${fmtMoney(balance)}</div>
+            <div className={`font-bold ${balance > 0 ? "text-red-600 dark:text-red-400" : balance < 0 ? "text-green-600 dark:text-green-400" : ""}`}>
+              {balance < 0 ? `$${fmtMoney(Math.abs(balance))} CR` : `$${fmtMoney(balance)}`}
+            </div>
           </div>
         </div>
         <div className="flex gap-2 shrink-0">
@@ -1036,22 +1048,35 @@ function LedgerView({ ledger, payments, contract, unitId }: { ledger: LedgerRow[
           </thead>
           <tbody>
             {ledger.map(r => {
-              const out = Number(r.expectedAmount) - Number(r.paidAmount);
+              const isFutureRow = r.year > nowYear || (r.year === nowYear && r.month > nowMonth);
+              // For future months: expected counts as 0 (not yet due), paid is a credit
+              const out = isFutureRow
+                ? 0 - Number(r.paidAmount)   // negative = credit
+                : Number(r.expectedAmount) - Number(r.paidAmount);
               return (
                 <tr key={r.id} className="border-t" data-testid={`row-ledger-${r.year}-${r.month}`}>
-                  <td className="px-3 py-1.5">{MONTH_NAMES[r.month]} {r.year}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums">${fmtMoney(r.expectedAmount)}</td>
+                  <td className="px-3 py-1.5">
+                    {MONTH_NAMES[r.month]} {r.year}
+                    {isFutureRow && <span className="ml-1.5 text-[10px] text-muted-foreground italic">prepaid</span>}
+                  </td>
+                  <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                    {isFutureRow ? "—" : `$${fmtMoney(r.expectedAmount)}`}
+                  </td>
                   <td className="px-3 py-1.5 text-right tabular-nums">${fmtMoney(r.paidAmount)}</td>
-                  <td className={`px-3 py-1.5 text-right tabular-nums font-semibold ${out > 0 ? "text-red-600 dark:text-red-400" : out < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>${fmtMoney(out)}</td>
+                  <td className={`px-3 py-1.5 text-right tabular-nums font-semibold ${out > 0 ? "text-red-600 dark:text-red-400" : out < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                    {out < 0 ? `$${fmtMoney(Math.abs(out))} CR` : `$${fmtMoney(out)}`}
+                  </td>
                   <td className="px-3 py-1.5 text-xs text-muted-foreground">{r.notes || ""}</td>
                 </tr>
               );
             })}
             <tr className="border-t-2 bg-muted/30 font-semibold">
-              <td className="px-3 py-2">TOTALS</td>
+              <td className="px-3 py-2">TOTALS <span className="font-normal text-[10px] text-muted-foreground">(as of today)</span></td>
               <td className="px-3 py-2 text-right tabular-nums">${fmtMoney(totalExpected)}</td>
               <td className="px-3 py-2 text-right tabular-nums">${fmtMoney(totalPaid)}</td>
-              <td className={`px-3 py-2 text-right tabular-nums ${balance > 0 ? "text-red-600 dark:text-red-400" : balance < 0 ? "text-green-600 dark:text-green-400" : ""}`}>${fmtMoney(balance)}</td>
+              <td className={`px-3 py-2 text-right tabular-nums ${balance > 0 ? "text-red-600 dark:text-red-400" : balance < 0 ? "text-green-600 dark:text-green-400" : ""}`}>
+                {balance < 0 ? `$${fmtMoney(Math.abs(balance))} CR` : `$${fmtMoney(balance)}`}
+              </td>
               <td></td>
             </tr>
           </tbody>

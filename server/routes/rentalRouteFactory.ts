@@ -227,9 +227,20 @@ export function registerRentalRoutes(
       const outstandingByContract = new Map<number, number>();
       const totalPaidByContract = new Map<number, number>();
       if (contractIds.length > 0) {
+        // Only count expectedAmount for months up to the current calendar month.
+        // All paidAmount is counted regardless of month so advance payments create
+        // a negative outstanding (credit) instead of silently zeroing out.
         const rows = await db.select({
           contractId: propertyMonthlyLedger.contractId,
-          expected: sql<string>`COALESCE(SUM(${propertyMonthlyLedger.expectedAmount}), 0)`,
+          expected: sql<string>`COALESCE(SUM(
+            CASE WHEN (
+              ${propertyMonthlyLedger.year} < EXTRACT(YEAR FROM NOW())
+              OR (
+                ${propertyMonthlyLedger.year} = EXTRACT(YEAR FROM NOW())
+                AND ${propertyMonthlyLedger.month} <= EXTRACT(MONTH FROM NOW())
+              )
+            ) THEN ${propertyMonthlyLedger.expectedAmount} ELSE 0 END
+          ), 0)`,
           paid: sql<string>`COALESCE(SUM(${propertyMonthlyLedger.paidAmount}), 0)`,
         }).from(propertyMonthlyLedger)
           .where(inArray(propertyMonthlyLedger.contractId, contractIds))
@@ -487,14 +498,19 @@ export function registerRentalRoutes(
       });
       hdr.height = 18;
 
-      // Data rows
+      // Data rows — only count expected for months up to today so advance payments show as credit
+      const nowDate = new Date();
+      const nowYear = nowDate.getUTCFullYear();
+      const nowMonth = nowDate.getUTCMonth() + 1;
       let totalExpected = 0, totalPaid = 0;
       for (const row of ledger) {
-        const exp = fmtNum(row.expectedAmount);
+        const isFutureRow = row.year > nowYear || (row.year === nowYear && row.month > nowMonth);
+        const exp = isFutureRow ? 0 : fmtNum(row.expectedAmount);
         const paid = fmtNum(row.paidAmount);
         const out = exp - paid;
         totalExpected += exp; totalPaid += paid;
-        const r = ws.addRow([`${monthNames[row.month]} ${row.year}`, exp, paid, out, row.notes || ""]);
+        const monthLabel = isFutureRow ? `${monthNames[row.month]} ${row.year} (prepaid)` : `${monthNames[row.month]} ${row.year}`;
+        const r = ws.addRow([monthLabel, isFutureRow ? "" : exp, paid, out, row.notes || ""]);
         r.getCell(1).font = bodyFont;
         r.getCell(2).font = bodyFont; r.getCell(2).numFmt = "#,##0.00"; r.getCell(2).alignment = { horizontal: "right" };
         r.getCell(3).font = bodyFont; r.getCell(3).numFmt = "#,##0.00"; r.getCell(3).alignment = { horizontal: "right" };
