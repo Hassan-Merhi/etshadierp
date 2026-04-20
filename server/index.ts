@@ -1269,6 +1269,38 @@ let migrationsDone = false;
     `ALTER TABLE customer_balances ADD COLUMN IF NOT EXISTS row_note TEXT`,
     // Destination field on incoming containers (where the goods are going/warehouse)
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS destination TEXT`,
+    // ── Factory/ERP User Profile Tables (may not exist on older prod DBs) ─────
+    `CREATE TABLE IF NOT EXISTS factory_user_profiles (
+      id               SERIAL PRIMARY KEY,
+      company_id       INTEGER NOT NULL,
+      user_id          VARCHAR NOT NULL,
+      display_name     TEXT NOT NULL,
+      has_erp_access   BOOLEAN NOT NULL DEFAULT TRUE,
+      has_factory_access BOOLEAN NOT NULL DEFAULT TRUE,
+      hidden_cost_fields TEXT[] NOT NULL DEFAULT '{}',
+      hide_all_costs   BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at       TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at       TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS factory_user_profiles_unique ON factory_user_profiles (company_id, user_id)`,
+    `CREATE TABLE IF NOT EXISTS factory_user_page_access (
+      id          SERIAL PRIMARY KEY,
+      company_id  INTEGER NOT NULL,
+      user_id     VARCHAR NOT NULL,
+      page_key    TEXT NOT NULL,
+      created_at  TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS factory_user_page_access_unique ON factory_user_page_access (company_id, user_id, page_key)`,
+    `CREATE TABLE IF NOT EXISTS erp_user_page_access (
+      id          SERIAL PRIMARY KEY,
+      company_id  INTEGER NOT NULL,
+      user_id     VARCHAR NOT NULL,
+      page_key    TEXT NOT NULL,
+      created_at  TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS erp_user_page_access_unique ON erp_user_page_access (company_id, user_id, page_key)`,
+    // hide_all_costs column added later — ensure it exists on older rows
+    `ALTER TABLE factory_user_profiles ADD COLUMN IF NOT EXISTS hide_all_costs BOOLEAN NOT NULL DEFAULT FALSE`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
