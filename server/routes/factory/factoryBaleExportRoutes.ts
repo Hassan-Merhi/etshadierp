@@ -426,11 +426,10 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       }
 
       // 7. Compute opening/closing balance per supplier per week
-      // Strategy: work from latest week backwards.
-      // currentBalance = balance right now.
-      // openingBalance[lastWeek] = currentBalance + consumption[lastWeek] - stockIn[lastWeek]
-      // openingBalance[prevWeek] = openingBalance[nextWeek] + consumption[prevWeek] - stockIn[prevWeek]
-      // closingBalance[W] = openingBalance[nextWeek]
+      // Strategy: work FORWARD from the very first week.
+      // Every supplier starts at 0 opening balance in week 1.
+      // Each week: closing = opening + stockIn - consumption
+      // Next week's opening = this week's closing
 
       const allSupplierIds = [...supplierBalMap.keys()];
 
@@ -451,30 +450,29 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         weekStockIn.set(wk, sMap);
       }
 
-      // Opening balances: work backwards from current
+      // Opening balances: forward from zero at the very first week
       const openingBalances = new Map<string, Map<number, number>>(); // weekKey → supplierId → openingBal
       const closingBalances = new Map<string, Map<number, number>>();
 
-      // Closing of last week = current balance
-      const lastWk = sortedWeekKeys[sortedWeekKeys.length - 1];
-      const lastClosing = new Map<number, number>();
-      for (const sid of allSupplierIds) lastClosing.set(sid, supplierBalMap.get(sid)!.currentBalance);
-      closingBalances.set(lastWk, lastClosing);
+      // First week: every supplier opens at 0
+      const firstOpening = new Map<number, number>();
+      for (const sid of allSupplierIds) firstOpening.set(sid, 0);
+      openingBalances.set(sortedWeekKeys[0], firstOpening);
 
-      // Compute opening of last week and backwards
-      for (let i = sortedWeekKeys.length - 1; i >= 0; i--) {
+      // Walk forward: closing = opening + stockIn - consumption; next opening = this closing
+      for (let i = 0; i < sortedWeekKeys.length; i++) {
         const wk = sortedWeekKeys[i];
-        const closing = closingBalances.get(wk)!;
+        const opening = openingBalances.get(wk)!;
         const cMap = weekConsumption.get(wk)!;
         const sMap = weekStockIn.get(wk)!;
-        const opening = new Map<number, number>();
+        const closing = new Map<number, number>();
         for (const sid of allSupplierIds) {
-          opening.set(sid, (closing.get(sid) || 0) + (cMap.get(sid) || 0) - (sMap.get(sid) || 0));
+          closing.set(sid, (opening.get(sid) || 0) + (sMap.get(sid) || 0) - (cMap.get(sid) || 0));
         }
-        openingBalances.set(wk, opening);
-        if (i > 0) {
-          // closing of previous week = opening of this week
-          closingBalances.set(sortedWeekKeys[i - 1], opening);
+        closingBalances.set(wk, closing);
+        if (i < sortedWeekKeys.length - 1) {
+          // next week opens where this week closes
+          openingBalances.set(sortedWeekKeys[i + 1], closing);
         }
       }
 
