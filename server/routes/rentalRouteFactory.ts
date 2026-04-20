@@ -664,6 +664,12 @@ export function registerRentalRoutes(
           ]);
         }
       });
+
+      // Fire auto-transfer if configured (same as regular payment — guarantee cash receipt triggers transfer)
+      if (cashAccountId) {
+        await maybeRunAutoTransfer(companyId, module, cashAccountId, amount, dateStr, unitLabel);
+      }
+
       res.json({ ok: true });
     } catch (e: any) {
       if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
