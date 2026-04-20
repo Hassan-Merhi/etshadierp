@@ -575,7 +575,6 @@ function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId }: { contrac
     cashAccountId: "" as string,
     amount: "",
     paymentDate: new Date().toISOString().slice(0, 10),
-    forMonth: "current" as "current" | "next",
     notes: "",
   });
 
@@ -585,7 +584,6 @@ function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId }: { contrac
       cashAccountId: form.cashAccountId ? parseInt(form.cashAccountId) : null,
       amount: form.amount,
       paymentDate: form.paymentDate,
-      forMonth: form.forMonth,
       notes: form.notes,
     }),
     onSuccess: () => {
@@ -617,13 +615,6 @@ function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId }: { contrac
         <div>
           <Label>Amount Received ($)</Label>
           <Input type="number" step="0.01" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} data-testid={`input-${testIdPrefix}-payment-amount`} />
-        </div>
-        <div>
-          <Label>For Month</Label>
-          <RadioGroup value={form.forMonth} onValueChange={v => setForm(f => ({ ...f, forMonth: v as any }))} className="flex gap-4 pt-2">
-            <div className="flex items-center gap-1.5"><RadioGroupItem value="current" id={`cur-${unitId}`} data-testid={`radio-${testIdPrefix}-current-month`} /><Label htmlFor={`cur-${unitId}`} className="font-normal cursor-pointer">Current Month</Label></div>
-            <div className="flex items-center gap-1.5"><RadioGroupItem value="next" id={`nxt-${unitId}`} data-testid={`radio-${testIdPrefix}-next-month`} /><Label htmlFor={`nxt-${unitId}`} className="font-normal cursor-pointer">Next Month</Label></div>
-          </RadioGroup>
         </div>
         <div className="col-span-2">
           <Label>Notes</Label>

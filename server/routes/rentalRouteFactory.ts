@@ -656,7 +656,6 @@ export function registerRentalRoutes(
         cashAccountId: z.number().nullable().optional(),
         amount: z.union([z.string(), z.number()]).transform(v => String(v)),
         paymentDate: z.string().min(1),
-        forMonth: z.enum(["current", "next"]).default("current"),
         notes: z.string().optional(),
       }).parse(req.body);
 
@@ -669,9 +668,9 @@ export function registerRentalRoutes(
 
       await ensureMonthlyLedgerRows(contract.id);
 
-      const now = new Date();
-      let y = now.getUTCFullYear(), m = now.getUTCMonth() + 1;
-      if (data.forMonth === "next") { m++; if (m > 12) { m = 1; y++; } }
+      // Derive year/month from the payment date itself
+      const pd = new Date(data.paymentDate);
+      let y = pd.getUTCFullYear(), m = pd.getUTCMonth() + 1;
 
       const [unit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, contract.unitId));
 
