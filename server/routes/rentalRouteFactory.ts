@@ -223,6 +223,7 @@ export function registerRentalRoutes(
 
       const contractIds = contracts.map(c => c.id);
       const outstandingByContract = new Map<number, number>();
+      const totalPaidByContract = new Map<number, number>();
       if (contractIds.length > 0) {
         const rows = await db.select({
           contractId: propertyMonthlyLedger.contractId,
@@ -233,12 +234,18 @@ export function registerRentalRoutes(
           .groupBy(propertyMonthlyLedger.contractId);
         rows.forEach(r => {
           outstandingByContract.set(r.contractId, Number(r.expected) - Number(r.paid));
+          totalPaidByContract.set(r.contractId, Number(r.paid));
         });
       }
 
       res.json(units.map(u => {
         const c = contractByUnit.get(u.id);
-        return { ...u, contract: c ?? null, outstanding: c ? (outstandingByContract.get(c.id) ?? 0) : null };
+        return {
+          ...u,
+          contract: c ?? null,
+          outstanding: c ? (outstandingByContract.get(c.id) ?? 0) : null,
+          totalPaid: c ? (totalPaidByContract.get(c.id) ?? 0) : null,
+        };
       }));
     } catch (e: any) {
       console.error(`${tag} units:`, e);

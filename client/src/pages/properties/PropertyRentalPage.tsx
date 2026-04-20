@@ -183,14 +183,15 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
   }, [units]);
 
   const totals = useMemo(() => {
-    let totalGuarantee = 0, totalOutstanding = 0;
+    let totalGuarantee = 0, totalOutstanding = 0, totalPaid = 0;
     units.forEach(u => {
       if (u.contract) {
         totalGuarantee += Number(u.contract.guaranteeAmount || 0);
         totalOutstanding += u.outstanding ?? 0;
+        totalPaid += (u as any).totalPaid ?? 0;
       }
     });
-    return { totalGuarantee, totalOutstanding };
+    return { totalGuarantee, totalOutstanding, totalPaid };
   }, [units]);
 
   const runMonthly = useMutation({
@@ -227,7 +228,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
         </div>
 
         {/* Summary tiles */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL UNITS</CardTitle></CardHeader>
             <CardContent><div className="text-2xl font-bold" data-testid={`stat-${testIdPrefix}-total-units`}>{units.length}</div></CardContent>
@@ -235,6 +236,14 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL GUARANTEE</CardTitle></CardHeader>
             <CardContent><div className="text-2xl font-bold" data-testid={`stat-${testIdPrefix}-total-guarantee`}>${fmtMoney(totals.totalGuarantee)}</div></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL PAID</CardTitle></CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${totals.totalPaid > 0 ? "text-green-600 dark:text-green-400" : ""}`} data-testid={`stat-${testIdPrefix}-total-paid`}>
+                ${fmtMoney(totals.totalPaid)}
+              </div>
+            </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL OUTSTANDING</CardTitle></CardHeader>
