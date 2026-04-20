@@ -715,10 +715,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       const currentRole = (req.session as any).currentRole;
+      const globalRole = req.user?.role;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
-        return res.status(403).json({ message: "Only Admin or Owner can manage users" });
-      }
+      const isAllowed = ["Admin","Owner","Developer"].includes(currentRole) || ["Admin","Developer"].includes(globalRole);
+      if (!isAllowed) return res.status(403).json({ message: "Only Admin or Owner can manage users" });
 
       const allUsers = await db.select({
         id: users.id,
@@ -727,13 +727,19 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         createdAt: users.createdAt,
       }).from(users);
 
-      // Collect Developer user IDs to hide them from non-Developer viewers
+      // Collect Developer user IDs — scoped to the CURRENT company only.
+      // A user with Developer role in Company X must still be visible when an
+      // Admin views from Company Y.  Cross-company pollution caused everyone to
+      // be hidden when any user held a Developer role anywhere.
       const devRoles = await db
         .select({ userId: userCompanyRoles.userId })
         .from(userCompanyRoles)
-        .where(eq(userCompanyRoles.role, "Developer"));
+        .where(and(
+          eq(userCompanyRoles.role, "Developer"),
+          eq(userCompanyRoles.companyId, companyId)
+        ));
       const devUserIds = new Set(devRoles.map((r: any) => r.userId));
-      const requesterIsDeveloper = currentRole === "Developer";
+      const requesterIsDeveloper = currentRole === "Developer" || globalRole === "Developer";
 
       const visibleUsers = allUsers.filter((u: any) =>
         requesterIsDeveloper || !devUserIds.has(u.id)
@@ -778,10 +784,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       const currentRole = (req.session as any).currentRole;
+      const globalRole = req.user?.role;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      if (currentRole !== "Admin" && currentRole !== "Owner") {
-        return res.status(403).json({ message: "Only Admin or Owner can manage users" });
-      }
+      const isAllowed = ["Admin","Owner"].includes(currentRole) || ["Admin","Developer"].includes(globalRole);
+      if (!isAllowed) return res.status(403).json({ message: "Only Admin or Owner can manage users" });
 
       const { username, password, displayName, pageAccess, hasErpAccess, hasFactoryAccess } = req.body;
 
@@ -848,10 +854,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       const currentRole = (req.session as any).currentRole;
+      const globalRole = req.user?.role;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      if (currentRole !== "Admin" && currentRole !== "Owner") {
-        return res.status(403).json({ message: "Only Admin or Owner can manage users" });
-      }
+      const isAllowed = ["Admin","Owner"].includes(currentRole) || ["Admin","Developer"].includes(globalRole);
+      if (!isAllowed) return res.status(403).json({ message: "Only Admin or Owner can manage users" });
 
       const { userId } = req.params;
       const { displayName, pageAccess, password, hasErpAccess, hasFactoryAccess, hiddenCostFields, hideAllCosts, username } = req.body;
@@ -926,11 +932,11 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       const currentRole = (req.session as any).currentRole;
+      const globalRole = req.user?.role;
       const sessionUserId = (req.session as any).userId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      if (currentRole !== "Admin" && currentRole !== "Owner") {
-        return res.status(403).json({ message: "Only Admin or Owner can manage users" });
-      }
+      const isAllowed = ["Admin","Owner"].includes(currentRole) || ["Admin","Developer"].includes(globalRole);
+      if (!isAllowed) return res.status(403).json({ message: "Only Admin or Owner can manage users" });
       const { userId } = req.params;
       if (userId === sessionUserId) {
         return res.status(400).json({ message: "You cannot delete your own account" });
