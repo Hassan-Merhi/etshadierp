@@ -372,31 +372,51 @@ export function registerInventoryRoutes(app: Express) {
           errors: [] as any[],
         };
 
+        // Per-session barcode registry: once a barcode resolves to an item it
+        // ALWAYS resolves to that same item for the rest of this import run.
+        // This prevents the same barcode from ever mapping to more than one product.
+        const barcodeItemMap = new Map<string, any>();
+
         for (const item of items) {
           try {
-            // Find stock item by Item_barcode (which maps to code field OR code alias)
-            let stockItem = await storage.getStockItemByCodeOrAlias(
-              item.Item_barcode,
-              req.session.currentCompanyId,
-            );
+            const barcodeKey = item.Item_barcode.trim().toLowerCase();
+
+            // 1. Check session-local registry first (fastest, no DB hit)
+            let stockItem: any = barcodeItemMap.get(barcodeKey) ?? null;
+
+            // 2. If not seen this session, look up in DB (code field OR alias)
+            if (!stockItem) {
+              stockItem = await storage.getStockItemByCodeOrAlias(
+                item.Item_barcode,
+                req.session.currentCompanyId,
+              ) ?? null;
+              if (stockItem) barcodeItemMap.set(barcodeKey, stockItem);
+            }
 
             // If stock item doesn't exist, create it
             if (!stockItem) {
-              // ── Name-match check: if an existing item has the same name as the
-              //    uploaded barcode, register the barcode as an alias and reuse
-              //    that item instead of creating a duplicate. ──────────────────
+              // ── Name-match check: if an existing item's NAME equals the
+              //    uploaded barcode string, register the barcode as an alias
+              //    and reuse that item instead of creating a duplicate. ─────
               const nameMatch = allStockItems.find(
-                (si) => si.name.trim().toLowerCase() === item.Item_barcode.trim().toLowerCase(),
+                (si) => si.name.trim().toLowerCase() === barcodeKey,
               );
 
               if (nameMatch) {
-                // Add the new barcode as a code alias on the existing item
-                await db.insert(stockItemCodeAliases).values({
-                  stockItemId: nameMatch.id,
-                  aliasCode: item.Item_barcode.trim(),
-                  companyId: req.session.currentCompanyId!,
-                }).onConflictDoNothing();
-                stockItem = nameMatch;
+                // Guard: only register alias if the barcode isn't already the
+                // primary code of a *different* item (belt-and-suspenders check)
+                const alreadyACode = allStockItems.find(
+                  (si) => si.id !== nameMatch.id && si.code.trim().toLowerCase() === barcodeKey,
+                );
+                if (!alreadyACode) {
+                  await db.insert(stockItemCodeAliases).values({
+                    stockItemId: nameMatch.id,
+                    aliasCode: item.Item_barcode.trim(),
+                    companyId: req.session.currentCompanyId!,
+                  }).onConflictDoNothing();
+                }
+                stockItem = alreadyACode ?? nameMatch;
+                barcodeItemMap.set(barcodeKey, stockItem);
               } else {
               // Auto-detect stock group from item code prefix (first 2-3 uppercase letters)
               let stockGroupId: number | null = null;
@@ -456,6 +476,7 @@ export function registerInventoryRoutes(app: Express) {
 
               stockItem = newStockItem;
               allStockItems.push(newStockItem); // Add to cache for subsequent rows
+              barcodeItemMap.set(barcodeKey, newStockItem); // lock barcode in session registry
               } // end else (no name match → create new)
             }
 
