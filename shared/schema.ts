@@ -2253,6 +2253,30 @@ export type BaleLabelPrint = typeof baleLabelPrints.$inferSelect;
 // FACTORY DOMAIN TABLES (isolated from ERP)
 // ============================================================
 
+export const factorySupplierCategories = pgTable("factory_supplier_categories", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyName: uniqueIndex("factory_supplier_categories_company_name_unique").on(t.companyId, t.name),
+}));
+
+export const insertFactorySupplierCategorySchema = createInsertSchema(factorySupplierCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  name: z.string().min(1, "Category name is required"),
+  displayOrder: z.number().optional(),
+});
+
+export type InsertFactorySupplierCategory = z.infer<typeof insertFactorySupplierCategorySchema>;
+export type FactorySupplierCategory = typeof factorySupplierCategories.$inferSelect;
+
 export const factorySuppliers = pgTable("factory_suppliers", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
@@ -2265,6 +2289,7 @@ export const factorySuppliers = pgTable("factory_suppliers", {
   openingBalance: decimal("opening_balance", { precision: 20, scale: 4 }).notNull().default("0"),
   linkedSupplierId: integer("linked_supplier_id"),
   parentId: integer("parent_id"),
+  supplierCategoryId: integer("supplier_category_id"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -2287,6 +2312,7 @@ export const insertFactorySupplierSchema = createInsertSchema(factorySuppliers).
   openingBalance: z.string().optional(),
   linkedSupplierId: z.number().optional().nullable(),
   parentId: z.number().optional().nullable(),
+  supplierCategoryId: z.number().optional().nullable(),
   isActive: z.boolean().optional(),
 });
 

@@ -42,6 +42,7 @@ import {
   factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
   factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
   factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+  factorySupplierCategories,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -56,6 +57,24 @@ export function registerFactoryRawStockRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // Pre-fetch all suppliers with their category info for this company
+      const supplierRows = await db
+        .select({
+          id: factorySuppliers.id,
+          supplierCategoryId: factorySuppliers.supplierCategoryId,
+          categoryName: factorySupplierCategories.name,
+        })
+        .from(factorySuppliers)
+        .leftJoin(factorySupplierCategories, eq(factorySuppliers.supplierCategoryId, factorySupplierCategories.id))
+        .where(eq(factorySuppliers.companyId, companyId));
+      const supplierCategoryMap = new Map<number, { categoryId: number | null; categoryName: string | null }>();
+      for (const s of supplierRows) {
+        supplierCategoryMap.set(s.id, {
+          categoryId: s.supplierCategoryId ?? null,
+          categoryName: s.categoryName ?? null,
+        });
+      }
 
       const results = await db
         .select({
@@ -110,9 +129,12 @@ export function registerFactoryRawStockRoutes(app: Express) {
           // If any container for this supplier is not OB, show as Container
           if (!isOB) existing.sourceType = "CONTAINER";
         } else {
+          const catInfo = r.supplierId ? (supplierCategoryMap.get(r.supplierId) || { categoryId: null, categoryName: null }) : { categoryId: null, categoryName: null };
           supplierMap.set(key, {
             supplierName: r.supplierName || "Unknown",
             supplierId: r.supplierId,
+            categoryId: catInfo.categoryId,
+            categoryName: catInfo.categoryName,
             sourceType: isOB ? "OPENING_BALANCE" : "CONTAINER",
             currencyCode: r.currencyCode || "USD",
             _totalReceived: received,
@@ -168,9 +190,12 @@ export function registerFactoryRawStockRoutes(app: Express) {
             existing._totalUsed += kg;
           }
         } else {
+          const adjCatInfo = supplierId ? (supplierCategoryMap.get(supplierId) || { categoryId: null, categoryName: null }) : { categoryId: null, categoryName: null };
           supplierMap.set(key, {
             supplierName,
             supplierId,
+            categoryId: adjCatInfo.categoryId,
+            categoryName: adjCatInfo.categoryName,
             sourceType: "MANUAL",
             currencyCode: adj.currencyCode || "USD",
             _totalReceived: isAdd ? kg : 0,
@@ -256,6 +281,8 @@ export function registerFactoryRawStockRoutes(app: Express) {
         return {
           supplierName: s.supplierName,
           supplierId: s.supplierId,
+          categoryId: s.categoryId ?? null,
+          categoryName: s.categoryName ?? null,
           sourceType: s.sourceType,
           currencyCode: s.currencyCode,
           receivedKg: s._totalReceived.toFixed(3),

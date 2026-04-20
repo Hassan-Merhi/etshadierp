@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from "react";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, FlaskConical, FileSpreadsheet, FileText, SlidersHorizontal, PlusCircle, MinusCircle, History, ArrowUpCircle, ArrowDownCircle, FlaskRound } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, FlaskConical, FileSpreadsheet, FileText, SlidersHorizontal, PlusCircle, MinusCircle, History, ArrowUpCircle, ArrowDownCircle, FlaskRound, Tag, ChevronRight, ChevronDown, Folder, FolderOpen } from "lucide-react";
 import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
 import { EditMixBatchDialog } from "@/components/EditMixBatchDialog";
 import type { FactoryMixBatch } from "@shared/schema";
@@ -160,6 +160,8 @@ interface AdditionalChargeRow {
 interface RawStockRow {
   supplierName: string;
   supplierId: number | null;
+  categoryId: number | null;
+  categoryName: string | null;
   sourceType?: string;
   currencyCode?: string;
   receivedKg: string;
@@ -172,6 +174,12 @@ interface RawStockRow {
   valueRemaining: string;
   valueRemainingUsd: string;
   lastOffloaded: string;
+}
+
+interface SupplierCategory {
+  id: number;
+  name: string;
+  displayOrder: number;
 }
 
 interface MixBatchRow {
@@ -300,6 +308,248 @@ function AdjustmentsHistoryCard({ onDeleteRequest }: {
   );
 }
 
+function SupplierCategoriesDialog({
+  open,
+  onClose,
+  suppliers,
+}: {
+  open: boolean;
+  onClose: () => void;
+  suppliers: { id: number; name: string; supplierCategoryId?: number | null }[];
+}) {
+  const { toast } = useToast();
+  const [newCatName, setNewCatName] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const { data: categories = [], refetch: refetchCats } = useQuery<SupplierCategory[]>({
+    queryKey: ["/api/factory/supplier-categories"],
+    enabled: open,
+  });
+
+  const { data: fullSuppliers = [], refetch: refetchSuppliers } = useQuery<{ id: number; name: string; supplierCategoryId?: number | null }[]>({
+    queryKey: ["/api/factory/suppliers"],
+    enabled: open,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await fetch("/api/factory/supplier-categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      if (!res.ok) throw new Error((await res.json()).message);
+      return res.json();
+    },
+    onSuccess: () => {
+      setNewCatName("");
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/supplier-categories"] });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const renameMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      const res = await fetch(`/api/factory/supplier-categories/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      if (!res.ok) throw new Error((await res.json()).message);
+      return res.json();
+    },
+    onSuccess: () => {
+      setEditingId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/supplier-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/factory/supplier-categories/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error((await res.json()).message);
+      return res.json();
+    },
+    onSuccess: () => {
+      setDeletingId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/supplier-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: async ({ supplierId, categoryId }: { supplierId: number; categoryId: number | null }) => {
+      const res = await fetch(`/api/factory/suppliers/${supplierId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ supplierCategoryId: categoryId }),
+      });
+      if (!res.ok) throw new Error((await res.json()).message);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const catToDelete = deletingId ? categories.find(c => c.id === deletingId) : null;
+  const supplierCountForCat = (catId: number) =>
+    fullSuppliers.filter(s => s.supplierCategoryId === catId).length;
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Tag className="h-4 w-4" />
+            Manage Supplier Categories
+          </DialogTitle>
+          <DialogDescription>
+            Create categories to group your suppliers, then assign each supplier to a category.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto space-y-6">
+          {/* Create new category */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">New Category</label>
+            <div className="flex gap-2">
+              <Input
+                placeholder="e.g. Cyprus, Australia…"
+                value={newCatName}
+                onChange={e => setNewCatName(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && newCatName.trim()) createMutation.mutate(newCatName); }}
+                data-testid="input-new-category-name"
+              />
+              <Button
+                onClick={() => { if (newCatName.trim()) createMutation.mutate(newCatName); }}
+                disabled={!newCatName.trim() || createMutation.isPending}
+                data-testid="button-create-category"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add
+              </Button>
+            </div>
+          </div>
+
+          {/* Existing categories */}
+          {categories.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Categories</label>
+              <div className="border rounded-md divide-y">
+                {categories.map(cat => (
+                  <div key={cat.id} className="flex items-center gap-2 px-3 py-2">
+                    <Folder className="h-4 w-4 text-muted-foreground shrink-0" />
+                    {editingId === cat.id ? (
+                      <Input
+                        autoFocus
+                        value={editingName}
+                        onChange={e => setEditingName(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter" && editingName.trim()) renameMutation.mutate({ id: cat.id, name: editingName });
+                          if (e.key === "Escape") setEditingId(null);
+                        }}
+                        className="h-7 text-sm flex-1"
+                        data-testid={`input-rename-category-${cat.id}`}
+                      />
+                    ) : (
+                      <span className="flex-1 text-sm font-medium">{cat.name}</span>
+                    )}
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {supplierCountForCat(cat.id)} supplier{supplierCountForCat(cat.id) !== 1 ? "s" : ""}
+                    </span>
+                    {editingId === cat.id ? (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => { if (editingName.trim()) renameMutation.mutate({ id: cat.id, name: editingName }); }} data-testid={`button-save-rename-${cat.id}`}>
+                          <Check className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => { setEditingId(cat.id); setEditingName(cat.name); }} data-testid={`button-rename-category-${cat.id}`}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setDeletingId(cat.id)} data-testid={`button-delete-category-${cat.id}`}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Assign suppliers */}
+          {fullSuppliers.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Assign Suppliers to Categories</label>
+              <div className="border rounded-md divide-y">
+                {fullSuppliers.map(sup => (
+                  <div key={sup.id} className="flex items-center gap-3 px-3 py-2">
+                    <span className="flex-1 text-sm truncate">{sup.name}</span>
+                    <Select
+                      value={sup.supplierCategoryId != null ? String(sup.supplierCategoryId) : "none"}
+                      onValueChange={val => {
+                        assignMutation.mutate({ supplierId: sup.id, categoryId: val === "none" ? null : parseInt(val) });
+                      }}
+                    >
+                      <SelectTrigger className="h-7 w-40 text-xs" data-testid={`select-supplier-category-${sup.id}`}>
+                        <SelectValue placeholder="Uncategorized" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Uncategorized</SelectItem>
+                        {categories.map(cat => (
+                          <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Delete confirmation */}
+        <AlertDialog open={!!deletingId} onOpenChange={open => { if (!open) setDeletingId(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete category "{catToDelete?.name}"?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Suppliers in this category will become uncategorized. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { if (deletingId) deleteMutation.mutate(deletingId); }}>
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function ProductionRawStock() {
   const { formatDisplayDate } = useDateFormat();
   const [offloadDialogOpen, setOffloadDialogOpen] = useState(false);
@@ -391,6 +641,10 @@ export default function ProductionRawStock() {
   const [historyDeleteTarget, setHistoryDeleteTarget] = useState<{ kind: string; label: string; adjId?: number; batchId?: number; rawStockId?: number } | null>(null);
   const [historyEditTarget, setHistoryEditTarget] = useState<{ rawStockId: number; currentKg: number; usedKg: number } | null>(null);
   const [historyEditKg, setHistoryEditKg] = useState("");
+
+  // Supplier categories
+  const [categoriesDialogOpen, setCategoriesDialogOpen] = useState(false);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
   // Mix batch section state
   const [createMixBatchOpen, setCreateMixBatchOpen] = useState(false);
@@ -1201,6 +1455,15 @@ export default function ProductionRawStock() {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setCategoriesDialogOpen(true)}
+              data-testid="button-manage-categories"
+            >
+              <Tag className="h-3.5 w-3.5 mr-1.5" />
+              Categories
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => {
                 setAdjIsNewMaterial(true);
                 setAdjustingRow(null);
@@ -1243,11 +1506,81 @@ export default function ProductionRawStock() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rawStock.map((row, idx) => {
-                  const remaining = parseFloat(row.remainingKg);
-                  const isOB = row.sourceType === "OPENING_BALANCE";
-                  const currency = row.currencyCode || "USD";
-                  return (
+                {(() => {
+                  // Group rows by category
+                  const categoryGroups = new Map<string, { categoryId: number | null; categoryName: string | null; rows: typeof rawStock }>();
+                  for (const row of rawStock) {
+                    const key = row.categoryId != null ? String(row.categoryId) : "uncategorized";
+                    if (!categoryGroups.has(key)) {
+                      categoryGroups.set(key, { categoryId: row.categoryId, categoryName: row.categoryName, rows: [] });
+                    }
+                    categoryGroups.get(key)!.rows.push(row);
+                  }
+                  // Sort: categorized groups first (by name), uncategorized last
+                  const sortedGroups = Array.from(categoryGroups.entries()).sort(([aKey, a], [bKey, b]) => {
+                    if (aKey === "uncategorized") return 1;
+                    if (bKey === "uncategorized") return -1;
+                    return (a.categoryName || "").localeCompare(b.categoryName || "");
+                  });
+                  const hasCategories = sortedGroups.some(([k]) => k !== "uncategorized");
+
+                  return sortedGroups.flatMap(([groupKey, group]) => {
+                    const isCollapsed = collapsedCategories.has(groupKey);
+                    const groupRows = group.rows;
+                    const groupTotalReceived = groupRows.reduce((s, r) => s + parseFloat(r.receivedKg), 0);
+                    const groupTotalFree = groupRows.reduce((s, r) => s + parseFloat(r.freeKg || "0"), 0);
+                    const groupTotalValue = groupRows.reduce((s, r) => s + parseFloat(r.valueRemainingUsd || r.valueRemaining), 0);
+                    const toggleGroup = () => setCollapsedCategories(prev => {
+                      const next = new Set(prev);
+                      if (next.has(groupKey)) next.delete(groupKey); else next.add(groupKey);
+                      return next;
+                    });
+                    const isUncategorized = groupKey === "uncategorized";
+                    const groupLabel = isUncategorized ? "Uncategorized" : (group.categoryName || "Unknown");
+
+                    const headerRow = hasCategories ? (
+                      <TableRow
+                        key={`group-${groupKey}`}
+                        className="bg-muted/40 hover:bg-muted/60 cursor-pointer select-none"
+                        onClick={toggleGroup}
+                        data-testid={`row-category-${groupKey}`}
+                      >
+                        <TableCell colSpan={2} className="py-2 font-semibold text-sm">
+                          <div className="flex items-center gap-2">
+                            {isCollapsed
+                              ? <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                              : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                            }
+                            {isUncategorized
+                              ? <Folder className="h-4 w-4 text-muted-foreground" />
+                              : <FolderOpen className="h-4 w-4 text-primary/70" />
+                            }
+                            <span>{groupLabel}</span>
+                            <span className="text-xs font-normal text-muted-foreground">
+                              ({groupRows.length} supplier{groupRows.length !== 1 ? "s" : ""})
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm py-2">
+                          {formatNumber(groupTotalReceived)}
+                        </TableCell>
+                        <TableCell className={`text-right font-mono text-sm py-2 font-medium ${groupTotalFree > 0.001 ? "text-green-600 dark:text-green-400" : "text-muted-foreground/50"}`}>
+                          {groupTotalFree > 0.001 ? formatNumber(groupTotalFree) : "—"}
+                        </TableCell>
+                        <TableCell className="py-2" />
+                        <TableCell className="text-right font-mono text-sm py-2 font-medium">
+                          ${formatNumber(groupTotalValue)}
+                        </TableCell>
+                        <TableCell className="py-2" />
+                        <TableCell className="py-2" />
+                      </TableRow>
+                    ) : null;
+
+                    const dataRows = isCollapsed ? [] : groupRows.map((row, idx) => {
+                      const remaining = parseFloat(row.remainingKg);
+                      const isOB = row.sourceType === "OPENING_BALANCE";
+                      const currency = row.currencyCode || "USD";
+                      return (
                     <TableRow key={(row.supplierId || idx) + (isOB ? "_ob" : "_ct")} data-testid={`row-raw-stock-${row.supplierId || idx}${isOB ? "-ob" : "-ct"}`}>
                       <TableCell className="font-medium" data-testid={`text-supplier-${row.supplierId || idx}`}>
                         {row.supplierId ? (
@@ -1425,8 +1758,11 @@ export default function ProductionRawStock() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  );
-                })}
+                      );
+                    }); // end dataRows.map
+                    return [headerRow, ...dataRows].filter(Boolean);
+                  }); // end sortedGroups.flatMap
+                })()}
               </TableBody>
             </Table>
           ) : (
@@ -3020,6 +3356,12 @@ export default function ProductionRawStock() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <SupplierCategoriesDialog
+        open={categoriesDialogOpen}
+        onClose={() => setCategoriesDialogOpen(false)}
+        suppliers={factorySuppliers}
+      />
 
       <Dialog open={deleteObDialogOpen} onOpenChange={(open) => { setDeleteObDialogOpen(open); if (!open) setDeletingObRecord(null); }}>
         <DialogContent>

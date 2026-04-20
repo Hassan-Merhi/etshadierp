@@ -42,6 +42,7 @@ import {
   factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
   factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
   factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+  factorySupplierCategories, insertFactorySupplierCategorySchema,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -216,6 +217,76 @@ export function registerFactorySuppliersRoutes(app: Express) {
     } catch (error: any) {
       console.error("Error permanently deleting factory supplier:", error);
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ───────────────────────────────────────────────
+  // 1b. Factory Supplier Categories
+  // ───────────────────────────────────────────────
+
+  app.get("/api/factory/supplier-categories", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const cats = await db
+        .select()
+        .from(factorySupplierCategories)
+        .where(eq(factorySupplierCategories.companyId, companyId))
+        .orderBy(asc(factorySupplierCategories.displayOrder), asc(factorySupplierCategories.name));
+      res.json(cats);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/factory/supplier-categories", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const parsed = insertFactorySupplierCategorySchema.parse({ ...req.body, companyId });
+      const [created] = await db.insert(factorySupplierCategories).values(parsed).returning();
+      res.json(created);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/factory/supplier-categories/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      const { name, displayOrder } = req.body;
+      const [updated] = await db
+        .update(factorySupplierCategories)
+        .set({ ...(name !== undefined && { name }), ...(displayOrder !== undefined && { displayOrder }), updatedAt: new Date() })
+        .where(and(eq(factorySupplierCategories.id, id), eq(factorySupplierCategories.companyId, companyId)))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Category not found" });
+      res.json(updated);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/factory/supplier-categories/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      // Unassign any suppliers that belong to this category
+      await db
+        .update(factorySuppliers)
+        .set({ supplierCategoryId: null, updatedAt: new Date() })
+        .where(and(eq(factorySuppliers.companyId, companyId), eq(factorySuppliers.supplierCategoryId, id)));
+      const [deleted] = await db
+        .delete(factorySupplierCategories)
+        .where(and(eq(factorySupplierCategories.id, id), eq(factorySupplierCategories.companyId, companyId)))
+        .returning();
+      if (!deleted) return res.status(404).json({ message: "Category not found" });
+      res.json({ message: "Category deleted" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
     }
   });
 
