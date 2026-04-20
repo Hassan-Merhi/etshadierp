@@ -685,56 +685,112 @@ function ModifyRentForm({ contract, testIdPrefix, unitId }: { contract: Contract
 function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contract: Contract; cashAccounts: CashAccount[]; testIdPrefix: string; unitId: number }) {
   const apiBase = useApiBase();
   const { toast } = useToast();
-  const [amount, setAmount] = useState(contract.guaranteeAmount);
-  const [cashAccountId, setCashAccountId] = useState<string>("");
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
-  const [notes, setNotes] = useState("");
+
+  // ── Post to Statement state ──
+  const [postAmount, setPostAmount] = useState(contract.guaranteeAmount);
+  const [postAccountId, setPostAccountId] = useState<string>("");
+  const [postDate, setPostDate] = useState(new Date().toISOString().slice(0, 10));
+  const [postNotes, setPostNotes] = useState("");
+
+  // ── Move to Cash state ──
+  const [moveAmount, setMoveAmount] = useState(contract.guaranteeAmount);
+  const [moveAccountId, setMoveAccountId] = useState<string>("");
+  const [moveDate, setMoveDate] = useState(new Date().toISOString().slice(0, 10));
+  const [moveNotes, setMoveNotes] = useState("");
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
+    queryClient.invalidateQueries({ queryKey: [apiBase + "/units", unitId, "detail"] });
+  };
 
   const post = useMutation({
-    mutationFn: () => apiRequest("POST", `${apiBase}/contracts/${contract.id}/guarantee-to-statement`, { amount, cashAccountId: cashAccountId ? parseInt(cashAccountId) : null, paymentDate, notes }),
-    onSuccess: () => {
-      toast({ title: "Guarantee posted to statement" });
-      queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
-      queryClient.invalidateQueries({ queryKey: [apiBase + "/units", unitId, "detail"] });
-    },
+    mutationFn: () => apiRequest("POST", `${apiBase}/contracts/${contract.id}/guarantee-to-statement`, {
+      amount: postAmount,
+      cashAccountId: postAccountId ? parseInt(postAccountId) : null,
+      paymentDate: postDate,
+      notes: postNotes,
+    }),
+    onSuccess: () => { toast({ title: "Guarantee posted to statement" }); invalidate(); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const moveToCash = useMutation({
+    mutationFn: () => apiRequest("POST", `${apiBase}/contracts/${contract.id}/guarantee-to-cash`, {
+      amount: moveAmount,
+      cashAccountId: parseInt(moveAccountId),
+      paymentDate: moveDate,
+      notes: moveNotes,
+    }),
+    onSuccess: () => { toast({ title: "Guarantee moved to cash successfully" }); invalidate(); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (
-    <div className="space-y-3 pt-3">
-      <div className="bg-muted/40 rounded-md p-3 text-sm">
-        <span className="text-muted-foreground">Guarantee on file: </span>
+    <div className="space-y-4 pt-3">
+      {/* Info bar */}
+      <div className="bg-muted/40 rounded-md p-3 text-sm flex items-center gap-2 flex-wrap">
+        <span className="text-muted-foreground">Guarantee on file:</span>
         <span className="font-bold">${fmtMoney(contract.guaranteeAmount)}</span>
-        {contract.guaranteePostedToStatement && <Badge variant="secondary" className="ml-2">Already posted</Badge>}
+        {contract.guaranteePostedToStatement && <Badge variant="secondary">Already posted</Badge>}
       </div>
-      <div>
-        <Label>Amount to Post to Statement ($) *</Label>
-        <Input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} data-testid={`input-${testIdPrefix}-guarantee-post`} />
+
+      {/* ── Section 1: Post to Statement ── */}
+      <div className="border rounded-md p-3 space-y-3">
+        <p className="text-sm font-semibold">Post Guarantee to Statement</p>
+        <p className="text-xs text-muted-foreground">Records guarantee received: Dr Cash / Cr Tenant Deposits</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Amount ($)</Label>
+            <Input type="number" step="0.01" value={postAmount} onChange={e => setPostAmount(e.target.value)} data-testid={`input-${testIdPrefix}-guarantee-post`} />
+          </div>
+          <div>
+            <Label>Date</Label>
+            <Input type="date" value={postDate} onChange={e => setPostDate(e.target.value)} data-testid={`input-${testIdPrefix}-guarantee-date`} />
+          </div>
+          <div className="col-span-2">
+            <Label>Account (where deposit is held)</Label>
+            <AccountSearchSelect accounts={cashAccounts} value={postAccountId} onChange={setPostAccountId} placeholder="Select account…" testId={`select-${testIdPrefix}-guarantee-cash`} />
+          </div>
+          <div className="col-span-2">
+            <Label>Notes</Label>
+            <Textarea rows={2} value={postNotes} onChange={e => setPostNotes(e.target.value)} data-testid={`input-${testIdPrefix}-guarantee-notes`} />
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button onClick={() => post.mutate()} disabled={!postAmount || post.isPending} data-testid={`button-${testIdPrefix}-post-guarantee`}>
+            {post.isPending ? "Posting…" : "Post to Statement"}
+          </Button>
+        </div>
       </div>
-      <div>
-        <Label>Account (where deposit is held)</Label>
-        <AccountSearchSelect
-          accounts={cashAccounts}
-          value={cashAccountId}
-          onChange={setCashAccountId}
-          placeholder="Select account…"
-          testId={`select-${testIdPrefix}-guarantee-cash`}
-        />
-        <p className="text-xs text-muted-foreground mt-1">If selected, a Receipt voucher (Dr Cash / Cr Tenant Deposits) will be posted into the main accounting ledger.</p>
+
+      {/* ── Section 2: Move to Cash ── */}
+      <div className="border rounded-md p-3 space-y-3">
+        <p className="text-sm font-semibold">Move Guarantee to Cash</p>
+        <p className="text-xs text-muted-foreground">Releases guarantee from Tenant Deposits: Dr Tenant Deposits / Cr Cash Account</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Amount ($)</Label>
+            <Input type="number" step="0.01" value={moveAmount} onChange={e => setMoveAmount(e.target.value)} data-testid={`input-${testIdPrefix}-guarantee-move-amount`} />
+          </div>
+          <div>
+            <Label>Date</Label>
+            <Input type="date" value={moveDate} onChange={e => setMoveDate(e.target.value)} data-testid={`input-${testIdPrefix}-guarantee-move-date`} />
+          </div>
+          <div className="col-span-2">
+            <Label>Target Cash Account</Label>
+            <AccountSearchSelect accounts={cashAccounts} value={moveAccountId} onChange={setMoveAccountId} placeholder="Select cash account…" testId={`select-${testIdPrefix}-guarantee-move-cash`} />
+          </div>
+          <div className="col-span-2">
+            <Label>Notes</Label>
+            <Textarea rows={2} value={moveNotes} onChange={e => setMoveNotes(e.target.value)} data-testid={`input-${testIdPrefix}-guarantee-move-notes`} />
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button onClick={() => moveToCash.mutate()} disabled={!moveAmount || !moveAccountId || moveToCash.isPending} data-testid={`button-${testIdPrefix}-guarantee-move-cash`}>
+            {moveToCash.isPending ? "Moving…" : "Move to Cash"}
+          </Button>
+        </div>
       </div>
-      <div>
-        <Label>Date</Label>
-        <Input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} data-testid={`input-${testIdPrefix}-guarantee-date`} />
-      </div>
-      <div>
-        <Label>Notes</Label>
-        <Textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} data-testid={`input-${testIdPrefix}-guarantee-notes`} />
-      </div>
-      <DialogFooter>
-        <Button onClick={() => post.mutate()} disabled={!amount || post.isPending} data-testid={`button-${testIdPrefix}-post-guarantee`}>
-          {post.isPending ? "Posting…" : "Post to Statement"}
-        </Button>
-      </DialogFooter>
     </div>
   );
 }

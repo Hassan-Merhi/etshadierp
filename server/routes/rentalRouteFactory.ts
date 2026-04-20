@@ -646,6 +646,51 @@ export function registerRentalRoutes(
     }
   });
 
+  // ── GUARANTEE TO CASH (release / apply guarantee deposit) ──
+  app.post(`${urlPrefix}/contracts/:id/guarantee-to-cash`, requireAuth, async (req: Request, res: Response) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      const { amount, cashAccountId, paymentDate, notes } = z.object({
+        amount: z.union([z.string(), z.number()]).transform(v => String(v)),
+        cashAccountId: z.number(),
+        paymentDate: z.string().optional(),
+        notes: z.string().optional(),
+      }).parse(req.body);
+
+      const [contract] = await db.select().from(propertyContracts).where(and(
+        eq(propertyContracts.id, id), eq(propertyContracts.companyId, companyId), eq(propertyContracts.module, module),
+      ));
+      if (!contract) return res.status(404).json({ message: "Contract not found" });
+
+      const [unit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, contract.unitId));
+      const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
+      const dateStr = paymentDate || new Date().toISOString().slice(0, 10);
+
+      await db.transaction(async (tx) => {
+        const depositAccountId = await findOrCreateLedgerAccount(tx, companyId, "Tenant Deposits", "Liability", "TENANT-DEP");
+        const narration = notes
+          ? `Guarantee moved to cash - ${unitLabel} - ${notes}`
+          : `Guarantee moved to cash - ${unitLabel}`;
+        const [v] = await tx.insert(vouchers).values({
+          companyId, voucherNumber: `GUAR-CASH-${Date.now()}-${id}`,
+          voucherType: "Journal", voucherDate: dateStr as any,
+          description: narration, totalAmount: amount, currency: "USD", sourceModule: "ERP",
+        }).returning();
+        // DR Tenant Deposits (clear liability) / CR Cash Account (money arrives in cash)
+        await tx.insert(voucherEntries).values([
+          { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: amount, creditAmount: "0", narration },
+          { voucherId: v.id, ledgerAccountId: cashAccountId, debitAmount: "0", creditAmount: amount, narration },
+        ]);
+      });
+      res.json({ ok: true });
+    } catch (e: any) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // ── RECORD PAYMENT ──
   app.post(`${urlPrefix}/payments`, requireAuth, async (req: Request, res: Response) => {
     try {
