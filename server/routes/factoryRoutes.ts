@@ -9,6 +9,7 @@ import { registerFactoryBalesRoutes } from "./factory/factoryBalesRoutes";
 import { registerFactoryCustomersRoutes } from "./factory/factoryCustomersRoutes";
 import { registerFactoryDocsUsersRoutes } from "./factory/factoryDocsUsersRoutes";
 import { registerFactoryEmployeesPosRoutes } from "./factory/factoryEmployeesPosRoutes";
+import { registerFactoryTransporterRoutes } from "./factory/factoryTransporterRoutes";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
@@ -56,4 +57,5 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   registerFactoryCustomersRoutes(app);
   registerFactoryDocsUsersRoutes(app);
   registerFactoryEmployeesPosRoutes(app);
+  registerFactoryTransporterRoutes(app);
 }

@@ -157,6 +157,7 @@ const FactoryPendingInvoices = lazy(() => import("@/pages/factory/FactoryPending
 const FactoryPendingInvoiceVerify = lazy(() => import("@/pages/factory/FactoryPendingInvoiceVerify"));
 const FactoryPendingLoadings = lazy(() => import("@/pages/factory/FactoryPendingLoadings"));
 const FactoryContainerLoadingScan = lazy(() => import("@/pages/factory/FactoryContainerLoadingScan"));
+const FactoryTransporters = lazy(() => import("@/pages/factory/FactoryTransporters"));
 const FactoryDashboardIntel = lazy(() => import("@/pages/factory/FactoryDashboard"));
 const FactoryKpis = lazy(() => import("@/pages/factory/FactoryKpis"));
 const FactoryProfitability = lazy(() => import("@/pages/factory/FactoryProfitability"));
@@ -787,6 +788,7 @@ function AuthenticatedApp() {
                   <Switch>
                     {hasDashboardAccess && <Route path="/factory/dashboard" component={FactoryDashboardIntel} />}
                     <Route path="/factory/daybook" component={FactoryDaybook} />
+                    <Route path="/factory/transporters" component={FactoryTransporters} />
                     <Route path="/factory/suppliers" component={FactorySuppliers} />
                     <Route path="/factory/containers/new" component={FactoryContainerCreate} />
                     <Route path="/factory/containers" component={FactoryContainers} />

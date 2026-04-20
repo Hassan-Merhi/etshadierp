@@ -4331,3 +4331,54 @@ export const insertRentalAutoTransferConfigSchema = createInsertSchema(rentalAut
 });
 export type InsertRentalAutoTransferConfig = z.infer<typeof insertRentalAutoTransferConfigSchema>;
 export type RentalAutoTransferConfig = typeof rentalAutoTransferConfigs.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FACTORY TRANSPORTERS
+// ─────────────────────────────────────────────────────────────────────────────
+export const factoryTransporters = pgTable("factory_transporters", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  name: text("name").notNull(),
+  phone: varchar("phone", { length: 50 }),
+  notes: text("notes"),
+  ledgerAccountId: integer("ledger_account_id"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  byCompany: index("factory_transporters_company_idx").on(t.companyId),
+}));
+
+export const insertFactoryTransporterSchema = createInsertSchema(factoryTransporters).omit({
+  id: true, createdAt: true, ledgerAccountId: true,
+}).extend({
+  name: z.string().min(1, "Name is required"),
+});
+export type InsertFactoryTransporter = z.infer<typeof insertFactoryTransporterSchema>;
+export type FactoryTransporter = typeof factoryTransporters.$inferSelect;
+
+export const factoryTransporterTransactions = pgTable("factory_transporter_transactions", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  transporterId: integer("transporter_id").notNull(),
+  txType: text("tx_type").notNull(), // "charge" | "payment"
+  amount: decimal("amount", { precision: 20, scale: 4 }).notNull(),
+  txDate: date("tx_date").notNull(),
+  description: text("description"),
+  expenseAccountId: integer("expense_account_id"),
+  cashAccountId: integer("cash_account_id"),
+  voucherId: integer("voucher_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  byTransporter: index("factory_transporter_tx_idx").on(t.transporterId),
+  byCompany: index("factory_transporter_tx_company_idx").on(t.companyId),
+}));
+
+export const insertFactoryTransporterTransactionSchema = createInsertSchema(factoryTransporterTransactions).omit({
+  id: true, createdAt: true, voucherId: true,
+}).extend({
+  amount: z.union([z.string(), z.number()]).transform(v => String(v)),
+  txDate: z.string().min(1, "Date is required"),
+  txType: z.enum(["charge", "payment"]),
+});
+export type InsertFactoryTransporterTransaction = z.infer<typeof insertFactoryTransporterTransactionSchema>;
+export type FactoryTransporterTransaction = typeof factoryTransporterTransactions.$inferSelect;
