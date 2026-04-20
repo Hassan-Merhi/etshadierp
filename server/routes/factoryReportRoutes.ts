@@ -286,9 +286,9 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
       }
 
       if (format === "pdf") {
-        await generatePdf(res, company.name, startDate, endDate, supplierSummaries, baleBreakdown);
+        await generatePdf(res, company.name, startDate, endDate, supplierSummaries, baleBreakdown, hideAllCosts);
       } else {
-        await generateExcel(res, company.name, startDate, endDate, supplierSummaries, baleBreakdown, allMixSources, containerMap, supplierMap);
+        await generateExcel(res, company.name, startDate, endDate, supplierSummaries, baleBreakdown, allMixSources, containerMap, supplierMap, hideAllCosts);
       }
 
       const today = getClientDate(req);
@@ -356,7 +356,8 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     startDate: string,
     endDate: string,
     supplierSummaries: any[],
-    baleBreakdown: any[]
+    baleBreakdown: any[],
+    hideAllCosts: boolean
   ) {
     const doc = new PDFDocument({ margin: 40, size: "A4", layout: "landscape" });
     res.setHeader("Content-Type", "application/pdf");
@@ -374,8 +375,12 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     doc.fontSize(12).text("Supplier Summary", { underline: true });
     doc.moveDown(0.5);
 
-    const summaryHeaders = ["Supplier", "Opening (KG)", "Purchased (KG)", "Used (KG)", "Remaining (KG)", "Cost/KG", "Cost/Bale", "Total Bales"];
-    const colWidths = [140, 85, 90, 80, 90, 70, 70, 70];
+    const summaryHeaders = hideAllCosts
+      ? ["Supplier", "Opening (KG)", "Purchased (KG)", "Used (KG)", "Remaining (KG)", "Total Bales"]
+      : ["Supplier", "Opening (KG)", "Purchased (KG)", "Used (KG)", "Remaining (KG)", "Cost/KG", "Cost/Bale", "Total Bales"];
+    const colWidths = hideAllCosts
+      ? [160, 100, 105, 95, 105, 90]
+      : [140, 85, 90, 80, 90, 70, 70, 70];
     let startX = 40;
     let y = doc.y;
 
@@ -397,16 +402,25 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
         y = 40;
       }
       x = startX;
-      const row = [
-        s.supplierName,
-        s.openingBalance.toFixed(3),
-        s.totalPurchasedKg.toFixed(3),
-        s.totalUsedKg.toFixed(3),
-        s.remaining.toFixed(3),
-        `$${s.avgCostPerKg.toFixed(4)}`,
-        `$${s.costPerBale.toFixed(2)}`,
-        String(s.totalBales),
-      ];
+      const row = hideAllCosts
+        ? [
+            s.supplierName,
+            s.openingBalance.toFixed(3),
+            s.totalPurchasedKg.toFixed(3),
+            s.totalUsedKg.toFixed(3),
+            s.remaining.toFixed(3),
+            String(s.totalBales),
+          ]
+        : [
+            s.supplierName,
+            s.openingBalance.toFixed(3),
+            s.totalPurchasedKg.toFixed(3),
+            s.totalUsedKg.toFixed(3),
+            s.remaining.toFixed(3),
+            `$${s.avgCostPerKg.toFixed(4)}`,
+            `$${s.costPerBale.toFixed(2)}`,
+            String(s.totalBales),
+          ];
       for (let i = 0; i < row.length; i++) {
         doc.text(row[i], x, y, { width: colWidths[i] });
         x += colWidths[i];
@@ -472,7 +486,8 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     baleBreakdown: any[],
     allMixSources: any[],
     containerMap: Map<number, any>,
-    supplierMap: Map<number, any>
+    supplierMap: Map<number, any>,
+    hideAllCosts: boolean
   ) {
     const workbook = new ExcelJS.Workbook();
     const boldFont = { bold: true };
@@ -490,24 +505,33 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     sheet1.addRow([`Generated: ${new Date().toISOString().replace("T", " ").substring(0, 19)}`]);
     sheet1.addRow([]);
 
-    const summaryHeaderRow = sheet1.addRow([
-      "Supplier", "Opening Balance (KG)", "Total Purchased (KG)", "Total Used (KG)",
-      "Remaining (KG)", "Avg Cost/KG (USD)", "Cost/Bale (USD)", "Total Bales", "Total Cost (USD)"
-    ]);
+    const summaryHeaderRow = hideAllCosts
+      ? sheet1.addRow(["Supplier", "Opening Balance (KG)", "Total Purchased (KG)", "Total Used (KG)", "Remaining (KG)", "Total Bales"])
+      : sheet1.addRow(["Supplier", "Opening Balance (KG)", "Total Purchased (KG)", "Total Used (KG)", "Remaining (KG)", "Avg Cost/KG (USD)", "Cost/Bale (USD)", "Total Bales", "Total Cost (USD)"]);
     summaryHeaderRow.font = boldFont;
 
     for (const s of supplierSummaries) {
-      const row = sheet1.addRow([
-        s.supplierName, s.openingBalance, s.totalPurchasedKg, s.totalUsedKg,
-        s.remaining, s.avgCostPerKg, s.costPerBale, s.totalBales, s.totalCost,
-      ]);
-      row.getCell(2).numFmt = numberFmt;
-      row.getCell(3).numFmt = numberFmt;
-      row.getCell(4).numFmt = numberFmt;
-      row.getCell(5).numFmt = numberFmt;
-      row.getCell(6).numFmt = moneyFmt;
-      row.getCell(7).numFmt = moneyFmt;
-      row.getCell(9).numFmt = moneyFmt;
+      if (hideAllCosts) {
+        const row = sheet1.addRow([
+          s.supplierName, s.openingBalance, s.totalPurchasedKg, s.totalUsedKg, s.remaining, s.totalBales,
+        ]);
+        row.getCell(2).numFmt = numberFmt;
+        row.getCell(3).numFmt = numberFmt;
+        row.getCell(4).numFmt = numberFmt;
+        row.getCell(5).numFmt = numberFmt;
+      } else {
+        const row = sheet1.addRow([
+          s.supplierName, s.openingBalance, s.totalPurchasedKg, s.totalUsedKg,
+          s.remaining, s.avgCostPerKg, s.costPerBale, s.totalBales, s.totalCost,
+        ]);
+        row.getCell(2).numFmt = numberFmt;
+        row.getCell(3).numFmt = numberFmt;
+        row.getCell(4).numFmt = numberFmt;
+        row.getCell(5).numFmt = numberFmt;
+        row.getCell(6).numFmt = moneyFmt;
+        row.getCell(7).numFmt = moneyFmt;
+        row.getCell(9).numFmt = moneyFmt;
+      }
     }
 
     sheet1.columns.forEach((col) => {
@@ -520,20 +544,27 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     });
 
     const sheet2 = workbook.addWorksheet("Bale Breakdown");
-    const baleHeaderRow = sheet2.addRow([
-      "Bale ID", "Reference Number", "Bale Code", "Product", "Supplier",
-      "Weight (KG)", "Cost/KG (USD)", "Total Cost (USD)", "Date"
-    ]);
+    const baleHeaderRow = hideAllCosts
+      ? sheet2.addRow(["Bale ID", "Reference Number", "Bale Code", "Product", "Supplier", "Weight (KG)", "Date"])
+      : sheet2.addRow(["Bale ID", "Reference Number", "Bale Code", "Product", "Supplier", "Weight (KG)", "Cost/KG (USD)", "Total Cost (USD)", "Date"]);
     baleHeaderRow.font = boldFont;
 
     for (const bale of baleBreakdown) {
-      const row = sheet2.addRow([
-        bale.baleId, bale.referenceNumber, bale.baleCode, bale.productName,
-        bale.supplierName, bale.weightKg, bale.costPerKg, bale.totalCost, bale.date,
-      ]);
-      row.getCell(6).numFmt = numberFmt;
-      row.getCell(7).numFmt = moneyFmt;
-      row.getCell(8).numFmt = moneyFmt;
+      if (hideAllCosts) {
+        const row = sheet2.addRow([
+          bale.baleId, bale.referenceNumber, bale.baleCode, bale.productName,
+          bale.supplierName, bale.weightKg, bale.date,
+        ]);
+        row.getCell(6).numFmt = numberFmt;
+      } else {
+        const row = sheet2.addRow([
+          bale.baleId, bale.referenceNumber, bale.baleCode, bale.productName,
+          bale.supplierName, bale.weightKg, bale.costPerKg, bale.totalCost, bale.date,
+        ]);
+        row.getCell(6).numFmt = numberFmt;
+        row.getCell(7).numFmt = moneyFmt;
+        row.getCell(8).numFmt = moneyFmt;
+      }
     }
 
     sheet2.columns.forEach((col) => {
@@ -546,27 +577,37 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     });
 
     const sheet3 = workbook.addWorksheet("Mixing Details");
-    const mixHeaderRow = sheet3.addRow([
-      "Mix Batch ID", "Container ID", "Container Number", "Supplier",
-      "Weight (KG)", "Cost/KG (USD)", "Total Cost (USD)"
-    ]);
+    const mixHeaderRow = hideAllCosts
+      ? sheet3.addRow(["Mix Batch ID", "Container ID", "Container Number", "Supplier", "Weight (KG)"])
+      : sheet3.addRow(["Mix Batch ID", "Container ID", "Container Number", "Supplier", "Weight (KG)", "Cost/KG (USD)", "Total Cost (USD)"]);
     mixHeaderRow.font = boldFont;
 
     for (const ms of allMixSources) {
       const container = containerMap.get(ms.containerId);
       const supplier = container ? supplierMap.get(container.supplierId) : null;
-      const row = sheet3.addRow([
-        ms.mixBatchId,
-        ms.containerId,
-        container ? container.containerNumber : `C-${ms.containerId}`,
-        supplier ? supplier.name : "Unknown",
-        parseFloat(ms.weightKg || "0"),
-        parseFloat(ms.costPerKg || "0"),
-        parseFloat(ms.totalCost || "0"),
-      ]);
-      row.getCell(5).numFmt = numberFmt;
-      row.getCell(6).numFmt = moneyFmt;
-      row.getCell(7).numFmt = moneyFmt;
+      if (hideAllCosts) {
+        const row = sheet3.addRow([
+          ms.mixBatchId,
+          ms.containerId,
+          container ? container.containerNumber : `C-${ms.containerId}`,
+          supplier ? supplier.name : "Unknown",
+          parseFloat(ms.weightKg || "0"),
+        ]);
+        row.getCell(5).numFmt = numberFmt;
+      } else {
+        const row = sheet3.addRow([
+          ms.mixBatchId,
+          ms.containerId,
+          container ? container.containerNumber : `C-${ms.containerId}`,
+          supplier ? supplier.name : "Unknown",
+          parseFloat(ms.weightKg || "0"),
+          parseFloat(ms.costPerKg || "0"),
+          parseFloat(ms.totalCost || "0"),
+        ]);
+        row.getCell(5).numFmt = numberFmt;
+        row.getCell(6).numFmt = moneyFmt;
+        row.getCell(7).numFmt = moneyFmt;
+      }
     }
 
     sheet3.columns.forEach((col) => {
