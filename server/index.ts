@@ -1324,6 +1324,8 @@ let migrationsDone = false;
       created_at          TIMESTAMP NOT NULL DEFAULT NOW()
     )`,
     `CREATE UNIQUE INDEX IF NOT EXISTS location_price_groups_unique ON location_price_groups (company_id, master_location_id, follower_location_id)`,
+    // Worker count per plan entry — how many workers are grouped under this person
+    `ALTER TABLE factory_production_plan_entries ADD COLUMN IF NOT EXISTS worker_count INTEGER NOT NULL DEFAULT 0`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

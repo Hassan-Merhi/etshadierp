@@ -28,14 +28,12 @@ export function registerProductionPlannerRoutes(app: Express) {
 
       const entryResult = await db.execute(sql`
         SELECT e.id, e.worker_id AS "workerId", w.full_name AS "workerName",
-               e.role, e.target_bales AS "targetBales",
-               e.team_leader_worker_id AS "teamLeaderWorkerId"
+               e.target_bales AS "targetBales",
+               COALESCE(e.worker_count, 0) AS "workerCount"
         FROM factory_production_plan_entries e
         JOIN factory_workers w ON w.id = e.worker_id
         WHERE e.plan_id = ${planId}
-        ORDER BY
-          CASE e.role WHEN 'TEAM_LEADER' THEN 1 WHEN 'HELPER' THEN 2 ELSE 3 END,
-          w.full_name
+        ORDER BY w.full_name
       `);
       const entries: any[] = Array.isArray(entryResult) ? entryResult : (entryResult as any).rows ?? [];
 
@@ -66,7 +64,6 @@ export function registerProductionPlannerRoutes(app: Express) {
         }
 
         if (!skipActuals) {
-          // All worker IDs including helpers (we need their individual counts to roll up)
           const actualResult = await db.execute(sql`
             SELECT fb.finalized_by AS worker_id, COUNT(*)::integer AS bale_count
             FROM factory_bales fb
@@ -78,27 +75,13 @@ export function registerProductionPlannerRoutes(app: Express) {
             GROUP BY fb.finalized_by
           `);
           const actualRows: any[] = Array.isArray(actualResult) ? actualResult : (actualResult as any).rows ?? [];
-          // Start with individual counts
-          const individual: Record<number, number> = {};
           for (const row of actualRows) {
-            individual[Number(row.worker_id)] = Number(row.bale_count);
+            actuals[Number(row.worker_id)] = Number(row.bale_count);
           }
-
-          // Roll helper bales up into their team leader
           for (const entry of entries) {
             const wid = Number(entry.workerId);
-            individual[wid] = individual[wid] ?? 0;
+            actuals[wid] = actuals[wid] ?? 0;
           }
-          for (const entry of entries) {
-            if (entry.role === "HELPER" && entry.teamLeaderWorkerId) {
-              const helperId = Number(entry.workerId);
-              const leaderId = Number(entry.teamLeaderWorkerId);
-              const helperBales = individual[helperId] ?? 0;
-              individual[leaderId] = (individual[leaderId] ?? 0) + helperBales;
-            }
-          }
-
-          actuals = individual;
         }
       }
 
@@ -127,7 +110,7 @@ export function registerProductionPlannerRoutes(app: Express) {
       const { notes, categoryIds, entries } = req.body as {
         notes?: string;
         categoryIds?: number[];
-        entries?: { workerId: number; role: string; targetBales: number; teamLeaderWorkerId?: number | null }[];
+        entries?: { workerId: number; targetBales: number; workerCount?: number }[];
       };
 
       const catJson = JSON.stringify(categoryIds ?? []);
@@ -150,11 +133,10 @@ export function registerProductionPlannerRoutes(app: Express) {
 
       if (entries && entries.length > 0) {
         for (const entry of entries) {
-          const role = ["TEAM_LEADER", "HELPER", "WORKER"].includes(entry.role) ? entry.role : "WORKER";
-          const teamLeaderWorkerId = role === "HELPER" && entry.teamLeaderWorkerId ? entry.teamLeaderWorkerId : null;
+          const wc = entry.workerCount ?? 0;
           await db.execute(sql`
-            INSERT INTO factory_production_plan_entries (plan_id, worker_id, role, target_bales, team_leader_worker_id)
-            VALUES (${planId}, ${entry.workerId}, ${role}, ${entry.targetBales ?? 0}, ${teamLeaderWorkerId})
+            INSERT INTO factory_production_plan_entries (plan_id, worker_id, role, target_bales, worker_count)
+            VALUES (${planId}, ${entry.workerId}, 'WORKER', ${entry.targetBales ?? 0}, ${wc})
           `);
         }
       }
@@ -186,12 +168,12 @@ export function registerProductionPlannerRoutes(app: Express) {
 
       const entryResult = await db.execute(sql`
         SELECT e.worker_id AS "workerId", w.full_name AS "workerName",
-               e.role, e.target_bales AS "targetBales",
-               e.team_leader_worker_id AS "teamLeaderWorkerId"
+               e.target_bales AS "targetBales",
+               COALESCE(e.worker_count, 0) AS "workerCount"
         FROM factory_production_plan_entries e
         JOIN factory_workers w ON w.id = e.worker_id
         WHERE e.plan_id = ${prevPlanId}
-        ORDER BY CASE e.role WHEN 'TEAM_LEADER' THEN 1 WHEN 'HELPER' THEN 2 ELSE 3 END, w.full_name
+        ORDER BY w.full_name
       `);
       const entries: any[] = Array.isArray(entryResult) ? entryResult : (entryResult as any).rows ?? [];
 
@@ -203,6 +185,42 @@ export function registerProductionPlannerRoutes(app: Express) {
       });
     } catch (e: any) {
       console.error("[ProductionPlanner] copy-previous error:", e.message);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // ── GET — worker plan map for a date (used by StockEntryHistory) ─────────────
+  app.get("/api/factory/production-planner/:date/worker-targets", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { date } = req.params;
+
+      const planResult = await db.execute(sql`
+        SELECT id FROM factory_production_plans
+        WHERE company_id = ${companyId} AND plan_date = ${date}
+      `);
+      const planRows: any[] = Array.isArray(planResult) ? planResult : (planResult as any).rows ?? [];
+      if (!planRows[0]) return res.json({});
+
+      const planId = Number(planRows[0].id);
+
+      const entryResult = await db.execute(sql`
+        SELECT e.worker_id AS "workerId",
+               e.target_bales AS "targetBales",
+               COALESCE(e.worker_count, 0) AS "workerCount"
+        FROM factory_production_plan_entries e
+        WHERE e.plan_id = ${planId}
+      `);
+      const entries: any[] = Array.isArray(entryResult) ? entryResult : (entryResult as any).rows ?? [];
+
+      const map: Record<number, { targetBales: number; workerCount: number }> = {};
+      for (const e of entries) {
+        map[Number(e.workerId)] = { targetBales: Number(e.targetBales), workerCount: Number(e.workerCount) };
+      }
+      res.json(map);
+    } catch (e: any) {
+      console.error("[ProductionPlanner] worker-targets error:", e.message);
       res.status(500).json({ message: e.message });
     }
   });
