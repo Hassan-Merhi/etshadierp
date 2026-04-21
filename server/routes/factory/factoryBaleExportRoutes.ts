@@ -340,21 +340,26 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       // 3. Build consumption map directly from mix batch sources + mix batch date.
       //    Each mix batch source records how much raw material (by container/supplier category)
       //    was allocated. We attribute that consumption to the mix batch's batchDate (or createdAt).
-      const directSuppliers2 = aliasedTable(factorySuppliers, "direct_suppliers_wk");
+      // Only include CONTAINER-type sources (containerId IS NOT NULL).
+      // These are the only sources that actually deduct from factoryRawStock.usedKg.
+      // BATCH-type (sourceBatchId) and direct SUPPLIER-type sources do NOT touch factoryRawStock,
+      // so including them in totalConsumption would break the opening-balance invariant and
+      // produce spurious negative balances.
       const consumptionRows = await db
         .select({
           batchDate: factoryMixBatches.batchDate,
           batchCreatedAt: factoryMixBatches.createdAt,
           catIdViaContainer: factorySuppliers.supplierCategoryId,
-          catIdViaDirect: directSuppliers2.supplierCategoryId,
           weightKg: factoryMixBatchSources.weightKg,
         })
         .from(factoryMixBatchSources)
         .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
-        .leftJoin(factoryContainers, eq(factoryMixBatchSources.containerId, factoryContainers.id))
+        .innerJoin(factoryContainers, eq(factoryMixBatchSources.containerId, factoryContainers.id))
         .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
-        .leftJoin(directSuppliers2, eq(factoryMixBatchSources.supplierId, directSuppliers2.id))
-        .where(eq(factoryMixBatches.companyId, companyId));
+        .where(and(
+          eq(factoryMixBatches.companyId, companyId),
+          not(isNull(factoryMixBatchSources.containerId)),
+        ));
 
       // 5. Consumption map: date → categoryKey → kgConsumed
       const consumptionByDate = new Map<string, Map<CatKey, number>>();
@@ -366,7 +371,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         } else {
           dateStr = (r.batchCreatedAt as Date).toISOString().slice(0, 10);
         }
-        const effectiveCatId = (r.catIdViaContainer ?? r.catIdViaDirect) as number | null;
+        const effectiveCatId = r.catIdViaContainer as number | null;
         const ck = getCatKey(effectiveCatId);
         const catName = getCatName(effectiveCatId);
         const weight = parseFloat(r.weightKg as string) || 0;
