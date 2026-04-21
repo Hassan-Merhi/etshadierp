@@ -337,6 +337,52 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         dm.set(ck, (dm.get(ck) || 0) + (parseFloat(r.receivedKg as string) || 0));
       }
 
+      // 2b. Manual stock adjustments (ADD/REMOVE) — these live in factoryRawMaterialAdjustments,
+      //     linked to a supplierId (not a container). Include them in stock-in, consumption, and
+      //     the current-balance map so the opening-balance formula stays consistent.
+      const manualAdjRows = await db
+        .select({
+          date: factoryRawMaterialAdjustments.date,
+          type: factoryRawMaterialAdjustments.type,
+          kg: factoryRawMaterialAdjustments.kg,
+          catId: factorySuppliers.supplierCategoryId,
+          supplierName: factorySuppliers.name,
+        })
+        .from(factoryRawMaterialAdjustments)
+        .leftJoin(factorySuppliers, eq(factoryRawMaterialAdjustments.supplierId, factorySuppliers.id))
+        .where(eq(factoryRawMaterialAdjustments.companyId, companyId));
+
+      // REMOVE adjustments are collected here and merged into consumptionByDate after step 5 builds it
+      const manualRemoveByDate = new Map<string, Map<CatKey, number>>();
+
+      for (const adj of manualAdjRows) {
+        const ck = getCatKey(adj.catId as number | null);
+        const catName = getCatName(adj.catId as number | null);
+        const kg = parseFloat(adj.kg as string) || 0;
+        if (kg <= 0) continue;
+        const isAdd = adj.type === "ADD";
+
+        // Keep catBalMap in sync: ADD increases free stock, REMOVE decreases it
+        if (catBalMap.has(ck)) {
+          catBalMap.get(ck)!.currentBalance += isAdd ? kg : -kg;
+        } else {
+          catBalMap.set(ck, { name: catName, currentBalance: isAdd ? kg : -kg });
+        }
+
+        const dateStr = typeof adj.date === "string" ? adj.date.slice(0, 10) : (adj.date as any).toISOString().slice(0, 10);
+        if (isAdd) {
+          // Treat manual ADD the same as receiving container stock
+          if (!stockInByDate.has(dateStr)) stockInByDate.set(dateStr, new Map());
+          const dm = stockInByDate.get(dateStr)!;
+          dm.set(ck, (dm.get(ck) || 0) + kg);
+        } else {
+          // Treat manual REMOVE as consumption on that date
+          if (!manualRemoveByDate.has(dateStr)) manualRemoveByDate.set(dateStr, new Map());
+          const dm = manualRemoveByDate.get(dateStr)!;
+          dm.set(ck, (dm.get(ck) || 0) + kg);
+        }
+      }
+
       // 3. Build consumption map directly from mix batch sources + mix batch date.
       //    Each mix batch source records how much raw material (by container/supplier category)
       //    was allocated. We attribute that consumption to the mix batch's batchDate (or createdAt).
@@ -380,6 +426,15 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         consumptionByDate.get(dateStr)!.set(ck, (consumptionByDate.get(dateStr)!.get(ck) || 0) + weight);
         if (!catBalMap.has(ck)) {
           catBalMap.set(ck, { name: catName, currentBalance: 0 });
+        }
+      }
+
+      // 5b. Merge manual REMOVE adjustments into consumptionByDate
+      for (const [dateStr, catMap] of manualRemoveByDate) {
+        if (!consumptionByDate.has(dateStr)) consumptionByDate.set(dateStr, new Map());
+        const dm = consumptionByDate.get(dateStr)!;
+        for (const [ck, kg] of catMap) {
+          dm.set(ck, (dm.get(ck) || 0) + kg);
         }
       }
 
