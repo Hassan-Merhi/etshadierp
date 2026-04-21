@@ -725,13 +725,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         username: users.username,
         active: users.active,
         createdAt: users.createdAt,
-        role: users.role,
       }).from(users);
 
-      // Collect Developer user IDs — scoped to the CURRENT company only.
-      // A user with Developer role in Company X must still be visible when an
-      // Admin views from Company Y.  Cross-company pollution caused everyone to
-      // be hidden when any user held a Developer role anywhere.
+      // Collect user IDs that have the Developer role in this company.
+      // Only hide them from non-developer requesters.
       const devRoles = await db
         .select({ userId: userCompanyRoles.userId })
         .from(userCompanyRoles)
@@ -743,7 +740,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const requesterIsDeveloper = currentRole === "Developer" || globalRole === "Developer";
 
       const visibleUsers = allUsers.filter((u: any) =>
-        requesterIsDeveloper || (!devUserIds.has(u.id) && u.role !== "Developer")
+        requesterIsDeveloper || !devUserIds.has(u.id)
       );
 
       const profiles = await db.select()
