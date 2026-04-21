@@ -16,6 +16,7 @@ import {
   vouchers, voucherEntries, salesItems, suppliers, customers,
   locations, employees, userLocations, auditLog, interCompanyTransfers,
   insertInterCompanyTransferSchema, FEATURE_KEYS,
+  locationPriceGroups,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -533,7 +534,7 @@ export function registerStockRoutes(app: Express) {
     }
   });
 
-  // Update or create location price for a stock item
+  // Update or create location price for a stock item (cascades to follower locations)
   app.post("/api/stock-items/:id/location-prices", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const stockItemId = parseInt(req.params.id);
@@ -546,7 +547,27 @@ export function registerStockRoutes(app: Express) {
         return res.status(400).json({ message: "Location ID and selling price are required" });
       }
 
+      const companyId = req.session.currentCompanyId;
+
+      // Save price for the target location
       await storage.upsertLocationPrice(stockItemId, locationId, sellingPrice);
+
+      // Cascade to follower locations if this is a master location
+      if (companyId) {
+        const followers = await db
+          .select({ followerLocationId: locationPriceGroups.followerLocationId })
+          .from(locationPriceGroups)
+          .where(
+            and(
+              eq(locationPriceGroups.companyId, companyId),
+              eq(locationPriceGroups.masterLocationId, locationId)
+            )
+          );
+        for (const f of followers) {
+          await storage.upsertLocationPrice(stockItemId, f.followerLocationId, sellingPrice);
+        }
+      }
+
       res.json({ message: "Location price updated successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -563,6 +584,64 @@ export function registerStockRoutes(app: Express) {
 
       await storage.deleteLocationPrice(priceId);
       res.json({ message: "Location price deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Location Price Groups ──────────────────────────────────────────────────
+  // GET: returns { masterLocationId, followerLocationIds[] } for each master
+  app.get("/api/location-price-groups", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rows = await db
+        .select()
+        .from(locationPriceGroups)
+        .where(eq(locationPriceGroups.companyId, companyId));
+
+      // Group by masterLocationId
+      const map = new Map<number, number[]>();
+      for (const r of rows) {
+        if (!map.has(r.masterLocationId)) map.set(r.masterLocationId, []);
+        map.get(r.masterLocationId)!.push(r.followerLocationId);
+      }
+      const result = Array.from(map.entries()).map(([masterLocationId, followerLocationIds]) => ({
+        masterLocationId,
+        followerLocationIds,
+      }));
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PUT: replaces the full group config for the company
+  app.put("/api/location-price-groups", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // groups: Array<{ masterLocationId: number; followerLocationIds: number[] }>
+      const { groups } = req.body as { groups: { masterLocationId: number; followerLocationIds: number[] }[] };
+      if (!Array.isArray(groups)) return res.status(400).json({ message: "groups must be an array" });
+
+      // Delete all existing for this company, then re-insert
+      await db.delete(locationPriceGroups).where(eq(locationPriceGroups.companyId, companyId));
+
+      const toInsert = groups.flatMap((g) =>
+        g.followerLocationIds.map((fid) => ({
+          companyId,
+          masterLocationId: g.masterLocationId,
+          followerLocationId: fid,
+        }))
+      );
+      if (toInsert.length > 0) {
+        await db.insert(locationPriceGroups).values(toInsert);
+      }
+
+      res.json({ message: "Price groups saved" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -711,6 +790,122 @@ export function registerStockRoutes(app: Express) {
       }
 
       res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Price list for All Locations view: one price column per configured master location
+  app.get("/api/pos/price-list-by-masters", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const isPrivileged = ["Admin", "Owner", "Manager"].includes((req.user as any)?.role || "");
+
+      // Get all configured master location IDs
+      const groupRows = await db
+        .select({ masterLocationId: locationPriceGroups.masterLocationId })
+        .from(locationPriceGroups)
+        .where(eq(locationPriceGroups.companyId, companyId));
+
+      const masterIds = [...new Set(groupRows.map((r) => r.masterLocationId))];
+
+      // Get master location names
+      const masterLocations = masterIds.length > 0
+        ? await db
+            .select({ id: locations.id, name: locations.name })
+            .from(locations)
+            .where(and(eq(locations.companyId, companyId), inArray(locations.id, masterIds)))
+        : [];
+
+      // Get all active stock items
+      const items = await db
+        .select({
+          stockItemId: stockItems.id,
+          code: stockItems.code,
+          name: stockItems.name,
+          stockGroupName: sql<string>`COALESCE(${stockGroups.name}, '')`,
+          baseSellingPrice: stockItems.sellingPrice,
+        })
+        .from(stockItems)
+        .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+        .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)))
+        .orderBy(stockItems.name);
+
+      // Get location-specific prices for all master locations in one query
+      const masterPriceRows = masterIds.length > 0
+        ? await db
+            .select({
+              stockItemId: stockItemLocationPrices.stockItemId,
+              locationId: stockItemLocationPrices.locationId,
+              sellingPrice: stockItemLocationPrices.sellingPrice,
+            })
+            .from(stockItemLocationPrices)
+            .where(
+              and(
+                inArray(stockItemLocationPrices.locationId, masterIds),
+                inArray(
+                  stockItemLocationPrices.stockItemId,
+                  items.map((i) => i.stockItemId)
+                )
+              )
+            )
+        : [];
+
+      // Build a nested map: stockItemId -> locationId -> price
+      const priceMap = new Map<number, Map<number, string>>();
+      for (const p of masterPriceRows) {
+        if (!priceMap.has(p.stockItemId)) priceMap.set(p.stockItemId, new Map());
+        priceMap.get(p.stockItemId)!.set(p.locationId, p.sellingPrice);
+      }
+
+      // Attach cost data for privileged users
+      let dubaiMap = new Map<number, string>();
+      let offloadMap = new Map<number, string>();
+      if (isPrivileged && items.length > 0) {
+        const [dubaiCostRes, offloadCostRes] = await Promise.all([
+          db.execute(sql`
+            SELECT DISTINCT ON (pli.stock_item_id)
+              pli.stock_item_id AS "stockItemId",
+              pli.rate AS "costDubai"
+            FROM po_line_items pli
+            JOIN purchase_orders po ON pli.po_id = po.id
+            JOIN containers c ON po.container_id = c.id
+            WHERE po.company_id = ${companyId}
+            ORDER BY pli.stock_item_id, pli.id DESC
+          `),
+          db.execute(sql`
+            SELECT DISTINCT ON (pli.stock_item_id)
+              pli.stock_item_id AS "stockItemId",
+              co.additional_cost_per_bale AS "offloadingCost"
+            FROM container_offloads co
+            JOIN containers c ON co.container_id = c.id
+            JOIN purchase_orders po ON po.container_id = c.id
+            JOIN po_line_items pli ON pli.po_id = po.id
+            WHERE c.company_id = ${companyId}
+            ORDER BY pli.stock_item_id, co.offloaded_at DESC
+          `),
+        ]);
+        for (const r of dubaiCostRes.rows as any[]) dubaiMap.set(Number(r.stockItemId), String(r.costDubai ?? "0"));
+        for (const r of offloadCostRes.rows as any[]) offloadMap.set(Number(r.stockItemId), String(r.offloadingCost ?? "0"));
+      }
+
+      const result = items.map((item) => {
+        const itemPrices: Record<number, string> = {};
+        for (const mloc of masterLocations) {
+          const custom = priceMap.get(item.stockItemId)?.get(mloc.id);
+          itemPrices[mloc.id] = custom ?? item.baseSellingPrice ?? "0";
+        }
+        const base: any = { ...item, masterPrices: itemPrices };
+        if (isPrivileged) {
+          base.costPrice = dubaiMap.get(item.stockItemId) ?? null;
+          base.offloadingCost = offloadMap.get(item.stockItemId) ?? null;
+        }
+        return base;
+      });
+
+      res.json({ masters: masterLocations, items: result });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

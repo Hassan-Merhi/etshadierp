@@ -113,6 +113,7 @@ import { BulkRenameTab } from "./settings/BulkRenameTab";
 import { LoginHistoryTab } from "./settings/LoginHistoryTab";
 import { POSReceiptSettings, IntercompanyPosTab } from "./settings/IntercompanyPosTab";
 import { OfflineSyncPanel, formatRelativeTime } from "./settings/OfflineSyncPanel";
+import { PriceGroupsTab } from "./settings/PriceGroupsTab";
 
 // Page access constants — single source of truth shared between Settings and BulkRenameTab
 const ALL_FACTORY_PAGES_SETTINGS = FACTORY_NAV_PAGES;
@@ -1102,6 +1103,7 @@ const FACTORY_COST_FIELDS = [
         label: "POS",
         items: appMode !== "factory" ? [
           { key: "pos-settings", label: "POS Settings", icon: ShoppingCart, devOnly: true },
+          { key: "price-groups", label: "Price Groups", icon: Layers },
         ] : [],
       },
       {
@@ -1974,6 +1976,10 @@ const FACTORY_COST_FIELDS = [
 
           {activeSection === "intercompany" && (
             <IntercompanyPosTab />
+          )}
+
+          {activeSection === "price-groups" && (
+            <PriceGroupsTab />
           )}
 
           {activeSection === "system" && (

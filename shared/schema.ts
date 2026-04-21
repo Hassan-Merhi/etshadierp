@@ -4430,3 +4430,21 @@ export const customerOrderBaleRemovals = pgTable("customer_order_bale_removals",
   removedAt: timestamp("removed_at").notNull().defaultNow(),
 });
 export type CustomerOrderBaleRemoval = typeof customerOrderBaleRemovals.$inferSelect;
+
+// ── Location Price Groups ─────────────────────────────────────────────────────
+// Defines master locations whose prices cascade to follower locations
+export const locationPriceGroups = pgTable("location_price_groups", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  masterLocationId: integer("master_location_id").notNull(),
+  followerLocationId: integer("follower_location_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertLocationPriceGroupSchema = createInsertSchema(locationPriceGroups).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type LocationPriceGroup = typeof locationPriceGroups.$inferSelect;
+export type InsertLocationPriceGroup = z.infer<typeof insertLocationPriceGroupSchema>;

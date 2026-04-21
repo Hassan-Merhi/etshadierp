@@ -35,6 +35,22 @@ interface PriceListItem {
   offloadingCost?: string | null;
 }
 
+interface MasterItem {
+  stockItemId: number;
+  code: string;
+  name: string;
+  stockGroupName: string;
+  baseSellingPrice: string | null;
+  masterPrices: Record<number, string>;
+  costPrice?: string | null;
+  offloadingCost?: string | null;
+}
+
+interface MasterPriceListResponse {
+  masters: { id: number; name: string }[];
+  items: MasterItem[];
+}
+
 interface POSPriceListProps {
   posUser?: any;
 }
@@ -52,7 +68,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [groupFilter, setGroupFilter] = useState<string>("all");
-  const [editingItem, setEditingItem] = useState<{ stockItemId: number; value: string } | null>(null);
+  const [editingItem, setEditingItem] = useState<{ stockItemId: number; locationId: number; value: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
@@ -79,16 +95,16 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
   const isAllMode = selectedLocationId === ALL_LOCATIONS_ID;
 
+  // ── Single-location price list ──────────────────────────────────────────────
   const {
     data: priceList = [],
     isLoading: priceListLoading,
-    isError,
-    error,
+    isError: priceListError,
+    error: priceListErrorObj,
   } = useQuery<PriceListItem[]>({
     queryKey: ["/api/pos/price-list", selectedLocationId],
     queryFn: async () => {
-      const param = isAllMode ? "all" : selectedLocationId;
-      const res = await fetch(`/api/pos/price-list?locationId=${param}`, {
+      const res = await fetch(`/api/pos/price-list?locationId=${selectedLocationId}`, {
         credentials: "include",
       });
       if (!res.ok) {
@@ -97,13 +113,41 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       }
       return res.json();
     },
-    enabled: !!selectedLocationId,
+    enabled: !!selectedLocationId && !isAllMode,
   });
 
+  // ── All-masters price list ──────────────────────────────────────────────────
+  const {
+    data: mastersData,
+    isLoading: mastersLoading,
+    isError: mastersError,
+    error: mastersErrorObj,
+  } = useQuery<MasterPriceListResponse>({
+    queryKey: ["/api/pos/price-list-by-masters"],
+    queryFn: async () => {
+      const res = await fetch("/api/pos/price-list-by-masters", { credentials: "include" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ message: "Unknown error" }));
+        throw new Error(body.message || "Failed to load price list");
+      }
+      return res.json();
+    },
+    enabled: isAllMode,
+  });
+
+  const masters = mastersData?.masters ?? [];
+  const masterItems = mastersData?.items ?? [];
+
+  // ── Merged state ────────────────────────────────────────────────────────────
+  const isLoading = isAllMode ? mastersLoading : priceListLoading;
+  const isError = isAllMode ? mastersError : priceListError;
+  const error = isAllMode ? mastersErrorObj : priceListErrorObj;
+
   const locationPricedList = useMemo(() => {
+    if (isAllMode) return masterItems as any[];
     if (!posUser) return priceList;
     return priceList.filter((item) => item.hasCustomPrice && item.sellingPrice !== null);
-  }, [priceList, posUser]);
+  }, [priceList, masterItems, posUser, isAllMode]);
 
   const stockGroups = useMemo(() => {
     const groups = new Set<string>();
@@ -115,7 +159,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return locationPricedList.filter((item) => {
+    return locationPricedList.filter((item: any) => {
       const matchesSearch =
         !q ||
         item.name.toLowerCase().includes(q) ||
@@ -130,9 +174,9 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const selectedLocation = locations.find((l) => l.id === selectedLocationId);
 
   const updatePriceMutation = useMutation({
-    mutationFn: async ({ stockItemId, sellingPrice }: { stockItemId: number; sellingPrice: string }) => {
+    mutationFn: async ({ stockItemId, locationId, sellingPrice }: { stockItemId: number; locationId: number; sellingPrice: string }) => {
       const res = await apiRequest("POST", `/api/stock-items/${stockItemId}/location-prices`, {
-        locationId: selectedLocationId,
+        locationId,
         sellingPrice,
       });
       if (!res.ok) {
@@ -142,7 +186,11 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list", selectedLocationId] });
+      if (isAllMode) {
+        queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list-by-masters"] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list", selectedLocationId] });
+      }
       toast({ title: "Price updated" });
       setEditingItem(null);
     },
@@ -151,12 +199,9 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     },
   });
 
-  const startEdit = (item: PriceListItem) => {
-    if (posUser || isAllMode) return;
-    setEditingItem({
-      stockItemId: item.stockItemId,
-      value: item.sellingPrice ?? item.baseSellingPrice ?? "",
-    });
+  const startEdit = (stockItemId: number, locationId: number, currentPrice: string | null) => {
+    if (posUser) return;
+    setEditingItem({ stockItemId, locationId, value: currentPrice ?? "" });
     setTimeout(() => inputRef.current?.focus(), 30);
   };
 
@@ -167,7 +212,11 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       toast({ title: "Invalid price", description: "Enter a valid number.", variant: "destructive" });
       return;
     }
-    updatePriceMutation.mutate({ stockItemId: editingItem.stockItemId, sellingPrice: val });
+    updatePriceMutation.mutate({
+      stockItemId: editingItem.stockItemId,
+      locationId: editingItem.locationId,
+      sellingPrice: val,
+    });
   };
 
   const cancelEdit = () => setEditingItem(null);
@@ -177,10 +226,10 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     if (e.key === "Escape") cancelEdit();
   };
 
-  const canEdit = !posUser && !isAllMode;
-  const showQty = !isAllMode;
+  const canEdit = !posUser;
   const showCostPrice = isPrivileged && !posUser;
 
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="flex h-full overflow-hidden">
       {/* ── Locations sidebar ── */}
@@ -198,16 +247,10 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
             <p className="text-xs text-muted-foreground px-3 py-4">No locations.</p>
           ) : (
             <div className="flex flex-col gap-0.5 px-2 py-1">
-              {/* All Locations option (non-POS only) */}
               {!posUser && (
                 <button
                   data-testid="button-location-all"
-                  onClick={() => {
-                    setSelectedLocationId(ALL_LOCATIONS_ID);
-                    setSearch("");
-                    setGroupFilter("all");
-                    setEditingItem(null);
-                  }}
+                  onClick={() => { setSelectedLocationId(ALL_LOCATIONS_ID); setSearch(""); setGroupFilter("all"); setEditingItem(null); }}
                   className={cn(
                     "w-full text-left px-3 py-2 rounded-md text-sm transition-colors hover-elevate flex items-center gap-1.5",
                     selectedLocationId === ALL_LOCATIONS_ID
@@ -223,12 +266,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 <button
                   key={loc.id}
                   data-testid={`button-location-${loc.id}`}
-                  onClick={() => {
-                    setSelectedLocationId(loc.id);
-                    setSearch("");
-                    setGroupFilter("all");
-                    setEditingItem(null);
-                  }}
+                  onClick={() => { setSelectedLocationId(loc.id); setSearch(""); setGroupFilter("all"); setEditingItem(null); }}
                   className={cn(
                     "w-full text-left px-3 py-2 rounded-md text-sm transition-colors hover-elevate",
                     selectedLocationId === loc.id
@@ -246,7 +284,6 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
       {/* ── Main content ── */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        {/* Header */}
         <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
           <Tag className="w-4 h-4 text-muted-foreground" />
           <h1 className="text-base font-semibold">Price List</h1>
@@ -263,7 +300,6 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
           ) : null}
         </div>
 
-        {/* Filters */}
         {selectedLocationId && (
           <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b shrink-0">
             <div className="relative flex-1 min-w-[180px]">
@@ -292,9 +328,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
           </div>
         )}
 
-        {/* Body */}
         <div className="flex-1 overflow-auto p-4">
-          {/* No location selected */}
           {!selectedLocationId && !locationsLoading && (
             <div className="flex flex-col items-center justify-center h-full text-center gap-2 text-muted-foreground">
               <MapPin className="w-10 h-10 opacity-30" />
@@ -302,7 +336,6 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
             </div>
           )}
 
-          {/* Error */}
           {isError && (
             <Alert variant="destructive">
               <AlertCircle className="w-4 h-4" />
@@ -310,8 +343,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
             </Alert>
           )}
 
-          {/* Loading */}
-          {selectedLocationId && priceListLoading && (
+          {selectedLocationId && isLoading && (
             <div className="divide-y rounded-md border overflow-hidden">
               {Array.from({ length: 10 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 px-4 py-3">
@@ -324,16 +356,23 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
             </div>
           )}
 
-          {/* Table */}
-          {selectedLocationId && !priceListLoading && !isError && (
+          {selectedLocationId && !isLoading && !isError && (
             <>
-              {filteredItems.length === 0 ? (
+              {/* No-masters notice in All mode */}
+              {isAllMode && masters.length === 0 && (
+                <Alert>
+                  <Layers className="w-4 h-4" />
+                  <AlertDescription>
+                    No price groups configured. Go to Settings → Price Groups to set up master locations.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {filteredItems.length === 0 && !(isAllMode && masters.length === 0) ? (
                 <div className="flex flex-col items-center justify-center h-full text-center gap-2 text-muted-foreground py-16">
                   <Tag className="w-10 h-10 opacity-30" />
                   <p className="text-sm">
-                    {search || groupFilter !== "all"
-                      ? "No items match your search."
-                      : "No items found for this location."}
+                    {search || groupFilter !== "all" ? "No items match your search." : "No items found."}
                   </p>
                   {(search || groupFilter !== "all") && (
                     <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setGroupFilter("all"); }}>
@@ -341,7 +380,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                     </Button>
                   )}
                 </div>
-              ) : (
+              ) : filteredItems.length > 0 ? (
                 <>
                   <div className="rounded-md border overflow-hidden">
                     <Table>
@@ -351,156 +390,161 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                           <TableHead>Item Name</TableHead>
                           <TableHead className="hidden sm:table-cell">Group</TableHead>
                           {showCostPrice && (
-                            <TableHead className="text-right hidden sm:table-cell w-36">Cost Price</TableHead>
+                            <TableHead className="text-right hidden sm:table-cell w-32">Cost Price</TableHead>
                           )}
                           {showCostPrice && (
-                            <TableHead className="text-right hidden sm:table-cell w-36">Offloading Cost</TableHead>
+                            <TableHead className="text-right hidden sm:table-cell w-32">Offloading Cost</TableHead>
                           )}
-                          <TableHead className="text-right w-48">Selling Price</TableHead>
-                          {showQty && (
+
+                          {/* All-mode: one column per master */}
+                          {isAllMode && masters.map((m) => (
+                            <TableHead key={m.id} className="text-right w-40">{m.name}</TableHead>
+                          ))}
+
+                          {/* Single-location mode: one Selling Price column */}
+                          {!isAllMode && (
+                            <TableHead className="text-right w-48">Selling Price</TableHead>
+                          )}
+
+                          {!isAllMode && (
                             <TableHead className="text-right hidden sm:table-cell w-28">Qty in Stock</TableHead>
                           )}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredItems.map((item) => {
-                          const isEditing = editingItem?.stockItemId === item.stockItemId;
-                          const isSaving = updatePriceMutation.isPending && editingItem?.stockItemId === item.stockItemId;
-
-                          return (
-                            <TableRow
-                              key={item.stockItemId}
-                              data-testid={`row-price-${item.stockItemId}`}
-                              className={cn(canEdit && "group")}
-                            >
-                              <TableCell className="font-mono text-sm text-muted-foreground">
-                                {item.code || "—"}
-                              </TableCell>
-                              <TableCell>
-                                <div className="font-medium">{item.name}</div>
-                                {item.stockGroupName && (
-                                  <div className="text-xs text-muted-foreground sm:hidden">
-                                    {item.stockGroupName}
-                                  </div>
-                                )}
-                              </TableCell>
-                              <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
-                                {item.stockGroupName || "—"}
-                              </TableCell>
-
-                              {/* ── Cost Price / Dubai Cost (privileged only) ── */}
-                              {showCostPrice && (
-                                <TableCell
-                                  className="text-right hidden sm:table-cell text-sm tabular-nums text-muted-foreground"
-                                  data-testid={`text-cost-${item.stockItemId}`}
-                                >
-                                  {item.costPrice && parseFloat(item.costPrice) > 0
-                                    ? formatAmount(parseFloat(item.costPrice))
-                                    : "—"}
-                                </TableCell>
+                        {filteredItems.map((item: any) => (
+                          <TableRow key={item.stockItemId} data-testid={`row-price-${item.stockItemId}`} className={cn(canEdit && !isAllMode && "group")}>
+                            <TableCell className="font-mono text-sm text-muted-foreground">{item.code || "—"}</TableCell>
+                            <TableCell>
+                              <div className="font-medium">{item.name}</div>
+                              {item.stockGroupName && (
+                                <div className="text-xs text-muted-foreground sm:hidden">{item.stockGroupName}</div>
                               )}
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+                              {item.stockGroupName || "—"}
+                            </TableCell>
 
-                              {/* ── Offloading Cost per Item (privileged only) ── */}
-                              {showCostPrice && (
-                                <TableCell
-                                  className="text-right hidden sm:table-cell text-sm tabular-nums text-muted-foreground"
-                                  data-testid={`text-offloading-cost-${item.stockItemId}`}
-                                >
-                                  {item.offloadingCost && parseFloat(item.offloadingCost) > 0
-                                    ? formatAmount(parseFloat(item.offloadingCost))
-                                    : "—"}
-                                </TableCell>
-                              )}
+                            {showCostPrice && (
+                              <TableCell className="text-right hidden sm:table-cell text-sm tabular-nums text-muted-foreground" data-testid={`text-cost-${item.stockItemId}`}>
+                                {item.costPrice && parseFloat(item.costPrice) > 0 ? formatAmount(parseFloat(item.costPrice)) : "—"}
+                              </TableCell>
+                            )}
+                            {showCostPrice && (
+                              <TableCell className="text-right hidden sm:table-cell text-sm tabular-nums text-muted-foreground" data-testid={`text-offloading-cost-${item.stockItemId}`}>
+                                {item.offloadingCost && parseFloat(item.offloadingCost) > 0 ? formatAmount(parseFloat(item.offloadingCost)) : "—"}
+                              </TableCell>
+                            )}
 
-                              {/* ── Editable selling price cell ── */}
-                              <TableCell className="text-right">
-                                {isEditing ? (
-                                  <div className="flex items-center justify-end gap-1">
-                                    <Input
-                                      ref={inputRef}
-                                      data-testid={`input-price-${item.stockItemId}`}
-                                      type="number"
-                                      step="0.01"
-                                      className="w-28 h-8 text-right tabular-nums"
-                                      value={editingItem.value}
-                                      onChange={(e) =>
-                                        setEditingItem((prev) =>
-                                          prev ? { ...prev, value: e.target.value } : null
-                                        )
-                                      }
-                                      onKeyDown={handleKeyDown}
-                                      disabled={isSaving}
-                                    />
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      data-testid={`button-save-price-${item.stockItemId}`}
-                                      onClick={commitEdit}
-                                      disabled={isSaving}
+                            {/* All-mode: editable price per master location */}
+                            {isAllMode && masters.map((m) => {
+                              const price = item.masterPrices?.[m.id] ?? item.baseSellingPrice ?? null;
+                              const isEditing = editingItem?.stockItemId === item.stockItemId && editingItem?.locationId === m.id;
+                              const isSaving = updatePriceMutation.isPending && editingItem?.stockItemId === item.stockItemId && editingItem?.locationId === m.id;
+                              return (
+                                <TableCell key={m.id} className="text-right">
+                                  {isEditing ? (
+                                    <div className="flex items-center justify-end gap-1">
+                                      <Input
+                                        ref={inputRef}
+                                        data-testid={`input-price-${item.stockItemId}-${m.id}`}
+                                        type="number"
+                                        step="0.01"
+                                        className="w-24 h-8 text-right tabular-nums"
+                                        value={editingItem.value}
+                                        onChange={(e) => setEditingItem((prev) => prev ? { ...prev, value: e.target.value } : null)}
+                                        onKeyDown={handleKeyDown}
+                                        disabled={isSaving}
+                                      />
+                                      <Button size="icon" variant="ghost" onClick={commitEdit} disabled={isSaving} data-testid={`button-save-price-${item.stockItemId}-${m.id}`}>
+                                        <Check className="w-3.5 h-3.5 text-green-600" />
+                                      </Button>
+                                      <Button size="icon" variant="ghost" onClick={cancelEdit} disabled={isSaving} data-testid={`button-cancel-price-${item.stockItemId}-${m.id}`}>
+                                        <X className="w-3.5 h-3.5 text-muted-foreground" />
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <div
+                                      className={cn("flex items-center justify-end gap-1.5 group/cell", canEdit && "cursor-pointer rounded-md px-2 py-1 hover-elevate")}
+                                      onClick={() => canEdit && startEdit(item.stockItemId, m.id, price)}
+                                      title={canEdit ? `Click to edit ${m.name} price` : undefined}
+                                      data-testid={`cell-price-${item.stockItemId}-${m.id}`}
                                     >
-                                      <Check className="w-3.5 h-3.5 text-green-600" />
-                                    </Button>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      data-testid={`button-cancel-price-${item.stockItemId}`}
-                                      onClick={cancelEdit}
-                                      disabled={isSaving}
-                                    >
-                                      <X className="w-3.5 h-3.5 text-muted-foreground" />
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <div
-                                    className={cn(
-                                      "flex items-center justify-end gap-1.5",
-                                      canEdit && "cursor-pointer rounded-md px-2 py-1 hover-elevate"
-                                    )}
-                                    data-testid={`cell-price-${item.stockItemId}`}
-                                    onClick={() => startEdit(item)}
-                                    title={canEdit ? "Click to edit price" : undefined}
-                                  >
-                                    <span className="font-semibold tabular-nums">
-                                      {item.sellingPrice
-                                        ? formatAmount(parseFloat(item.sellingPrice))
-                                        : "—"}
-                                    </span>
-                                    {!item.hasCustomPrice && item.sellingPrice && !isAllMode && (
-                                      <Badge variant="outline" className="text-xs hidden sm:inline-flex">
-                                        base
-                                      </Badge>
-                                    )}
-                                    {canEdit && (
-                                      <Pencil className="w-3 h-3 text-muted-foreground opacity-40 md:opacity-0 md:group-hover:opacity-60 transition-opacity shrink-0" />
-                                    )}
-                                  </div>
-                                )}
-                              </TableCell>
-
-                              {/* ── Qty in Stock ── */}
-                              {showQty && (
-                                <TableCell
-                                  className="text-right hidden sm:table-cell text-sm text-muted-foreground tabular-nums"
-                                  data-testid={`text-qty-${item.stockItemId}`}
-                                >
-                                  {formatQty(item.quantity)}
+                                      <span className="font-semibold tabular-nums">
+                                        {price && parseFloat(price) > 0 ? formatAmount(parseFloat(price)) : "—"}
+                                      </span>
+                                      {canEdit && <Pencil className="w-3 h-3 text-muted-foreground opacity-40 md:opacity-0 md:group-hover/cell:opacity-60 transition-opacity shrink-0" />}
+                                    </div>
+                                  )}
                                 </TableCell>
-                              )}
-                            </TableRow>
-                          );
-                        })}
+                              );
+                            })}
+
+                            {/* Single-location mode: editable Selling Price */}
+                            {!isAllMode && (() => {
+                              const isEditing = editingItem?.stockItemId === item.stockItemId;
+                              const isSaving = updatePriceMutation.isPending && editingItem?.stockItemId === item.stockItemId;
+                              return (
+                                <TableCell className="text-right">
+                                  {isEditing ? (
+                                    <div className="flex items-center justify-end gap-1">
+                                      <Input
+                                        ref={inputRef}
+                                        data-testid={`input-price-${item.stockItemId}`}
+                                        type="number"
+                                        step="0.01"
+                                        className="w-28 h-8 text-right tabular-nums"
+                                        value={editingItem!.value}
+                                        onChange={(e) => setEditingItem((prev) => prev ? { ...prev, value: e.target.value } : null)}
+                                        onKeyDown={handleKeyDown}
+                                        disabled={isSaving}
+                                      />
+                                      <Button size="icon" variant="ghost" data-testid={`button-save-price-${item.stockItemId}`} onClick={commitEdit} disabled={isSaving}>
+                                        <Check className="w-3.5 h-3.5 text-green-600" />
+                                      </Button>
+                                      <Button size="icon" variant="ghost" data-testid={`button-cancel-price-${item.stockItemId}`} onClick={cancelEdit} disabled={isSaving}>
+                                        <X className="w-3.5 h-3.5 text-muted-foreground" />
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <div
+                                      className={cn("flex items-center justify-end gap-1.5", canEdit && "group cursor-pointer rounded-md px-2 py-1 hover-elevate")}
+                                      data-testid={`cell-price-${item.stockItemId}`}
+                                      onClick={() => canEdit && startEdit(item.stockItemId, selectedLocationId!, item.sellingPrice)}
+                                      title={canEdit ? "Click to edit price" : undefined}
+                                    >
+                                      <span className="font-semibold tabular-nums">
+                                        {item.sellingPrice ? formatAmount(parseFloat(item.sellingPrice)) : "—"}
+                                      </span>
+                                      {!item.hasCustomPrice && item.sellingPrice && (
+                                        <Badge variant="outline" className="text-xs hidden sm:inline-flex">base</Badge>
+                                      )}
+                                      {canEdit && (
+                                        <Pencil className="w-3 h-3 text-muted-foreground opacity-40 md:opacity-0 md:group-hover:opacity-60 transition-opacity shrink-0" />
+                                      )}
+                                    </div>
+                                  )}
+                                </TableCell>
+                              );
+                            })()}
+
+                            {!isAllMode && (
+                              <TableCell className="text-right hidden sm:table-cell text-sm text-muted-foreground tabular-nums" data-testid={`text-qty-${item.stockItemId}`}>
+                                {formatQty(item.quantity)}
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        ))}
                       </TableBody>
                     </Table>
                   </div>
 
                   <p className="text-xs text-muted-foreground text-right mt-2" data-testid="text-item-count">
                     Showing {filteredItems.length} of {locationPricedList.length} items
-                    {canEdit && (
-                      <span className="ml-1">· Click any price to edit it</span>
-                    )}
+                    {canEdit && <span className="ml-1">· Click any price to edit it{isAllMode && masters.length > 0 ? " (cascades to followers)" : ""}</span>}
                   </p>
                 </>
-              )}
+              ) : null}
             </>
           )}
         </div>
