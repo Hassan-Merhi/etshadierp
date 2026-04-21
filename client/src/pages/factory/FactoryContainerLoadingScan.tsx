@@ -48,6 +48,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Customer {
   id: number;
@@ -129,6 +139,7 @@ export default function FactoryContainerLoadingScan() {
   const [importRefNumbers, setImportRefNumbers] = useState<string[]>([]);
   const [showPendingWarning, setShowPendingWarning] = useState(false);
   const [pendingOrders, setPendingOrders] = useState<Array<{ id: number; invoiceNumber: string | null; status: string; totalQtyBales: number }>>([]);
+  const [baleToDelete, setBaleToDelete] = useState<{ id: number; baleReference: string } | null>(null);
   const scannerRef = useRef<HTMLInputElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -911,7 +922,7 @@ export default function FactoryContainerLoadingScan() {
                                     variant="ghost"
                                     size="icon"
                                     onClick={() =>
-                                      removeBaleMutation.mutate(bale.id)
+                                      setBaleToDelete({ id: bale.id, baleReference: bale.baleReference })
                                     }
                                     disabled={removeBaleMutation.isPending}
                                     data-testid={`button-remove-bale-${bale.id}`}
@@ -1651,6 +1662,33 @@ export default function FactoryContainerLoadingScan() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Bale removal confirmation */}
+      <AlertDialog open={!!baleToDelete} onOpenChange={(open) => { if (!open) setBaleToDelete(null); }}>
+        <AlertDialogContent data-testid="dialog-confirm-remove-bale">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove bale from loading?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bale <span className="font-mono font-semibold">{baleToDelete?.baleReference}</span> will be removed from this loading and returned to stock. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-remove-bale">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground"
+              data-testid="button-confirm-remove-bale"
+              onClick={() => {
+                if (baleToDelete) {
+                  removeBaleMutation.mutate(baleToDelete.id);
+                  setBaleToDelete(null);
+                }
+              }}
+            >
+              Remove Bale
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
