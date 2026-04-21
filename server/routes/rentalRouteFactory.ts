@@ -728,6 +728,7 @@ export function registerRentalRoutes(
       const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
       const dateStr = paymentDate || new Date().toISOString().slice(0, 10);
 
+      let voucherId: number | null = null;
       await db.transaction(async (tx) => {
         const depositAccountId = await findOrCreateLedgerAccount(tx, companyId, "Tenant Deposits", "Liability", "TENANT-DEP");
         const narration = notes
@@ -738,12 +739,27 @@ export function registerRentalRoutes(
           voucherType: "Journal", voucherDate: dateStr as any,
           description: narration, totalAmount: amount, currency: "USD", sourceModule: "ERP",
         }).returning();
+        voucherId = v.id;
         // DR Tenant Deposits (clear liability) / CR Cash Account (money arrives in cash)
         await tx.insert(voucherEntries).values([
           { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: amount, creditAmount: "0", narration },
           { voucherId: v.id, ledgerAccountId: cashAccountId, debitAmount: "0", creditAmount: amount, narration },
         ]);
       });
+
+      // Record in payments log so it's visible in cash flow / payments history
+      const pd = new Date(dateStr);
+      await db.insert(propertyPayments).values({
+        companyId, module, contractId: contract.id, unitId: contract.unitId,
+        ledgerRowId: null, cashAccountId, voucherId,
+        amount, paymentDate: dateStr as any,
+        forYear: pd.getUTCFullYear(), forMonth: pd.getUTCMonth() + 1,
+        notes: notes ? `[Guarantee release] ${notes}` : `[Guarantee release] ${unitLabel}`,
+      });
+
+      // Fire auto-transfer if configured — guarantee cash receipt triggers the same transfer rules as rent payments
+      await maybeRunAutoTransfer(companyId, module, cashAccountId, amount, dateStr, unitLabel);
+
       res.json({ ok: true });
     } catch (e: any) {
       if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
