@@ -784,6 +784,32 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
     }
   });
 
+  // Link (or unlink) a proforma to an existing loading
+  app.patch("/api/factory/customer-orders/:id/link-proforma", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const { proformaId } = req.body; // null to unlink, number to link
+
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Loading not found" });
+      if (order.status !== "LOADING") return res.status(400).json({ message: "Can only link a proforma to an active loading" });
+
+      const [updated] = await db.update(customerOrders)
+        .set({ proformaIdUsed: proformaId ? parseInt(proformaId) : null })
+        .where(eq(customerOrders.id, orderId))
+        .returning();
+
+      res.json({ success: true, order: updated });
+    } catch (error: any) {
+      console.error("Error linking proforma to loading:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/factory/customer-orders/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;

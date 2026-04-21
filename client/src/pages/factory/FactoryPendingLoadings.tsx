@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
-import { Clock, Package, Play, Trash2, Download } from "lucide-react";
+import { Clock, Package, Play, Trash2, Download, Link, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -18,6 +18,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { apiRequest, keyStartsWith } from "@/lib/queryClient";
 
 interface PendingLoad {
@@ -33,16 +41,38 @@ interface PendingLoad {
   status: string;
 }
 
+interface Proforma {
+  id: number;
+  name: string;
+  status: string;
+  customerId: number;
+  createdAt: string;
+  lines: Array<{ id: number; articleCode: string; productName: string; qty: number }>;
+}
+
 export default function FactoryPendingLoadings() {
   const { formatDisplayDate } = useDateFormat();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState<PendingLoad | null>(null);
+  const [linkTarget, setLinkTarget] = useState<PendingLoad | null>(null);
+  const [selectedProformaId, setSelectedProformaId] = useState<number | null>(null);
 
   const { data: loads = [], isLoading } = useQuery<PendingLoad[]>({
     queryKey: ["/api/factory/customer-orders?status=LOADING"],
     refetchInterval: 30000,
+  });
+
+  const { data: proformas = [], isLoading: proformasLoading } = useQuery<Proforma[]>({
+    queryKey: ["/api/factory/customer-proformas", linkTarget?.customerId],
+    queryFn: async () => {
+      if (!linkTarget) return [];
+      const res = await fetch(`/api/factory/customer-proformas?customerId=${linkTarget.customerId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch proformas");
+      return res.json();
+    },
+    enabled: !!linkTarget,
   });
 
   const deleteMutation = useMutation({
@@ -59,6 +89,35 @@ export default function FactoryPendingLoadings() {
       setDeleteTarget(null);
     },
   });
+
+  const linkProformaMutation = useMutation({
+    mutationFn: async ({ orderId, proformaId }: { orderId: number; proformaId: number | null }) => {
+      return await apiRequest("PATCH", `/api/factory/customer-orders/${orderId}/link-proforma`, { proformaId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+      toast({ title: "Proforma linked", description: "The loading has been linked to the selected proforma." });
+      closeLinkDialog();
+    },
+    onError: (err: any) => {
+      toast({ title: "Link failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const closeLinkDialog = () => {
+    setLinkTarget(null);
+    setSelectedProformaId(null);
+  };
+
+  const handleOpenLink = (load: PendingLoad) => {
+    setLinkTarget(load);
+    setSelectedProformaId(load.proformaIdUsed);
+  };
+
+  const handleConfirmLink = () => {
+    if (!linkTarget) return;
+    linkProformaMutation.mutate({ orderId: linkTarget.id, proformaId: selectedProformaId });
+  };
 
   const handleExport = (load: PendingLoad) => {
     window.open(`/api/factory/customer-orders/${load.id}/pending-export`, "_blank");
@@ -107,9 +166,14 @@ export default function FactoryPendingLoadings() {
                     <Badge variant="secondary" data-testid={`badge-load-id-${load.id}`}>
                       Loading #{load.id}
                     </Badge>
-                    {load.proformaIdUsed && (
+                    {load.proformaIdUsed ? (
                       <Badge variant="outline" data-testid={`badge-proforma-${load.id}`}>
+                        <Link className="h-3 w-3 mr-1" />
                         {load.proformaName ? load.proformaName : `Proforma #${load.proformaIdUsed}`}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground" data-testid={`badge-no-proforma-${load.id}`}>
+                        No proforma linked
                       </Badge>
                     )}
                   </div>
@@ -136,6 +200,16 @@ export default function FactoryPendingLoadings() {
                   </Button>
                   <Button
                     variant="outline"
+                    size="sm"
+                    onClick={() => handleOpenLink(load)}
+                    data-testid={`button-link-proforma-${load.id}`}
+                    title="Link proforma"
+                  >
+                    <Link className="h-4 w-4 mr-1.5" />
+                    {load.proformaIdUsed ? "Change Proforma" : "Link Proforma"}
+                  </Button>
+                  <Button
+                    variant="outline"
                     size="icon"
                     onClick={() => setDeleteTarget(load)}
                     data-testid={`button-delete-${load.id}`}
@@ -157,6 +231,94 @@ export default function FactoryPendingLoadings() {
           ))}
         </div>
       )}
+
+      {/* Link Proforma Dialog */}
+      <Dialog open={!!linkTarget} onOpenChange={(open) => { if (!open) closeLinkDialog(); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Link Proforma to Loading #{linkTarget?.id}</DialogTitle>
+            <DialogDescription>
+              Select a proforma for <strong>{linkTarget?.customerName}</strong> to link to this loading. The proforma will be used to validate scanned bales.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 max-h-[400px] overflow-y-auto py-2">
+            {proformasLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
+              </div>
+            ) : proformas.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">No proformas found for this customer.</p>
+            ) : (
+              <>
+                {/* Option to unlink */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedProformaId(null)}
+                  className={`w-full text-left rounded-md border p-3 transition-colors ${
+                    selectedProformaId === null
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover-elevate"
+                  }`}
+                  data-testid="option-no-proforma"
+                >
+                  <div className="flex items-center gap-2">
+                    <X className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-muted-foreground">No proforma (unlink)</span>
+                  </div>
+                </button>
+
+                {proformas.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setSelectedProformaId(p.id)}
+                    className={`w-full text-left rounded-md border p-3 transition-colors ${
+                      selectedProformaId === p.id
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover-elevate"
+                    }`}
+                    data-testid={`option-proforma-${p.id}`}
+                  >
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{p.name || `Proforma #${p.id}`}</span>
+                        <Badge
+                          variant={p.status === "ACTIVE" ? "default" : "secondary"}
+                          className="text-xs no-default-active-elevate"
+                        >
+                          {p.status}
+                        </Badge>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {p.lines?.length ?? 0} lines
+                      </span>
+                    </div>
+                    {p.createdAt && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Created {formatDisplayDate(p.createdAt.split("T")[0])}
+                      </p>
+                    )}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeLinkDialog} data-testid="button-cancel-link">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmLink}
+              disabled={linkProformaMutation.isPending}
+              data-testid="button-confirm-link"
+            >
+              {linkProformaMutation.isPending ? "Linking…" : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
