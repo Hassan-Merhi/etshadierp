@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
-import { apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { useToast } from "@/hooks/use-toast";
 import {
