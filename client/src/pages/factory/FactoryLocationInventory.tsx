@@ -895,9 +895,11 @@ export default function FactoryLocationInventory() {
     }
   };
 
-  // Autosave: when editing a proforma, debounce-save 2s after any selection change
+  // Autosave: when editing a proforma, debounce-save 2s after any selection change.
+  // IMPORTANT: guard with editModeInitialized — if the existing proforma lines have not yet been
+  // loaded and mapped into selections, firing replace-lines would wipe all previous lines.
   useEffect(() => {
-    if (!proformaAutoSave || !proformaMode || !editingProformaId || selections.size === 0) return;
+    if (!proformaAutoSave || !proformaMode || !editingProformaId || selections.size === 0 || !editModeInitialized) return;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
       isSilentAutoSaveRef.current = true;
@@ -908,7 +910,7 @@ export default function FactoryLocationInventory() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proformaAutoSave, proformaMode, editingProformaId, selections]);
+  }, [proformaAutoSave, proformaMode, editingProformaId, selections, editModeInitialized]);
 
   const handleExportExcel = () => {
     if (!savedProformaId) return;

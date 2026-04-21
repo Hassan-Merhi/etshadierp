@@ -8,16 +8,17 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Star, Pencil, FileText, Check, LayoutGrid, Download, RefreshCw, Search, BookOpen, PenLine, Truck, ArrowRightLeft, Clock } from "lucide-react";
+import { Plus, Trash2, Star, Pencil, FileText, LayoutGrid, Download, RefreshCw, Search, BookOpen, PenLine, Truck, ArrowRightLeft, Upload, AlertCircle } from "lucide-react";
 import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
+import { read as readExcel, utils as excelUtils } from "@/lib/excelHelper";
 
 interface ProformaLine {
   id: number;
@@ -77,6 +78,14 @@ export default function FactoryProformas() {
   const [createLoadingLocationId, setCreateLoadingLocationId] = useState<string>("");
   const [transferProforma, setTransferProforma] = useState<Proforma | null>(null);
   const [transferTargetCustomerId, setTransferTargetCustomerId] = useState<string>("");
+
+  // Excel import state
+  const [isExcelImportOpen, setIsExcelImportOpen] = useState(false);
+  const [excelImportName, setExcelImportName] = useState("");
+  const [excelImportLines, setExcelImportLines] = useState<{ articleCode: string; productName: string; quantity: string; pricePerBale: string }[]>([]);
+  const [excelImportErrors, setExcelImportErrors] = useState<string[]>([]);
+  const [excelImportLoading, setExcelImportLoading] = useState(false);
+  const excelFileInputRef = useRef<HTMLInputElement>(null);
 
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId) : null;
 
@@ -288,6 +297,87 @@ export default function FactoryProformas() {
     return { label: "", value: "" };
   };
 
+  const bulkImportMutation = useMutation({
+    mutationFn: async (data: { customerId: number; name: string; isActive: boolean; lines: any[] }) => {
+      const res = await modeApiRequest("POST", "/api/factory/customer-proformas/bulk", data);
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Proforma created", description: "Excel data imported successfully" });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-proformas") });
+      setIsExcelImportOpen(false);
+      setExcelImportName("");
+      setExcelImportLines([]);
+      setExcelImportErrors([]);
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Import failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleExcelFile = async (file: File) => {
+    setExcelImportLoading(true);
+    setExcelImportErrors([]);
+    setExcelImportLines([]);
+    try {
+      const workbook = await readExcel(file);
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      if (!firstSheet) { setExcelImportErrors(["No sheets found in this file"]); return; }
+      const rows = excelUtils.sheet_to_json<Record<string, any>>(firstSheet);
+      if (rows.length === 0) { setExcelImportErrors(["The sheet appears to be empty"]); return; }
+
+      // Smart column detection — case-insensitive, multiple aliases
+      const normalize = (s: string) => String(s ?? "").toLowerCase().replace(/[\s_\-]/g, "");
+      const findCol = (row: Record<string, any>, aliases: string[]): string => {
+        const keys = Object.keys(row);
+        for (const alias of aliases) {
+          const found = keys.find((k) => normalize(k) === alias);
+          if (found) return String(row[found] ?? "").trim();
+        }
+        return "";
+      };
+
+      const parsed: { articleCode: string; productName: string; quantity: string; pricePerBale: string }[] = [];
+      const errors: string[] = [];
+
+      rows.forEach((row, i) => {
+        const articleCode = findCol(row, ["articlecode", "code", "article", "artcode", "sku", "ref"]);
+        const productName = findCol(row, ["productname", "name", "product", "description", "item", "itemname"]);
+        const quantity = findCol(row, ["quantity", "qty", "bales", "count"]);
+        const pricePerBale = findCol(row, ["priceperbale", "price", "rate", "unitprice", "saleprice", "sellingprice"]);
+
+        if (!articleCode && !productName) {
+          errors.push(`Row ${i + 2}: Missing article code and product name — skipped`);
+          return;
+        }
+        if (!articleCode) { errors.push(`Row ${i + 2}: Missing article code — skipped`); return; }
+        if (!productName) { errors.push(`Row ${i + 2}: Missing product name — skipped`); return; }
+        const qty = parseInt(quantity);
+        if (isNaN(qty) || qty <= 0) { errors.push(`Row ${i + 2}: Invalid quantity "${quantity}" — skipped`); return; }
+
+        parsed.push({ articleCode, productName, quantity: String(qty), pricePerBale: pricePerBale || "0" });
+      });
+
+      if (errors.length > 0) setExcelImportErrors(errors);
+      if (parsed.length === 0) {
+        setExcelImportErrors((prev) => [...prev, "No valid rows found. Check that columns are named: Article Code, Product Name, Quantity, Price Per Bale"]);
+        return;
+      }
+      setExcelImportLines(parsed);
+      // Suggest a proforma name from the filename
+      if (!excelImportName) {
+        const base = file.name.replace(/\.(xlsx?|csv)$/i, "").replace(/[_\-]+/g, " ").trim();
+        setExcelImportName(base || "Imported Proforma");
+      }
+    } catch (err: any) {
+      setExcelImportErrors([`Failed to read file: ${err?.message || "Unknown error"}`]);
+    } finally {
+      setExcelImportLoading(false);
+    }
+  };
+
   const applyCatalogPricesMutation = useMutation({
     mutationFn: async (proformaId: number) => {
       const res = await modeApiRequest("POST", `/api/factory/customer-proformas/${proformaId}/apply-catalog-prices`, {});
@@ -344,13 +434,28 @@ export default function FactoryProformas() {
           <p className="text-muted-foreground text-sm sm:text-base">Manage customer-specific price lists for bale sales</p>
         </div>
         {customerId && (
-          <Button
-            data-testid="button-create-proforma"
-            onClick={() => setIsCreateOpen(true)}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            New Proforma
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              data-testid="button-import-excel-proforma"
+              onClick={() => {
+                setExcelImportName("");
+                setExcelImportLines([]);
+                setExcelImportErrors([]);
+                setIsExcelImportOpen(true);
+              }}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Import Excel
+            </Button>
+            <Button
+              data-testid="button-create-proforma"
+              onClick={() => setIsCreateOpen(true)}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              New Proforma
+            </Button>
+          </div>
         )}
       </div>
 
@@ -1100,6 +1205,159 @@ export default function FactoryProformas() {
               data-testid="button-confirm-create-loading"
             >
               {createLoadingMutation.isPending ? "Creating..." : "Create Loading"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Excel Import Dialog ──────────────────────────────────────────── */}
+      <Dialog
+        open={isExcelImportOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsExcelImportOpen(false);
+            setExcelImportLines([]);
+            setExcelImportErrors([]);
+            if (excelFileInputRef.current) excelFileInputRef.current.value = "";
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Import Proforma from Excel</DialogTitle>
+            <DialogDescription>
+              Upload an Excel file (.xlsx) with columns: <strong>Article Code</strong>, <strong>Product Name</strong>, <strong>Quantity</strong>, <strong>Price Per Bale</strong>. Column names are flexible — any common variation is detected automatically.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-4 py-2 pr-1">
+            {/* Customer info */}
+            <div className="flex items-center gap-2 p-3 rounded-md bg-muted">
+              <div>
+                <p className="text-xs text-muted-foreground">Customer</p>
+                <p className="text-sm font-medium">
+                  {customers.find((c: Customer) => c.id === customerId)?.legalName ?? "—"}
+                </p>
+              </div>
+            </div>
+
+            {/* Proforma name */}
+            <div>
+              <Label className="text-sm font-medium mb-1 block">Proforma Name</Label>
+              <Input
+                placeholder="e.g. Summer 2024 Pricing"
+                value={excelImportName}
+                onChange={(e) => setExcelImportName(e.target.value)}
+                data-testid="input-excel-import-name"
+              />
+            </div>
+
+            {/* File upload */}
+            <div>
+              <Label className="text-sm font-medium mb-1 block">Excel File (.xlsx)</Label>
+              <div
+                className="border-2 border-dashed rounded-md p-6 text-center cursor-pointer hover-elevate transition-colors"
+                onClick={() => excelFileInputRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const file = e.dataTransfer.files[0];
+                  if (file) handleExcelFile(file);
+                }}
+                data-testid="dropzone-excel-import"
+              >
+                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  {excelImportLoading ? "Reading file…" : "Click or drag & drop an Excel file here"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Supports .xlsx format</p>
+              </div>
+              <input
+                ref={excelFileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleExcelFile(f); }}
+                data-testid="input-file-excel"
+              />
+            </div>
+
+            {/* Parse errors */}
+            {excelImportErrors.length > 0 && (
+              <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 space-y-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
+                  <p className="text-sm font-medium text-destructive">
+                    {excelImportLines.length > 0 ? "Some rows were skipped:" : "Could not parse file:"}
+                  </p>
+                </div>
+                {excelImportErrors.map((err, i) => (
+                  <p key={i} className="text-xs text-muted-foreground pl-6">{err}</p>
+                ))}
+              </div>
+            )}
+
+            {/* Preview table */}
+            {excelImportLines.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-2">
+                  Preview — {excelImportLines.length} row{excelImportLines.length !== 1 ? "s" : ""} ready to import
+                </p>
+                <div className="border rounded-md overflow-hidden">
+                  <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Article Code</TableHead>
+                          <TableHead className="text-xs">Product Name</TableHead>
+                          <TableHead className="text-xs text-right">Qty</TableHead>
+                          <TableHead className="text-xs text-right">Price/Bale</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {excelImportLines.map((row, i) => (
+                          <TableRow key={i} data-testid={`row-excel-preview-${i}`}>
+                            <TableCell className="font-mono text-xs py-1.5">{row.articleCode}</TableCell>
+                            <TableCell className="text-xs py-1.5">{row.productName}</TableCell>
+                            <TableCell className="text-right font-mono text-xs py-1.5">{row.quantity}</TableCell>
+                            <TableCell className="text-right font-mono text-xs py-1.5">{parseFloat(row.pricePerBale) > 0 ? parseFloat(row.pricePerBale).toFixed(2) : "—"}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsExcelImportOpen(false);
+                setExcelImportLines([]);
+                setExcelImportErrors([]);
+                if (excelFileInputRef.current) excelFileInputRef.current.value = "";
+              }}
+              data-testid="button-cancel-excel-import"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!customerId || !excelImportName.trim() || excelImportLines.length === 0) return;
+                bulkImportMutation.mutate({
+                  customerId,
+                  name: excelImportName.trim(),
+                  isActive: false,
+                  lines: excelImportLines,
+                });
+              }}
+              disabled={!excelImportName.trim() || excelImportLines.length === 0 || bulkImportMutation.isPending}
+              data-testid="button-confirm-excel-import"
+            >
+              {bulkImportMutation.isPending ? "Creating…" : `Create Proforma (${excelImportLines.length} lines)`}
             </Button>
           </DialogFooter>
         </DialogContent>
