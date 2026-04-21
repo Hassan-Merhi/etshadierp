@@ -43,7 +43,7 @@ import {
   factoryPosSales, factoryPosSaleItems, proformaStockReservations,
   factorySupplierCategories,
 } from "@shared/schema";
-import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
+import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt, alias } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import CryptoJS from "crypto-js";
 import multer from "multer";
@@ -355,21 +355,32 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       const batchCatMap = new Map<number, Map<CatKey, { name: string; weightKg: number }>>();
 
       if (batchIds.length > 0) {
+        // Alias needed so we can join factorySuppliers twice:
+        //   1. via containerId → container → supplier (CONTAINER-type sources)
+        //   2. directly via supplierId (SUPPLIER-type sources, no containerId)
+        const directSuppliers = alias(factorySuppliers, "direct_suppliers");
+
         const sourceRows = await db
           .select({
             mixBatchId: factoryMixBatchSources.mixBatchId,
-            categoryId: factorySuppliers.supplierCategoryId,
+            // CONTAINER path: resolve category through container's supplier
+            catIdViaContainer: factorySuppliers.supplierCategoryId,
+            // SUPPLIER path: resolve category directly from the source's supplierId
+            catIdViaDirect: directSuppliers.supplierCategoryId,
             weightKg: factoryMixBatchSources.weightKg,
           })
           .from(factoryMixBatchSources)
           .leftJoin(factoryContainers, eq(factoryMixBatchSources.containerId, factoryContainers.id))
           .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
+          .leftJoin(directSuppliers, eq(factoryMixBatchSources.supplierId, directSuppliers.id))
           .where(inArray(factoryMixBatchSources.mixBatchId, batchIds));
 
         for (const r of sourceRows) {
           const bid = r.mixBatchId;
-          const ck = getCatKey(r.categoryId as number | null);
-          const catName = getCatName(r.categoryId as number | null);
+          // Use container path first; fall back to direct supplier path for SUPPLIER-type sources
+          const effectiveCatId = (r.catIdViaContainer ?? r.catIdViaDirect) as number | null;
+          const ck = getCatKey(effectiveCatId);
+          const catName = getCatName(effectiveCatId);
           if (!batchCatMap.has(bid)) batchCatMap.set(bid, new Map());
           const cm = batchCatMap.get(bid)!;
           const w = parseFloat(r.weightKg as string) || 0;
