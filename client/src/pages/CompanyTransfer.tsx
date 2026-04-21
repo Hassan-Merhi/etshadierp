@@ -35,7 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
-import { ArrowRight, Undo2, Building2, Zap, Trash2, Plus } from "lucide-react";
+import { Undo2, Zap, Trash2, Plus } from "lucide-react";
 
 interface LedgerAccount {
   id: number;
@@ -90,14 +90,6 @@ export default function CompanyTransfer() {
   const { formatAmount } = useCurrencyContext();
   const { toast } = useToast();
 
-  const today = new Date().toLocaleDateString("en-CA");
-
-  const [toCompanyId, setToCompanyId] = useState<string>("");
-  const [fromAccountId, setFromAccountId] = useState<string>("");
-  const [toAccountId, setToAccountId] = useState<string>("");
-  const [amount, setAmount] = useState("");
-  const [transferDate, setTransferDate] = useState(today);
-  const [description, setDescription] = useState("");
   const [undoTarget, setUndoTarget] = useState<Transfer | null>(null);
 
   // Auto-rule editor state (one "add" form at a time per module)
@@ -119,12 +111,6 @@ export default function CompanyTransfer() {
   const { data: fromAccounts = [] } = useQuery<LedgerAccount[]>({
     queryKey: [`/api/company-accounts/${fromCompanyId}`],
     enabled: !!fromCompanyId,
-  });
-
-  // Accounts for selected destination company (manual transfer)
-  const { data: toAccounts = [] } = useQuery<LedgerAccount[]>({
-    queryKey: [`/api/company-accounts/${toCompanyId}`],
-    enabled: !!toCompanyId,
   });
 
   // Accounts for rule destination company
@@ -152,23 +138,6 @@ export default function CompanyTransfer() {
     enabled: !!fromCompanyId,
   });
   const autoConfigQueries = [cfgProperties, cfgErp, cfgFactory];
-
-  const transferMutation = useMutation({
-    mutationFn: (body: object) =>
-      apiRequest("POST", "/api/simple-company-transfer", body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/simple-company-transfers"] });
-      toast({ title: "Transfer complete", description: "Amount moved successfully." });
-      setToCompanyId("");
-      setFromAccountId("");
-      setToAccountId("");
-      setAmount("");
-      setDescription("");
-    },
-    onError: (e: any) => {
-      toast({ title: "Transfer failed", description: e.message, variant: "destructive" });
-    },
-  });
 
   const undoMutation = useMutation({
     mutationFn: (id: number) =>
@@ -221,22 +190,6 @@ export default function CompanyTransfer() {
     },
   });
 
-  const handleSubmit = () => {
-    if (!fromCompanyId || !toCompanyId || !fromAccountId || !toAccountId || !amount) {
-      toast({ title: "Missing fields", description: "Please fill in all required fields.", variant: "destructive" });
-      return;
-    }
-    transferMutation.mutate({
-      fromCompanyId,
-      toCompanyId: parseInt(toCompanyId),
-      fromLedgerAccountId: parseInt(fromAccountId),
-      toLedgerAccountId: parseInt(toAccountId),
-      amount,
-      transferDate,
-      description: description || undefined,
-    });
-  };
-
   const openAddRule = (module: string) => {
     setAddingModule(module);
     setRuleDestCompanyId("");
@@ -280,102 +233,6 @@ export default function CompanyTransfer() {
       </div>
 
       <div className="p-6 space-y-6">
-        {/* Manual Transfer Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
-              New Transfer
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-end gap-4">
-              <div className="space-y-2">
-                <Label>From Company</Label>
-                <div
-                  className="flex items-center h-9 px-3 rounded-md border bg-muted/40 text-sm font-medium"
-                  data-testid="text-from-company"
-                >
-                  {currentCompany?.name ?? "—"}
-                </div>
-              </div>
-              <ArrowRight className="h-5 w-5 text-muted-foreground mb-0.5 hidden md:block" />
-              <div className="space-y-2">
-                <Label>To Company</Label>
-                <Select value={toCompanyId} onValueChange={v => { setToCompanyId(v); setToAccountId(""); }} data-testid="select-to-company">
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select destination company" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {otherCompanies.map(c => (
-                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-end gap-4">
-              <div className="space-y-2">
-                <Label>From Account <span className="text-destructive">*</span></Label>
-                <Select value={fromAccountId} onValueChange={setFromAccountId} data-testid="select-from-account">
-                  <SelectTrigger>
-                    <SelectValue placeholder="Account to deduct from" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accountOptions(fromAccounts).map(a => (
-                      <SelectItem key={a.id} value={String(a.id)}>
-                        {a.name}
-                        <span className="text-muted-foreground text-xs ml-1">({a.accountType})</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="hidden md:block w-5" />
-              <div className="space-y-2">
-                <Label>To Account <span className="text-destructive">*</span></Label>
-                <Select value={toAccountId} onValueChange={setToAccountId} disabled={!toCompanyId} data-testid="select-to-account">
-                  <SelectTrigger>
-                    <SelectValue placeholder={toCompanyId ? "Account to receive into" : "Select company first"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accountOptions(toAccounts).map(a => (
-                      <SelectItem key={a.id} value={String(a.id)}>
-                        {a.name}
-                        <span className="text-muted-foreground text-xs ml-1">({a.accountType})</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Amount <span className="text-destructive">*</span></Label>
-                <Input
-                  type="number" min="0" step="0.01" placeholder="0.00"
-                  value={amount} onChange={e => setAmount(e.target.value)}
-                  data-testid="input-amount"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Date</Label>
-                <Input type="date" value={transferDate} onChange={e => setTransferDate(e.target.value)} data-testid="input-date" />
-              </div>
-              <div className="space-y-2">
-                <Label>Note (optional)</Label>
-                <Input placeholder="e.g. Cash to Kinshasa" value={description} onChange={e => setDescription(e.target.value)} data-testid="input-description" />
-              </div>
-            </div>
-
-            <Button onClick={handleSubmit} disabled={transferMutation.isPending} data-testid="button-submit-transfer">
-              {transferMutation.isPending ? "Transferring…" : "Transfer"}
-            </Button>
-          </CardContent>
-        </Card>
-
         {/* Auto-Transfer Rules */}
         <Card>
           <CardHeader>
