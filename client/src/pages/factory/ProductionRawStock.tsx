@@ -1529,8 +1529,12 @@ export default function ProductionRawStock() {
                   const hasCategories = sortedGroups.some(([k]) => k !== "uncategorized");
 
                   return sortedGroups.flatMap(([groupKey, group]) => {
-                    const isCollapsed = collapsedCategories.has(groupKey);
                     const groupRows = group.rows;
+                    // Single-supplier groups start collapsed by default; clicking toggles them.
+                    // Multi-supplier groups start expanded; clicking collapses them.
+                    const defaultCollapsed = groupRows.length === 1;
+                    const isToggled = collapsedCategories.has(groupKey);
+                    const isCollapsed = defaultCollapsed !== isToggled;
                     const groupTotalReceived = groupRows.reduce((s, r) => s + parseFloat(r.receivedKg), 0);
                     const groupTotalFree = groupRows.reduce((s, r) => s + parseFloat(r.freeKg || "0"), 0);
                     const groupTotalValue = groupRows.reduce((s, r) => s + parseFloat(r.valueRemainingUsd || r.valueRemaining), 0);
