@@ -452,9 +452,25 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         weekStockIn.set(wk, sMap);
       }
 
+      // Compute total stock-in and total consumption across ALL historical weeks so we can
+      // back-calculate the true opening balance of the very first week.
+      // Invariant: currentBalance = firstOpening + totalStockIn − totalConsumption
+      // → firstOpening = currentBalance − totalStockIn + totalConsumption
+      const totalStockInAll = new Map<CatKey, number>();
+      const totalConsumptionAll = new Map<CatKey, number>();
+      for (const wk of sortedWeekKeys) {
+        for (const [ck, v] of weekStockIn.get(wk)!) totalStockInAll.set(ck, (totalStockInAll.get(ck) || 0) + v);
+        for (const [ck, v] of weekConsumption.get(wk)!) totalConsumptionAll.set(ck, (totalConsumptionAll.get(ck) || 0) + v);
+      }
+
       const openingBalances = new Map<string, Map<CatKey, number>>();
       const closingBalances = new Map<string, Map<CatKey, number>>();
-      const firstOpening = new Map<CatKey, number>(allCatKeys.map(ck => [ck, 0]));
+      const firstOpening = new Map<CatKey, number>(
+        allCatKeys.map(ck => [
+          ck,
+          (catBalMap.get(ck)?.currentBalance || 0) - (totalStockInAll.get(ck) || 0) + (totalConsumptionAll.get(ck) || 0),
+        ])
+      );
       openingBalances.set(sortedWeekKeys[0], firstOpening);
       for (let i = 0; i < sortedWeekKeys.length; i++) {
         const wk = sortedWeekKeys[i];
@@ -467,14 +483,23 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         if (i < sortedWeekKeys.length - 1) openingBalances.set(sortedWeekKeys[i + 1], closing);
       }
 
-      // Apply period filter — only display weeks within the selected range
+      // Apply period filter — only display weeks within the selected range.
+      // We include a week if ANY of its activity dates falls on or after the period start.
       const displayWeekKeys = periodStart
         ? sortedWeekKeys.filter(wk => {
             const dates = weekMap.get(wk)!;
+            // Include the week if its LAST recorded date is >= period start,
+            // OR if the week's Monday falls within the period (handles partially-started weeks)
             const lastDate = dates[dates.length - 1];
-            return lastDate >= periodStart!;
+            const monDate = mondayOfWeek(dates[0]);
+            return lastDate >= periodStart! || monDate >= periodStart!;
           })
         : sortedWeekKeys;
+
+      const periodLabel = period === "week" ? "This Week"
+        : period === "month" ? "This Month"
+        : period === "year" ? "This Year"
+        : "All Time";
 
       // 8. Excel generation
       if (format === "excel") {
@@ -494,6 +519,15 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         sh.getColumn(3).width = 12;
 
         let row = 1;
+
+        if (displayWeekKeys.length === 0) {
+          const msgRow = sh.getRow(row);
+          const msgCell = msgRow.getCell(1);
+          msgCell.value = `No production data found for period: ${periodLabel}`;
+          msgCell.font = { italic: true, size: 11 };
+          sh.mergeCells(row, 1, row, 12);
+          row++;
+        }
 
         for (const wk of displayWeekKeys) {
           const dates = weekMap.get(wk)!;
@@ -647,13 +681,35 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         const rowH = 14;
         const wpLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
 
+        // Show "no data" page when the selected period has no weeks
+        if (displayWeekKeys.length === 0) {
+          const hasLogo = fs.existsSync(wpLogoPath);
+          if (hasLogo) {
+            try { doc.image(wpLogoPath, (doc.page.width - 220) / 2, 10, { width: 220 }); } catch {}
+            if (doc.y < 130) (doc as any).y = 130;
+            doc.moveDown(0.5);
+          }
+          doc.fontSize(13).font("Helvetica-Bold")
+            .text(`No production data found for period: ${periodLabel}`, 30, doc.y, { width: pageW, align: "center" });
+          doc.end();
+          return;
+        }
+
         for (let wi = 0; wi < displayWeekKeys.length; wi++) {
           const wk = displayWeekKeys[wi];
           if (wi > 0) doc.addPage({ layout: "landscape" });
 
+          // On the first page, place logo at top then continue below it.
+          // On subsequent pages start from the top margin.
+          let startY = 30; // default top margin
           if (wi === 0 && fs.existsSync(wpLogoPath)) {
-            try { doc.image(wpLogoPath, (doc.page.width - 220) / 2, 10, { width: 220 }); } catch {}
-            doc.moveDown(0.5);
+            try {
+              doc.image(wpLogoPath, (doc.page.width - 220) / 2, 10, { width: 220 });
+              // Ensure we start below the logo — use whichever is lower: doc.y or a minimum clearance
+              startY = Math.max(doc.y + 8, 130);
+            } catch {
+              startY = 30;
+            }
           }
 
           const dates = weekMap.get(wk)!;
@@ -673,7 +729,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           for (let i = 1; i < colWidths.length; i++) colX.push(colX[i - 1] + colWidths[i - 1]);
 
           const titleText = `Week ${wk}  |  ${fmtDate(monDate)} – ${fmtDate(weekDaysMoSa[5])}`;
-          doc.fontSize(11).font("Helvetica-Bold").text(titleText, 30, 30, { width: pageW, align: "center" });
+          doc.fontSize(11).font("Helvetica-Bold").text(titleText, 30, startY, { width: pageW, align: "center" });
           doc.moveDown(0.3);
 
           const headers = ["CATEGORY", "Balance", "Stock In", ...weekDaysMoSa.map(d => `${dayName(d)}\n${fmtDate(d)}`), "TOTAL", "REMAINS"];
