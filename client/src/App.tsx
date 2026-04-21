@@ -635,7 +635,7 @@ function AuthenticatedApp() {
   const isPropertiesRoute = currentLocation.startsWith("/properties/");
 
   if (isPropertiesCompany && !isPropertiesRoute) {
-    return <Redirect to="/properties/dashboard" />;
+    return <Redirect to="/properties/daybook" />;
   }
 
   if (isPropertiesRoute && isPropertiesCompany) {
@@ -696,7 +696,7 @@ function AuthenticatedApp() {
                         <Route path="/properties/ledger-monthly/:accountId" component={PropertiesLedgerMonthly} />
                         <Route path="/properties/ledger-vouchers/:accountId/:year/:month" component={PropertiesLedgerVouchers} />
                         {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/settings" component={PropertiesSettings} />}
-                        <Route><Redirect to="/properties/dashboard" /></Route>
+                        <Route><Redirect to="/properties/daybook" /></Route>
                       </Switch>
                     </Suspense>
                   </ErrorBoundary>

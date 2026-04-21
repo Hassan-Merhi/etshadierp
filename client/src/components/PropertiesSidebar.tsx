@@ -1,8 +1,6 @@
 import {
-  LayoutDashboard,
   Landmark,
   FileText,
-  TrendingUp,
   BookOpen,
   Settings,
   Building2,
@@ -46,13 +44,6 @@ const navSections: NavSection[] = [
     items: [
       { title: "Accounts", url: "/properties/accounts", icon: Landmark },
       { title: "Vouchers", url: "/properties/vouchers", icon: FileText },
-    ],
-  },
-  {
-    label: "Reports",
-    color: "#8b5cf6",
-    items: [
-      { title: "Analytics",  url: "/properties/analytics", icon: TrendingUp },
     ],
   },
 ];
@@ -143,7 +134,6 @@ export function PropertiesSidebar({ user }: { user?: any }) {
 
       <SidebarContent className="px-3 py-2 overflow-y-auto">
         <div className="space-y-0.5 mb-2">
-          <FlatLink href="/properties/dashboard" icon={LayoutDashboard} label="Dashboard" color="#6366f1" testId="link-properties-dashboard" />
           <FlatLink href="/properties/daybook" icon={BookOpen} label="Daybook" color="#6366f1" testId="link-properties-daybook" />
         </div>
 
