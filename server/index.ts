@@ -1316,6 +1316,14 @@ let migrationsDone = false;
       removed_by_username  VARCHAR,
       removed_at           TIMESTAMP NOT NULL DEFAULT NOW()
     )`,
+    `CREATE TABLE IF NOT EXISTS location_price_groups (
+      id                  SERIAL PRIMARY KEY,
+      company_id          INTEGER NOT NULL,
+      master_location_id  INTEGER NOT NULL,
+      follower_location_id INTEGER NOT NULL,
+      created_at          TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS location_price_groups_unique ON location_price_groups (company_id, master_location_id, follower_location_id)`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
