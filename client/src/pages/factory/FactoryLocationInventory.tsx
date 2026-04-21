@@ -50,6 +50,7 @@ interface FactoryBaleProduct {
   totalCost: number;
   baleCount: number;
   sellingPrice: string;
+  productionPrice: number;
   // Populated only in proforma mode (from /available endpoint)
   reservedQty?: number;
   availableQty?: number;
@@ -326,7 +327,7 @@ export default function FactoryLocationInventory() {
   });
 
   // Catalog of all bale products — fetched in proforma mode OR when showZeroStock is on
-  const { data: catalogBaleProducts = [] } = useQuery<Array<{ id: number; articleCode: string | null; name: string; sellingPrice: string | null; categoryId: number | null; active: boolean }>>({
+  const { data: catalogBaleProducts = [] } = useQuery<Array<{ id: number; articleCode: string | null; name: string; sellingPrice: string | null; productionPrice: string | null; categoryId: number | null; active: boolean }>>({
     queryKey: ["/api/factory/bale-products"],
     queryFn: async () => {
       const res = await fetch("/api/factory/bale-products", { credentials: "include" });
@@ -370,6 +371,7 @@ export default function FactoryLocationInventory() {
         totalCost: 0,
         baleCount: 0,
         sellingPrice: String(p.sellingPrice || "0"),
+        productionPrice: parseFloat(p.productionPrice || "0"),
         isInactive: p.active === false,
       }));
     return [...base, ...zeroItems];
@@ -790,6 +792,28 @@ export default function FactoryLocationInventory() {
       return next;
     });
   }, []);
+
+  const applySellingPrices = useCallback(() => {
+    setSelections((prev) => {
+      const next = new Map(prev);
+      for (const [productId, sel] of next) {
+        const prod = activeInventoryData.find((p) => p.productId === productId);
+        if (prod) next.set(productId, { ...sel, pricePerBale: prod.sellingPrice || "0" });
+      }
+      return next;
+    });
+  }, [activeInventoryData]);
+
+  const applyProductionPrices = useCallback(() => {
+    setSelections((prev) => {
+      const next = new Map(prev);
+      for (const [productId, sel] of next) {
+        const prod = activeInventoryData.find((p) => p.productId === productId);
+        if (prod) next.set(productId, { ...sel, pricePerBale: String(prod.productionPrice || "0") });
+      }
+      return next;
+    });
+  }, [activeInventoryData]);
 
   const updateFinalizePrice = useCallback((productId: number, price: string) => {
     setSelections((prev) => {
@@ -1672,7 +1696,7 @@ export default function FactoryLocationInventory() {
   const allCategoryNamesForProducts = isAllItems
     ? [...new Set(activeInventoryData.map((p) => p.category || ""))].filter(Boolean).sort()
     : [];
-  const colSpanAll = (isAllItems ? 8 : 7) + (proformaMode ? 2 : 0) - (hideSellingPrice ? 2 : 0);
+  const colSpanAll = (isAllItems ? 10 : 9) + (proformaMode ? 2 : 0) - (hideSellingPrice ? 4 : 0);
   const colSpanLabel = isAllItems ? 2 : 1;
 
   return (
@@ -1775,6 +1799,16 @@ export default function FactoryLocationInventory() {
           <Button variant="outline" size="sm" onClick={deselectAllVisible} data-testid="button-deselect-all">
             <X className="h-4 w-4 mr-1" /> Deselect All
           </Button>
+          {selections.size > 0 && (
+            <>
+              <Button variant="outline" size="sm" onClick={applySellingPrices} data-testid="button-apply-selling-price">
+                Apply Sell Price
+              </Button>
+              <Button variant="outline" size="sm" onClick={applyProductionPrices} data-testid="button-apply-production-price">
+                Apply Prod Price
+              </Button>
+            </>
+          )}
           <div className="flex items-center gap-1.5 ml-2">
             <Checkbox
               checked={showSelectedOnly}
@@ -1869,7 +1903,6 @@ export default function FactoryLocationInventory() {
           ) : (
             <>
               {regularProducts.map((prod) => {
-                const avgRate = (prod as any).productionPrice || 0;
                 const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
                 const isSelected = selections.has(prod.productId);
                 const selection = selections.get(prod.productId);
@@ -1929,7 +1962,9 @@ export default function FactoryLocationInventory() {
                       <div className="text-right"><span className="text-muted-foreground">Wt/Bale: </span><span className="font-mono">{fmt(weightPerBale)} KG</span></div>
                       <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
                       {!hideSellingPrice && <div className="text-right"><span className="text-muted-foreground">Sell Price: </span><span className="font-mono">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</span></div>}
-                      {!hideSellingPrice && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>}
+                      {!hideSellingPrice && <div><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>}
+                      {!hideSellingPrice && <div className="text-right"><span className="text-muted-foreground">Prod Price: </span><span className="font-mono">{formatAmount(prod.productionPrice)}</span></div>}
+                      {!hideSellingPrice && <div><span className="text-muted-foreground">Prod Value: </span><span className="font-mono font-medium">{formatAmount(prod.baleCount * prod.productionPrice)}</span></div>}
                     </div>
                     {proformaMode && isSelected && selection && (
                       <div className="mt-2 pt-2 border-t flex items-center gap-2 flex-wrap">
@@ -1963,14 +1998,16 @@ export default function FactoryLocationInventory() {
                     <span>Total ({regularProducts.length} products, {totalBales.toLocaleString()} bales)</span>
                     <span className="font-mono">{fmt(totalKg)} KG</span>
                   </div>
-                  <div className="text-right text-sm font-mono font-bold">{formatAmount(totalSellValue)} sell</div>
+                  {!hideSellingPrice && <div className="flex justify-between text-sm font-mono font-bold">
+                    <span>{formatAmount(totalSellValue)} sell</span>
+                    <span>{formatAmount(regularProducts.reduce((s, p) => s + p.baleCount * p.productionPrice, 0))} prod</span>
+                  </div>}
                 </Card>
               )}
               {isAllItems && specialProducts.length > 0 && (
                 <>
                   <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide pt-2">Wipers &amp; Garbage</p>
                   {specialProducts.map((prod) => {
-                    const avgRate = (prod as any).productionPrice || 0;
                     const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
                     const isSelected = selections.has(prod.productId);
                     const selection = selections.get(prod.productId);
@@ -2028,7 +2065,9 @@ export default function FactoryLocationInventory() {
                           <div className="text-right"><span className="text-muted-foreground">Wt/Bale: </span><span className="font-mono">{fmt(weightPerBale)} KG</span></div>
                           <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
                           {!hideSellingPrice && <div className="text-right"><span className="text-muted-foreground">Sell Price: </span><span className="font-mono">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</span></div>}
-                          {!hideSellingPrice && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>}
+                          {!hideSellingPrice && <div><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>}
+                          {!hideSellingPrice && <div className="text-right"><span className="text-muted-foreground">Prod Price: </span><span className="font-mono">{formatAmount(prod.productionPrice)}</span></div>}
+                          {!hideSellingPrice && <div><span className="text-muted-foreground">Prod Value: </span><span className="font-mono font-medium">{formatAmount(prod.baleCount * prod.productionPrice)}</span></div>}
                         </div>
                         {proformaMode && isSelected && selection && (
                           <div className="mt-2 pt-2 border-t flex items-center gap-2 flex-wrap">
@@ -2066,8 +2105,10 @@ export default function FactoryLocationInventory() {
                 {proformaMode && <col style={{ width: "80px" }} />}
                 {proformaMode && <col style={{ width: "110px" }} />}
                 <col style={{ width: "110px" }} />
-                <col style={{ width: "110px" }} />
-                <col style={{ width: "130px" }} />
+                {!hideSellingPrice && <col style={{ width: "110px" }} />}
+                {!hideSellingPrice && <col style={{ width: "130px" }} />}
+                {!hideSellingPrice && <col style={{ width: "110px" }} />}
+                {!hideSellingPrice && <col style={{ width: "130px" }} />}
                 <col style={{ width: "100px" }} />
                 {!proformaMode && <col style={{ width: "80px" }} />}
               </colgroup>
@@ -2082,6 +2123,8 @@ export default function FactoryLocationInventory() {
                   <th className="text-right px-3 font-medium">Wt/Bale (KG)</th>
                   {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Price</th>}
                   {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Value</th>}
+                  {!hideSellingPrice && <th className="text-right px-3 font-medium">Prod Price</th>}
+                  {!hideSellingPrice && <th className="text-right px-3 font-medium">Prod Value</th>}
                   <th className="text-right px-3 font-medium">Total KG</th>
                   {!proformaMode && <th></th>}
                 </tr>
@@ -2096,7 +2139,6 @@ export default function FactoryLocationInventory() {
                 ) : (
                   <>
                     {regularProducts.map((prod) => {
-                      const avgRate = (prod as any).productionPrice || 0;
                       const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
                       const isSelected = selections.has(prod.productId);
                       const selection = selections.get(prod.productId);
@@ -2137,6 +2179,8 @@ export default function FactoryLocationInventory() {
                           <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
                           {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
                           {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
+                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.productionPrice)}</td>}
+                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.baleCount * prod.productionPrice)}</td>}
                           <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
                           {!proformaMode && (
                             <td className="px-1 text-center">
@@ -2176,6 +2220,8 @@ export default function FactoryLocationInventory() {
                       <td className="text-right px-3 font-mono">{proformaMode ? fmt(totalKg) : ""}</td>
                       {!hideSellingPrice && <td className="text-right px-3 font-mono"></td>}
                       {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(totalSellValue)}</td>}
+                      {!hideSellingPrice && <td className="text-right px-3 font-mono"></td>}
+                      {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(regularProducts.reduce((s, p) => s + p.baleCount * p.productionPrice, 0))}</td>}
                       <td className="text-right px-3 font-mono">{fmt(totalKg)}</td>
                       {!proformaMode && <td></td>}
                     </tr>
@@ -2214,13 +2260,14 @@ export default function FactoryLocationInventory() {
                       <th className="text-right px-3 font-medium">Wt/Bale (KG)</th>
                       {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Price</th>}
                       {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Value</th>}
+                      {!hideSellingPrice && <th className="text-right px-3 font-medium">Prod Price</th>}
+                      {!hideSellingPrice && <th className="text-right px-3 font-medium">Prod Value</th>}
                       <th className="text-right px-3 font-medium">Total KG</th>
                       {!proformaMode && <th></th>}
                     </tr>
                   </thead>
                   <tbody>
                     {specialProducts.map((prod) => {
-                      const avgRate = (prod as any).productionPrice || 0;
                       const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
                       const isSelected = selections.has(prod.productId);
                       const selection = selections.get(prod.productId);
@@ -2261,6 +2308,8 @@ export default function FactoryLocationInventory() {
                           <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
                           {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
                           {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
+                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.productionPrice)}</td>}
+                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.baleCount * prod.productionPrice)}</td>}
                           <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
                           {!proformaMode && (
                             <td className="px-1 text-center">
@@ -2300,6 +2349,8 @@ export default function FactoryLocationInventory() {
                       <td className="text-right px-3 font-mono">{proformaMode ? fmt(spProdTotalKg) : ""}</td>
                       {!hideSellingPrice && <td className="text-right px-3 font-mono"></td>}
                       {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(spProdTotalSellValue)}</td>}
+                      {!hideSellingPrice && <td className="text-right px-3 font-mono"></td>}
+                      {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(specialProducts.reduce((s, p) => s + p.baleCount * p.productionPrice, 0))}</td>}
                       <td className="text-right px-3 font-mono">{fmt(spProdTotalKg)}</td>
                       {!proformaMode && <td></td>}
                     </tr>

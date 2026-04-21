@@ -119,6 +119,7 @@ export function registerFactoryBalesRoutes(app: Express) {
               articleCode: product.articleCode,
               productName: product.name,
               weightKg: String(weightPerBale),
+              sellingPrice: String(product.productionPrice || "0"),
               status: "PENDING_PRESSING",
             })
             .returning();
@@ -215,6 +216,7 @@ export function registerFactoryBalesRoutes(app: Express) {
                 articleCode: product.articleCode,
                 productName: product.name,
                 weightKg: String(weight),
+                sellingPrice: String(product.productionPrice || "0"),
                 status: "PENDING_PRESSING",
               })
               .returning();
@@ -305,6 +307,7 @@ export function registerFactoryBalesRoutes(app: Express) {
               articleCode: product.articleCode,
               productName: product.name,
               weightKg: String(weightPerBale),
+              sellingPrice: String(product.productionPrice || "0"),
               status: "PENDING_PRESSING",
             })
             .returning();
