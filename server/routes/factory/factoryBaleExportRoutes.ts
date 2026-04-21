@@ -290,9 +290,10 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         periodStart = `${today.getUTCFullYear()}-01-01`;
       }
 
-      // 1. Fetch raw stock with supplier → category join
+      // 1. Fetch raw stock with supplier → category join (include containerId for scaling later)
       const rawStockRows = await db
         .select({
+          containerId: factoryRawStock.containerId,
           supplierId: factoryContainers.supplierId,
           categoryId: factorySuppliers.supplierCategoryId,
           receivedKg: factoryRawStock.receivedKg,
@@ -383,16 +384,20 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         }
       }
 
-      // 3. Build consumption map directly from mix batch sources + mix batch date.
-      //    Each mix batch source records how much raw material (by container/supplier category)
-      //    was allocated. We attribute that consumption to the mix batch's batchDate (or createdAt).
-      // Only include CONTAINER-type sources (containerId IS NOT NULL).
-      // These are the only sources that actually deduct from factoryRawStock.usedKg.
-      // BATCH-type (sourceBatchId) and direct SUPPLIER-type sources do NOT touch factoryRawStock,
-      // so including them in totalConsumption would break the opening-balance invariant and
-      // produce spurious negative balances.
+      // Build a lookup: containerId → actual usedKg (from factoryRawStock)
+      // This is the ground-truth for how much raw material was consumed from each container.
+      const containerUsedKgMap = new Map<number, number>();
+      for (const r of rawStockRows) {
+        containerUsedKgMap.set(r.containerId as number, parseFloat(r.usedKg as string) || 0);
+      }
+
+      // 3. Fetch mix batch sources (container-type only) with their batch dates.
+      //    We will scale their weights proportionally so that the total consumption per container
+      //    exactly equals factoryRawStock.usedKg — eliminating any gap from edits, reversals, or
+      //    legacy data that would otherwise produce spurious negative opening balances.
       const consumptionRows = await db
         .select({
+          containerId: factoryMixBatchSources.containerId,
           batchDate: factoryMixBatches.batchDate,
           batchCreatedAt: factoryMixBatches.createdAt,
           catIdViaContainer: factorySuppliers.supplierCategoryId,
@@ -407,10 +412,22 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           not(isNull(factoryMixBatchSources.containerId)),
         ));
 
+      // Pre-compute total tracked source weight per container (raw, unscaled)
+      // Used in step 5b to find the gap between actual usedKg and tracked sources.
+      const sourceSumByContainer = new Map<number, number>();
+      for (const r of consumptionRows) {
+        const cid = r.containerId as number;
+        sourceSumByContainer.set(cid, (sourceSumByContainer.get(cid) || 0) + (parseFloat(r.weightKg as string) || 0));
+      }
+
       // 5. Consumption map: date → categoryKey → kgConsumed
+      //    Use raw source weights (unscaled). The gap between tracked sources and actual usedKg
+      //    is filled in step 5b so the total per container exactly equals factoryRawStock.usedKg.
       const consumptionByDate = new Map<string, Map<CatKey, number>>();
       for (const r of consumptionRows) {
-        // Use batchDate (date field, returned as string YYYY-MM-DD) or fall back to createdAt timestamp
+        const rawWeight = parseFloat(r.weightKg as string) || 0;
+        if (rawWeight <= 0) continue;
+
         let dateStr: string;
         if (r.batchDate) {
           dateStr = typeof r.batchDate === "string" ? r.batchDate : (r.batchDate as Date).toISOString().slice(0, 10);
@@ -420,16 +437,33 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         const effectiveCatId = r.catIdViaContainer as number | null;
         const ck = getCatKey(effectiveCatId);
         const catName = getCatName(effectiveCatId);
-        const weight = parseFloat(r.weightKg as string) || 0;
-        if (weight <= 0) continue;
         if (!consumptionByDate.has(dateStr)) consumptionByDate.set(dateStr, new Map());
-        consumptionByDate.get(dateStr)!.set(ck, (consumptionByDate.get(dateStr)!.get(ck) || 0) + weight);
+        consumptionByDate.get(dateStr)!.set(ck, (consumptionByDate.get(dateStr)!.get(ck) || 0) + rawWeight);
         if (!catBalMap.has(ck)) {
           catBalMap.set(ck, { name: catName, currentBalance: 0 });
         }
       }
 
-      // 5b. Merge manual REMOVE adjustments into consumptionByDate
+      // 5b. Close the "no-source" gap: any container whose usedKg exceeds the sum of its tracked
+      //     mix-batch sources has un-dated consumption. Attribute that gap to the container's
+      //     offloadedAt date so the opening-balance formula always collapses to exactly zero.
+      for (const r of rawStockRows) {
+        const cid = r.containerId as number;
+        const actualUsed = parseFloat(r.usedKg as string) || 0;
+        if (actualUsed <= 0) continue;
+        const sourceTotal = sourceSumByContainer.get(cid) || 0;
+        const gap = actualUsed - sourceTotal;
+        if (gap <= 0.001) continue; // no gap or fully covered by sources
+
+        const dateStr = (r.offloadedAt as Date).toISOString().slice(0, 10);
+        const ck = getCatKey(r.categoryId as number | null);
+        const catName = getCatName(r.categoryId as number | null);
+        if (!consumptionByDate.has(dateStr)) consumptionByDate.set(dateStr, new Map());
+        consumptionByDate.get(dateStr)!.set(ck, (consumptionByDate.get(dateStr)!.get(ck) || 0) + gap);
+        if (!catBalMap.has(ck)) catBalMap.set(ck, { name: catName, currentBalance: 0 });
+      }
+
+      // 5c. Merge manual REMOVE adjustments into consumptionByDate
       for (const [dateStr, catMap] of manualRemoveByDate) {
         if (!consumptionByDate.has(dateStr)) consumptionByDate.set(dateStr, new Map());
         const dm = consumptionByDate.get(dateStr)!;
