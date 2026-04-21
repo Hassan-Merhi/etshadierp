@@ -337,78 +337,44 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         dm.set(ck, (dm.get(ck) || 0) + (parseFloat(r.receivedKg as string) || 0));
       }
 
-      // 3. Daily usages
-      const usages = await db
+      // 3. Build consumption map directly from mix batch sources + mix batch date.
+      //    Each mix batch source records how much raw material (by container/supplier category)
+      //    was allocated. We attribute that consumption to the mix batch's batchDate (or createdAt).
+      const directSuppliers2 = aliasedTable(factorySuppliers, "direct_suppliers_wk");
+      const consumptionRows = await db
         .select({
-          id: factoryDailyUsages.id,
-          mixBatchId: factoryDailyUsages.mixBatchId,
-          kgUsed: factoryDailyUsages.kgUsed,
-          usedDate: factoryDailyUsages.usedDate,
+          batchDate: factoryMixBatches.batchDate,
+          batchCreatedAt: factoryMixBatches.createdAt,
+          catIdViaContainer: factorySuppliers.supplierCategoryId,
+          catIdViaDirect: directSuppliers2.supplierCategoryId,
+          weightKg: factoryMixBatchSources.weightKg,
         })
-        .from(factoryDailyUsages)
-        .where(eq(factoryDailyUsages.companyId, companyId))
-        .orderBy(factoryDailyUsages.usedDate);
-
-      // 4. Mix batch sources → resolve to categories
-      const batchIds = [...new Set(usages.map((u: any) => u.mixBatchId))];
-      // batchCatMap: batchId → categoryKey → { name, weightKg }
-      const batchCatMap = new Map<number, Map<CatKey, { name: string; weightKg: number }>>();
-
-      if (batchIds.length > 0) {
-        // Alias needed so we can join factorySuppliers twice:
-        //   1. via containerId → container → supplier (CONTAINER-type sources)
-        //   2. directly via supplierId (SUPPLIER-type sources, no containerId)
-        const directSuppliers = aliasedTable(factorySuppliers, "direct_suppliers");
-
-        const sourceRows = await db
-          .select({
-            mixBatchId: factoryMixBatchSources.mixBatchId,
-            // CONTAINER path: resolve category through container's supplier
-            catIdViaContainer: factorySuppliers.supplierCategoryId,
-            // SUPPLIER path: resolve category directly from the source's supplierId
-            catIdViaDirect: directSuppliers.supplierCategoryId,
-            weightKg: factoryMixBatchSources.weightKg,
-          })
-          .from(factoryMixBatchSources)
-          .leftJoin(factoryContainers, eq(factoryMixBatchSources.containerId, factoryContainers.id))
-          .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
-          .leftJoin(directSuppliers, eq(factoryMixBatchSources.supplierId, directSuppliers.id))
-          .where(inArray(factoryMixBatchSources.mixBatchId, batchIds));
-
-        for (const r of sourceRows) {
-          const bid = r.mixBatchId;
-          // Use container path first; fall back to direct supplier path for SUPPLIER-type sources
-          const effectiveCatId = (r.catIdViaContainer ?? r.catIdViaDirect) as number | null;
-          const ck = getCatKey(effectiveCatId);
-          const catName = getCatName(effectiveCatId);
-          if (!batchCatMap.has(bid)) batchCatMap.set(bid, new Map());
-          const cm = batchCatMap.get(bid)!;
-          const w = parseFloat(r.weightKg as string) || 0;
-          if (cm.has(ck)) {
-            cm.get(ck)!.weightKg += w;
-          } else {
-            cm.set(ck, { name: catName, weightKg: w });
-          }
-        }
-      }
+        .from(factoryMixBatchSources)
+        .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
+        .leftJoin(factoryContainers, eq(factoryMixBatchSources.containerId, factoryContainers.id))
+        .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
+        .leftJoin(directSuppliers2, eq(factoryMixBatchSources.supplierId, directSuppliers2.id))
+        .where(eq(factoryMixBatches.companyId, companyId));
 
       // 5. Consumption map: date → categoryKey → kgConsumed
       const consumptionByDate = new Map<string, Map<CatKey, number>>();
-      for (const u of usages) {
-        const dateStr = u.usedDate as string;
-        const kgUsed = parseFloat(u.kgUsed as string) || 0;
-        const catSrcs = batchCatMap.get(u.mixBatchId);
-        if (!catSrcs || catSrcs.size === 0) continue;
-        const totalW = [...catSrcs.values()].reduce((s, v) => s + v.weightKg, 0);
-        if (totalW <= 0) continue;
+      for (const r of consumptionRows) {
+        // Use batchDate (date field, returned as string YYYY-MM-DD) or fall back to createdAt timestamp
+        let dateStr: string;
+        if (r.batchDate) {
+          dateStr = typeof r.batchDate === "string" ? r.batchDate : (r.batchDate as Date).toISOString().slice(0, 10);
+        } else {
+          dateStr = (r.batchCreatedAt as Date).toISOString().slice(0, 10);
+        }
+        const effectiveCatId = (r.catIdViaContainer ?? r.catIdViaDirect) as number | null;
+        const ck = getCatKey(effectiveCatId);
+        const catName = getCatName(effectiveCatId);
+        const weight = parseFloat(r.weightKg as string) || 0;
+        if (weight <= 0) continue;
         if (!consumptionByDate.has(dateStr)) consumptionByDate.set(dateStr, new Map());
-        const dm = consumptionByDate.get(dateStr)!;
-        for (const [ck, v] of catSrcs) {
-          const alloc = kgUsed * (v.weightKg / totalW);
-          dm.set(ck, (dm.get(ck) || 0) + alloc);
-          if (!catBalMap.has(ck)) {
-            catBalMap.set(ck, { name: v.name, currentBalance: 0 });
-          }
+        consumptionByDate.get(dateStr)!.set(ck, (consumptionByDate.get(dateStr)!.get(ck) || 0) + weight);
+        if (!catBalMap.has(ck)) {
+          catBalMap.set(ck, { name: catName, currentBalance: 0 });
         }
       }
 
@@ -581,11 +547,12 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           const opening = openingBalances.get(wk)!;
           const sMap = weekStockIn.get(wk)!;
 
-          // Active categories this week
+          // Active categories this week: include any category with non-zero consumption,
+          // stock-in, or opening balance (including negative balances).
           const activeCats = allCatKeys.filter(ck => {
-            return (weekConsumption.get(wk)!.get(ck) || 0) > 0
-              || (sMap.get(ck) || 0) > 0
-              || (opening.get(ck) || 0) > 0;
+            return (weekConsumption.get(wk)!.get(ck) || 0) > 0.001
+              || (sMap.get(ck) || 0) > 0.001
+              || Math.abs(opening.get(ck) || 0) > 0.5;
           }).sort((a, b) => (catBalMap.get(a)?.name || "").localeCompare(catBalMap.get(b)?.name || ""));
 
           let weekTotalBalance = 0, weekTotalStockIn = 0, weekTotalTotal = 0, weekTotalRemains = 0;
