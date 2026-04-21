@@ -651,6 +651,7 @@ export default function ProductionRawStock() {
   // Mix batch section state
   const [createMixBatchOpen, setCreateMixBatchOpen] = useState(false);
   const [dailyReportOpen, setDailyReportOpen] = useState(false);
+  const [weeklyPeriod, setWeeklyPeriod] = useState<"all" | "year" | "month" | "week">("all");
   const [deleteBatchId, setDeleteBatchId] = useState<number | null>(null);
   const [editBatch, setEditBatch] = useState<FactoryMixBatch | null>(null);
   const [batchDetailOpen, setBatchDetailOpen] = useState(false);
@@ -1828,13 +1829,29 @@ export default function ProductionRawStock() {
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <span className="text-sm font-medium">Weekly Production Report</span>
-                  <p className="text-xs text-muted-foreground mt-0.5">Supplier × day pivot — one section per week, with opening balance, stock-in and daily consumption</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Category × day pivot — one section per week, with opening balance, stock-in and daily consumption</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Period filter toggles */}
+                  {(["all", "year", "month", "week"] as const).map(p => {
+                    const labels = { all: "All time", year: "This year", month: "This month", week: "This week" };
+                    return (
+                      <Button
+                        key={p}
+                        variant={weeklyPeriod === p ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setWeeklyPeriod(p)}
+                        data-testid={`button-weekly-period-${p}`}
+                      >
+                        {labels[p]}
+                      </Button>
+                    );
+                  })}
+                  <div className="w-px h-5 bg-border mx-1" />
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => window.open(`/api/factory/weekly-report/export?format=excel`, "_blank")}
+                    onClick={() => window.open(`/api/factory/weekly-report/export?format=excel&period=${weeklyPeriod}`, "_blank")}
                     data-testid="button-export-weekly-excel"
                   >
                     <FileSpreadsheet className="h-4 w-4 mr-1" />
@@ -1843,7 +1860,7 @@ export default function ProductionRawStock() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => window.open(`/api/factory/weekly-report/export?format=pdf`, "_blank")}
+                    onClick={() => window.open(`/api/factory/weekly-report/export?format=pdf&period=${weeklyPeriod}`, "_blank")}
                     data-testid="button-export-weekly-pdf"
                   >
                     <FileText className="h-4 w-4 mr-1" />
