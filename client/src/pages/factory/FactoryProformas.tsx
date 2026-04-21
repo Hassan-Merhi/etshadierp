@@ -18,7 +18,7 @@ import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
-import { read as readExcel, utils as excelUtils } from "@/lib/excelHelper";
+import { read as readExcel, utils as excelUtils, writeFile as writeExcel } from "@/lib/excelHelper";
 
 interface ProformaLine {
   id: number;
@@ -316,6 +316,18 @@ export default function FactoryProformas() {
       toast({ title: "Import failed", description: error.message, variant: "destructive" });
     },
   });
+
+  const downloadProformaTemplate = async () => {
+    const wb = excelUtils.book_new();
+    const sampleData = [
+      { "Article Code": "A001", "Product Name": "Mixed Cotton Bales", "Quantity": 50, "Price Per Bale": 45.00 },
+      { "Article Code": "A002", "Product Name": "White Cotton Bales", "Quantity": 30, "Price Per Bale": 52.50 },
+      { "Article Code": "B001", "Product Name": "Polyester Mix Bales", "Quantity": 20, "Price Per Bale": 38.00 },
+    ];
+    const sheet = excelUtils.json_to_sheet(sampleData);
+    excelUtils.book_append_sheet(wb, sheet, "Proforma");
+    await writeExcel(wb, "proforma_template.xlsx");
+  };
 
   const handleExcelFile = async (file: File) => {
     setExcelImportLoading(true);
@@ -1254,7 +1266,18 @@ export default function FactoryProformas() {
 
             {/* File upload */}
             <div>
-              <Label className="text-sm font-medium mb-1 block">Excel File (.xlsx)</Label>
+              <div className="flex items-center justify-between mb-1">
+                <Label className="text-sm font-medium">Excel File (.xlsx)</Label>
+                <button
+                  type="button"
+                  onClick={downloadProformaTemplate}
+                  className="text-xs text-primary underline-offset-2 hover:underline flex items-center gap-1"
+                  data-testid="button-download-template"
+                >
+                  <Download className="h-3 w-3" />
+                  Download template
+                </button>
+              </div>
               <div
                 className="border-2 border-dashed rounded-md p-6 text-center cursor-pointer hover-elevate transition-colors"
                 onClick={() => excelFileInputRef.current?.click()}
