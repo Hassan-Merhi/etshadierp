@@ -727,15 +727,13 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         createdAt: users.createdAt,
       }).from(users);
 
-      // Collect user IDs that have the Developer role in this company.
-      // Only hide them from non-developer requesters.
+      // Collect user IDs that have the Developer role in ANY company.
+      // Match the ERP user-list behaviour: Developer accounts are globally
+      // invisible to non-developers, regardless of which company is active.
       const devRoles = await db
         .select({ userId: userCompanyRoles.userId })
         .from(userCompanyRoles)
-        .where(and(
-          eq(userCompanyRoles.role, "Developer"),
-          eq(userCompanyRoles.companyId, companyId)
-        ));
+        .where(eq(userCompanyRoles.role, "Developer"));
       const devUserIds = new Set(devRoles.map((r: any) => r.userId));
       const requesterIsDeveloper = currentRole === "Developer" || globalRole === "Developer";
 
