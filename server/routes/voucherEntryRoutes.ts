@@ -35,6 +35,7 @@ import {
   insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
   chatSessions, chatMessages,
   inventoryValueAdjustments,
+  propertyPayments, propertyMonthlyLedger,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -985,6 +986,45 @@ export function registerVoucherEntryRoutes(app: Express) {
                 currentCompanyId,
                 true // reverse
               );
+            }
+
+            // IMPORTANT: If this voucher is linked to a property payment entry,
+            // reverse the monthly ledger and delete the payment log row so the
+            // rent balance and payment history stay consistent.
+            const linkedPayments = await tx
+              .select()
+              .from(propertyPayments)
+              .where(eq(propertyPayments.voucherId, id));
+            for (const pmt of linkedPayments) {
+              if (pmt.ledgerRowId) {
+                await tx.execute(sql`
+                  UPDATE property_monthly_ledger
+                  SET paid_amount = GREATEST(0, paid_amount - ${pmt.amount}::numeric)
+                  WHERE id = ${pmt.ledgerRowId}
+                `);
+              }
+              await tx.delete(propertyPayments).where(eq(propertyPayments.id, pmt.id));
+            }
+
+            // IMPORTANT: If this voucher is one side of an inter-company transfer,
+            // also delete the OTHER side's entries + voucher and the transfer record,
+            // so both companies' books are fully clean.
+            const linkedTransfers = await tx
+              .select()
+              .from(interCompanyTransfers)
+              .where(or(
+                eq(interCompanyTransfers.fromVoucherId, id),
+                eq(interCompanyTransfers.toVoucherId, id),
+              ));
+            for (const transfer of linkedTransfers) {
+              const otherVoucherId = transfer.fromVoucherId === id
+                ? transfer.toVoucherId
+                : transfer.fromVoucherId;
+              if (otherVoucherId && otherVoucherId !== id) {
+                await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, otherVoucherId));
+                await tx.delete(vouchers).where(eq(vouchers.id, otherVoucherId));
+              }
+              await tx.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, transfer.id));
             }
 
             // Soft delete: Set deletedAt instead of hard delete
