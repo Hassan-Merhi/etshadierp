@@ -1590,15 +1590,16 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const otherChargesTotal = parseFloat(order.otherChargesTotal || "0");
       const grandTotal = parseFloat(order.grandTotal || "0");
 
-      const chargeRows: [string, number][] = orderCharges.length > 0
-        ? orderCharges.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
+      const otherChargeLines = orderCharges.filter((ch: any) => ch.chargeType !== "FREIGHT");
+      const chargeRows: [string, number][] = otherChargeLines.length > 0
+        ? otherChargeLines.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
         : otherChargesTotal > 0
           ? [["Other Charges", otherChargesTotal]]
           : [];
 
       const summaryData: [string, number][] = [
         ["Subtotal (Bales)", subtotal],
-        ["Freight", freight],
+        ...(freight > 0 ? [["Freight", freight] as [string, number]] : []),
         ...chargeRows,
         ["Grand Total", grandTotal],
       ];
@@ -2322,15 +2323,16 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const otherChargesTotal2 = parseFloat(order.otherChargesTotal || "0");
       const grandTotal = parseFloat(order.grandTotal || "0");
 
-      const chargeRows2: [string, number][] = orderCharges2.length > 0
-        ? orderCharges2.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
+      const otherChargeLines2 = orderCharges2.filter((ch: any) => ch.chargeType !== "FREIGHT");
+      const chargeRows2: [string, number][] = otherChargeLines2.length > 0
+        ? otherChargeLines2.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
         : otherChargesTotal2 > 0
           ? [["Other Charges", otherChargesTotal2]]
           : [];
 
       const summaryData: [string, number][] = [
         ["Subtotal (Bales)", subtotal],
-        ["Freight", freight],
+        ...(freight > 0 ? [["Freight", freight] as [string, number]] : []),
         ...chargeRows2,
         ["Grand Total", grandTotal],
       ];
@@ -2693,12 +2695,15 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
   <div class="totals-wrap">
     <table class="totals-table">
       <tr><td>Subtotal (Bales)</td><td>${fmtMoney(order.subtotalBales)}</td></tr>
-      <tr><td>Freight</td><td>${fmtMoney(order.freightAmount)}</td></tr>
-      ${charges.length > 0
-        ? charges.map((ch: any) => `<tr><td>${ch.name}</td><td>${fmtMoney(ch.amount)}</td></tr>`).join("\n      ")
-        : parseFloat(order.otherChargesTotal || "0") > 0
-          ? `<tr><td>Other Charges</td><td>${fmtMoney(order.otherChargesTotal)}</td></tr>`
-          : ""}
+      ${parseFloat(order.freightAmount || "0") > 0 ? `<tr><td>Freight</td><td>${fmtMoney(order.freightAmount)}</td></tr>` : ""}
+      ${(() => {
+          const otherLines = charges.filter((ch: any) => ch.chargeType !== "FREIGHT");
+          if (otherLines.length > 0) {
+            return otherLines.map((ch: any) => `<tr><td>${ch.name}</td><td>${fmtMoney(ch.amount)}</td></tr>`).join("\n      ");
+          }
+          const otherTotal = parseFloat(order.otherChargesTotal || "0");
+          return otherTotal > 0 ? `<tr><td>Other Charges</td><td>${fmtMoney(order.otherChargesTotal)}</td></tr>` : "";
+        })()}
       <tr class="grand"><td>Grand Total</td><td>${fmtMoney(order.grandTotal)}</td></tr>
     </table>
   </div>
