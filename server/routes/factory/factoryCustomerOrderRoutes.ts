@@ -42,6 +42,7 @@ import {
   factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
   factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
   factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+  customerOrderBaleRemovals,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -627,10 +628,33 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const [orderBale] = await db.select().from(customerOrderBales)
         .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.id, baleId)));
 
+      // Fetch full bale details before deleting the join row, so we can log it
+      let baleDetails: typeof factoryBales.$inferSelect | undefined;
+      if (orderBale) {
+        const [found] = await db.select().from(factoryBales).where(eq(factoryBales.id, orderBale.baleId));
+        baleDetails = found;
+      }
+
       await db.delete(customerOrderBales)
         .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.id, baleId)));
 
-      if (orderBale) {
+      if (orderBale && baleDetails) {
+        await db.update(factoryBales).set({ status: "IN_STOCK", updatedAt: new Date() }).where(eq(factoryBales.id, orderBale.baleId));
+
+        // Log the removal so it's visible on the loading page
+        const userId = req.user?.id ? String(req.user.id) : null;
+        const username = req.user?.username || req.user?.email || null;
+        await db.insert(customerOrderBaleRemovals).values({
+          orderId,
+          baleId: orderBale.baleId,
+          referenceNumber: baleDetails.referenceNumber,
+          articleCode: baleDetails.articleCode || null,
+          productName: baleDetails.productName || null,
+          weightKg: baleDetails.weightKg,
+          removedByUserId: userId,
+          removedByUsername: username,
+        });
+      } else if (orderBale) {
         await db.update(factoryBales).set({ status: "IN_STOCK", updatedAt: new Date() }).where(eq(factoryBales.id, orderBale.baleId));
       }
 
@@ -644,6 +668,24 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       res.json({ ...updatedOrder, bales: updatedBales, lines: updatedLines, charges: updatedCharges });
     } catch (error: any) {
       console.error("Error removing bale from order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET removal log for a specific order/loading
+  app.get("/api/factory/customer-orders/:id/bale-removals", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const orderId = parseInt(req.params.id);
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      const removals = await db.select().from(customerOrderBaleRemovals)
+        .where(eq(customerOrderBaleRemovals.orderId, orderId))
+        .orderBy(desc(customerOrderBaleRemovals.removedAt));
+      res.json(removals);
+    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });

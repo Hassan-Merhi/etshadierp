@@ -1301,6 +1301,19 @@ let migrationsDone = false;
     `CREATE UNIQUE INDEX IF NOT EXISTS erp_user_page_access_unique ON erp_user_page_access (company_id, user_id, page_key)`,
     // hide_all_costs column added later — ensure it exists on older rows
     `ALTER TABLE factory_user_profiles ADD COLUMN IF NOT EXISTS hide_all_costs BOOLEAN NOT NULL DEFAULT FALSE`,
+    // Bale removal log — records every bale removed from a loading for audit/history
+    `CREATE TABLE IF NOT EXISTS customer_order_bale_removals (
+      id                   SERIAL PRIMARY KEY,
+      order_id             INTEGER NOT NULL,
+      bale_id              INTEGER NOT NULL,
+      reference_number     VARCHAR(100) NOT NULL,
+      article_code         VARCHAR(50),
+      product_name         TEXT,
+      weight_kg            DECIMAL(15,3),
+      removed_by_user_id   VARCHAR,
+      removed_by_username  VARCHAR,
+      removed_at           TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

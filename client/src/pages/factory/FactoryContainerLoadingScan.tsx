@@ -40,6 +40,9 @@ import {
   Upload,
   Download,
   ArrowRight,
+  History,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   Dialog,
@@ -109,6 +112,18 @@ interface OrderDetail {
   bales: OrderBale[];
 }
 
+interface BaleRemoval {
+  id: number;
+  orderId: number;
+  baleId: number;
+  referenceNumber: string;
+  articleCode: string | null;
+  productName: string | null;
+  weightKg: string | null;
+  removedByUsername: string | null;
+  removedAt: string;
+}
+
 export default function FactoryContainerLoadingScan() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -140,6 +155,7 @@ export default function FactoryContainerLoadingScan() {
   const [showPendingWarning, setShowPendingWarning] = useState(false);
   const [pendingOrders, setPendingOrders] = useState<Array<{ id: number; invoiceNumber: string | null; status: string; totalQtyBales: number }>>([]);
   const [baleToDelete, setBaleToDelete] = useState<{ id: number; baleReference: string } | null>(null);
+  const [showRemovalLog, setShowRemovalLog] = useState(false);
   const scannerRef = useRef<HTMLInputElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -193,6 +209,16 @@ export default function FactoryContainerLoadingScan() {
     },
     enabled: !!orderId,
     refetchInterval: 5000,
+  });
+
+  const { data: baleRemovals = [] } = useQuery<BaleRemoval[]>({
+    queryKey: ["/api/factory/customer-orders", orderId, "bale-removals"],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/customer-orders/${orderId}/bale-removals`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch removal log");
+      return res.json();
+    },
+    enabled: !!orderId,
   });
 
   // When resuming: restore customer/location and show last scanned popup
@@ -373,6 +399,10 @@ export default function FactoryContainerLoadingScan() {
       queryClient.invalidateQueries({
         queryKey: ["/api/factory/customer-orders", orderId],
       });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/factory/customer-orders", orderId, "bale-removals"],
+      });
+      setBaleToDelete(null);
       toast({ title: "Bale removed" });
     },
     onError: (error: Error) => {
@@ -941,6 +971,53 @@ export default function FactoryContainerLoadingScan() {
               )}
             </div>
           </Card>
+
+          {/* Removal log — only shown when there are removals */}
+          {orderId && baleRemovals.length > 0 && (
+            <Card className="p-4">
+              <button
+                className="w-full flex items-center justify-between gap-2 text-sm font-medium"
+                onClick={() => setShowRemovalLog((v) => !v)}
+                data-testid="button-toggle-removal-log"
+                type="button"
+              >
+                <span className="flex items-center gap-2">
+                  <History className="h-4 w-4 text-muted-foreground" />
+                  Removed Bales
+                  <Badge variant="secondary" data-testid="badge-removal-count">{baleRemovals.length}</Badge>
+                </span>
+                {showRemovalLog ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+              </button>
+              {showRemovalLog && (
+                <Table className="mt-3">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Reference</TableHead>
+                      <TableHead>Article</TableHead>
+                      <TableHead className="text-right">Weight</TableHead>
+                      <TableHead>Removed By</TableHead>
+                      <TableHead>Time</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {baleRemovals.map((r) => (
+                      <TableRow key={r.id} data-testid={`row-removal-${r.id}`} className="text-sm text-muted-foreground">
+                        <TableCell className="font-mono" data-testid={`text-removal-ref-${r.id}`}>{r.referenceNumber}</TableCell>
+                        <TableCell>{r.articleCode || "—"}</TableCell>
+                        <TableCell className="text-right">
+                          {r.weightKg ? `${parseFloat(r.weightKg).toFixed(2)} kg` : "—"}
+                        </TableCell>
+                        <TableCell>{r.removedByUsername || "—"}</TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {new Date(r.removedAt).toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </Card>
+          )}
         </div>
 
         {/* Right: controls + proforma panel */}

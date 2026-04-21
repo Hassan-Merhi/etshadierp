@@ -4414,3 +4414,19 @@ export const insertFactoryTransporterTransactionSchema = createInsertSchema(fact
 });
 export type InsertFactoryTransporterTransaction = z.infer<typeof insertFactoryTransporterTransactionSchema>;
 export type FactoryTransporterTransaction = typeof factoryTransporterTransactions.$inferSelect;
+
+// ── Loading Bale Removal Log ──────────────────────────────────────────────────
+// Records every bale removed from a customer order so it's visible in the UI
+export const customerOrderBaleRemovals = pgTable("customer_order_bale_removals", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").notNull(),
+  baleId: integer("bale_id").notNull(),
+  referenceNumber: varchar("reference_number", { length: 100 }).notNull(),
+  articleCode: varchar("article_code", { length: 50 }),
+  productName: text("product_name"),
+  weightKg: decimal("weight_kg", { precision: 15, scale: 3 }),
+  removedByUserId: varchar("removed_by_user_id"),
+  removedByUsername: varchar("removed_by_username"),
+  removedAt: timestamp("removed_at").notNull().defaultNow(),
+});
+export type CustomerOrderBaleRemoval = typeof customerOrderBaleRemovals.$inferSelect;
