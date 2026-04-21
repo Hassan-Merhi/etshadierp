@@ -432,7 +432,10 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                             )}
                             {showCostPrice && (
                               <TableCell className="text-right hidden sm:table-cell text-sm tabular-nums text-muted-foreground" data-testid={`text-offloading-cost-${item.stockItemId}`}>
-                                {item.offloadingCost && parseFloat(item.offloadingCost) > 0 ? formatAmount(parseFloat(item.offloadingCost)) : "—"}
+                                {(() => {
+                                  const total = parseFloat(item.costPrice ?? "0") + parseFloat(item.offloadingCost ?? "0");
+                                  return total > 0 ? formatAmount(total) : "—";
+                                })()}
                               </TableCell>
                             )}
 
