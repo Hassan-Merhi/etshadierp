@@ -1512,9 +1512,12 @@ export default function ProductionRawStock() {
               </TableHeader>
               <TableBody>
                 {(() => {
+                  // Hide rows with zero free kg before grouping
+                  const visibleRawStock = rawStock.filter(row => parseFloat(row.freeKg || "0") > 0.001);
+
                   // Group rows by category
                   const categoryGroups = new Map<string, { categoryId: number | null; categoryName: string | null; rows: typeof rawStock }>();
-                  for (const row of rawStock) {
+                  for (const row of visibleRawStock) {
                     const key = row.categoryId != null ? String(row.categoryId) : "uncategorized";
                     if (!categoryGroups.has(key)) {
                       categoryGroups.set(key, { categoryId: row.categoryId, categoryName: row.categoryName, rows: [] });

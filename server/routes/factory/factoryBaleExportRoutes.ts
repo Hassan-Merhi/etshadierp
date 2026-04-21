@@ -43,7 +43,7 @@ import {
   factoryPosSales, factoryPosSaleItems, proformaStockReservations,
   factorySupplierCategories,
 } from "@shared/schema";
-import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt, alias } from "drizzle-orm";
+import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt, aliasedTable } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import CryptoJS from "crypto-js";
 import multer from "multer";
@@ -358,7 +358,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         // Alias needed so we can join factorySuppliers twice:
         //   1. via containerId → container → supplier (CONTAINER-type sources)
         //   2. directly via supplierId (SUPPLIER-type sources, no containerId)
-        const directSuppliers = alias(factorySuppliers, "direct_suppliers");
+        const directSuppliers = aliasedTable(factorySuppliers, "direct_suppliers");
 
         const sourceRows = await db
           .select({
