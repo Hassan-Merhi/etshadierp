@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -35,11 +35,8 @@ import {
 import {
   User,
   Shield,
-  Building2,
   Lock,
   Trash2,
-  Plus,
-  Edit,
   ChevronDown,
   ChevronRight,
   Check,
@@ -49,7 +46,7 @@ import {
 } from "lucide-react";
 import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
 import { FEATURE_KEYS, FEATURE_PAGE_INFO } from "@shared/schema";
-import { UserRoleDialog } from "./UserRoleDialog";
+import { UserRolesCard } from "./UserRolesCard";
 
 const ALL_FACTORY_PAGES = FACTORY_NAV_PAGES;
 const FACTORY_PAGE_GROUPS = Array.from(new Set(ALL_FACTORY_PAGES.map((p) => p.group)));
@@ -99,11 +96,6 @@ export function UserManagementDrawer({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
-  // Role dialog state — fully owned by this drawer
-  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
-  const [editingRole, setEditingRole] = useState<any>(null);
-  const [roleToDelete, setRoleToDelete] = useState<any>(null);
-
   useEffect(() => {
     if (user) {
       setUsername(user.username ?? "");
@@ -117,11 +109,6 @@ export function UserManagementDrawer({
       setAdvancedOpen(false);
     }
   }, [user?.id]);
-
-  const { data: companyRoles = [] } = useQuery<any[]>({
-    queryKey: [`/api/users/${user?.id}/company-roles`],
-    enabled: !!user?.id,
-  });
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -157,20 +144,6 @@ export function UserManagementDrawer({
       toast({ title: "Removed", description: `${user.username} has been removed` });
       setConfirmDelete(false);
       onUserDeleted();
-    },
-    onError: (err: Error) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const deleteRoleMutation = useMutation({
-    mutationFn: async (roleId: number) => {
-      await apiRequest("DELETE", `/api/user-company-roles/${roleId}`, {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/users/${user?.id}/company-roles`] });
-      toast({ title: "Role removed" });
-      setRoleToDelete(null);
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -421,70 +394,8 @@ export function UserManagementDrawer({
               </CardContent>
             </Card>
 
-            {/* Card 3: Company Roles */}
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <Building2 className="h-4 w-4" />
-                    Company Roles
-                  </CardTitle>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5"
-                    onClick={() => { setEditingRole(null); setRoleDialogOpen(true); }}
-                    data-testid={`button-add-role-${user.id}`}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add Role
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {companyRoles.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No company roles assigned yet.</p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {companyRoles.map((role: any) => (
-                      <div
-                        key={role.id}
-                        className="flex items-center gap-2 rounded-md border px-3 py-2 bg-background"
-                        data-testid={`role-item-${role.id}`}
-                      >
-                        <span className="flex-1 text-sm font-medium">
-                          {companies.find((c: any) => c.id === role.companyId)?.name ||
-                            `Company ${role.companyId}`}
-                        </span>
-                        <Badge
-                          variant={["Admin", "Owner"].includes(role.role) ? "default" : "secondary"}
-                          className="text-xs"
-                        >
-                          {role.role}
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => { setEditingRole(role); setRoleDialogOpen(true); }}
-                          data-testid={`button-edit-role-${role.id}`}
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive"
-                          onClick={() => setRoleToDelete(role)}
-                          data-testid={`button-delete-role-${role.id}`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {/* Card 3: Company Roles — inline editing, no modal */}
+            <UserRolesCard userId={user.id} companies={companies} />
 
             {/* Card 4: Advanced Restrictions */}
             <Card>
@@ -645,39 +556,6 @@ export function UserManagementDrawer({
           </div>
         </SheetContent>
       </Sheet>
-
-      {/* Self-contained role assignment dialog */}
-      <UserRoleDialog
-        open={roleDialogOpen}
-        onClose={() => { setRoleDialogOpen(false); setEditingRole(null); }}
-        userId={user.id}
-        companies={companies}
-        editingRole={editingRole}
-      />
-
-      {/* Delete role confirmation */}
-      <AlertDialog open={!!roleToDelete} onOpenChange={(v) => { if (!v) setRoleToDelete(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove this role?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Remove the <strong>{roleToDelete?.role}</strong> role from{" "}
-              <strong>{companies.find((c: any) => c.id === roleToDelete?.companyId)?.name || `Company ${roleToDelete?.companyId}`}</strong>?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteRoleMutation.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => roleToDelete && deleteRoleMutation.mutate(roleToDelete.id)}
-              disabled={deleteRoleMutation.isPending}
-              className="bg-destructive text-destructive-foreground"
-              data-testid="button-confirm-delete-role"
-            >
-              {deleteRoleMutation.isPending ? "Removing..." : "Remove Role"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Delete user confirmation */}
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>

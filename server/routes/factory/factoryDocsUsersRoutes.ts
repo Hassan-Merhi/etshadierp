@@ -725,6 +725,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         username: users.username,
         active: users.active,
         createdAt: users.createdAt,
+        role: users.role,
       }).from(users);
 
       // Collect Developer user IDs — scoped to the CURRENT company only.
@@ -742,7 +743,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const requesterIsDeveloper = currentRole === "Developer" || globalRole === "Developer";
 
       const visibleUsers = allUsers.filter((u: any) =>
-        requesterIsDeveloper || !devUserIds.has(u.id)
+        requesterIsDeveloper || (!devUserIds.has(u.id) && u.role !== "Developer")
       );
 
       const profiles = await db.select()
