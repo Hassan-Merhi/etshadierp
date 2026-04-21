@@ -6,25 +6,17 @@ import { UserListTable } from "./UserListTable";
 import { UserManagementDrawer } from "./UserManagementDrawer";
 import { AddUserDialog } from "./AddUserDialog";
 
-interface UsersSectionProps {
-  companies: any[];
-  handleAddRole: (userId: string) => void;
-  handleEditRole: (role: any) => void;
-  handleDeleteRole: (roleId: number, userId: string) => void;
-}
-
-export function UsersSection({
-  companies,
-  handleAddRole,
-  handleEditRole,
-  handleDeleteRole,
-}: UsersSectionProps) {
+export function UsersSection() {
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const { data: users = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/users"],
+  });
+
+  const { data: companies = [] } = useQuery<any[]>({
+    queryKey: ["/api/companies"],
   });
 
   const openDrawer = (user: any) => {
@@ -39,7 +31,6 @@ export function UsersSection({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-semibold flex items-center gap-2" data-testid="text-users-title">
@@ -50,16 +41,12 @@ export function UsersSection({
             Select a user to manage their account, access, and permissions.
           </p>
         </div>
-        <Button
-          onClick={() => setAddDialogOpen(true)}
-          data-testid="button-add-user"
-        >
+        <Button onClick={() => setAddDialogOpen(true)} data-testid="button-add-user">
           <UserPlus className="h-4 w-4 mr-2" />
           Add User
         </Button>
       </div>
 
-      {/* User list */}
       <UserListTable
         users={users}
         isLoading={isLoading}
@@ -67,23 +54,15 @@ export function UsersSection({
         onSelectUser={openDrawer}
       />
 
-      {/* Management drawer */}
       <UserManagementDrawer
         user={selectedUser}
         open={drawerOpen}
         onClose={closeDrawer}
         companies={companies}
-        handleAddRole={handleAddRole}
-        handleEditRole={handleEditRole}
-        handleDeleteRole={handleDeleteRole}
         onUserDeleted={closeDrawer}
       />
 
-      {/* Add user dialog */}
-      <AddUserDialog
-        open={addDialogOpen}
-        onOpenChange={setAddDialogOpen}
-      />
+      <AddUserDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
     </div>
   );
 }

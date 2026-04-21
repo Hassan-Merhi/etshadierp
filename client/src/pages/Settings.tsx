@@ -68,7 +68,7 @@
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
-  import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, type FeatureKey } from "@shared/schema";
+  import { insertUserSchema, insertCompanySchema, type FeatureKey } from "@shared/schema";
   import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
   import { useCompany } from "@/contexts/CompanyContext";
   import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
@@ -76,23 +76,8 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   
   const userFormSchema = insertUserSchema;
   const companyFormSchema = insertCompanySchema;
-  const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
-    (data) => {
-      // If role is POS, assignedLocationId must be present
-      if (data.role.startsWith("POS") && !data.assignedLocationId) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: "POS roles require an assigned location",
-      path: ["assignedLocationId"],
-    }
-  );
-  
   type UserFormData = z.infer<typeof userFormSchema>;
   type CompanyFormData = z.infer<typeof companyFormSchema>;
-  type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 
 
 import { ParentCreditAccountSelect } from "./settings/ParentCreditAccountSelect";
@@ -127,13 +112,8 @@ import { UsersSection } from "./settings/UsersSection";
     const [editingCompany, setEditingCompany] = useState<any>(null);
     const [companyToDelete, setCompanyToDelete] = useState<any>(null);
     const [userToDelete, setUserToDelete] = useState<any>(null);
-    const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
     const [isZeroBalanceDialogOpen, setIsZeroBalanceDialogOpen] = useState(false);
     const [selectedAccountsToZero, setSelectedAccountsToZero] = useState<number[]>([]);
-    const [editingRole, setEditingRole] = useState<any>(null);
-    const [selectedLocationIds, setSelectedLocationIds] = useState<number[]>([]);
-    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-    const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
     const [isInitBalancesDialogOpen, setIsInitBalancesDialogOpen] = useState(false);
     const [initBalancesResult, setInitBalancesResult] = useState<any>(null);
     const [expandedBreakdownId, setExpandedBreakdownId] = useState<number | null>(null);
@@ -311,57 +291,6 @@ import { UsersSection } from "./settings/UsersSection";
       },
     });
   
-    const roleForm = useForm<RoleAssignmentData>({
-      resolver: zodResolver(roleAssignmentSchema),
-      defaultValues: {
-        userId: "",
-        companyId: 0,
-        role: "Manager",
-      },
-    });
-  
-    const selectedRole = roleForm.watch("role");
-    const selectedCompanyId = roleForm.watch("companyId");
-    
-    // Load locations for the selected company when assigning roles
-    const { data: locations = [] } = useQuery<any[]>({
-      queryKey: ["/api/locations", { companyId: selectedCompanyId }],
-      queryFn: async () => {
-        if (!selectedCompanyId) return [];
-        const res = await fetch(`/api/locations?companyId=${selectedCompanyId}`);
-        if (!res.ok) throw new Error("Failed to fetch locations");
-        return res.json();
-      },
-      enabled: !!selectedCompanyId && isRoleDialogOpen,
-    });
-  
-    // Load bank accounts (cash accounts) for the selected company
-    const { data: bankAccounts = [] } = useQuery<any[]>({
-      queryKey: ["/api/bank-accounts", { companyId: selectedCompanyId }],
-      queryFn: async () => {
-        if (!selectedCompanyId) return [];
-        const res = await fetch(`/api/bank-accounts?companyId=${selectedCompanyId}`);
-        if (!res.ok) throw new Error("Failed to fetch bank accounts");
-        return res.json();
-      },
-      enabled: !!selectedCompanyId && isRoleDialogOpen,
-    });
-  
-    // Load ledger accounts for the selected company (for role dialog)
-    const { data: roleDialogLedgerAccounts = [] } = useQuery<any[]>({
-      queryKey: ["/api/ledger-accounts", { companyId: selectedCompanyId }],
-      queryFn: async () => {
-        if (!selectedCompanyId) return [];
-        const res = await fetch(`/api/ledger-accounts?companyId=${selectedCompanyId}`);
-        if (!res.ok) throw new Error("Failed to fetch ledger accounts");
-        return res.json();
-      },
-      enabled: !!selectedCompanyId && isRoleDialogOpen,
-    });
-  
-    // Filter for Cash type ledger accounts only
-    const cashAccounts = roleDialogLedgerAccounts.filter((account: any) => account.accountType === "Cash");
-  
     const createCompanyMutation = useMutation({
       mutationFn: async (data: CompanyFormData) => {
         if (editingCompany) {
@@ -526,75 +455,6 @@ import { UsersSection } from "./settings/UsersSection";
       },
     });
   
-    const createRoleMutation = useMutation({
-      mutationFn: async (data: RoleAssignmentData) => {
-        let result;
-        if (editingRole) {
-          const res = await modeApiRequest("PATCH", `/api/user-company-roles/${editingRole.id}`, data);
-          result = await res.json();
-        } else {
-          const res = await modeApiRequest("POST", "/api/user-company-roles", data);
-          result = await res.json();
-        }
-        if (data.role?.startsWith("POS") && selectedLocationIds.length > 0) {
-          await modeApiRequest("PUT", `/api/user-locations/${data.userId}/${data.companyId}`, {
-            locationIds: selectedLocationIds,
-          });
-        }
-        return result;
-      },
-      onSuccess: () => {
-        const userId = currentUserId;
-        
-        toast({
-          title: "Success",
-          description: editingRole ? "Role updated successfully" : "Role assigned successfully",
-        });
-        queryClient.invalidateQueries({ queryKey: [`/api/users/${userId}/company-roles`] });
-        setIsRoleDialogOpen(false);
-        setEditingRole(null);
-        setCurrentUserId(null);
-        setSelectedLocationIds([]);
-        roleForm.reset({
-          userId: "",
-          companyId: 0,
-          role: "Manager",
-        });
-      },
-      onError: (error: any) => {
-        if ((error as any)?._handledGlobally) return;
-        toast({
-          title: "Error",
-          description: error.message || "Failed to save role",
-          variant: "destructive",
-        });
-      },
-    });
-  
-    const deleteRoleMutation = useMutation({
-      mutationFn: async (roleId: number) => {
-        await modeApiRequest("DELETE", `/api/user-company-roles/${roleId}`, {});
-      },
-      onSuccess: () => {
-        // Capture userId before it potentially changes
-        const userId = currentUserId;
-        
-        toast({
-          title: "Success",
-          description: "Role assignment removed successfully",
-        });
-        queryClient.invalidateQueries({ queryKey: [`/api/users/${userId}/company-roles`] });
-      },
-      onError: (error: any) => {
-        if ((error as any)?._handledGlobally) return;
-        toast({
-          title: "Error",
-          description: error.message || "Failed to delete role",
-          variant: "destructive",
-        });
-      },
-    });
-
     const zeroBalancesMutation = useMutation({
       mutationFn: async (accountIds: number[]) => {
         const res = await modeApiRequest("POST", "/api/ledger-accounts/zero-balances", { accountIds });
@@ -749,59 +609,6 @@ import { UsersSection } from "./settings/UsersSection";
       },
     });
   
-    const updatePermissionMutation = useMutation({
-      mutationFn: async ({ roleId, userId, companyId, data }: { roleId: number; userId: string; companyId: number; data: any }) => {
-        const res = await modeApiRequest("PATCH", `/api/user-company-roles/${roleId}`, data);
-        return await res.json();
-      },
-      onSuccess: async (_, variables) => {
-        // Invalidate the user's company roles query
-        queryClient.invalidateQueries({ queryKey: [`/api/users/${variables.userId}/company-roles`] });
-        
-        // Invalidate the aggregate permissions query so the permissions table updates
-        queryClient.invalidateQueries({ queryKey: ["/api/user-company-roles"] });
-        
-        let isCurrentUser = false;
-        
-        // Check if we need to refresh current user's session
-        const currentUserRes = await fetch("/api/auth/me");
-        if (currentUserRes.ok) {
-          const currentUser = await currentUserRes.json();
-          isCurrentUser = currentUser.id === variables.userId;
-          
-          // If we just updated the current user's permissions for the current company, refresh the session
-          if (isCurrentUser) {
-            const currentCompanyRes = await fetch("/api/user/companies");
-            if (currentCompanyRes.ok) {
-              const userCompanies = await currentCompanyRes.json();
-              const currentCompany = userCompanies.find((uc: any) => uc.companyId === variables.companyId);
-              if (currentCompany) {
-                // Refresh session by re-selecting the company
-                await modeApiRequest("POST", "/api/auth/set-company", { companyId: variables.companyId });
-                // Invalidate current user query to refresh UI
-                queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-              }
-            }
-          }
-        }
-        
-        toast({
-          title: "Success",
-          description: isCurrentUser 
-            ? "Permission updated successfully"
-            : "Permission updated successfully. The user will need to log out and log back in for this change to take effect.",
-        });
-      },
-      onError: (error: any) => {
-        if ((error as any)?._handledGlobally) return;
-        toast({
-          title: "Error",
-          description: error.message || "Failed to update permission",
-          variant: "destructive",
-        });
-      },
-    });
-  
     const handleEditCompany = async (company: any) => {
       setEditingCompany(company);
       companyForm.reset({
@@ -838,79 +645,6 @@ import { UsersSection } from "./settings/UsersSection";
         createUserMutation.mutate(data);
       }
     };
-  
-    const handleAddRole = async (userId: string) => {
-      setCurrentUserId(userId);
-      setEditingRole(null);
-      setSelectedLocationIds([]);
-      roleForm.reset({
-        userId,
-        companyId: companies[0]?.id || 0,
-        role: "Manager",
-      });
-      setIsRoleDialogOpen(true);
-    };
-  
-    const handleEditRole = async (role: any) => {
-      setCurrentUserId(role.userId);
-      setEditingRole(role);
-      roleForm.reset({
-        userId: role.userId,
-        companyId: role.companyId,
-        role: role.role,
-        assignedLocationId: role.assignedLocationId,
-        posStation: role.posStation,
-        canSellNegativeStock: role.canSellNegativeStock ?? false,
-        daybookEditDays: role.daybookEditDays ?? 0,
-      });
-      if (role.role?.startsWith("POS")) {
-        try {
-          const res = await fetch(`/api/user-locations/${role.userId}/${role.companyId}`);
-          const locs = await res.json();
-          if (Array.isArray(locs) && locs.length > 0) {
-            setSelectedLocationIds(locs.map((l: any) => l.locationId));
-          } else {
-            // Fallback to legacy single assignedLocationId if userLocations is empty
-            setSelectedLocationIds(role.assignedLocationId ? [role.assignedLocationId] : []);
-          }
-        } catch {
-          setSelectedLocationIds(role.assignedLocationId ? [role.assignedLocationId] : []);
-        }
-      } else {
-        setSelectedLocationIds([]);
-      }
-      setIsRoleDialogOpen(true);
-    };
-  
-    const handleSubmitRole = async (data: RoleAssignmentData) => {
-      createRoleMutation.mutate(data);
-    };
-  
-    const handleDeleteRole = async (roleId: number, userId: string) => {
-      setCurrentUserId(userId);
-      setPendingDelete(() => () => deleteRoleMutation.mutate(roleId));
-    };
-  
-  
-    const handlePermissionToggle = async (roleId: number, userId: string, companyId: number, field: string, value: boolean) => {
-      updatePermissionMutation.mutate({
-        roleId,
-        userId,
-        companyId,
-        data: { [field]: value },
-      });
-    };
-
-    const handleDaybookDaysChange = async (roleId: number, userId: string, companyId: number, days: number) => {
-      updatePermissionMutation.mutate({
-        roleId,
-        userId,
-        companyId,
-        data: { daybookEditDays: days },
-      });
-    };
-  
-    const isPOSRole = selectedRole?.startsWith("POS");
   
     const [activeSection, setActiveSection] = useState("companies");
 
@@ -1387,12 +1121,7 @@ import { UsersSection } from "./settings/UsersSection";
   
           {/* Users Tab */}
           {activeSection === "users" && (
-            <UsersSection
-              companies={companies}
-              handleAddRole={handleAddRole}
-              handleEditRole={handleEditRole}
-              handleDeleteRole={handleDeleteRole}
-            />
+            <UsersSection />
           )}
 
 
@@ -3042,245 +2771,6 @@ import { UsersSection } from "./settings/UsersSection";
           </AlertDialogContent>
         </AlertDialog>
   
-        {/* Role Assignment Dialog */}
-        <Dialog open={isRoleDialogOpen} onOpenChange={setIsRoleDialogOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>{editingRole ? "Edit Role Assignment" : "Add Role Assignment"}</DialogTitle>
-            </DialogHeader>
-            <Form {...roleForm}>
-              <form onSubmit={roleForm.handleSubmit(handleSubmitRole)} className="space-y-4" noValidate>
-                <FormField
-                  control={roleForm.control}
-                  name="companyId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Company *</FormLabel>
-                      <Select
-                        onValueChange={(v) => field.onChange(parseInt(v))}
-                        value={field.value?.toString() || ""}
-                      >
-                        <FormControl>
-                          <SelectTrigger data-testid="select-company">
-                            <SelectValue placeholder="Select company" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {companies.map((company: any) => (
-                            <SelectItem key={company.id} value={company.id.toString()}>
-                              {company.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-  
-                <FormField
-                  control={roleForm.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Role *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-role">
-                            <SelectValue placeholder="Select role" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Admin">Admin</SelectItem>
-                          <SelectItem value="Owner">Owner</SelectItem>
-                          <SelectItem value="Manager">Manager</SelectItem>
-                          <SelectItem value="POS1">POS 1</SelectItem>
-                          <SelectItem value="POS2">POS 2</SelectItem>
-                          <SelectItem value="POS3">POS 3</SelectItem>
-                          <SelectItem value="POS4">POS 4</SelectItem>
-                          <SelectItem value="POS5">POS 5</SelectItem>
-                          <SelectItem value="POS6">POS 6</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-  
-                {isPOSRole && (
-                  <>
-                    <FormField
-                      control={roleForm.control}
-                      name="assignedLocationId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Assigned Locations *</FormLabel>
-                          <div className="border rounded-md p-3 space-y-2 max-h-48 overflow-y-auto" data-testid="select-locations">
-                            {locations.map((loc: any) => {
-                              const isChecked = (selectedLocationIds || []).includes(loc.id);
-                              return (
-                                <label
-                                  key={loc.id}
-                                  className="flex items-center gap-2 cursor-pointer text-sm"
-                                  data-testid={`checkbox-location-${loc.id}`}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={(e) => {
-                                      const newIds = e.target.checked
-                                        ? [...(selectedLocationIds || []), loc.id]
-                                        : (selectedLocationIds || []).filter((id: number) => id !== loc.id);
-                                      setSelectedLocationIds(newIds);
-                                      if (newIds.length > 0) {
-                                        field.onChange(newIds[0]);
-                                      } else {
-                                        field.onChange(undefined);
-                                      }
-                                    }}
-                                    className="rounded"
-                                  />
-                                  {loc.name} ({loc.code})
-                                </label>
-                              );
-                            })}
-                          </div>
-                          {(selectedLocationIds || []).length === 0 && (
-                            <p className="text-sm text-destructive">At least one location is required for POS roles</p>
-                          )}
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-  
-                    <FormField
-                      control={roleForm.control}
-                      name="posStation"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>POS Station Number</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="number"
-                              min="1"
-                              max="6"
-                              placeholder="1-6"
-                              data-testid="input-pos-station"
-                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
-                              value={field.value || ""}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                  </>
-                )}
-
-                {selectedRole !== "Admin" && selectedRole !== "Owner" && (
-                  <FormField
-                    control={roleForm.control}
-                    name="daybookEditDays"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>POS Daybook Editable Days</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="number"
-                            min="0"
-                            placeholder="0 = no editing"
-                            data-testid="input-daybook-edit-days"
-                            onChange={(e) => field.onChange(e.target.value !== "" ? parseInt(e.target.value) : 0)}
-                            value={field.value ?? 0}
-                          />
-                        </FormControl>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          How many past days this user can edit POS daybook vouchers (0 = cannot edit). Admin and Owner can always edit.
-                        </p>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-  
-                <FormField
-                  control={roleForm.control}
-                  name="cashAccountId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cash Account (Optional)</FormLabel>
-                      <Select
-                        onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)}
-                        value={field.value?.toString() || ""}
-                      >
-                        <FormControl>
-                          <SelectTrigger data-testid="select-cash-account">
-                            <SelectValue placeholder="Select cash account" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {cashAccounts.map((account: any) => (
-                            <SelectItem key={account.id} value={account.id.toString()}>
-                              {account.name} ({account.code})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-  
-                <FormField
-                  control={roleForm.control}
-                  name="canSellNegativeStock"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center justify-between rounded-md border p-3">
-                      <div>
-                        <FormLabel className="cursor-pointer">Allow Selling 0-Stock Items</FormLabel>
-                        <p className="text-xs text-muted-foreground mt-0.5">Lets this user add items to POS even when stock is at 0</p>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value ?? false}
-                          onCheckedChange={field.onChange}
-                          data-testid="switch-can-sell-negative-stock"
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-
-                <div className="flex gap-2 justify-end border-t pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setIsRoleDialogOpen(false);
-                      setEditingRole(null);
-                      setCurrentUserId(null);
-                    }}
-                    disabled={createRoleMutation.isPending}
-                    data-testid="button-cancel-role"
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={createRoleMutation.isPending} data-testid="button-save-role">
-                    {createRoleMutation.isPending ? "Saving..." : "Save"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-        <DeleteConfirmDialog
-          open={!!pendingDelete}
-          onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
-          onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
-        />
       </div>
     );
   }

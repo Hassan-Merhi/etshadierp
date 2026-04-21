@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -49,6 +50,7 @@ import {
 } from "lucide-react";
 import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
 import { FEATURE_KEYS, FEATURE_PAGE_INFO } from "@shared/schema";
+import { UserRoleDialog } from "./UserRoleDialog";
 
 const ALL_FACTORY_PAGES = FACTORY_NAV_PAGES;
 const FACTORY_PAGE_GROUPS = Array.from(new Set(ALL_FACTORY_PAGES.map((p) => p.group)));
@@ -73,9 +75,6 @@ interface UserManagementDrawerProps {
   open: boolean;
   onClose: () => void;
   companies: any[];
-  handleAddRole: (userId: string) => void;
-  handleEditRole: (role: any) => void;
-  handleDeleteRole: (roleId: number, userId: string) => void;
   onUserDeleted: () => void;
 }
 
@@ -84,9 +83,6 @@ export function UserManagementDrawer({
   open,
   onClose,
   companies,
-  handleAddRole,
-  handleEditRole,
-  handleDeleteRole,
   onUserDeleted,
 }: UserManagementDrawerProps) {
   const { toast } = useToast();
@@ -103,6 +99,11 @@ export function UserManagementDrawer({
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  // Role dialog state — fully owned by this drawer
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState<any>(null);
+  const [roleToDelete, setRoleToDelete] = useState<any>(null);
 
   useEffect(() => {
     if (user) {
@@ -157,6 +158,20 @@ export function UserManagementDrawer({
       toast({ title: "Removed", description: `${user.username} has been removed` });
       setConfirmDelete(false);
       onUserDeleted();
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteRoleMutation = useMutation({
+    mutationFn: async (roleId: number) => {
+      await apiRequest("DELETE", `/api/user-company-roles/${roleId}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/users/${user?.id}/company-roles`] });
+      toast({ title: "Role removed" });
+      setRoleToDelete(null);
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -230,11 +245,11 @@ export function UserManagementDrawer({
           className="w-full sm:max-w-[520px] overflow-y-auto p-0"
         >
           <SheetHeader className="px-6 py-4 border-b">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted font-bold text-base uppercase text-muted-foreground">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted font-bold text-base uppercase text-muted-foreground">
                 {(user.displayName || user.username).charAt(0)}
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <SheetTitle className="text-lg leading-tight">
                   {user.displayName || user.username}
                 </SheetTitle>
@@ -245,7 +260,7 @@ export function UserManagementDrawer({
                 )}
               </div>
               {isPrivileged && (
-                <Badge variant="default" className="ml-auto capitalize gap-1 shrink-0">
+                <Badge variant="default" className="capitalize gap-1 shrink-0">
                   <Shield className="h-3 w-3" />
                   {user.role}
                 </Badge>
@@ -320,7 +335,7 @@ export function UserManagementDrawer({
                   </Button>
                 )}
 
-                <div className="flex items-center justify-between gap-3 pt-1">
+                <div className="flex items-center justify-between gap-3 pt-1 flex-wrap">
                   {!isPrivileged && (
                     <Button
                       variant="ghost"
@@ -419,7 +434,7 @@ export function UserManagementDrawer({
                     size="sm"
                     variant="outline"
                     className="gap-1.5"
-                    onClick={() => handleAddRole(user.id)}
+                    onClick={() => { setEditingRole(null); setRoleDialogOpen(true); }}
                     data-testid={`button-add-role-${user.id}`}
                   >
                     <Plus className="h-3.5 w-3.5" />
@@ -451,7 +466,7 @@ export function UserManagementDrawer({
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleEditRole(role)}
+                          onClick={() => { setEditingRole(role); setRoleDialogOpen(true); }}
                           data-testid={`button-edit-role-${role.id}`}
                         >
                           <Edit className="h-3.5 w-3.5" />
@@ -460,7 +475,7 @@ export function UserManagementDrawer({
                           variant="ghost"
                           size="icon"
                           className="text-destructive"
-                          onClick={() => handleDeleteRole(role.id, user.id)}
+                          onClick={() => setRoleToDelete(role)}
                           data-testid={`button-delete-role-${role.id}`}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -491,11 +506,7 @@ export function UserManagementDrawer({
                         )}
                       </CardTitle>
                       <div className="text-muted-foreground">
-                        {advancedOpen ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
+                        {advancedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                       </div>
                     </div>
                     {!advancedOpen && (
@@ -513,7 +524,6 @@ export function UserManagementDrawer({
                       </p>
                     ) : (
                       <>
-                        {/* Factory Pages */}
                         {hasFactoryAccess && (
                           <div className="space-y-2">
                             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -521,39 +531,15 @@ export function UserManagementDrawer({
                                 Factory Pages
                               </p>
                               <div className="flex gap-1.5">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    setPageAccess((prev) =>
-                                      new Set([...prev, ...ALL_FACTORY_PAGES.map((p) => p.key)])
-                                    )
-                                  }
-                                  data-testid="button-factory-pages-all"
-                                >
-                                  <Check className="h-3 w-3 mr-1" />
-                                  All
+                                <Button variant="outline" size="sm" onClick={() => setPageAccess((prev) => new Set([...prev, ...ALL_FACTORY_PAGES.map((p) => p.key)]))} data-testid="button-factory-pages-all">
+                                  <Check className="h-3 w-3 mr-1" />All
                                 </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    setPageAccess((prev) => {
-                                      const next = new Set(prev);
-                                      ALL_FACTORY_PAGES.forEach((p) => next.delete(p.key));
-                                      return next;
-                                    })
-                                  }
-                                  data-testid="button-factory-pages-none"
-                                >
-                                  <X className="h-3 w-3 mr-1" />
-                                  None
+                                <Button variant="outline" size="sm" onClick={() => setPageAccess((prev) => { const next = new Set(prev); ALL_FACTORY_PAGES.forEach((p) => next.delete(p.key)); return next; })} data-testid="button-factory-pages-none">
+                                  <X className="h-3 w-3 mr-1" />None
                                 </Button>
                               </div>
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                              Leave all unchecked for full factory access.
-                            </p>
+                            <p className="text-xs text-muted-foreground">Leave all unchecked for full factory access.</p>
                             <div className="space-y-3 border rounded-md p-3 max-h-48 overflow-y-auto">
                               {FACTORY_PAGE_GROUPS.map((group) => {
                                 const groupPages = ALL_FACTORY_PAGES.filter((p) => p.group === group);
@@ -562,26 +548,14 @@ export function UserManagementDrawer({
                                 return (
                                   <div key={group} className="space-y-1.5">
                                     <div className="flex items-center gap-2">
-                                      <Checkbox
-                                        checked={allSel}
-                                        onCheckedChange={() => toggleGroup(group, groupPages)}
-                                        data-testid={`checkbox-group-${group.toLowerCase().replace(/\s+/g, "-")}`}
-                                      />
-                                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                        {group}
-                                      </span>
-                                      {someSel && !allSel && (
-                                        <Badge variant="secondary" className="text-xs">partial</Badge>
-                                      )}
+                                      <Checkbox checked={allSel} onCheckedChange={() => toggleGroup(group, groupPages)} data-testid={`checkbox-group-${group.toLowerCase().replace(/\s+/g, "-")}`} />
+                                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</span>
+                                      {someSel && !allSel && <Badge variant="secondary" className="text-xs">partial</Badge>}
                                     </div>
                                     <div className="ml-6 grid grid-cols-2 gap-1">
                                       {groupPages.map((page) => (
                                         <div key={page.key} className="flex items-center gap-2">
-                                          <Checkbox
-                                            checked={pageAccess.has(page.key)}
-                                            onCheckedChange={() => togglePage(page.key)}
-                                            data-testid={`checkbox-page-${page.key.replace(/\//g, "-")}`}
-                                          />
+                                          <Checkbox checked={pageAccess.has(page.key)} onCheckedChange={() => togglePage(page.key)} data-testid={`checkbox-page-${page.key.replace(/\//g, "-")}`} />
                                           <span className="text-sm">{page.label}</span>
                                         </div>
                                       ))}
@@ -593,47 +567,20 @@ export function UserManagementDrawer({
                           </div>
                         )}
 
-                        {/* ERP Pages */}
                         {hasErpAccess && (
                           <div className="space-y-2">
                             <div className="flex items-center justify-between flex-wrap gap-2">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                ERP Pages
-                              </p>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">ERP Pages</p>
                               <div className="flex gap-1.5">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    setPageAccess((prev) =>
-                                      new Set([...prev, ...ALL_ERP_PAGES.map((p) => p.key)])
-                                    )
-                                  }
-                                  data-testid="button-erp-pages-all"
-                                >
-                                  <Check className="h-3 w-3 mr-1" />
-                                  All
+                                <Button variant="outline" size="sm" onClick={() => setPageAccess((prev) => new Set([...prev, ...ALL_ERP_PAGES.map((p) => p.key)]))} data-testid="button-erp-pages-all">
+                                  <Check className="h-3 w-3 mr-1" />All
                                 </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    setPageAccess((prev) => {
-                                      const next = new Set(prev);
-                                      ALL_ERP_PAGES.forEach((p) => next.delete(p.key));
-                                      return next;
-                                    })
-                                  }
-                                  data-testid="button-erp-pages-none"
-                                >
-                                  <X className="h-3 w-3 mr-1" />
-                                  None
+                                <Button variant="outline" size="sm" onClick={() => setPageAccess((prev) => { const next = new Set(prev); ALL_ERP_PAGES.forEach((p) => next.delete(p.key)); return next; })} data-testid="button-erp-pages-none">
+                                  <X className="h-3 w-3 mr-1" />None
                                 </Button>
                               </div>
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                              Leave all unchecked for full ERP access.
-                            </p>
+                            <p className="text-xs text-muted-foreground">Leave all unchecked for full ERP access.</p>
                             <div className="space-y-3 border rounded-md p-3 max-h-48 overflow-y-auto">
                               {ERP_PAGE_GROUPS.map((group) => {
                                 const groupPages = ALL_ERP_PAGES.filter((p) => p.group === group);
@@ -642,26 +589,14 @@ export function UserManagementDrawer({
                                 return (
                                   <div key={`erp-${group}`} className="space-y-1.5">
                                     <div className="flex items-center gap-2">
-                                      <Checkbox
-                                        checked={allSel}
-                                        onCheckedChange={() => toggleGroup(group, groupPages)}
-                                        data-testid={`checkbox-erp-group-${group.toLowerCase().replace(/\s+/g, "-")}`}
-                                      />
-                                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                        {group}
-                                      </span>
-                                      {someSel && !allSel && (
-                                        <Badge variant="secondary" className="text-xs">partial</Badge>
-                                      )}
+                                      <Checkbox checked={allSel} onCheckedChange={() => toggleGroup(group, groupPages)} data-testid={`checkbox-erp-group-${group.toLowerCase().replace(/\s+/g, "-")}`} />
+                                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</span>
+                                      {someSel && !allSel && <Badge variant="secondary" className="text-xs">partial</Badge>}
                                     </div>
                                     <div className="ml-6 grid grid-cols-2 gap-1">
                                       {groupPages.map((page) => (
                                         <div key={page.key} className="flex items-center gap-2">
-                                          <Checkbox
-                                            checked={pageAccess.has(page.key)}
-                                            onCheckedChange={() => togglePage(page.key)}
-                                            data-testid={`checkbox-erp-page-${page.key}`}
-                                          />
+                                          <Checkbox checked={pageAccess.has(page.key)} onCheckedChange={() => togglePage(page.key)} data-testid={`checkbox-erp-page-${page.key}`} />
                                           <span className="text-sm">{page.label}</span>
                                         </div>
                                       ))}
@@ -673,53 +608,31 @@ export function UserManagementDrawer({
                           </div>
                         )}
 
-                        {/* Cost Visibility */}
                         <div className="space-y-2">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            Hidden Cost Fields
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Checked fields will be hidden from this user.
-                          </p>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Hidden Cost Fields</p>
+                          <p className="text-xs text-muted-foreground">Checked fields will be hidden from this user.</p>
                           <div className="space-y-1.5 border rounded-md p-3">
                             {FACTORY_COST_FIELDS.map((field) => (
                               <div key={field.key} className="flex items-center gap-2">
-                                <Checkbox
-                                  checked={hiddenCostFields.includes(field.key)}
-                                  onCheckedChange={() => toggleCostField(field.key)}
-                                  data-testid={`checkbox-cost-${field.key}`}
-                                />
+                                <Checkbox checked={hiddenCostFields.includes(field.key)} onCheckedChange={() => toggleCostField(field.key)} data-testid={`checkbox-cost-${field.key}`} />
                                 <span className="text-sm">{field.label}</span>
                               </div>
                             ))}
                           </div>
                         </div>
 
-                        {/* Daybook */}
                         <div className="space-y-2">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            Daybook Restrictions
-                          </p>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Daybook Restrictions</p>
                           <div className="border rounded-md p-3">
                             <div className="flex items-center gap-2">
-                              <Checkbox
-                                checked={hiddenCostFields.includes("daybook_own_only")}
-                                onCheckedChange={() => toggleCostField("daybook_own_only")}
-                                data-testid="checkbox-daybook-own-only"
-                              />
+                              <Checkbox checked={hiddenCostFields.includes("daybook_own_only")} onCheckedChange={() => toggleCostField("daybook_own_only")} data-testid="checkbox-daybook-own-only" />
                               <span className="text-sm">Show only entries they created</span>
                             </div>
                           </div>
                         </div>
 
                         <div className="flex justify-end">
-                          <Button
-                            size="sm"
-                            className="gap-2"
-                            onClick={handleSaveRestrictions}
-                            disabled={updateMutation.isPending}
-                            data-testid="button-save-restrictions"
-                          >
+                          <Button size="sm" className="gap-2" onClick={handleSaveRestrictions} disabled={updateMutation.isPending} data-testid="button-save-restrictions">
                             <Save className="h-3.5 w-3.5" />
                             {updateMutation.isPending ? "Saving..." : "Save Restrictions"}
                           </Button>
@@ -734,7 +647,40 @@ export function UserManagementDrawer({
         </SheetContent>
       </Sheet>
 
-      {/* Delete confirmation */}
+      {/* Self-contained role assignment dialog */}
+      <UserRoleDialog
+        open={roleDialogOpen}
+        onClose={() => { setRoleDialogOpen(false); setEditingRole(null); }}
+        userId={user.id}
+        companies={companies}
+        editingRole={editingRole}
+      />
+
+      {/* Delete role confirmation */}
+      <AlertDialog open={!!roleToDelete} onOpenChange={(v) => { if (!v) setRoleToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this role?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove the <strong>{roleToDelete?.role}</strong> role from{" "}
+              <strong>{companies.find((c: any) => c.id === roleToDelete?.companyId)?.name || `Company ${roleToDelete?.companyId}`}</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteRoleMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => roleToDelete && deleteRoleMutation.mutate(roleToDelete.id)}
+              disabled={deleteRoleMutation.isPending}
+              className="bg-destructive text-destructive-foreground"
+              data-testid="button-confirm-delete-role"
+            >
+              {deleteRoleMutation.isPending ? "Removing..." : "Remove Role"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete user confirmation */}
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
