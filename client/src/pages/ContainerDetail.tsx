@@ -24,7 +24,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import type { Supplier, Customer, ContainerSale } from "@shared/schema";
-import { utils, writeFile } from "@/lib/excelHelper";
+import { utils, writeFile, read as readExcel } from "@/lib/excelHelper";
 
 interface ContainerDetailData {
   container: any;
@@ -126,6 +126,102 @@ export default function ContainerDetail() {
   const [uploadDocTypeId, setUploadDocTypeId] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [showPriceImportDialog, setShowPriceImportDialog] = useState(false);
+  const [priceImportPreview, setPriceImportPreview] = useState<any[] | null>(null);
+  const [priceImportParsing, setPriceImportParsing] = useState(false);
+  const [priceImportError, setPriceImportError] = useState<string | null>(null);
+  const priceImportFileRef = useRef<HTMLInputElement>(null);
+
+  const pricePreviewMutation = useMutation({
+    mutationFn: async (rows: { barcode: string; price: string }[]) => {
+      const res = await apiRequest("POST", "/api/bales/price-import/preview", { rows });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      setPriceImportPreview(data.preview || []);
+    },
+    onError: (e: any) => {
+      toast({ title: "Preview failed", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const priceApplyMutation = useMutation({
+    mutationFn: async (rows: { id: number; price: string }[]) => {
+      const res = await apiRequest("POST", "/api/bales/price-import/apply", { rows });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: "Prices updated", description: `${data.updated} bale(s) updated successfully.` });
+      setShowPriceImportDialog(false);
+      setPriceImportPreview(null);
+      setPriceImportError(null);
+      queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+    },
+    onError: (e: any) => {
+      toast({ title: "Apply failed", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const handlePriceImportFile = async (file: File) => {
+    setPriceImportError(null);
+    setPriceImportPreview(null);
+    setPriceImportParsing(true);
+    try {
+      const wb = await readExcel(file);
+      const sheetName = wb.SheetNames[0];
+      const sheet = wb.Sheets[sheetName];
+      const rows: { barcode: string; price: string }[] = [];
+      let barcodeCol = -1;
+      let priceCol = -1;
+      let headerRow = -1;
+
+      sheet.eachRow((row: any, rowNumber: number) => {
+        const vals = row.values as any[];
+        if (headerRow === -1) {
+          vals.forEach((cell: any, colIdx: number) => {
+            const v = String(cell || "").toLowerCase().trim();
+            if (v === "barcode" || v === "barcodes" || v === "bar_code" || v === "code") barcodeCol = colIdx;
+            if (v === "price" || v === "new_price" || v === "newprice" || v === "unit_price" || v === "unit price") priceCol = colIdx;
+          });
+          if (barcodeCol !== -1 && priceCol !== -1) { headerRow = rowNumber; }
+          return;
+        }
+        const barcode = String(vals[barcodeCol] ?? "").trim();
+        const price = String(vals[priceCol] ?? "").trim();
+        if (barcode) rows.push({ barcode, price });
+      });
+
+      if (rows.length === 0 && (barcodeCol === -1 || priceCol === -1)) {
+        const headerKeywords = ["barcode", "barcodes", "bar_code", "code", "price", "new_price", "newprice", "unit_price", "unit price"];
+        sheet.eachRow((row: any) => {
+          const vals = row.values as any[];
+          const firstCell = String(vals[1] ?? "").toLowerCase().trim();
+          if (headerKeywords.includes(firstCell)) return;
+          const barcode = String(vals[1] ?? "").trim();
+          const price = String(vals[2] ?? "").trim();
+          if (barcode) rows.push({ barcode, price });
+        });
+        if (rows.length === 0) {
+          setPriceImportError('Could not detect columns. Use headers "barcode" and "price", or put barcodes in column A and prices in column B.');
+          setPriceImportParsing(false);
+          return;
+        }
+      }
+
+      if (rows.length === 0) {
+        setPriceImportError("No data rows found in the Excel file.");
+        setPriceImportParsing(false);
+        return;
+      }
+
+      pricePreviewMutation.mutate(rows);
+    } catch (err: any) {
+      setPriceImportError("Could not read Excel file: " + err.message);
+    } finally {
+      setPriceImportParsing(false);
+    }
+  };
 
   const uploadDocMutation = useMutation({
     mutationFn: async ({ docTypeId, file }: { docTypeId: number; file: File }) => {
@@ -526,6 +622,14 @@ export default function ContainerDetail() {
             <DropdownMenuItem onClick={handlePrint} data-testid="button-export-pdf">
               <Printer className="w-4 h-4 mr-2" />
               Export PDF
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => { setPriceImportPreview(null); setPriceImportError(null); setShowPriceImportDialog(true); }}
+              data-testid="button-import-pricing"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Import Pricing (Excel)
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -1268,6 +1372,127 @@ export default function ContainerDetail() {
         onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
         onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
       />
+
+      {/* Price Import Dialog */}
+      <Dialog open={showPriceImportDialog} onOpenChange={(open) => {
+        if (!open) { setPriceImportPreview(null); setPriceImportError(null); }
+        setShowPriceImportDialog(open);
+      }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Import Pricing from Excel</DialogTitle>
+            <DialogDescription>
+              Upload an Excel file with columns <strong>barcode</strong> and <strong>price</strong>. Review the preview, then save to apply.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4 flex-1 overflow-hidden">
+            {/* File upload area */}
+            <div
+              className="border-2 border-dashed rounded-md p-6 flex flex-col items-center gap-3 cursor-pointer hover-elevate"
+              onClick={() => priceImportFileRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const file = e.dataTransfer.files[0];
+                if (file) handlePriceImportFile(file);
+              }}
+              data-testid="dropzone-price-import"
+            >
+              <Upload className="w-8 h-8 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground text-center">
+                Click or drag an Excel file here<br />
+                <span className="text-xs">Columns: <code>barcode</code> and <code>price</code> (or A/B if no headers)</span>
+              </p>
+              <input
+                ref={priceImportFileRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                data-testid="input-price-import-file"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handlePriceImportFile(file);
+                  e.target.value = "";
+                }}
+              />
+            </div>
+
+            {(priceImportParsing || pricePreviewMutation.isPending) && (
+              <p className="text-sm text-muted-foreground text-center">Reading file and fetching preview…</p>
+            )}
+
+            {priceImportError && (
+              <p className="text-sm text-destructive">{priceImportError}</p>
+            )}
+
+            {/* Preview table */}
+            {priceImportPreview && priceImportPreview.length > 0 && (
+              <div className="overflow-auto flex-1 border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Barcode</TableHead>
+                      <TableHead>Category / Grade</TableHead>
+                      <TableHead>Current Price</TableHead>
+                      <TableHead>New Price</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {priceImportPreview.map((row: any, i: number) => (
+                      <TableRow key={i} data-testid={`row-price-preview-${i}`}>
+                        <TableCell className="font-mono text-xs">{row.barcode}</TableCell>
+                        <TableCell className="text-sm">
+                          {row.category && row.grade ? `${row.category} / ${row.grade}` : "—"}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {row.currentPrice != null ? row.currentPrice.toFixed(2) : "—"}
+                        </TableCell>
+                        <TableCell className="text-sm font-medium">
+                          {row.newPrice != null ? row.newPrice.toFixed(2) : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {row.status === "will_update" && <Badge variant="default" data-testid={`status-preview-${i}`}>Will Update</Badge>}
+                          {row.status === "no_change" && <Badge variant="secondary" data-testid={`status-preview-${i}`}>No Change</Badge>}
+                          {row.status === "not_found" && <Badge variant="destructive" data-testid={`status-preview-${i}`}>Not Found</Badge>}
+                          {row.status === "invalid_price" && <Badge variant="destructive" data-testid={`status-preview-${i}`}>Invalid Price</Badge>}
+                          {row.status === "invalid" && <Badge variant="destructive" data-testid={`status-preview-${i}`}>Invalid Row</Badge>}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {priceImportPreview && priceImportPreview.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center">No rows found in the file.</p>
+            )}
+          </div>
+
+          {priceImportPreview && priceImportPreview.some((r: any) => r.status === "will_update") && (
+            <div className="flex justify-between items-center pt-2 border-t gap-2 flex-wrap">
+              <p className="text-sm text-muted-foreground">
+                {priceImportPreview.filter((r: any) => r.status === "will_update").length} bale(s) will be updated
+                {priceImportPreview.some((r: any) => r.status === "not_found") && ` · ${priceImportPreview.filter((r: any) => r.status === "not_found").length} not found`}
+              </p>
+              <Button
+                onClick={() => {
+                  const rows = priceImportPreview
+                    .filter((r: any) => r.status === "will_update" && r.id)
+                    .map((r: any) => ({ id: r.id, price: String(r.newPrice) }));
+                  priceApplyMutation.mutate(rows);
+                }}
+                disabled={priceApplyMutation.isPending}
+                data-testid="button-save-price-import"
+              >
+                {priceApplyMutation.isPending ? "Saving…" : "Save Changes"}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

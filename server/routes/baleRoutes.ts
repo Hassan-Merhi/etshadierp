@@ -216,6 +216,72 @@ export function registerBaleRoutes(app: Express) {
     }
   });
 
+  // Price import from Excel: preview + apply
+  app.post("/api/bales/price-import/preview", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rows: { barcode: string; price: string }[] = req.body.rows || [];
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ message: "No rows provided" });
+      }
+
+      const preview = await Promise.all(rows.map(async (row) => {
+        const barcode = String(row.barcode || "").trim();
+        const newPrice = parseFloat(String(row.price || ""));
+        if (!barcode) return { barcode, status: "invalid", currentPrice: null, newPrice: null };
+        if (isNaN(newPrice) || newPrice < 0) return { barcode, status: "invalid_price", currentPrice: null, newPrice: null };
+        const bale = await storage.getBaleByBarcode(barcode, companyId);
+        if (!bale) return { barcode, status: "not_found", currentPrice: null, newPrice };
+        const currentPrice = bale.price ? parseFloat(bale.price) : null;
+        const noChange = currentPrice !== null && Math.abs(currentPrice - newPrice) < 0.001;
+        return {
+          id: bale.id,
+          barcode,
+          category: bale.category,
+          grade: bale.grade,
+          status: noChange ? "no_change" : "will_update",
+          currentPrice,
+          newPrice,
+        };
+      }));
+
+      res.json({ preview });
+    } catch (error: any) {
+      console.error("Error in price-import preview:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/bales/price-import/apply", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rows: { id: number; price: string }[] = req.body.rows || [];
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ message: "No rows provided" });
+      }
+
+      let updated = 0;
+      for (const row of rows) {
+        const id = parseInt(String(row.id));
+        const price = parseFloat(String(row.price));
+        if (isNaN(id) || isNaN(price) || price < 0) continue;
+        const bale = await storage.getBaleById(id);
+        if (!bale || bale.companyId !== companyId) continue;
+        await storage.updateBale(id, { price: String(price) });
+        updated++;
+      }
+
+      res.json({ success: true, updated });
+    } catch (error: any) {
+      console.error("Error in price-import apply:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Pending Barcodes API Routes - for pre-printing barcode labels
   app.get("/api/pending-barcodes", requireAuth, async (req, res) => {
     try {
