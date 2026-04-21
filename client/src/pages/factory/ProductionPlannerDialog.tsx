@@ -252,6 +252,30 @@ export default function ProductionPlannerDialog() {
     }
   }
 
+  // Toggle a worker as helper under a team leader from the leader's row
+  const toggleHelperForLeader = useCallback((leaderId: number, worker: Worker) => {
+    setEntries(prev => {
+      const existing = prev.find(e => e.workerId === worker.id);
+      if (existing) {
+        if (existing.role === "HELPER" && existing.teamLeaderWorkerId === leaderId) {
+          // Already helper for this leader → revert to Worker
+          return prev.map(e => e._key === existing._key ? { ...e, role: "WORKER", teamLeaderWorkerId: null } : e);
+        }
+        // Exists in plan with another role → convert to Helper for this leader
+        return prev.map(e => e._key === existing._key ? { ...e, role: "HELPER", teamLeaderWorkerId: leaderId } : e);
+      }
+      // Not yet in plan → add as new Helper row
+      return [...prev, {
+        workerId: worker.id,
+        workerName: worker.fullName,
+        role: "HELPER",
+        targetBales: 0,
+        teamLeaderWorkerId: leaderId,
+        _key: `helper-${Date.now()}-${worker.id}`,
+      }];
+    });
+  }, []);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -396,12 +420,12 @@ export default function ProductionPlannerDialog() {
                           </Select>
                         </td>
 
-                        {/* Team leader selector — only for helpers */}
+                        {/* Team leader selector (helper rows) / Assign helpers popover (leader rows) */}
                         <td className="px-3 py-2">
                           {isHelper ? (
                             <Select
-                              value={entry.teamLeaderWorkerId ? String(entry.teamLeaderWorkerId) : ""}
-                              onValueChange={v => updateEntry(entry._key, "teamLeaderWorkerId", v ? parseInt(v) : null)}
+                              value={entry.teamLeaderWorkerId ? String(entry.teamLeaderWorkerId) : "__unset__"}
+                              onValueChange={v => updateEntry(entry._key, "teamLeaderWorkerId", v === "__unset__" ? null : parseInt(v))}
                             >
                               <SelectTrigger
                                 className="h-8 text-sm"
@@ -411,7 +435,7 @@ export default function ProductionPlannerDialog() {
                               </SelectTrigger>
                               <SelectContent>
                                 {teamLeaders.length === 0 ? (
-                                  <SelectItem value="" disabled>No team leaders yet</SelectItem>
+                                  <SelectItem value="__unset__" disabled>No team leaders yet</SelectItem>
                                 ) : teamLeaders.map(tl => (
                                   <SelectItem key={tl.workerId} value={String(tl.workerId)}>
                                     {tl.workerName}
@@ -419,12 +443,55 @@ export default function ProductionPlannerDialog() {
                                 ))}
                               </SelectContent>
                             </Select>
-                          ) : isLeader && helperCountByLeader[entry.workerId] ? (
-                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Users className="h-3 w-3" />
-                              {helperCountByLeader[entry.workerId]} helper{helperCountByLeader[entry.workerId] !== 1 ? "s" : ""}
-                            </span>
-                          ) : (
+                          ) : isLeader ? (() => {
+                            const helperWorkerIds = new Set(
+                              entries.filter(e => e.role === "HELPER" && e.teamLeaderWorkerId === entry.workerId).map(e => e.workerId)
+                            );
+                            const assignedHelpers = workers.filter(w => helperWorkerIds.has(w.id));
+                            const available = workers.filter(w => w.id !== entry.workerId);
+                            return (
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 text-xs gap-1"
+                                    data-testid={`button-assign-helpers-${entry._key}`}
+                                  >
+                                    <Users className="h-3 w-3" />
+                                    {assignedHelpers.length > 0
+                                      ? `${assignedHelpers.length} helper${assignedHelpers.length !== 1 ? "s" : ""}`
+                                      : "Assign helpers…"}
+                                    <ChevronsUpDown className="h-3 w-3 opacity-50" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-56 p-0" align="start">
+                                  <Command>
+                                    <CommandInput placeholder="Search workers…" className="h-8" />
+                                    <CommandList>
+                                      <CommandEmpty>No workers found</CommandEmpty>
+                                      <CommandGroup>
+                                        {available.map(w => {
+                                          const isAssigned = helperWorkerIds.has(w.id);
+                                          return (
+                                            <CommandItem
+                                              key={w.id}
+                                              value={w.fullName}
+                                              onSelect={() => toggleHelperForLeader(entry.workerId, w)}
+                                              data-testid={`item-helper-${w.id}`}
+                                            >
+                                              <Check className={cn("mr-2 h-4 w-4", isAssigned ? "opacity-100" : "opacity-0")} />
+                                              {w.fullName}
+                                            </CommandItem>
+                                          );
+                                        })}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                            );
+                          })() : (
                             <span className="text-muted-foreground text-xs">—</span>
                           )}
                         </td>
