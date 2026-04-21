@@ -32,6 +32,7 @@ interface PriceListItem {
   sellingPrice: string | null;
   quantity: string;
   costPrice?: string | null;
+  offloadingCost?: string | null;
 }
 
 interface POSPriceListProps {
@@ -352,6 +353,9 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                           {showCostPrice && (
                             <TableHead className="text-right hidden sm:table-cell w-36">Cost Price</TableHead>
                           )}
+                          {showCostPrice && (
+                            <TableHead className="text-right hidden sm:table-cell w-36">Offloading Cost</TableHead>
+                          )}
                           <TableHead className="text-right w-48">Selling Price</TableHead>
                           {showQty && (
                             <TableHead className="text-right hidden sm:table-cell w-28">Qty in Stock</TableHead>
@@ -384,7 +388,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                                 {item.stockGroupName || "—"}
                               </TableCell>
 
-                              {/* ── Cost Price (privileged only) ── */}
+                              {/* ── Cost Price / Dubai Cost (privileged only) ── */}
                               {showCostPrice && (
                                 <TableCell
                                   className="text-right hidden sm:table-cell text-sm tabular-nums text-muted-foreground"
@@ -392,6 +396,18 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                                 >
                                   {item.costPrice && parseFloat(item.costPrice) > 0
                                     ? formatAmount(parseFloat(item.costPrice))
+                                    : "—"}
+                                </TableCell>
+                              )}
+
+                              {/* ── Offloading Cost per Item (privileged only) ── */}
+                              {showCostPrice && (
+                                <TableCell
+                                  className="text-right hidden sm:table-cell text-sm tabular-nums text-muted-foreground"
+                                  data-testid={`text-offloading-cost-${item.stockItemId}`}
+                                >
+                                  {item.offloadingCost && parseFloat(item.offloadingCost) > 0
+                                    ? formatAmount(parseFloat(item.offloadingCost))
                                     : "—"}
                                 </TableCell>
                               )}

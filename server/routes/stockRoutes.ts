@@ -621,7 +621,6 @@ export function registerStockRoutes(app: Express) {
       let rows: any[];
 
       if (showAll) {
-        // All locations: return base selling price for every active stock item (no qty)
         rows = await db
           .select({
             stockItemId: stockItems.id,
@@ -632,14 +631,12 @@ export function registerStockRoutes(app: Express) {
             hasCustomPrice: sql<boolean>`false`,
             sellingPrice: stockItems.sellingPrice,
             quantity: sql<string>`'0'`,
-            ...(isPrivileged ? { costPrice: stockItems.costPrice } : {}),
           })
           .from(stockItems)
           .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
           .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)))
           .orderBy(stockItems.name);
       } else {
-        // Specific location: include location-specific price and qty
         rows = await db
           .select({
             stockItemId: stockItems.id,
@@ -650,7 +647,6 @@ export function registerStockRoutes(app: Express) {
             hasCustomPrice: sql<boolean>`(${stockItemLocationPrices.sellingPrice} IS NOT NULL)`,
             sellingPrice: sql<string>`COALESCE(${stockItemLocationPrices.sellingPrice}, ${stockItems.sellingPrice})`,
             quantity: sql<string>`COALESCE(${inventory.quantity}::text, '0')`,
-            ...(isPrivileged ? { costPrice: stockItems.costPrice } : {}),
           })
           .from(stockItems)
           .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
@@ -670,6 +666,48 @@ export function registerStockRoutes(app: Express) {
           )
           .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)))
           .orderBy(stockItems.name);
+      }
+
+      // For privileged users, fetch Dubai cost (from latest PO line rate) and offloading cost
+      if (isPrivileged && rows.length > 0) {
+        const [dubaiCostRes, offloadCostRes] = await Promise.all([
+          db.execute(sql`
+            SELECT DISTINCT ON (pli.stock_item_id)
+              pli.stock_item_id AS "stockItemId",
+              pli.rate AS "costDubai"
+            FROM po_line_items pli
+            JOIN purchase_orders po ON pli.po_id = po.id
+            JOIN containers c ON po.container_id = c.id
+            WHERE po.company_id = ${companyId}
+            ORDER BY pli.stock_item_id, pli.id DESC
+          `),
+          db.execute(sql`
+            SELECT DISTINCT ON (pli.stock_item_id)
+              pli.stock_item_id AS "stockItemId",
+              co.additional_cost_per_bale AS "offloadingCost"
+            FROM container_offloads co
+            JOIN containers c ON co.container_id = c.id
+            JOIN purchase_orders po ON po.container_id = c.id
+            JOIN po_line_items pli ON pli.po_id = po.id
+            WHERE c.company_id = ${companyId}
+            ORDER BY pli.stock_item_id, co.offloaded_at DESC
+          `),
+        ]);
+
+        const dubaiMap = new Map<number, string>();
+        for (const r of dubaiCostRes.rows as any[]) {
+          dubaiMap.set(Number(r.stockItemId), String(r.costDubai ?? "0"));
+        }
+        const offloadMap = new Map<number, string>();
+        for (const r of offloadCostRes.rows as any[]) {
+          offloadMap.set(Number(r.stockItemId), String(r.offloadingCost ?? "0"));
+        }
+
+        rows = rows.map((row: any) => ({
+          ...row,
+          costPrice: dubaiMap.get(row.stockItemId) ?? null,
+          offloadingCost: offloadMap.get(row.stockItemId) ?? null,
+        }));
       }
 
       res.json(rows);
