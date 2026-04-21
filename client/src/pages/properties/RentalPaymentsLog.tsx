@@ -220,7 +220,9 @@ export default function RentalPaymentsLog({
                 <>
                   This will permanently remove the <strong>${fmtMoney(deleteTarget.amount)}</strong> payment
                   from <strong>{deleteTarget.tenantName ?? "—"}</strong>{" "}
-                  ({MONTH_NAMES[deleteTarget.forMonth]} {deleteTarget.forYear}) and reverse its accounting entry.
+                  ({MONTH_NAMES[deleteTarget.forMonth]} {deleteTarget.forYear}).
+                  The accounting entry will be reversed, and any inter-company transfer that was automatically
+                  created for this payment will also be fully reversed in both companies.
                   This cannot be undone.
                 </>
               )}

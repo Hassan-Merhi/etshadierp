@@ -749,16 +749,16 @@ export function registerRentalRoutes(
 
       // Record in payments log so it's visible in cash flow / payments history
       const pd = new Date(dateStr);
-      await db.insert(propertyPayments).values({
+      const [savedPayment] = await db.insert(propertyPayments).values({
         companyId, module, contractId: contract.id, unitId: contract.unitId,
         ledgerRowId: null, cashAccountId, voucherId,
         amount, paymentDate: dateStr as any,
         forYear: pd.getUTCFullYear(), forMonth: pd.getUTCMonth() + 1,
         notes: notes ? `[Guarantee release] ${notes}` : `[Guarantee release] ${unitLabel}`,
-      });
+      }).returning();
 
-      // Fire auto-transfer if configured — guarantee cash receipt triggers the same transfer rules as rent payments
-      await maybeRunAutoTransfer(companyId, module, cashAccountId, amount, dateStr, unitLabel);
+      // Fire auto-transfer if configured — pass the payment ID so deletion can reverse both sides
+      await maybeRunAutoTransfer(companyId, module, cashAccountId, amount, dateStr, unitLabel, savedPayment?.id);
 
       res.json({ ok: true });
     } catch (e: any) {
