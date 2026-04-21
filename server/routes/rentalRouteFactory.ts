@@ -56,6 +56,7 @@ async function maybeRunAutoTransfer(
   transferDate: string,
   unitLabel: string,
   sourcePaymentId?: number,
+  notes?: string,
 ) {
   try {
     // Fetch ALL active rules for this company+module
@@ -95,8 +96,16 @@ async function maybeRunAutoTransfer(
       if (!toCompany) continue;
 
       const toClearing = await getOrCreateClearing(cfg.destCompanyId);
-      const desc = `Auto rent transfer - ${unitLabel}`;
+      const baseDesc = `Auto rent transfer - ${unitLabel}`;
+      const desc = notes ? `${baseDesc} - ${notes}` : baseDesc;
       const ts = Date.now();
+
+      const outNarration = notes
+        ? `Transfer out to ${toCompany.name} - ${notes}`
+        : `Transfer out to ${toCompany.name}`;
+      const inNarration = notes
+        ? `Transfer in from ${fromCompany.name} - ${notes}`
+        : `Transfer in from ${fromCompany.name}`;
 
       // Voucher in FROM company (Payment — money leaves)
       const [fromVoucher] = await db.insert(vouchers).values({
@@ -105,19 +114,20 @@ async function maybeRunAutoTransfer(
         description: `${desc} → ${toCompany.name}`, totalAmount: amount, optional: false,
       }).returning();
       await db.insert(voucherEntries).values([
-        { voucherId: fromVoucher.id, ledgerAccountId: fromClearing.id, debitAmount: amount,  creditAmount: "0", narration: `Transfer out to ${toCompany.name}` },
-        { voucherId: fromVoucher.id, ledgerAccountId: fromLedgerAccountId, debitAmount: "0", creditAmount: amount, narration: `Transfer out to ${toCompany.name}` },
+        { voucherId: fromVoucher.id, ledgerAccountId: fromClearing.id, debitAmount: amount,  creditAmount: "0", narration: outNarration },
+        { voucherId: fromVoucher.id, ledgerAccountId: fromLedgerAccountId, debitAmount: "0", creditAmount: amount, narration: outNarration },
       ]);
 
       // Voucher in TO company (Receipt — money arrives)
       const [toVoucher] = await db.insert(vouchers).values({
         companyId: cfg.destCompanyId, voucherNumber: `TR-IN-${ts + 1}`,
         voucherType: "Receipt", voucherDate: transferDate as any,
-        description: `Transfer from ${fromCompany.name}`, totalAmount: amount, optional: false,
+        description: notes ? `Transfer from ${fromCompany.name} - ${notes}` : `Transfer from ${fromCompany.name}`,
+        totalAmount: amount, optional: false,
       }).returning();
       await db.insert(voucherEntries).values([
-        { voucherId: toVoucher.id, ledgerAccountId: cfg.destLedgerAccountId, debitAmount: amount, creditAmount: "0", narration: `Transfer in from ${fromCompany.name}` },
-        { voucherId: toVoucher.id, ledgerAccountId: toClearing.id,           debitAmount: "0",   creditAmount: amount, narration: `Transfer in from ${fromCompany.name}` },
+        { voucherId: toVoucher.id, ledgerAccountId: cfg.destLedgerAccountId, debitAmount: amount, creditAmount: "0", narration: inNarration },
+        { voucherId: toVoucher.id, ledgerAccountId: toClearing.id,           debitAmount: "0",   creditAmount: amount, narration: inNarration },
       ]);
 
       // Record link (sourcePaymentId links this transfer back to the originating payment)
@@ -696,7 +706,7 @@ export function registerRentalRoutes(
 
       // Fire auto-transfer if configured (same as regular payment — guarantee cash receipt triggers transfer)
       if (cashAccountId) {
-        await maybeRunAutoTransfer(companyId, module, cashAccountId, amount, dateStr, unitLabel);
+        await maybeRunAutoTransfer(companyId, module, cashAccountId, amount, dateStr, unitLabel, undefined, notes);
       }
 
       res.json({ ok: true });
@@ -758,7 +768,7 @@ export function registerRentalRoutes(
       }).returning();
 
       // Fire auto-transfer if configured — pass the payment ID so deletion can reverse both sides
-      await maybeRunAutoTransfer(companyId, module, cashAccountId, amount, dateStr, unitLabel, savedPayment?.id);
+      await maybeRunAutoTransfer(companyId, module, cashAccountId, amount, dateStr, unitLabel, savedPayment?.id, notes);
 
       res.json({ ok: true });
     } catch (e: any) {
@@ -861,7 +871,7 @@ export function registerRentalRoutes(
       // Fire auto-transfer if configured (outside transaction — best-effort)
       if (data.cashAccountId) {
         const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
-        await maybeRunAutoTransfer(companyId, module, data.cashAccountId, data.amount, data.paymentDate, unitLabel, payment.id);
+        await maybeRunAutoTransfer(companyId, module, data.cashAccountId, data.amount, data.paymentDate, unitLabel, payment.id, data.notes);
       }
 
       res.json(payment);
