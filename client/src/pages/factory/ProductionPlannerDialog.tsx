@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ClipboardList, Plus, Trash2, CheckCircle2, XCircle, Copy, Save, Loader2, ChevronDown, Check, ChevronsUpDown } from "lucide-react";
+import { ClipboardList, Plus, Trash2, CheckCircle2, XCircle, Copy, Save, Loader2, ChevronDown, Check, ChevronsUpDown, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -8,15 +8,28 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 
 interface Worker { id: number; fullName: string; position: string; active: boolean; }
 interface WorkerCategory { id: number; name: string; workerIds?: number[]; }
-interface PlanEntry { id?: number; workerId: number; workerName: string; role: string; targetBales: number; }
+interface PlanEntry {
+  id?: number;
+  workerId: number;
+  workerName: string;
+  role: string;
+  targetBales: number;
+  teamLeaderWorkerId?: number | null;
+}
 interface PlanData { plan: { id: number; planDate: string; categoryIds: number[]; notes: string } | null; entries: PlanEntry[]; actuals: Record<number, number>; }
 
+const ROLE_LABELS: Record<string, string> = {
+  WORKER: "Worker",
+  TEAM_LEADER: "Team Leader",
+  HELPER: "Helper",
+};
 
 function WorkerCombobox({
   value,
@@ -128,7 +141,6 @@ export default function ProductionPlannerDialog() {
     enabled: open,
   });
 
-  // Load plan data into local state when fetched
   useEffect(() => {
     if (!planData) return;
     setCategoryIds(planData.plan?.categoryIds ?? []);
@@ -140,7 +152,12 @@ export default function ProductionPlannerDialog() {
     mutationFn: () => apiRequest("POST", `/api/factory/production-planner/${date}`, {
       notes,
       categoryIds,
-      entries: entries.map(e => ({ workerId: e.workerId, role: e.role, targetBales: e.targetBales })),
+      entries: entries.map(e => ({
+        workerId: e.workerId,
+        role: e.role,
+        targetBales: e.targetBales,
+        teamLeaderWorkerId: e.teamLeaderWorkerId ?? null,
+      })),
     }),
     onSuccess: () => {
       toast({ title: "Plan saved" });
@@ -173,6 +190,7 @@ export default function ProductionPlannerDialog() {
       workerName: worker.fullName,
       role: "WORKER",
       targetBales: 0,
+      teamLeaderWorkerId: null,
       _key: `new-${Date.now()}`,
     }]);
   }, [workers, entries]);
@@ -185,12 +203,24 @@ export default function ProductionPlannerDialog() {
   const updateEntry = (key: string, field: string, value: any) =>
     setEntries(prev => prev.map(e => {
       if (e._key !== key) return e;
+      if (field === "role") {
+        // When switching away from HELPER, clear the team leader link
+        // When switching away from TEAM_LEADER, clear any helpers' links
+        if (value !== "HELPER") {
+          return { ...e, role: value, teamLeaderWorkerId: null };
+        }
+        // When becoming TEAM_LEADER, also clear team leader assignment
+        return { ...e, role: value };
+      }
       return { ...e, [field]: field === "targetBales" ? (parseInt(value) || 0) : value };
     }));
 
   const actuals = planData?.actuals ?? {};
 
-  // When teams are selected, build the set of allowed worker IDs for display filtering
+  // Team leader entries available for helpers to link to
+  const teamLeaders = entries.filter(e => e.role === "TEAM_LEADER");
+
+  // When teams are selected, build the set of allowed worker IDs
   const allowedWorkerIds: Set<number> | null = categoryIds.length === 0 ? null : (() => {
     const ids = new Set<number>();
     for (const catId of categoryIds) {
@@ -203,8 +233,24 @@ export default function ProductionPlannerDialog() {
 
   const visibleEntries = allowedWorkerIds ? entries.filter(e => allowedWorkerIds.has(e.workerId)) : entries;
 
-  const totalTarget = visibleEntries.reduce((s, e) => s + (e.targetBales || 0), 0);
-  const totalActual = visibleEntries.reduce((s, e) => s + (actuals[e.workerId] ?? 0), 0);
+  // Total target only counts WORKER and TEAM_LEADER (not individual HELPER rows)
+  const totalTarget = visibleEntries
+    .filter(e => e.role !== "HELPER")
+    .reduce((s, e) => s + (e.targetBales || 0), 0);
+
+  // Total actual: for HELPER rows, their bales are already rolled into their leader on the backend
+  // So we only sum WORKER and TEAM_LEADER actuals to avoid double-counting
+  const totalActual = visibleEntries
+    .filter(e => e.role !== "HELPER")
+    .reduce((s, e) => s + (actuals[e.workerId] ?? 0), 0);
+
+  // Helper count per team leader (for display in the leader row)
+  const helperCountByLeader: Record<number, number> = {};
+  for (const e of entries) {
+    if (e.role === "HELPER" && e.teamLeaderWorkerId) {
+      helperCountByLeader[e.teamLeaderWorkerId] = (helperCountByLeader[e.teamLeaderWorkerId] ?? 0) + 1;
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -214,7 +260,7 @@ export default function ProductionPlannerDialog() {
           Production Planner
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
+      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0">
         <DialogHeader className="px-6 pt-5 pb-3 border-b shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <ClipboardList className="h-5 w-5" />
@@ -286,28 +332,42 @@ export default function ProductionPlannerDialog() {
                 <thead className="bg-muted/50 border-b">
                   <tr>
                     <th className="text-left px-3 py-2 font-semibold">Worker</th>
+                    <th className="text-left px-3 py-2 font-semibold w-36">Role</th>
+                    <th className="text-left px-3 py-2 font-semibold w-40">Team Leader</th>
                     <th className="text-right px-3 py-2 font-semibold w-28">Target</th>
                     <th className="text-right px-3 py-2 font-semibold w-24">Actual</th>
-                    <th className="text-center px-3 py-2 font-semibold w-24">Status</th>
+                    <th className="text-center px-3 py-2 font-semibold w-20">Status</th>
                     <th className="w-10 px-2" />
                   </tr>
                 </thead>
                 <tbody>
                   {visibleEntries.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
+                      <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
                         {entries.length === 0
                           ? "No workers in plan. Add workers below or copy from a previous plan."
                           : "No workers match the selected team filter."}
                       </td>
                     </tr>
                   ) : visibleEntries.map(entry => {
+                    const isHelper = entry.role === "HELPER";
+                    const isLeader = entry.role === "TEAM_LEADER";
+                    // For helpers: show their own individual bale count only
+                    // For team leaders: actuals already include helpers rolled up (from backend)
                     const actual = actuals[entry.workerId] ?? 0;
-                    const met = entry.targetBales > 0 && actual >= entry.targetBales;
-                    const notMet = entry.targetBales > 0 && actual < entry.targetBales;
+                    const met = !isHelper && entry.targetBales > 0 && actual >= entry.targetBales;
+                    const notMet = !isHelper && entry.targetBales > 0 && actual < entry.targetBales;
+
                     return (
-                      <tr key={entry._key} className="border-b last:border-0 hover:bg-muted/30">
-                        <td className="px-3 py-2 min-w-[180px]">
+                      <tr
+                        key={entry._key}
+                        className={cn(
+                          "border-b last:border-0 hover:bg-muted/30",
+                          isHelper && "bg-muted/20",
+                        )}
+                      >
+                        {/* Worker name */}
+                        <td className={cn("px-3 py-2 min-w-[160px]", isHelper && "pl-6")}>
                           <WorkerCombobox
                             value={entry.workerId}
                             onChange={(id, name) => updateWorker(entry._key, id, name)}
@@ -315,24 +375,92 @@ export default function ProductionPlannerDialog() {
                             entryKey={entry._key}
                           />
                         </td>
+
+                        {/* Role dropdown */}
                         <td className="px-3 py-2">
-                          <Input
-                            type="number"
-                            min={0}
-                            value={entry.targetBales}
-                            onChange={e => updateEntry(entry._key, "targetBales", e.target.value)}
-                            className="h-8 text-sm text-right"
-                            data-testid={`input-target-${entry._key}`}
-                          />
+                          <Select
+                            value={entry.role}
+                            onValueChange={v => updateEntry(entry._key, "role", v)}
+                          >
+                            <SelectTrigger
+                              className="h-8 text-sm"
+                              data-testid={`select-role-${entry._key}`}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="WORKER">Worker</SelectItem>
+                              <SelectItem value="TEAM_LEADER">Team Leader</SelectItem>
+                              <SelectItem value="HELPER">Helper</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </td>
+
+                        {/* Team leader selector — only for helpers */}
+                        <td className="px-3 py-2">
+                          {isHelper ? (
+                            <Select
+                              value={entry.teamLeaderWorkerId ? String(entry.teamLeaderWorkerId) : ""}
+                              onValueChange={v => updateEntry(entry._key, "teamLeaderWorkerId", v ? parseInt(v) : null)}
+                            >
+                              <SelectTrigger
+                                className="h-8 text-sm"
+                                data-testid={`select-leader-${entry._key}`}
+                              >
+                                <SelectValue placeholder="Assign to leader…" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {teamLeaders.length === 0 ? (
+                                  <SelectItem value="" disabled>No team leaders yet</SelectItem>
+                                ) : teamLeaders.map(tl => (
+                                  <SelectItem key={tl.workerId} value={String(tl.workerId)}>
+                                    {tl.workerName}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : isLeader && helperCountByLeader[entry.workerId] ? (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Users className="h-3 w-3" />
+                              {helperCountByLeader[entry.workerId]} helper{helperCountByLeader[entry.workerId] !== 1 ? "s" : ""}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
+                        </td>
+
+                        {/* Target — hidden for helpers (their production counts toward leader) */}
+                        <td className="px-3 py-2">
+                          {isHelper ? (
+                            <span className="text-muted-foreground text-xs text-right block">counted in leader</span>
+                          ) : (
+                            <Input
+                              type="number"
+                              min={0}
+                              value={entry.targetBales}
+                              onChange={e => updateEntry(entry._key, "targetBales", e.target.value)}
+                              className="h-8 text-sm text-right"
+                              data-testid={`input-target-${entry._key}`}
+                            />
+                          )}
+                        </td>
+
+                        {/* Actual */}
                         <td className="px-3 py-2 text-right font-mono font-semibold">
                           {actual}
+                          {isLeader && helperCountByLeader[entry.workerId] > 0 && (
+                            <div className="text-xs font-normal text-muted-foreground">incl. helpers</div>
+                          )}
                         </td>
+
+                        {/* Status */}
                         <td className="px-3 py-2 text-center">
                           {met && <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />}
                           {notMet && <XCircle className="h-5 w-5 text-red-500 mx-auto" />}
                           {!met && !notMet && <span className="text-muted-foreground text-xs">—</span>}
                         </td>
+
+                        {/* Remove */}
                         <td className="px-2 py-2 text-center">
                           <Button size="icon" variant="ghost" onClick={() => removeRow(entry._key)} data-testid={`button-remove-${entry._key}`}>
                             <Trash2 className="h-4 w-4 text-muted-foreground" />

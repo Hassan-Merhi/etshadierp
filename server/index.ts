@@ -1301,6 +1301,8 @@ let migrationsDone = false;
     `CREATE UNIQUE INDEX IF NOT EXISTS erp_user_page_access_unique ON erp_user_page_access (company_id, user_id, page_key)`,
     // hide_all_costs column added later — ensure it exists on older rows
     `ALTER TABLE factory_user_profiles ADD COLUMN IF NOT EXISTS hide_all_costs BOOLEAN NOT NULL DEFAULT FALSE`,
+    // Team leader linking — helpers can be assigned to a team leader in a production plan
+    `ALTER TABLE factory_production_plan_entries ADD COLUMN IF NOT EXISTS team_leader_worker_id INTEGER`,
     // Bale removal log — records every bale removed from a loading for audit/history
     `CREATE TABLE IF NOT EXISTS customer_order_bale_removals (
       id                   SERIAL PRIMARY KEY,

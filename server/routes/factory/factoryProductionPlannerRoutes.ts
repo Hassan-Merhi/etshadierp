@@ -28,7 +28,8 @@ export function registerProductionPlannerRoutes(app: Express) {
 
       const entryResult = await db.execute(sql`
         SELECT e.id, e.worker_id AS "workerId", w.full_name AS "workerName",
-               e.role, e.target_bales AS "targetBales"
+               e.role, e.target_bales AS "targetBales",
+               e.team_leader_worker_id AS "teamLeaderWorkerId"
         FROM factory_production_plan_entries e
         JOIN factory_workers w ON w.id = e.worker_id
         WHERE e.plan_id = ${planId}
@@ -43,7 +44,6 @@ export function registerProductionPlannerRoutes(app: Express) {
 
       let actuals: Record<number, number> = {};
       if (workerIds.length > 0) {
-        // Resolve worker category IDs → worker IDs for the team filter
         let teamWorkerFilter = sql``;
         let skipActuals = false;
         if (categoryIds.length > 0) {
@@ -66,6 +66,7 @@ export function registerProductionPlannerRoutes(app: Express) {
         }
 
         if (!skipActuals) {
+          // All worker IDs including helpers (we need their individual counts to roll up)
           const actualResult = await db.execute(sql`
             SELECT fb.finalized_by AS worker_id, COUNT(*)::integer AS bale_count
             FROM factory_bales fb
@@ -77,9 +78,27 @@ export function registerProductionPlannerRoutes(app: Express) {
             GROUP BY fb.finalized_by
           `);
           const actualRows: any[] = Array.isArray(actualResult) ? actualResult : (actualResult as any).rows ?? [];
+          // Start with individual counts
+          const individual: Record<number, number> = {};
           for (const row of actualRows) {
-            actuals[Number(row.worker_id)] = Number(row.bale_count);
+            individual[Number(row.worker_id)] = Number(row.bale_count);
           }
+
+          // Roll helper bales up into their team leader
+          for (const entry of entries) {
+            const wid = Number(entry.workerId);
+            individual[wid] = individual[wid] ?? 0;
+          }
+          for (const entry of entries) {
+            if (entry.role === "HELPER" && entry.teamLeaderWorkerId) {
+              const helperId = Number(entry.workerId);
+              const leaderId = Number(entry.teamLeaderWorkerId);
+              const helperBales = individual[helperId] ?? 0;
+              individual[leaderId] = (individual[leaderId] ?? 0) + helperBales;
+            }
+          }
+
+          actuals = individual;
         }
       }
 
@@ -108,7 +127,7 @@ export function registerProductionPlannerRoutes(app: Express) {
       const { notes, categoryIds, entries } = req.body as {
         notes?: string;
         categoryIds?: number[];
-        entries?: { workerId: number; role: string; targetBales: number }[];
+        entries?: { workerId: number; role: string; targetBales: number; teamLeaderWorkerId?: number | null }[];
       };
 
       const catJson = JSON.stringify(categoryIds ?? []);
@@ -132,9 +151,10 @@ export function registerProductionPlannerRoutes(app: Express) {
       if (entries && entries.length > 0) {
         for (const entry of entries) {
           const role = ["TEAM_LEADER", "HELPER", "WORKER"].includes(entry.role) ? entry.role : "WORKER";
+          const teamLeaderWorkerId = role === "HELPER" && entry.teamLeaderWorkerId ? entry.teamLeaderWorkerId : null;
           await db.execute(sql`
-            INSERT INTO factory_production_plan_entries (plan_id, worker_id, role, target_bales)
-            VALUES (${planId}, ${entry.workerId}, ${role}, ${entry.targetBales ?? 0})
+            INSERT INTO factory_production_plan_entries (plan_id, worker_id, role, target_bales, team_leader_worker_id)
+            VALUES (${planId}, ${entry.workerId}, ${role}, ${entry.targetBales ?? 0}, ${teamLeaderWorkerId})
           `);
         }
       }
@@ -165,7 +185,9 @@ export function registerProductionPlannerRoutes(app: Express) {
       const prevPlanId = Number(prevRows[0].id);
 
       const entryResult = await db.execute(sql`
-        SELECT e.worker_id AS "workerId", w.full_name AS "workerName", e.role, e.target_bales AS "targetBales"
+        SELECT e.worker_id AS "workerId", w.full_name AS "workerName",
+               e.role, e.target_bales AS "targetBales",
+               e.team_leader_worker_id AS "teamLeaderWorkerId"
         FROM factory_production_plan_entries e
         JOIN factory_workers w ON w.id = e.worker_id
         WHERE e.plan_id = ${prevPlanId}
