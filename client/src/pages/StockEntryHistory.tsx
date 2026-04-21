@@ -197,7 +197,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     queryFn: () => fetch(`/api/factory/production-planner/${planDate}/worker-targets`, { credentials: "include" }).then(r => r.json()),
     enabled: !!planDate,
   });
-  const hasPlan = planDate !== null && Object.keys(workerTargets).length > 0;
 
   const selectedCategoryWorkerIds: number[] | null = useMemo(() => {
     if (categoryFilter === "all") return null;
@@ -845,17 +844,17 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                 <th className="px-3 py-2">Worker</th>
                 <th className="px-3 py-2 text-right">Bales</th>
                 <th className="px-3 py-2 text-right">Total kg</th>
-                {hasPlan && <th className="px-3 py-2 text-right">Target</th>}
-                {hasPlan && <th className="px-3 py-2 text-right">+/- Bales</th>}
-                {hasPlan && <th className="px-3 py-2 text-right">Workers</th>}
+                <th className="px-3 py-2 text-right">Target</th>
+                <th className="px-3 py-2 text-right">Shortage</th>
+                <th className="px-3 py-2 text-right">No. Workers</th>
               </tr>
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={hasPlan ? 7 : 4} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
+                <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
               )}
               {!isLoading && workerGroups.length === 0 && (
-                <tr><td colSpan={hasPlan ? 7 : 4} className="px-3 py-8 text-center text-muted-foreground">No stock entry records found for the selected filters.</td></tr>
+                <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">No stock entry records found for the selected filters.</td></tr>
               )}
               {workerGroups.map(wg => {
                 const wExpanded = expandedKeys.has(wg.workerKey);
@@ -879,33 +878,25 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                     </td>
                     <td className="px-3 py-2 text-right font-semibold">{wg.totalBales}</td>
                     <td className="px-3 py-2 text-right font-semibold">{wg.totalWeight.toFixed(2)}</td>
-                    {hasPlan && (
-                      <td className="px-3 py-2 text-right text-muted-foreground">
-                        {plan ? target : <span className="text-xs">—</span>}
-                      </td>
-                    )}
-                    {hasPlan && (
-                      <td className="px-3 py-2 text-right font-semibold">
-                        {plan ? (
-                          target === 0 ? <span className="text-muted-foreground text-xs">—</span> : (
-                            <span className={diff >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-                              {diff >= 0 ? `+${diff}` : diff}
-                            </span>
-                          )
-                        ) : <span className="text-muted-foreground text-xs">—</span>}
-                      </td>
-                    )}
-                    {hasPlan && (
-                      <td className="px-3 py-2 text-right text-muted-foreground">
-                        {plan && workerCount > 0 ? workerCount : <span className="text-xs">—</span>}
-                      </td>
-                    )}
+                    <td className="px-3 py-2 text-right text-muted-foreground">
+                      {plan && target > 0 ? target : <span className="text-xs text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold">
+                      {plan && target > 0 ? (
+                        <span className={diff >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                          {diff >= 0 ? `+${diff}` : diff}
+                        </span>
+                      ) : <span className="text-xs text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-3 py-2 text-right text-muted-foreground">
+                      {plan && workerCount > 0 ? workerCount : <span className="text-xs text-muted-foreground">—</span>}
+                    </td>
                   </tr>,
 
                   /* Expanded: sub-group rows per date+location+product */
                   wExpanded && (
                     <tr key={wg.workerKey + "-sub"} className="bg-muted/10">
-                      <td colSpan={hasPlan ? 7 : 4} className="px-0 py-0">
+                      <td colSpan={7} className="px-0 py-0">
                         <table className="w-full text-xs">
                           <thead>
                             <tr className="text-muted-foreground border-b bg-muted/20">
