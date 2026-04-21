@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation, useRoute } from "wouter";
 import { useEscapeBack } from "@/hooks/use-escape-back";
-import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw, Container, Pencil } from "lucide-react";
+import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw, Container, Pencil, RotateCcw, Hammer } from "lucide-react";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { useState, useRef } from "react";
 import {
@@ -178,6 +178,48 @@ export default function FactoryInvoiceDetail() {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
       setEditingArticleCode(null);
+    },
+  });
+
+  const unfinalizeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/unfinalize`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to revert invoice");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Reverted to Draft", description: "Invoice has been reverted. You can now edit prices." });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+    },
+    onError: (error: any) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "Cannot revert", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const repriceProductionMutation = useMutation({
+    mutationFn: async () => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/reprice-production`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to apply production prices");
+      }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.repriced === 0) {
+        toast({ title: "Already at production prices", description: "All bale prices already match the current production prices — no changes needed." });
+      } else {
+        toast({ title: "Production prices applied", description: `Updated ${data.repriced} bale(s) to production prices.` });
+      }
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
+    },
+    onError: (error: any) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -349,6 +391,17 @@ export default function FactoryInvoiceDetail() {
               )}
             </Button>
           )}
+          {order.status !== "CANCELLED" && (
+            <Button
+              variant="outline"
+              onClick={() => repriceProductionMutation.mutate()}
+              disabled={repriceProductionMutation.isPending}
+              data-testid="button-apply-production-prices"
+            >
+              <Hammer className={`mr-2 h-4 w-4 ${repriceProductionMutation.isPending ? "animate-spin" : ""}`} />
+              Apply Production Prices
+            </Button>
+          )}
           {(order.status === "VERIFIED" || order.status === "FINALIZED") && (
             <Button
               variant="outline"
@@ -357,8 +410,41 @@ export default function FactoryInvoiceDetail() {
               data-testid="button-apply-prices"
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${repriceMutation.isPending ? "animate-spin" : ""}`} />
-              Apply Current Prices
+              Apply Selling Prices
             </Button>
+          )}
+          {order.status === "FINALIZED" && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  data-testid="button-unfinalize"
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Revert to Draft
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Revert invoice to Draft?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will un-finalize {order.invoiceNumber || `Order #${order.id}`} and return it to Draft status.
+                    The invoice number will be cleared and bales will be returned to "Reserved" state.
+                    Any recorded payments must be reversed first.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-cancel-unfinalize">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => unfinalizeMutation.mutate()}
+                    disabled={unfinalizeMutation.isPending}
+                    data-testid="button-confirm-unfinalize"
+                  >
+                    {unfinalizeMutation.isPending ? "Reverting…" : "Revert to Draft"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
           <Button
             variant="outline"
