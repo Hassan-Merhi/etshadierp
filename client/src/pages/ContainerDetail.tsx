@@ -135,7 +135,7 @@ export default function ContainerDetail() {
 
   const pricePreviewMutation = useMutation({
     mutationFn: async (rows: { barcode: string; price: string }[]) => {
-      const res = await apiRequest("POST", "/api/bales/price-import/preview", { rows });
+      const res = await apiRequest("POST", `/api/containers/${containerId}/price-import/preview`, { rows });
       return res.json();
     },
     onSuccess: (data: any) => {
@@ -147,12 +147,12 @@ export default function ContainerDetail() {
   });
 
   const priceApplyMutation = useMutation({
-    mutationFn: async (rows: { id: number; price: string }[]) => {
-      const res = await apiRequest("POST", "/api/bales/price-import/apply", { rows });
+    mutationFn: async (rows: { lineItemIds: number[]; newRate: number }[]) => {
+      const res = await apiRequest("POST", `/api/containers/${containerId}/price-import/apply`, { rows });
       return res.json();
     },
     onSuccess: (data: any) => {
-      toast({ title: "Prices updated", description: `${data.updated} bale(s) updated successfully.` });
+      toast({ title: "Prices updated", description: `${data.updated} line item(s) updated successfully.` });
       setShowPriceImportDialog(false);
       setPriceImportPreview(null);
       setPriceImportError(null);
@@ -1432,10 +1432,10 @@ export default function ContainerDetail() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Barcode</TableHead>
-                      <TableHead>Category / Grade</TableHead>
-                      <TableHead>Current Price</TableHead>
-                      <TableHead>New Price</TableHead>
+                      <TableHead>Code / Barcode</TableHead>
+                      <TableHead>Item Name</TableHead>
+                      <TableHead>Current Rate</TableHead>
+                      <TableHead>New Rate</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1443,19 +1443,18 @@ export default function ContainerDetail() {
                     {priceImportPreview.map((row: any, i: number) => (
                       <TableRow key={i} data-testid={`row-price-preview-${i}`}>
                         <TableCell className="font-mono text-xs">{row.barcode}</TableCell>
+                        <TableCell className="text-sm">{row.itemName || "—"}</TableCell>
                         <TableCell className="text-sm">
-                          {row.category && row.grade ? `${row.category} / ${row.grade}` : "—"}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {row.currentPrice != null ? row.currentPrice.toFixed(2) : "—"}
+                          {row.currentRate != null ? row.currentRate.toFixed(2) : "—"}
                         </TableCell>
                         <TableCell className="text-sm font-medium">
-                          {row.newPrice != null ? row.newPrice.toFixed(2) : "—"}
+                          {row.newRate != null ? row.newRate.toFixed(2) : "—"}
                         </TableCell>
                         <TableCell>
                           {row.status === "will_update" && <Badge variant="default" data-testid={`status-preview-${i}`}>Will Update</Badge>}
                           {row.status === "no_change" && <Badge variant="secondary" data-testid={`status-preview-${i}`}>No Change</Badge>}
                           {row.status === "not_found" && <Badge variant="destructive" data-testid={`status-preview-${i}`}>Not Found</Badge>}
+                          {row.status === "not_in_container" && <Badge variant="secondary" data-testid={`status-preview-${i}`}>Not in Container</Badge>}
                           {row.status === "invalid_price" && <Badge variant="destructive" data-testid={`status-preview-${i}`}>Invalid Price</Badge>}
                           {row.status === "invalid" && <Badge variant="destructive" data-testid={`status-preview-${i}`}>Invalid Row</Badge>}
                         </TableCell>
@@ -1474,14 +1473,15 @@ export default function ContainerDetail() {
           {priceImportPreview && priceImportPreview.some((r: any) => r.status === "will_update") && (
             <div className="flex justify-between items-center pt-2 border-t gap-2 flex-wrap">
               <p className="text-sm text-muted-foreground">
-                {priceImportPreview.filter((r: any) => r.status === "will_update").length} bale(s) will be updated
+                {priceImportPreview.filter((r: any) => r.status === "will_update").length} item(s) will be updated
                 {priceImportPreview.some((r: any) => r.status === "not_found") && ` · ${priceImportPreview.filter((r: any) => r.status === "not_found").length} not found`}
+                {priceImportPreview.some((r: any) => r.status === "not_in_container") && ` · ${priceImportPreview.filter((r: any) => r.status === "not_in_container").length} not in this container`}
               </p>
               <Button
                 onClick={() => {
                   const rows = priceImportPreview
-                    .filter((r: any) => r.status === "will_update" && r.id)
-                    .map((r: any) => ({ id: r.id, price: String(r.newPrice) }));
+                    .filter((r: any) => r.status === "will_update" && r.lineItemIds?.length)
+                    .map((r: any) => ({ lineItemIds: r.lineItemIds, newRate: r.newRate }));
                   priceApplyMutation.mutate(rows);
                 }}
                 disabled={priceApplyMutation.isPending}
