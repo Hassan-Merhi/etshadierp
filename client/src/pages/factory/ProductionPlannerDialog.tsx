@@ -12,6 +12,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 
 interface Worker { id: number; fullName: string; position: string; active: boolean; }
+interface WorkerCategory { id: number; name: string; workerIds: number[]; }
 interface PlanEntry {
   id?: number;
   workerId: number;
@@ -91,10 +92,22 @@ export default function ProductionPlannerDialog() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: workers = [] } = useQuery<Worker[]>({
+  const { data: allWorkers = [] } = useQuery<Worker[]>({
     queryKey: ["/api/factory/workers"],
     enabled: open,
   });
+
+  const { data: workerCategories = [] } = useQuery<WorkerCategory[]>({
+    queryKey: ["/api/factory/worker-categories"],
+    enabled: open,
+  });
+
+  // Only show workers who are assigned to at least one pressing category.
+  // If no categories exist yet, fall back to showing all workers so the planner isn't empty.
+  const categoryWorkerIdSet = new Set(workerCategories.flatMap(c => c.workerIds ?? []));
+  const workers = categoryWorkerIdSet.size > 0
+    ? allWorkers.filter(w => categoryWorkerIdSet.has(w.id))
+    : allWorkers;
 
   const { data: planData, isLoading: planLoading, refetch: refetchPlan } = useQuery<PlanData>({
     queryKey: ["/api/factory/production-planner", date],
