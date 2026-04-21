@@ -1401,6 +1401,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const baleRows: any[] = baleIds.length > 0
         ? await db.select().from(factoryBales).where(inArray(factoryBales.id, baleIds))
         : [];
+      const orderCharges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
 
       const productIds = [...new Set(baleRows.map((b: any) => b.productId).filter((id: any) => id != null))];
       const productRecords: any[] = productIds.length > 0
@@ -1586,13 +1587,19 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       // ── Financial summary block ──
       const subtotal = parseFloat(order.subtotalBales || "0");
       const freight = parseFloat(order.freightAmount || "0");
-      const clearance = parseFloat(order.otherChargesTotal || "0");
+      const otherChargesTotal = parseFloat(order.otherChargesTotal || "0");
       const grandTotal = parseFloat(order.grandTotal || "0");
 
-      const summaryData = [
+      const chargeRows: [string, number][] = orderCharges.length > 0
+        ? orderCharges.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
+        : otherChargesTotal > 0
+          ? [["Other Charges", otherChargesTotal]]
+          : [];
+
+      const summaryData: [string, number][] = [
         ["Subtotal (Bales)", subtotal],
         ["Freight", freight],
-        ["Clearance", clearance],
+        ...chargeRows,
         ["Grand Total", grandTotal],
       ];
 
@@ -2135,6 +2142,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       if (!order) return res.status(404).json({ message: "Order not found" });
 
+      const orderCharges2 = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
       const rawLines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
 
       // Canonical product names from factoryBaleProducts
@@ -2311,13 +2319,19 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       // ── Financial summary block ──
       const subtotal = parseFloat(order.subtotalBales || "0");
       const freight = parseFloat(order.freightAmount || "0");
-      const clearance = parseFloat(order.otherChargesTotal || "0");
+      const otherChargesTotal2 = parseFloat(order.otherChargesTotal || "0");
       const grandTotal = parseFloat(order.grandTotal || "0");
+
+      const chargeRows2: [string, number][] = orderCharges2.length > 0
+        ? orderCharges2.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
+        : otherChargesTotal2 > 0
+          ? [["Other Charges", otherChargesTotal2]]
+          : [];
 
       const summaryData: [string, number][] = [
         ["Subtotal (Bales)", subtotal],
         ["Freight", freight],
-        ["Clearance", clearance],
+        ...chargeRows2,
         ["Grand Total", grandTotal],
       ];
 
@@ -2680,7 +2694,11 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
     <table class="totals-table">
       <tr><td>Subtotal (Bales)</td><td>${fmtMoney(order.subtotalBales)}</td></tr>
       <tr><td>Freight</td><td>${fmtMoney(order.freightAmount)}</td></tr>
-      <tr><td>Other Charges</td><td>${fmtMoney(order.otherChargesTotal)}</td></tr>
+      ${charges.length > 0
+        ? charges.map((ch: any) => `<tr><td>${ch.name}</td><td>${fmtMoney(ch.amount)}</td></tr>`).join("\n      ")
+        : parseFloat(order.otherChargesTotal || "0") > 0
+          ? `<tr><td>Other Charges</td><td>${fmtMoney(order.otherChargesTotal)}</td></tr>`
+          : ""}
       <tr class="grand"><td>Grand Total</td><td>${fmtMoney(order.grandTotal)}</td></tr>
     </table>
   </div>
