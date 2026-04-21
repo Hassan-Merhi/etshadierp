@@ -577,69 +577,100 @@ export function registerStockRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const locationId = parseInt(req.query.locationId as string);
-      if (isNaN(locationId)) {
+      const locationIdParam = req.query.locationId as string;
+      const showAll = locationIdParam === "all";
+      const locationId = showAll ? null : parseInt(locationIdParam);
+
+      if (!showAll && isNaN(locationId as number)) {
         return res.status(400).json({ message: "locationId query parameter is required" });
       }
 
       const isPOS = req.user?.role?.startsWith("POS");
+      const isPrivileged = ["Admin", "Owner", "Manager"].includes(req.user?.role || "");
 
-      if (isPOS) {
-        // POS security: validate the requested location is assigned to this user
-        const assigned = await db
-          .select({ locationId: userLocations.locationId })
-          .from(userLocations)
-          .where(
-            and(
-              eq(userLocations.userId, req.user!.id),
-              eq(userLocations.companyId, companyId)
-            )
-          );
-        const assignedIds = assigned.map((r) => r.locationId);
-        if (!assignedIds.includes(locationId)) {
-          return res.status(403).json({ message: "Forbidden: location not assigned to this user" });
-        }
-      } else {
-        // Non-POS: verify the location belongs to the company
-        const [loc] = await db
-          .select({ id: locations.id })
-          .from(locations)
-          .where(and(eq(locations.id, locationId), eq(locations.companyId, companyId)));
-        if (!loc) {
-          return res.status(403).json({ message: "Forbidden: location not found" });
+      if (showAll && isPOS) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      if (!showAll) {
+        if (isPOS) {
+          const assigned = await db
+            .select({ locationId: userLocations.locationId })
+            .from(userLocations)
+            .where(
+              and(
+                eq(userLocations.userId, req.user!.id),
+                eq(userLocations.companyId, companyId)
+              )
+            );
+          const assignedIds = assigned.map((r) => r.locationId);
+          if (!assignedIds.includes(locationId as number)) {
+            return res.status(403).json({ message: "Forbidden: location not assigned to this user" });
+          }
+        } else {
+          const [loc] = await db
+            .select({ id: locations.id })
+            .from(locations)
+            .where(and(eq(locations.id, locationId as number), eq(locations.companyId, companyId)));
+          if (!loc) {
+            return res.status(403).json({ message: "Forbidden: location not found" });
+          }
         }
       }
 
-      // Query all active stock items for company with location-specific price (COALESCE to base price)
-      const rows = await db
-        .select({
-          stockItemId: stockItems.id,
-          code: stockItems.code,
-          name: stockItems.name,
-          stockGroupName: sql<string>`COALESCE(${stockGroups.name}, '')`,
-          baseSellingPrice: stockItems.sellingPrice,
-          hasCustomPrice: sql<boolean>`(${stockItemLocationPrices.sellingPrice} IS NOT NULL)`,
-          sellingPrice: sql<string>`COALESCE(${stockItemLocationPrices.sellingPrice}, ${stockItems.sellingPrice})`,
-          quantity: sql<string>`COALESCE(${inventory.quantity}::text, '0')`,
-        })
-        .from(stockItems)
-        .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
-        .leftJoin(
-          stockItemLocationPrices,
-          and(
-            eq(stockItemLocationPrices.stockItemId, stockItems.id),
-            eq(stockItemLocationPrices.locationId, locationId)
+      let rows: any[];
+
+      if (showAll) {
+        // All locations: return base selling price for every active stock item (no qty)
+        rows = await db
+          .select({
+            stockItemId: stockItems.id,
+            code: stockItems.code,
+            name: stockItems.name,
+            stockGroupName: sql<string>`COALESCE(${stockGroups.name}, '')`,
+            baseSellingPrice: stockItems.sellingPrice,
+            hasCustomPrice: sql<boolean>`false`,
+            sellingPrice: stockItems.sellingPrice,
+            quantity: sql<string>`'0'`,
+            ...(isPrivileged ? { costPrice: stockItems.costPrice } : {}),
+          })
+          .from(stockItems)
+          .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+          .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)))
+          .orderBy(stockItems.name);
+      } else {
+        // Specific location: include location-specific price and qty
+        rows = await db
+          .select({
+            stockItemId: stockItems.id,
+            code: stockItems.code,
+            name: stockItems.name,
+            stockGroupName: sql<string>`COALESCE(${stockGroups.name}, '')`,
+            baseSellingPrice: stockItems.sellingPrice,
+            hasCustomPrice: sql<boolean>`(${stockItemLocationPrices.sellingPrice} IS NOT NULL)`,
+            sellingPrice: sql<string>`COALESCE(${stockItemLocationPrices.sellingPrice}, ${stockItems.sellingPrice})`,
+            quantity: sql<string>`COALESCE(${inventory.quantity}::text, '0')`,
+            ...(isPrivileged ? { costPrice: stockItems.costPrice } : {}),
+          })
+          .from(stockItems)
+          .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+          .leftJoin(
+            stockItemLocationPrices,
+            and(
+              eq(stockItemLocationPrices.stockItemId, stockItems.id),
+              eq(stockItemLocationPrices.locationId, locationId as number)
+            )
           )
-        )
-        .leftJoin(
-          inventory,
-          and(
-            eq(inventory.stockItemId, stockItems.id),
-            eq(inventory.locationId, locationId)
+          .leftJoin(
+            inventory,
+            and(
+              eq(inventory.stockItemId, stockItems.id),
+              eq(inventory.locationId, locationId as number)
+            )
           )
-        )
-        .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)))
-        .orderBy(stockItems.name);
+          .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)))
+          .orderBy(stockItems.name);
+      }
 
       res.json(rows);
     } catch (error: any) {

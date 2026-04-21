@@ -9,9 +9,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, MapPin, Tag, AlertCircle, Check, X, Pencil } from "lucide-react";
+import { Search, MapPin, Tag, AlertCircle, Check, X, Pencil, Layers } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+
+const ALL_LOCATIONS_ID = -1;
 
 interface Location {
   id: number;
@@ -29,10 +31,18 @@ interface PriceListItem {
   hasCustomPrice: boolean;
   sellingPrice: string | null;
   quantity: string;
+  costPrice?: string | null;
 }
 
 interface POSPriceListProps {
   posUser?: any;
+}
+
+function formatQty(raw: string | number | null | undefined): string {
+  if (raw == null) return "—";
+  const n = typeof raw === "string" ? parseFloat(raw) : raw;
+  if (isNaN(n) || n === 0) return "—";
+  return n % 1 === 0 ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 3 });
 }
 
 export default function POSPriceList({ posUser }: POSPriceListProps) {
@@ -43,6 +53,9 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const [groupFilter, setGroupFilter] = useState<string>("all");
   const [editingItem, setEditingItem] = useState<{ stockItemId: number; value: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const isPrivileged = ["Admin", "Owner", "Manager"].includes(currentUser?.role || "");
 
   const { data: posAssignedLocations = [], isLoading: posLocationsLoading } = useQuery<Location[]>({
     queryKey: ["/api/my-locations"],
@@ -63,6 +76,8 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     }
   }, [locations, selectedLocationId]);
 
+  const isAllMode = selectedLocationId === ALL_LOCATIONS_ID;
+
   const {
     data: priceList = [],
     isLoading: priceListLoading,
@@ -71,7 +86,8 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   } = useQuery<PriceListItem[]>({
     queryKey: ["/api/pos/price-list", selectedLocationId],
     queryFn: async () => {
-      const res = await fetch(`/api/pos/price-list?locationId=${selectedLocationId}`, {
+      const param = isAllMode ? "all" : selectedLocationId;
+      const res = await fetch(`/api/pos/price-list?locationId=${param}`, {
         credentials: "include",
       });
       if (!res.ok) {
@@ -135,7 +151,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   });
 
   const startEdit = (item: PriceListItem) => {
-    if (posUser) return;
+    if (posUser || isAllMode) return;
     setEditingItem({
       stockItemId: item.stockItemId,
       value: item.sellingPrice ?? item.baseSellingPrice ?? "",
@@ -160,6 +176,10 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     if (e.key === "Escape") cancelEdit();
   };
 
+  const canEdit = !posUser && !isAllMode;
+  const showQty = !isAllMode;
+  const showCostPrice = isPrivileged && !posUser;
+
   return (
     <div className="flex h-full overflow-hidden">
       {/* ── Locations sidebar ── */}
@@ -177,6 +197,27 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
             <p className="text-xs text-muted-foreground px-3 py-4">No locations.</p>
           ) : (
             <div className="flex flex-col gap-0.5 px-2 py-1">
+              {/* All Locations option (non-POS only) */}
+              {!posUser && (
+                <button
+                  data-testid="button-location-all"
+                  onClick={() => {
+                    setSelectedLocationId(ALL_LOCATIONS_ID);
+                    setSearch("");
+                    setGroupFilter("all");
+                    setEditingItem(null);
+                  }}
+                  className={cn(
+                    "w-full text-left px-3 py-2 rounded-md text-sm transition-colors hover-elevate flex items-center gap-1.5",
+                    selectedLocationId === ALL_LOCATIONS_ID
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "text-sidebar-foreground"
+                  )}
+                >
+                  <Layers className="w-3.5 h-3.5 shrink-0" />
+                  All Locations
+                </button>
+              )}
               {locations.map((loc) => (
                 <button
                   key={loc.id}
@@ -208,12 +249,17 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
         <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
           <Tag className="w-4 h-4 text-muted-foreground" />
           <h1 className="text-base font-semibold">Price List</h1>
-          {selectedLocation && (
+          {isAllMode ? (
+            <Badge variant="secondary" className="gap-1">
+              <Layers className="w-3 h-3" />
+              All Locations
+            </Badge>
+          ) : selectedLocation ? (
             <Badge variant="secondary" className="gap-1">
               <MapPin className="w-3 h-3" />
               {selectedLocation.name}
             </Badge>
-          )}
+          ) : null}
         </div>
 
         {/* Filters */}
@@ -303,8 +349,13 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                           <TableHead className="w-28">Code</TableHead>
                           <TableHead>Item Name</TableHead>
                           <TableHead className="hidden sm:table-cell">Group</TableHead>
+                          {showCostPrice && (
+                            <TableHead className="text-right hidden sm:table-cell w-36">Cost Price</TableHead>
+                          )}
                           <TableHead className="text-right w-48">Selling Price</TableHead>
-                          <TableHead className="text-right hidden sm:table-cell w-28">Qty in Stock</TableHead>
+                          {showQty && (
+                            <TableHead className="text-right hidden sm:table-cell w-28">Qty in Stock</TableHead>
+                          )}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -316,7 +367,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                             <TableRow
                               key={item.stockItemId}
                               data-testid={`row-price-${item.stockItemId}`}
-                              className={cn(!posUser && "group")}
+                              className={cn(canEdit && "group")}
                             >
                               <TableCell className="font-mono text-sm text-muted-foreground">
                                 {item.code || "—"}
@@ -333,7 +384,19 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                                 {item.stockGroupName || "—"}
                               </TableCell>
 
-                              {/* ── Editable price cell ── */}
+                              {/* ── Cost Price (privileged only) ── */}
+                              {showCostPrice && (
+                                <TableCell
+                                  className="text-right hidden sm:table-cell text-sm tabular-nums text-muted-foreground"
+                                  data-testid={`text-cost-${item.stockItemId}`}
+                                >
+                                  {item.costPrice && parseFloat(item.costPrice) > 0
+                                    ? formatAmount(parseFloat(item.costPrice))
+                                    : "—"}
+                                </TableCell>
+                              )}
+
+                              {/* ── Editable selling price cell ── */}
                               <TableCell className="text-right">
                                 {isEditing ? (
                                   <div className="flex items-center justify-end gap-1">
@@ -355,7 +418,6 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                                     <Button
                                       size="icon"
                                       variant="ghost"
-                                      className="h-8 w-8 shrink-0"
                                       data-testid={`button-save-price-${item.stockItemId}`}
                                       onClick={commitEdit}
                                       disabled={isSaving}
@@ -365,7 +427,6 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                                     <Button
                                       size="icon"
                                       variant="ghost"
-                                      className="h-8 w-8 shrink-0"
                                       data-testid={`button-cancel-price-${item.stockItemId}`}
                                       onClick={cancelEdit}
                                       disabled={isSaving}
@@ -377,35 +438,38 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                                   <div
                                     className={cn(
                                       "flex items-center justify-end gap-1.5",
-                                      !posUser && "cursor-pointer rounded-md px-2 py-1 hover-elevate"
+                                      canEdit && "cursor-pointer rounded-md px-2 py-1 hover-elevate"
                                     )}
                                     data-testid={`cell-price-${item.stockItemId}`}
                                     onClick={() => startEdit(item)}
-                                    title={!posUser ? "Click to edit price" : undefined}
+                                    title={canEdit ? "Click to edit price" : undefined}
                                   >
                                     <span className="font-semibold tabular-nums">
                                       {item.sellingPrice
                                         ? formatAmount(parseFloat(item.sellingPrice))
                                         : "—"}
                                     </span>
-                                    {!item.hasCustomPrice && item.sellingPrice && (
+                                    {!item.hasCustomPrice && item.sellingPrice && !isAllMode && (
                                       <Badge variant="outline" className="text-xs hidden sm:inline-flex">
                                         base
                                       </Badge>
                                     )}
-                                    {!posUser && (
+                                    {canEdit && (
                                       <Pencil className="w-3 h-3 text-muted-foreground opacity-40 md:opacity-0 md:group-hover:opacity-60 transition-opacity shrink-0" />
                                     )}
                                   </div>
                                 )}
                               </TableCell>
 
-                              <TableCell
-                                className="text-right hidden sm:table-cell text-sm text-muted-foreground tabular-nums"
-                                data-testid={`text-qty-${item.stockItemId}`}
-                              >
-                                {parseFloat(item.quantity) !== 0 ? item.quantity : "—"}
-                              </TableCell>
+                              {/* ── Qty in Stock ── */}
+                              {showQty && (
+                                <TableCell
+                                  className="text-right hidden sm:table-cell text-sm text-muted-foreground tabular-nums"
+                                  data-testid={`text-qty-${item.stockItemId}`}
+                                >
+                                  {formatQty(item.quantity)}
+                                </TableCell>
+                              )}
                             </TableRow>
                           );
                         })}
@@ -415,7 +479,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
                   <p className="text-xs text-muted-foreground text-right mt-2" data-testid="text-item-count">
                     Showing {filteredItems.length} of {locationPricedList.length} items
-                    {!posUser && (
+                    {canEdit && (
                       <span className="ml-1">· Click any price to edit it</span>
                     )}
                   </p>
