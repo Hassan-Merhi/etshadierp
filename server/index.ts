@@ -1484,6 +1484,27 @@ let migrationsDone = false;
         `);
       } catch { /* skip if table not ready */ }
 
+      // One-time fix: correct reversed rental auto-transfer entries on the TO company side.
+      // Previously, TR-IN vouchers incorrectly DEBITED the clearing account and CREDITED the
+      // destination account. The correct pattern is DR destination, CR clearing.
+      // This query finds only the wrong ones (where clearing is debited) and swaps them.
+      try {
+        await migrationClient.query(`
+          UPDATE voucher_entries ve
+          SET
+            debit_amount  = ve.credit_amount,
+            credit_amount = ve.debit_amount
+          WHERE ve.voucher_id IN (
+            SELECT DISTINCT ve2.voucher_id
+            FROM voucher_entries ve2
+            JOIN inter_company_transfers ict ON ict.to_voucher_id = ve2.voucher_id
+            JOIN ledger_accounts la ON la.id = ve2.ledger_account_id
+            WHERE la.code = 'TRANSFER-CLEARING'
+              AND ve2.debit_amount::numeric > 0
+          )
+        `);
+      } catch { /* skip if tables not ready */ }
+
       // Auto-fix sequence desyncs (can happen after data restores / bulk imports with explicit IDs)
       const seqFixes: Array<[string, string]> = [
         ["ledger_accounts", "ledger_accounts_id_seq"],
