@@ -414,15 +414,20 @@ export function registerRentalRoutes(
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
-      const { tenantName, startDate } = z.object({
+      const { tenantName, startDate, guaranteeAmount, guaranteePeriod } = z.object({
         tenantName: z.string().min(1, "Tenant name required"),
         startDate: z.string().min(1, "Start date required"),
+        guaranteeAmount: z.string().optional(),
+        guaranteePeriod: z.string().optional(),
       }).parse(req.body);
       const [contract] = await db.select().from(propertyContracts).where(and(
         eq(propertyContracts.id, id), eq(propertyContracts.companyId, companyId), eq(propertyContracts.module, module),
       ));
       if (!contract) return res.status(404).json({ message: "Contract not found" });
-      await db.update(propertyContracts).set({ tenantName, startDate: startDate as any }).where(eq(propertyContracts.id, id));
+      const contractUpdates: any = { tenantName, startDate: startDate as any };
+      if (guaranteeAmount !== undefined) contractUpdates.guaranteeAmount = guaranteeAmount;
+      if (guaranteePeriod !== undefined) contractUpdates.guaranteePeriod = guaranteePeriod;
+      await db.update(propertyContracts).set(contractUpdates).where(eq(propertyContracts.id, id));
 
       // Clean up ledger rows that are now before the new start date
       const newStart = new Date(startDate);

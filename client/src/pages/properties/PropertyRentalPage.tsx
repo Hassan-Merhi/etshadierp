@@ -295,10 +295,22 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                     </tr>
                   </thead>
                   <tbody>
-                    {grouped.map(([group, groupUnits]) => (
+                    {grouped.map(([group, groupUnits], gIdx) => {
+                      const GROUP_COLORS = [
+                        { bg: "#1d4ed8", text: "#fff" },
+                        { bg: "#047857", text: "#fff" },
+                        { bg: "#b45309", text: "#fff" },
+                        { bg: "#7c3aed", text: "#fff" },
+                        { bg: "#be123c", text: "#fff" },
+                        { bg: "#0e7490", text: "#fff" },
+                        { bg: "#c2410c", text: "#fff" },
+                        { bg: "#4d7c0f", text: "#fff" },
+                      ];
+                      const gc = GROUP_COLORS[gIdx % GROUP_COLORS.length];
+                      return (
                       <>
-                        <tr key={`grp-${group}`} className="bg-muted/30 border-t">
-                          <td colSpan={8} className="px-3 py-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">{group}</td>
+                        <tr key={`grp-${group}`} className="border-t">
+                          <td colSpan={8} className="px-3 py-1.5 text-xs font-bold uppercase tracking-widest" style={{ backgroundColor: gc.bg, color: gc.text }}>{group}</td>
                         </tr>
                         {groupUnits.map(u => (
                           <tr
@@ -353,7 +365,8 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                           </tr>
                         ))}
                       </>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
               )}
@@ -524,7 +537,7 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
               />
             </TabsContent>
             <TabsContent value="edit">
-              <EditInfoForm contract={contract} testIdPrefix={testIdPrefix} unitId={unit.id} />
+              <EditInfoForm contract={contract} testIdPrefix={testIdPrefix} unitId={unit.id} unit={unit} />
             </TabsContent>
             <TabsContent value="modify">
               <ModifyRentForm contract={contract} testIdPrefix={testIdPrefix} unitId={unit.id} />
@@ -994,16 +1007,21 @@ function EndContractForm({ contract, testIdPrefix, onClose, unitId }: { contract
 // ──────────────────────────────────────────────────────────
 // TAB: EDIT CONTRACT INFO
 // ──────────────────────────────────────────────────────────
-function EditInfoForm({ contract, testIdPrefix, unitId }: { contract: Contract; testIdPrefix: string; unitId: number }) {
+function EditInfoForm({ contract, testIdPrefix, unitId, unit }: { contract: Contract; testIdPrefix: string; unitId: number; unit: Unit }) {
   const apiBase = useApiBase();
   const { toast } = useToast();
   const [tenantName, setTenantName] = useState(contract.tenantName);
   const [startDate, setStartDate] = useState(
     contract.startDate ? new Date(contract.startDate).toISOString().slice(0, 10) : ""
   );
+  const [guaranteeAmount, setGuaranteeAmount] = useState(contract.guaranteeAmount ?? "");
+  const [guaranteePeriod, setGuaranteePeriod] = useState(contract.guaranteePeriod ?? "");
+  const [unitNumber, setUnitNumber] = useState(unit.unitNumber);
 
-  const save = useMutation({
-    mutationFn: () => apiRequest("PATCH", `${apiBase}/contracts/${contract.id}/info`, { tenantName, startDate }),
+  const saveContract = useMutation({
+    mutationFn: () => apiRequest("PATCH", `${apiBase}/contracts/${contract.id}/info`, {
+      tenantName, startDate, guaranteeAmount, guaranteePeriod,
+    }),
     onSuccess: () => {
       toast({ title: "Contract info updated" });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
@@ -1012,40 +1030,68 @@ function EditInfoForm({ contract, testIdPrefix, unitId }: { contract: Contract; 
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const changed = tenantName !== contract.tenantName ||
-    startDate !== (contract.startDate ? new Date(contract.startDate).toISOString().slice(0, 10) : "");
+  const saveUnit = useMutation({
+    mutationFn: () => apiRequest("PATCH", `${apiBase}/units/${unitId}`, { unitNumber }),
+    onSuccess: () => {
+      toast({ title: "Unit name updated" });
+      queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const contractChanged = tenantName !== contract.tenantName ||
+    startDate !== (contract.startDate ? new Date(contract.startDate).toISOString().slice(0, 10) : "") ||
+    guaranteeAmount !== (contract.guaranteeAmount ?? "") ||
+    guaranteePeriod !== (contract.guaranteePeriod ?? "");
+  const unitChanged = unitNumber !== unit.unitNumber;
 
   return (
-    <div className="space-y-4 pt-3">
-      <p className="text-sm text-muted-foreground">Update the tenant name and/or contract start date.</p>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label>Tenant Name *</Label>
-          <Input
-            value={tenantName}
-            onChange={e => setTenantName(e.target.value)}
-            data-testid={`input-${testIdPrefix}-edit-tenant`}
-          />
+    <div className="space-y-5 pt-3">
+      <div className="space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unit</p>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label>Unit Name</Label>
+            <Input value={unitNumber} onChange={e => setUnitNumber(e.target.value.toUpperCase())} data-testid={`input-${testIdPrefix}-edit-unit-number`} />
+          </div>
         </div>
-        <div>
-          <Label>Start Date *</Label>
-          <Input
-            type="date"
-            value={startDate}
-            onChange={e => setStartDate(e.target.value)}
-            data-testid={`input-${testIdPrefix}-edit-start-date`}
-          />
+        <div className="flex justify-end">
+          <Button onClick={() => saveUnit.mutate()} disabled={!unitChanged || !unitNumber || saveUnit.isPending} data-testid={`button-${testIdPrefix}-save-unit`}>
+            {saveUnit.isPending ? "Saving…" : "Rename Unit"}
+          </Button>
         </div>
       </div>
-      <DialogFooter>
-        <Button
-          onClick={() => save.mutate()}
-          disabled={!changed || !tenantName || !startDate || save.isPending}
-          data-testid={`button-${testIdPrefix}-save-info`}
-        >
-          {save.isPending ? "Saving…" : "Save Changes"}
-        </Button>
-      </DialogFooter>
+
+      <div className="border-t pt-4 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Contract</p>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label>Tenant Name *</Label>
+            <Input value={tenantName} onChange={e => setTenantName(e.target.value)} data-testid={`input-${testIdPrefix}-edit-tenant`} />
+          </div>
+          <div>
+            <Label>Start Date *</Label>
+            <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} data-testid={`input-${testIdPrefix}-edit-start-date`} />
+          </div>
+          <div>
+            <Label>Guarantee Amount</Label>
+            <Input type="number" step="0.01" value={guaranteeAmount} onChange={e => setGuaranteeAmount(e.target.value)} data-testid={`input-${testIdPrefix}-edit-guarantee`} />
+          </div>
+          <div>
+            <Label>Guarantee Period</Label>
+            <Input value={guaranteePeriod} onChange={e => setGuaranteePeriod(e.target.value)} placeholder="e.g. 3 MONTHS" data-testid={`input-${testIdPrefix}-edit-guarantee-period`} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            onClick={() => saveContract.mutate()}
+            disabled={!contractChanged || !tenantName || !startDate || saveContract.isPending}
+            data-testid={`button-${testIdPrefix}-save-info`}
+          >
+            {saveContract.isPending ? "Saving…" : "Save Contract Info"}
+          </Button>
+        </DialogFooter>
+      </div>
     </div>
   );
 }
