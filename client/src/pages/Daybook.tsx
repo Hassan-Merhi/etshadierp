@@ -1931,17 +1931,30 @@ export default function Daybook({ user }: { user?: any } = {}) {
             </CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
               {hiddenRowIds.size > 0 && (
-                <Button
-                  variant={showHidden ? "secondary" : "outline"}
-                  size="sm"
-                  onClick={() => setShowHidden((v) => !v)}
-                  className="gap-1"
-                  data-testid="button-toggle-show-hidden"
-                >
-                  <EyeOff className="w-4 h-4" />
-                  {showHidden ? "Hide hidden rows" : "Show hidden"}
-                  <Badge className="ml-1">{hiddenRowIds.size}</Badge>
-                </Button>
+                <>
+                  <Button
+                    variant={showHidden ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={() => setShowHidden((v) => !v)}
+                    className="gap-1"
+                    data-testid="button-toggle-show-hidden"
+                  >
+                    <EyeOff className="w-4 h-4" />
+                    {showHidden ? "Hide hidden rows" : "Show hidden"}
+                    <Badge className="ml-1">{hiddenRowIds.size}</Badge>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setHiddenRowIds(new Set()); setShowHidden(false); }}
+                    className="gap-1 text-muted-foreground"
+                    data-testid="button-clear-hidden-rows"
+                    title="Clear all hidden rows"
+                  >
+                    <X className="w-4 h-4" />
+                    Clear
+                  </Button>
+                </>
               )}
               <div className="flex items-center border rounded-md overflow-hidden">
                 <Button

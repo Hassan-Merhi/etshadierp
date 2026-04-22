@@ -558,16 +558,30 @@ export default function POSDaybook() {
             )}
           </CardTitle>
           {hiddenRowIds.size > 0 && (
-            <Button
-              variant={showHidden ? "secondary" : "outline"}
-              size="sm"
-              onClick={() => setShowHidden((prev) => !prev)}
-              data-testid="button-toggle-show-hidden"
-            >
-              <EyeOff className="w-4 h-4" />
-              {showHidden ? "Hide hidden rows" : "Show hidden"}
-              <Badge className="ml-1">{hiddenRowIds.size}</Badge>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={showHidden ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setShowHidden((prev) => !prev)}
+                data-testid="button-toggle-show-hidden"
+                className="gap-1"
+              >
+                <EyeOff className="w-4 h-4" />
+                {showHidden ? "Hide hidden rows" : "Show hidden"}
+                <Badge className="ml-1">{hiddenRowIds.size}</Badge>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setHiddenRowIds(new Set()); setShowHidden(false); }}
+                className="gap-1 text-muted-foreground"
+                data-testid="button-clear-hidden-rows"
+                title="Clear all hidden rows"
+              >
+                <X className="w-4 h-4" />
+                Clear
+              </Button>
+            </div>
           )}
         </CardHeader>
         <CardContent>
