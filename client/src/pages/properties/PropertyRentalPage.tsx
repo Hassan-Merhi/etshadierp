@@ -296,30 +296,37 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                   </thead>
                   <tbody>
                     {grouped.map(([group, groupUnits], gIdx) => {
-                      const GROUP_COLORS = [
-                        { bg: "#1d4ed8", text: "#fff" },
-                        { bg: "#047857", text: "#fff" },
-                        { bg: "#b45309", text: "#fff" },
-                        { bg: "#7c3aed", text: "#fff" },
-                        { bg: "#be123c", text: "#fff" },
-                        { bg: "#0e7490", text: "#fff" },
-                        { bg: "#c2410c", text: "#fff" },
-                        { bg: "#4d7c0f", text: "#fff" },
+                      const GROUP_PALETTE = [
+                        { headerBg: "#1d4ed8", headerText: "#fff", r: 29,  g: 78,  b: 216 },
+                        { headerBg: "#047857", headerText: "#fff", r: 4,   g: 120, b: 87  },
+                        { headerBg: "#7c3aed", headerText: "#fff", r: 124, g: 58,  b: 237 },
+                        { headerBg: "#b45309", headerText: "#fff", r: 180, g: 83,  b: 9   },
+                        { headerBg: "#be123c", headerText: "#fff", r: 190, g: 18,  b: 60  },
+                        { headerBg: "#0e7490", headerText: "#fff", r: 14,  g: 116, b: 144 },
+                        { headerBg: "#c2410c", headerText: "#fff", r: 194, g: 65,  b: 12  },
+                        { headerBg: "#4d7c0f", headerText: "#fff", r: 77,  g: 124, b: 15  },
                       ];
-                      const gc = GROUP_COLORS[gIdx % GROUP_COLORS.length];
+                      const p = GROUP_PALETTE[gIdx % GROUP_PALETTE.length];
+                      const rowBgEven = `rgba(${p.r},${p.g},${p.b},0.06)`;
+                      const rowBgOdd  = `rgba(${p.r},${p.g},${p.b},0.12)`;
+                      const unitNumBg = `rgba(${p.r},${p.g},${p.b},0.18)`;
+                      const unitNumColor = p.headerBg;
                       return (
                       <>
                         <tr key={`grp-${group}`} className="border-t">
-                          <td colSpan={8} className="px-3 py-1.5 text-xs font-bold uppercase tracking-widest" style={{ backgroundColor: gc.bg, color: gc.text }}>{group}</td>
+                          <td colSpan={8} className="px-3 py-1.5 text-xs font-bold uppercase tracking-widest" style={{ backgroundColor: p.headerBg, color: p.headerText }}>{group}</td>
                         </tr>
-                        {groupUnits.map(u => (
+                        {groupUnits.map((u, uIdx) => (
                           <tr
                             key={u.id}
-                            className="border-t hover-elevate cursor-pointer"
+                            className="border-t cursor-pointer transition-colors"
+                            style={{ backgroundColor: uIdx % 2 === 0 ? rowBgEven : rowBgOdd }}
+                            onMouseEnter={e => (e.currentTarget.style.filter = "brightness(0.93)")}
+                            onMouseLeave={e => (e.currentTarget.style.filter = "")}
                             onClick={() => setOpenUnitId(u.id)}
                             data-testid={`row-unit-${u.id}`}
                           >
-                            <td className="px-3 py-2 font-mono text-xs font-semibold">{u.unitNumber}</td>
+                            <td className="px-3 py-2 font-mono text-xs font-bold" style={{ backgroundColor: unitNumBg, color: unitNumColor }}>{u.unitNumber}</td>
                             <td className="px-3 py-2">
                               {u.contract
                                 ? <span className="font-medium">{u.contract.tenantName}</span>
