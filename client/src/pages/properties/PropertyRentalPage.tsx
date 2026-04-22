@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog, ChevronsUpDown, Trash2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 
 // ── Types ──────────────────────────────────────────────────
@@ -42,6 +43,7 @@ type Contract = {
   notes: string | null;
   statementNote: string | null;
   guaranteePostedToStatement: boolean;
+  isInternal: boolean;
 };
 type CashAccount = { id: number; name: string; code: string; accountType: string };
 type LedgerRow = { id: number; year: number; month: number; expectedAmount: string; paidAmount: string; notes?: string | null };
@@ -329,7 +331,10 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                             <td className="px-3 py-2 font-mono text-xs font-bold" style={{ backgroundColor: unitNumBg, color: unitNumColor }}>{u.unitNumber}</td>
                             <td className="px-3 py-2">
                               {u.contract
-                                ? <span className="font-medium">{u.contract.tenantName}</span>
+                                ? <span className="font-medium flex items-center gap-1.5 flex-wrap">
+                                    {u.contract.tenantName}
+                                    {u.contract.isInternal && <Badge className="text-xs bg-violet-600 text-white">Internal</Badge>}
+                                  </span>
                                 : <Badge variant="secondary" className="text-xs">Vacant</Badge>}
                             </td>
                             <td className="px-3 py-2">
@@ -520,7 +525,7 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
         {isLoading ? (
           <div className="p-6 text-center text-muted-foreground">Loading…</div>
         ) : !contract ? (
-          <StartContractForm unitId={unit.id} testIdPrefix={testIdPrefix} onClose={onClose} />
+          <StartContractForm unitId={unit.id} testIdPrefix={testIdPrefix} onClose={onClose} unitType={unitType} />
         ) : (
           <Tabs defaultValue="payment" className="w-full">
             <TabsList className="grid w-full grid-cols-6">
@@ -544,7 +549,7 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
               />
             </TabsContent>
             <TabsContent value="edit">
-              <EditInfoForm contract={contract} testIdPrefix={testIdPrefix} unitId={unit.id} unit={unit} />
+              <EditInfoForm contract={contract} testIdPrefix={testIdPrefix} unitId={unit.id} unit={unit} unitType={unitType} />
             </TabsContent>
             <TabsContent value="modify">
               <ModifyRentForm contract={contract} testIdPrefix={testIdPrefix} unitId={unit.id} />
@@ -565,16 +570,17 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
 // ──────────────────────────────────────────────────────────
 // START CONTRACT (vacant unit)
 // ──────────────────────────────────────────────────────────
-function StartContractForm({ unitId, testIdPrefix, onClose }: { unitId: number; testIdPrefix: string; onClose: () => void }) {
+function StartContractForm({ unitId, testIdPrefix, onClose, unitType }: { unitId: number; testIdPrefix: string; onClose: () => void; unitType: "WAREHOUSE" | "SHOP" }) {
   const apiBase = useApiBase();
   const { toast } = useToast();
   const [form, setForm] = useState({
     tenantName: "", rentalAmount: "", guaranteeAmount: "",
     guaranteePeriod: "", startDate: new Date().toISOString().slice(0, 10), notes: "",
   });
+  const [isInternal, setIsInternal] = useState(false);
 
   const start = useMutation({
-    mutationFn: () => apiRequest("POST", apiBase + "/contracts", { ...form, unitId }),
+    mutationFn: () => apiRequest("POST", apiBase + "/contracts", { ...form, unitId, isInternal }),
     onSuccess: () => {
       toast({ title: "Contract started" });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
@@ -611,6 +617,20 @@ function StartContractForm({ unitId, testIdPrefix, onClose }: { unitId: number; 
           <Label>Notes</Label>
           <Textarea rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} data-testid={`input-${testIdPrefix}-contract-notes`} />
         </div>
+        {unitType === "WAREHOUSE" && (
+          <div className="col-span-2 flex items-center gap-3 rounded-md border p-3 bg-violet-50 dark:bg-violet-950/20">
+            <Switch
+              id={`switch-${testIdPrefix}-internal`}
+              checked={isInternal}
+              onCheckedChange={setIsInternal}
+              data-testid={`switch-${testIdPrefix}-internal`}
+            />
+            <div>
+              <Label htmlFor={`switch-${testIdPrefix}-internal`} className="font-semibold cursor-pointer">Internal Lease</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">This warehouse is occupied by your own company. It will also appear in Shops Rented for tracking.</p>
+            </div>
+          </div>
+        )}
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Cancel</Button>
@@ -1014,7 +1034,7 @@ function EndContractForm({ contract, testIdPrefix, onClose, unitId }: { contract
 // ──────────────────────────────────────────────────────────
 // TAB: EDIT CONTRACT INFO
 // ──────────────────────────────────────────────────────────
-function EditInfoForm({ contract, testIdPrefix, unitId, unit }: { contract: Contract; testIdPrefix: string; unitId: number; unit: Unit }) {
+function EditInfoForm({ contract, testIdPrefix, unitId, unit, unitType }: { contract: Contract; testIdPrefix: string; unitId: number; unit: Unit; unitType: "WAREHOUSE" | "SHOP" }) {
   const apiBase = useApiBase();
   const { toast } = useToast();
   const [tenantName, setTenantName] = useState(contract.tenantName);
@@ -1024,10 +1044,11 @@ function EditInfoForm({ contract, testIdPrefix, unitId, unit }: { contract: Cont
   const [guaranteeAmount, setGuaranteeAmount] = useState(contract.guaranteeAmount ?? "");
   const [guaranteePeriod, setGuaranteePeriod] = useState(contract.guaranteePeriod ?? "");
   const [unitNumber, setUnitNumber] = useState(unit.unitNumber);
+  const [isInternal, setIsInternal] = useState(contract.isInternal ?? false);
 
   const saveContract = useMutation({
     mutationFn: () => apiRequest("PATCH", `${apiBase}/contracts/${contract.id}/info`, {
-      tenantName, startDate, guaranteeAmount, guaranteePeriod,
+      tenantName, startDate, guaranteeAmount, guaranteePeriod, isInternal,
     }),
     onSuccess: () => {
       toast({ title: "Contract info updated" });
@@ -1049,7 +1070,8 @@ function EditInfoForm({ contract, testIdPrefix, unitId, unit }: { contract: Cont
   const contractChanged = tenantName !== contract.tenantName ||
     startDate !== (contract.startDate ? new Date(contract.startDate).toISOString().slice(0, 10) : "") ||
     guaranteeAmount !== (contract.guaranteeAmount ?? "") ||
-    guaranteePeriod !== (contract.guaranteePeriod ?? "");
+    guaranteePeriod !== (contract.guaranteePeriod ?? "") ||
+    isInternal !== (contract.isInternal ?? false);
   const unitChanged = unitNumber !== unit.unitNumber;
 
   return (
@@ -1089,6 +1111,20 @@ function EditInfoForm({ contract, testIdPrefix, unitId, unit }: { contract: Cont
             <Input value={guaranteePeriod} onChange={e => setGuaranteePeriod(e.target.value)} placeholder="e.g. 3 MONTHS" data-testid={`input-${testIdPrefix}-edit-guarantee-period`} />
           </div>
         </div>
+        {unitType === "WAREHOUSE" && (
+          <div className="flex items-center gap-3 rounded-md border p-3 bg-violet-50 dark:bg-violet-950/20 mt-2">
+            <Switch
+              id={`switch-edit-${testIdPrefix}-internal`}
+              checked={isInternal}
+              onCheckedChange={setIsInternal}
+              data-testid={`switch-edit-${testIdPrefix}-internal`}
+            />
+            <div>
+              <Label htmlFor={`switch-edit-${testIdPrefix}-internal`} className="font-semibold cursor-pointer">Internal Lease</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">Toggle on to make this warehouse also appear in Shops Rented as a self-occupied property.</p>
+            </div>
+          </div>
+        )}
         <DialogFooter>
           <Button
             onClick={() => saveContract.mutate()}

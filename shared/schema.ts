@@ -4264,6 +4264,7 @@ export const propertyContracts = pgTable("property_contracts", {
   statementNote: text("statement_note"),
   guaranteePostedToStatement: boolean("guarantee_posted_to_statement").notNull().default(false),
   guaranteePostedAmount: decimal("guarantee_posted_amount", { precision: 20, scale: 2 }).default("0"),
+  isInternal: boolean("is_internal").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   byUnit: index("property_contracts_unit_idx").on(t.unitId, t.status),

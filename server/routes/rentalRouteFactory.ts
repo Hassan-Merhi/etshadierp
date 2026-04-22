@@ -224,7 +224,7 @@ export function registerRentalRoutes(
 
       await ensureMonthlyForCompany(companyId, module);
 
-      const units = await db.select().from(propertyUnits)
+      const regularUnits = await db.select().from(propertyUnits)
         .where(and(
           eq(propertyUnits.companyId, companyId),
           eq(propertyUnits.module, module),
@@ -233,6 +233,31 @@ export function registerRentalRoutes(
         ))
         .orderBy(propertyUnits.locationGroup, propertyUnits.sortOrder, propertyUnits.unitNumber);
 
+      // When viewing SHOP type, also pull in any WAREHOUSE units that are marked as
+      // "internal lease" (the company occupies its own warehouse) so they appear in both views.
+      let internalWarehouseUnits: typeof regularUnits = [];
+      if (unitType === "SHOP") {
+        const allWarehouseUnits = await db.select().from(propertyUnits)
+          .where(and(
+            eq(propertyUnits.companyId, companyId),
+            eq(propertyUnits.module, module),
+            eq(propertyUnits.unitType, "WAREHOUSE"),
+            eq(propertyUnits.active, true),
+          ));
+        if (allWarehouseUnits.length) {
+          const internalContracts = await db.select().from(propertyContracts).where(and(
+            eq(propertyContracts.companyId, companyId),
+            eq(propertyContracts.module, module),
+            inArray(propertyContracts.unitId, allWarehouseUnits.map(u => u.id)),
+            eq(propertyContracts.status, "ACTIVE"),
+            eq(propertyContracts.isInternal, true),
+          ));
+          const internalUnitIds = new Set(internalContracts.map(c => c.unitId));
+          internalWarehouseUnits = allWarehouseUnits.filter(u => internalUnitIds.has(u.id));
+        }
+      }
+
+      const units = [...regularUnits, ...internalWarehouseUnits];
       const unitIds = units.map(u => u.id);
       const contracts = unitIds.length
         ? await db.select().from(propertyContracts).where(and(
@@ -414,11 +439,12 @@ export function registerRentalRoutes(
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
-      const { tenantName, startDate, guaranteeAmount, guaranteePeriod } = z.object({
+      const { tenantName, startDate, guaranteeAmount, guaranteePeriod, isInternal } = z.object({
         tenantName: z.string().min(1, "Tenant name required"),
         startDate: z.string().min(1, "Start date required"),
         guaranteeAmount: z.string().optional(),
         guaranteePeriod: z.string().optional(),
+        isInternal: z.boolean().optional(),
       }).parse(req.body);
       const [contract] = await db.select().from(propertyContracts).where(and(
         eq(propertyContracts.id, id), eq(propertyContracts.companyId, companyId), eq(propertyContracts.module, module),
@@ -427,6 +453,7 @@ export function registerRentalRoutes(
       const contractUpdates: any = { tenantName, startDate: startDate as any };
       if (guaranteeAmount !== undefined) contractUpdates.guaranteeAmount = guaranteeAmount;
       if (guaranteePeriod !== undefined) contractUpdates.guaranteePeriod = guaranteePeriod;
+      if (isInternal !== undefined) contractUpdates.isInternal = isInternal;
       await db.update(propertyContracts).set(contractUpdates).where(eq(propertyContracts.id, id));
 
       // Clean up ledger rows that are now before the new start date
