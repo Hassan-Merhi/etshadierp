@@ -257,11 +257,11 @@ export function registerAdminRoutes(app: Express) {
         .where(and(eq(stockGroups.companyId, companyId), eq(stockGroups.active, true)))
         .orderBy(stockGroups.name);
       
-      // Get all stock items with their groups
+      // Get all stock items with their groups (excluding deleted)
       const allStockItems = await db
         .select()
         .from(stockItems)
-        .where(and(eq(stockItems.companyId, companyId), eq(stockItems.active, true)))
+        .where(and(eq(stockItems.companyId, companyId), eq(stockItems.active, true), isNull(stockItems.deletedAt)))
         .orderBy(stockItems.name);
       
       // Get inventory for the selected locations

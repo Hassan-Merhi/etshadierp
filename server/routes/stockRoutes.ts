@@ -1512,7 +1512,7 @@ export function registerStockRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      // Get all stock items for the company
+      // Get all stock items for the company (excluding deleted)
       const allStockItems = await db
         .select({
           id: stockItems.id,
@@ -1530,7 +1530,7 @@ export function registerStockRoutes(app: Express) {
         })
         .from(stockItems)
         .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
-        .where(eq(stockItems.companyId, req.session.currentCompanyId));
+        .where(and(eq(stockItems.companyId, req.session.currentCompanyId), isNull(stockItems.deletedAt)));
 
       // Get all inventory records for the company to calculate current qty and value
       const inventoryRecords = await db
