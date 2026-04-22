@@ -874,8 +874,59 @@ export function registerBaleRoutes(app: Express) {
       const referenceNumber = decodeURIComponent(req.params.referenceNumber);
       const labelPrint = await storage.getBaleLabelPrintByReference(referenceNumber, companyId);
 
+      // If no label print exists, try to find the bale directly in factory_bales
+      // (bales can exist without a label print if entered manually / imported)
       if (!labelPrint) {
-        return res.status(404).json({ message: "Reference number not found" });
+        const [directBale] = await db
+          .select()
+          .from(factoryBales)
+          .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)))
+          .limit(1);
+
+        if (!directBale) {
+          return res.status(404).json({ message: "Reference number not found" });
+        }
+
+        // Build a minimal response from the bale row alone
+        let locationInfo: any = null;
+        if (directBale.erpLocationId) {
+          const [loc] = await db
+            .select({ id: locations.id, name: locations.name, city: locations.city, state: locations.state })
+            .from(locations)
+            .where(eq(locations.id, directBale.erpLocationId))
+            .limit(1);
+          if (loc) locationInfo = loc;
+        }
+
+        let product = null;
+        if (directBale.productId) {
+          product = await storage.getBaleProductById(directBale.productId);
+        } else if (directBale.articleCode) {
+          product = await storage.getBaleProductByArticleCode(directBale.articleCode, companyId);
+        }
+
+        return res.json({
+          labelPrint: null,
+          product: product || null,
+          baleInfo: {
+            id: directBale.id,
+            baleCode: directBale.baleCode,
+            productName: directBale.productName,
+            status: directBale.status,
+            weightKg: directBale.weightKg,
+            costPerKg: directBale.costPerKg,
+            totalCost: directBale.totalCost,
+            grade: directBale.grade,
+            stockEntryDate: directBale.stockEntryDate,
+            pressedAt: directBale.pressedAt,
+            finalizedAt: directBale.finalizedAt,
+          },
+          locationInfo,
+          pressingBatch: null,
+          mixBatch: null,
+          containers_used: [],
+          loadedOnOrder: null,
+        });
       }
 
       let printedByName = null;
