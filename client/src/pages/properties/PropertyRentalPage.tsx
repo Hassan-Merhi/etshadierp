@@ -265,9 +265,9 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
             <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL OUTSTANDING</CardTitle></CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${totals.totalOutstanding > 0 ? "text-red-600 dark:text-red-400" : totals.totalOutstanding < 0 ? "text-green-600 dark:text-green-400" : ""}`} data-testid={`stat-${testIdPrefix}-total-outstanding`}>
-                ${fmtMoney(totals.totalOutstanding)}
+                ${fmtMoney(Math.abs(totals.totalOutstanding))}
               </div>
-              <p className="text-[10px] text-muted-foreground mt-1">positive = owed · negative = credit</p>
+              <p className="text-[10px] text-muted-foreground mt-1">red = owed · green = credit</p>
             </CardContent>
           </Card>
         </div>
@@ -331,7 +331,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                               {u.contract ? `$${fmtMoney(u.contract.guaranteeAmount)}` : "—"}
                             </td>
                             <td className={`px-3 py-2 text-right tabular-nums font-semibold ${(u.outstanding ?? 0) > 0 ? "text-red-600 dark:text-red-400" : (u.outstanding ?? 0) < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
-                              {u.outstanding !== null ? `$${fmtMoney(u.outstanding)}` : "—"}
+                              {u.outstanding !== null ? `$${fmtMoney(Math.abs(u.outstanding))}` : "—"}
                             </td>
                             <td className="px-3 py-2 text-xs text-muted-foreground">
                               {u.contract ? format(new Date(u.contract.startDate), "dd MMM yyyy") : "—"}
