@@ -1031,6 +1031,68 @@ export function registerAccountRoutes(app: Express) {
     },
   );
 
+  // Get deleted (soft-deleted) vouchers for a specific account — used by the Accounts page
+  // to show recoverable vouchers directly in the ledger view.
+  app.get("/api/accounts/:type/:id/deleted-vouchers", requireAuth, async (req, res) => {
+    try {
+      const accountType = req.params.type;
+      const accountId = parseInt(req.params.id);
+      const companyId = req.session.currentCompanyId;
+
+      if (isNaN(accountId)) return res.status(400).json({ message: "Invalid ID" });
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // Build the account-specific filter on voucherEntries
+      let entryFilter: any;
+      switch (accountType) {
+        case "ledger":
+          entryFilter = eq(voucherEntries.ledgerAccountId, accountId);
+          break;
+        case "bank":
+          entryFilter = eq(voucherEntries.bankAccountId, accountId);
+          break;
+        case "fixed-asset":
+          entryFilter = eq(voucherEntries.fixedAssetId, accountId);
+          break;
+        case "supplier":
+          entryFilter = eq(voucherEntries.supplierId, accountId);
+          break;
+        case "employee":
+          entryFilter = eq(voucherEntries.employeeId, accountId);
+          break;
+        case "customer":
+          entryFilter = eq(voucherEntries.customerId, accountId);
+          break;
+        default:
+          return res.json([]);
+      }
+
+      const results = await db
+        .selectDistinct({
+          id: vouchers.id,
+          voucherNumber: vouchers.voucherNumber,
+          voucherType: vouchers.voucherType,
+          voucherDate: vouchers.voucherDate,
+          totalAmount: vouchers.totalAmount,
+          description: vouchers.description,
+          locationName: vouchers.locationName,
+          deletedAt: vouchers.deletedAt,
+        })
+        .from(vouchers)
+        .innerJoin(voucherEntries, eq(voucherEntries.voucherId, vouchers.id))
+        .where(and(
+          eq(vouchers.companyId, companyId),
+          isNotNull(vouchers.deletedAt),
+          entryFilter,
+        ))
+        .orderBy(desc(vouchers.deletedAt));
+
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Compute the pre-period (opening) balance for any account type
   // endDate = last day BEFORE the current period start
   app.get("/api/accounts/:type/:id/pre-period-balance", requireAuth, async (req, res) => {

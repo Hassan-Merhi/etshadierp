@@ -46,6 +46,8 @@ import {
   Trash2,
   ExternalLink,
   FileDown,
+  RotateCcw,
+  History,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -230,6 +232,7 @@ export default function Accounts() {
     new Set(),
   );
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [showDeletedVouchers, setShowDeletedVouchers] = useState(false);
 
   // Export language selection
   const [exportLang, setExportLang] = useState<"en" | "fr" | "ar">("en");
@@ -478,6 +481,50 @@ export default function Accounts() {
       return res.json();
     },
     enabled: !!selectedAccount && !!periodFilter.fromDate && !isFactoryWorkerAccount,
+  });
+
+  // Deleted vouchers for current account (shown when toggle is active)
+  const { data: deletedVouchers = [], isLoading: deletedVouchersLoading } = useQuery<any[]>({
+    queryKey: selectedAccount && prePeriodAccountType && showDeletedVouchers
+      ? [`/api/accounts/${prePeriodAccountType}/${selectedAccount.accountId}/deleted-vouchers`]
+      : ["deleted-vouchers-disabled"],
+    queryFn: async () => {
+      if (!selectedAccount || !prePeriodAccountType) return [];
+      const res = await fetch(
+        `/api/accounts/${prePeriodAccountType}/${selectedAccount.accountId}/deleted-vouchers`,
+        { credentials: "include" }
+      );
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedAccount && !!prePeriodAccountType && showDeletedVouchers,
+  });
+
+  const restoreVoucherMutation = useMutation({
+    mutationFn: async (voucherId: number) => {
+      const res = await fetch(`/api/deleted-items/voucher/${voucherId}/restore`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to restore voucher");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Voucher restored", description: "The voucher is back in the ledger." });
+      queryClient.invalidateQueries({ queryKey: ["/api/deleted-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all", selectedCompany?.id] });
+      if (selectedAccount && prePeriodAccountType) {
+        queryClient.invalidateQueries({
+          predicate: (q) =>
+            Array.isArray(q.queryKey) &&
+            typeof q.queryKey[0] === "string" &&
+            (q.queryKey[0] as string).startsWith(`/api/accounts/${prePeriodAccountType}/${selectedAccount.accountId}/`),
+        });
+      }
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Could not restore voucher.", variant: "destructive" });
+    },
   });
 
   // Restore account from URL params when accounts load
@@ -2218,21 +2265,32 @@ export default function Accounts() {
                 </Card>
               ) : (
               <Card>
-                <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
+                <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2 flex-wrap">
                   <CardTitle className="text-base">
                     Ledger: {selectedAccount?.name}
                   </CardTitle>
-                  {selectedVoucherIds.size > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {selectedVoucherIds.size > 0 && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setShowBulkDeleteConfirm(true)}
+                        data-testid="button-delete-selected"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete Selected ({selectedVoucherIds.size})
+                      </Button>
+                    )}
                     <Button
-                      variant="destructive"
+                      variant={showDeletedVouchers ? "secondary" : "outline"}
                       size="sm"
-                      onClick={() => setShowBulkDeleteConfirm(true)}
-                      data-testid="button-delete-selected"
+                      onClick={() => setShowDeletedVouchers((v) => !v)}
+                      data-testid="button-toggle-deleted-vouchers"
                     >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete Selected ({selectedVoucherIds.size})
+                      <History className="h-4 w-4 mr-1" />
+                      {showDeletedVouchers ? "Hide Deleted" : "Show Deleted"}
                     </Button>
-                  )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {transactionsLoading ? (
@@ -2701,6 +2759,79 @@ export default function Accounts() {
                         </div>
                       </div>
                     </div>
+                    {/* Deleted vouchers section */}
+                    {showDeletedVouchers && (
+                      <div className="mt-6 print:hidden">
+                        <div className="flex items-center gap-2 mb-3">
+                          <History className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                            Deleted Vouchers
+                          </span>
+                          {deletedVouchers.length > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              {deletedVouchers.length}
+                            </Badge>
+                          )}
+                        </div>
+                        {deletedVouchersLoading ? (
+                          <div className="space-y-2">
+                            {[1, 2, 3].map((i) => (
+                              <Skeleton key={i} className="h-10 w-full" />
+                            ))}
+                          </div>
+                        ) : deletedVouchers.length === 0 ? (
+                          <p className="text-sm text-muted-foreground py-4 text-center">
+                            No deleted vouchers found for this account.
+                          </p>
+                        ) : (
+                          <div className="rounded-md border overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="bg-muted/30">
+                                  <TableHead className="py-2">Date</TableHead>
+                                  <TableHead className="py-2">Voucher #</TableHead>
+                                  <TableHead className="py-2">Type</TableHead>
+                                  <TableHead className="py-2">Amount</TableHead>
+                                  <TableHead className="py-2">Deleted</TableHead>
+                                  <TableHead className="py-2 w-[100px]"></TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {deletedVouchers.map((v: any) => (
+                                  <TableRow key={v.id} className="opacity-70">
+                                    <TableCell className="py-2 font-mono text-sm">
+                                      {v.voucherDate ? formatDisplayDate(new Date(v.voucherDate)) : "-"}
+                                    </TableCell>
+                                    <TableCell className="py-2 text-sm">{v.voucherNumber || "-"}</TableCell>
+                                    <TableCell className="py-2">
+                                      <Badge variant="outline" className="text-xs">{v.voucherType || "-"}</Badge>
+                                    </TableCell>
+                                    <TableCell className="py-2 font-mono text-sm">
+                                      {v.totalAmount != null ? formatAmount(Number(v.totalAmount)) : "-"}
+                                    </TableCell>
+                                    <TableCell className="py-2 text-xs text-muted-foreground">
+                                      {v.deletedAt ? formatDisplayDate(new Date(v.deletedAt)) : "-"}
+                                    </TableCell>
+                                    <TableCell className="py-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => restoreVoucherMutation.mutate(v.id)}
+                                        disabled={restoreVoucherMutation.isPending}
+                                        data-testid={`button-restore-voucher-${v.id}`}
+                                      >
+                                        <RotateCcw className="h-3 w-3 mr-1" />
+                                        Restore
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   )}
                 </CardContent>
               </Card>
