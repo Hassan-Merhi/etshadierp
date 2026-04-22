@@ -623,23 +623,16 @@ export default function Analytics() {
     enabled: !!selectedCompany,
   });
 
-  // Build Net Profit URL with date filters
-  const buildNetProfitUrl = () => {
-    const params = new URLSearchParams();
-    if (plStartDate) {
-      params.append("startDate", plStartDate);
-    }
-    if (plEndDate) {
-      params.append("endDate", plEndDate);
-    }
-    return `/api/reports/net-profit-statement?${params}`;
-  };
-
   // Fetch Net Profit Statement
   const { data: netProfitData, isLoading: loadingNetProfit } = useQuery<NetProfitStatementData>({
     queryKey: ["/api/reports/net-profit-statement", selectedCompany?.id, plStartDate, plEndDate],
-    queryFn: async () => {
-      const response = await fetch(buildNetProfitUrl(), { credentials: "include" });
+    queryFn: async ({ queryKey }) => {
+      const [base, , startDate, endDate] = queryKey as [string, unknown, string, string];
+      const params = new URLSearchParams();
+      if (startDate) params.append("startDate", startDate);
+      if (endDate) params.append("endDate", endDate);
+      const url = `${base}${params.toString() ? `?${params.toString()}` : ""}`;
+      const response = await fetch(url, { credentials: "include" });
       if (!response.ok) throw new Error("Failed to fetch net profit statement");
       return response.json();
     },

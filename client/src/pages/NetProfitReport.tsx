@@ -251,8 +251,9 @@ export default function NetProfitReport() {
 
   const { data, isLoading, error } = useQuery<any>({
     queryKey: ["/api/reports/net-profit-statement", queryParams],
-    queryFn: async () => {
-      const url = `/api/reports/net-profit-statement${queryParams ? `?${queryParams}` : ""}`;
+    queryFn: async ({ queryKey }) => {
+      const params = queryKey[1] as string;
+      const url = `/api/reports/net-profit-statement${params ? `?${params}` : ""}`;
       const r = await fetch(url, { credentials: "include" });
       if (!r.ok) throw new Error(await r.text());
       return r.json();
