@@ -642,7 +642,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         const prodRaw = await db.execute(
           sql`SELECT DISTINCT ON (article_code) article_code as "articleCode", name
               FROM factory_bale_products
-              WHERE article_code = ANY(${sql.raw(`ARRAY[${allArticleCodes.map((c: string) => `'${c.replace(/'/g, "''")}'`).join(',')}]`)})
+              WHERE company_id = ${companyId}
+                AND article_code = ANY(${sql.raw(`ARRAY[${allArticleCodes.map((c: string) => `'${c.replace(/'/g, "''")}'`).join(',')}]`)})
               ORDER BY article_code`
         );
         (prodRaw.rows || prodRaw as any[]).forEach((r: any) => {
@@ -768,9 +769,12 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const totalStockCounts = Array.from(totalStockMap.entries()).map(([articleCode, count]) => ({ articleCode, count }));
 
       // 6. Product name lookup from factory_bale_products
+      //    Include all article codes: free stock, scanned bales, AND proforma targets.
+      //    Filter by company_id to prevent name bleed-in from other companies.
       const articleCodeSet = new Set<string>([
         ...freeStockCounts.map((s: any) => s.articleCode),
         ...loadingBales.map((b: any) => b.articleCode),
+        ...proformaLines.map((pl: any) => pl.articleCode),
       ]);
       const productNameByCode = new Map<string, string>();
       if (articleCodeSet.size > 0) {
@@ -778,7 +782,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         const prodRaw = await db.execute(
           sql`SELECT DISTINCT ON (fbp.article_code) fbp.article_code as "articleCode", fbp.name
               FROM factory_bale_products fbp
-              WHERE fbp.article_code = ANY(${sql.raw(`ARRAY[${codes.map((c: string) => `'${c.replace(/'/g, "''")}'`).join(',')}]`)})
+              WHERE fbp.company_id = ${companyId}
+                AND fbp.article_code = ANY(${sql.raw(`ARRAY[${codes.map((c: string) => `'${c.replace(/'/g, "''")}'`).join(',')}]`)})
               ORDER BY fbp.article_code`
         );
         (prodRaw.rows || prodRaw as any[]).forEach((r: any) => {
