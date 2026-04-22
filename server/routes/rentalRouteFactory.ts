@@ -87,13 +87,24 @@ async function maybeRunAutoTransfer(
 
     const fromClearing = await getOrCreateClearing(companyId);
 
-    for (const cfg of configs) {
-      // Filter: if specific source accounts are set, only fire for those
-      const filterIds = (cfg.sourceCashAccountIds ?? []) as number[];
-      if (filterIds.length > 0 && !filterIds.includes(fromLedgerAccountId)) continue;
+    // Find the FIRST rule that matches the source account.
+    // Rules with a specific sourceCashAccountIds list take precedence; fallback to the
+    // first rule with an empty filter only when no specific rule matched.
+    const specificMatch = configs.find(c => {
+      const ids = (c.sourceCashAccountIds ?? []) as number[];
+      return ids.length > 0 && ids.includes(fromLedgerAccountId);
+    });
+    const fallbackMatch = configs.find(c => {
+      const ids = (c.sourceCashAccountIds ?? []) as number[];
+      return ids.length === 0;
+    });
+    const cfg = specificMatch ?? fallbackMatch;
+    if (!cfg) return;
 
+    // Only one transfer per payment — use the matched rule.
+    {
       const [toCompany] = await db.select().from(companies).where(eq(companies.id, cfg.destCompanyId));
-      if (!toCompany) continue;
+      if (!toCompany) return;
 
       const toClearing = await getOrCreateClearing(cfg.destCompanyId);
       const baseDesc = `Auto rent transfer - ${unitLabel}`;
