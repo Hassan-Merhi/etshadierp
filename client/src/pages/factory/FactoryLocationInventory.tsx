@@ -1264,6 +1264,7 @@ export default function FactoryLocationInventory() {
     const totalKg = regularCategories.reduce((s, c) => s + c.totalWeight, 0);
     const totalValue = regularCategories.reduce((s, c) => s + c.totalCost, 0);
     const totalSellValue = regularCategories.reduce((s, c) => s + c.totalSellValue, 0);
+    const totalCostValue = regularCategories.reduce((s, c) => s + c.products.reduce((ps, p) => ps + p.baleCount * p.productionPrice, 0), 0);
     const totalProducts = regularCategories.reduce((s, c) => s + c.productCount, 0);
     const spTotalBales = specialCategories.reduce((s, c) => s + c.baleCount, 0);
     const spTotalKg = specialCategories.reduce((s, c) => s + c.totalWeight, 0);
@@ -1331,6 +1332,12 @@ export default function FactoryLocationInventory() {
               <span className="text-muted-foreground">Total KG:</span>
               <span className="font-mono font-semibold">{fmt(totalKg)}</span>
             </div>
+            {!hideSellingPrice && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
+                <span className="text-muted-foreground">Cost Value:</span>
+                <span className="font-mono font-semibold">{formatAmount(totalCostValue)}</span>
+              </div>
+            )}
             {!hideSellingPrice && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
                 <span className="text-muted-foreground">Sell Value:</span>
@@ -1689,6 +1696,7 @@ export default function FactoryLocationInventory() {
   const totalKg = regularProducts.reduce((s, p) => s + p.totalWeight, 0);
   const totalCost = regularProducts.reduce((s, p) => s + p.totalCost, 0);
   const totalSellValue = regularProducts.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
+  const totalProductionCostValue = regularProducts.reduce((s, p) => s + p.baleCount * p.productionPrice, 0);
   const spProdTotalBales = specialProducts.reduce((s, p) => s + p.baleCount, 0);
   const spProdTotalKg = specialProducts.reduce((s, p) => s + p.totalWeight, 0);
   const spProdTotalCost = specialProducts.reduce((s, p) => s + p.totalCost, 0);
@@ -1756,6 +1764,12 @@ export default function FactoryLocationInventory() {
             <span className="text-muted-foreground">Total KG:</span>
             <span className="font-mono font-semibold">{fmt(totalKg)}</span>
           </div>
+          {!hideSellingPrice && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
+              <span className="text-muted-foreground">Cost Value:</span>
+              <span className="font-mono font-semibold">{formatAmount(totalProductionCostValue)}</span>
+            </div>
+          )}
           {!hideSellingPrice && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
               <span className="text-muted-foreground">Sell Value:</span>
