@@ -31,7 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar, DollarSign, Package, Eye, Lock, Pencil, Save, X, Plus, Trash2, ArrowRight, Printer } from "lucide-react";
+import { Calendar, DollarSign, Package, Eye, EyeOff, Lock, Pencil, Save, X, Plus, Trash2, ArrowRight, Printer } from "lucide-react";
 import { useRef } from "react";
 import { useReactToPrint } from "react-to-print";
 import { format, startOfDay, endOfDay, isValid, parseISO } from "date-fns";
@@ -120,6 +120,8 @@ export default function POSDaybook() {
   };
 
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getInitialPeriod);
+  const [hiddenRowIds, setHiddenRowIds] = useState<Set<number>>(new Set());
+  const [showHidden, setShowHidden] = useState(false);
 
   // Use periodFilter dates for API queries
   const startDate = periodFilter.fromDate;
@@ -183,6 +185,11 @@ export default function POSDaybook() {
   
   // Backward compatibility alias
   const salesVouchers = filteredVouchers;
+
+  // Visible vouchers: filter out hidden rows unless showHidden is true
+  const visibleVouchers = showHidden
+    ? salesVouchers
+    : salesVouchers.filter((v) => !hiddenRowIds.has(v.id));
 
   // Fetch voucher details when viewing
   const { data: voucherDetails, isLoading: detailsLoading } = useQuery<VoucherWithItems>({
@@ -541,8 +548,27 @@ export default function POSDaybook() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Transactions</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
+          <CardTitle className="text-base">
+            Transactions
+            {hiddenRowIds.size > 0 && !showHidden && (
+              <span className="text-sm font-normal text-muted-foreground ml-2">
+                ({visibleVouchers.length} of {salesVouchers.length})
+              </span>
+            )}
+          </CardTitle>
+          {hiddenRowIds.size > 0 && (
+            <Button
+              variant={showHidden ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setShowHidden((prev) => !prev)}
+              data-testid="button-toggle-show-hidden"
+            >
+              <EyeOff className="w-4 h-4" />
+              {showHidden ? "Hide hidden rows" : "Show hidden"}
+              <Badge className="ml-1">{hiddenRowIds.size}</Badge>
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           {isLoadingUser || isLoading ? (
@@ -571,57 +597,76 @@ export default function POSDaybook() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {salesVouchers.map((voucher) => (
-                    <TableRow
-                      key={voucher.id}
-                      data-testid={`row-voucher-${voucher.id}`}
-                    >
-                      <TableCell className="font-mono text-xs">
-                        {format(new Date(voucher.createdAt), "MMM dd, hh:mm a")}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={voucher.voucherType === "Sales" ? "default" : "outline"} className="text-xs">
-                          {voucher.voucherType === "Sales" ? "Sale" : "Transfer"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        <Badge variant="secondary" className="text-xs">
-                          {voucher.locationName || `Location ${voucher.locationId}`}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs font-semibold">
-                        {formatAmount(voucher.totalAmount)}
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate text-xs hidden md:table-cell">
-                        {voucher.description || "-"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {voucher.voucherType === "Sales" && (
+                  {visibleVouchers.map((voucher) => {
+                    const isHidden = hiddenRowIds.has(voucher.id);
+                    return (
+                      <TableRow
+                        key={voucher.id}
+                        data-testid={`row-voucher-${voucher.id}`}
+                        className={isHidden && showHidden ? "opacity-50" : ""}
+                      >
+                        <TableCell className="font-mono text-xs">
+                          {format(new Date(voucher.createdAt), "MMM dd, hh:mm a")}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={voucher.voucherType === "Sales" ? "default" : "outline"} className="text-xs">
+                            {voucher.voucherType === "Sales" ? "Sale" : "Transfer"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          <Badge variant="secondary" className="text-xs">
+                            {voucher.locationName || `Location ${voucher.locationId}`}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs font-semibold">
+                          {formatAmount(voucher.totalAmount)}
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate text-xs hidden md:table-cell">
+                          {voucher.description || "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {voucher.voucherType === "Sales" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setReprintRowVoucherId(voucher.id)}
+                                disabled={reprintRowVoucherId === voucher.id}
+                                data-testid={`button-reprint-row-${voucher.id}`}
+                                title="Reprint invoice"
+                              >
+                                <Printer className={`h-4 w-4 ${reprintRowVoucherId === voucher.id ? "animate-pulse" : ""}`} />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => setReprintRowVoucherId(voucher.id)}
-                              disabled={reprintRowVoucherId === voucher.id}
-                              data-testid={`button-reprint-row-${voucher.id}`}
-                              title="Reprint invoice"
+                              onClick={() => setSelectedVoucher(voucher as VoucherWithItems)}
+                              data-testid={`button-view-${voucher.id}`}
+                              title="View details"
                             >
-                              <Printer className={`h-4 w-4 ${reprintRowVoucherId === voucher.id ? "animate-pulse" : ""}`} />
+                              <Eye className="h-4 w-4" />
                             </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectedVoucher(voucher as VoucherWithItems)}
-                            data-testid={`button-view-${voucher.id}`}
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            View
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title={isHidden ? "Unhide row" : "Hide row"}
+                              onClick={() => {
+                                if (isHidden) {
+                                  setHiddenRowIds((prev) => { const next = new Set(prev); next.delete(voucher.id); return next; });
+                                } else {
+                                  setHiddenRowIds((prev) => { const next = new Set(prev); next.add(voucher.id); return next; });
+                                }
+                              }}
+                              data-testid={isHidden ? `button-unhide-${voucher.id}` : `button-hide-${voucher.id}`}
+                            >
+                              {isHidden ? <Eye className="h-4 w-4 text-muted-foreground" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
