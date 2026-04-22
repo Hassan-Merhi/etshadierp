@@ -728,6 +728,28 @@ export function registerRentalRoutes(
     }
   });
 
+  // ── RESET GUARANTEE STATUS (undo "post to statement") ──
+  app.delete(`${urlPrefix}/contracts/:id/guarantee-to-statement`, requireAuth, async (req: Request, res: Response) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+
+      const [contract] = await db.select().from(propertyContracts).where(and(
+        eq(propertyContracts.id, id), eq(propertyContracts.companyId, companyId), eq(propertyContracts.module, module),
+      ));
+      if (!contract) return res.status(404).json({ message: "Contract not found" });
+
+      await db.update(propertyContracts)
+        .set({ guaranteePostedToStatement: false })
+        .where(eq(propertyContracts.id, id));
+
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // ── GUARANTEE TO CASH (release / apply guarantee deposit) ──
   app.post(`${urlPrefix}/contracts/:id/guarantee-to-cash`, requireAuth, async (req: Request, res: Response) => {
     try {

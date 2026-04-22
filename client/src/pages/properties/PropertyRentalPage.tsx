@@ -825,6 +825,12 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
     queryClient.invalidateQueries({ queryKey: [apiBase + "/units", unitId, "detail"] });
   };
 
+  const resetGuarantee = useMutation({
+    mutationFn: () => apiRequest("DELETE", `${apiBase}/contracts/${contract.id}/guarantee-to-statement`, {}),
+    onSuccess: () => { toast({ title: "Guarantee status reset" }); invalidate(); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   const post = useMutation({
     mutationFn: () => apiRequest("POST", `${apiBase}/contracts/${contract.id}/guarantee-to-statement`, {
       amount: postAmount,
@@ -858,12 +864,24 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
         <Badge variant={contract.guaranteePostedToStatement ? "default" : "destructive"} className="text-xs">
           {contract.guaranteePostedToStatement ? "Paid" : "Not Paid"}
         </Badge>
+        {contract.guaranteePostedToStatement && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto text-xs"
+            disabled={resetGuarantee.isPending}
+            onClick={() => resetGuarantee.mutate()}
+            data-testid={`button-${testIdPrefix}-guarantee-reset`}
+          >
+            {resetGuarantee.isPending ? "Resetting…" : "Reset Status"}
+          </Button>
+        )}
       </div>
 
       {/* ── Section 1: Post to Statement ── */}
       <div className="border rounded-md p-3 space-y-3">
         <p className="text-sm font-semibold">Post Guarantee to Statement</p>
-        <p className="text-xs text-muted-foreground">Records guarantee received: Dr Cash / Cr Tenant Deposits</p>
+        <p className="text-xs text-muted-foreground">Records guarantee received: Dr Cash / Cr Tenant Deposits. <span className="font-medium text-amber-600 dark:text-amber-400">Select an account to create an accounting entry — without an account only the status badge is updated.</span></p>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Amount ($)</Label>
