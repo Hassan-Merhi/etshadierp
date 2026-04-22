@@ -644,6 +644,28 @@ function AccountSearchSelect({ accounts, value, onChange, placeholder, testId }:
 // ──────────────────────────────────────────────────────────
 // TAB 1: PAYMENT
 // ──────────────────────────────────────────────────────────
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function buildPaymentAllocations(
+  totalAmount: number,
+  rentalAmount: number,
+  paymentDate: string,
+): Array<{ year: number; month: number; chunk: number }> {
+  if (!totalAmount || !rentalAmount || !paymentDate) return [];
+  const pd = new Date(paymentDate);
+  let ay = pd.getUTCFullYear(), am = pd.getUTCMonth() + 1;
+  const allocations: Array<{ year: number; month: number; chunk: number }> = [];
+  let remaining = totalAmount;
+  while (remaining > 0.005) {
+    const chunk = rentalAmount > 0 ? Math.min(remaining, rentalAmount) : remaining;
+    allocations.push({ year: ay, month: am, chunk: Math.round(chunk * 100) / 100 });
+    remaining = Math.round((remaining - chunk) * 100) / 100;
+    am++; if (am > 12) { am = 1; ay++; }
+    if (allocations.length >= 120) break;
+  }
+  return allocations;
+}
+
 function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId }: { contract: Contract; cashAccounts: CashAccount[]; testIdPrefix: string; unitId: number }) {
   const apiBase = useApiBase();
   const { toast } = useToast();
@@ -671,6 +693,15 @@ function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId }: { contrac
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const allocations = useMemo(() => {
+    const total = parseFloat(form.amount);
+    const monthly = parseFloat(contract.rentalAmount);
+    if (!total || !monthly || total <= 0) return [];
+    return buildPaymentAllocations(total, monthly, form.paymentDate);
+  }, [form.amount, form.paymentDate, contract.rentalAmount]);
+
+  const isMultiMonth = allocations.length > 1;
+
   return (
     <div className="space-y-3 pt-3">
       <div className="grid grid-cols-2 gap-3">
@@ -697,6 +728,23 @@ function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId }: { contrac
           <Textarea rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} data-testid={`input-${testIdPrefix}-payment-notes`} />
         </div>
       </div>
+
+      {isMultiMonth && (
+        <div className="rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 p-3 space-y-1.5">
+          <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
+            Payment will be split across {allocations.length} months
+          </p>
+          <div className="space-y-1">
+            {allocations.map((a, i) => (
+              <div key={i} className="flex items-center justify-between text-xs text-blue-800 dark:text-blue-200">
+                <span>{MONTH_NAMES[a.month - 1]} {a.year}</span>
+                <span className="font-medium">${a.chunk.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <DialogFooter>
         <Button onClick={() => pay.mutate()} disabled={!form.amount || pay.isPending} data-testid={`button-${testIdPrefix}-confirm-payment`}>
           {pay.isPending ? "Recording…" : "Confirm Payment"}

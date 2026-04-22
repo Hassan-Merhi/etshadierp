@@ -816,29 +816,48 @@ export function registerRentalRoutes(
 
       const [unit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, contract.unitId));
 
-      const payment = await db.transaction(async (tx) => {
-        await tx.insert(propertyMonthlyLedger).values({
-          companyId, module, contractId: contract.id, unitId: contract.unitId,
-          year: y, month: m, expectedAmount: contract.rentalAmount, paidAmount: "0",
-        }).onConflictDoNothing({
-          target: [propertyMonthlyLedger.contractId, propertyMonthlyLedger.year, propertyMonthlyLedger.month],
-        });
+      // ── Build monthly allocations ──────────────────────────────────────────
+      // If the payment exceeds one month's rent, split it across consecutive months
+      // starting from the payment date's month. Each chunk = min(remaining, rentalAmount).
+      const totalAmountNum = parseFloat(data.amount);
+      const rentalAmountNum = parseFloat(contract.rentalAmount as string);
+      const allocations: Array<{ year: number; month: number; chunk: string }> = [];
+      {
+        let remaining = totalAmountNum;
+        let ay = y, am = m;
+        while (remaining > 0.005) {
+          const chunk = rentalAmountNum > 0 ? Math.min(remaining, rentalAmountNum) : remaining;
+          allocations.push({ year: ay, month: am, chunk: chunk.toFixed(2) });
+          remaining = Math.round((remaining - chunk) * 100) / 100;
+          am++; if (am > 12) { am = 1; ay++; }
+          if (allocations.length >= 120) break; // safety cap ~10 years
+        }
+      }
 
-        const [row] = await tx.select().from(propertyMonthlyLedger).where(and(
-          eq(propertyMonthlyLedger.contractId, contract.id),
-          eq(propertyMonthlyLedger.year, y),
-          eq(propertyMonthlyLedger.month, m),
-        ));
+      const payments = await db.transaction(async (tx) => {
+        // Ensure a ledger row exists for every allocated month
+        for (const alloc of allocations) {
+          await tx.insert(propertyMonthlyLedger).values({
+            companyId, module, contractId: contract.id, unitId: contract.unitId,
+            year: alloc.year, month: alloc.month,
+            expectedAmount: contract.rentalAmount, paidAmount: "0",
+          }).onConflictDoNothing({
+            target: [propertyMonthlyLedger.contractId, propertyMonthlyLedger.year, propertyMonthlyLedger.month],
+          });
+        }
 
+        // Create ONE voucher for the full payment total
         let voucherId: number | null = null;
         if (data.cashAccountId) {
           const isShop = unit?.unitType === "SHOP";
           const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
+          const monthSpan = allocations.length > 1
+            ? `${String(allocations[0].month).padStart(2,"0")}/${allocations[0].year} – ${String(allocations[allocations.length-1].month).padStart(2,"0")}/${allocations[allocations.length-1].year}`
+            : `${String(m).padStart(2,"0")}/${y}`;
 
           if (isShop) {
-            // SHOP rentals: company is paying rent OUT → Payment voucher (DR Expense / CR Cash)
             const expenseAccountId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Expense", "SHOP-RENT-EXP");
-            const narration = `Rent paid - ${unitLabel} - ${String(m).padStart(2, "0")}/${y}`;
+            const narration = `Rent paid - ${unitLabel} - ${monthSpan}`;
             const [v] = await tx.insert(vouchers).values({
               companyId, voucherNumber: `RENT-${Date.now()}-${contract.id}`,
               voucherType: "Payment", voucherDate: data.paymentDate as any,
@@ -850,9 +869,8 @@ export function registerRentalRoutes(
               { voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: "0", creditAmount: data.amount, narration },
             ]);
           } else {
-            // WAREHOUSE/other rentals: company is receiving rent IN → Receipt voucher (DR Cash / CR Income)
             const incomeAccountId = await findOrCreateLedgerAccount(tx, companyId, incomeAccountName, "Income", "RENT-INC");
-            const narration = `Rent received - ${unitLabel} - ${String(m).padStart(2, "0")}/${y}`;
+            const narration = `Rent received - ${unitLabel} - ${monthSpan}`;
             const [v] = await tx.insert(vouchers).values({
               companyId, voucherNumber: `RENT-${Date.now()}-${contract.id}`,
               voucherType: "Receipt", voucherDate: data.paymentDate as any,
@@ -866,26 +884,44 @@ export function registerRentalRoutes(
           }
         }
 
-        const [created] = await tx.insert(propertyPayments).values({
-          companyId, module, contractId: contract.id, unitId: contract.unitId,
-          ledgerRowId: row.id, cashAccountId: data.cashAccountId ?? null, voucherId: voucherId ?? null,
-          amount: data.amount, paymentDate: data.paymentDate as any,
-          forYear: y, forMonth: m, notes: data.notes ?? null,
-        }).returning();
+        // Create one payment row per allocated month and update that month's ledger
+        const created: (typeof propertyPayments.$inferSelect)[] = [];
+        for (const alloc of allocations) {
+          const [row] = await tx.select().from(propertyMonthlyLedger).where(and(
+            eq(propertyMonthlyLedger.contractId, contract.id),
+            eq(propertyMonthlyLedger.year, alloc.year),
+            eq(propertyMonthlyLedger.month, alloc.month),
+          ));
 
-        await tx.execute(sql`
-          UPDATE property_monthly_ledger SET paid_amount = paid_amount + ${data.amount}::numeric WHERE id = ${row.id}
-        `);
+          const [p] = await tx.insert(propertyPayments).values({
+            companyId, module, contractId: contract.id, unitId: contract.unitId,
+            ledgerRowId: row.id,
+            cashAccountId: data.cashAccountId ?? null,
+            // All split rows share the same voucherId (one financial transaction)
+            voucherId: voucherId ?? null,
+            amount: alloc.chunk,
+            paymentDate: data.paymentDate as any,
+            forYear: alloc.year, forMonth: alloc.month,
+            notes: allocations.length > 1
+              ? `${data.notes ? data.notes + " | " : ""}Split from $${totalAmountNum.toFixed(2)} payment`
+              : (data.notes ?? null),
+          }).returning();
+          created.push(p);
+
+          await tx.execute(sql`
+            UPDATE property_monthly_ledger SET paid_amount = paid_amount + ${alloc.chunk}::numeric WHERE id = ${row.id}
+          `);
+        }
         return created;
       });
 
-      // Fire auto-transfer if configured (outside transaction — best-effort)
+      // Fire auto-transfer if configured (outside transaction — best-effort, use total amount)
       if (data.cashAccountId) {
         const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
-        await maybeRunAutoTransfer(companyId, module, data.cashAccountId, data.amount, data.paymentDate, unitLabel, payment.id, data.notes);
+        await maybeRunAutoTransfer(companyId, module, data.cashAccountId, data.amount, data.paymentDate, unitLabel, payments[0].id, data.notes);
       }
 
-      res.json(payment);
+      res.json(payments[0]);
     } catch (e: any) {
       if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
       console.error(`${tag} payments:`, e);
@@ -918,11 +954,20 @@ export function registerRentalRoutes(
           `);
         }
 
-        // 2. Soft-delete the linked payment voucher (entries stay for audit)
+        // 2. Soft-delete the linked payment voucher ONLY if no other payment row
+        //    references the same voucherId (split payments share one voucher)
         if (payment.voucherId) {
-          await tx.execute(sql`
-            UPDATE vouchers SET deleted_at = NOW() WHERE id = ${payment.voucherId}
-          `);
+          const siblings = await tx.select({ id: propertyPayments.id })
+            .from(propertyPayments)
+            .where(and(
+              eq(propertyPayments.voucherId, payment.voucherId),
+              sql`${propertyPayments.id} != ${paymentId}`,
+            ));
+          if (siblings.length === 0) {
+            await tx.execute(sql`
+              UPDATE vouchers SET deleted_at = NOW() WHERE id = ${payment.voucherId}
+            `);
+          }
         }
 
         // 3. Reverse any auto-transfers that were created for this payment
