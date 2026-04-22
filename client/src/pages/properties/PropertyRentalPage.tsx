@@ -644,8 +644,6 @@ function AccountSearchSelect({ accounts, value, onChange, placeholder, testId }:
 // ──────────────────────────────────────────────────────────
 // TAB 1: PAYMENT
 // ──────────────────────────────────────────────────────────
-const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-
 function buildPaymentAllocations(
   totalAmount: number,
   rentalAmount: number,
@@ -737,7 +735,7 @@ function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId }: { contrac
           <div className="space-y-1">
             {allocations.map((a, i) => (
               <div key={i} className="flex items-center justify-between text-xs text-blue-800 dark:text-blue-200">
-                <span>{MONTH_NAMES[a.month - 1]} {a.year}</span>
+                <span>{MONTH_NAMES[a.month]} {a.year}</span>
                 <span className="font-medium">${a.chunk.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             ))}
