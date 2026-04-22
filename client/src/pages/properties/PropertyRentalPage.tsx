@@ -321,7 +321,13 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                             <td className="px-3 py-2 text-right tabular-nums">
                               {u.contract ? `$${fmtMoney(u.contract.rentalAmount)}` : "—"}
                             </td>
-                            <td className="px-3 py-2 text-right tabular-nums">
+                            <td className={`px-3 py-2 text-right tabular-nums font-semibold ${
+                              u.contract && Number(u.contract.guaranteeAmount) > 0
+                                ? u.contract.guaranteePostedToStatement
+                                  ? "text-green-600 dark:text-green-400"
+                                  : "text-red-600 dark:text-red-400"
+                                : "text-muted-foreground"
+                            }`}>
                               {u.contract ? `$${fmtMoney(u.contract.guaranteeAmount)}` : "—"}
                             </td>
                             <td className={`px-3 py-2 text-right tabular-nums font-semibold ${(u.outstanding ?? 0) > 0 ? "text-red-600 dark:text-red-400" : (u.outstanding ?? 0) < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
@@ -800,8 +806,12 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
       {/* Info bar */}
       <div className="bg-muted/40 rounded-md p-3 text-sm flex items-center gap-2 flex-wrap">
         <span className="text-muted-foreground">Guarantee on file:</span>
-        <span className="font-bold">${fmtMoney(contract.guaranteeAmount)}</span>
-        {contract.guaranteePostedToStatement && <Badge variant="secondary">Already posted</Badge>}
+        <span className={`font-bold ${contract.guaranteePostedToStatement ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+          ${fmtMoney(contract.guaranteeAmount)}
+        </span>
+        <Badge variant={contract.guaranteePostedToStatement ? "default" : "destructive"} className="text-xs">
+          {contract.guaranteePostedToStatement ? "Paid" : "Not Paid"}
+        </Badge>
       </div>
 
       {/* ── Section 1: Post to Statement ── */}
