@@ -1091,7 +1091,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           WHERE fb.company_id = ${companyId}
           AND fb.status IN ('IN_STOCK', 'SOLD', 'DISPATCHED', 'RESERVED_FOR_ORDER')
         `),
-        db.select({ id: factoryBaleProducts.id, name: factoryBaleProducts.name, articleCode: factoryBaleProducts.articleCode, categoryId: factoryBaleProducts.categoryId, sellingPrice: factoryBaleProducts.sellingPrice }).from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId)),
+        db.select({ id: factoryBaleProducts.id, name: factoryBaleProducts.name, articleCode: factoryBaleProducts.articleCode, categoryId: factoryBaleProducts.categoryId, productionPrice: factoryBaleProducts.productionPrice }).from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId)),
         db.select({ id: factoryCategories.id, name: factoryCategories.name }).from(factoryCategories).where(eq(factoryCategories.companyId, companyId)),
         // Bale IDs linked to orders currently in LOADING / PENDING_VERIFICATION / VERIFIED
         db.execute(sql`
@@ -1141,10 +1141,10 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         };
       }
 
-      // Use selling price per bale (from product) instead of raw cost
+      // Use production (cost) price per bale from product
       function getSellingPrice(bale: any): number {
         const p = bale.productId ? productMap.get(bale.productId) : null;
-        return parseFloat(p?.sellingPrice || "0") || 0;
+        return parseFloat(p?.productionPrice || "0") || 0;
       }
 
       // Group bales into buckets
