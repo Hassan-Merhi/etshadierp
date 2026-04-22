@@ -250,6 +250,7 @@ export default function FactoryStockAllocation() {
                           <tr key={row.articleCode} className={cn("border-b transition-colors", idx % 2 === 0 ? "bg-background" : "bg-muted/20")} data-testid={`row-article-${row.articleCode}`}>
                             <td className="px-3 py-2 border-r sticky left-0 bg-inherit z-10">
                               <div className="font-medium truncate max-w-[220px]" title={displayName}>{displayName}</div>
+                              <div className="text-xs text-muted-foreground font-mono">{row.articleCode}</div>
                             </td>
                             <td className="px-3 py-2 text-right border-r font-mono tabular-nums">{row.inStock}</td>
                             <td className={cn("px-3 py-2 text-right border-r font-mono tabular-nums font-semibold",
@@ -361,6 +362,7 @@ export default function FactoryStockAllocation() {
                         {/* Product name */}
                         <td className="px-3 py-2 border-r sticky left-0 bg-inherit z-10">
                           <div className="font-medium truncate max-w-[220px]" title={row.displayName}>{row.displayName}</div>
+                          <div className="text-xs text-muted-foreground font-mono">{row.articleCode}</div>
                         </td>
 
                         {/* In Stock */}
