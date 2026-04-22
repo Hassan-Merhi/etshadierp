@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Skeleton } from "@/components/ui/skeleton";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -135,6 +136,17 @@ export default function DeletedItems() {
 
   const { data, isLoading, error } = useQuery<DeletedItemsResponse>({
     queryKey: ["/api/deleted-items"],
+  });
+
+  // Fetch journal entries for the selected voucher (to show accounts + descriptions)
+  const { data: voucherEntries = [], isLoading: entriesLoading } = useQuery<any[]>({
+    queryKey: ["/api/vouchers", detailItem?.id, "view-entries"],
+    queryFn: async () => {
+      const res = await fetch(`/api/vouchers/${detailItem!.id}/view-entries`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!detailItem && detailItem.type === "voucher",
   });
 
   const restoreMutation = useMutation({
@@ -523,7 +535,7 @@ export default function DeletedItems() {
             </SheetDescription>
           </SheetHeader>
           {detailItem && (
-            <div className="mt-6 space-y-4">
+            <div className="mt-6 space-y-4 overflow-y-auto max-h-[calc(100vh-10rem)] pr-1">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Type</p>
@@ -572,6 +584,66 @@ export default function DeletedItems() {
                   <p className="text-sm text-muted-foreground">Location</p>
                   <p className="font-medium">{detailItem.locationName}</p>
                 </div>
+              )}
+              {detailItem.type === "voucher" && (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="text-sm font-medium mb-2">Journal Entries</p>
+                    {entriesLoading ? (
+                      <div className="space-y-2">
+                        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+                      </div>
+                    ) : voucherEntries.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No entries found</p>
+                    ) : (
+                      <div className="rounded-md border overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b bg-muted/40">
+                              <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Account</th>
+                              <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Debit</th>
+                              <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Credit</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {voucherEntries.map((entry: any, i: number) => (
+                              <tr key={entry.id ?? i} className="border-b last:border-0">
+                                <td className="px-3 py-2">
+                                  <p className="font-medium text-xs">{entry.accountName || "—"}</p>
+                                  {entry.description && (
+                                    <p className="text-xs text-muted-foreground mt-0.5">{entry.description}</p>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono text-xs">
+                                  {parseFloat(entry.debitAmount || "0") > 0
+                                    ? `$${parseFloat(entry.debitAmount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                    : "—"}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono text-xs">
+                                  {parseFloat(entry.creditAmount || "0") > 0
+                                    ? `$${parseFloat(entry.creditAmount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                    : "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-muted/50 font-semibold">
+                              <td className="px-3 py-2 text-xs">Total</td>
+                              <td className="px-3 py-2 text-right font-mono text-xs">
+                                ${voucherEntries.reduce((s: number, e: any) => s + parseFloat(e.debitAmount || "0"), 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono text-xs">
+                                ${voucherEntries.reduce((s: number, e: any) => s + parseFloat(e.creditAmount || "0"), 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
               <Separator />
               <div>
