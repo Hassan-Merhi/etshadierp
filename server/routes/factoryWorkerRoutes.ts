@@ -353,6 +353,38 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     }
   });
 
+  // POST /api/factory/workers/reassign-codes - Bulk reassign HMD001, HMD002... codes
+  app.post("/api/factory/workers/reassign-codes", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.body.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const prefix = (req.body.prefix as string) || "HMD";
+
+      const allWorkers = await db
+        .select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
+        .from(factoryWorkers)
+        .where(eq(factoryWorkers.companyId, companyId))
+        .orderBy(factoryWorkers.id);
+
+      const results: { id: number; name: string; code: string }[] = [];
+
+      for (let i = 0; i < allWorkers.length; i++) {
+        const code = `${prefix}${String(i + 1).padStart(3, "0")}`;
+        await db
+          .update(factoryWorkers)
+          .set({ employeeCode: code, updatedAt: new Date() })
+          .where(and(eq(factoryWorkers.id, allWorkers[i].id), eq(factoryWorkers.companyId, companyId)));
+        results.push({ id: allWorkers[i].id, name: allWorkers[i].fullName, code });
+      }
+
+      res.json({ updated: results.length, codes: results });
+    } catch (error: any) {
+      console.error("Error reassigning worker codes:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // GET /api/factory/workers/:id - Get single worker with computed stats
   app.get("/api/factory/workers/:id", requireAuth, async (req: any, res: any) => {
     try {

@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
-  Plus, Pencil, Search, Users, UserX, UserCheck, Upload, Download, Calculator, X, FileDown, Layers, Trash2,
+  Plus, Pencil, Search, Users, UserX, UserCheck, Upload, Download, Calculator, X, FileDown, Layers, Trash2, RefreshCw,
 } from "lucide-react";
 import { ExcelJS, writeFile } from "@/lib/excelHelper";
 import { Button } from "@/components/ui/button";
@@ -79,6 +79,7 @@ export default function FactoryWorkers() {
   const [endResult, setEndResult] = useState<{ earned: string; paid: string; advances: string; balance: string } | null>(null);
   const [endCashAccountId, setEndCashAccountId] = useState("");
   const [endSubmitting, setEndSubmitting] = useState(false);
+  const [reassignOpen, setReassignOpen] = useState(false);
 
   const { data: cashAccounts } = useQuery<CashAccount[]>({
     queryKey: ["/api/factory/cash-accounts"],
@@ -214,6 +215,20 @@ export default function FactoryWorkers() {
       toast({ title: "Worker reactivated", description: `${data.fullName} is now active again.` });
     },
     onError: (err: Error) => { if ((err as any)?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
+  });
+
+  const reassignCodesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await factoryApiRequest("POST", "/api/factory/workers/reassign-codes", { prefix: "HMD" });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
+      return res.json();
+    },
+    onSuccess: (data: { updated: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
+      setReassignOpen(false);
+      toast({ title: "Codes reassigned", description: `${data.updated} workers updated with HMD codes.` });
+    },
+    onError: (err: Error) => { toast({ title: "Error", description: err.message, variant: "destructive" }); },
   });
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -561,6 +576,9 @@ export default function FactoryWorkers() {
             </Button>
             <Button variant="outline" onClick={handleExportSalaries} disabled={!filteredWorkers.length} data-testid="button-export-salaries">
               <FileDown className="h-4 w-4 mr-2" />Export Salaries
+            </Button>
+            <Button variant="outline" onClick={() => setReassignOpen(true)} data-testid="button-reassign-codes">
+              <RefreshCw className="h-4 w-4 mr-2" />Reassign Codes
             </Button>
             <Button onClick={() => { resetForm(); setCreateOpen(true); }} data-testid="button-add-worker">
               <Plus className="h-4 w-4 mr-2" />Add Worker
@@ -912,6 +930,29 @@ export default function FactoryWorkers() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reassign Codes Confirmation Dialog */}
+      <Dialog open={reassignOpen} onOpenChange={setReassignOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reassign Worker Codes</DialogTitle>
+            <DialogDescription>
+              This will replace every worker's current code with a new sequential HMD code (HMD001, HMD002, …) ordered by worker ID. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md bg-muted px-4 py-3 text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">{(workers ?? []).length}</span> workers will be updated.
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => setReassignOpen(false)} disabled={reassignCodesMutation.isPending} data-testid="button-reassign-cancel">
+              Cancel
+            </Button>
+            <Button onClick={() => reassignCodesMutation.mutate()} disabled={reassignCodesMutation.isPending} data-testid="button-reassign-confirm">
+              {reassignCodesMutation.isPending ? "Updating…" : "Yes, Reassign All Codes"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
