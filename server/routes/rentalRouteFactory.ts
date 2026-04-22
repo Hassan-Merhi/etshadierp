@@ -789,6 +789,10 @@ export function registerRentalRoutes(
           { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: amount, creditAmount: "0", narration },
           { voucherId: v.id, ledgerAccountId: cashAccountId, debitAmount: "0", creditAmount: amount, narration },
         ]);
+        // Mark guarantee as paid on the contract
+        await tx.update(propertyContracts)
+          .set({ guaranteePostedToStatement: true, guaranteePostedAmount: amount })
+          .where(eq(propertyContracts.id, id));
       });
 
       // Record in payments log so it's visible in cash flow / payments history
