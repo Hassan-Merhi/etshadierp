@@ -130,7 +130,7 @@ async function maybeRunAutoTransfer(
       ]);
 
       // Voucher in TO company (Receipt — money arrives)
-      // DR toClearing (intercompany receipt), CR destLedgerAccountId (income/ledger in dest company)
+      // DR destLedgerAccountId (cash/account receives money), CR toClearing (clearing settled)
       const [toVoucher] = await db.insert(vouchers).values({
         companyId: cfg.destCompanyId, voucherNumber: `TR-IN-${ts + 1}`,
         voucherType: "Receipt", voucherDate: transferDate as any,
@@ -138,8 +138,8 @@ async function maybeRunAutoTransfer(
         totalAmount: amount, optional: false,
       }).returning();
       await db.insert(voucherEntries).values([
-        { voucherId: toVoucher.id, ledgerAccountId: toClearing.id,           debitAmount: amount, creditAmount: "0",   narration: inNarration },
-        { voucherId: toVoucher.id, ledgerAccountId: cfg.destLedgerAccountId, debitAmount: "0",   creditAmount: amount, narration: inNarration },
+        { voucherId: toVoucher.id, ledgerAccountId: cfg.destLedgerAccountId, debitAmount: amount, creditAmount: "0",   narration: inNarration },
+        { voucherId: toVoucher.id, ledgerAccountId: toClearing.id,           debitAmount: "0",   creditAmount: amount, narration: inNarration },
       ]);
 
       // Record link (sourcePaymentId links this transfer back to the originating payment)
