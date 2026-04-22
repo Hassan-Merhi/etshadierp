@@ -784,10 +784,10 @@ export function registerRentalRoutes(
           description: narration, totalAmount: amount, currency: "USD", sourceModule: "ERP",
         }).returning();
         voucherId = v.id;
-        // DR Tenant Deposits (clear liability) / CR Cash Account (money arrives in cash)
+        // DR Cash Account (cash received) / CR Tenant Deposits (clear liability)
         await tx.insert(voucherEntries).values([
-          { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: amount, creditAmount: "0", narration },
-          { voucherId: v.id, ledgerAccountId: cashAccountId, debitAmount: "0", creditAmount: amount, narration },
+          { voucherId: v.id, ledgerAccountId: cashAccountId,   debitAmount: amount, creditAmount: "0",   narration },
+          { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: "0",   creditAmount: amount, narration },
         ]);
         // Mark guarantee as paid on the contract
         await tx.update(propertyContracts)
