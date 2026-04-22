@@ -306,7 +306,7 @@ export default function Analytics() {
   const [rangeStart, setRangeStart] = useState("");
   const [rangeEnd, setRangeEnd] = useState("");
   const [detailsPeriod, setDetailsPeriod] = useState("all");
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("last_1_month"));
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("all_time"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   const [selectedLocationForDetails, setSelectedLocationForDetails] = useState<number | null>(null);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set());
@@ -327,12 +327,12 @@ export default function Analytics() {
   
   // Net Profit Report state
   const [expandedNetProfitSections, setExpandedNetProfitSections] = useState<Set<string>>(new Set());
-  const [plStartDate, setPlStartDate] = useState("");
-  const [plEndDate, setPlEndDate] = useState("");
 
-  // Account Balance sections date filter (assets, cash, liabilities, loans-banks)
-  const [balStartDate, setBalStartDate] = useState("");
-  const [balEndDate, setBalEndDate] = useState("");
+  // Derive P&L and Balance date filters from the global period filter
+  const plStartDate = periodFilter.fromDate;
+  const plEndDate = periodFilter.toDate;
+  const balStartDate = periodFilter.fromDate;
+  const balEndDate = periodFilter.toDate;
 
   // Factory-specific filters
   const [factoryContainerCustomerId, setFactoryContainerCustomerId] = useState("all");
@@ -1101,91 +1101,6 @@ export default function Analytics() {
           )}
         </div>
 
-        {(activeSection === "reports" || activeSection === "expenses" || activeSection === "direct-expenses" || activeSection === "indirect-expenses") && (
-          <div className="flex flex-wrap items-center gap-3 p-3 rounded-md bg-muted/40 border">
-            <span className="text-sm font-medium text-muted-foreground shrink-0">P&amp;L Date Range:</span>
-            <div className="flex items-center gap-2">
-              <Label htmlFor="pl-start-date-top" className="text-sm whitespace-nowrap">From:</Label>
-              <Input
-                id="pl-start-date-top"
-                type="date"
-                value={plStartDate}
-                onChange={(e) => setPlStartDate(e.target.value)}
-                className="w-36"
-                data-testid="input-pl-start-date"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Label htmlFor="pl-end-date-top" className="text-sm whitespace-nowrap">To:</Label>
-              <Input
-                id="pl-end-date-top"
-                type="date"
-                value={plEndDate}
-                onChange={(e) => setPlEndDate(e.target.value)}
-                className="w-36"
-                data-testid="input-pl-end-date"
-              />
-            </div>
-            {(plStartDate || plEndDate) && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { setPlStartDate(""); setPlEndDate(""); }}
-                  data-testid="button-pl-clear-dates"
-                >
-                  Clear
-                </Button>
-                <span className="text-xs text-muted-foreground">
-                  Showing: {plStartDate || "Beginning"} — {plEndDate || "Present"}
-                </span>
-              </>
-            )}
-          </div>
-        )}
-
-        {(activeSection === "assets" || activeSection === "liabilities" || activeSection === "cash" || activeSection === "loans-banks") && (
-          <div className="flex flex-wrap items-center gap-3 p-3 rounded-md bg-muted/40 border">
-            <span className="text-sm font-medium text-muted-foreground shrink-0">Balance Date Range:</span>
-            <div className="flex items-center gap-2">
-              <Label htmlFor="bal-start-date" className="text-sm whitespace-nowrap">From:</Label>
-              <Input
-                id="bal-start-date"
-                type="date"
-                value={balStartDate}
-                onChange={(e) => setBalStartDate(e.target.value)}
-                className="w-36"
-                data-testid="input-bal-start-date"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Label htmlFor="bal-end-date" className="text-sm whitespace-nowrap">To:</Label>
-              <Input
-                id="bal-end-date"
-                type="date"
-                value={balEndDate}
-                onChange={(e) => setBalEndDate(e.target.value)}
-                className="w-36"
-                data-testid="input-bal-end-date"
-              />
-            </div>
-            {(balStartDate || balEndDate) && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { setBalStartDate(""); setBalEndDate(""); }}
-                  data-testid="button-bal-clear-dates"
-                >
-                  Clear
-                </Button>
-                <span className="text-xs text-muted-foreground">
-                  Showing: {balStartDate || "Beginning"} — {balEndDate || "Present"}
-                </span>
-              </>
-            )}
-          </div>
-        )}
 
         {activeSection === "assets" && (
           <Card>
