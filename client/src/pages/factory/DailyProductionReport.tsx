@@ -18,6 +18,11 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
+function yesterdayStr() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
 function monthStart() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
@@ -46,7 +51,7 @@ function fmtKg(n: number) {
   return `${r.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} kg`;
 }
 
-type Preset = "today" | "month" | "lastmonth" | "year" | "custom";
+type Preset = "today" | "yesterday" | "month" | "lastmonth" | "year" | "custom";
 
 interface ReportData {
   from: string | null;
@@ -543,6 +548,7 @@ export default function DailyProductionReport() {
 
   const { from, to } = useMemo(() => {
     if (preset === "today") return { from: todayStr(), to: todayStr() };
+    if (preset === "yesterday") return { from: yesterdayStr(), to: yesterdayStr() };
     if (preset === "month") return { from: monthStart(), to: todayStr() };
     if (preset === "lastmonth") {
       const [f, t] = lastMonthRange();
@@ -564,6 +570,7 @@ export default function DailyProductionReport() {
 
   const presets: { key: Preset; label: string }[] = [
     { key: "today", label: "Today" },
+    { key: "yesterday", label: "Yesterday" },
     { key: "month", label: "This Month" },
     { key: "lastmonth", label: "Last Month" },
     { key: "year", label: "This Year" },
