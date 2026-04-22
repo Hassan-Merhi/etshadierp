@@ -899,7 +899,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       if (from) mixBatchConditions.push(sql`COALESCE(${factoryMixBatches.batchDate}, DATE(${factoryMixBatches.createdAt})) >= ${from}`);
       if (to)   mixBatchConditions.push(sql`COALESCE(${factoryMixBatches.batchDate}, DATE(${factoryMixBatches.createdAt})) <= ${to}`);
 
-      // ── Fetch bales with product selling price and category ──
+      // ── Fetch bales with product cost price and category ──
       const baleRows = await db
         .select({
           id: factoryBales.id,
@@ -907,7 +907,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           productName: factoryBales.productName,
           weightKg: factoryBales.weightKg,
           stockEntryDate: factoryBales.stockEntryDate,
-          sellingPrice: factoryBaleProducts.sellingPrice,
+          productionPrice: factoryBaleProducts.productionPrice,
           productId: factoryBales.productId,
           categoryId: factoryBaleProducts.categoryId,
           categoryName: factoryCategories.name,
@@ -930,7 +930,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         categoryName: string;
         qty: number;
         totalWeightKg: number;
-        sellingPricePerBale: number;
+        costPricePerBale: number;
         totalValue: number;
       }>();
 
@@ -955,7 +955,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         const name = bale.productName || code;
         const catName = bale.categoryName || "Uncategorized";
         const wt = parseFloat(bale.weightKg || "0");
-        const price = parseFloat(bale.sellingPrice || "0");
+        const price = parseFloat(bale.productionPrice || "0");
         const value = price; // price is per bale (not per kg)
 
         if (isWiperOrGarbage(catName)) {
@@ -978,7 +978,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
             existing.totalWeightKg += wt;
             existing.totalValue += value;
           } else {
-            productMap.set(code, { articleCode: code, productName: name, categoryName: catName, qty: 1, totalWeightKg: wt, sellingPricePerBale: price, totalValue: value });
+            productMap.set(code, { articleCode: code, productName: name, categoryName: catName, qty: 1, totalWeightKg: wt, costPricePerBale: price, totalValue: value });
           }
 
           const catExisting = categoryMap.get(catName);

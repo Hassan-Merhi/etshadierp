@@ -66,7 +66,7 @@ interface ReportData {
       categoryName: string;
       qty: number;
       totalWeightKg: number;
-      sellingPricePerBale: number;
+      costPricePerBale: number;
       totalValue: number;
     }[];
     byCategory: {
@@ -263,7 +263,7 @@ function CategoryProductBreakdown({
                       <TableHead className="text-xs">Product</TableHead>
                       <TableHead className="text-xs text-right">Qty</TableHead>
                       <TableHead className="text-xs text-right">Weight</TableHead>
-                      <TableHead className="text-xs text-right">Price / Bale</TableHead>
+                      <TableHead className="text-xs text-right">Cost / Bale</TableHead>
                       <TableHead className="text-xs text-right">Value</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -274,7 +274,7 @@ function CategoryProductBreakdown({
                         <TableCell className="text-xs py-1.5">{p.productName}</TableCell>
                         <TableCell className="text-xs text-right font-mono py-1.5">{p.qty.toLocaleString()}</TableCell>
                         <TableCell className="text-xs text-right font-mono py-1.5">{fmtKg(p.totalWeightKg)}</TableCell>
-                        <TableCell className="text-xs text-right font-mono py-1.5">{fmtMoney(p.sellingPricePerBale)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono py-1.5">{fmtMoney(p.costPricePerBale)}</TableCell>
                         <TableCell className="text-xs text-right font-mono font-semibold py-1.5">{fmtMoney(p.totalValue)}</TableCell>
                       </TableRow>
                     ))}
