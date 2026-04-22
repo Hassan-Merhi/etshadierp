@@ -2300,6 +2300,7 @@ export default function Accounts() {
                       ))}
                     </div>
                   ) : (
+                    <>
                     <div ref={printRef} className="print-container">
                       <div className="hidden print:block print-header">
                         <div style={{ textAlign: "center", marginBottom: "16px" }}>
@@ -2832,6 +2833,7 @@ export default function Accounts() {
                         )}
                       </div>
                     )}
+                    </>
                   )}
                 </CardContent>
               </Card>
