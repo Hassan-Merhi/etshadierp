@@ -145,7 +145,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   const today = new Date().toLocaleDateString('en-CA');
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA');
 
-  const [useDateFilter, setUseDateFilter] = useState(false);
+  const [useDateFilter, setUseDateFilter] = useState(true);
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
 
