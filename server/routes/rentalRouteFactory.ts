@@ -423,6 +423,30 @@ export function registerRentalRoutes(
       ));
       if (!contract) return res.status(404).json({ message: "Contract not found" });
       await db.update(propertyContracts).set({ tenantName, startDate: startDate as any }).where(eq(propertyContracts.id, id));
+
+      // Clean up ledger rows that are now before the new start date
+      const newStart = new Date(startDate);
+      const newStartYear = newStart.getUTCFullYear();
+      const newStartMonth = newStart.getUTCMonth() + 1;
+
+      // Delete rows before the new start date that have no payments (zero or null paidAmount)
+      await db.execute(sql`
+        DELETE FROM property_monthly_ledger
+        WHERE contract_id = ${id}
+          AND (year < ${newStartYear} OR (year = ${newStartYear} AND month < ${newStartMonth}))
+          AND (paid_amount IS NULL OR paid_amount::numeric = 0)
+      `);
+
+      // Zero out expected amount for rows before the new start date that DO have payments
+      // (they become pure credit entries rather than appearing as unpaid obligations)
+      await db.execute(sql`
+        UPDATE property_monthly_ledger
+        SET expected_amount = 0
+        WHERE contract_id = ${id}
+          AND (year < ${newStartYear} OR (year = ${newStartYear} AND month < ${newStartMonth}))
+          AND paid_amount::numeric > 0
+      `);
+
       res.json({ ok: true });
     } catch (e: any) {
       if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
