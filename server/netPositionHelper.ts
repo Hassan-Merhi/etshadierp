@@ -166,7 +166,11 @@ export function classifyNetPositionAccounts(
       if (stockInventoryCodes.some(c =>
         codeLower === c.toLowerCase() || codeLower.startsWith(c.toLowerCase() + "_")
       )) return true;
-      if (fixedAssetNamePatterns.some(p => nameLower.includes(p))) return true;
+      // Fixed-asset name patterns (vehicles, land, luxury goods, etc.) are only applied
+      // to accounts explicitly typed as "Fixed Asset". Regular Asset / Current Asset
+      // accounts (e.g. "Security Deposits Paid") are current assets and must appear in
+      // the net position.
+      if (acc.accountType === "Fixed Asset" && fixedAssetNamePatterns.some(p => nameLower.includes(p))) return true;
     }
 
     return false;
