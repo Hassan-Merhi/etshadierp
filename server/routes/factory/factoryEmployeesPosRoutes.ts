@@ -3111,8 +3111,27 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         cleanLedgerForUsTotal + baleInventoryValue + rawMaterialStockValue + balanceOnTableValue +
         stockOtwValue + totalCustomerDr + pendingTotal + verifiedTotal + loadingTotal,
       );
-      // onUsTotal: ledger liabilities + supplier balances + customer credit balances (CR)
-      const onUsTotal = round2(ledgerOnUsTotal + totalSupplierLiabilities + totalCustomerCr);
+      // ── Employee Salaries Payable — directly from employees.currentBalance ───────
+      // Employee balances are tracked via employees.currentBalance (not through a
+      // "Payroll Payable" ledger account), so we inject them here explicitly.
+      const allEmployeesForNP = await db
+        .select({ currentBalance: employees.currentBalance })
+        .from(employees)
+        .where(and(
+          eq(employees.companyId, companyId),
+          eq(employees.employeeType, "Employee"),
+          eq(employees.active, true),
+          isNull(employees.deletedAt),
+        ));
+      let employeeSalariesPayable = 0;
+      for (const emp of allEmployeesForNP) {
+        const bal = parseFloat(emp.currentBalance || "0");
+        if (bal > 0) employeeSalariesPayable += bal;
+      }
+      employeeSalariesPayable = round2(employeeSalariesPayable);
+
+      // onUsTotal: ledger liabilities + supplier balances + customer credit balances (CR) + employee salaries
+      const onUsTotal = round2(ledgerOnUsTotal + totalSupplierLiabilities + totalCustomerCr + employeeSalariesPayable);
       const netPosition = round2(forUsTotal - onUsTotal);
 
       // Inject factory-specific lines explicitly (always present so the UI
@@ -3148,6 +3167,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           .sort((a, b) => b.balanceUsd - a.balanceUsd)
           .map(s => ({ name: s.name, code: "SUPPLIER", value: round2(s.balanceUsd), category: "Supplier", breakdown: s.breakdown })),
         ...ledgerOnUs.sort((a, b) => b.value - a.value).map(a => ({ ...a, value: round2(a.value) })),
+        ...(employeeSalariesPayable > 0 ? [{ name: "Payroll Payable", code: "EMPLOYEE_PAYROLL_PAYABLE", value: employeeSalariesPayable, category: "Liability" }] : []),
         ...customerCrItems
           .sort((a, b) => Math.abs(b.balanceUsd) - Math.abs(a.balanceUsd))
           .map(c => ({ name: c.name, code: "CUSTOMER_CR", value: round2(Math.abs(c.balanceUsd)), category: "Customer" })),
@@ -3160,9 +3180,14 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         }, {})
       ).map(([name, value]) => ({ name, value: round2(value) })).sort((a, b) => b.value - a.value);
 
+      // Merge employee salaries payable into the "Liability" category in the breakdown
+      const mergedLedgerOnUsGrouped = { ...ledgerOnUsGrouped };
+      if (employeeSalariesPayable > 0) {
+        mergedLedgerOnUsGrouped["Liability"] = round2((mergedLedgerOnUsGrouped["Liability"] || 0) + employeeSalariesPayable);
+      }
       const onUsBreakdown = [
         ...(totalSupplierLiabilities > 0 ? [{ name: "Suppliers", value: round2(totalSupplierLiabilities) }] : []),
-        ...Object.entries(ledgerOnUsGrouped)
+        ...Object.entries(mergedLedgerOnUsGrouped)
           .map(([name, value]) => ({ name, value: round2(value) }))
           .sort((a, b) => b.value - a.value),
         ...(totalCustomerCr > 0 ? [{ name: "Customer", value: totalCustomerCr }] : []),
