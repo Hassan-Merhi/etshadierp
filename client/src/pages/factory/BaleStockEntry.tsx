@@ -340,16 +340,20 @@
 
         const { labelPrints } = await labelResponse.json();
 
-        const labels = labelPrints.map((lp: any) => {
+        const labelsWithColor = labelPrints.map((lp: any) => {
           const bale = bales.find((b: any) => b.id === lp.productionBaleId);
+          const product = baleProducts?.find((p) => p.id === bale?.productId);
           return {
             referenceNumber: lp.referenceNumber,
             articleCode: lp.articleCode || bale?.articleCode || "",
             pieces: lp.pieces || 1,
             approxWeightKg: lp.approxWeightKg || bale?.weightKg || "0",
             productName: bale?.productName || "",
+            _designColor: (product?.labelDesignColor as A4DesignColor | null | undefined) || null,
           };
         });
+
+        const labels: LabelData[] = labelsWithColor.map(({ _designColor: _dc, ...rest }) => rest);
 
         if (isZebraMode()) {
           try {
@@ -361,7 +365,47 @@
             openBrowserPrint(labels);
           }
         } else {
-          openBrowserPrint(labels);
+          const paperFormat = getPaperFormat();
+          if (paperFormat === "A4") {
+            // Group by assigned design color — separate window per color group
+            const colorGroups = new Map<string | null, typeof labelsWithColor>();
+            for (const lbl of labelsWithColor) {
+              const key = lbl._designColor || null;
+              if (!colorGroups.has(key)) colorGroups.set(key, []);
+              colorGroups.get(key)!.push(lbl);
+            }
+            for (const [color, group] of colorGroups) {
+              const groupLabels: LabelData[] = group.map(({ _designColor: _dc, ...rest }) => rest);
+              const html = generateCombinedLabelsHtml(groupLabels, color as A4DesignColor | undefined);
+              const win = window.open("", "_blank");
+              if (win) {
+                win.document.write(html);
+                win.document.close();
+                win.focus();
+                setTimeout(() => win.print(), 500);
+              }
+            }
+          } else {
+            const html = generateA5LabelsHtml(labels);
+            const win = window.open("", "_blank");
+            if (win) { win.document.write(html); win.document.close(); win.focus(); setTimeout(() => win.print(), 500); }
+          }
+          // Sticker window — always one window for all labels
+          const stickerWindow = window.open("", "_blank");
+          if (stickerWindow) {
+            stickerWindow.document.write(generateStickerLabelsHtml(labels));
+            stickerWindow.document.close();
+            stickerWindow.focus();
+            const imgs = stickerWindow.document.images;
+            let loaded = 0;
+            const total = imgs.length;
+            const tryPrint = () => { loaded++; if (loaded >= total) setTimeout(() => stickerWindow.print(), 300); };
+            if (total === 0) { setTimeout(() => stickerWindow.print(), 300); }
+            else { for (let i = 0; i < total; i++) { if (imgs[i].complete) tryPrint(); else imgs[i].onload = imgs[i].onerror = tryPrint; } }
+          }
+          if (!window) {
+            toast({ title: "Warning", description: "Please allow pop-ups to print labels", variant: "destructive" });
+          }
         }
       } catch (error: any) {
         toast({ title: "Label Error", description: error.message || "Failed to generate labels", variant: "destructive" });
@@ -1044,6 +1088,7 @@
     const { formatDisplayDate } = useDateFormat();
 
     const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/factory/workers"] });
+    const { data: baleProducts } = useQuery<FactoryBaleProduct[]>({ queryKey: ["/api/factory/bale-products"] });
 
     const bulkUpdateNamesMutation = useMutation({
       mutationFn: async (file: File) => {
@@ -1133,6 +1178,25 @@
       }
     };
 
+    const printDirectNoDesign = (labels: LabelData[]) => {
+      const paperFormat = getPaperFormat();
+      const html = paperFormat === "A5" ? generateA5LabelsHtml(labels) : generateCombinedLabelsHtml(labels);
+      const win = window.open("", "_blank");
+      if (win) { win.document.write(html); win.document.close(); win.focus(); setTimeout(() => win.print(), 500); }
+      const stickerWindow = window.open("", "_blank");
+      if (stickerWindow) {
+        stickerWindow.document.write(generateStickerLabelsHtml(labels));
+        stickerWindow.document.close();
+        stickerWindow.focus();
+        const imgs = stickerWindow.document.images;
+        let loaded = 0;
+        const total = imgs.length;
+        const tryPrint = () => { loaded++; if (loaded >= total) setTimeout(() => stickerWindow.print(), 300); };
+        if (total === 0) { setTimeout(() => stickerWindow.print(), 300); }
+        else { for (let i = 0; i < total; i++) { if (imgs[i].complete) tryPrint(); else imgs[i].onload = imgs[i].onerror = tryPrint; } }
+      }
+    };
+
     const printSingleBale = async (bale: any) => {
       try {
         const labelResponse = await modeApiRequest("POST", "/api/bale-label-prints", {
@@ -1153,15 +1217,19 @@
           approxWeightKg: lp.approxWeightKg || bale.weightKg || "0",
           productName: bale.productName || "",
         }));
+        const product = baleProducts?.find((p) => p.id === bale.productId);
+        const assignedColor = product?.labelDesignColor as A4DesignColor | null | undefined;
         if (isZebraMode()) {
           try {
             await printRawZpl(buildZplBatch(labels, true));
             toast({ title: "Label sent to Zebra printer" });
           } catch (err: any) {
-            openBrowserPrint(labels);
+            if (assignedColor) openBrowserPrint(labels, assignedColor);
+            else printDirectNoDesign(labels);
           }
         } else {
-          openBrowserPrint(labels);
+          if (assignedColor) openBrowserPrint(labels, assignedColor);
+          else printDirectNoDesign(labels);
         }
       } catch (error: any) {
         toast({ title: "Print Error", description: error.message, variant: "destructive" });

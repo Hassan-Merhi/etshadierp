@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X, AlertTriangle, FileSpreadsheet, EyeOff, Eye, AlertCircle } from "lucide-react";
+import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X, AlertTriangle, FileSpreadsheet, EyeOff, Eye, AlertCircle, Palette } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +37,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
+import { A4_DESIGN_OPTIONS } from "@/lib/labelHtml";
 import { CreateBaleProductDialog } from "../components/CreateBaleProductDialog";
 import { AdminAuthDialog } from "@/components/AdminAuthDialog";
 import type { FactoryBaleProduct, FactoryCategory } from "@shared/schema";
@@ -74,7 +75,7 @@ export default function BaleProducts() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingCategory, setEditingCategory] = useState<{ id: number; name: string } | null>(null);
   const [editingProduct, setEditingProduct] = useState<FactoryBaleProduct | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", articleCode: "", weightPerBaleKg: "", categoryId: "", description: "", grade: "", productionPrice: "", sellingPrice: "" });
+  const [editForm, setEditForm] = useState({ name: "", articleCode: "", weightPerBaleKg: "", categoryId: "", description: "", grade: "", productionPrice: "", sellingPrice: "", labelDesignColor: "" });
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -96,6 +97,7 @@ export default function BaleProducts() {
         grade: "",
         productionPrice: editingProduct.productionPrice && parseFloat(editingProduct.productionPrice) > 0 ? String(parseFloat(editingProduct.productionPrice)) : "",
         sellingPrice: editingProduct.sellingPrice && parseFloat(editingProduct.sellingPrice) > 0 ? String(parseFloat(editingProduct.sellingPrice)) : "",
+        labelDesignColor: editingProduct.labelDesignColor || "",
       });
     }
   }, [editingProduct]);
@@ -264,7 +266,7 @@ export default function BaleProducts() {
   });
 
   const editProductMutation = useMutation({
-    mutationFn: async (data: { name: string; weightPerBaleKg: number | null; articleCode: string; description: string; categoryId: number | null }) => {
+    mutationFn: async (data: { name: string; weightPerBaleKg: number | null; articleCode: string; description: string; categoryId: number | null; labelDesignColor: string | null; productionPrice: string; sellingPrice: string }) => {
       const response = await modeApiRequest("POST", `/api/factory/bale-products/${editingProduct!.id}/cascade-update`, data);
       return response.json();
     },
@@ -342,6 +344,7 @@ export default function BaleProducts() {
       description: editForm.description.trim(),
       productionPrice: editForm.productionPrice,
       sellingPrice: editForm.sellingPrice,
+      labelDesignColor: editForm.labelDesignColor || null,
     });
   };
 
@@ -1145,6 +1148,43 @@ export default function BaleProducts() {
                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                 data-testid="input-edit-product-description"
               />
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <Palette className="h-3.5 w-3.5" />
+                Label Design Color
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  data-testid="button-label-color-none"
+                  onClick={() => setEditForm({ ...editForm, labelDesignColor: "" })}
+                  className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-colors ${!editForm.labelDesignColor ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover-elevate"}`}
+                >
+                  No Design
+                </button>
+                {A4_DESIGN_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    data-testid={`button-label-color-${opt.value}`}
+                    onClick={() => setEditForm({ ...editForm, labelDesignColor: opt.value })}
+                    className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-colors ${editForm.labelDesignColor === opt.value ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover-elevate"}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {editForm.labelDesignColor && (
+                <p className="text-xs text-muted-foreground">
+                  Labels for this product will print with the <span className="font-medium">{A4_DESIGN_OPTIONS.find(o => o.value === editForm.labelDesignColor)?.label}</span> design automatically.
+                </p>
+              )}
+              {!editForm.labelDesignColor && (
+                <p className="text-xs text-muted-foreground">
+                  Labels will print with no design banner.
+                </p>
+              )}
             </div>
             <div className="flex items-start gap-2 p-3 rounded-md bg-muted text-sm text-muted-foreground">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />

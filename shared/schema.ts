@@ -2357,6 +2357,7 @@ export const factoryBaleProducts = pgTable("factory_bale_products", {
   categoryId: integer("category_id"),
   sellingPrice: decimal("selling_price", { precision: 20, scale: 2 }).default("0"),
   productionPrice: decimal("production_price", { precision: 20, scale: 2 }).default("0"),
+  labelDesignColor: varchar("label_design_color", { length: 20 }),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -2379,6 +2380,7 @@ export const insertFactoryBaleProductSchema = createInsertSchema(factoryBaleProd
   sellingPrice: z.string().optional().nullable(),
   productionPrice: z.string().optional().nullable(),
   categoryId: z.number().optional().nullable(),
+  labelDesignColor: z.string().optional().nullable(),
   active: z.boolean().optional(),
 });
 

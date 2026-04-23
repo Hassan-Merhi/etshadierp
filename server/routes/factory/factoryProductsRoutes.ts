@@ -606,7 +606,7 @@ export function registerFactoryProductsRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
-      const { name, weightPerBaleKg, articleCode, description, categoryId, productionPrice, sellingPrice } = req.body;
+      const { name, weightPerBaleKg, articleCode, description, categoryId, productionPrice, sellingPrice, labelDesignColor } = req.body;
 
       const [existing] = await db
         .select()
@@ -653,6 +653,7 @@ export function registerFactoryProductsRoutes(app: Express) {
       if (categoryId !== undefined) productUpdate.categoryId = categoryId;
       if (productionPrice !== undefined && productionPrice !== "") productUpdate.productionPrice = String(parseFloat(productionPrice) || 0);
       if (sellingPrice !== undefined && sellingPrice !== "") productUpdate.sellingPrice = String(parseFloat(sellingPrice) || 0);
+      if (labelDesignColor !== undefined) productUpdate.labelDesignColor = labelDesignColor || null;
 
       const [updatedProduct] = await db
         .update(factoryBaleProducts)
