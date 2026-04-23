@@ -2046,8 +2046,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               </div>
             ) : stockGroups.length === 0 && unassignedInventoryItems.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                <p className="font-medium mb-1">No inventory found at this location.</p>
-                <p className="text-xs">Create Stock Groups and Stock Items first, then import or receive stock.</p>
+                <p className="font-medium mb-1">No inventory found at this location{asOfDate ? ` as of ${asOfDate}` : ""}.</p>
+                {asOfDate ? (
+                  <>
+                    <p className="text-xs mb-3">Stock may have been added after this date. Clear the date filter to see current inventory.</p>
+                    <Button size="sm" variant="outline" onClick={() => { setFromDate(""); setAsOfDate(""); }}>Clear date filter</Button>
+                  </>
+                ) : (
+                  <p className="text-xs">Create Stock Groups and Stock Items first, then import or receive stock.</p>
+                )}
               </div>
             ) : stockGroups.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground text-sm">
