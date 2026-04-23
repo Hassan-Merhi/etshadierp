@@ -34,7 +34,7 @@ import {
   salaryAdvances, salaryAdvanceDeductions,
   insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
   chatSessions, chatMessages,
-  inventoryValueAdjustments,
+  inventoryValueAdjustments, exchangeRates,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -226,6 +226,18 @@ export function registerNetProfitExcelRoute(app: Express) {
         return false;
       };
 
+      // CFA revaluation: Cash accounts hold physical CFA units — their USD worth changes with the rate.
+      const xlsxCfaRateRows = await db.select()
+        .from(exchangeRates)
+        .where(and(
+          eq(exchangeRates.companyId, companyId),
+          eq(exchangeRates.fromCurrency, "USD"),
+          eq(exchangeRates.toCurrency, "CFA"),
+        ))
+        .orderBy(desc(exchangeRates.effectiveDate))
+        .limit(1);
+      const xlsxCurrentCfaRate = xlsxCfaRateRows.length > 0 ? parseFloat(xlsxCfaRateRows[0].rate) : 0;
+
       let npForUs = 0, npOnUs = 0;
       for (const acc of companyAccounts) {
         if (npExpenseTypes.includes(acc.accountType || "")) continue;
@@ -234,7 +246,11 @@ export function registerNetProfitExcelRoute(app: Express) {
         const opening = parseFloat((acc as any).openingBalance || "0");
         const openingSigned = (acc as any).openingBalanceSide === "Dr" ? opening : -opening;
         const bal = allTimeBalsXlsx.get(acc.id) || { debit: 0, credit: 0 };
-        const net = openingSigned + bal.debit - bal.credit;
+        let net = openingSigned + bal.debit - bal.credit;
+        // Revalue Cash accounts: amounts are in CFA, divide by current rate to get USD
+        if (xlsxCurrentCfaRate > 0 && acc.accountType === "Cash") {
+          net = net / xlsxCurrentCfaRate;
+        }
         if (net > 0) npForUs += net;
         else if (net < 0) npOnUs += Math.abs(net);
       }

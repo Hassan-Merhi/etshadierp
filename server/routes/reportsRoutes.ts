@@ -34,7 +34,7 @@ import {
   salaryAdvances, salaryAdvanceDeductions,
   insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
   chatSessions, chatMessages,
-  inventoryValueAdjustments,
+  inventoryValueAdjustments, exchangeRates,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -538,6 +538,20 @@ export function registerReportsRoutes(app: Express) {
         return false;
       };
 
+      // CFA revaluation: fetch the latest USD→CFA rate for this company (if any).
+      // Cash accounts hold physical CFA units — their USD worth changes with the rate.
+      // Expenses, loans and all other accounts are locked at historical values.
+      const stmtCfaRateRows = await db.select()
+        .from(exchangeRates)
+        .where(and(
+          eq(exchangeRates.companyId, companyId),
+          eq(exchangeRates.fromCurrency, "USD"),
+          eq(exchangeRates.toCurrency, "CFA"),
+        ))
+        .orderBy(desc(exchangeRates.effectiveDate))
+        .limit(1);
+      const stmtCurrentCfaRate = stmtCfaRateRows.length > 0 ? parseFloat(stmtCfaRateRows[0].rate) : 0;
+
       let stmtNpForUs = 0, stmtNpOnUs = 0;
       const stmtLiabilityTypes = ['Liability', 'Duty Agent', 'Transporter Agent', 'Loan'];
       for (const acc of companyAccounts) {
@@ -547,7 +561,11 @@ export function registerReportsRoutes(app: Express) {
         const opening = parseFloat(acc.openingBalance || '0');
         const openingSigned = acc.openingBalanceSide === 'Dr' ? opening : -opening;
         const bal = allTimeAccountBalances.get(acc.id) || { debit: 0, credit: 0 };
-        const net = openingSigned + bal.debit - bal.credit;
+        let net = openingSigned + bal.debit - bal.credit;
+        // Revalue Cash accounts by the current CFA rate (amounts stored in CFA, convert to USD)
+        if (stmtCurrentCfaRate > 0 && acc.accountType === 'Cash') {
+          net = net / stmtCurrentCfaRate;
+        }
         if (net > 0) stmtNpForUs += net;
         else if (net < 0) stmtNpOnUs += Math.abs(net);
       }

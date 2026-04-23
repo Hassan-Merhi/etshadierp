@@ -27,7 +27,7 @@ import {
   insertDashboardAccountSelectionSchema,
   creditNoteItems, pendingBarcodes, insertPendingBarcodeSchema,
   bales, baleProducts, baleProductCategories, storedFiles,
-  stockItemLocationPrices,
+  stockItemLocationPrices, exchangeRates,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -36,7 +36,7 @@ import { format } from "date-fns";
 import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
-import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
+import { classifyNetPositionAccounts, getAccountNetBalance, round2 } from "../netPositionHelper";
 
 
 export function registerStatsRoutes(app: Express) {
@@ -155,6 +155,46 @@ export function registerStatsRoutes(app: Express) {
       const forUsAccounts = classified.forUsAccounts;
       const onUsAccounts = classified.onUsAccounts;
       const categoryTotals = classified.categoryTotals;
+
+      // CFA revaluation: Cash accounts hold physical CFA units whose USD worth changes with the rate.
+      // Expenses, loans, receivables are locked at their historical CFA values — do NOT revalue them.
+      // Only revalue if this company has a USD→CFA exchange rate defined.
+      const cfaRateRows = await db.select()
+        .from(exchangeRates)
+        .where(and(
+          eq(exchangeRates.companyId, companyId),
+          eq(exchangeRates.fromCurrency, "USD"),
+          eq(exchangeRates.toCurrency, "CFA"),
+        ))
+        .orderBy(desc(exchangeRates.effectiveDate))
+        .limit(1);
+      const currentCfaRate = cfaRateRows.length > 0 ? parseFloat(cfaRateRows[0].rate) : 0;
+
+      if (currentCfaRate > 0) {
+        const cashAccountIds = new Set(
+          companyAccounts.filter(a => a.accountType === "Cash").map(a => a.id)
+        );
+        // Adjust forUs Cash accounts: raw CFA value → USD value
+        for (const acc of forUsAccounts) {
+          if (cashAccountIds.has(acc.id)) {
+            const oldVal = acc.value;
+            const newVal = round2(oldVal / currentCfaRate);
+            forUsTotal = round2(forUsTotal - oldVal + newVal);
+            classified.forUsTotal = forUsTotal;
+            acc.value = newVal;
+          }
+        }
+        // Adjust onUs Cash accounts (overdrafts in CFA)
+        for (const acc of onUsAccounts) {
+          if (cashAccountIds.has(acc.id)) {
+            const oldVal = acc.value;
+            const newVal = round2(oldVal / currentCfaRate);
+            onUsTotal = round2(onUsTotal - oldVal + newVal);
+            classified.onUsTotal = onUsTotal;
+            acc.value = newVal;
+          }
+        }
+      }
 
       // 2. Process income and expense accounts for the P&L breakdown (ERP-specific)
       //    The helper skips expense/income types; we handle them here.
