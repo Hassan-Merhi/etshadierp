@@ -357,9 +357,9 @@ export default function FactoryLocationInventory() {
     if (!shouldMergeZero) return base;
 
     const inStockIds = new Set(base.map((p) => p.productId));
-    // Include ALL catalog products not already in stock — active or inactive
+    // Only include active catalog products not already in stock
     const zeroItems: FactoryBaleProduct[] = catalogBaleProducts
-      .filter((p) => !inStockIds.has(p.id))
+      .filter((p) => !inStockIds.has(p.id) && p.active !== false)
       .map((p) => ({
         productId: p.id,
         articleCode: p.articleCode || "",
