@@ -847,6 +847,7 @@ function ModifyRentForm({ contract, testIdPrefix, unitId }: { contract: Contract
 function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contract: Contract; cashAccounts: CashAccount[]; testIdPrefix: string; unitId: number }) {
   const apiBase = useApiBase();
   const { toast } = useToast();
+  const tenantPays = apiBase.includes("/erp/") || apiBase.includes("/factory/");
 
   // ── Post to Statement state ──
   const [postAmount, setPostAmount] = useState(contract.guaranteeAmount);
@@ -920,8 +921,13 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
 
       {/* ── Section 1: Post to Statement ── */}
       <div className="border rounded-md p-3 space-y-3">
-        <p className="text-sm font-semibold">Post Guarantee to Statement</p>
-        <p className="text-xs text-muted-foreground">Records guarantee received: Dr Cash / Cr Tenant Deposits. <span className="font-medium text-amber-600 dark:text-amber-400">Select an account to create an accounting entry — without an account only the status badge is updated.</span></p>
+        <p className="text-sm font-semibold">{tenantPays ? "Post Guarantee Paid" : "Post Guarantee to Statement"}</p>
+        <p className="text-xs text-muted-foreground">
+          {tenantPays
+            ? <>Records guarantee paid out: Dr Security Deposits Paid / Cr Cash. <span className="font-medium text-amber-600 dark:text-amber-400">Select an account to create an accounting entry — without an account only the status badge is updated.</span></>
+            : <>Records guarantee received: Dr Cash / Cr Tenant Deposits. <span className="font-medium text-amber-600 dark:text-amber-400">Select an account to create an accounting entry — without an account only the status badge is updated.</span></>
+          }
+        </p>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Amount ($)</Label>
@@ -932,7 +938,7 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
             <Input type="date" value={postDate} onChange={e => setPostDate(e.target.value)} data-testid={`input-${testIdPrefix}-guarantee-date`} />
           </div>
           <div className="col-span-2">
-            <Label>Account (where deposit is held)</Label>
+            <Label>{tenantPays ? "Cash account (paid from)" : "Account (where deposit is held)"}</Label>
             <AccountSearchSelect accounts={cashAccounts} value={postAccountId} onChange={setPostAccountId} placeholder="Select account…" testId={`select-${testIdPrefix}-guarantee-cash`} />
           </div>
           <div className="col-span-2">
@@ -949,8 +955,13 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
 
       {/* ── Section 2: Move to Cash ── */}
       <div className="border rounded-md p-3 space-y-3">
-        <p className="text-sm font-semibold">Move Guarantee to Cash</p>
-        <p className="text-xs text-muted-foreground">Releases guarantee from Tenant Deposits: Dr Tenant Deposits / Cr Cash Account</p>
+        <p className="text-sm font-semibold">{tenantPays ? "Recover Guarantee" : "Move Guarantee to Cash"}</p>
+        <p className="text-xs text-muted-foreground">
+          {tenantPays
+            ? "Recovers guarantee returned by landlord: Dr Cash / Cr Security Deposits Paid"
+            : "Releases guarantee from Tenant Deposits: Dr Tenant Deposits / Cr Cash Account"
+          }
+        </p>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Amount ($)</Label>
@@ -961,7 +972,7 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
             <Input type="date" value={moveDate} onChange={e => setMoveDate(e.target.value)} data-testid={`input-${testIdPrefix}-guarantee-move-date`} />
           </div>
           <div className="col-span-2">
-            <Label>Target Cash Account</Label>
+            <Label>{tenantPays ? "Cash account (received into)" : "Target Cash Account"}</Label>
             <AccountSearchSelect accounts={cashAccounts} value={moveAccountId} onChange={setMoveAccountId} placeholder="Select cash account…" testId={`select-${testIdPrefix}-guarantee-move-cash`} />
           </div>
           <div className="col-span-2">
@@ -971,7 +982,7 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
         </div>
         <div className="flex justify-end">
           <Button onClick={() => moveToCash.mutate()} disabled={!moveAmount || !moveAccountId || moveToCash.isPending} data-testid={`button-${testIdPrefix}-guarantee-move-cash`}>
-            {moveToCash.isPending ? "Moving…" : "Move to Cash"}
+            {moveToCash.isPending ? (tenantPays ? "Recovering…" : "Moving…") : (tenantPays ? "Recover to Cash" : "Move to Cash")}
           </Button>
         </div>
       </div>

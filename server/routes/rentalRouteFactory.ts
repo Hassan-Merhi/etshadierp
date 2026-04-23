@@ -770,22 +770,39 @@ export function registerRentalRoutes(
         }).where(eq(propertyContracts.id, id));
 
         if (cashAccountId) {
-          const depositAccountId = await findOrCreateLedgerAccount(tx, companyId, "Tenant Deposits", "Liability", "TENANT-DEP");
-          const narration = `Guarantee deposit - ${unitLabel}`;
-          const [v] = await tx.insert(vouchers).values({
-            companyId, voucherNumber: `GUAR-${Date.now()}-${id}`,
-            voucherType: "Receipt", voucherDate: dateStr as any,
-            description: narration, totalAmount: amount, currency: "USD", sourceModule: "ERP",
-          }).returning();
-          await tx.insert(voucherEntries).values([
-            { voucherId: v.id, ledgerAccountId: cashAccountId, debitAmount: amount, creditAmount: "0", narration },
-            { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: "0", creditAmount: amount, narration },
-          ]);
+          const tenantPays = module === "ERP" || module === "FACTORY";
+          if (tenantPays) {
+            // Tenant perspective: company PAYS the guarantee out — Dr Security Deposits Paid (Asset) / Cr Cash
+            const depositAccountId = await findOrCreateLedgerAccount(tx, companyId, "Security Deposits Paid", "Asset", "SEC-DEP-PAID");
+            const narration = `Guarantee paid - ${unitLabel}`;
+            const [v] = await tx.insert(vouchers).values({
+              companyId, voucherNumber: `GUAR-${Date.now()}-${id}`,
+              voucherType: "Payment", voucherDate: dateStr as any,
+              description: narration, totalAmount: amount, currency: "USD", sourceModule: "ERP",
+            }).returning();
+            await tx.insert(voucherEntries).values([
+              { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: amount, creditAmount: "0", narration },
+              { voucherId: v.id, ledgerAccountId: cashAccountId, debitAmount: "0", creditAmount: amount, narration },
+            ]);
+          } else {
+            // Landlord perspective: company RECEIVES the guarantee — Dr Cash / Cr Tenant Deposits (Liability)
+            const depositAccountId = await findOrCreateLedgerAccount(tx, companyId, "Tenant Deposits", "Liability", "TENANT-DEP");
+            const narration = `Guarantee deposit - ${unitLabel}`;
+            const [v] = await tx.insert(vouchers).values({
+              companyId, voucherNumber: `GUAR-${Date.now()}-${id}`,
+              voucherType: "Receipt", voucherDate: dateStr as any,
+              description: narration, totalAmount: amount, currency: "USD", sourceModule: "ERP",
+            }).returning();
+            await tx.insert(voucherEntries).values([
+              { voucherId: v.id, ledgerAccountId: cashAccountId, debitAmount: amount, creditAmount: "0", narration },
+              { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: "0", creditAmount: amount, narration },
+            ]);
+          }
         }
       });
 
-      // Fire auto-transfer if configured (same as regular payment — guarantee cash receipt triggers transfer)
-      if (cashAccountId) {
+      // Fire auto-transfer if configured (only for landlord receiving cash)
+      if (cashAccountId && !(module === "ERP" || module === "FACTORY")) {
         await maybeRunAutoTransfer(companyId, module, cashAccountId, amount, dateStr, unitLabel, undefined, notes);
       }
 
@@ -840,9 +857,9 @@ export function registerRentalRoutes(
       const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
       const dateStr = paymentDate || new Date().toISOString().slice(0, 10);
 
+      const tenantPays = module === "ERP" || module === "FACTORY";
       let voucherId: number | null = null;
       await db.transaction(async (tx) => {
-        const depositAccountId = await findOrCreateLedgerAccount(tx, companyId, "Tenant Deposits", "Liability", "TENANT-DEP");
         const narration = notes
           ? `Guarantee moved to cash - ${unitLabel} - ${notes}`
           : `Guarantee moved to cash - ${unitLabel}`;
@@ -852,11 +869,21 @@ export function registerRentalRoutes(
           description: narration, totalAmount: amount, currency: "USD", sourceModule: "ERP",
         }).returning();
         voucherId = v.id;
-        // DR Cash Account (cash received) / CR Tenant Deposits (clear liability)
-        await tx.insert(voucherEntries).values([
-          { voucherId: v.id, ledgerAccountId: cashAccountId,   debitAmount: amount, creditAmount: "0",   narration },
-          { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: "0",   creditAmount: amount, narration },
-        ]);
+        if (tenantPays) {
+          // Tenant perspective: company RECOVERS the guarantee back as cash — Dr Cash / Cr Security Deposits Paid (Asset)
+          const depositAccountId = await findOrCreateLedgerAccount(tx, companyId, "Security Deposits Paid", "Asset", "SEC-DEP-PAID");
+          await tx.insert(voucherEntries).values([
+            { voucherId: v.id, ledgerAccountId: cashAccountId,   debitAmount: amount, creditAmount: "0",   narration },
+            { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: "0",   creditAmount: amount, narration },
+          ]);
+        } else {
+          // Landlord perspective: releases deposit to tenant — Dr Tenant Deposits (Liability) / Cr Cash
+          const depositAccountId = await findOrCreateLedgerAccount(tx, companyId, "Tenant Deposits", "Liability", "TENANT-DEP");
+          await tx.insert(voucherEntries).values([
+            { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: amount, creditAmount: "0",   narration },
+            { voucherId: v.id, ledgerAccountId: cashAccountId,   debitAmount: "0",   creditAmount: amount, narration },
+          ]);
+        }
         // Mark guarantee as paid on the contract
         await tx.update(propertyContracts)
           .set({ guaranteePostedToStatement: true, guaranteePostedAmount: amount })
