@@ -2047,14 +2047,12 @@ export class DbStorage implements IStorage {
         stockGroupName: sql<string>`COALESCE(${schema.stockGroups.name}, '')`,
         stockGroupCode: sql<string>`COALESCE(${schema.stockGroups.code}, '')`,
         lastSellingPrice: sql<string>`COALESCE(${schema.stockItemLocationPrices.sellingPrice}, ${schema.stockItems.sellingPrice})`.as('configured_price'),
+        stockItemActive: schema.stockItems.active,
       })
       .from(schema.inventory)
       .leftJoin(
         schema.stockItems,
-        and(
-          eq(schema.inventory.stockItemId, schema.stockItems.id),
-          isNull(schema.stockItems.deletedAt)
-        )
+        eq(schema.inventory.stockItemId, schema.stockItems.id)
       )
       .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
       .leftJoin(

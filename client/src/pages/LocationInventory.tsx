@@ -6,6 +6,7 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useLocation as useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
 import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown, Globe, Eye, Pencil, FileSpreadsheet } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -66,6 +67,7 @@ interface InventoryItem {
   stockGroupId: number | null;
   stockGroupName: string | null;
   stockGroupCode: string | null;
+  stockItemActive: boolean | null;
 }
 
 interface StockGroupSummary {
@@ -2367,7 +2369,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           className="text-left text-primary hover:underline cursor-pointer font-medium mb-2 block"
                           data-testid={`link-item-${item.stockItemId}`}
                         >
-                          {item.stockItemName}
+                          <span className="flex items-center gap-2 flex-wrap">
+                            {item.stockItemName}
+                            {item.stockItemActive === false && <Badge variant="outline" className="text-xs">Inactive</Badge>}
+                          </span>
                         </button>
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           {showMovement ? (
@@ -2503,7 +2508,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                               className="text-left text-primary hover:underline cursor-pointer"
                               data-testid={`link-item-desktop-${item.stockItemId}`}
                             >
-                              {item.stockItemName}
+                              <span className="flex items-center gap-2 flex-wrap">
+                                {item.stockItemName}
+                                {item.stockItemActive === false && <Badge variant="outline" className="text-xs">Inactive</Badge>}
+                              </span>
                             </button>
                           </td>
                           {showMovement ? (
@@ -2815,7 +2823,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                       className="text-left text-primary hover:underline cursor-pointer font-medium mb-2 block"
                                       data-testid={`link-all-item-${item.stockItemId}`}
                                     >
-                                      {item.stockItemName}
+                                      <span className="flex items-center gap-2 flex-wrap">
+                                        {item.stockItemName}
+                                        {item.stockItemActive === false && <Badge variant="outline" className="text-xs">Inactive</Badge>}
+                                      </span>
                                     </button>
                                     <div className="grid grid-cols-2 gap-2 text-sm">
                                       <div>
@@ -2902,7 +2913,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                               className="text-left text-primary hover:underline cursor-pointer"
                                               data-testid={`link-all-item-desktop-${item.stockItemId}`}
                                             >
-                                              {item.stockItemName}
+                                              <span className="flex items-center gap-2 flex-wrap">
+                                                {item.stockItemName}
+                                                {item.stockItemActive === false && <Badge variant="outline" className="text-xs">Inactive</Badge>}
+                                              </span>
                                             </button>
                                           </td>
                                           <td className={`px-3 py-2 text-right font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>
@@ -2978,7 +2992,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                   const isItemNegative = itemQty < 0;
                                   return (
                                     <tr key={`item-${item.inventoryId}`} className={`item-row ${isItemNegative ? "negative-row" : ""}`}>
-                                      <td>{item.stockItemName}</td>
+                                      <td>{item.stockItemName}{item.stockItemActive === false ? " (Inactive)" : ""}</td>
                                       <td className="qty-col">
                                         <span className={isItemNegative ? "negative-value" : ""}>{Math.floor(itemQty).toLocaleString()}</span>
                                         <span className="qty-unit">{item.stockItemUom}</span>
