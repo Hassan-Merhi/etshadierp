@@ -2810,7 +2810,22 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
 
       // Strip customer-linked accounts from the classifier output.
       const ledgerForUs = classified.forUsAccounts.filter((a: any) => !customerLedgerIds.has(a.id));
-      const ledgerOnUs = classified.onUsAccounts.filter((a: any) => !customerLedgerIds.has(a.id));
+      const ledgerOnUsRaw = classified.onUsAccounts.filter((a: any) => !customerLedgerIds.has(a.id));
+
+      // ── Strip any ledger-based "Payroll Payable" accounts ─────────────────────
+      // The authoritative source for payroll payable is employees.currentBalance
+      // (tracked directly via employeeId on voucher entries, not via a ledger account).
+      // Any ledger account named/coded as "Payroll Payable" duplicates that and
+      // must be excluded here — the single correct figure is injected below.
+      const ledgerOnUs = ledgerOnUsRaw.filter((a: any) => {
+        const nameLower = (a.name || "").toLowerCase();
+        const code = (a.code || "").toUpperCase();
+        const isPayrollPayable =
+          nameLower.includes("payroll payable") ||
+          code === "PAYROLL_PAYABLE" ||
+          code === "PAY_PAYABLE";
+        return !isPayrollPayable;
+      });
       const ledgerForUsTotal = round2(ledgerForUs.reduce((s: number, a: any) => s + a.value, 0));
       const ledgerOnUsTotal = round2(ledgerOnUs.reduce((s: number, a: any) => s + a.value, 0));
 
@@ -3167,7 +3182,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           .sort((a, b) => b.balanceUsd - a.balanceUsd)
           .map(s => ({ name: s.name, code: "SUPPLIER", value: round2(s.balanceUsd), category: "Supplier", breakdown: s.breakdown })),
         ...ledgerOnUs.sort((a, b) => b.value - a.value).map(a => ({ ...a, value: round2(a.value) })),
-        ...(employeeSalariesPayable > 0 ? [{ name: "Payroll Payable", code: "EMPLOYEE_PAYROLL_PAYABLE", value: employeeSalariesPayable, category: "Liability" }] : []),
+        { name: "Payroll Payable", code: "EMPLOYEE_PAYROLL_PAYABLE", value: employeeSalariesPayable, category: "Liability" },
         ...customerCrItems
           .sort((a, b) => Math.abs(b.balanceUsd) - Math.abs(a.balanceUsd))
           .map(c => ({ name: c.name, code: "CUSTOMER_CR", value: round2(Math.abs(c.balanceUsd)), category: "Customer" })),
@@ -3181,10 +3196,9 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       ).map(([name, value]) => ({ name, value: round2(value) })).sort((a, b) => b.value - a.value);
 
       // Merge employee salaries payable into the "Liability" category in the breakdown
+      // employeeSalariesPayable is always the authoritative Payroll Payable figure
       const mergedLedgerOnUsGrouped = { ...ledgerOnUsGrouped };
-      if (employeeSalariesPayable > 0) {
-        mergedLedgerOnUsGrouped["Liability"] = round2((mergedLedgerOnUsGrouped["Liability"] || 0) + employeeSalariesPayable);
-      }
+      mergedLedgerOnUsGrouped["Liability"] = round2((mergedLedgerOnUsGrouped["Liability"] || 0) + employeeSalariesPayable);
       const onUsBreakdown = [
         ...(totalSupplierLiabilities > 0 ? [{ name: "Suppliers", value: round2(totalSupplierLiabilities) }] : []),
         ...Object.entries(mergedLedgerOnUsGrouped)
@@ -3211,6 +3225,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         verifiedTotal,
         loadingTotal,
         ledgerLiabilities: round2(ledgerOnUsTotal),
+        payrollPayable: employeeSalariesPayable,
       });
     } catch (error: any) {
       console.error("Factory net-position error:", error);
