@@ -23,6 +23,11 @@ interface StockItem {
   stockGroup?: { name: string } | null;
 }
 
+interface BaleProductWeight {
+  articleCode: string;
+  weightPerBaleKg: string | null;
+}
+
 interface ProformaLine {
   id: number;
   articleCode: string;
@@ -67,6 +72,26 @@ export default function ProformaAddLine() {
     queryKey: ["/api/stock-items"],
   });
 
+  const { data: baleProducts = [] } = useQuery<BaleProductWeight[]>({
+    queryKey: ["/api/factory/bale-products"],
+    select: (data: any[]) => data.map((p) => ({ articleCode: p.articleCode || p.code, weightPerBaleKg: p.weightPerBaleKg ?? null })),
+  });
+
+  const baleWeightMap = useMemo(() => {
+    const m = new Map<string, string>();
+    baleProducts.forEach((p) => {
+      if (p.articleCode && p.weightPerBaleKg && parseFloat(p.weightPerBaleKg) > 0) {
+        m.set(p.articleCode, p.weightPerBaleKg);
+      }
+    });
+    return m;
+  }, [baleProducts]);
+
+  const getEffectiveWeight = (item: StockItem): string | null => {
+    if (item.weightPerBaleKg && parseFloat(item.weightPerBaleKg) > 0) return item.weightPerBaleKg;
+    return baleWeightMap.get(item.code) ?? null;
+  };
+
   const { data: proforma } = useQuery<Proforma>({
     queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
     select: (data: any) => {
@@ -106,7 +131,7 @@ export default function ProformaAddLine() {
         productName: selectedItem.name,
         quantity: parseInt(qty) || 1,
         pricePerBale: price,
-        weightPerBaleKg: selectedItem.weightPerBaleKg || null,
+        weightPerBaleKg: getEffectiveWeight(selectedItem),
       });
       if (!res.ok) {
         const e = await res.json();
@@ -281,7 +306,9 @@ export default function ProformaAddLine() {
             {filtered.map((item) => {
               const added = isAdded(item);
               const selected = isSelected(item);
-              const wt = item.weightPerBaleKg ? parseFloat(item.weightPerBaleKg) : null;
+              const effectiveWt = getEffectiveWeight(item);
+              const wt = effectiveWt ? parseFloat(effectiveWt) : null;
+              const wtFromBaleProduct = !item.weightPerBaleKg || parseFloat(item.weightPerBaleKg) === 0;
               return (
                 <button
                   key={item.id}
@@ -308,7 +335,9 @@ export default function ProformaAddLine() {
                     <p className="text-xs font-mono text-muted-foreground">{item.code}</p>
                   )}
                   {wt !== null && (
-                    <p className="text-xs text-muted-foreground mt-auto">{formatNumber(wt)} kg/bale</p>
+                    <p className="text-xs text-muted-foreground mt-auto">
+                      {formatNumber(wt)} kg/bale{wtFromBaleProduct && wt > 0 ? " *" : ""}
+                    </p>
                   )}
                   {item.salePrice && parseFloat(item.salePrice) > 0 && (
                     <p className="text-xs text-muted-foreground">${parseFloat(item.salePrice).toFixed(2)}</p>
@@ -349,7 +378,19 @@ export default function ProformaAddLine() {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground font-mono">{selectedItem.code}</p>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <p className="text-xs text-muted-foreground font-mono">{selectedItem.code}</p>
+                  {(() => {
+                    const ew = getEffectiveWeight(selectedItem);
+                    if (!ew || parseFloat(ew) === 0) return null;
+                    const fromBaleProduct = !selectedItem.weightPerBaleKg || parseFloat(selectedItem.weightPerBaleKg) === 0;
+                    return (
+                      <p className="text-xs text-muted-foreground">
+                        {formatNumber(parseFloat(ew))} kg/bale{fromBaleProduct ? " (from product)" : ""}
+                      </p>
+                    );
+                  })()}
+                </div>
               </div>
               <Button
                 size="icon"
