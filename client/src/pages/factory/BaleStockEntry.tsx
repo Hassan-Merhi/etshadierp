@@ -295,23 +295,30 @@
     const openBrowserPrint = (labels: LabelData[], designColor?: A4DesignColor) => {
       const paperFormat = getPaperFormat();
       const hasPerLabelColors = labels.some((l) => l.designColor);
-      if (paperFormat === "A4" && !designColor && !hasPerLabelColors) {
-        setPendingPrintLabels(labels);
-        setDesignPickerOpen(true);
-        return;
-      }
+      // Labels that have an effective color (global or per-label) → go to A4/A5 design window
+      const labelsForA4 = designColor ? labels : labels.filter((l) => l.designColor);
+
       // Consume pre-opened windows if available, otherwise fall back to window.open
       const preOpened = preOpenedWindowsRef.current;
       preOpenedWindowsRef.current = null;
 
-      const labelHtml = paperFormat === "A5" ? generateA5LabelsHtml(labels) : generateCombinedLabelsHtml(labels, designColor);
-      const a4Window = (preOpened?.a4 && !preOpened.a4.closed) ? preOpened.a4 : window.open("", "_blank");
-      if (a4Window) {
-        a4Window.document.write(labelHtml);
-        a4Window.document.close();
-        a4Window.focus();
-        setTimeout(() => a4Window.print(), 500);
+      if (paperFormat === "A4" && !designColor && !hasPerLabelColors) {
+        // All labels have no color assigned — barcode/sticker only, close unused A4 window
+        if (preOpened?.a4 && !preOpened.a4.closed) preOpened.a4.close();
+      } else if (labelsForA4.length > 0) {
+        const labelHtml = paperFormat === "A5" ? generateA5LabelsHtml(labelsForA4) : generateCombinedLabelsHtml(labelsForA4, designColor);
+        const a4Window = (preOpened?.a4 && !preOpened.a4.closed) ? preOpened.a4 : window.open("", "_blank");
+        if (a4Window) {
+          a4Window.document.write(labelHtml);
+          a4Window.document.close();
+          a4Window.focus();
+          setTimeout(() => a4Window.print(), 500);
+        }
+      } else {
+        if (preOpened?.a4 && !preOpened.a4.closed) preOpened.a4.close();
       }
+
+      // Sticker/barcode window always prints all labels regardless of color
       const stickerWindow = (preOpened?.sticker && !preOpened.sticker.closed) ? preOpened.sticker : window.open("", "_blank");
       if (stickerWindow) {
         stickerWindow.document.write(generateStickerLabelsHtml(labels));
@@ -324,7 +331,7 @@
         if (total === 0) { setTimeout(() => stickerWindow.print(), 300); }
         else { for (let i = 0; i < total; i++) { if (imgs[i].complete) tryPrint(); else imgs[i].onload = imgs[i].onerror = tryPrint; } }
       }
-      if (!a4Window && !stickerWindow) {
+      if (!stickerWindow) {
         toast({ title: "Warning", description: "Please allow pop-ups to print labels", variant: "destructive" });
       }
     };
@@ -1183,19 +1190,21 @@
 
     const openBrowserPrint = (labels: LabelData[], designColor?: A4DesignColor) => {
       const paperFormat = getPaperFormat();
-      if (paperFormat === "A4" && !designColor) {
-        setPendingPrintLabels(labels);
-        setDesignPickerOpen(true);
-        return;
+      // Labels that have an effective color → go to A4/A5 design window
+      const labelsForA4 = designColor ? labels : labels.filter((l) => l.designColor);
+
+      if (labelsForA4.length > 0) {
+        const labelHtml = paperFormat === "A5" ? generateA5LabelsHtml(labelsForA4) : generateCombinedLabelsHtml(labelsForA4, designColor);
+        const a4Window = window.open("", "_blank");
+        if (a4Window) {
+          a4Window.document.write(labelHtml);
+          a4Window.document.close();
+          a4Window.focus();
+          setTimeout(() => a4Window.print(), 500);
+        }
       }
-      const labelHtml = paperFormat === "A5" ? generateA5LabelsHtml(labels) : generateCombinedLabelsHtml(labels, designColor);
-      const a4Window = window.open("", "_blank");
-      if (a4Window) {
-        a4Window.document.write(labelHtml);
-        a4Window.document.close();
-        a4Window.focus();
-        setTimeout(() => a4Window.print(), 500);
-      }
+
+      // Sticker/barcode window always prints all labels regardless of color
       const stickerWindow = window.open("", "_blank");
       if (stickerWindow) {
         stickerWindow.document.write(generateStickerLabelsHtml(labels));
@@ -1211,10 +1220,7 @@
     };
 
     const printDirectNoDesign = (labels: LabelData[]) => {
-      const paperFormat = getPaperFormat();
-      const html = paperFormat === "A5" ? generateA5LabelsHtml(labels) : generateCombinedLabelsHtml(labels);
-      const win = window.open("", "_blank");
-      if (win) { win.document.write(html); win.document.close(); win.focus(); setTimeout(() => win.print(), 500); }
+      // No color assigned — barcode/sticker only, skip the A4 design page
       const stickerWindow = window.open("", "_blank");
       if (stickerWindow) {
         stickerWindow.document.write(generateStickerLabelsHtml(labels));
