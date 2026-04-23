@@ -365,47 +365,9 @@
             openBrowserPrint(labels);
           }
         } else {
-          const paperFormat = getPaperFormat();
-          if (paperFormat === "A4") {
-            // Group by assigned design color — separate window per color group
-            const colorGroups = new Map<string | null, typeof labelsWithColor>();
-            for (const lbl of labelsWithColor) {
-              const key = lbl._designColor || null;
-              if (!colorGroups.has(key)) colorGroups.set(key, []);
-              colorGroups.get(key)!.push(lbl);
-            }
-            for (const [color, group] of colorGroups) {
-              const groupLabels: LabelData[] = group.map(({ _designColor: _dc, ...rest }) => rest);
-              const html = generateCombinedLabelsHtml(groupLabels, color as A4DesignColor | undefined);
-              const win = window.open("", "_blank");
-              if (win) {
-                win.document.write(html);
-                win.document.close();
-                win.focus();
-                setTimeout(() => win.print(), 500);
-              }
-            }
-          } else {
-            const html = generateA5LabelsHtml(labels);
-            const win = window.open("", "_blank");
-            if (win) { win.document.write(html); win.document.close(); win.focus(); setTimeout(() => win.print(), 500); }
-          }
-          // Sticker window — always one window for all labels
-          const stickerWindow = window.open("", "_blank");
-          if (stickerWindow) {
-            stickerWindow.document.write(generateStickerLabelsHtml(labels));
-            stickerWindow.document.close();
-            stickerWindow.focus();
-            const imgs = stickerWindow.document.images;
-            let loaded = 0;
-            const total = imgs.length;
-            const tryPrint = () => { loaded++; if (loaded >= total) setTimeout(() => stickerWindow.print(), 300); };
-            if (total === 0) { setTimeout(() => stickerWindow.print(), 300); }
-            else { for (let i = 0; i < total; i++) { if (imgs[i].complete) tryPrint(); else imgs[i].onload = imgs[i].onerror = tryPrint; } }
-          }
-          if (!window) {
-            toast({ title: "Warning", description: "Please allow pop-ups to print labels", variant: "destructive" });
-          }
+          // Use openBrowserPrint which handles the color picker dialog and
+          // correctly consumes the pre-opened windows (no blank tabs).
+          openBrowserPrint(labels);
         }
       } catch (error: any) {
         toast({ title: "Label Error", description: error.message || "Failed to generate labels", variant: "destructive" });
