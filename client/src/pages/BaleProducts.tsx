@@ -81,6 +81,7 @@ export default function BaleProducts() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showHidden, setShowHidden] = useState(false);
   const [showZeroPrice, setShowZeroPrice] = useState(false);
+  const [showNoColor, setShowNoColor] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const appMode = useAppMode();
@@ -128,9 +129,10 @@ export default function BaleProducts() {
   categories?.forEach((c) => categoryMap.set(c.id, c.name));
 
   const allActiveProducts = products?.filter((p) => p.active !== false);
-  const activeProducts = showZeroPrice
-    ? allActiveProducts?.filter((p) => parseFloat(p.sellingPrice || "0") === 0)
-    : allActiveProducts;
+  const noColorCount = allActiveProducts?.filter((p) => !p.labelDesignColor).length ?? 0;
+  const activeProducts = allActiveProducts
+    ?.filter((p) => !showZeroPrice || parseFloat(p.sellingPrice || "0") === 0)
+    ?.filter((p) => !showNoColor || !p.labelDesignColor);
   const hiddenProducts = products?.filter((p) => p.active === false);
 
   const toggleSelectId = (id: number) => {
@@ -792,6 +794,17 @@ export default function BaleProducts() {
                 >
                   <AlertCircle className="h-4 w-4 mr-1" />
                   {showZeroPrice ? "Showing unpriced" : "Show unpriced"}
+                </Button>
+              )}
+              {noColorCount > 0 && (
+                <Button
+                  size="sm"
+                  variant={showNoColor ? "default" : "outline"}
+                  onClick={() => { setShowNoColor(v => !v); setSelectedIds(new Set()); }}
+                  data-testid="button-show-no-color"
+                >
+                  <Palette className="h-4 w-4 mr-1" />
+                  {showNoColor ? "Showing uncolored" : `No color (${noColorCount})`}
                 </Button>
               )}
               {hiddenProducts && hiddenProducts.length > 0 && (
