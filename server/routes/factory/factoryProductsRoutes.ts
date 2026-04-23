@@ -646,6 +646,14 @@ export function registerFactoryProductsRoutes(app: Express) {
         }
       }
 
+      // Only admins/owners/developers may change the label design color
+      if (labelDesignColor !== undefined) {
+        const userRole = (req.user as any)?.role || "";
+        if (!["Admin", "Owner", "Developer"].includes(userRole)) {
+          return res.status(403).json({ message: "Only administrators can change the label design color" });
+        }
+      }
+
       const productUpdate: any = { updatedAt: new Date() };
       if (name !== undefined) productUpdate.name = name;
       if (weightPerBaleKg !== undefined) productUpdate.weightPerBaleKg = weightPerBaleKg;

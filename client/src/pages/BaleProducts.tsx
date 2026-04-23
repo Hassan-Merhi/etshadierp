@@ -942,26 +942,28 @@ export default function BaleProducts() {
                             <TableCell className="text-sm">
                               <div className="flex items-center gap-2">
                                 <span>{product.name}</span>
-                                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                  <button
-                                    title="No color"
-                                    onClick={() => colorUpdateMutation.mutate({ id: product.id, labelDesignColor: null })}
-                                    className={`w-5 h-5 rounded-full border border-border flex items-center justify-center transition-all ${!product.labelDesignColor ? "ring-1 ring-offset-1 ring-primary" : "opacity-50 hover:opacity-100"}`}
-                                    data-testid={`button-color-none-${product.id}`}
-                                  >
-                                    <X className="w-3 h-3 text-muted-foreground" />
-                                  </button>
-                                  {A4_DESIGN_OPTIONS.map((opt) => (
+                                {isAdmin && (
+                                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                     <button
-                                      key={opt.value}
-                                      title={opt.label}
-                                      onClick={() => colorUpdateMutation.mutate({ id: product.id, labelDesignColor: opt.value })}
-                                      className={`w-5 h-5 rounded-full border transition-all ${product.labelDesignColor === opt.value ? "ring-1 ring-offset-1 ring-primary opacity-100" : "opacity-50 hover:opacity-100"}`}
-                                      style={{ backgroundColor: opt.color, borderColor: opt.color === "#F5F5F5" ? "#ccc" : opt.color }}
-                                      data-testid={`button-color-${opt.value}-${product.id}`}
-                                    />
-                                  ))}
-                                </div>
+                                      title="No color"
+                                      onClick={() => colorUpdateMutation.mutate({ id: product.id, labelDesignColor: null })}
+                                      className={`w-5 h-5 rounded-full border border-border flex items-center justify-center transition-all ${!product.labelDesignColor ? "ring-1 ring-offset-1 ring-primary" : "opacity-50 hover:opacity-100"}`}
+                                      data-testid={`button-color-none-${product.id}`}
+                                    >
+                                      <X className="w-3 h-3 text-muted-foreground" />
+                                    </button>
+                                    {A4_DESIGN_OPTIONS.map((opt) => (
+                                      <button
+                                        key={opt.value}
+                                        title={opt.label}
+                                        onClick={() => colorUpdateMutation.mutate({ id: product.id, labelDesignColor: opt.value })}
+                                        className={`w-5 h-5 rounded-full border transition-all ${product.labelDesignColor === opt.value ? "ring-1 ring-offset-1 ring-primary opacity-100" : "opacity-50 hover:opacity-100"}`}
+                                        style={{ backgroundColor: opt.color, borderColor: opt.color === "#F5F5F5" ? "#ccc" : opt.color }}
+                                        data-testid={`button-color-${opt.value}-${product.id}`}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
@@ -1029,26 +1031,28 @@ export default function BaleProducts() {
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <span>{product.name}</span>
-                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            title="No color"
-                            onClick={() => colorUpdateMutation.mutate({ id: product.id, labelDesignColor: null })}
-                            className={`w-5 h-5 rounded-full border border-border flex items-center justify-center transition-all ${!product.labelDesignColor ? "ring-1 ring-offset-1 ring-primary" : "opacity-50 hover:opacity-100"}`}
-                            data-testid={`button-color-none-${product.id}`}
-                          >
-                            <X className="w-3 h-3 text-muted-foreground" />
-                          </button>
-                          {A4_DESIGN_OPTIONS.map((opt) => (
+                        {isAdmin && (
+                          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                             <button
-                              key={opt.value}
-                              title={opt.label}
-                              onClick={() => colorUpdateMutation.mutate({ id: product.id, labelDesignColor: opt.value })}
-                              className={`w-5 h-5 rounded-full border transition-all ${product.labelDesignColor === opt.value ? "ring-1 ring-offset-1 ring-primary opacity-100" : "opacity-50 hover:opacity-100"}`}
-                              style={{ backgroundColor: opt.color, borderColor: opt.color === "#F5F5F5" ? "#ccc" : opt.color }}
-                              data-testid={`button-color-${opt.value}-${product.id}`}
-                            />
-                          ))}
-                        </div>
+                              title="No color"
+                              onClick={() => colorUpdateMutation.mutate({ id: product.id, labelDesignColor: null })}
+                              className={`w-5 h-5 rounded-full border border-border flex items-center justify-center transition-all ${!product.labelDesignColor ? "ring-1 ring-offset-1 ring-primary" : "opacity-50 hover:opacity-100"}`}
+                              data-testid={`button-color-none-${product.id}`}
+                            >
+                              <X className="w-3 h-3 text-muted-foreground" />
+                            </button>
+                            {A4_DESIGN_OPTIONS.map((opt) => (
+                              <button
+                                key={opt.value}
+                                title={opt.label}
+                                onClick={() => colorUpdateMutation.mutate({ id: product.id, labelDesignColor: opt.value })}
+                                className={`w-5 h-5 rounded-full border transition-all ${product.labelDesignColor === opt.value ? "ring-1 ring-offset-1 ring-primary opacity-100" : "opacity-50 hover:opacity-100"}`}
+                                style={{ backgroundColor: opt.color, borderColor: opt.color === "#F5F5F5" ? "#ccc" : opt.color }}
+                                data-testid={`button-color-${opt.value}-${product.id}`}
+                              />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
