@@ -222,8 +222,18 @@ export function registerFactoryStockRoutes(app: Express) {
                   const [created] = await tx
                     .insert(stockGroups)
                     .values({ companyId, name: catName, code: groupCode })
+                    .onConflictDoNothing()
                     .returning({ id: stockGroups.id });
-                  stockGroupId = created.id;
+                  if (created) {
+                    stockGroupId = created.id;
+                  } else {
+                    // Code collision with a different group name — fetch by code
+                    const [byCode] = await tx
+                      .select({ id: stockGroups.id })
+                      .from(stockGroups)
+                      .where(and(eq(stockGroups.companyId, companyId), eq(stockGroups.code, groupCode)));
+                    stockGroupId = byCode?.id;
+                  }
                 }
                 stockGroupCache.set(catName, stockGroupId!);
               }
