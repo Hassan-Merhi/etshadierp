@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download, WifiOff, ToggleRight, DollarSign, AlertTriangle, FileSpreadsheet } from "lucide-react";
+import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download, WifiOff, ToggleRight, DollarSign, AlertTriangle, FileSpreadsheet, Images } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
 import { ImportBalesTab } from "./BaleStockEntry";
@@ -897,6 +897,30 @@ export default function FactorySettings() {
         </CardHeader>
         <CardContent className="pt-0">
           <ImportBalesTab />
+        </CardContent>
+      </Card>
+
+      {/* ── Product Images ───────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Images className="h-5 w-5 text-muted-foreground" />
+            Product Images
+          </CardTitle>
+          <CardDescription>
+            Upload and manage product images for each article code. Images can be attached to any bale product and used for catalogues, labels, or reference.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <Button
+            variant="outline"
+            onClick={() => window.location.href = "/factory/bale-product-images"}
+            data-testid="button-open-product-images"
+          >
+            <Images className="h-4 w-4 mr-2" />
+            Manage Product Images
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
         </CardContent>
       </Card>
 

@@ -3613,6 +3613,22 @@ export const insertFactoryBalePhotoSchema = createInsertSchema(factoryBalePhotos
 export type InsertFactoryBalePhoto = z.infer<typeof insertFactoryBalePhotoSchema>;
 export type FactoryBalePhoto = typeof factoryBalePhotos.$inferSelect;
 
+export const factoryBaleProductImages = pgTable("factory_bale_product_images", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  articleCode: varchar("article_code", { length: 50 }).notNull(),
+  productId: integer("product_id"),
+  url: text("url").notNull(),
+  fileName: varchar("file_name", { length: 255 }),
+  sortOrder: integer("sort_order").default(0),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+}, (t) => ({
+  companyIdx: index("factory_bale_product_images_company_idx").on(t.companyId),
+  articleCodeIdx: index("factory_bale_product_images_article_code_idx").on(t.articleCode),
+}));
+
+export type FactoryBaleProductImage = typeof factoryBaleProductImages.$inferSelect;
+
 export const factoryDailyKpiSnapshots = pgTable("factory_daily_kpi_snapshots", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),

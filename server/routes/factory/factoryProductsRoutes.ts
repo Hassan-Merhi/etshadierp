@@ -34,6 +34,7 @@ import {
   factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
   factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
   factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
+  factoryBaleProductImages,
   factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
   factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
   bankAccounts, inventory, exchangeRates, vouchers, suppliers,
@@ -1434,5 +1435,89 @@ export function registerFactoryProductsRoutes(app: Express) {
   // ───────────────────────────────────────────────
   // 4. Factory Containers CRUD
   // ───────────────────────────────────────────────
+
+  // ── Bale Product Images ──────────────────────────────────────────────────────
+  const productImageStorage = multer.diskStorage({
+    destination: (_req: any, _file: any, cb: any) => {
+      const dir = path.join(process.cwd(), "uploads", "product-images");
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (_req: any, file: any, cb: any) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `prod-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  });
+  const productImageUpload = multer({
+    storage: productImageStorage,
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req: any, file: any, cb: any) => {
+      if (file.mimetype.startsWith("image/")) cb(null, true);
+      else cb(new Error("Only image files are allowed"));
+    },
+  });
+
+  app.get("/api/factory/bale-product-images", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { articleCode } = req.query;
+      const conditions = [eq(factoryBaleProductImages.companyId, companyId)];
+      if (articleCode) conditions.push(eq(factoryBaleProductImages.articleCode, String(articleCode)));
+      const images = await db.select().from(factoryBaleProductImages)
+        .where(and(...conditions))
+        .orderBy(asc(factoryBaleProductImages.sortOrder), asc(factoryBaleProductImages.uploadedAt));
+      res.json(images);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/factory/bale-product-images", requireAuth, (req: any, res: any) => {
+    productImageUpload.single("image")(req, res, async (err: any) => {
+      try {
+        if (err) return res.status(400).json({ message: err.message });
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        if (!req.file) return res.status(400).json({ message: "No image uploaded" });
+        const { articleCode, productId } = req.body;
+        if (!articleCode) return res.status(400).json({ message: "articleCode is required" });
+        const url = `/api/factory/uploads/product-images/${req.file.filename}`;
+        const [created] = await db.insert(factoryBaleProductImages).values({
+          companyId,
+          articleCode,
+          productId: productId ? parseInt(productId) : null,
+          url,
+          fileName: req.file.originalname,
+          sortOrder: 0,
+        }).returning();
+        res.json(created);
+      } catch (e: any) {
+        res.status(500).json({ message: e.message });
+      }
+    });
+  });
+
+  app.delete("/api/factory/bale-product-images/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      const [img] = await db.select().from(factoryBaleProductImages)
+        .where(and(eq(factoryBaleProductImages.id, id), eq(factoryBaleProductImages.companyId, companyId)));
+      if (!img) return res.status(404).json({ message: "Image not found" });
+      // Delete physical file
+      const filename = img.url.split("/").pop();
+      if (filename) {
+        const filePath = path.join(process.cwd(), "uploads", "product-images", filename);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      }
+      await db.delete(factoryBaleProductImages)
+        .where(and(eq(factoryBaleProductImages.id, id), eq(factoryBaleProductImages.companyId, companyId)));
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
 
 }
