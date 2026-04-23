@@ -26,6 +26,64 @@ import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Inter-company sync helper
+// When a subsidiary PO is edited (amount or container number), the matching
+// INTERCO-PARENT-{poNumber} voucher in the parent company must also be updated.
+// ──────────────────────────────────────────────────────────────────────────────
+async function syncIntercoParentVoucher(
+  tx: any,
+  poNumber: string,
+  newAmount: number,
+): Promise<void> {
+  try {
+    const parentCompanyId = await storage.getParentCompanyId();
+    if (!parentCompanyId) return;
+
+    // Find the INTERCO-PARENT voucher for this PO in the parent company
+    const [parentVoucher] = await tx
+      .select({ id: vouchers.id })
+      .from(vouchers)
+      .where(
+        and(
+          eq(vouchers.companyId, parentCompanyId),
+          like(vouchers.voucherNumber, `INTERCO-PARENT-${poNumber}-%`),
+        ),
+      )
+      .limit(1);
+
+    if (!parentVoucher) return;
+
+    // Update parent voucher total
+    await tx
+      .update(vouchers)
+      .set({ totalAmount: newAmount.toFixed(2) })
+      .where(eq(vouchers.id, parentVoucher.id));
+
+    // Update all entries on this parent voucher (both DR and CR sides)
+    const parentEntries = await tx
+      .select()
+      .from(voucherEntries)
+      .where(eq(voucherEntries.voucherId, parentVoucher.id));
+
+    for (const entry of parentEntries) {
+      if (parseFloat(entry.debitAmount || "0") > 0) {
+        await tx
+          .update(voucherEntries)
+          .set({ debitAmount: newAmount.toFixed(2) })
+          .where(eq(voucherEntries.id, entry.id));
+      } else if (parseFloat(entry.creditAmount || "0") > 0) {
+        await tx
+          .update(voucherEntries)
+          .set({ creditAmount: newAmount.toFixed(2) })
+          .where(eq(voucherEntries.id, entry.id));
+      }
+    }
+  } catch (err) {
+    console.error("[syncIntercoParentVoucher] Error syncing parent INTERCO voucher:", err);
+  }
+}
+
 export function registerContainerRoutes(app: Express) {
   app.get("/api/containers", requireAuth, requireNonPOS, async (req, res) => {
     try {
@@ -175,6 +233,52 @@ export function registerContainerRoutes(app: Express) {
         .where(and(eq(containers.id, id), eq(containers.companyId, companyId)))
         .returning();
       if (!updated) return res.status(404).json({ message: "Container not found" });
+
+      // ── Inter-company sync: update the description of INTERCO-PARENT vouchers in the parent
+      //    company so the new container number is reflected there too ──
+      try {
+        const parentCompanyId = await storage.getParentCompanyId();
+        if (parentCompanyId) {
+          const containerPOs = await db
+            .select({ poNumber: purchaseOrders.poNumber })
+            .from(purchaseOrders)
+            .where(and(eq(purchaseOrders.containerId, id), eq(purchaseOrders.companyId, companyId)));
+
+          for (const po of containerPOs) {
+            const [parentVoucher] = await db
+              .select({ id: vouchers.id, description: vouchers.description })
+              .from(vouchers)
+              .where(
+                and(
+                  eq(vouchers.companyId, parentCompanyId),
+                  like(vouchers.voucherNumber, `INTERCO-PARENT-${po.poNumber}-%`),
+                ),
+              )
+              .limit(1);
+
+            if (!parentVoucher) continue;
+
+            // The admin-created description format is "{oldContainerNumber} {supplierName}"
+            // Update only if the description starts with a container-number-like token
+            if (parentVoucher.description) {
+              const parts = parentVoucher.description.split(" ");
+              // Heuristic: if the first word looks like a container number (alphanumeric, may contain dashes)
+              // and is NOT "Inter-company", replace it with the new container number
+              if (parts[0] && parts[0] !== "Inter-company") {
+                parts[0] = newNumber;
+                const newDesc = parts.join(" ");
+                await db
+                  .update(vouchers)
+                  .set({ description: newDesc })
+                  .where(eq(vouchers.id, parentVoucher.id));
+              }
+            }
+          }
+        }
+      } catch (syncErr) {
+        console.error("[container number sync] Error updating INTERCO-PARENT voucher descriptions:", syncErr);
+      }
+
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1644,6 +1748,9 @@ export function registerContainerRoutes(app: Express) {
                   .where(eq(voucherEntries.id, entry.id));
               }
             }
+
+            // ── Inter-company sync: update the matching INTERCO-PARENT voucher in the parent company ──
+            await syncIntercoParentVoucher(tx, existingPO.poNumber, poGrandTotal);
           }
           
           // Sync container_charges table when PO charges are edited
@@ -1790,6 +1897,9 @@ export function registerContainerRoutes(app: Express) {
                 .where(eq(voucherEntries.id, entry.id));
             }
           }
+
+          // ── Inter-company sync: update the matching INTERCO-PARENT voucher in the parent company ──
+          await syncIntercoParentVoucher(tx, existingPO.poNumber, newGrandTotal);
           
           // Update container totals if applicable
           const container = await storage.getContainerById(existingPO.containerId);
