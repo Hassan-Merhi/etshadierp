@@ -203,16 +203,13 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const locations = posUser ? posAssignedLocations : allLocations;
   const locationsLoading = posUser ? posLocationsLoading : allLocationsLoading;
 
-  // Fetch inventory for selected location (closing / as-of date)
+  // Fetch inventory for selected location (always current — never historical)
   const { data: inventoryData = [], isLoading: inventoryLoading, isFetching } = useQuery<InventoryItem[]>({
     queryKey: selectedLocationLocal 
-      ? [`/api/locations/${selectedLocationLocal.id}/inventory`, { asOfDate }] 
+      ? [`/api/locations/${selectedLocationLocal.id}/inventory`]
       : [],
     queryFn: async () => {
-      const url = asOfDate 
-        ? `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${asOfDate}`
-        : `/api/locations/${selectedLocationLocal!.id}/inventory`;
-      const response = await fetch(url, { credentials: 'include' });
+      const response = await fetch(`/api/locations/${selectedLocationLocal!.id}/inventory`, { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to fetch inventory');
       return response.json();
     },
@@ -1291,7 +1288,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
       {/* Date range filter bar */}
       <div className="flex flex-wrap items-center gap-3 px-3 py-2.5 rounded-md bg-muted/40 border">
-        <span className="text-sm font-medium text-muted-foreground shrink-0">Inventory Date Range:</span>
+        <span className="text-sm font-medium text-muted-foreground shrink-0">Movement Period:</span>
         <div className="flex items-center gap-2">
           <Label className="text-sm whitespace-nowrap text-muted-foreground">From:</Label>
           <Input
@@ -2046,15 +2043,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               </div>
             ) : stockGroups.length === 0 && unassignedInventoryItems.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                <p className="font-medium mb-1">No inventory found at this location{asOfDate ? ` as of ${asOfDate}` : ""}.</p>
-                {asOfDate ? (
-                  <>
-                    <p className="text-xs mb-3">Stock may have been added after this date. Clear the date filter to see current inventory.</p>
-                    <Button size="sm" variant="outline" onClick={() => { setFromDate(""); setAsOfDate(""); }}>Clear date filter</Button>
-                  </>
-                ) : (
-                  <p className="text-xs">Create Stock Groups and Stock Items first, then import or receive stock.</p>
-                )}
+                <p className="font-medium mb-1">No inventory found at this location.</p>
+                <p className="text-xs">Create Stock Groups and Stock Items first, then import or receive stock.</p>
               </div>
             ) : stockGroups.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground text-sm">
