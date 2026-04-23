@@ -82,6 +82,7 @@ export default function BaleProducts() {
   const [showHidden, setShowHidden] = useState(false);
   const [showZeroPrice, setShowZeroPrice] = useState(false);
   const [showNoColor, setShowNoColor] = useState(false);
+  const [filterCategoryId, setFilterCategoryId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const appMode = useAppMode();
@@ -132,7 +133,8 @@ export default function BaleProducts() {
   const noColorCount = allActiveProducts?.filter((p) => !p.labelDesignColor).length ?? 0;
   const activeProducts = allActiveProducts
     ?.filter((p) => !showZeroPrice || parseFloat(p.sellingPrice || "0") === 0)
-    ?.filter((p) => !showNoColor || !p.labelDesignColor);
+    ?.filter((p) => !showNoColor || !p.labelDesignColor)
+    ?.filter((p) => filterCategoryId === null || p.categoryId === filterCategoryId);
   const hiddenProducts = products?.filter((p) => p.active === false);
 
   const toggleSelectId = (id: number) => {
@@ -785,6 +787,22 @@ export default function BaleProducts() {
               )}
             </div>
             <div className="flex items-center gap-3 flex-wrap">
+              {categories && categories.length > 0 && (
+                <Select
+                  value={filterCategoryId === null ? "all" : String(filterCategoryId)}
+                  onValueChange={(val) => { setFilterCategoryId(val === "all" ? null : Number(val)); setSelectedIds(new Set()); }}
+                >
+                  <SelectTrigger className="w-44" data-testid="select-filter-category">
+                    <SelectValue placeholder="All categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All categories</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               {!hideSellingPriceBP && (
                 <Button
                   size="sm"
