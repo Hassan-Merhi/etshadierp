@@ -83,6 +83,7 @@ export default function BaleProducts() {
   const [showZeroPrice, setShowZeroPrice] = useState(false);
   const [showNoColor, setShowNoColor] = useState(false);
   const [filterCategoryId, setFilterCategoryId] = useState<number | null>(null);
+  const [filterWeight, setFilterWeight] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const appMode = useAppMode();
@@ -131,10 +132,14 @@ export default function BaleProducts() {
 
   const allActiveProducts = products?.filter((p) => p.active !== false);
   const noColorCount = allActiveProducts?.filter((p) => !p.labelDesignColor).length ?? 0;
+  const distinctWeights = Array.from(
+    new Set((allActiveProducts ?? []).map((p) => p.weightPerBaleKg).filter(Boolean) as string[])
+  ).sort((a, b) => parseFloat(a) - parseFloat(b));
   const activeProducts = allActiveProducts
     ?.filter((p) => !showZeroPrice || parseFloat(p.sellingPrice || "0") === 0)
     ?.filter((p) => !showNoColor || !p.labelDesignColor)
-    ?.filter((p) => filterCategoryId === null || p.categoryId === filterCategoryId);
+    ?.filter((p) => filterCategoryId === null || p.categoryId === filterCategoryId)
+    ?.filter((p) => filterWeight === null || String(p.weightPerBaleKg) === filterWeight);
   const hiddenProducts = products?.filter((p) => p.active === false);
 
   const toggleSelectId = (id: number) => {
@@ -799,6 +804,22 @@ export default function BaleProducts() {
                     <SelectItem value="all">All categories</SelectItem>
                     {categories.map((cat) => (
                       <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {distinctWeights.length > 0 && (
+                <Select
+                  value={filterWeight === null ? "all" : filterWeight}
+                  onValueChange={(val) => { setFilterWeight(val === "all" ? null : val); setSelectedIds(new Set()); }}
+                >
+                  <SelectTrigger className="w-36" data-testid="select-filter-weight">
+                    <SelectValue placeholder="All weights" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All weights</SelectItem>
+                    {distinctWeights.map((w) => (
+                      <SelectItem key={w} value={w}>{w} kg</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
