@@ -576,7 +576,9 @@ export function registerFactoryBalesRoutes(app: Express) {
             const cat = categoryMap.get(factoryProduct.categoryId);
             if (cat) {
               const catName = cat.name as string;
-              const cached = stockGroupCache.get(catName);
+              const catId = (cat as any).id as number;
+              const cacheKey = String(catId || catName);
+              const cached = stockGroupCache.get(cacheKey);
               if (cached) {
                 stockGroupId = cached;
               } else {
@@ -588,7 +590,8 @@ export function registerFactoryBalesRoutes(app: Express) {
                 if (existingGroup) {
                   stockGroupId = existingGroup.id;
                 } else {
-                  const groupCode = "F-" + catName.replace(/[^A-Z0-9]/gi, "").substring(0, 10).toUpperCase();
+                  // Use the category's own ID for a collision-free code
+                  const groupCode = catId ? `FCAT-${catId}` : "F-" + catName.replace(/[^A-Z0-9]/gi, "").substring(0, 10).toUpperCase();
                   const [created] = await tx
                     .insert(stockGroups)
                     .values({ companyId, name: catName, code: groupCode })
@@ -597,7 +600,6 @@ export function registerFactoryBalesRoutes(app: Express) {
                   if (created) {
                     stockGroupId = created.id;
                   } else {
-                    // Code collision with a different group name — fetch by code
                     const [byCode] = await tx
                       .select({ id: stockGroups.id })
                       .from(stockGroups)
@@ -605,7 +607,7 @@ export function registerFactoryBalesRoutes(app: Express) {
                     stockGroupId = byCode?.id;
                   }
                 }
-                stockGroupCache.set(catName, stockGroupId!);
+                stockGroupCache.set(cacheKey, stockGroupId!);
               }
             }
           }
@@ -1045,7 +1047,9 @@ export function registerFactoryBalesRoutes(app: Express) {
             let stockGroupId: number | null = null;
             if (bale.category) {
               const catName = bale.category as string;
-              const cached = stockGroupCache.get(catName);
+              const catId = (product as any)?.categoryId as number | undefined;
+              const cacheKey = catId ? String(catId) : catName;
+              const cached = stockGroupCache.get(cacheKey);
               if (cached) {
                 stockGroupId = cached;
               } else {
@@ -1056,7 +1060,8 @@ export function registerFactoryBalesRoutes(app: Express) {
                 if (existingGroup) {
                   stockGroupId = existingGroup.id;
                 } else {
-                  const groupCode = "F-" + catName.replace(/[^A-Z0-9]/gi, "").substring(0, 10).toUpperCase();
+                  // Use the category's own ID for a collision-free code
+                  const groupCode = catId ? `FCAT-${catId}` : "F-" + catName.replace(/[^A-Z0-9]/gi, "").substring(0, 10).toUpperCase();
                   const [created] = await tx
                     .insert(stockGroups)
                     .values({ companyId, name: catName, code: groupCode })
@@ -1065,7 +1070,6 @@ export function registerFactoryBalesRoutes(app: Express) {
                   if (created) {
                     stockGroupId = created.id;
                   } else {
-                    // Code collision with a different group name — fetch by code
                     const [byCode] = await tx
                       .select({ id: stockGroups.id })
                       .from(stockGroups)
@@ -1073,7 +1077,7 @@ export function registerFactoryBalesRoutes(app: Express) {
                     stockGroupId = byCode?.id;
                   }
                 }
-                stockGroupCache.set(catName, stockGroupId!);
+                stockGroupCache.set(cacheKey, stockGroupId!);
               }
             }
 
