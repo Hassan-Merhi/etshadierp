@@ -12,6 +12,7 @@ export type LabelData = {
   pieces: number;
   approxWeightKg: string;
   productName: string;
+  designColor?: A4DesignColor | null;
 };
 
 function getHeaderImage(code: string): string {
@@ -107,8 +108,9 @@ function getDesignBannerUrl(design: A4DesignColor): string {
 export function generateCombinedLabelsHtml(labels: LabelData[], designColor?: A4DesignColor) {
   let labelsHtml = '';
   for (const label of labels) {
-    const bannerUrl = designColor ? getDesignBannerUrl(designColor) : getHeaderImage(label.articleCode);
-    const hasBanner = designColor || isBrandUrl(bannerUrl);
+    const effectiveColor = label.designColor || designColor;
+    const bannerUrl = effectiveColor ? getDesignBannerUrl(effectiveColor) : getHeaderImage(label.articleCode);
+    const hasBanner = effectiveColor || isBrandUrl(bannerUrl);
     const gapContent = hasBanner
       ? `<div class="a4-preprint-gap"><img class="a4-banner-img" src="${bannerUrl}" alt="HMD" /></div>`
       : `<div class="a4-preprint-gap"></div>`;
