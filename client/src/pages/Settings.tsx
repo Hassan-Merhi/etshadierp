@@ -830,6 +830,7 @@ import { UsersSection } from "./settings/UsersSection";
                             <SelectContent>
                               <SelectItem value="erp">Normal ERP</SelectItem>
                               <SelectItem value="factory">Factory Production</SelectItem>
+                              <SelectItem value="factory_v2">Factory 2.0</SelectItem>
                               <SelectItem value="properties">Properties</SelectItem>
                             </SelectContent>
                           </Select>

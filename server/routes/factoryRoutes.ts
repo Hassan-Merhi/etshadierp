@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import { companies } from "@shared/schema";
 import { registerFactoryStockRoutes } from "./factory/factoryStockRoutes";
 import { registerFactorySuppliersRoutes } from "./factory/factorySuppliersRoutes";
@@ -10,6 +10,7 @@ import { registerFactoryCustomersRoutes } from "./factory/factoryCustomersRoutes
 import { registerFactoryDocsUsersRoutes } from "./factory/factoryDocsUsersRoutes";
 import { registerFactoryEmployeesPosRoutes } from "./factory/factoryEmployeesPosRoutes";
 import { registerFactoryTransporterRoutes } from "./factory/factoryTransporterRoutes";
+import { registerFactoryStockAllocationV2Routes } from "./factory/factoryStockAllocationV2Routes";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
@@ -27,15 +28,19 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (currentCompanyId) {
         const [co] = await db.select({ id: companies.id, companyType: companies.companyType })
           .from(companies).where(eq(companies.id, currentCompanyId));
-        if (co?.companyType === "factory") {
+        if (co?.companyType === "factory" || co?.companyType === "factory_v2") {
           session.factoryCompanyId = co.id;
           return next();
         }
       }
 
+      // Fall back to any active factory-type company
       const [factoryComp] = await db.select({ id: companies.id })
         .from(companies)
-        .where(and(eq(companies.companyType, "factory"), eq(companies.active, true)))
+        .where(and(
+          or(eq(companies.companyType, "factory"), eq(companies.companyType, "factory_v2")),
+          eq(companies.active, true),
+        ))
         .limit(1);
       if (factoryComp) {
         session.factoryCompanyId = factoryComp.id;
@@ -58,4 +63,5 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   registerFactoryDocsUsersRoutes(app);
   registerFactoryEmployeesPosRoutes(app);
   registerFactoryTransporterRoutes(app);
+  registerFactoryStockAllocationV2Routes(app);
 }

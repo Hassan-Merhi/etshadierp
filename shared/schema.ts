@@ -21,7 +21,7 @@ export const insertCompanySchema = createInsertSchema(companies).omit({
 }).extend({
   code: z.string().min(1, "Code is required"),
   name: z.string().min(1, "Name is required"),
-  companyType: z.enum(["erp", "factory", "properties"]).default("erp"),
+  companyType: z.enum(["erp", "factory", "factory_v2", "properties"]).default("erp"),
   baseCurrency: z.string().optional(),
   displayCurrency: z.string().optional(),
 });

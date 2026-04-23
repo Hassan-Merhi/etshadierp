@@ -226,7 +226,7 @@ export function AppSidebar({ user }: { user?: any }) {
     const isDeveloper = user?.role === "Developer";
     const featureKey  = ROUTE_TO_FEATURE[item.url];
 
-    if (item.url === "/factory/raw-stock" && selectedCompany?.companyType !== "factory") return false;
+    if (item.url === "/factory/raw-stock" && selectedCompany?.companyType !== "factory" && selectedCompany?.companyType !== "factory_v2") return false;
     if (item.url === "/net-profit-report") return isDeveloper;
     if (item.url === "/chat")       return !isPOSUser;
     if (item.url === "/price-list") return !isPOSUser;
