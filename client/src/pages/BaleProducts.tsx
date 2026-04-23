@@ -285,6 +285,20 @@ export default function BaleProducts() {
     },
   });
 
+  const colorUpdateMutation = useMutation({
+    mutationFn: async ({ id, labelDesignColor }: { id: number; labelDesignColor: string | null }) => {
+      const response = await modeApiRequest("POST", `/api/factory/bale-products/${id}/cascade-update`, { labelDesignColor });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const deleteProductMutation = useMutation({
     mutationFn: async (id: number) => {
       const response = await modeApiRequest("DELETE", `/api/factory/bale-products/${id}`);
@@ -873,7 +887,31 @@ export default function BaleProducts() {
                             <TableCell className="font-mono text-muted-foreground text-sm pl-8">
                               {product.articleCode || "-"}
                             </TableCell>
-                            <TableCell className="text-sm">{product.name}</TableCell>
+                            <TableCell className="text-sm">
+                              <div className="flex items-center gap-2">
+                                <span>{product.name}</span>
+                                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    title="No color"
+                                    onClick={() => colorUpdateMutation.mutate({ id: product.id, labelDesignColor: null })}
+                                    className={`w-3.5 h-3.5 rounded-full border border-border flex items-center justify-center transition-all ${!product.labelDesignColor ? "ring-1 ring-offset-1 ring-primary" : "opacity-50 hover:opacity-100"}`}
+                                    data-testid={`button-color-none-${product.id}`}
+                                  >
+                                    <X className="w-2 h-2 text-muted-foreground" />
+                                  </button>
+                                  {A4_DESIGN_OPTIONS.map((opt) => (
+                                    <button
+                                      key={opt.value}
+                                      title={opt.label}
+                                      onClick={() => colorUpdateMutation.mutate({ id: product.id, labelDesignColor: opt.value })}
+                                      className={`w-3.5 h-3.5 rounded-full border transition-all ${product.labelDesignColor === opt.value ? "ring-1 ring-offset-1 ring-primary opacity-100" : "opacity-50 hover:opacity-100"}`}
+                                      style={{ backgroundColor: opt.color, borderColor: opt.color === "#F5F5F5" ? "#ccc" : opt.color }}
+                                      data-testid={`button-color-${opt.value}-${product.id}`}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
                               {product.categoryId ? categoryMap.get(product.categoryId) || "-" : "-"}
                             </TableCell>
@@ -936,7 +974,31 @@ export default function BaleProducts() {
                       />
                     </TableCell>
                     <TableCell className="font-mono font-medium">{product.articleCode || "-"}</TableCell>
-                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <span>{product.name}</span>
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            title="No color"
+                            onClick={() => colorUpdateMutation.mutate({ id: product.id, labelDesignColor: null })}
+                            className={`w-3.5 h-3.5 rounded-full border border-border flex items-center justify-center transition-all ${!product.labelDesignColor ? "ring-1 ring-offset-1 ring-primary" : "opacity-50 hover:opacity-100"}`}
+                            data-testid={`button-color-none-${product.id}`}
+                          >
+                            <X className="w-2 h-2 text-muted-foreground" />
+                          </button>
+                          {A4_DESIGN_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.value}
+                              title={opt.label}
+                              onClick={() => colorUpdateMutation.mutate({ id: product.id, labelDesignColor: opt.value })}
+                              className={`w-3.5 h-3.5 rounded-full border transition-all ${product.labelDesignColor === opt.value ? "ring-1 ring-offset-1 ring-primary opacity-100" : "opacity-50 hover:opacity-100"}`}
+                              style={{ backgroundColor: opt.color, borderColor: opt.color === "#F5F5F5" ? "#ccc" : opt.color }}
+                              data-testid={`button-color-${opt.value}-${product.id}`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {product.categoryId ? categoryMap.get(product.categoryId) || "Uncategorized" : "Uncategorized"}
                     </TableCell>
