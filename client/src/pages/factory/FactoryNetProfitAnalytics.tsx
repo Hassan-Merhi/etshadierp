@@ -150,7 +150,7 @@ function AccountBreakdown({
               </thead>
               <tbody>
                 {active.map((acc: any, i: number) => (
-                  <tr key={i} className="border-t hover-elevate cursor-pointer" onClick={() => acc.id && navigate(`/factory/ledger-monthly/${acc.id}`)}>
+                  <tr key={i} className="border-t hover-elevate cursor-pointer" onClick={() => acc.id && window.open(`/factory/ledger-monthly/${acc.id}`, "_blank")}>
                     <td className="px-3 py-2 text-foreground hover:underline">{acc.name}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground font-mono">{fmt(acc.debit)}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground font-mono">{fmt(acc.credit)}</td>

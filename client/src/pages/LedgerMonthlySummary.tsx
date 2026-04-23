@@ -126,7 +126,7 @@ export default function LedgerMonthlySummary() {
   })) || [];
 
   const handleMonthClick = (month: number, year: number) => {
-    navigate(`/ledger-vouchers/${accountId}/${year}/${month}`);
+    window.open(`/ledger-vouchers/${accountId}/${year}/${month}`, "_blank");
   };
 
   if (!accountId) {

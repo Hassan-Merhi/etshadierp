@@ -897,12 +897,12 @@ export default function Analytics() {
 
   const goToStatement = (accountId: number, customerId?: number, accountType?: string) => {
     if (customerId && appMode === "factory") {
-      navigate(`/factory/customers/${customerId}`);
+      window.open(`/factory/customers/${customerId}`, "_blank");
       return;
     }
     const basePath = appMode === "factory" ? "/factory" : "";
     const typeParam = accountType ? `&accountType=${encodeURIComponent(accountType.toLowerCase())}` : "";
-    navigate(`${basePath}/accounts?accountId=${accountId}${typeParam}`);
+    window.open(`${basePath}/accounts?accountId=${accountId}${typeParam}`, "_blank");
   };
 
   // Render hierarchical accounts (filters out zero-balance accounts)
@@ -1773,7 +1773,7 @@ export default function Analytics() {
                                     params.set("locationId", String(selectedLocationForDetails));
                                   }
                                   setSelectedLocationForDetails(null);
-                                  navigate(`/sales-report/detail?${params.toString()}`);
+                                  window.open(`/sales-report/detail?${params.toString()}`, "_blank");
                                 }}
                               >
                                 {formatDisplayDate(transaction.voucherDate)}
@@ -1813,7 +1813,7 @@ export default function Analytics() {
                               params.set("locationId", String(selectedLocationForDetails));
                             }
                             setSelectedLocationForDetails(null);
-                            navigate(`/sales-report/detail?${params.toString()}`);
+                            window.open(`/sales-report/detail?${params.toString()}`, "_blank");
                           }}
                         >
                           <CardContent className="p-3 space-y-1">
@@ -2316,7 +2316,7 @@ export default function Analytics() {
                             <div 
                               key={acc.id} 
                               className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground cursor-pointer hover-elevate"
-                              onClick={() => navigate(`/ledger-monthly/${acc.id}`)}
+                              onClick={() => window.open(`/ledger-monthly/${acc.id}`, "_blank")}
                               data-testid={`row-purchase-account-${acc.id}`}
                             >
                               <span className="flex items-center gap-2">
@@ -2538,7 +2538,7 @@ export default function Analytics() {
                                   <div 
                                     key={acc.id} 
                                     className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground cursor-pointer hover-elevate"
-                                    onClick={() => navigate(`/ledger-monthly/${acc.id}`)}
+                                    onClick={() => window.open(`/ledger-monthly/${acc.id}`, "_blank")}
                                     data-testid={`row-indirect-income-${acc.id}`}
                                   >
                                     <span className="flex items-center gap-2">

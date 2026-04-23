@@ -397,7 +397,7 @@ export default function SalesReport() {
       params.set("allCompanies", "true");
       if (selectedCompanies.length > 0) params.set("companyFilter", selectedCompanies.join(","));
     }
-    navigate(`/sales-report/detail?${params.toString()}`);
+    window.open(`/sales-report/detail?${params.toString()}`, "_blank");
   };
 
   const handleExportExcel = async () => {

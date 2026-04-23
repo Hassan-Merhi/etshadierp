@@ -124,7 +124,7 @@ export default function LedgerVouchers() {
   });
 
   const handleVoucherClick = (voucherId: number) => {
-    navigate(`/voucher-detail/${voucherId}`);
+    window.open(`/voucher-detail/${voucherId}`, "_blank");
   };
 
   if (!accountId || !year || !month) {
