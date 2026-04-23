@@ -23,6 +23,7 @@ import {
   wasteDispatches, wasteDispatchItems, insertWasteDispatchSchema,
   bales, baleProducts, baleProductCategories, baleTransfers,
   factoryBales, factoryBaleProducts, baleLabelPrints,
+  factoryWorkers,
   factoryPressingBatches, factoryMixBatches, factoryMixBatchSources, factoryContainers, factorySuppliers,
   customerOrders, customerOrderBales,
   insertBaleSchema, insertBaleTransferSchema,
@@ -905,6 +906,12 @@ export function registerBaleRoutes(app: Express) {
           product = await storage.getBaleProductByArticleCode(directBale.articleCode, companyId);
         }
 
+        let directWorkerName: string | null = null;
+        if (directBale.finalizedBy) {
+          const [wk] = await db.select({ fullName: factoryWorkers.fullName }).from(factoryWorkers).where(eq(factoryWorkers.id, directBale.finalizedBy)).limit(1);
+          if (wk) directWorkerName = wk.fullName;
+        }
+
         return res.json({
           labelPrint: null,
           product: product || null,
@@ -920,6 +927,7 @@ export function registerBaleRoutes(app: Express) {
             stockEntryDate: directBale.stockEntryDate,
             pressedAt: directBale.pressedAt,
             finalizedAt: directBale.finalizedAt,
+            workerName: directWorkerName,
           },
           locationInfo,
           pressingBatch: null,
@@ -964,6 +972,12 @@ export function registerBaleRoutes(app: Express) {
         // Use the name stored on the bale row directly — this matches what the bale history page shows.
         const resolvedProductName = factoryBale.productName;
 
+        let workerName: string | null = null;
+        if (factoryBale.finalizedBy) {
+          const [wk] = await db.select({ fullName: factoryWorkers.fullName }).from(factoryWorkers).where(eq(factoryWorkers.id, factoryBale.finalizedBy)).limit(1);
+          if (wk) workerName = wk.fullName;
+        }
+
         baleInfo = {
           id: factoryBale.id,
           baleCode: factoryBale.baleCode,
@@ -976,6 +990,7 @@ export function registerBaleRoutes(app: Express) {
           stockEntryDate: factoryBale.stockEntryDate,
           pressedAt: factoryBale.pressedAt,
           finalizedAt: factoryBale.finalizedAt,
+          workerName,
         };
 
         // Get location

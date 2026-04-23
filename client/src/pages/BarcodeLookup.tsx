@@ -77,6 +77,7 @@ export default function BarcodeLookup() {
       stockEntryDate: string | null;
       pressedAt: string | null;
       finalizedAt: string | null;
+      workerName: string | null;
     } | null;
     locationInfo: { id: number; name: string; city: string | null; state: string | null } | null;
     pressingBatch: {
@@ -436,6 +437,14 @@ export default function BarcodeLookup() {
                       )}
                       <InfoRow label="Weight" value={`${parseFloat(referenceResult.baleInfo.weightKg).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} KG`} />
                       <InfoRow label="Cost / Bale" value={referenceResult.baleInfo.totalCost ? parseFloat(referenceResult.baleInfo.totalCost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null} />
+                      {referenceResult.baleInfo.workerName && (
+                        <div>
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <User className="h-3 w-3" /> Worker
+                          </p>
+                          <p className="font-medium" data-testid="text-bale-worker">{referenceResult.baleInfo.workerName}</p>
+                        </div>
+                      )}
                       {referenceResult.baleInfo.stockEntryDate && (
                         <InfoRow label="Stock Entry Date" value={formatDateOnly(referenceResult.baleInfo.stockEntryDate)} />
                       )}
