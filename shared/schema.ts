@@ -2893,7 +2893,6 @@ export const customerProformaLines = pgTable("customer_proforma_lines", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   proformaIdx: index("customer_proforma_lines_proforma_idx").on(t.proformaId),
-  uniqueProformaArticle: uniqueIndex("customer_proforma_lines_proforma_article_unique").on(t.proformaId, t.articleCode),
 }));
 
 export const insertCustomerProformaLineSchema = createInsertSchema(customerProformaLines).omit({
