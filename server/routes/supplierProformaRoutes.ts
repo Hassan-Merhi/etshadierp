@@ -801,7 +801,9 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       });
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      const fileName = `Verification_${container?.containerNumber || containerId}_${proforma.reference.replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`;
+      const safeSupplier = (supplier?.name || "").replace(/[^a-zA-Z0-9 ]/g, "").trim();
+      const safeContainer = (container?.containerNumber || String(containerId)).replace(/[^a-zA-Z0-9]/g, "");
+      const fileName = `Verification ${safeSupplier} ${safeContainer}.xlsx`;
       res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
       await workbook.xlsx.write(res);
       res.end();
@@ -1045,7 +1047,9 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       addBlock("Price Diff", sc.priceDiffBorder, priceDiffCols, priceDiffs);
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      const summaryFileName = `Verification_Summary_${container?.containerNumber || containerId}_${proforma.reference.replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`;
+      const safeSupplierS = (supplier?.name || "").replace(/[^a-zA-Z0-9 ]/g, "").trim();
+      const safeContainerS = (container?.containerNumber || String(containerId)).replace(/[^a-zA-Z0-9]/g, "");
+      const summaryFileName = `Verification Summary ${safeSupplierS} ${safeContainerS}.xlsx`;
       res.setHeader("Content-Disposition", `attachment; filename="${summaryFileName}"`);
       await wb.xlsx.write(res);
       res.end();
