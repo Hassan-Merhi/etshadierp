@@ -28,18 +28,30 @@ async function findOrCreateLedgerAccount(
   tx: any,
   companyId: number,
   name: string,
-  accountType: "Income" | "Liability",
+  accountType: "Income" | "Liability" | "Indirect Expense" | "Indirect Income",
   codePrefix: string,
+  subType?: string,
 ): Promise<number> {
   const [existing] = await tx.select().from(ledgerAccounts).where(and(
     eq(ledgerAccounts.companyId, companyId),
     eq(ledgerAccounts.name, name),
     isNull(ledgerAccounts.deletedAt),
   ));
-  if (existing) return existing.id;
+  if (existing) {
+    // Patch account type/subType if it was previously created with wrong values
+    const needsPatch =
+      existing.accountType !== accountType ||
+      (subType !== undefined && existing.subType !== subType);
+    if (needsPatch) {
+      await tx.update(ledgerAccounts)
+        .set({ accountType, ...(subType !== undefined ? { subType } : {}) })
+        .where(eq(ledgerAccounts.id, existing.id));
+    }
+    return existing.id;
+  }
   const code = `${codePrefix}-${Date.now()}`;
   const [created] = await tx.insert(ledgerAccounts).values({
-    companyId, code, name, accountType, active: true,
+    companyId, code, name, accountType, subType: subType ?? null, active: true,
   }).returning();
   return created.id;
 }
@@ -939,7 +951,7 @@ export function registerRentalRoutes(
             : `${String(m).padStart(2,"0")}/${y}`;
 
           if (isShop) {
-            const expenseAccountId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Expense", "SHOP-RENT-EXP");
+            const expenseAccountId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
             const narration = `Rent paid - ${unitLabel} - ${monthSpan}`;
             const [v] = await tx.insert(vouchers).values({
               companyId, voucherNumber: `RENT-${Date.now()}-${contract.id}`,
@@ -952,7 +964,7 @@ export function registerRentalRoutes(
               { voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: "0", creditAmount: data.amount, narration },
             ]);
           } else {
-            const incomeAccountId = await findOrCreateLedgerAccount(tx, companyId, incomeAccountName, "Income", "RENT-INC");
+            const incomeAccountId = await findOrCreateLedgerAccount(tx, companyId, incomeAccountName, "Income", "RENT-INC", "Indirect Income");
             const narration = `Rent received - ${unitLabel} - ${monthSpan}`;
             const [v] = await tx.insert(vouchers).values({
               companyId, voucherNumber: `RENT-${Date.now()}-${contract.id}`,
