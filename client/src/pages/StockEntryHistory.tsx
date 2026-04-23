@@ -841,12 +841,12 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
             <thead className="sticky top-0 z-10 bg-muted/50">
               <tr className="text-left">
                 <th className="px-3 py-2 w-6"></th>
+                <th className="px-3 py-2 text-right">No. Workers</th>
                 <th className="px-3 py-2">Worker</th>
-                <th className="px-3 py-2 text-right">Bales</th>
-                <th className="px-3 py-2 text-right">Total kg</th>
                 <th className="px-3 py-2 text-right">Target</th>
                 <th className="px-3 py-2 text-right">Shortage</th>
-                <th className="px-3 py-2 text-right">No. Workers</th>
+                <th className="px-3 py-2 text-right">Bales</th>
+                <th className="px-3 py-2 text-right">Total kg</th>
               </tr>
             </thead>
             <tbody>
@@ -873,11 +873,12 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                     <td className="px-3 py-2 text-muted-foreground">
                       {wExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                     </td>
+                    <td className="px-3 py-2 text-right text-muted-foreground">
+                      {plan && workerCount > 0 ? workerCount : <span className="text-xs text-muted-foreground">—</span>}
+                    </td>
                     <td className="px-3 py-2 font-semibold">
                       {wg.workerName || <span className="italic text-muted-foreground">Unassigned</span>}
                     </td>
-                    <td className="px-3 py-2 text-right font-semibold">{wg.totalBales}</td>
-                    <td className="px-3 py-2 text-right font-semibold">{wg.totalWeight.toFixed(2)}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">
                       {plan && target > 0 ? target : <span className="text-xs text-muted-foreground">—</span>}
                     </td>
@@ -888,9 +889,8 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                         </span>
                       ) : <span className="text-xs text-muted-foreground">—</span>}
                     </td>
-                    <td className="px-3 py-2 text-right text-muted-foreground">
-                      {plan && workerCount > 0 ? workerCount : <span className="text-xs text-muted-foreground">—</span>}
-                    </td>
+                    <td className="px-3 py-2 text-right font-semibold">{wg.totalBales}</td>
+                    <td className="px-3 py-2 text-right font-semibold">{wg.totalWeight.toFixed(2)}</td>
                   </tr>,
 
                   /* Expanded: sub-group rows per date+location+product */
