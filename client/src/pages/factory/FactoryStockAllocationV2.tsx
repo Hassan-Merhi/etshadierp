@@ -102,7 +102,7 @@ export default function FactoryStockAllocationV2() {
       visibleProformas: [] as ProformaV2[],
     };
 
-    const allProformas = data.proformas;
+    const allProformas = data.proformas.filter(p => p.isActive);
     const visibleProformas = allProformas.filter(p => visibleProformaIds.has(p.id));
 
     // Build a merged set of all article codes from stock truth + all proforma lines
