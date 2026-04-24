@@ -117,11 +117,16 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
 
       // Fetch inactive product article codes so we can exclude them from the view
       const inactiveProductsRaw = await db.execute(
-        sql`SELECT article_code FROM factory_bale_products
-            WHERE company_id = ${companyId} AND active = false AND article_code IS NOT NULL`,
+        sql`SELECT code, article_code FROM factory_bale_products
+            WHERE company_id = ${companyId} AND active = false`,
       );
       const inactiveArticleCodes = new Set<string>(
-        ((inactiveProductsRaw as any).rows ?? (inactiveProductsRaw as any[])).map((r: any) => r.article_code as string),
+        ((inactiveProductsRaw as any).rows ?? (inactiveProductsRaw as any[])).flatMap((r: any) => {
+          const vals: string[] = [];
+          if (r.code) vals.push(r.code as string);
+          if (r.article_code) vals.push(r.article_code as string);
+          return vals;
+        }),
       );
       const activeStockTruth = stockTruth.filter(t => !inactiveArticleCodes.has(t.code));
 
@@ -193,12 +198,19 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
       ])];
       const productNamesMap: Record<string, string> = {};
       if (allCodes.length > 0) {
+        const codeArr = sql.raw(`ARRAY[${allCodes.map(c => `'${c.replace(/'/g, "''")}'`).join(',')}]`);
         const prodRaw = await db.execute(
-          sql`SELECT DISTINCT ON (article_code) article_code as "articleCode", name
-              FROM factory_bale_products
-              WHERE company_id = ${companyId}
-                AND article_code = ANY(${sql.raw(`ARRAY[${allCodes.map(c => `'${c.replace(/'/g, "''")}'`).join(',')}]`)})
-              ORDER BY article_code`
+          sql`SELECT DISTINCT ON (matched_code) matched_code as "articleCode", name FROM (
+                SELECT name,
+                  CASE WHEN code = ANY(${codeArr}) THEN code
+                       WHEN article_code = ANY(${codeArr}) THEN article_code
+                  END as matched_code
+                FROM factory_bale_products
+                WHERE company_id = ${companyId}
+                  AND (code = ANY(${codeArr}) OR article_code = ANY(${codeArr}))
+              ) sub
+              WHERE matched_code IS NOT NULL
+              ORDER BY matched_code`
         );
         (prodRaw.rows || (prodRaw as any[])).forEach((r: any) => {
           if (r.name) productNamesMap[r.articleCode] = r.name;
@@ -316,13 +328,18 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
         totalStockMap.set(b.articleCode, (totalStockMap.get(b.articleCode) || 0) + b.count);
       }
 
-      // Exclude inactive products
+      // Exclude inactive products (match by both code and article_code)
       const inactiveRaw2 = await db.execute(
-        sql`SELECT article_code FROM factory_bale_products
-            WHERE company_id = ${companyId} AND active = false AND article_code IS NOT NULL`,
+        sql`SELECT code, article_code FROM factory_bale_products
+            WHERE company_id = ${companyId} AND active = false`,
       );
       const inactiveCodes2 = new Set<string>(
-        ((inactiveRaw2 as any).rows ?? (inactiveRaw2 as any[])).map((r: any) => r.article_code as string),
+        ((inactiveRaw2 as any).rows ?? (inactiveRaw2 as any[])).flatMap((r: any) => {
+          const vals: string[] = [];
+          if (r.code) vals.push(r.code as string);
+          if (r.article_code) vals.push(r.article_code as string);
+          return vals;
+        }),
       );
 
       const articleCodeSet = new Set<string>([
@@ -333,12 +350,19 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
       const productNameByCode = new Map<string, string>();
       if (articleCodeSet.size > 0) {
         const codes = Array.from(articleCodeSet);
+        const codeArr2 = sql.raw(`ARRAY[${codes.map(c => `'${c.replace(/'/g, "''")}'`).join(',')}]`);
         const prodRaw = await db.execute(
-          sql`SELECT DISTINCT ON (fbp.article_code) fbp.article_code as "articleCode", fbp.name
-              FROM factory_bale_products fbp
-              WHERE fbp.company_id = ${companyId}
-                AND fbp.article_code = ANY(${sql.raw(`ARRAY[${codes.map(c => `'${c.replace(/'/g, "''")}'`).join(',')}]`)})
-              ORDER BY fbp.article_code`
+          sql`SELECT DISTINCT ON (matched_code) matched_code as "articleCode", name FROM (
+                SELECT name,
+                  CASE WHEN code = ANY(${codeArr2}) THEN code
+                       WHEN article_code = ANY(${codeArr2}) THEN article_code
+                  END as matched_code
+                FROM factory_bale_products
+                WHERE company_id = ${companyId}
+                  AND (code = ANY(${codeArr2}) OR article_code = ANY(${codeArr2}))
+              ) sub
+              WHERE matched_code IS NOT NULL
+              ORDER BY matched_code`
         );
         (prodRaw.rows || (prodRaw as any[])).forEach((r: any) => { if (r.name) productNameByCode.set(r.articleCode, r.name); });
       }
