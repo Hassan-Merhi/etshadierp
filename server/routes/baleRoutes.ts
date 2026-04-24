@@ -1167,6 +1167,122 @@ export function registerBaleRoutes(app: Express) {
     }
   });
 
+  // Admin: Delete bale/reference everywhere (soft-delete the factory bale)
+  app.delete("/api/lookup/reference/:referenceNumber/delete-everywhere", requireAuth, requireRole("Admin", "Owner", "Developer"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const referenceNumber = decodeURIComponent(req.params.referenceNumber);
+
+      const [bale] = await db
+        .select()
+        .from(factoryBales)
+        .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)))
+        .limit(1);
+
+      if (!bale) return res.status(404).json({ message: "Bale not found for this reference" });
+
+      // Guard: refuse if bale is on a finalized/locked customer order
+      const [orderBaleRow] = await db
+        .select()
+        .from(customerOrderBales)
+        .where(eq(customerOrderBales.baleReference, referenceNumber))
+        .limit(1);
+
+      if (orderBaleRow) {
+        const [order] = await db
+          .select({ status: customerOrders.status })
+          .from(customerOrders)
+          .where(eq(customerOrders.id, orderBaleRow.orderId))
+          .limit(1);
+        if (order && ["FINALIZED", "VERIFIED", "DISPATCHED", "SOLD"].includes(order.status)) {
+          return res.status(409).json({ message: "This bale is linked to a finalized/locked order and cannot be deleted from here." });
+        }
+      }
+
+      await db
+        .update(factoryBales)
+        .set({ status: "DELETED", updatedAt: new Date() })
+        .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)));
+
+      res.json({ message: "Bale deleted from linked records" });
+    } catch (error: any) {
+      console.error("Error deleting bale everywhere:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Change the linked bale product (article code / product name) for a reference
+  app.patch("/api/lookup/reference/:referenceNumber/change-product", requireAuth, requireRole("Admin", "Owner", "Developer"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const referenceNumber = decodeURIComponent(req.params.referenceNumber);
+      const { newProductId } = req.body;
+
+      if (!newProductId || typeof newProductId !== "number") {
+        return res.status(400).json({ message: "newProductId (number) is required" });
+      }
+
+      const [bale] = await db
+        .select()
+        .from(factoryBales)
+        .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)))
+        .limit(1);
+
+      if (!bale) return res.status(404).json({ message: "Bale not found for this reference" });
+
+      // Guard: locked order
+      const [orderBaleRow] = await db
+        .select()
+        .from(customerOrderBales)
+        .where(eq(customerOrderBales.baleReference, referenceNumber))
+        .limit(1);
+
+      if (orderBaleRow) {
+        const [order] = await db
+          .select({ status: customerOrders.status })
+          .from(customerOrders)
+          .where(eq(customerOrders.id, orderBaleRow.orderId))
+          .limit(1);
+        if (order && ["FINALIZED", "VERIFIED", "DISPATCHED", "SOLD"].includes(order.status)) {
+          return res.status(409).json({ message: "This bale is linked to a finalized/locked order and cannot be changed." });
+        }
+      }
+
+      const [newProduct] = await db
+        .select()
+        .from(factoryBaleProducts)
+        .where(and(eq(factoryBaleProducts.id, newProductId), eq(factoryBaleProducts.companyId, companyId)))
+        .limit(1);
+
+      if (!newProduct) return res.status(404).json({ message: "Target product not found" });
+
+      const newArticleCode = newProduct.articleCode || newProduct.code;
+      const newBaleCode = newProduct.code;
+      const newProductName = newProduct.name;
+
+      await db.transaction(async (tx) => {
+        await tx
+          .update(factoryBales)
+          .set({ productId: newProduct.id, articleCode: newArticleCode, baleCode: newBaleCode, productName: newProductName, updatedAt: new Date() })
+          .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)));
+
+        await tx
+          .update(baleLabelPrints)
+          .set({ articleCode: newArticleCode })
+          .where(and(eq(baleLabelPrints.referenceNumber, referenceNumber), eq(baleLabelPrints.companyId, companyId)));
+      });
+
+      res.json({ message: "Bale product changed", newArticleCode, newProductName });
+    } catch (error: any) {
+      console.error("Error changing bale product:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Company Settings API Routes
   app.get("/api/company-settings", requireAuth, async (req, res) => {
     try {

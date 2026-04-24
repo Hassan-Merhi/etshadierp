@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { Search, Package, Tag, Clock, User, Scale, Hash, MapPin, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX, Ship, FileText, User2 } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Search, Package, Tag, Clock, User, Scale, Hash, MapPin, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX, Ship, FileText, User2, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useAppMode } from "@/contexts/AppModeContext";
@@ -57,6 +65,12 @@ export default function BarcodeLookup() {
   const { toast } = useToast();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
+
+  // Admin dialog state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showChangeProductDialog, setShowChangeProductDialog] = useState(false);
+  const [changeProductSearch, setChangeProductSearch] = useState("");
+  const [selectedNewProductId, setSelectedNewProductId] = useState<number | null>(null);
 
   const [articleResult, setArticleResult] = useState<{
     product: BaleProduct | null;
@@ -184,6 +198,66 @@ export default function BarcodeLookup() {
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Fetch current user role for admin actions
+  const { data: currentUser } = useQuery<{ role: string }>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
+
+  // Fetch all bale products for the change-product dialog
+  const { data: baleProductsList } = useQuery<BaleProduct[]>({
+    queryKey: ["/api/factory/bale-products"],
+    enabled: showChangeProductDialog,
+  });
+
+  const filteredBaleProducts = (baleProductsList || []).filter((p) => {
+    if (!changeProductSearch.trim()) return true;
+    const s = changeProductSearch.toLowerCase();
+    return p.name.toLowerCase().includes(s) || (p.articleCode || "").toLowerCase().includes(s) || p.code.toLowerCase().includes(s);
+  });
+
+  const deleteBaleMutation = useMutation({
+    mutationFn: async (refNum: string) => {
+      const response = await modeApiRequest("DELETE", `/api/lookup/reference/${encodeURIComponent(refNum)}/delete-everywhere`, {});
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Failed to delete bale");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      setShowDeleteDialog(false);
+      setReferenceResult(null);
+      setSearchValue("");
+      toast({ title: "Deleted", description: "Bale has been deleted from all linked records." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const changeProductMutation = useMutation({
+    mutationFn: async ({ refNum, newProductId }: { refNum: string; newProductId: number }) => {
+      const response = await modeApiRequest("PATCH", `/api/lookup/reference/${encodeURIComponent(refNum)}/change-product`, { newProductId });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Failed to change product");
+      }
+      return response.json();
+    },
+    onSuccess: (_data, { refNum }) => {
+      setShowChangeProductDialog(false);
+      setSelectedNewProductId(null);
+      setChangeProductSearch("");
+      referenceLookup.mutate(refNum);
+      toast({ title: "Updated", description: "Bale product changed successfully." });
+    },
+    onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -361,23 +435,74 @@ export default function BarcodeLookup() {
         <div className="space-y-4">
           {referenceResult.labelPrint ? (
             <>
-              {/* Label Print Record */}
+              {/* Merged: Bale Reference Details (Label Print + Bale Details) */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 flex-wrap">
-                    <Hash className="h-5 w-5" />
-                    Label Print Record
-                  </CardTitle>
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <CardTitle className="flex items-center gap-2 flex-wrap">
+                      <Hash className="h-5 w-5" />
+                      Bale Reference Details
+                      {referenceResult.baleInfo && <BaleStatusBadge status={referenceResult.baleInfo.status} />}
+                    </CardTitle>
+                    {isAdmin && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedNewProductId(null);
+                            setChangeProductSearch("");
+                            setShowChangeProductDialog(true);
+                          }}
+                          data-testid="button-change-product"
+                        >
+                          <Pencil className="h-3.5 w-3.5 mr-1" />
+                          Change Product
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => setShowDeleteDialog(true)}
+                          data-testid="button-delete-bale-everywhere"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1" />
+                          Delete Bale
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* Identity section */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <InfoRow
                       label="Reference Number"
                       value={<span className="font-mono text-lg" data-testid="text-reference-number">{referenceResult.labelPrint.referenceNumber}</span>}
                     />
                     <InfoRow label="Article Code" value={<span data-testid="text-ref-article-code">{referenceResult.labelPrint.articleCode}</span>} />
+                    {referenceResult.baleInfo?.baleCode && (
+                      <InfoRow label="Bale Code" value={<span className="font-mono">{referenceResult.baleInfo.baleCode}</span>} />
+                    )}
+                    {referenceResult.baleInfo?.productName && (
+                      <InfoRow label="Product Name" value={<span className="font-semibold" data-testid="text-bale-product-name">{referenceResult.baleInfo.productName}</span>} />
+                    )}
                     <InfoRow label="Pieces" value={<span data-testid="text-ref-pieces">{referenceResult.labelPrint.pieces}</span>} />
                     <InfoRow label="Approx Weight" value={<span data-testid="text-ref-weight">{referenceResult.labelPrint.approxWeightKg} KGS</span>} />
+                    {referenceResult.baleInfo && (
+                      <InfoRow label="Actual Weight" value={`${parseFloat(referenceResult.baleInfo.weightKg).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} KG`} />
+                    )}
+                    {referenceResult.baleInfo?.grade && (
+                      <InfoRow label="Grade" value={referenceResult.baleInfo.grade} />
+                    )}
+                    {referenceResult.baleInfo?.totalCost && (
+                      <InfoRow label="Cost / Bale" value={parseFloat(referenceResult.baleInfo.totalCost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} />
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Print / Scan section */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> Printed At</p>
                       <p className="font-medium" data-testid="text-ref-printed-at">{formatDate(referenceResult.labelPrint.printedAt as any) ?? "N/A"}</p>
@@ -413,70 +538,47 @@ export default function BarcodeLookup() {
                       )}
                     </div>
                   </div>
+
+                  {/* Production / Stock section */}
+                  {referenceResult.baleInfo && (referenceResult.baleInfo.workerName || referenceResult.baleInfo.pressedAt || referenceResult.baleInfo.finalizedAt || referenceResult.baleInfo.stockEntryDate || referenceResult.locationInfo) && (
+                    <>
+                      <Separator />
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {referenceResult.baleInfo.workerName && (
+                          <div>
+                            <p className="text-sm text-muted-foreground flex items-center gap-1"><User className="h-3 w-3" /> Worker</p>
+                            <p className="font-medium" data-testid="text-bale-worker">{referenceResult.baleInfo.workerName}</p>
+                          </div>
+                        )}
+                        {referenceResult.baleInfo.pressedAt && (
+                          <InfoRow label="Pressed At" value={formatDate(referenceResult.baleInfo.pressedAt)} />
+                        )}
+                        {referenceResult.baleInfo.finalizedAt && (
+                          <InfoRow label="Finalized At" value={formatDate(referenceResult.baleInfo.finalizedAt)} />
+                        )}
+                        {referenceResult.baleInfo.stockEntryDate && (
+                          <InfoRow label="Stock Entry Date" value={formatDateOnly(referenceResult.baleInfo.stockEntryDate)} />
+                        )}
+                        {referenceResult.locationInfo && (
+                          <div className="col-span-2 md:col-span-3">
+                            <p className="text-sm text-muted-foreground flex items-center gap-1 mb-1">
+                              <MapPin className="h-3.5 w-3.5" /> Current Location
+                            </p>
+                            <p className="font-medium text-base" data-testid="text-bale-location">
+                              {referenceResult.locationInfo.name}
+                              {(referenceResult.locationInfo.city || referenceResult.locationInfo.state) && (
+                                <span className="text-muted-foreground font-normal text-sm ml-2">
+                                  ({[referenceResult.locationInfo.city, referenceResult.locationInfo.state].filter(Boolean).join(", ")})
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
-
-              {/* Bale Info + Location */}
-              {referenceResult.baleInfo && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 flex-wrap">
-                      <Box className="h-5 w-5" />
-                      Bale Details
-                      <BaleStatusBadge status={referenceResult.baleInfo.status} />
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      {referenceResult.baleInfo.productName && (
-                        <InfoRow label="Product Name" value={<span className="font-semibold">{referenceResult.baleInfo.productName}</span>} />
-                      )}
-                      <InfoRow label="Bale Code" value={<span className="font-mono">{referenceResult.baleInfo.baleCode}</span>} />
-                      {referenceResult.baleInfo.grade && (
-                        <InfoRow label="Grade" value={referenceResult.baleInfo.grade} />
-                      )}
-                      <InfoRow label="Weight" value={`${parseFloat(referenceResult.baleInfo.weightKg).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} KG`} />
-                      <InfoRow label="Cost / Bale" value={referenceResult.baleInfo.totalCost ? parseFloat(referenceResult.baleInfo.totalCost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null} />
-                      {referenceResult.baleInfo.workerName && (
-                        <div>
-                          <p className="text-sm text-muted-foreground flex items-center gap-1">
-                            <User className="h-3 w-3" /> Worker
-                          </p>
-                          <p className="font-medium" data-testid="text-bale-worker">{referenceResult.baleInfo.workerName}</p>
-                        </div>
-                      )}
-                      {referenceResult.baleInfo.stockEntryDate && (
-                        <InfoRow label="Stock Entry Date" value={formatDateOnly(referenceResult.baleInfo.stockEntryDate)} />
-                      )}
-                      {referenceResult.baleInfo.pressedAt && (
-                        <InfoRow label="Pressed At" value={formatDate(referenceResult.baleInfo.pressedAt)} />
-                      )}
-                      {referenceResult.baleInfo.finalizedAt && (
-                        <InfoRow label="Finalized At" value={formatDate(referenceResult.baleInfo.finalizedAt)} />
-                      )}
-                    </div>
-
-                    {referenceResult.locationInfo && (
-                      <>
-                        <Separator />
-                        <div>
-                          <p className="text-sm text-muted-foreground flex items-center gap-1 mb-1">
-                            <MapPin className="h-3.5 w-3.5" /> Current Location
-                          </p>
-                          <p className="font-medium text-base" data-testid="text-bale-location">
-                            {referenceResult.locationInfo.name}
-                            {(referenceResult.locationInfo.city || referenceResult.locationInfo.state) && (
-                              <span className="text-muted-foreground font-normal text-sm ml-2">
-                                ({[referenceResult.locationInfo.city, referenceResult.locationInfo.state].filter(Boolean).join(", ")})
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
 
               {/* Loaded onto outbound container / customer order */}
               {referenceResult.loadedOnOrder && (() => {
@@ -679,6 +781,103 @@ export default function BarcodeLookup() {
           )}
         </div>
       )}
+
+      {/* Delete Bale Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Bale Everywhere</DialogTitle>
+            <DialogDescription>
+              This will permanently soft-delete the factory bale record for{" "}
+              <span className="font-mono font-semibold">{referenceResult?.labelPrint?.referenceNumber}</span>.
+              The label print history will remain for audit purposes.
+              This action cannot be undone from here.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={deleteBaleMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteBaleMutation.isPending}
+              onClick={() => {
+                if (referenceResult?.labelPrint?.referenceNumber) {
+                  deleteBaleMutation.mutate(referenceResult.labelPrint.referenceNumber);
+                }
+              }}
+              data-testid="button-confirm-delete-bale"
+            >
+              {deleteBaleMutation.isPending ? "Deleting..." : "Yes, Delete Bale"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Product Dialog */}
+      <Dialog open={showChangeProductDialog} onOpenChange={(open) => {
+        setShowChangeProductDialog(open);
+        if (!open) { setSelectedNewProductId(null); setChangeProductSearch(""); }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Change Linked Bale Product</DialogTitle>
+            <DialogDescription>
+              Select a new product to link to reference{" "}
+              <span className="font-mono font-semibold">{referenceResult?.labelPrint?.referenceNumber}</span>.
+              This will update the article code, bale code and product name on the bale record and label print.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              placeholder="Search by name or article code..."
+              value={changeProductSearch}
+              onChange={(e) => setChangeProductSearch(e.target.value)}
+              data-testid="input-change-product-search"
+            />
+            <div className="border rounded-md max-h-64 overflow-y-auto">
+              {filteredBaleProducts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No products found</p>
+              ) : (
+                filteredBaleProducts.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`w-full text-left px-3 py-2 text-sm hover-elevate ${selectedNewProductId === p.id ? "bg-muted font-semibold" : ""}`}
+                    onClick={() => setSelectedNewProductId(p.id)}
+                    data-testid={`item-product-${p.id}`}
+                  >
+                    <span className="font-medium">{p.name}</span>
+                    {p.articleCode && (
+                      <span className="ml-2 text-muted-foreground font-mono text-xs">{p.articleCode}</span>
+                    )}
+                    <span className="ml-2 text-muted-foreground font-mono text-xs">{p.code}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+          <DialogFooter className="gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => setShowChangeProductDialog(false)} disabled={changeProductMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!selectedNewProductId || changeProductMutation.isPending}
+              onClick={() => {
+                if (referenceResult?.labelPrint?.referenceNumber && selectedNewProductId) {
+                  changeProductMutation.mutate({
+                    refNum: referenceResult.labelPrint.referenceNumber,
+                    newProductId: selectedNewProductId,
+                  });
+                }
+              }}
+              data-testid="button-confirm-change-product"
+            >
+              {changeProductMutation.isPending ? "Saving..." : "Confirm Change"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
