@@ -128,7 +128,9 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
           return vals;
         }),
       );
-      const activeStockTruth = stockTruth.filter(t => !inactiveArticleCodes.has(t.code));
+      // Keep ALL stock-truth entries so inactive products with remaining bales still appear.
+      // We tag each entry with isActive so the frontend can apply display rules.
+      const activeStockTruth = stockTruth;
 
       // All proformas with lines
       const allProformas = await db
@@ -221,6 +223,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
         // Backend-computed stock truth — one source of reality, never re-derived on frontend
         stockTruth: activeStockTruth.map(t => ({
           articleCode:          t.code,
+          isActive:             !inactiveArticleCodes.has(t.code),
           onHand:               t.onHand,
           inStock:              t.inStock,
           inLoading:            t.inLoading,

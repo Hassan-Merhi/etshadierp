@@ -11,6 +11,7 @@ import CreateProformaDrawer from "./CreateProformaDrawer";
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 interface StockTruthEntry {
   articleCode: string;
+  isActive: boolean;
   onHand: number;
   inStock: number;
   inLoading: number;
@@ -44,6 +45,7 @@ interface AllocationDataV2 {
 export default function FactoryStockAllocationV2() {
   const [visibleProformaIds, setVisibleProformaIds] = useState<Set<number>>(new Set());
   const [showInactiveProformas, setShowInactiveProformas] = useState(false);
+  const [showZeroItems, setShowZeroItems] = useState(false);
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
 
   const proformaQuery = useQuery<AllocationDataV2>({
@@ -102,16 +104,30 @@ export default function FactoryStockAllocationV2() {
         }
       }
       displayName = displayName || code;
-      return { ...truth, displayName };
+      // isActive comes from the backend tag; default true if not yet in stockTruth
+      const isActive = truth.isActive ?? true;
+      return { ...truth, isActive, displayName };
     });
 
-    const nonEmptyRows = articleRows.filter(r =>
+    // Determine which rows have "substance" (bales or proforma allocations)
+    const hasSubstance = (r: typeof articleRows[number]) =>
       r.onHand > 0 || r.proformaReserved > 0 ||
-      allProformas.some(p => p.lines.some(l => l.articleCode === r.articleCode))
-    );
+      allProformas.some(p => p.lines.some(l => l.articleCode === r.articleCode));
 
-    return { articleRows: nonEmptyRows, allProformas, visibleProformas };
-  }, [proformaQuery.data, visibleProformaIds, showInactiveProformas]);
+    // Inactive items: show only if they have bales (onHand > 0)
+    // Active items with 0 bales and no allocations: hidden unless showZeroItems
+    const visibleRows = articleRows.filter(r => {
+      if (!r.isActive) return r.onHand > 0;  // inactive → only show if physical stock exists
+      if (hasSubstance(r)) return true;       // active with allocations → always show
+      return showZeroItems;                   // active with nothing → depends on toggle
+    });
+
+    const hiddenZeroCount = articleRows.filter(r =>
+      r.isActive && !hasSubstance(r)
+    ).length;
+
+    return { articleRows: visibleRows, hiddenZeroCount, allProformas, visibleProformas };
+  }, [proformaQuery.data, visibleProformaIds, showInactiveProformas, showZeroItems]);
 
   /* ── Render ──────────────────────────────────────────────────────────── */
   return (
@@ -122,7 +138,17 @@ export default function FactoryStockAllocationV2() {
           <h1 className="text-xl font-semibold">Stock Allocation</h1>
           <Badge variant="secondary" className="text-[11px] font-semibold tracking-wide">v2</Badge>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {computed.hiddenZeroCount > 0 && (
+            <Button
+              variant={showZeroItems ? "default" : "outline"}
+              size="default"
+              onClick={() => setShowZeroItems(v => !v)}
+              data-testid="button-toggle-zero-items"
+            >
+              {showZeroItems ? `Hide 0-bale items (${computed.hiddenZeroCount})` : `Show 0-bale items (${computed.hiddenZeroCount})`}
+            </Button>
+          )}
           <Button
             size="default"
             onClick={() => setCreateDrawerOpen(true)}
@@ -280,11 +306,18 @@ export default function FactoryStockAllocationV2() {
                   {computed.articleRows.map((row, idx) => (
                     <tr
                       key={row.articleCode}
-                      className={cn("border-b transition-colors", idx % 2 === 0 ? "bg-background" : "bg-muted/20")}
+                      className={cn(
+                        "border-b transition-colors",
+                        !row.isActive ? "opacity-60" : "",
+                        idx % 2 === 0 ? "bg-background" : "bg-muted/20",
+                      )}
                       data-testid={`row-article-${row.articleCode}`}
                     >
                       <td className="px-3 py-2 border-r sticky left-0 bg-inherit z-10">
-                        <div className="font-medium truncate max-w-[220px]" title={row.displayName}>{row.displayName}</div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-medium truncate max-w-[200px]" title={row.displayName}>{row.displayName}</span>
+                          {!row.isActive && <Badge variant="outline" className="text-[10px] px-1 py-0 shrink-0">Inactive</Badge>}
+                        </div>
                         {row.displayName !== row.articleCode && (
                           <div className="text-xs text-muted-foreground font-mono">{row.articleCode}</div>
                         )}
