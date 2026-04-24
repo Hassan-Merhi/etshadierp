@@ -2176,6 +2176,14 @@
     const todayStr = new Date().toLocaleDateString('en-CA');
     const [summaryDate, setSummaryDate] = useState<string>(todayStr);
 
+    const { data: settings } = useQuery<any>({
+      queryKey: ["/api/factory/settings"],
+      queryFn: async () => { const r = await fetch("/api/factory/settings"); return r.ok ? r.json() : {}; },
+      staleTime: 60000,
+    });
+
+    const showHistory = settings?.stockEntryTabHistoryEnabled !== false;
+
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
@@ -2194,19 +2202,23 @@
               <ScanLine className="h-4 w-4 mr-1" />
               Stock Entry
             </TabsTrigger>
-            <TabsTrigger value="history" data-testid="tab-stock-entry-history">
-              <List className="h-4 w-4 mr-1" />
-              Stock Entry History
-            </TabsTrigger>
+            {showHistory && (
+              <TabsTrigger value="history" data-testid="tab-stock-entry-history">
+                <List className="h-4 w-4 mr-1" />
+                Stock Entry History
+              </TabsTrigger>
+            )}
           </TabsList>
           <TabsContent value="entry" className="mt-4">
             <StockEntryTab />
           </TabsContent>
-          <TabsContent value="history" className="mt-0 p-0">
-            <StockEntryHistory
-              onActiveDateChange={(d) => setSummaryDate(d ?? todayStr)}
-            />
-          </TabsContent>
+          {showHistory && (
+            <TabsContent value="history" className="mt-0 p-0">
+              <StockEntryHistory
+                onActiveDateChange={(d) => setSummaryDate(d ?? todayStr)}
+              />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     );

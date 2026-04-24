@@ -44,6 +44,7 @@ interface FactorySettingsData {
   balesTabBarcodeEnabled: boolean;
   balesTabRemoveEnabled: boolean;
   loadingsTabPendingEnabled: boolean;
+  stockEntryTabHistoryEnabled: boolean;
   laborCostPerKg: number;
   overheadPerKg: number;
   hideSellingPrice: boolean;
@@ -75,6 +76,7 @@ const defaultSettings: FactorySettingsData = {
   balesTabBarcodeEnabled: true,
   balesTabRemoveEnabled: true,
   loadingsTabPendingEnabled: true,
+  stockEntryTabHistoryEnabled: true,
   laborCostPerKg: 0,
   overheadPerKg: 0,
   hideSellingPrice: false,
@@ -347,6 +349,7 @@ export default function FactorySettings() {
       balesTabBarcodeEnabled: true,
       balesTabRemoveEnabled: true,
       loadingsTabPendingEnabled: true,
+      stockEntryTabHistoryEnabled: true,
     };
     setSettings(allEnabled);
     mutation.mutate(allEnabled);
@@ -480,6 +483,8 @@ export default function FactorySettings() {
             {toggleItem("Remove from Stock tab", "balesTabRemoveEnabled")}
             <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Loadings Hub</p>
             {toggleItem("Pending Loadings tab", "loadingsTabPendingEnabled")}
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Stock Entry</p>
+            {toggleItem("Stock Entry History tab", "stockEntryTabHistoryEnabled")}
           </CardContent>
         </Card>
 
