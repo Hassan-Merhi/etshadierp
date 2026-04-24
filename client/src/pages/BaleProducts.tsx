@@ -675,41 +675,6 @@ export default function BaleProducts() {
           <p className="text-muted-foreground mt-1">Manage product types for bale production</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            onClick={() => setShowCategories(!showCategories)}
-            data-testid="button-manage-categories"
-          >
-            <Tags className="h-4 w-4 mr-2" />
-            Categories
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" data-testid="button-export-excel">
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Export Excel
-                <ChevronDown className="h-3 w-3 ml-1" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">Choose price type</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleExportExcel("selling")} data-testid="menu-export-selling-price">
-                Export Selling Price
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportExcel("production")} data-testid="menu-export-production-price">
-                Export Production Price
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button
-            variant="outline"
-            onClick={handleDownloadTemplate}
-            data-testid="button-download-template"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Download Template
-          </Button>
           <input
             ref={fileInputRef}
             type="file"
@@ -718,14 +683,41 @@ export default function BaleProducts() {
             onChange={handleFileSelect}
             data-testid="input-import-file"
           />
-          <Button
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            data-testid="button-import-excel"
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Import Excel
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" data-testid="button-actions-menu">
+                Actions
+                <ChevronDown className="h-3 w-3 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Categories</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => setShowCategories(!showCategories)} data-testid="menu-manage-categories">
+                <Tags className="h-4 w-4 mr-2" />
+                {showCategories ? "Hide Categories" : "Manage Categories"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Export Excel</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => handleExportExcel("selling")} data-testid="menu-export-selling-price">
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export Selling Price
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportExcel("production")} data-testid="menu-export-production-price">
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export Production Price
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Import / Template</DropdownMenuLabel>
+              <DropdownMenuItem onClick={handleDownloadTemplate} data-testid="menu-download-template">
+                <Download className="h-4 w-4 mr-2" />
+                Download Template
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => fileInputRef.current?.click()} data-testid="menu-import-excel">
+                <Upload className="h-4 w-4 mr-2" />
+                Import Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             onClick={() => {
               if (isAdmin) {
@@ -974,39 +966,68 @@ export default function BaleProducts() {
                   </SelectContent>
                 </Select>
               )}
-              {!hideSellingPriceBP && (
-                <Button
-                  size="sm"
-                  variant={showZeroPrice ? "default" : "outline"}
-                  onClick={() => { setShowZeroPrice(v => !v); setSelectedIds(new Set()); }}
-                  data-testid="button-show-zero-price"
-                >
-                  <AlertCircle className="h-4 w-4 mr-1" />
-                  {showZeroPrice ? "Showing unpriced" : "Show unpriced"}
-                </Button>
-              )}
-              {noColorCount > 0 && (
-                <Button
-                  size="sm"
-                  variant={showNoColor ? "default" : "outline"}
-                  onClick={() => { setShowNoColor(v => !v); setSelectedIds(new Set()); }}
-                  data-testid="button-show-no-color"
-                >
-                  <Palette className="h-4 w-4 mr-1" />
-                  {showNoColor ? "Showing uncolored" : `No color (${noColorCount})`}
-                </Button>
-              )}
-              {hiddenProducts && hiddenProducts.length > 0 && (
-                <Button
-                  size="sm"
-                  variant={showHidden ? "secondary" : "outline"}
-                  onClick={() => { setShowHidden(!showHidden); setSelectedIds(new Set()); }}
-                  data-testid="button-show-hidden"
-                >
-                  <EyeOff className="h-4 w-4 mr-1" />
-                  {showHidden ? "Hide Hidden" : `Show Hidden (${hiddenProducts.length})`}
-                </Button>
-              )}
+              {/* Filters dropdown */}
+              {(() => {
+                const activeFilterCount = (showZeroPrice && !hideSellingPriceBP ? 1 : 0) + (showNoColor && noColorCount > 0 ? 1 : 0) + (showHidden && hiddenProducts && hiddenProducts.length > 0 ? 1 : 0);
+                const hasAnyFilter = (!hideSellingPriceBP) || (noColorCount > 0) || (hiddenProducts && hiddenProducts.length > 0);
+                if (!hasAnyFilter) return null;
+                return (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" variant={activeFilterCount > 0 ? "default" : "outline"} data-testid="button-filters-dropdown">
+                        <AlertCircle className="h-4 w-4 mr-1.5" />
+                        Filters
+                        {activeFilterCount > 0 && (
+                          <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs no-default-active-elevate">{activeFilterCount}</Badge>
+                        )}
+                        <ChevronDown className="h-3 w-3 ml-1" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52">
+                      <DropdownMenuLabel className="text-xs text-muted-foreground">Show in list</DropdownMenuLabel>
+                      {!hideSellingPriceBP && (
+                        <DropdownMenuItem
+                          onClick={() => { setShowZeroPrice(v => !v); setSelectedIds(new Set()); }}
+                          data-testid="menu-filter-unpriced"
+                          className="flex items-center justify-between"
+                        >
+                          <span className="flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                            Unpriced products
+                          </span>
+                          {showZeroPrice && <span className="text-xs text-primary font-medium">On</span>}
+                        </DropdownMenuItem>
+                      )}
+                      {noColorCount > 0 && (
+                        <DropdownMenuItem
+                          onClick={() => { setShowNoColor(v => !v); setSelectedIds(new Set()); }}
+                          data-testid="menu-filter-no-color"
+                          className="flex items-center justify-between"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Palette className="h-4 w-4 text-muted-foreground" />
+                            No color ({noColorCount})
+                          </span>
+                          {showNoColor && <span className="text-xs text-primary font-medium">On</span>}
+                        </DropdownMenuItem>
+                      )}
+                      {hiddenProducts && hiddenProducts.length > 0 && (
+                        <DropdownMenuItem
+                          onClick={() => { setShowHidden(!showHidden); setSelectedIds(new Set()); }}
+                          data-testid="menu-filter-hidden"
+                          className="flex items-center justify-between"
+                        >
+                          <span className="flex items-center gap-2">
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            Hidden products ({hiddenProducts.length})
+                          </span>
+                          {showHidden && <span className="text-xs text-primary font-medium">On</span>}
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                );
+              })()}
               <div className="flex items-center gap-2">
                 <List className="h-4 w-4 text-muted-foreground" />
                 <Switch
@@ -1038,7 +1059,8 @@ export default function BaleProducts() {
                     <TableHead>Name</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead className="text-right">Wt/Bale (kg)</TableHead>
-                    {!hideAvgRate && !hideSellingPriceBP && <TableHead className="text-right">Sell Price</TableHead>}
+                    {!hideAvgRate && <TableHead className="text-right">Prod. Price</TableHead>}
+                    {!hideSellingPriceBP && <TableHead className="text-right">Sell Price</TableHead>}
                     <TableHead className="text-right">Count</TableHead>
                     <TableHead className="w-[60px]">Actions</TableHead>
                   </TableRow>
@@ -1070,7 +1092,8 @@ export default function BaleProducts() {
                         <TableCell className="text-muted-foreground">
                           {group.items[0]?.categoryId ? categoryMap.get(group.items[0].categoryId) || "-" : "-"}
                         </TableCell>
-                        {!hideAvgRate && !hideSellingPriceBP && <TableCell></TableCell>}
+                        {!hideAvgRate && <TableCell></TableCell>}
+                        {!hideSellingPriceBP && <TableCell></TableCell>}
                         <TableCell className="text-right">
                           <Badge variant="secondary">{group.count}</Badge>
                         </TableCell>
@@ -1122,7 +1145,12 @@ export default function BaleProducts() {
                             <TableCell className="text-right text-sm text-muted-foreground">
                               {product.weightPerBaleKg ? `${product.weightPerBaleKg} kg` : "-"}
                             </TableCell>
-                            {!hideAvgRate && !hideSellingPriceBP && (
+                            {!hideAvgRate && (
+                              <TableCell className="text-right text-sm font-mono text-muted-foreground">
+                                {product.productionPrice && parseFloat(product.productionPrice) > 0 ? parseFloat(product.productionPrice).toLocaleString() : "—"}
+                              </TableCell>
+                            )}
+                            {!hideSellingPriceBP && (
                               <TableCell className="text-right text-sm font-mono text-muted-foreground">
                                 {product.sellingPrice && parseFloat(product.sellingPrice) > 0 ? parseFloat(product.sellingPrice).toLocaleString() : "—"}
                               </TableCell>
@@ -1162,7 +1190,8 @@ export default function BaleProducts() {
                   <TableHead>Name</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead className="text-right">Weight/Bale (kg)</TableHead>
-                  {!hideAvgRate && !hideSellingPriceBP && <TableHead className="text-right">Sell Price</TableHead>}
+                  {!hideAvgRate && <TableHead className="text-right">Prod. Price</TableHead>}
+                  {!hideSellingPriceBP && <TableHead className="text-right">Sell Price</TableHead>}
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[60px]">Actions</TableHead>
                 </TableRow>
@@ -1209,7 +1238,12 @@ export default function BaleProducts() {
                       {product.categoryId ? categoryMap.get(product.categoryId) || "Uncategorized" : "Uncategorized"}
                     </TableCell>
                     <TableCell className="text-right font-mono">{product.weightPerBaleKg || "-"}</TableCell>
-                    {!hideAvgRate && !hideSellingPriceBP && (
+                    {!hideAvgRate && (
+                      <TableCell className="text-right font-mono">
+                        {product.productionPrice && parseFloat(product.productionPrice) > 0 ? parseFloat(product.productionPrice).toLocaleString() : "—"}
+                      </TableCell>
+                    )}
+                    {!hideSellingPriceBP && (
                       <TableCell className="text-right font-mono">
                         {product.sellingPrice && parseFloat(product.sellingPrice) > 0 ? parseFloat(product.sellingPrice).toLocaleString() : "—"}
                       </TableCell>
