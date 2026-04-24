@@ -85,9 +85,8 @@ async function computeStockTruth(companyId: number) {
     const reservedNotYetLoaded = reservedNotYetLoadedMap.get(code) ?? 0;
     // proformaReserved = total proforma commitment = what's still owed + what's already in loading
     const proformaReserved     = reservedNotYetLoaded + inLoading;
-    // freeToPromise = free stock minus what's still owed to active proformas
-    // Can be negative — shows the over-allocation so the user sees the real deficit
-    const freeToPromise        = inStock - reservedNotYetLoaded;
+    // freeToPromise = free stock minus what's still owed to active proformas (floor 0)
+    const freeToPromise        = Math.max(0, inStock - reservedNotYetLoaded);
     return { code, inStock, inLoading, onHand, proformaReserved, reservedNotYetLoaded, freeToPromise };
   });
 }
