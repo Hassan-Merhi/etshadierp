@@ -88,11 +88,20 @@ export default function FactoryStockAllocationV2() {
         articleCode: code, onHand: 0, inStock: 0, inLoading: 0,
         proformaReserved: 0, reservedNotYetLoaded: 0, freeToPromise: 0,
       };
-      let displayName = data.productNames[code] || code;
-      for (const p of allProformas) {
-        const line = p.lines.find(l => l.articleCode === code);
-        if (line?.productName) { displayName = line.productName; break; }
+      // productNames (from factory_bale_products SQL) is the canonical source — always wins.
+      // Only fall back to the proforma line's stored productName if the canonical lookup fails
+      // AND the stored name is actually different from the code (i.e. a real name was saved).
+      let displayName = data.productNames[code];
+      if (!displayName) {
+        for (const p of allProformas) {
+          const line = p.lines.find(l => l.articleCode === code);
+          if (line?.productName && line.productName !== code) {
+            displayName = line.productName;
+            break;
+          }
+        }
       }
+      displayName = displayName || code;
       return { ...truth, displayName };
     });
 
