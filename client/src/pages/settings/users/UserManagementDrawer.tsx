@@ -565,7 +565,7 @@ export function UserManagementDrawer({
                               </div>
                             </div>
                             <p className="text-xs text-muted-foreground">Checked tabs will be hidden from this user.</p>
-                            <div className="space-y-3 border rounded-md p-3 max-h-52 overflow-y-auto">
+                            <div className="space-y-3 border rounded-md p-3 max-h-80 overflow-y-auto">
                               {FACTORY_TAB_GROUPS.map((group) => (
                                 <div key={group} className="space-y-1.5">
                                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</span>
