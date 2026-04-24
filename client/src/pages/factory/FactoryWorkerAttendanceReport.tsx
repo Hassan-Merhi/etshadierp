@@ -262,23 +262,11 @@ export default function FactoryWorkerAttendanceReport() {
           </div>
 
           {/* ── Summary cards ───────────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 print:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 print:grid-cols-2">
             <Card>
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground font-medium mb-1">Workers</p>
                 <p className="text-2xl font-bold tabular-nums" data-testid="stat-total-workers">{data.totals.workers}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground font-medium mb-1">Present Days</p>
-                <p className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400" data-testid="stat-total-present">{data.totals.presentDays}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground font-medium mb-1">Absent Days</p>
-                <p className="text-2xl font-bold tabular-nums text-red-500 dark:text-red-400" data-testid="stat-total-absent">{data.totals.absentDays}</p>
               </CardContent>
             </Card>
             <Card>
