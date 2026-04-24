@@ -85,8 +85,11 @@ async function computeStockTruth(companyId: number) {
     const reservedNotYetLoaded = reservedNotYetLoadedMap.get(code) ?? 0;
     // proformaReserved = total proforma commitment = what's still owed + what's already in loading
     const proformaReserved     = reservedNotYetLoaded + inLoading;
-    // freeToPromise = free stock minus what's still owed to active proformas (floor 0)
-    const freeToPromise        = Math.max(0, inStock - reservedNotYetLoaded);
+    // In-loading bales count toward satisfying reservations (even if the loading order
+    // isn't formally linked to a proforma). Net pending = max(0, owed − inLoading).
+    // freeToPromise = free stock minus the net pending reservations (floor 0).
+    const netPendingReservation = Math.max(0, reservedNotYetLoaded - inLoading);
+    const freeToPromise         = Math.max(0, inStock - netPendingReservation);
     return { code, inStock, inLoading, onHand, proformaReserved, reservedNotYetLoaded, freeToPromise };
   });
 }
