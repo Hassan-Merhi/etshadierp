@@ -82,8 +82,6 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
   const [productionPrices, setProductionPrices] = useState<Record<string, string>>(draft?.productionPrices ?? {});
   const [draftStatus, setDraftStatus] = useState<"idle" | "saved">("idle");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [globalSellingPrice, setGlobalSellingPrice] = useState("");
-  const [globalProductionPrice, setGlobalProductionPrice] = useState("");
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const qtyRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -204,17 +202,23 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
     }
   }
 
-  function applyGlobalSellingPrice() {
-    if (!globalSellingPrice) return;
+  function applyCatalogSellingPrice() {
+    const m = productMap();
     const next: Record<string, string> = {};
-    for (const row of articleRows) next[row.articleCode] = globalSellingPrice;
+    for (const row of articleRows) {
+      const p = m.get(row.articleCode);
+      if (p?.sellingPrice && parseFloat(p.sellingPrice) > 0) next[row.articleCode] = p.sellingPrice;
+    }
     setSellingPrices(prev => ({ ...prev, ...next }));
   }
 
-  function applyGlobalProductionPrice() {
-    if (!globalProductionPrice) return;
+  function applyCatalogProductionPrice() {
+    const m = productMap();
     const next: Record<string, string> = {};
-    for (const row of articleRows) next[row.articleCode] = globalProductionPrice;
+    for (const row of articleRows) {
+      const p = m.get(row.articleCode);
+      if (p?.productionPrice && parseFloat(p.productionPrice) > 0) next[row.articleCode] = p.productionPrice;
+    }
     setProductionPrices(prev => ({ ...prev, ...next }));
   }
 
@@ -324,43 +328,13 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
           </div>
 
           {/* Global pricing controls */}
-          <div className="flex items-end gap-2 border-l pl-4">
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-medium">Selling Price / bale</Label>
-              <div className="flex items-center gap-1.5">
-                <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  placeholder="0.00"
-                  value={globalSellingPrice}
-                  onChange={e => setGlobalSellingPrice(e.target.value)}
-                  className="h-9 w-28 text-right font-mono text-xs"
-                  data-testid="input-global-selling-price"
-                />
-                <Button size="default" variant="outline" onClick={applyGlobalSellingPrice} data-testid="button-set-selling-price-all">
-                  Set for all
-                </Button>
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-medium">Production Price / bale</Label>
-              <div className="flex items-center gap-1.5">
-                <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  placeholder="0.00"
-                  value={globalProductionPrice}
-                  onChange={e => setGlobalProductionPrice(e.target.value)}
-                  className="h-9 w-28 text-right font-mono text-xs"
-                  data-testid="input-global-production-price"
-                />
-                <Button size="default" variant="outline" onClick={applyGlobalProductionPrice} data-testid="button-set-production-price-all">
-                  Set for all
-                </Button>
-              </div>
-            </div>
+          <div className="flex items-center gap-2 border-l pl-4">
+            <Button size="default" variant="outline" onClick={applyCatalogSellingPrice} data-testid="button-apply-selling-price">
+              Apply Sell Price
+            </Button>
+            <Button size="default" variant="outline" onClick={applyCatalogProductionPrice} data-testid="button-apply-production-price">
+              Apply Prod Price
+            </Button>
           </div>
 
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground h-9 ml-auto">
