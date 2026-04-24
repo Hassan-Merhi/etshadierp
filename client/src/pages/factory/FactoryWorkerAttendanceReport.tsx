@@ -329,8 +329,6 @@ export default function FactoryWorkerAttendanceReport() {
                       </th>
                     ))}
                     {/* Summary columns */}
-                    <th className="text-center px-2 py-2 font-medium border-b border-r whitespace-nowrap min-w-[52px] text-emerald-700 dark:text-emerald-400">P</th>
-                    <th className="text-center px-2 py-2 font-medium border-b border-r whitespace-nowrap min-w-[52px] text-red-500 dark:text-red-400">A</th>
                     <th className="text-center px-2 py-2 font-medium border-b whitespace-nowrap min-w-[52px]">%</th>
                   </tr>
                 </thead>
@@ -374,14 +372,6 @@ export default function FactoryWorkerAttendanceReport() {
                           </div>
                         </td>
                       ))}
-                      {/* Present count */}
-                      <td className="text-center px-2 py-1.5 border-r font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
-                        {worker.presentCount}
-                      </td>
-                      {/* Absent count */}
-                      <td className="text-center px-2 py-1.5 border-r font-semibold tabular-nums text-red-500 dark:text-red-400">
-                        {worker.absentCount}
-                      </td>
                       {/* Attendance % */}
                       <td className={cn(
                         "text-center px-2 py-1.5 font-semibold tabular-nums",
