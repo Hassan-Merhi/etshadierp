@@ -151,8 +151,7 @@ const FactoryInvoices = lazy(() => import("@/pages/factory/FactoryInvoices"));
 const FactoryInvoiceCreate = lazy(() => import("@/pages/factory/FactoryInvoiceCreate"));
 const FactoryInvoiceDetail = lazy(() => import("@/pages/factory/FactoryInvoiceDetail"));
 const FactoryProformas = lazy(() => import("@/pages/factory/FactoryProformas"));
-const FactoryStockAllocation = lazy(() => import("@/pages/factory/FactoryStockAllocation"));
-const FactoryStockAllocationV2 = lazy(() => import("@/pages/factory/FactoryStockAllocationV2"));
+const FactoryStockAllocation = lazy(() => import("@/pages/factory/FactoryStockAllocationV2"));
 const ProformaAddLine = lazy(() => import("@/pages/factory/ProformaAddLine"));
 const FactoryPriceList = lazy(() => import("@/pages/factory/FactoryPriceList"));
 const FactoryPendingInvoices = lazy(() => import("@/pages/factory/FactoryPendingInvoices"));
@@ -713,7 +712,6 @@ function AuthenticatedApp() {
   }
 
   const isFactoryCompany = selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
-  const isFactoryV2 = selectedCompany?.companyType === "factory_v2";
   const isFactoryRoute = currentLocation.startsWith("/factory/");
 
   const factoryDefaultPage = hasDashboardAccess ? "/factory/dashboard" : "/factory/stock-entry";
@@ -829,7 +827,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/price-list" component={FactoryPriceList} />
                     <Route path="/factory/sales/proformas/:proformaId/add-line" component={ProformaAddLine} />
                     <Route path="/factory/invoicing" component={FactoryInvoicing} />
-                    <Route path="/factory/stock-allocation" component={isFactoryV2 ? FactoryStockAllocationV2 : FactoryStockAllocation} />
+                    <Route path="/factory/stock-allocation" component={FactoryStockAllocation} />
                     <Route path="/factory/customers/:id" component={FactoryCustomerStatement} />
                     <Route path="/factory/customers" component={FactoryCustomers} />
                     <Route path="/factory/employees/:id" component={FactoryEmployeeDetail} />

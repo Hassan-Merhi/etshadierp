@@ -830,7 +830,6 @@ import { UsersSection } from "./settings/UsersSection";
                             <SelectContent>
                               <SelectItem value="erp">Normal ERP</SelectItem>
                               <SelectItem value="factory">Factory Production</SelectItem>
-                              <SelectItem value="factory_v2">Factory 2.0</SelectItem>
                               <SelectItem value="properties">Properties</SelectItem>
                             </SelectContent>
                           </Select>
@@ -949,8 +948,8 @@ import { UsersSection } from "./settings/UsersSection";
                         {company.name}
                       </TableCell>
                       <TableCell data-testid={`text-company-type-${company.id}`}>
-                        <Badge variant={company.companyType === "factory" ? "default" : company.companyType === "properties" ? "outline" : "secondary"}>
-                          {company.companyType === "factory" ? "Factory" : company.companyType === "properties" ? "Properties" : "ERP"}
+                        <Badge variant={(company.companyType === "factory" || company.companyType === "factory_v2") ? "default" : company.companyType === "properties" ? "outline" : "secondary"}>
+                          {(company.companyType === "factory" || company.companyType === "factory_v2") ? "Factory" : company.companyType === "properties" ? "Properties" : "ERP"}
                         </Badge>
                       </TableCell>
                       <TableCell data-testid={`text-company-status-${company.id}`}>

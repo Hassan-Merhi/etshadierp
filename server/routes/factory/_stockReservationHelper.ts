@@ -116,14 +116,16 @@ export async function syncProformaReservations(
 }
 
 /**
- * Returns whether a company is of type factory_v2.
+ * Returns whether a company uses factory-mode reservation logic.
+ * Applies to both "factory" and "factory_v2" company types — v2 is now the
+ * default behaviour for all factory companies.
  */
 export async function isFactoryV2Company(companyId: number): Promise<boolean> {
   const [co] = await db
     .select({ companyType: companies.companyType })
     .from(companies)
     .where(eq(companies.id, companyId));
-  return co?.companyType === "factory_v2";
+  return co?.companyType === "factory" || co?.companyType === "factory_v2";
 }
 
 /**
