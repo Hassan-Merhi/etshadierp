@@ -35,6 +35,15 @@ interface FactorySettingsData {
   productionSummaryEnabled: boolean;
   supplierReportEnabled: boolean;
   supplierStatementEnabled: boolean;
+  daybookEnabled: boolean;
+  workersTabPayrollEnabled: boolean;
+  workersTabAttendanceEnabled: boolean;
+  workersTabReportEnabled: boolean;
+  workersTabAdvancesEnabled: boolean;
+  workersTabBonusesEnabled: boolean;
+  balesTabBarcodeEnabled: boolean;
+  balesTabRemoveEnabled: boolean;
+  loadingsTabPendingEnabled: boolean;
   laborCostPerKg: number;
   overheadPerKg: number;
   hideSellingPrice: boolean;
@@ -57,6 +66,15 @@ const defaultSettings: FactorySettingsData = {
   productionSummaryEnabled: true,
   supplierReportEnabled: true,
   supplierStatementEnabled: true,
+  daybookEnabled: true,
+  workersTabPayrollEnabled: true,
+  workersTabAttendanceEnabled: true,
+  workersTabReportEnabled: true,
+  workersTabAdvancesEnabled: true,
+  workersTabBonusesEnabled: true,
+  balesTabBarcodeEnabled: true,
+  balesTabRemoveEnabled: true,
+  loadingsTabPendingEnabled: true,
   laborCostPerKg: 0,
   overheadPerKg: 0,
   hideSellingPrice: false,
@@ -320,6 +338,15 @@ export default function FactorySettings() {
       productionSummaryEnabled: true,
       supplierReportEnabled: true,
       supplierStatementEnabled: true,
+      daybookEnabled: true,
+      workersTabPayrollEnabled: true,
+      workersTabAttendanceEnabled: true,
+      workersTabReportEnabled: true,
+      workersTabAdvancesEnabled: true,
+      workersTabBonusesEnabled: true,
+      balesTabBarcodeEnabled: true,
+      balesTabRemoveEnabled: true,
+      loadingsTabPendingEnabled: true,
     };
     setSettings(allEnabled);
     mutation.mutate(allEnabled);
@@ -423,6 +450,36 @@ export default function FactorySettings() {
             {toggleItem("Production Summary", "productionSummaryEnabled")}
             {toggleItem("Supplier Report", "supplierReportEnabled")}
             {toggleItem("Supplier Statement", "supplierStatementEnabled")}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle data-testid="text-section-pages">Page Visibility</CardTitle>
+            <CardDescription>Show or hide entire pages for all users</CardDescription>
+          </CardHeader>
+          <CardContent className="divide-y">
+            {toggleItem("Daybook", "daybookEnabled")}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle data-testid="text-section-tabs">Page Tabs</CardTitle>
+            <CardDescription>Disable tabs you don't use — they will be hidden from all users</CardDescription>
+          </CardHeader>
+          <CardContent className="divide-y">
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Workers Hub</p>
+            {toggleItem("Payroll tab", "workersTabPayrollEnabled")}
+            {toggleItem("Attendance tab", "workersTabAttendanceEnabled")}
+            {toggleItem("Report tab", "workersTabReportEnabled")}
+            {toggleItem("Advances tab", "workersTabAdvancesEnabled")}
+            {toggleItem("Bonuses tab", "workersTabBonusesEnabled")}
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Bales Hub</p>
+            {toggleItem("Barcode Lookup tab", "balesTabBarcodeEnabled")}
+            {toggleItem("Remove from Stock tab", "balesTabRemoveEnabled")}
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Loadings Hub</p>
+            {toggleItem("Pending Loadings tab", "loadingsTabPendingEnabled")}
           </CardContent>
         </Card>
 

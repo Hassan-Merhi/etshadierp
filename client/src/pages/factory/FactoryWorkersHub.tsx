@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HardHat, DollarSign, CalendarDays, Banknote, Gift, BarChart3 } from "lucide-react";
 import FactoryWorkers from "@/pages/factory/FactoryWorkers";
@@ -37,6 +38,18 @@ function setTabInUrl(tab: TabValue) {
 export default function FactoryWorkersHub() {
   const [tab, setTab] = useState<TabValue>(getInitialTab);
 
+  const { data: settings } = useQuery<any>({
+    queryKey: ["/api/factory/settings"],
+    queryFn: async () => { const r = await fetch("/api/factory/settings"); return r.ok ? r.json() : {}; },
+    staleTime: 60000,
+  });
+
+  const showPayroll    = settings?.workersTabPayrollEnabled    !== false;
+  const showAttendance = settings?.workersTabAttendanceEnabled !== false;
+  const showReport     = settings?.workersTabReportEnabled     !== false;
+  const showAdvances   = settings?.workersTabAdvancesEnabled   !== false;
+  const showBonuses    = settings?.workersTabBonusesEnabled    !== false;
+
   const handleTabChange = (v: string) => {
     const newTab = v as TabValue;
     setTab(newTab);
@@ -50,46 +63,66 @@ export default function FactoryWorkersHub() {
           <HardHat className="h-4 w-4 mr-2" />
           Workers
         </TabsTrigger>
-        <TabsTrigger value="payroll" data-testid="tab-payroll">
-          <DollarSign className="h-4 w-4 mr-2" />
-          Payroll
-        </TabsTrigger>
-        <TabsTrigger value="attendance" data-testid="tab-attendance">
-          <CalendarDays className="h-4 w-4 mr-2" />
-          Attendance
-        </TabsTrigger>
-        <TabsTrigger value="report" data-testid="tab-attendance-report">
-          <BarChart3 className="h-4 w-4 mr-2" />
-          Report
-        </TabsTrigger>
-        <TabsTrigger value="advances" data-testid="tab-advances">
-          <Banknote className="h-4 w-4 mr-2" />
-          Advances
-        </TabsTrigger>
-        <TabsTrigger value="bonuses" data-testid="tab-bonuses">
-          <Gift className="h-4 w-4 mr-2" />
-          Bonuses
-        </TabsTrigger>
+        {showPayroll && (
+          <TabsTrigger value="payroll" data-testid="tab-payroll">
+            <DollarSign className="h-4 w-4 mr-2" />
+            Payroll
+          </TabsTrigger>
+        )}
+        {showAttendance && (
+          <TabsTrigger value="attendance" data-testid="tab-attendance">
+            <CalendarDays className="h-4 w-4 mr-2" />
+            Attendance
+          </TabsTrigger>
+        )}
+        {showReport && (
+          <TabsTrigger value="report" data-testid="tab-attendance-report">
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Report
+          </TabsTrigger>
+        )}
+        {showAdvances && (
+          <TabsTrigger value="advances" data-testid="tab-advances">
+            <Banknote className="h-4 w-4 mr-2" />
+            Advances
+          </TabsTrigger>
+        )}
+        {showBonuses && (
+          <TabsTrigger value="bonuses" data-testid="tab-bonuses">
+            <Gift className="h-4 w-4 mr-2" />
+            Bonuses
+          </TabsTrigger>
+        )}
       </TabsList>
 
       <TabsContent value="workers" className="mt-0">
         <FactoryWorkers />
       </TabsContent>
-      <TabsContent value="payroll" className="mt-0">
-        <FactoryPayrollTab />
-      </TabsContent>
-      <TabsContent value="attendance" className="mt-0">
-        <FactoryAttendance />
-      </TabsContent>
-      <TabsContent value="report" className="mt-0">
-        <FactoryWorkerAttendanceReport />
-      </TabsContent>
-      <TabsContent value="advances" className="mt-0">
-        <FactoryAdvancesTab />
-      </TabsContent>
-      <TabsContent value="bonuses" className="mt-0">
-        <FactoryWorkerBonusesTab />
-      </TabsContent>
+      {showPayroll && (
+        <TabsContent value="payroll" className="mt-0">
+          <FactoryPayrollTab />
+        </TabsContent>
+      )}
+      {showAttendance && (
+        <TabsContent value="attendance" className="mt-0">
+          <FactoryAttendance />
+        </TabsContent>
+      )}
+      {showReport && (
+        <TabsContent value="report" className="mt-0">
+          <FactoryWorkerAttendanceReport />
+        </TabsContent>
+      )}
+      {showAdvances && (
+        <TabsContent value="advances" className="mt-0">
+          <FactoryAdvancesTab />
+        </TabsContent>
+      )}
+      {showBonuses && (
+        <TabsContent value="bonuses" className="mt-0">
+          <FactoryWorkerBonusesTab />
+        </TabsContent>
+      )}
     </Tabs>
   );
 }

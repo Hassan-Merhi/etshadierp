@@ -1,10 +1,20 @@
+import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import FactoryContainerLoadingScan from "./FactoryContainerLoadingScan";
 import FactoryPendingLoadings from "./FactoryPendingLoadings";
 
 export default function FactoryLoadingsHub() {
   const hash = typeof window !== "undefined" ? window.location.hash.replace("#", "") : "";
-  const defaultTab = hash === "pending" ? "pending" : "loadings";
+
+  const { data: settings } = useQuery<any>({
+    queryKey: ["/api/factory/settings"],
+    queryFn: async () => { const r = await fetch("/api/factory/settings"); return r.ok ? r.json() : {}; },
+    staleTime: 60000,
+  });
+
+  const showPending = settings?.loadingsTabPendingEnabled !== false;
+
+  const defaultTab = hash === "pending" && showPending ? "pending" : "loadings";
 
   function handleTabChange(value: string) {
     window.history.replaceState(null, "", `#${value}`);
@@ -16,15 +26,19 @@ export default function FactoryLoadingsHub() {
         <div className="border-b px-4 pt-3 flex-shrink-0">
           <TabsList>
             <TabsTrigger value="loadings" data-testid="tab-container-loadings">Container Loadings</TabsTrigger>
-            <TabsTrigger value="pending" data-testid="tab-pending-loadings">Pending Loadings</TabsTrigger>
+            {showPending && (
+              <TabsTrigger value="pending" data-testid="tab-pending-loadings">Pending Loadings</TabsTrigger>
+            )}
           </TabsList>
         </div>
         <TabsContent value="loadings" className="flex-1 overflow-auto mt-0">
           <FactoryContainerLoadingScan />
         </TabsContent>
-        <TabsContent value="pending" className="flex-1 overflow-auto mt-0">
-          <FactoryPendingLoadings />
-        </TabsContent>
+        {showPending && (
+          <TabsContent value="pending" className="flex-1 overflow-auto mt-0">
+            <FactoryPendingLoadings />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

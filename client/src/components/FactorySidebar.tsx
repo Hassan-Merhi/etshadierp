@@ -323,7 +323,9 @@ export function FactorySidebar({ user }: { user?: any }) {
           {hasDashboard && (
             <FlatLink href="/factory/dashboard" icon={LayoutDashboard} label="Dashboard" color="#3b82f6" testId="link-factory-dashboard" />
           )}
-          <FlatLink href="/factory/daybook" icon={BookOpen} label="Daybook" color="#3b82f6" testId="link-factory-daybook" />
+          {settings?.daybookEnabled !== false && (
+            <FlatLink href="/factory/daybook" icon={BookOpen} label="Daybook" color="#3b82f6" testId="link-factory-daybook" />
+          )}
         </div>
 
         {/* Collapsible sections */}
