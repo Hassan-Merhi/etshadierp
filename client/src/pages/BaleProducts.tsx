@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import hmdLogoPath from "@assets/image_1777022653159.png";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X, AlertTriangle, FileSpreadsheet, EyeOff, Eye, AlertCircle, Palette } from "lucide-react";
@@ -386,73 +387,150 @@ export default function BaleProducts() {
       return;
     }
     try {
-      const XLSX = await import("xlsx");
+      const ExcelJSModule = await import("exceljs");
+      const ExcelJS = ExcelJSModule.default ?? ExcelJSModule;
+
       const priceHeader = priceType === "selling" ? "Selling Price" : "Production Price";
       const today = new Date().toISOString().slice(0, 10);
-      const subtitle = `Bale Products - ${priceHeader}`;
       const fileName = priceType === "selling"
         ? "bale_products_selling_price_export.xlsx"
         : "bale_products_production_price_export.xlsx";
 
-      // Build header rows
-      const headerRows = [
-        ["HMD International Group", "", "", "", "", "", ""],
-        [subtitle,                  "", "", "", "", "", ""],
-        [`Price Type: ${priceHeader}`, "", "", "", "", "", ""],
-        [`Generated: ${today}`,     "", "", "", "", "", ""],
-        ["",                        "", "", "", "", "", ""],
-        ["#", "Article Code", "Name of Item", "Category", "Weight", priceHeader, "Order"],
+      // ── Brand colours ────────────────────────────────────────────────
+      const C_NAVY    = "FF00205B"; // Deep navy  – company header text
+      const C_BLUE    = "FF1F3A6B"; // Mid blue   – table header bg
+      const C_ACCENT  = "FF2E75B6"; // Accent blue – subtitle text
+      const C_ALT_ROW = "FFDCE6F1"; // Pale blue  – alternating rows
+      const C_WHITE   = "FFFFFFFF";
+      const C_BORDER  = "FFBFBFBF";
+      const C_MUTED   = "FF888888";
+      const C_ZERO    = "FFBBBBBB";
+
+      const wb = new (ExcelJS as any).Workbook();
+      wb.creator = "HMD International Group";
+      const ws = wb.addWorksheet("Bale Products");
+
+      // ── Column definitions ──────────────────────────────────────────
+      ws.columns = [
+        { key: "num",      width: 6  },
+        { key: "article",  width: 18, hidden: true },
+        { key: "name",     width: 42 },
+        { key: "category", width: 22 },
+        { key: "weight",   width: 14 },
+        { key: "price",    width: 16 },
+        { key: "order",    width: 14 },
       ];
 
-      // Build data rows
-      const dataRows = activeProducts.map((p, i) => {
+      // ── Logo ─────────────────────────────────────────────────────────
+      try {
+        const logoRes = await fetch(hmdLogoPath);
+        const logoBuffer = await logoRes.arrayBuffer();
+        const imageId = wb.addImage({ buffer: logoBuffer, extension: "png" });
+        ws.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 180, height: 72 } });
+      } catch { /* logo fetch failed — skip */ }
+
+      // ── Header rows 1-4 (logo sits over A:B cols) ───────────────────
+      const addHeaderRow = (text: string, height: number, font: any) => {
+        const r = ws.addRow(["", "", text, "", "", "", ""]);
+        r.height = height;
+        const cell = r.getCell(3);
+        cell.font = font;
+        cell.alignment = { vertical: "middle", horizontal: "left" };
+        ws.mergeCells(`C${r.number}:G${r.number}`);
+        return r;
+      };
+
+      addHeaderRow("HMD International Group", 24,
+        { bold: true, size: 16, color: { argb: C_NAVY } });
+      addHeaderRow(`Bale Products – ${priceHeader}`, 20,
+        { bold: true, size: 12, color: { argb: C_ACCENT } });
+      addHeaderRow(`Price Type: ${priceHeader}`, 16,
+        { size: 10, color: { argb: C_MUTED } });
+      addHeaderRow(`Generated: ${today}`, 16,
+        { size: 10, color: { argb: C_MUTED } });
+
+      // Row 5 – thin spacer with a bottom border accent line
+      const spacer = ws.addRow(["", "", "", "", "", "", ""]);
+      spacer.height = 6;
+      ws.mergeCells(`A${spacer.number}:G${spacer.number}`);
+      spacer.getCell(1).fill = {
+        type: "pattern", pattern: "solid", fgColor: { argb: C_NAVY },
+      };
+
+      // ── Table header (row 6) ─────────────────────────────────────────
+      const hdrRow = ws.addRow(["#", "Article Code", "Name of Item", "Category", "Weight (kg)", priceHeader, "Order"]);
+      hdrRow.height = 22;
+      hdrRow.eachCell((cell: any) => {
+        cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: C_BLUE } };
+        cell.font   = { bold: true, color: { argb: C_WHITE }, size: 11 };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.border = {
+          top:    { style: "thin",   color: { argb: C_BLUE } },
+          bottom: { style: "medium", color: { argb: C_NAVY } },
+          left:   { style: "thin",   color: { argb: C_BLUE } },
+          right:  { style: "thin",   color: { argb: C_BLUE } },
+        };
+      });
+
+      // ── Data rows ────────────────────────────────────────────────────
+      activeProducts.forEach((p, i) => {
         const rawPrice = priceType === "selling" ? p.sellingPrice : p.productionPrice;
         const numPrice = rawPrice ? parseFloat(rawPrice) : 0;
-        return [
+        const categoryName = p.categoryId ? (categoryMap.get(p.categoryId) || "") : "";
+        const weight = p.weightPerBaleKg != null ? parseFloat(String(p.weightPerBaleKg)) : "";
+
+        const row = ws.addRow([
           `#${i + 1}`,
           p.articleCode || "",
           p.name || "",
-          p.categoryId ? (categoryMap.get(p.categoryId) || "") : "",
-          p.weightPerBaleKg != null ? p.weightPerBaleKg : "",
+          categoryName,
+          weight,
           numPrice,
           "",
-        ];
+        ]);
+        row.height = 18;
+
+        const isAlt = i % 2 === 1;
+        const rowFill = isAlt
+          ? { type: "pattern", pattern: "solid", fgColor: { argb: C_ALT_ROW } }
+          : undefined;
+
+        row.eachCell((cell: any, colNum: number) => {
+          if (rowFill) cell.fill = rowFill;
+          cell.font = { size: 10 };
+          cell.border = { bottom: { style: "hair", color: { argb: C_BORDER } } };
+          if (colNum === 1) cell.alignment = { horizontal: "center" };
+          if (colNum === 5 || colNum === 6) cell.alignment = { horizontal: "right" };
+        });
+
+        // Number format for price column
+        const priceCell = row.getCell(6);
+        priceCell.numFmt = "#,##0.00";
+        if (numPrice === 0) priceCell.font = { size: 10, color: { argb: C_ZERO } };
+
+        // Weight number format
+        if (weight !== "") row.getCell(5).numFmt = "#,##0.##";
       });
 
-      const allRows = [...headerRows, ...dataRows];
-      const ws = XLSX.utils.aoa_to_sheet(allRows);
+      // ── Freeze & auto-filter ─────────────────────────────────────────
+      ws.views = [{ state: "frozen", xSplit: 0, ySplit: 6 }];
+      ws.autoFilter = { from: "A6", to: `G${6 + activeProducts.length}` };
 
-      // Column widths — Article Code (col B) hidden
-      ws["!cols"] = [
-        { wch: 8 },
-        { wch: 18, hidden: true },
-        { wch: 40 },
-        { wch: 22 },
-        { wch: 14 },
-        { wch: 18 },
-        { wch: 16 },
-      ];
+      // ── Download ─────────────────────────────────────────────────────
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
 
-      // Merge title rows across A:G (rows 0-3, 0-indexed)
-      ws["!merges"] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
-        { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } },
-        { s: { r: 2, c: 0 }, e: { r: 2, c: 6 } },
-        { s: { r: 3, c: 0 }, e: { r: 3, c: 6 } },
-      ];
-
-      // Freeze panes below header row (row 6 = index 5 is the table header)
-      ws["!freeze"] = { xSplit: 0, ySplit: 6 };
-
-      // Auto filter on table header row (row index 5)
-      const lastDataRow = headerRows.length + dataRows.length - 1;
-      ws["!autofilter"] = { ref: `A6:G${lastDataRow + 1}` };
-
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Bale Products");
-      XLSX.writeFile(wb, fileName);
       toast({ title: priceType === "selling" ? "Selling price export downloaded" : "Production price export downloaded" });
-    } catch {
+    } catch (err) {
+      console.error("Export failed", err);
       toast({ title: "Export failed", variant: "destructive" });
     }
   };
