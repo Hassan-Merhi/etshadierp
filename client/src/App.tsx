@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useState, useRef, lazy, Suspense } from "react";
 import { Switch, Route, useLocation, Redirect } from "wouter";
-import { queryClient, getQueryFn } from "./lib/queryClient";
+import { queryClient, getQueryFn, setAppTimezone } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -450,9 +450,14 @@ function AuthenticatedApp() {
 
   const { data: posCompanySettings } = useQuery<any>({
     queryKey: ["/api/company-settings"],
-    enabled: isPOS,
+    enabled: !!user,
   });
   const posImportEnabled = posCompanySettings?.posExcelImportEnabled === true;
+
+  // Keep the app's date utility in sync with the company's configured timezone.
+  useEffect(() => {
+    setAppTimezone(posCompanySettings?.timezone);
+  }, [posCompanySettings?.timezone]);
 
   const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hasErpAccess: boolean; hasFactoryAccess: boolean; companyId?: number; companyName?: string }>({
     queryKey: ["/api/factory/my-access"],

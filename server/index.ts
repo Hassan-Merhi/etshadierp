@@ -1338,6 +1338,8 @@ let migrationsDone = false;
     // Performance index for the per-company aggregation used in computeStockTruth
     `CREATE INDEX IF NOT EXISTS proforma_stock_reservations_company_article_idx
        ON proforma_stock_reservations (company_id, article_code)`,
+    // Company-level timezone setting (Apr 2026)
+    `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS timezone text`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

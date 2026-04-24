@@ -1354,6 +1354,7 @@ export const companySettings = pgTable("company_settings", {
   parentCreditAccountId: integer("parent_credit_account_id"),
   netPositionAdjustment: decimal("net_position_adjustment", { precision: 15, scale: 2 }).default("0"),
   posExcelImportEnabled: boolean("pos_excel_import_enabled").default(false),
+  timezone: text("timezone"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -1370,6 +1371,7 @@ export const insertCompanySettingsSchema = createInsertSchema(companySettings).o
   parentCreditAccountId: z.number().optional(),
   netPositionAdjustment: z.string().optional(),
   posExcelImportEnabled: z.boolean().optional(),
+  timezone: z.string().optional(),
 });
 
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;

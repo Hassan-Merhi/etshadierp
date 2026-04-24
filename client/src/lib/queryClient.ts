@@ -2,6 +2,38 @@ import { QueryClient, QueryFunction, MutationCache } from "@tanstack/react-query
 import { isSafeToQueue, enqueueRequest, getDescriptionForRequest } from "./offlineQueue";
 import { toast } from "@/hooks/use-toast";
 
+/* ── Timezone-aware date utility ───────────────────────────────────────────── */
+// Stores the configured timezone for the current company.
+// Defaults to the browser's local timezone so behaviour is unchanged until a
+// company timezone is explicitly saved.
+let _appTimezone: string | null = null;
+
+/** Call this whenever company settings are loaded to configure the app timezone. */
+export function setAppTimezone(tz: string | null | undefined) {
+  _appTimezone = tz || null;
+}
+
+/**
+ * Returns today's date string (YYYY-MM-DD) in the configured company timezone.
+ * Falls back to the browser's local timezone if no company timezone is set.
+ */
+export function getAppDate(): string {
+  const tz = _appTimezone;
+  if (tz) {
+    try {
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: tz,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+    } catch {
+      // Invalid timezone string — fall through to browser local
+    }
+  }
+  return new Date().toLocaleDateString("en-CA");
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = await res.text();
@@ -59,7 +91,7 @@ export async function apiRequest(
       method,
       headers: {
         ...(data ? { "Content-Type": "application/json" } : {}),
-        "X-Client-Date": new Date().toLocaleDateString('en-CA'),
+        "X-Client-Date": getAppDate(),
       },
       body,
       credentials: "include",
@@ -115,7 +147,7 @@ export const getQueryFn: <T>(options: {
       const res = await fetch(url, {
         credentials: "include",
         signal: controller.signal,
-        headers: { "X-Client-Date": new Date().toLocaleDateString('en-CA') },
+        headers: { "X-Client-Date": getAppDate() },
       });
 
       clearTimeout(timeoutId);

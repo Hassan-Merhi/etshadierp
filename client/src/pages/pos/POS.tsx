@@ -19,7 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, getAppDate } from "@/lib/queryClient";
 import { useCurrencyContext, type Currency } from "@/contexts/CurrencyContext";
 import { useToast } from "@/hooks/use-toast";
 import { useReactToPrint } from "react-to-print";
@@ -240,7 +240,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     ? posCustomers.find((c: any) => String(c.id) === selectedCustomerId)
     : null;
   const [notes, setNotes] = useState("");
-  const [saleDate, setSaleDate] = useState(new Date().toISOString().substring(0, 10));
+  const [saleDate, setSaleDate] = useState(getAppDate());
   const [searchTerm, setSearchTerm] = useState("");
   const [activeRow, setActiveRow] = useState<number | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState(0);

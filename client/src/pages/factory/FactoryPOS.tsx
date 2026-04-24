@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, getAppDate } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useReactToPrint } from "react-to-print";
 import { Button } from "@/components/ui/button";
@@ -114,7 +114,7 @@ export default function FactoryPOS() {
   const [paymentType, setPaymentType]   = useState<"CASH" | "CREDIT">("CASH");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [notes, setNotes]               = useState("");
-  const [txDate, setTxDate]             = useState(new Date().toLocaleDateString('en-CA'));
+  const [txDate, setTxDate]             = useState(getAppDate());
   const [currencyCode, setCurrencyCode] = useState("USD");
   const [cashAccountId, setCashAccountId] = useState<string>("");
   const [rows, setRows]                 = useState<CartRow[]>([emptyRow("1")]);
@@ -178,7 +178,7 @@ export default function FactoryPOS() {
     setPaymentType((editSaleData.paymentType as "CASH" | "CREDIT") || "CASH");
     setSelectedCustomerId(editSaleData.customerId ? String(editSaleData.customerId) : "");
     setNotes(editSaleData.notes || "");
-    setTxDate(editSaleData.txDate || new Date().toLocaleDateString('en-CA'));
+    setTxDate(editSaleData.txDate || getAppDate());
     setCurrencyCode(editSaleData.currencyCode || "USD");
     setCashAccountId(editSaleData.cashAccountId ? String(editSaleData.cashAccountId) : "");
     if (editSaleData.items && editSaleData.items.length > 0) {
