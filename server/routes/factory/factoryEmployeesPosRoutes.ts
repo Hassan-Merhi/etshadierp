@@ -3273,15 +3273,16 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
 
       const workerIds = workers.map((w: any) => w.id);
 
-      // Attendance rows for this month
+      // Attendance rows for this month — filter by year+month via EXTRACT to avoid
+      // any date-string casting ambiguity in parameterized queries.
       const attRows = await db.execute(
         sql`SELECT worker_id AS "workerId",
                    EXTRACT(DAY FROM attendance_date::date)::int AS day,
                    status
             FROM factory_attendance
             WHERE company_id = ${companyId}
-              AND attendance_date >= ${startDate}
-              AND attendance_date <= ${endDate}
+              AND EXTRACT(YEAR  FROM attendance_date::date) = ${year}
+              AND EXTRACT(MONTH FROM attendance_date::date) = ${month}
               AND worker_id = ANY(${sql.raw(`ARRAY[${workerIds.join(",")}]`)})
             ORDER BY attendance_date`
       );
