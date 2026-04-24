@@ -886,45 +886,47 @@ export default function BaleProducts() {
             onChange={handleFileSelect}
             data-testid="input-import-file"
           />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" data-testid="button-actions-menu">
-                Actions
-                <ChevronDown className="h-3 w-3 ml-2" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">Categories</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => setShowCategories(!showCategories)} data-testid="menu-manage-categories">
-                <Tags className="h-4 w-4 mr-2" />
-                {showCategories ? "Hide Categories" : "Manage Categories"}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-xs text-muted-foreground">Make Your Order</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => handleExportExcel("selling")} data-testid="menu-export-selling-price">
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Selling Price
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportExcel("production")} data-testid="menu-export-production-price">
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Production Price
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportNoPrices} data-testid="menu-export-no-prices">
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                No Prices
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-xs text-muted-foreground">Import / Template</DropdownMenuLabel>
-              <DropdownMenuItem onClick={handleDownloadTemplate} data-testid="menu-download-template">
-                <Download className="h-4 w-4 mr-2" />
-                Download Template
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => fileInputRef.current?.click()} data-testid="menu-import-excel">
-                <Upload className="h-4 w-4 mr-2" />
-                Import Excel
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {isAdmin && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" data-testid="button-actions-menu">
+                  Actions
+                  <ChevronDown className="h-3 w-3 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Categories</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => setShowCategories(!showCategories)} data-testid="menu-manage-categories">
+                  <Tags className="h-4 w-4 mr-2" />
+                  {showCategories ? "Hide Categories" : "Manage Categories"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Make Your Order</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => handleExportExcel("selling")} data-testid="menu-export-selling-price">
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Selling Price
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExportExcel("production")} data-testid="menu-export-production-price">
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Production Price
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportNoPrices} data-testid="menu-export-no-prices">
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  No Prices
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Import / Template</DropdownMenuLabel>
+                <DropdownMenuItem onClick={handleDownloadTemplate} data-testid="menu-download-template">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Template
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => fileInputRef.current?.click()} data-testid="menu-import-excel">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <Button
             onClick={() => {
               if (isAdmin) {
