@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import hmdLogoPath from "@assets/image_1777023994734.png";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X, AlertTriangle, FileSpreadsheet, EyeOff, Eye, AlertCircle, Palette } from "lucide-react";
@@ -43,6 +42,8 @@ import { A4_DESIGN_OPTIONS } from "@/lib/labelHtml";
 import { CreateBaleProductDialog } from "../components/CreateBaleProductDialog";
 import { AdminAuthDialog } from "@/components/AdminAuthDialog";
 import type { FactoryBaleProduct, FactoryCategory } from "@shared/schema";
+
+const hmdLogoPath = "/hmd-logo-export.png";
 
 interface ImportPreviewRow {
   articleCode: string;
