@@ -115,6 +115,16 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
 
       const stockTruth = await computeStockTruth(companyId);
 
+      // Fetch inactive product article codes so we can exclude them from the view
+      const inactiveProductsRaw = await db.execute(
+        sql`SELECT article_code FROM factory_bale_products
+            WHERE company_id = ${companyId} AND active = false AND article_code IS NOT NULL`,
+      );
+      const inactiveArticleCodes = new Set<string>(
+        ((inactiveProductsRaw as any).rows ?? (inactiveProductsRaw as any[])).map((r: any) => r.article_code as string),
+      );
+      const activeStockTruth = stockTruth.filter(t => !inactiveArticleCodes.has(t.code));
+
       // All proformas with lines
       const allProformas = await db
         .select({
@@ -173,10 +183,13 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
         rows.forEach((c: any) => customerMap.set(c.id, c.legalName));
       }
 
+      // Filter proforma lines that reference inactive products
+      const activeLines = allLines.filter(l => !inactiveArticleCodes.has(l.articleCode));
+
       // Product names
       const allCodes = [...new Set([
-        ...stockTruth.map(t => t.code),
-        ...allLines.map(l => l.articleCode),
+        ...activeStockTruth.map(t => t.code),
+        ...activeLines.map(l => l.articleCode),
       ])];
       const productNamesMap: Record<string, string> = {};
       if (allCodes.length > 0) {
@@ -194,7 +207,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
 
       res.json({
         // Backend-computed stock truth — one source of reality, never re-derived on frontend
-        stockTruth: stockTruth.map(t => ({
+        stockTruth: activeStockTruth.map(t => ({
           articleCode:          t.code,
           onHand:               t.onHand,
           inStock:              t.inStock,
@@ -210,7 +223,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
           name:         p.name,
           isActive:     p.isActive,
           createdAt:    p.createdAt,
-          lines: allLines
+          lines: activeLines
             .filter(l => l.proformaId === p.id)
             .map(l => {
               const loaded = loadedByProforma.find(lb => lb.proformaId === p.id && lb.articleCode === l.articleCode)?.loaded || 0;
@@ -303,10 +316,19 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
         totalStockMap.set(b.articleCode, (totalStockMap.get(b.articleCode) || 0) + b.count);
       }
 
+      // Exclude inactive products
+      const inactiveRaw2 = await db.execute(
+        sql`SELECT article_code FROM factory_bale_products
+            WHERE company_id = ${companyId} AND active = false AND article_code IS NOT NULL`,
+      );
+      const inactiveCodes2 = new Set<string>(
+        ((inactiveRaw2 as any).rows ?? (inactiveRaw2 as any[])).map((r: any) => r.article_code as string),
+      );
+
       const articleCodeSet = new Set<string>([
-        ...freeStockCounts.map(s => s.articleCode),
-        ...loadingBales.map(b => b.articleCode),
-        ...proformaLines.map(pl => pl.articleCode),
+        ...freeStockCounts.map(s => s.articleCode).filter(c => !inactiveCodes2.has(c)),
+        ...loadingBales.map(b => b.articleCode).filter(c => !inactiveCodes2.has(c)),
+        ...proformaLines.map(pl => pl.articleCode).filter(c => !inactiveCodes2.has(c)),
       ]);
       const productNameByCode = new Map<string, string>();
       if (articleCodeSet.size > 0) {
