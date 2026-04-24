@@ -65,25 +65,37 @@ function fmt(val: string | number | null | undefined) {
 export default function FactoryAdvancesTab() {
   const [subTab, setSubTab] = useState("advances");
 
+  const { data: settings } = useQuery<any>({
+    queryKey: ["/api/factory/settings"],
+    queryFn: async () => { const r = await fetch("/api/factory/settings"); return r.ok ? r.json() : {}; },
+    staleTime: 60000,
+  });
+
+  const showRepayments = settings?.advancesTabRepaymentsEnabled !== false;
+
   return (
-    <Tabs value={subTab} onValueChange={setSubTab}>
+    <Tabs value={showRepayments ? subTab : "advances"} onValueChange={setSubTab}>
       <TabsList className="mb-4">
         <TabsTrigger value="advances" data-testid="subtab-advances">
           <Banknote className="h-4 w-4 mr-2" />
           Advances
         </TabsTrigger>
-        <TabsTrigger value="repayments" data-testid="subtab-repayments">
-          <RotateCcw className="h-4 w-4 mr-2" />
-          Repayments
-        </TabsTrigger>
+        {showRepayments && (
+          <TabsTrigger value="repayments" data-testid="subtab-repayments">
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Repayments
+          </TabsTrigger>
+        )}
       </TabsList>
 
       <TabsContent value="advances" className="mt-0">
         <AdvancesView />
       </TabsContent>
-      <TabsContent value="repayments" className="mt-0">
-        <RepaymentsView />
-      </TabsContent>
+      {showRepayments && (
+        <TabsContent value="repayments" className="mt-0">
+          <RepaymentsView />
+        </TabsContent>
+      )}
     </Tabs>
   );
 }

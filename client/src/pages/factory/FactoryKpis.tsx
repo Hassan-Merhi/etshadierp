@@ -52,6 +52,15 @@ export default function FactoryKpis() {
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
 
+  const { data: settings } = useQuery<any>({
+    queryKey: ["/api/factory/settings"],
+    queryFn: async () => { const r = await fetch("/api/factory/settings"); return r.ok ? r.json() : {}; },
+    staleTime: 60000,
+  });
+
+  const showWorkers = settings?.kpisTabWorkerPerformanceEnabled !== false;
+  const showMixes   = settings?.kpisTabMixEfficiencyEnabled    !== false;
+
   const dailyQuery = useQuery<DailyProduction[]>({
     queryKey: ["/api/factory/kpis/daily", from, to],
     queryFn: async () => {
@@ -113,8 +122,8 @@ export default function FactoryKpis() {
       <Tabs defaultValue="daily" data-testid="tabs-kpi">
         <TabsList>
           <TabsTrigger value="daily" data-testid="tab-daily">Daily Production</TabsTrigger>
-          <TabsTrigger value="workers" data-testid="tab-workers">Worker Performance</TabsTrigger>
-          <TabsTrigger value="mixes" data-testid="tab-mixes">Mix Efficiency</TabsTrigger>
+          {showWorkers && <TabsTrigger value="workers" data-testid="tab-workers">Worker Performance</TabsTrigger>}
+          {showMixes && <TabsTrigger value="mixes" data-testid="tab-mixes">Mix Efficiency</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="daily">
@@ -160,97 +169,101 @@ export default function FactoryKpis() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="workers">
-          <Card>
-            <CardHeader>
-              <CardTitle>Worker Performance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {workersQuery.isLoading ? (
-                <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  <span className="ml-2 text-muted-foreground">Loading worker performance...</span>
-                </div>
-              ) : !Array.isArray(workersQuery.data) || workersQuery.data.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground" data-testid="text-no-data">No worker performance data for selected range</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>#</TableHead>
-                        <TableHead>Worker Name</TableHead>
-                        <TableHead>Bales Count</TableHead>
-                        <TableHead>Total KG</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {workersQuery.data.map((worker, idx) => (
-                        <TableRow key={worker.workerName ?? idx} data-testid={`row-worker-${idx}`}>
-                          <TableCell>
-                            <Badge variant="outline">{idx + 1}</Badge>
-                          </TableCell>
-                          <TableCell className="font-medium">{worker.workerName}</TableCell>
-                          <TableCell className="font-mono">{worker.balesCount}</TableCell>
-                          <TableCell className="font-mono">{worker.totalKg}</TableCell>
+        {showWorkers && (
+          <TabsContent value="workers">
+            <Card>
+              <CardHeader>
+                <CardTitle>Worker Performance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {workersQuery.isLoading ? (
+                  <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-muted-foreground">Loading worker performance...</span>
+                  </div>
+                ) : !Array.isArray(workersQuery.data) || workersQuery.data.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground" data-testid="text-no-data">No worker performance data for selected range</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>#</TableHead>
+                          <TableHead>Worker Name</TableHead>
+                          <TableHead>Bales Count</TableHead>
+                          <TableHead>Total KG</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                      </TableHeader>
+                      <TableBody>
+                        {workersQuery.data.map((worker, idx) => (
+                          <TableRow key={worker.workerName ?? idx} data-testid={`row-worker-${idx}`}>
+                            <TableCell>
+                              <Badge variant="outline">{idx + 1}</Badge>
+                            </TableCell>
+                            <TableCell className="font-medium">{worker.workerName}</TableCell>
+                            <TableCell className="font-mono">{worker.balesCount}</TableCell>
+                            <TableCell className="font-mono">{worker.totalKg}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
-        <TabsContent value="mixes">
-          <Card>
-            <CardHeader>
-              <CardTitle>Mix Efficiency</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {mixesQuery.isLoading ? (
-                <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  <span className="ml-2 text-muted-foreground">Loading mix efficiency...</span>
-                </div>
-              ) : !Array.isArray(mixesQuery.data) || mixesQuery.data.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground" data-testid="text-no-data">No mix efficiency data for selected range</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Mix Batch ID</TableHead>
-                        <TableHead>Total Input KG</TableHead>
-                        <TableHead>Total Output KG</TableHead>
-                        <TableHead>Waste KG</TableHead>
-                        <TableHead>Waste %</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {mixesQuery.data.map((mix, idx) => (
-                        <TableRow key={mix.mixBatchId ?? idx} data-testid={`row-mix-${idx}`}>
-                          <TableCell className="font-mono">{mix.mixBatchId}</TableCell>
-                          <TableCell className="font-mono">{mix.totalInputKg}</TableCell>
-                          <TableCell className="font-mono">{mix.totalOutputKg}</TableCell>
-                          <TableCell className="font-mono">{mix.wasteKg}</TableCell>
-                          <TableCell className={`font-mono font-medium ${getWasteColor(mix.wastePercent ?? 0)}`} data-testid={`text-waste-percent-${idx}`}>
-                            {(mix.wastePercent ?? 0).toFixed(1)}%
-                          </TableCell>
+        {showMixes && (
+          <TabsContent value="mixes">
+            <Card>
+              <CardHeader>
+                <CardTitle>Mix Efficiency</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {mixesQuery.isLoading ? (
+                  <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-muted-foreground">Loading mix efficiency...</span>
+                  </div>
+                ) : !Array.isArray(mixesQuery.data) || mixesQuery.data.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground" data-testid="text-no-data">No mix efficiency data for selected range</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Mix Batch ID</TableHead>
+                          <TableHead>Total Input KG</TableHead>
+                          <TableHead>Total Output KG</TableHead>
+                          <TableHead>Waste KG</TableHead>
+                          <TableHead>Waste %</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                      </TableHeader>
+                      <TableBody>
+                        {mixesQuery.data.map((mix, idx) => (
+                          <TableRow key={mix.mixBatchId ?? idx} data-testid={`row-mix-${idx}`}>
+                            <TableCell className="font-mono">{mix.mixBatchId}</TableCell>
+                            <TableCell className="font-mono">{mix.totalInputKg}</TableCell>
+                            <TableCell className="font-mono">{mix.totalOutputKg}</TableCell>
+                            <TableCell className="font-mono">{mix.wasteKg}</TableCell>
+                            <TableCell className={`font-mono font-medium ${getWasteColor(mix.wastePercent ?? 0)}`} data-testid={`text-waste-percent-${idx}`}>
+                              {(mix.wastePercent ?? 0).toFixed(1)}%
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

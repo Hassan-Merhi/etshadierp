@@ -85,6 +85,14 @@ export default function FactoryPayrollPage() {
   const today = new Date().toLocaleDateString('en-CA');
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA');
 
+  const { data: settings } = useQuery<any>({
+    queryKey: ["/api/factory/settings"],
+    queryFn: async () => { const r = await fetch("/api/factory/settings"); return r.ok ? r.json() : {}; },
+    staleTime: 60000,
+  });
+
+  const showWorkerMaster = settings?.payrollTabWorkerMasterEnabled !== false;
+
   const [companyId, setCompanyId] = useState<number | null>(null);
   const [filterStartDate, setFilterStartDate] = useState(thirtyDaysAgo);
   const [filterEndDate, setFilterEndDate] = useState(today);
@@ -391,10 +399,12 @@ export default function FactoryPayrollPage() {
             <FileText className="h-4 w-4 mr-1" />
             Payroll Records
           </TabsTrigger>
-          <TabsTrigger value="workers" data-testid="tab-worker-master">
-            <Table2 className="h-4 w-4 mr-1" />
-            Worker Master Sheet
-          </TabsTrigger>
+          {showWorkerMaster && (
+            <TabsTrigger value="workers" data-testid="tab-worker-master">
+              <Table2 className="h-4 w-4 mr-1" />
+              Worker Master Sheet
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="payroll" className="space-y-4">
@@ -761,7 +771,7 @@ export default function FactoryPayrollPage() {
       </Dialog>
         </TabsContent>
 
-        <TabsContent value="workers" className="space-y-4">
+        {showWorkerMaster && <TabsContent value="workers" className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <Input
@@ -872,7 +882,7 @@ export default function FactoryPayrollPage() {
               </Table>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent>}
       </Tabs>
     </div>
   );

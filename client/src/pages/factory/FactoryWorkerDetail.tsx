@@ -213,6 +213,17 @@ export default function FactoryWorkerDetail() {
   const docInputRef = useRef<HTMLInputElement>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
 
+  const { data: tabSettings } = useQuery<any>({
+    queryKey: ["/api/factory/settings"],
+    queryFn: async () => { const r = await fetch("/api/factory/settings"); return r.ok ? r.json() : {}; },
+    staleTime: 60000,
+  });
+
+  const showStatement = tabSettings?.workerDetailTabStatementEnabled !== false;
+  const showAdvances  = tabSettings?.workerDetailTabAdvancesEnabled  !== false;
+  const showBales     = tabSettings?.workerDetailTabBalesEnabled      !== false;
+  const showDocuments = tabSettings?.workerDetailTabDocumentsEnabled  !== false;
+
   const { formatDisplayDate } = useDateFormat();
   const formatDate = (val: string | Date | null | undefined) => {
     if (!val) return "—";
@@ -707,10 +718,10 @@ export default function FactoryWorkerDetail() {
           <Tabs defaultValue="profile">
             <TabsList className="mb-4">
               <TabsTrigger value="profile" data-testid="tab-profile">Profile</TabsTrigger>
-              <TabsTrigger value="statement" data-testid="tab-statement">Statement</TabsTrigger>
-              <TabsTrigger value="advances" data-testid="tab-advances">Advances</TabsTrigger>
-              <TabsTrigger value="bales" data-testid="tab-bales">Bales</TabsTrigger>
-              <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
+              {showStatement && <TabsTrigger value="statement" data-testid="tab-statement">Statement</TabsTrigger>}
+              {showAdvances  && <TabsTrigger value="advances" data-testid="tab-advances">Advances</TabsTrigger>}
+              {showBales     && <TabsTrigger value="bales" data-testid="tab-bales">Bales</TabsTrigger>}
+              {showDocuments && <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="profile" className="space-y-4">
@@ -791,7 +802,7 @@ export default function FactoryWorkerDetail() {
               )}
             </TabsContent>
 
-            <TabsContent value="statement" className="space-y-4">
+            {showStatement && <TabsContent value="statement" className="space-y-4">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Card>
                   <CardContent className="p-4 text-center">
@@ -962,9 +973,9 @@ export default function FactoryWorkerDetail() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent>}
 
-            <TabsContent value="advances" className="space-y-4">
+            {showAdvances && <TabsContent value="advances" className="space-y-4">
               {/* Advance balance KPIs */}
               {(() => {
                 const allOutstanding = (workerAdvances || []).filter((a) => !a.fullyPaid);
@@ -1289,9 +1300,9 @@ export default function FactoryWorkerDetail() {
                   </Dialog>
                 );
               })()}
-            </TabsContent>
+            </TabsContent>}
 
-            <TabsContent value="documents" className="space-y-4">
+            {showDocuments && <TabsContent value="documents" className="space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold">Worker Documents</h3>
@@ -1379,9 +1390,9 @@ export default function FactoryWorkerDetail() {
                   </CardContent>
                 </Card>
               )}
-            </TabsContent>
+            </TabsContent>}
 
-            <TabsContent value="bales">
+            {showBales && <TabsContent value="bales">
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -1444,7 +1455,7 @@ export default function FactoryWorkerDetail() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent>}
           </Tabs>
         </div>
       </div>

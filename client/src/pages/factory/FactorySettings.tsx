@@ -45,6 +45,16 @@ interface FactorySettingsData {
   balesTabRemoveEnabled: boolean;
   loadingsTabPendingEnabled: boolean;
   stockEntryTabHistoryEnabled: boolean;
+  advancesTabRepaymentsEnabled: boolean;
+  kpisTabWorkerPerformanceEnabled: boolean;
+  kpisTabMixEfficiencyEnabled: boolean;
+  payrollTabWorkerMasterEnabled: boolean;
+  profitabilityTabContainersEnabled: boolean;
+  workersTabCategoriesEnabled: boolean;
+  workerDetailTabStatementEnabled: boolean;
+  workerDetailTabAdvancesEnabled: boolean;
+  workerDetailTabBalesEnabled: boolean;
+  workerDetailTabDocumentsEnabled: boolean;
   laborCostPerKg: number;
   overheadPerKg: number;
   hideSellingPrice: boolean;
@@ -77,6 +87,16 @@ const defaultSettings: FactorySettingsData = {
   balesTabRemoveEnabled: true,
   loadingsTabPendingEnabled: true,
   stockEntryTabHistoryEnabled: true,
+  advancesTabRepaymentsEnabled: true,
+  kpisTabWorkerPerformanceEnabled: true,
+  kpisTabMixEfficiencyEnabled: true,
+  payrollTabWorkerMasterEnabled: true,
+  profitabilityTabContainersEnabled: true,
+  workersTabCategoriesEnabled: true,
+  workerDetailTabStatementEnabled: true,
+  workerDetailTabAdvancesEnabled: true,
+  workerDetailTabBalesEnabled: true,
+  workerDetailTabDocumentsEnabled: true,
   laborCostPerKg: 0,
   overheadPerKg: 0,
   hideSellingPrice: false,
@@ -350,6 +370,16 @@ export default function FactorySettings() {
       balesTabRemoveEnabled: true,
       loadingsTabPendingEnabled: true,
       stockEntryTabHistoryEnabled: true,
+      advancesTabRepaymentsEnabled: true,
+      kpisTabWorkerPerformanceEnabled: true,
+      kpisTabMixEfficiencyEnabled: true,
+      payrollTabWorkerMasterEnabled: true,
+      profitabilityTabContainersEnabled: true,
+      workersTabCategoriesEnabled: true,
+      workerDetailTabStatementEnabled: true,
+      workerDetailTabAdvancesEnabled: true,
+      workerDetailTabBalesEnabled: true,
+      workerDetailTabDocumentsEnabled: true,
     };
     setSettings(allEnabled);
     mutation.mutate(allEnabled);
@@ -485,6 +515,22 @@ export default function FactorySettings() {
             {toggleItem("Pending Loadings tab", "loadingsTabPendingEnabled")}
             <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Stock Entry</p>
             {toggleItem("Stock Entry History tab", "stockEntryTabHistoryEnabled")}
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Advances</p>
+            {toggleItem("Repayments tab", "advancesTabRepaymentsEnabled")}
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">KPIs</p>
+            {toggleItem("Worker Performance tab", "kpisTabWorkerPerformanceEnabled")}
+            {toggleItem("Mix Efficiency tab", "kpisTabMixEfficiencyEnabled")}
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Payroll</p>
+            {toggleItem("Worker Master tab", "payrollTabWorkerMasterEnabled")}
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Profitability</p>
+            {toggleItem("Container Profitability tab", "profitabilityTabContainersEnabled")}
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Workers List</p>
+            {toggleItem("Categories tab", "workersTabCategoriesEnabled")}
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Worker Profile</p>
+            {toggleItem("Statement tab", "workerDetailTabStatementEnabled")}
+            {toggleItem("Advances tab", "workerDetailTabAdvancesEnabled")}
+            {toggleItem("Bales tab", "workerDetailTabBalesEnabled")}
+            {toggleItem("Documents tab", "workerDetailTabDocumentsEnabled")}
           </CardContent>
         </Card>
 

@@ -59,6 +59,13 @@ function getInitials(name: string) {
 }
 
 export default function FactoryWorkers() {
+  const { data: settings } = useQuery<any>({
+    queryKey: ["/api/factory/settings"],
+    queryFn: async () => { const r = await fetch("/api/factory/settings"); return r.ok ? r.json() : {}; },
+    staleTime: 60000,
+  });
+
+  const showCategories = settings?.workersTabCategoriesEnabled !== false;
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -560,10 +567,12 @@ export default function FactoryWorkers() {
             </div>
             <TabsList>
               <TabsTrigger value="workers" data-testid="tab-workers">Workers</TabsTrigger>
-              <TabsTrigger value="categories" data-testid="tab-categories">
-                <Layers className="h-3.5 w-3.5 mr-1.5" />Categories
-                {categories.length > 0 && <Badge variant="secondary" className="ml-1.5 text-xs no-default-active-elevate">{categories.length}</Badge>}
-              </TabsTrigger>
+              {showCategories && (
+                <TabsTrigger value="categories" data-testid="tab-categories">
+                  <Layers className="h-3.5 w-3.5 mr-1.5" />Categories
+                  {categories.length > 0 && <Badge variant="secondary" className="ml-1.5 text-xs no-default-active-elevate">{categories.length}</Badge>}
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -685,7 +694,7 @@ export default function FactoryWorkers() {
         )}
         </TabsContent>
 
-        <TabsContent value="categories" className="mt-4">
+        {showCategories && <TabsContent value="categories" className="mt-4">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
@@ -757,7 +766,7 @@ export default function FactoryWorkers() {
               </div>
             )}
           </div>
-        </TabsContent>
+        </TabsContent>}
       </Tabs>
 
       {/* Category dialog */}

@@ -85,6 +85,14 @@ export default function FactoryProfitability() {
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
 
+  const { data: settings } = useQuery<any>({
+    queryKey: ["/api/factory/settings"],
+    queryFn: async () => { const r = await fetch("/api/factory/settings"); return r.ok ? r.json() : {}; },
+    staleTime: 60000,
+  });
+
+  const showContainers = settings?.profitabilityTabContainersEnabled !== false;
+
   const balesQuery = useQuery<BaleCost[]>({
     queryKey: ["/api/factory/profitability/bales", from, to],
     queryFn: async () => {
@@ -161,7 +169,7 @@ export default function FactoryProfitability() {
       <Tabs defaultValue="bales" data-testid="tabs-profitability">
         <TabsList>
           <TabsTrigger value="bales" data-testid="tab-bales">Bale Costs</TabsTrigger>
-          <TabsTrigger value="containers" data-testid="tab-containers">Container Profitability</TabsTrigger>
+          {showContainers && <TabsTrigger value="containers" data-testid="tab-containers">Container Profitability</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="bales">
@@ -268,7 +276,7 @@ export default function FactoryProfitability() {
           )}
         </TabsContent>
 
-        <TabsContent value="containers">
+        {showContainers && <TabsContent value="containers">
           {containersQuery.isLoading ? (
             <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -367,7 +375,7 @@ export default function FactoryProfitability() {
               </Card>
             </>
           )}
-        </TabsContent>
+        </TabsContent>}
       </Tabs>
     </div>
   );
