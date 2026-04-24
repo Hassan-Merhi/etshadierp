@@ -2357,7 +2357,7 @@ export default function ProductionRawStock() {
 
             {selectedContainer && (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <Label className="text-muted-foreground text-xs">Declared Weight (kg)</Label>
                     <Input
@@ -2368,7 +2368,20 @@ export default function ProductionRawStock() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-muted-foreground text-xs">Declared Rate/kg ($)</Label>
+                    <Label className="text-xs font-medium">Actual Received (kg)</Label>
+                    <Input
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      placeholder="Enter actual kg received"
+                      value={actualReceivedKg}
+                      onChange={(e) => setActualReceivedKg(e.target.value)}
+                      className="font-mono"
+                      data-testid="input-actual-received-kg"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground text-xs">Declared Rate/kg</Label>
                     <Input
                       value={selectedContainer.ratePerKg ? parseFloat(selectedContainer.ratePerKg).toFixed(4) : "N/A"}
                       disabled
