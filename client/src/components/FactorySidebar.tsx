@@ -208,7 +208,7 @@ export function FactorySidebar({ user }: { user?: any }) {
     staleTime: 60000,
   });
 
-  const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[] }>({
+  const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hiddenCostFields: string[] }>({
     queryKey: ["/api/factory/my-access"],
     staleTime: 30000,
   });
@@ -323,7 +323,7 @@ export function FactorySidebar({ user }: { user?: any }) {
           {hasDashboard && (
             <FlatLink href="/factory/dashboard" icon={LayoutDashboard} label="Dashboard" color="#3b82f6" testId="link-factory-dashboard" />
           )}
-          {settings?.daybookEnabled !== false && (
+          {settings?.daybookEnabled !== false && !myAccess?.hiddenCostFields?.includes("hide_tab_daybook") && (
             <FlatLink href="/factory/daybook" icon={BookOpen} label="Daybook" color="#3b82f6" testId="link-factory-daybook" />
           )}
         </div>
