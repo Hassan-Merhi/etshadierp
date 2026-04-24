@@ -61,6 +61,7 @@ interface LoadingModeData {
 export default function FactoryStockAllocationV2() {
   const [activeTab, setActiveTab] = useState<"proforma" | "loading">("proforma");
   const [visibleProformaIds, setVisibleProformaIds] = useState<Set<number>>(new Set());
+  const [showInactiveProformas, setShowInactiveProformas] = useState(false);
 
   const proformaQuery = useQuery<AllocationDataV2>({
     queryKey: ["/api/factory/v2/stock-allocation"],
@@ -102,7 +103,7 @@ export default function FactoryStockAllocationV2() {
       visibleProformas: [] as ProformaV2[],
     };
 
-    const allProformas = data.proformas.filter(p => p.isActive);
+    const allProformas = data.proformas.filter(p => p.isActive || showInactiveProformas);
     const visibleProformas = allProformas.filter(p => visibleProformaIds.has(p.id));
 
     // Build a merged set of all article codes from stock truth + all proforma lines
@@ -135,7 +136,7 @@ export default function FactoryStockAllocationV2() {
     );
 
     return { articleRows: nonEmptyRows, allProformas, visibleProformas };
-  }, [proformaQuery.data, visibleProformaIds]);
+  }, [proformaQuery.data, visibleProformaIds, showInactiveProformas]);
 
   /* ── Loading mode computed ───────────────────────────────────────────────── */
   const loadingComputed = useMemo(() => {
@@ -216,7 +217,17 @@ export default function FactoryStockAllocationV2() {
               {/* Proforma column toggles */}
               {proformaComputed.allProformas.length > 0 && (
                 <div className="flex flex-col gap-2">
-                  <p className="text-xs text-muted-foreground font-medium">Show proforma columns:</p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-xs text-muted-foreground font-medium">Show proforma columns:</p>
+                    <Button
+                      variant={showInactiveProformas ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setShowInactiveProformas(v => !v)}
+                      data-testid="button-toggle-inactive-proformas"
+                    >
+                      {showInactiveProformas ? "Hide Inactive" : "Show Inactive"}
+                    </Button>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {proformaComputed.allProformas.map(p => {
                       const isOn = visibleProformaIds.has(p.id);
