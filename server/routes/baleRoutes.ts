@@ -18,7 +18,7 @@ import {
   suppliers, customers, customerBalances, locations, employees, userLocations,
   auditLog, interCompanyTransfers, insertInterCompanyTransferSchema,
   ledgerAccounts, insertLedgerAccountSchema, insertLedgerEntrySchema,
-  companies, users, userCompanyRoles, companySettings,
+  companies, users, userCompanyRoles, companySettings, insertCompanySettingsSchema,
   FEATURE_KEYS, fiscalPeriodClosures,
   wasteDispatches, wasteDispatchItems, insertWasteDispatchSchema,
   bales, baleProducts, baleProductCategories, baleTransfers,
