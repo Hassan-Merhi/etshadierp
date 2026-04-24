@@ -156,6 +156,29 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         }
       }
 
+      // factory_v2: block activation when any line quantity exceeds current freeToPromise
+      // This prevents committing stock that isn't available.
+      const activating = req.body.isActive === true && existing.isActive === false;
+      if (activating && await isFactoryV2Company(companyId)) {
+        const lines = await db.select({
+          articleCode: customerProformaLines.articleCode,
+          quantity: customerProformaLines.quantity,
+        }).from(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
+
+        const violations: string[] = [];
+        for (const line of lines) {
+          const ftp = await computeFreeToPromise(companyId, line.articleCode);
+          if (Number(line.quantity) > ftp) {
+            violations.push(`${line.articleCode}: needs ${line.quantity}, only ${ftp} free`);
+          }
+        }
+        if (violations.length > 0) {
+          return res.status(400).json({
+            message: `Cannot activate: insufficient free stock — ${violations.join("; ")}`,
+          });
+        }
+      }
+
       const [updated] = await db.update(customerProformas)
         .set({ ...req.body, updatedAt: new Date() })
         .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)))
