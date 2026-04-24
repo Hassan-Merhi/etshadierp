@@ -255,7 +255,8 @@ export default function FactoryStockAllocationV2() {
                     <thead>
                       <tr className="bg-muted sticky top-0 z-10">
                         <th className="text-left px-3 py-2.5 font-medium border-b border-r whitespace-nowrap sticky left-0 bg-muted z-20 min-w-[200px]">Product</th>
-                        {/* On Hand = IN_STOCK + In Loading */}
+
+                        {/* On Hand = IN_STOCK + In Loading (full physical pool) */}
                         <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[90px]">
                           <span className="flex items-center justify-end gap-1">
                             On Hand
@@ -263,36 +264,56 @@ export default function FactoryStockAllocationV2() {
                               <TooltipTrigger asChild>
                                 <Info className="h-3 w-3 text-muted-foreground cursor-help" />
                               </TooltipTrigger>
-                              <TooltipContent side="bottom" className="max-w-xs text-xs">
-                                Free in stock + bales currently being loaded
+                              <TooltipContent side="bottom" className="max-w-[260px] text-xs">
+                                Total physical bales still in the warehouse pool — includes both free stock and bales already assigned to active loading orders.<br />
+                                <span className="font-mono mt-1 block">= Free stock + In Loading</span>
                               </TooltipContent>
                             </Tooltip>
                           </span>
                         </th>
-                        {/* In Loading = bales in active loading orders */}
-                        <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[90px] text-blue-600 dark:text-blue-400">
+
+                        {/* Reserved = proforma qty not yet loaded */}
+                        <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[95px] text-amber-600 dark:text-amber-400">
+                          <span className="flex items-center justify-end gap-1">
+                            Reserved
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Info className="h-3 w-3 text-amber-400 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="max-w-[260px] text-xs">
+                                Total quantity committed to active proformas but not yet physically loaded. Decreases as bales are scanned into loading orders.<br />
+                                <span className="font-mono mt-1 block">= Proforma qty − Already loaded</span>
+                              </TooltipContent>
+                            </Tooltip>
+                          </span>
+                        </th>
+
+                        {/* In Loading = bales physically in active loading orders */}
+                        <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[95px] text-blue-600 dark:text-blue-400">
                           <span className="flex items-center justify-end gap-1">
                             In Loading
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Info className="h-3 w-3 text-blue-400 cursor-help" />
                               </TooltipTrigger>
-                              <TooltipContent side="bottom" className="max-w-xs text-xs">
-                                Bales already scanned into active loading orders
+                              <TooltipContent side="bottom" className="max-w-[260px] text-xs">
+                                Bales already scanned into active loading orders (status: Loading or Pending Verification). Still counted in On Hand until the shipment is finalised.
                               </TooltipContent>
                             </Tooltip>
                           </span>
                         </th>
-                        {/* Free To Promise = backend-computed availability */}
-                        <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[110px] text-green-700 dark:text-green-400">
+
+                        {/* Free to Promise = On Hand − Reserved − In Loading */}
+                        <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[115px] text-green-700 dark:text-green-400">
                           <span className="flex items-center justify-end gap-1">
                             Free to Promise
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Info className="h-3 w-3 text-green-500 cursor-help" />
                               </TooltipTrigger>
-                              <TooltipContent side="bottom" className="max-w-xs text-xs">
-                                Free stock minus what is still owed to active proformas but not yet loaded
+                              <TooltipContent side="bottom" className="max-w-[260px] text-xs">
+                                Stock available to commit to new proformas. Proforma column toggles never affect this value — it is computed entirely on the server.<br />
+                                <span className="font-mono mt-1 block">= On Hand − Reserved − In Loading</span>
                               </TooltipContent>
                             </Tooltip>
                           </span>
@@ -321,20 +342,28 @@ export default function FactoryStockAllocationV2() {
                             <div className="text-xs text-muted-foreground font-mono">{row.articleCode}</div>
                           </td>
 
-                          {/* On Hand */}
+                          {/* On Hand = free stock + in loading */}
                           <td className="px-3 py-2 text-right border-r font-mono tabular-nums">
                             {row.onHand}
                           </td>
 
-                          {/* In Loading */}
+                          {/* Reserved = proforma qty not yet loaded */}
                           <td className={cn(
                             "px-3 py-2 text-right border-r font-mono tabular-nums",
-                            row.inLoading > 0 ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground",
+                            row.reservedNotYetLoaded > 0 ? "text-amber-600 dark:text-amber-400" : "",
+                          )}>
+                            {row.reservedNotYetLoaded > 0 ? row.reservedNotYetLoaded : <span className="text-muted-foreground/40 text-xs">—</span>}
+                          </td>
+
+                          {/* In Loading = bales in active loading orders */}
+                          <td className={cn(
+                            "px-3 py-2 text-right border-r font-mono tabular-nums",
+                            row.inLoading > 0 ? "text-blue-600 dark:text-blue-400" : "",
                           )}>
                             {row.inLoading > 0 ? row.inLoading : <span className="text-muted-foreground/40 text-xs">—</span>}
                           </td>
 
-                          {/* Free to Promise — backend-computed, colored by urgency */}
+                          {/* Free to Promise = On Hand − Reserved − In Loading (server-computed) */}
                           <td className={cn(
                             "px-3 py-2 text-right border-r font-mono tabular-nums font-semibold",
                             row.freeToPromise > 0 ? "text-green-700 dark:text-green-400"
