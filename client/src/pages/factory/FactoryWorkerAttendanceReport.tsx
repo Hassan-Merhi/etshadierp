@@ -35,6 +35,8 @@ interface AttendanceReportData {
   };
 }
 
+type AttendanceFilter = "all" | "absent" | "present";
+
 /* ── Constants ──────────────────────────────────────────────────────────────── */
 const MONTH_NAMES = [
   "January","February","March","April","May","June",
@@ -63,8 +65,9 @@ function StatusCell({ status }: { status?: string }) {
 /* ── Main Component ─────────────────────────────────────────────────────────── */
 export default function FactoryWorkerAttendanceReport() {
   const today = new Date();
-  const [year, setYear]   = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth() + 1);
+  const [year, setYear]     = useState(today.getFullYear());
+  const [month, setMonth]   = useState(today.getMonth() + 1);
+  const [filter, setFilter] = useState<AttendanceFilter>("all");
 
   const queryKey = ["/api/factory/workers/attendance-report", year, month];
 
@@ -102,6 +105,18 @@ export default function FactoryWorkerAttendanceReport() {
       return { day: d, dow, isWeekend, abbr: DAY_ABBR[dow] };
     });
   }, [data]);
+
+  /* Filtered worker list */
+  const filteredWorkers = useMemo(() => {
+    if (!data) return [];
+    if (filter === "absent")  return data.workers.filter(w => w.absentCount > 0);
+    if (filter === "present") return data.workers.filter(w => w.absentCount === 0);
+    return data.workers;
+  }, [data, filter]);
+
+  /* Counts for filter badges */
+  const absentCount  = data ? data.workers.filter(w => w.absentCount > 0).length  : 0;
+  const presentCount = data ? data.workers.filter(w => w.absentCount === 0).length : 0;
 
   const overallPct = data && data.totals.presentDays + data.totals.absentDays > 0
     ? Math.round((data.totals.presentDays / (data.totals.presentDays + data.totals.absentDays)) * 100)
@@ -160,6 +175,64 @@ export default function FactoryWorkerAttendanceReport() {
           >
             <Printer className="h-4 w-4 mr-2" />
             Print
+          </Button>
+        </div>
+      </div>
+
+      {/* ── Attendance filter ───────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 flex-wrap print:hidden">
+        <span className="text-xs text-muted-foreground font-medium">Show:</span>
+        <div className="flex items-center gap-1 rounded-md border bg-background p-0.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setFilter("all")}
+            data-testid="filter-all"
+            className={cn(
+              "h-7 px-3 text-xs rounded-sm",
+              filter === "all" ? "bg-muted font-semibold" : "",
+            )}
+          >
+            All
+            {data && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0 h-4">
+                {data.workers.length}
+              </Badge>
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setFilter("present")}
+            data-testid="filter-present"
+            className={cn(
+              "h-7 px-3 text-xs rounded-sm",
+              filter === "present" ? "bg-emerald-50 dark:bg-emerald-950/40 font-semibold text-emerald-700 dark:text-emerald-300" : "",
+            )}
+          >
+            No Absences
+            {data && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0 h-4 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                {presentCount}
+              </Badge>
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setFilter("absent")}
+            data-testid="filter-absent"
+            className={cn(
+              "h-7 px-3 text-xs rounded-sm",
+              filter === "absent" ? "bg-red-50 dark:bg-red-950/40 font-semibold text-red-600 dark:text-red-400" : "",
+            )}
+          >
+            Has Absences
+            {data && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0 h-4 bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400">
+                {absentCount}
+              </Badge>
+            )}
           </Button>
         </div>
       </div>
@@ -231,6 +304,12 @@ export default function FactoryWorkerAttendanceReport() {
                 No active workers found. Add workers first from the Workers tab.
               </CardContent>
             </Card>
+          ) : filteredWorkers.length === 0 ? (
+            <Card>
+              <CardContent className="p-10 text-center text-muted-foreground">
+                No workers match the selected filter.
+              </CardContent>
+            </Card>
           ) : (
             /* ── Attendance grid ────────────────────────────────────────────── */
             <div className="overflow-auto rounded-md border print:overflow-visible print:border-0">
@@ -269,7 +348,7 @@ export default function FactoryWorkerAttendanceReport() {
                 </thead>
 
                 <tbody>
-                  {data.workers.map((worker, idx) => (
+                  {filteredWorkers.map((worker, idx) => (
                     <tr
                       key={worker.id}
                       className={cn(
