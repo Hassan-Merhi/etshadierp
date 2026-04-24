@@ -1327,6 +1327,17 @@ let migrationsDone = false;
     // Worker count per plan entry — how many workers are grouped under this person
     `ALTER TABLE factory_production_plan_entries ADD COLUMN IF NOT EXISTS worker_count INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE property_contracts ADD COLUMN IF NOT EXISTS is_internal BOOLEAN NOT NULL DEFAULT FALSE`,
+
+    // ── Factory 2.0 Stock Allocation — proforma reservation tracking (Apr 2026) ──
+    // Add reserved_qty to proforma_stock_reservations so the table stores the
+    // pre-computed "not yet loaded" quantity per proforma+article.
+    // Maintained by syncProformaReservations() after every proforma/line/loading mutation.
+    // NOTE: the UNIQUE(company_id, proforma_id, article_code) constraint was already created
+    // inline in the CREATE TABLE statement above — no separate index needed.
+    `ALTER TABLE proforma_stock_reservations ADD COLUMN IF NOT EXISTS reserved_qty INTEGER NOT NULL DEFAULT 0`,
+    // Performance index for the per-company aggregation used in computeStockTruth
+    `CREATE INDEX IF NOT EXISTS proforma_stock_reservations_company_article_idx
+       ON proforma_stock_reservations (company_id, article_code)`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
