@@ -7,6 +7,7 @@ import {
   customers,
 } from "@shared/schema";
 import { eq, inArray, sql } from "drizzle-orm";
+import { syncProformaReservations } from "./_stockReservationHelper";
 
 // ─── Backend stock-truth helper ───────────────────────────────────────────────
 // Phases 1–4: compute per-article inventory state entirely on the backend.
@@ -29,61 +30,63 @@ import { eq, inArray, sql } from "drizzle-orm";
 // so onHand stays the same.  The final shipment is the definitive stock-out event.
 
 async function computeStockTruth(companyId: number) {
-  // Phase 1: explicit per-article counts from actual bale statuses
+  // ── Bale statuses are physical reality ──────────────────────────────────────
+  // IN_STOCK = free bales, not assigned to any order
   const inStockRaw = await db.execute(
-    sql`SELECT article_code as "articleCode", COUNT(*)::int as count
+    sql`SELECT article_code AS "articleCode", COUNT(*)::int AS count
         FROM factory_bales
         WHERE company_id = ${companyId} AND status = 'IN_STOCK'
-        GROUP BY article_code`
+        GROUP BY article_code`,
   );
   const inStockMap = new Map<string, number>(
-    (inStockRaw.rows || (inStockRaw as any[])).map((r: any) => [r.articleCode, Number(r.count)])
+    ((inStockRaw as any).rows ?? (inStockRaw as any[])).map((r: any) => [r.articleCode, Number(r.count)]),
   );
 
-  // inLoading = bales assigned to active loading orders (status RESERVED_FOR_ORDER)
-  // These are physically picked / scanned, but not yet shipped.
+  // RESERVED_FOR_ORDER = bales physically picked into an active loading order
   const inLoadingRaw = await db.execute(
-    sql`SELECT fb.article_code as "articleCode", COUNT(*)::int as count
+    sql`SELECT fb.article_code AS "articleCode", COUNT(*)::int AS count
         FROM customer_order_bales cob
-        JOIN factory_bales fb ON fb.id = cob.bale_id
-        JOIN customer_orders co ON co.id = cob.order_id
+        JOIN factory_bales fb   ON fb.id  = cob.bale_id
+        JOIN customer_orders co ON co.id  = cob.order_id
         WHERE co.company_id = ${companyId}
           AND co.status IN ('LOADING', 'PENDING_VERIFICATION')
-        GROUP BY fb.article_code`
+        GROUP BY fb.article_code`,
   );
   const inLoadingMap = new Map<string, number>(
-    (inLoadingRaw.rows || (inLoadingRaw as any[])).map((r: any) => [r.articleCode, Number(r.count)])
+    ((inLoadingRaw as any).rows ?? (inLoadingRaw as any[])).map((r: any) => [r.articleCode, Number(r.count)]),
   );
 
-  // Phase 2: proforma reservation truth — sum of ACTIVE proforma line quantities
-  // This is the backend source of truth, not a UI toggle.
-  const proformaReservedRaw = await db.execute(
-    sql`SELECT cpl.article_code as "articleCode", SUM(cpl.quantity)::int as "totalReserved"
-        FROM customer_proforma_lines cpl
-        JOIN customer_proformas cp ON cp.id = cpl.proforma_id
-        WHERE cp.company_id = ${companyId} AND cp.is_active = true
-        GROUP BY cpl.article_code`
+  // ── proformaStockReservations is the backend SOT for reservedNotYetLoaded ──
+  // Maintained by syncProformaReservations() after every proforma/line/loading mutation.
+  // reservedQty = max(0, proformaLineQty - alreadyLoadedInActiveOrders) per proforma+article.
+  // We SUM across all proformas to get the per-article total.
+  const reservedRaw = await db.execute(
+    sql`SELECT article_code AS "articleCode", SUM(reserved_qty)::int AS "reservedNotYetLoaded"
+        FROM proforma_stock_reservations
+        WHERE company_id = ${companyId}
+        GROUP BY article_code`,
   );
-  const proformaReservedMap = new Map<string, number>(
-    (proformaReservedRaw.rows || (proformaReservedRaw as any[])).map((r: any) => [r.articleCode, Number(r.totalReserved)])
+  const reservedNotYetLoadedMap = new Map<string, number>(
+    ((reservedRaw as any).rows ?? (reservedRaw as any[])).map((r: any) => [r.articleCode, Number(r.reservedNotYetLoaded)]),
   );
 
-  // Union all known article codes
+  // Union all known article codes from all three sources
   const allCodes = new Set([
     ...inStockMap.keys(),
     ...inLoadingMap.keys(),
-    ...proformaReservedMap.keys(),
+    ...reservedNotYetLoadedMap.keys(),
   ]);
 
   return Array.from(allCodes).map(code => {
-    const inStock        = inStockMap.get(code) || 0;
-    const inLoading      = inLoadingMap.get(code) || 0;
-    const onHand         = inStock + inLoading;
-    const proformaReserved      = proformaReservedMap.get(code) || 0;
-    // reserved_not_yet_loaded shrinks as loading scans bales
-    const reservedNotYetLoaded  = Math.max(0, proformaReserved - inLoading);
-    // freeToPromise = free bales minus what's still owed to active proformas
-    const freeToPromise         = Math.max(0, inStock - reservedNotYetLoaded);
+    const inStock              = inStockMap.get(code) ?? 0;
+    const inLoading            = inLoadingMap.get(code) ?? 0;
+    const onHand               = inStock + inLoading;
+    // reservedNotYetLoaded comes from the synced table (SOT)
+    const reservedNotYetLoaded = reservedNotYetLoadedMap.get(code) ?? 0;
+    // proformaReserved = total proforma commitment = what's still owed + what's already in loading
+    const proformaReserved     = reservedNotYetLoaded + inLoading;
+    // freeToPromise = free stock minus what's still owed to active proformas
+    const freeToPromise        = Math.max(0, inStock - reservedNotYetLoaded);
     return { code, inStock, inLoading, onHand, proformaReserved, reservedNotYetLoaded, freeToPromise };
   });
 }
@@ -98,6 +101,17 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // Bootstrap / reconcile: sync all active proformas so the reservations table is current.
+      // This is lightweight when already in sync (one UPDATE per proforma at most).
+      // Runs on every proforma-mode page load — safe because this view is not auto-refreshed.
+      const activeProformaIds = await db.execute(
+        sql`SELECT id FROM customer_proformas WHERE company_id = ${companyId} AND is_active = true`,
+      );
+      const idsToSync: number[] = ((activeProformaIds as any).rows ?? (activeProformaIds as any[])).map((r: any) => Number(r.id));
+      for (const pid of idsToSync) {
+        await syncProformaReservations(db, companyId, pid);
+      }
 
       const stockTruth = await computeStockTruth(companyId);
 

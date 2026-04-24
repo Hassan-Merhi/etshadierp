@@ -4215,12 +4215,15 @@ export const insertSnapshotPinnedAccountSchema = createInsertSchema(snapshotPinn
 export type InsertSnapshotPinnedAccount = z.infer<typeof insertSnapshotPinnedAccountSchema>;
 export type SnapshotPinnedAccount = typeof snapshotPinnedAccounts.$inferSelect;
 
-// Proforma Stock Reservations — tracks which proforma+articleCode combos are toggled as "reserved"
+// Proforma Stock Reservations — backend-synced cache of per-proforma/article reservation state.
+// reservedQty = max(0, proformaLineQty - alreadyLoadedInActiveOrders)
+// Kept in sync by syncProformaReservations() after every proforma/line/loading mutation.
 export const proformaStockReservations = pgTable("proforma_stock_reservations", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
   proformaId: integer("proforma_id").notNull(),
   articleCode: varchar("article_code", { length: 50 }).notNull(),
+  reservedQty: integer("reserved_qty").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   uniq: uniqueIndex("proforma_stock_reservations_unique").on(t.companyId, t.proformaId, t.articleCode),

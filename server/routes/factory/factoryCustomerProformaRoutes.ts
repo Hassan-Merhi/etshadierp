@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { syncProformaReservations, isFactoryV2Company, computeFreeToPromise } from "./_stockReservationHelper";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -124,6 +125,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       }
 
       const [proforma] = await db.insert(customerProformas).values(parsed).returning();
+      // Sync reservations — no lines yet, but initialises a clean slate
+      await syncProformaReservations(db, companyId, proforma.id);
       res.json(proforma);
     } catch (error: any) {
       console.error("Error creating customer proforma:", error);
@@ -158,6 +161,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)))
         .returning();
 
+      // Sync reservations — critical when isActive toggled (releases/restores reservation)
+      await syncProformaReservations(db, companyId, id);
       res.json(updated);
     } catch (error: any) {
       console.error("Error updating customer proforma:", error);
@@ -181,6 +186,10 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         console.log(`[PROFORMA DELETE] Deleting proforma id=${id} name="${proformaBefore.name}" customerId=${proformaBefore.customerId} customerName="${custBefore?.legalName}" customerDeletedAt=${custBefore?.deletedAt}`);
       }
 
+      // Clear reservations before deleting — releases stock back to freeToPromise
+      await syncProformaReservations(db, companyId, id);
+      await db.delete(proformaStockReservations)
+        .where(and(eq(proformaStockReservations.companyId, companyId), eq(proformaStockReservations.proformaId, id)));
       await db.delete(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
       const [deleted] = await db.delete(customerProformas)
         .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)))
@@ -342,6 +351,10 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
       await recalculateOrderTotals(db, order.id);
 
+      // Sync reservations — loading consumed some of the reservation, update the table
+      // reservedQty per article = max(0, lineQty - totalLoaded across ALL active orders for this proforma)
+      await syncProformaReservations(db, companyId, proformaId);
+
       const [loadingCustomer] = await db.select({ legalName: customers.legalName })
         .from(customers).where(eq(customers.id, proforma.customerId));
       const insufficientNote = insufficientStock.length > 0 ? ` (${insufficientStock.join(", ")})` : "";
@@ -366,13 +379,27 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
   app.post("/api/factory/customer-proforma-lines", requireAuth, async (req: any, res: any) => {
     try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const parsed = insertCustomerProformaLineSchema.parse(req.body);
 
       const [existingLine] = await db.select().from(customerProformaLines)
         .where(and(eq(customerProformaLines.proformaId, parsed.proformaId), eq(customerProformaLines.articleCode, parsed.articleCode)));
       if (existingLine) return res.status(400).json({ message: "Article code already exists in this proforma" });
 
+      // factory_v2: block if requested quantity exceeds free-to-promise
+      if (await isFactoryV2Company(companyId)) {
+        const ftp = await computeFreeToPromise(companyId, parsed.articleCode);
+        if ((parsed.quantity ?? 0) > ftp) {
+          return res.status(400).json({
+            message: `Insufficient free stock for ${parsed.articleCode}: requested ${parsed.quantity}, available ${ftp}`,
+          });
+        }
+      }
+
       const [line] = await db.insert(customerProformaLines).values(parsed).returning();
+      // Sync — new line changes reservedNotYetLoaded for this proforma
+      await syncProformaReservations(db, companyId, parsed.proformaId);
       res.json(line);
     } catch (error: any) {
       console.error("Error creating proforma line:", error);
@@ -382,16 +409,40 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
   app.put("/api/factory/customer-proforma-lines/:id", requireAuth, async (req: any, res: any) => {
     try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
+
+      // Fetch the line first to get its proformaId
+      const [existingLine] = await db.select().from(customerProformaLines)
+        .where(eq(customerProformaLines.id, id)).limit(1);
+      if (!existingLine) return res.status(404).json({ message: "Proforma line not found" });
+
       const updateData: any = {};
       if (req.body.productName !== undefined) updateData.productName = req.body.productName;
       if (req.body.quantity !== undefined) updateData.quantity = parseInt(req.body.quantity);
       if (req.body.pricePerBale !== undefined) updateData.pricePerBale = req.body.pricePerBale;
 
+      // factory_v2: block quantity increases that exceed free-to-promise
+      // ftp is computed excluding the current line's own reservation, so we add it back
+      if (updateData.quantity !== undefined && await isFactoryV2Company(companyId)) {
+        const delta = updateData.quantity - (Number(existingLine.quantity) ?? 0);
+        if (delta > 0) {
+          const ftp = await computeFreeToPromise(companyId, existingLine.articleCode);
+          if (delta > ftp) {
+            return res.status(400).json({
+              message: `Insufficient free stock for ${existingLine.articleCode}: need ${delta} more, available ${ftp}`,
+            });
+          }
+        }
+      }
+
       const [updated] = await db.update(customerProformaLines).set(updateData)
         .where(eq(customerProformaLines.id, id)).returning();
 
       if (!updated) return res.status(404).json({ message: "Proforma line not found" });
+      // Sync — quantity change alters reservedNotYetLoaded
+      await syncProformaReservations(db, companyId, existingLine.proformaId);
       res.json(updated);
     } catch (error: any) {
       console.error("Error updating proforma line:", error);
@@ -401,9 +452,19 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
   app.delete("/api/factory/customer-proforma-lines/:id", requireAuth, async (req: any, res: any) => {
     try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
+
+      // Fetch the line first to get its proformaId before deletion
+      const [lineToDelete] = await db.select().from(customerProformaLines)
+        .where(eq(customerProformaLines.id, id)).limit(1);
+      if (!lineToDelete) return res.status(404).json({ message: "Proforma line not found" });
+
       const [deleted] = await db.delete(customerProformaLines).where(eq(customerProformaLines.id, id)).returning();
       if (!deleted) return res.status(404).json({ message: "Proforma line not found" });
+      // Sync — removed line releases its reservation
+      await syncProformaReservations(db, companyId, lineToDelete.proformaId);
       res.json({ message: "Proforma line deleted" });
     } catch (error: any) {
       console.error("Error deleting proforma line:", error);
@@ -444,6 +505,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         return { ...proforma, lines: insertedLines };
       });
 
+      // Sync outside transaction — reservations are derived, not transactional
+      await syncProformaReservations(db, companyId, result.id);
       res.json(result);
     } catch (error: any) {
       console.error("Error bulk creating proforma:", error);
@@ -484,6 +547,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         return { ...proforma, lines: insertedLines };
       });
 
+      // Sync — all lines replaced, recalculate reservation state
+      await syncProformaReservations(db, companyId, id);
       res.json(result);
     } catch (error: any) {
       console.error("Error replacing proforma lines:", error);
