@@ -82,6 +82,7 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
   const [productionPrices, setProductionPrices] = useState<Record<string, string>>(draft?.productionPrices ?? {});
   const [draftStatus, setDraftStatus] = useState<"idle" | "saved">("idle");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showZeroItems, setShowZeroItems] = useState(false);
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const qtyRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -274,6 +275,8 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
     const n = parseInt(quantities[r.articleCode] || "0");
     return !isNaN(n) && n > r.freeToPromise && n > 0;
   }).length;
+  const zeroItemCount = articleRows.filter(r => r.onHand === 0).length;
+  const visibleRows = showZeroItems ? articleRows : articleRows.filter(r => r.onHand > 0);
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
@@ -338,6 +341,19 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
             </Button>
           </div>
 
+          {zeroItemCount > 0 && (
+            <div className="border-l pl-4">
+              <Button
+                size="default"
+                variant={showZeroItems ? "secondary" : "outline"}
+                onClick={() => setShowZeroItems(v => !v)}
+                data-testid="button-toggle-zero-items"
+              >
+                {showZeroItems ? `Hide 0-bale (${zeroItemCount})` : `Show 0-bale (${zeroItemCount})`}
+              </Button>
+            </div>
+          )}
+
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground h-9 ml-auto">
             {draftStatus === "saved" && (
               <><CheckCircle className="h-3 w-3 text-green-500" />Draft autosaved</>
@@ -367,7 +383,7 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
               </tr>
             </thead>
             <tbody>
-              {articleRows.map((row, idx) => {
+              {visibleRows.map((row, idx) => {
                 const rawVal = quantities[row.articleCode] ?? "";
                 const parsed = parseInt(rawVal);
                 const qty = isNaN(parsed) ? 0 : parsed;
