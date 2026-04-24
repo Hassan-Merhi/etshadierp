@@ -27,9 +27,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Palette } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
+import { A4_DESIGN_OPTIONS } from "@/lib/labelHtml";
 import type { FactoryCategory } from "@shared/schema";
 
 const formSchema = z.object({
@@ -38,6 +40,9 @@ const formSchema = z.object({
   categoryId: z.string().optional(),
   weightPerBaleKg: z.string().optional(),
   description: z.string().optional(),
+  productionPrice: z.string().optional(),
+  sellingPrice: z.string().optional(),
+  labelDesignColor: z.string().optional(),
 });
 
 interface CreateBaleProductDialogProps {
@@ -67,6 +72,9 @@ export function CreateBaleProductDialog({
       categoryId: "",
       weightPerBaleKg: "",
       description: "",
+      productionPrice: "",
+      sellingPrice: "",
+      labelDesignColor: "",
     },
   });
 
@@ -76,6 +84,9 @@ export function CreateBaleProductDialog({
       if (data.categoryId && data.categoryId !== "none") body.categoryId = parseInt(data.categoryId);
       if (data.weightPerBaleKg) body.weightPerBaleKg = data.weightPerBaleKg;
       if (data.description) body.description = data.description;
+      if (data.productionPrice) body.productionPrice = data.productionPrice;
+      if (data.sellingPrice) body.sellingPrice = data.sellingPrice;
+      if (data.labelDesignColor) body.labelDesignColor = data.labelDesignColor;
       if (adminAuth) body.adminAuth = adminAuth;
       const response = await factoryApiRequest("POST", "/api/factory/bale-products", body);
       if (!response.ok) {
@@ -109,7 +120,7 @@ export function CreateBaleProductDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Bale Product</DialogTitle>
           <DialogDescription>
@@ -119,6 +130,7 @@ export function CreateBaleProductDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+            {/* Grade */}
             <FormField
               control={form.control}
               name="grade"
@@ -145,6 +157,7 @@ export function CreateBaleProductDialog({
               )}
             />
 
+            {/* Product Name */}
             <FormField
               control={form.control}
               name="name"
@@ -163,6 +176,7 @@ export function CreateBaleProductDialog({
               )}
             />
 
+            {/* Category + Weight */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -211,6 +225,52 @@ export function CreateBaleProductDialog({
               />
             </div>
 
+            {/* Production Price + Selling Price */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="productionPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Prod. Price</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="e.g., 80"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        data-testid="input-production-price"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="sellingPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sell Price</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="e.g., 120"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        data-testid="input-selling-price"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Description */}
             <FormField
               control={form.control}
               name="description"
@@ -229,7 +289,52 @@ export function CreateBaleProductDialog({
               )}
             />
 
-            <div className="flex justify-end gap-2">
+            {/* Label Design Color */}
+            <FormField
+              control={form.control}
+              name="labelDesignColor"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-1.5">
+                    <Palette className="h-3.5 w-3.5 text-muted-foreground" />
+                    Label Design Color
+                  </FormLabel>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      data-testid="button-label-color-none"
+                      onClick={() => field.onChange("")}
+                      className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-colors ${!field.value ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover-elevate"}`}
+                    >
+                      No Design
+                    </button>
+                    {A4_DESIGN_OPTIONS.map((opt) => (
+                      <button
+                        type="button"
+                        key={opt.value}
+                        data-testid={`button-label-color-${opt.value}`}
+                        onClick={() => field.onChange(opt.value)}
+                        className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-colors ${field.value === opt.value ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover-elevate"}`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {field.value && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Labels will print with the{" "}
+                      <span className="font-medium">
+                        {A4_DESIGN_OPTIONS.find(o => o.value === field.value)?.label}
+                      </span>{" "}
+                      design automatically.
+                    </p>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex justify-end gap-2 pt-1">
               <Button
                 type="button"
                 variant="outline"
