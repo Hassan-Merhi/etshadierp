@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -204,6 +205,8 @@ function CategoryProductBreakdown({
 }) {
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
 
+  const allOpen = categories.length > 0 && openCats.size === categories.length;
+
   function toggle(cat: string) {
     setOpenCats((prev) => {
       const next = new Set(prev);
@@ -211,6 +214,14 @@ function CategoryProductBreakdown({
       else next.add(cat);
       return next;
     });
+  }
+
+  function toggleAll() {
+    if (allOpen) {
+      setOpenCats(new Set());
+    } else {
+      setOpenCats(new Set(categories.map(c => c.categoryName)));
+    }
   }
 
   const productsByCategory = useMemo(() => {
@@ -226,8 +237,17 @@ function CategoryProductBreakdown({
   return (
     <div className="space-y-1">
       {/* Header row */}
-      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-2 pb-1 border-b">
+      <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-2 pb-1 border-b items-center">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={toggleAll}
+          data-testid="button-toggle-all-categories"
+          className="h-6 text-xs px-2"
+        >
+          {allOpen ? "Collapse All" : "Show All"}
+        </Button>
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide text-right w-16">Qty</span>
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide text-right w-24">Weight</span>
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide text-right w-24">Value</span>
