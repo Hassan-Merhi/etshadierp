@@ -737,6 +737,7 @@ let migrationsDone = false;
       created_at timestamp NOT NULL DEFAULT now()
     )`,
     `ALTER TABLE customer_proforma_lines ADD COLUMN IF NOT EXISTS price_fixed boolean NOT NULL DEFAULT false`,
+    `ALTER TABLE customer_proforma_lines ADD COLUMN IF NOT EXISTS production_price_per_bale numeric(20,2) NOT NULL DEFAULT 0`,
     `CREATE TABLE IF NOT EXISTS factory_raw_material_adjustments (
       id serial PRIMARY KEY,
       company_id integer NOT NULL,

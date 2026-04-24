@@ -499,6 +499,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           productName: l.productName,
           quantity: parseInt(l.quantity),
           pricePerBale: String(l.pricePerBale || "0"),
+          productionPricePerBale: String(l.productionPricePerBale || "0"),
         }));
 
         const insertedLines = await tx.insert(customerProformaLines).values(lineValues).returning();
