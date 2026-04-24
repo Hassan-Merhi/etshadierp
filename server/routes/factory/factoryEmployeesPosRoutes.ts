@@ -2919,11 +2919,12 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         }
       }
 
-      // ── 3. Inventory (Stock In Hand) — direct SQL sum of selling price ──────
-      // Single query: sum selling_price for every IN_STOCK bale that has a
+      // ── 3. Inventory (Stock In Hand) — direct SQL sum of production price ──────
+      // Single query: sum production_price for every IN_STOCK bale that has a
       // matched product, scoped strictly to companyId.
+      // Production price (cost to manufacture) is used here, not selling price.
       const invResult = await db.execute(sql`
-        SELECT COALESCE(SUM(p.selling_price::numeric), 0) AS total
+        SELECT COALESCE(SUM(p.production_price::numeric), 0) AS total
         FROM   factory_bales   b
         JOIN   factory_bale_products p ON p.id = b.product_id
         WHERE  b.company_id = ${companyId}

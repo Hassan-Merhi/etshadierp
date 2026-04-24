@@ -231,29 +231,29 @@ export function registerFactoryDaybookRoutes(app: Express) {
               articleCode: factoryBales.articleCode,
             }).from(factoryBales).where(inArray(factoryBales.id, allBaleIds));
 
-            // Build product selling price map: by id (primary) and by articleCode (fallback)
-            const productSellingPriceById = new Map<number, number>();
-            const productSellingPriceByArticleCode = new Map<string, number>();
-            // Always fetch products so we can look up sellingPrice per bale
+            // Build product production price map: by id (primary) and by articleCode (fallback)
+            // Production price is what was spent to produce the bale — used for cost-side daybook entries.
+            const productProductionPriceById = new Map<number, number>();
+            const productProductionPriceByArticleCode = new Map<string, number>();
             const allProducts = await db.select({
               id: factoryBaleProducts.id,
               articleCode: factoryBaleProducts.articleCode,
-              sellingPrice: factoryBaleProducts.sellingPrice,
+              productionPrice: (factoryBaleProducts as any).productionPrice,
             }).from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId));
             allProducts.forEach((p: any) => {
-              productSellingPriceById.set(p.id, parseFloat(p.sellingPrice || "0"));
-              if (p.articleCode) productSellingPriceByArticleCode.set(p.articleCode, parseFloat(p.sellingPrice || "0"));
+              productProductionPriceById.set(p.id, parseFloat(p.productionPrice || "0"));
+              if (p.articleCode) productProductionPriceByArticleCode.set(p.articleCode, parseFloat(p.productionPrice || "0"));
             });
 
-            // Accumulate value per daybook row id using sellingPrice (per bale)
+            // Accumulate value per daybook row id using productionPrice (per bale)
             const rowValueMap = new Map<number, number>();
             for (const baleRec of baleRecords) {
               const entries = baleIdToEntry.get(baleRec.id) || [];
               let val = 0;
-              // primary: productId → sellingPrice
-              if (baleRec.productId) val = productSellingPriceById.get(baleRec.productId) || 0;
-              // fallback: articleCode → sellingPrice
-              if (val === 0 && baleRec.articleCode) val = productSellingPriceByArticleCode.get(baleRec.articleCode) || 0;
+              // primary: productId → productionPrice
+              if (baleRec.productId) val = productProductionPriceById.get(baleRec.productId) || 0;
+              // fallback: articleCode → productionPrice
+              if (val === 0 && baleRec.articleCode) val = productProductionPriceByArticleCode.get(baleRec.articleCode) || 0;
               for (const { row } of entries) {
                 rowValueMap.set(row.id, (rowValueMap.get(row.id) || 0) + val);
               }
