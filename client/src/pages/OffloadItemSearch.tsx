@@ -15,7 +15,9 @@ interface OffloadResult {
   lineTotal: string;
   poNumber: string;
   containerNumber: string;
-  offloadDate: string;
+  offloadDate: string | null;
+  importDate: string | null;
+  containerStatus: string;
   currency: string;
   supplierName: string | null;
 }
@@ -135,7 +137,8 @@ export default function OffloadItemSearch() {
                   <TableRow>
                     <TableHead>Item Name</TableHead>
                     <TableHead>Container</TableHead>
-                    <TableHead>Offload Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Date</TableHead>
                     <TableHead>PO #</TableHead>
                     <TableHead>Supplier</TableHead>
                     <TableHead className="text-right">Qty (KG)</TableHead>
@@ -144,16 +147,22 @@ export default function OffloadItemSearch() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {results.map((row, i) => (
+                  {results.map((row, i) => {
+                    const displayDate = row.offloadDate || row.importDate;
+                    const isOffloaded = row.containerStatus === "OFFLOADED";
+                    return (
                     <TableRow key={i} data-testid={`row-result-${i}`}>
                       <TableCell className="font-medium">{row.itemName}</TableCell>
                       <TableCell>
                         <span className="font-mono text-sm">{row.containerNumber}</span>
                       </TableCell>
                       <TableCell>
-                        {row.offloadDate
-                          ? format(new Date(row.offloadDate), "dd MMM yyyy")
-                          : "—"}
+                        <Badge variant={isOffloaded ? "default" : "secondary"}>
+                          {row.containerStatus}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {displayDate ? format(new Date(displayDate), "dd MMM yyyy") : "—"}
                       </TableCell>
                       <TableCell>{row.poNumber}</TableCell>
                       <TableCell className="text-muted-foreground">{row.supplierName ?? "—"}</TableCell>
@@ -165,7 +174,8 @@ export default function OffloadItemSearch() {
                         {row.currency} {fmtMoney(row.lineTotal)}
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>

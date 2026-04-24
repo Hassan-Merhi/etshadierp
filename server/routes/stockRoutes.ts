@@ -450,16 +450,18 @@ export function registerStockRoutes(app: Express) {
           po.po_number        AS "poNumber",
           c.container_number  AS "containerNumber",
           c.offload_date      AS "offloadDate",
+          c.import_date       AS "importDate",
+          c.status            AS "containerStatus",
           po.currency         AS "currency",
-          s.name              AS "supplierName"
+          s.legal_name        AS "supplierName"
         FROM po_line_items pli
         JOIN purchase_orders po ON pli.po_id = po.id
         JOIN containers c ON po.container_id = c.id
         LEFT JOIN suppliers s ON po.supplier_id = s.id
         WHERE po.company_id = ${companyId}
-          AND c.offload_date IS NOT NULL
+          AND (c.offload_date IS NOT NULL OR c.import_date IS NOT NULL)
           AND pli.item_name ILIKE ${'%' + q + '%'}
-        ORDER BY c.offload_date DESC, pli.item_name
+        ORDER BY COALESCE(c.offload_date, c.import_date) DESC, pli.item_name
       `);
       res.json(result.rows);
     } catch (error: any) {
