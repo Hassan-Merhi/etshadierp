@@ -2185,6 +2185,7 @@
     const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
     const hiddenTabs = myAccess?.hiddenCostFields ?? [];
 
+    const showEntry   = settings?.stockEntryTabEntryEnabled   !== false && !hiddenTabs.includes("hide_tab_stockentry_entry");
     const showHistory = settings?.stockEntryTabHistoryEnabled !== false && !hiddenTabs.includes("hide_tab_stockentry_history");
 
     return (
@@ -2199,12 +2200,14 @@
 
         <DailyStockSummary date={summaryDate} />
 
-        <Tabs defaultValue="entry">
+        <Tabs defaultValue={showEntry ? "entry" : "history"}>
           <TabsList>
-            <TabsTrigger value="entry" data-testid="tab-stock-entry">
-              <ScanLine className="h-4 w-4 mr-1" />
-              Stock Entry
-            </TabsTrigger>
+            {showEntry && (
+              <TabsTrigger value="entry" data-testid="tab-stock-entry">
+                <ScanLine className="h-4 w-4 mr-1" />
+                Stock Entry
+              </TabsTrigger>
+            )}
             {showHistory && (
               <TabsTrigger value="history" data-testid="tab-stock-entry-history">
                 <List className="h-4 w-4 mr-1" />
@@ -2212,9 +2215,11 @@
               </TabsTrigger>
             )}
           </TabsList>
-          <TabsContent value="entry" className="mt-4">
-            <StockEntryTab />
-          </TabsContent>
+          {showEntry && (
+            <TabsContent value="entry" className="mt-4">
+              <StockEntryTab />
+            </TabsContent>
+          )}
           {showHistory && (
             <TabsContent value="history" className="mt-0 p-0">
               <StockEntryHistory

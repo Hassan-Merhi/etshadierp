@@ -75,6 +75,7 @@ const FACTORY_TABS: { key: string; label: string; group: string }[] = [
   { key: "hide_tab_bales_barcode",            label: "Barcode Lookup",          group: "Bales Hub" },
   { key: "hide_tab_bales_remove",             label: "Remove from Stock",       group: "Bales Hub" },
   { key: "hide_tab_loadings_pending",         label: "Pending Loadings",        group: "Loadings Hub" },
+  { key: "hide_tab_stockentry_entry",         label: "Stock Entry",             group: "Stock Entry" },
   { key: "hide_tab_stockentry_history",       label: "History",                 group: "Stock Entry" },
   { key: "hide_tab_advances_repayments",      label: "Repayments",              group: "Advances" },
   { key: "hide_tab_kpis_worker_performance",  label: "Worker Performance",      group: "KPIs" },

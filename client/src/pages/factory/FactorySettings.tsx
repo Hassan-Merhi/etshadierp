@@ -44,6 +44,7 @@ interface FactorySettingsData {
   balesTabBarcodeEnabled: boolean;
   balesTabRemoveEnabled: boolean;
   loadingsTabPendingEnabled: boolean;
+  stockEntryTabEntryEnabled: boolean;
   stockEntryTabHistoryEnabled: boolean;
   advancesTabRepaymentsEnabled: boolean;
   kpisTabWorkerPerformanceEnabled: boolean;
@@ -86,6 +87,7 @@ const defaultSettings: FactorySettingsData = {
   balesTabBarcodeEnabled: true,
   balesTabRemoveEnabled: true,
   loadingsTabPendingEnabled: true,
+  stockEntryTabEntryEnabled: true,
   stockEntryTabHistoryEnabled: true,
   advancesTabRepaymentsEnabled: true,
   kpisTabWorkerPerformanceEnabled: true,
@@ -369,6 +371,7 @@ export default function FactorySettings() {
       balesTabBarcodeEnabled: true,
       balesTabRemoveEnabled: true,
       loadingsTabPendingEnabled: true,
+      stockEntryTabEntryEnabled: true,
       stockEntryTabHistoryEnabled: true,
       advancesTabRepaymentsEnabled: true,
       kpisTabWorkerPerformanceEnabled: true,
@@ -514,6 +517,7 @@ export default function FactorySettings() {
             <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Loadings Hub</p>
             {toggleItem("Pending Loadings tab", "loadingsTabPendingEnabled")}
             <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Stock Entry</p>
+            {toggleItem("Stock Entry tab", "stockEntryTabEntryEnabled")}
             {toggleItem("Stock Entry History tab", "stockEntryTabHistoryEnabled")}
             <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Advances</p>
             {toggleItem("Repayments tab", "advancesTabRepaymentsEnabled")}
