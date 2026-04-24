@@ -219,7 +219,8 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
       const p = m.get(row.articleCode);
       if (p?.productionPrice && parseFloat(p.productionPrice) > 0) next[row.articleCode] = p.productionPrice;
     }
-    setProductionPrices(prev => ({ ...prev, ...next }));
+    // Both buttons target the single visible price column (sellingPrices)
+    setSellingPrices(prev => ({ ...prev, ...next }));
   }
 
   function validate(): boolean {
@@ -362,8 +363,7 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
                 <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[95px] text-green-700 dark:text-green-400">Free to Promise</th>
                 <th className="text-center px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[110px]">Qty</th>
                 <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[90px] text-muted-foreground">Total KG</th>
-                <th className="text-center px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[130px]">Selling Price</th>
-                <th className="text-center px-3 py-2 font-medium border-b whitespace-nowrap min-w-[130px]">Production Price</th>
+                <th className="text-center px-3 py-2 font-medium border-b whitespace-nowrap min-w-[130px]">Price</th>
               </tr>
             </thead>
             <tbody>
@@ -455,8 +455,8 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
                         : <span className="text-muted-foreground/40">—</span>}
                     </td>
 
-                    {/* Selling Price */}
-                    <td className="px-2 py-1 border-r">
+                    {/* Price (selling or production, depending on which Apply button was used) */}
+                    <td className="px-2 py-1">
                       <Input
                         type="number"
                         min={0}
@@ -466,22 +466,7 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
                         onFocus={e => e.target.select()}
                         placeholder="0.00"
                         className="h-7 text-right text-xs font-mono w-24 px-2 tabular-nums"
-                        data-testid={`input-selling-price-${row.articleCode}`}
-                      />
-                    </td>
-
-                    {/* Production Price */}
-                    <td className="px-2 py-1">
-                      <Input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={productionPrices[row.articleCode] ?? ""}
-                        onChange={e => setProductionPrices(prev => ({ ...prev, [row.articleCode]: e.target.value }))}
-                        onFocus={e => e.target.select()}
-                        placeholder="0.00"
-                        className="h-7 text-right text-xs font-mono w-24 px-2 tabular-nums"
-                        data-testid={`input-production-price-${row.articleCode}`}
+                        data-testid={`input-price-${row.articleCode}`}
                       />
                     </td>
                   </tr>
