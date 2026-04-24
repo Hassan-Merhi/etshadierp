@@ -85,12 +85,23 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
           .returning();
       }
 
-      res.json(settings);
+      // Spread extraSettings so clients see all flags as top-level fields
+      const extra = (settings as any).extraSettings ?? {};
+      res.json({ ...settings, ...extra });
     } catch (error: any) {
       console.error("Error fetching factory settings:", error);
       res.status(500).json({ message: error.message });
     }
   });
+
+  // Known DB columns — everything else goes into extraSettings JSONB
+  const KNOWN_SETTINGS_COLUMNS = new Set([
+    "companyId", "dashboardEnabled", "kpisEnabled", "profitabilityEnabled", "alertsEnabled",
+    "supplierScoringEnabled", "mixOptimizerEnabled", "traceabilityEnabled", "balePhotosEnabled",
+    "wasteTrackingEnabled", "cashflowEnabled", "rolesEnabled", "netProfitEnabled",
+    "productionSummaryEnabled", "supplierReportEnabled", "supplierStatementEnabled",
+    "laborCostPerKg", "overheadPerKg", "hideSellingPrice", "hideAvgCost",
+  ]);
 
   app.put("/api/factory/settings", requireAuth, async (req: any, res: any) => {
     try {
@@ -126,6 +137,19 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       if (hideSellingPrice !== undefined) updateData.hideSellingPrice = hideSellingPrice;
       if (hideAvgCost !== undefined) updateData.hideAvgCost = hideAvgCost;
 
+      // Collect any extra boolean/string settings into extraSettings JSONB
+      const extraKeys = Object.keys(req.body).filter(k => !KNOWN_SETTINGS_COLUMNS.has(k) && k !== "id" && k !== "updatedAt" && k !== "extraSettings");
+      if (extraKeys.length > 0) {
+        // Fetch current extraSettings to merge
+        const [current] = await db.select({ extraSettings: factorySettings.extraSettings }).from(factorySettings).where(eq(factorySettings.companyId, companyId));
+        const currentExtra: any = (current?.extraSettings as any) ?? {};
+        const newExtra: any = { ...currentExtra };
+        for (const key of extraKeys) {
+          if (req.body[key] !== undefined) newExtra[key] = req.body[key];
+        }
+        updateData.extraSettings = newExtra;
+      }
+
       const [result] = await db
         .insert(factorySettings)
         .values({ companyId, ...updateData })
@@ -135,7 +159,8 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         })
         .returning();
 
-      res.json(result);
+      const resultExtra = (result as any).extraSettings ?? {};
+      res.json({ ...result, ...resultExtra });
     } catch (error: any) {
       console.error("Error updating factory settings:", error);
       res.status(500).json({ message: error.message });
