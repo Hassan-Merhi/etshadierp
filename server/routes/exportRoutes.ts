@@ -127,6 +127,7 @@ export function registerExportRoutes(app: Express) {
         }
         addStep(job, `Found ${companies.length} company/companies to export`, "success");
 
+        // buildFullExportZip throws if the ZIP would be empty — failJob is called in catch below
         const { zip: zipBuf, names, skipped } = await buildFullExportZip(
           companies,
           fromDate,
@@ -134,13 +135,18 @@ export function registerExportRoutes(app: Express) {
           (msg, level) => addStep(job, msg, level ?? "info"),
         );
 
+        if (names.length === 0) {
+          failJob(job, "ZIP is empty — no companies exported successfully. Nothing will be sent or downloaded.");
+          return;
+        }
+
         if (skipped.length > 0) {
           addStep(job, `Skipped ${skipped.length} companies: ${skipped.join(", ")}`, "warning");
         }
 
         const dateLabel = new Date().toISOString().substring(0, 10);
         const sizeMB = (zipBuf.length / 1024 / 1024).toFixed(1);
-        addStep(job, `ZIP archive ready — ${sizeMB} MB total`, "success");
+        addStep(job, `ZIP archive ready — ${sizeMB} MB, ${names.length} companies`, "success");
 
         if (mode === "email") {
           addStep(job, "Sending email to recipients...", "info");

@@ -62,23 +62,15 @@ async function runDailyExport(retryCount = 0): Promise<void> {
     // Use full history (no date filter) so the export is never empty
     console.log(`[DailyExport] Building full-history export for ${companies.length} company/companies (label: ${today})`);
 
+    // buildFullExportZip throws if the ZIP would be empty (all companies failed)
     const { zip, names, skipped } = await buildFullExportZip(companies, undefined, undefined);
-
-    // Always attempt WhatsApp send, even if some companies failed
-    await runDailyWhatsAppSend(zip, today, companies);
-
-    if (names.length === 0) {
-      console.error(`[DailyExport] All ${companies.length} companies failed — nothing to email.`);
-      if (retryCount < MAX_RETRIES) {
-        console.log(`[DailyExport] Retrying in 10 minutes...`);
-        setTimeout(() => runDailyExport(retryCount + 1), 10 * 60 * 1000);
-      }
-      return;
-    }
 
     if (skipped.length > 0) {
       console.warn(`[DailyExport] Skipped ${skipped.length} companies: ${skipped.join(", ")}`);
     }
+
+    // Only send via WhatsApp and email once we have confirmed the ZIP is non-empty
+    await runDailyWhatsAppSend(zip, today, companies);
 
     const result = await sendExportEmail(zip, today, names);
 
@@ -422,7 +414,12 @@ export function startScheduler() {
           return;
         }
         const today = getTodayLabel();
-        const { zip } = await buildFullExportZip(companies, undefined, undefined);
+        // buildFullExportZip throws if ZIP would be empty — no empty send possible
+        const { zip, names } = await buildFullExportZip(companies, undefined, undefined);
+        if (names.length === 0) {
+          console.log("[DailyExport] ZIP is empty after build — WhatsApp send skipped.");
+          return;
+        }
         await runDailyWhatsAppSend(zip, today, companies);
       } catch (err: any) {
         console.error("[DailyExport] WhatsApp-only 6 PM send failed:", err?.message || err);
@@ -465,12 +462,17 @@ export async function triggerDailyWhatsAppSendNow(
     return { message: "No companies found." };
   }
   const today = getTodayLabel();
-  const { zip } = await buildFullExportZip(companies, fromDate, toDate);
+  // buildFullExportZip throws if ZIP would be empty — propagates to caller as error
+  const { zip, names, skipped } = await buildFullExportZip(companies, fromDate, toDate);
+  if (names.length === 0) {
+    throw new Error("ZIP is empty — no companies exported successfully. WhatsApp send aborted.");
+  }
   await runDailyWhatsAppSend(zip, today, companies);
   const rangeLabel = (fromDate || toDate)
     ? ` (${fromDate || "start"} → ${toDate || "today"})`
     : " (full history)";
-  return { message: `Daily ZIP sent to WhatsApp — ${companies.length} companies${rangeLabel}.` };
+  const skippedNote = skipped.length > 0 ? ` (${skipped.length} skipped)` : "";
+  return { message: `Daily ZIP sent to WhatsApp — ${names.length} companies${rangeLabel}${skippedNote}.` };
 }
 
 export { runDailyExport };

@@ -51,7 +51,9 @@ export async function buildFullExportZip(
   }
 
   if (xlsxBuffers.length === 0) {
-    log(`WARNING: All ${companies.length} companies failed — ZIP will be empty. Check server logs for errors.`, "error");
+    const msg = `Export aborted — all ${companies.length} company/companies failed to generate workbooks. ZIP would be empty. Check server logs for per-company errors.`;
+    log(msg, "error");
+    throw new Error(msg);
   }
 
   const zip = await new Promise<Buffer>((resolve, reject) => {
