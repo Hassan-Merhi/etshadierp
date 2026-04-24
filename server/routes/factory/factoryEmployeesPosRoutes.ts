@@ -3233,4 +3233,128 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // ─── Monthly Attendance Report ───────────────────────────────────────────────
+  // GET /api/factory/workers/attendance-report?year=YYYY&month=M
+  // Returns all active workers + attendance matrix for the given month.
+  app.get("/api/factory/workers/attendance-report", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const year  = parseInt((req.query.year  as string) || String(new Date().getFullYear()));
+      const month = parseInt((req.query.month as string) || String(new Date().getMonth() + 1));
+      if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+        return res.status(400).json({ message: "Invalid year or month" });
+      }
+
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const startDate   = `${year}-${String(month).padStart(2, "0")}-01`;
+      const endDate     = `${year}-${String(month).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
+
+      // All active workers for this company
+      const workers = await db
+        .select({
+          id:           factoryWorkers.id,
+          employeeCode: factoryWorkers.employeeCode,
+          fullName:     factoryWorkers.fullName,
+          active:       factoryWorkers.active,
+        })
+        .from(factoryWorkers)
+        .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)))
+        .orderBy(factoryWorkers.fullName);
+
+      if (workers.length === 0) {
+        return res.json({
+          year, month, daysInMonth, workers: [],
+          dailySummary: {}, totals: { workers: 0, presentDays: 0, absentDays: 0, totalPossibleDays: 0 },
+        });
+      }
+
+      const workerIds = workers.map((w: any) => w.id);
+
+      // Attendance rows for this month
+      const attRows = await db.execute(
+        sql`SELECT worker_id AS "workerId",
+                   EXTRACT(DAY FROM attendance_date::date)::int AS day,
+                   status
+            FROM factory_attendance
+            WHERE company_id = ${companyId}
+              AND attendance_date >= ${startDate}
+              AND attendance_date <= ${endDate}
+              AND worker_id = ANY(${workerIds})
+            ORDER BY attendance_date`
+      );
+      const attRecords: { workerId: number; day: number; status: string }[] =
+        ((attRows as any).rows ?? (attRows as any[])).map((r: any) => ({
+          workerId: Number(r.workerId),
+          day:      Number(r.day),
+          status:   r.status,
+        }));
+
+      // Build per-worker attendance map: { workerId → { day → status } }
+      const workerAttMap = new Map<number, Map<number, string>>();
+      for (const r of attRecords) {
+        if (!workerAttMap.has(r.workerId)) workerAttMap.set(r.workerId, new Map());
+        workerAttMap.get(r.workerId)!.set(r.day, r.status);
+      }
+
+      // Build daily summary: { day → { present, absent } }
+      const dailySummary: Record<number, { present: number; absent: number }> = {};
+      for (let d = 1; d <= daysInMonth; d++) dailySummary[d] = { present: 0, absent: 0 };
+      for (const r of attRecords) {
+        if (r.status === "Present") dailySummary[r.day].present++;
+        else if (r.status === "Absent") dailySummary[r.day].absent++;
+      }
+
+      let totalPresent = 0;
+      let totalAbsent  = 0;
+
+      const workerResults = workers.map((w: any) => {
+        const dayMap = workerAttMap.get(w.id) || new Map<number, string>();
+        const attendance: Record<number, string> = {};
+        for (const [d, s] of dayMap) attendance[d] = s;
+
+        let presentCount = 0;
+        let absentCount  = 0;
+        for (const s of dayMap.values()) {
+          if (s === "Present") presentCount++;
+          else if (s === "Absent") absentCount++;
+        }
+        totalPresent += presentCount;
+        totalAbsent  += absentCount;
+
+        const recordedCount   = presentCount + absentCount;
+        const attendancePct   = recordedCount > 0 ? Math.round((presentCount / recordedCount) * 100) : null;
+
+        return {
+          id:             w.id,
+          employeeCode:   w.employeeCode,
+          fullName:       w.fullName,
+          attendance,
+          presentCount,
+          absentCount,
+          recordedCount,
+          attendancePct,
+        };
+      });
+
+      res.json({
+        year,
+        month,
+        daysInMonth,
+        workers: workerResults,
+        dailySummary,
+        totals: {
+          workers:          workers.length,
+          presentDays:      totalPresent,
+          absentDays:       totalAbsent,
+          totalPossibleDays: workers.length * daysInMonth,
+        },
+      });
+    } catch (error: any) {
+      console.error("Attendance report error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
 }

@@ -1,19 +1,21 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { HardHat, DollarSign, CalendarDays, Banknote, Gift } from "lucide-react";
+import { HardHat, DollarSign, CalendarDays, Banknote, Gift, BarChart3 } from "lucide-react";
 import FactoryWorkers from "@/pages/factory/FactoryWorkers";
 import FactoryPayrollTab from "@/pages/factory/FactoryPayrollTab";
 import FactoryAttendance from "@/pages/factory/FactoryAttendance";
 import FactoryAdvancesTab from "@/pages/factory/FactoryAdvancesTab";
 import FactoryWorkerBonusesTab from "@/pages/factory/FactoryWorkerBonusesTab";
+import FactoryWorkerAttendanceReport from "@/pages/factory/FactoryWorkerAttendanceReport";
 
-type TabValue = "workers" | "payroll" | "attendance" | "advances" | "bonuses";
+type TabValue = "workers" | "payroll" | "attendance" | "report" | "advances" | "bonuses";
 
 function getInitialTab(): TabValue {
   const params = new URLSearchParams(window.location.search);
   const tab = params.get("tab");
   if (tab === "payroll") return "payroll";
   if (tab === "attendance") return "attendance";
+  if (tab === "report") return "report";
   if (tab === "advances") return "advances";
   if (tab === "bonuses") return "bonuses";
   return "workers";
@@ -26,7 +28,6 @@ function setTabInUrl(tab: TabValue) {
   } else {
     url.searchParams.set("tab", tab);
   }
-  // Clear attendance mode when leaving attendance tab
   if (tab !== "attendance") {
     url.searchParams.delete("mode");
   }
@@ -57,6 +58,10 @@ export default function FactoryWorkersHub() {
           <CalendarDays className="h-4 w-4 mr-2" />
           Attendance
         </TabsTrigger>
+        <TabsTrigger value="report" data-testid="tab-attendance-report">
+          <BarChart3 className="h-4 w-4 mr-2" />
+          Report
+        </TabsTrigger>
         <TabsTrigger value="advances" data-testid="tab-advances">
           <Banknote className="h-4 w-4 mr-2" />
           Advances
@@ -75,6 +80,9 @@ export default function FactoryWorkersHub() {
       </TabsContent>
       <TabsContent value="attendance" className="mt-0">
         <FactoryAttendance />
+      </TabsContent>
+      <TabsContent value="report" className="mt-0">
+        <FactoryWorkerAttendanceReport />
       </TabsContent>
       <TabsContent value="advances" className="mt-0">
         <FactoryAdvancesTab />
