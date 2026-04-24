@@ -138,6 +138,56 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     throw new Error(`Unable to create ledger account "${name}" after multiple attempts`);
   }
 
+  // GET /api/factory/workers/with-balances - List active workers with computed current balances
+  // Balance = total advances (debit) minus total paid payroll net salary (credit), all-time
+  app.get("/api/factory/workers/with-balances", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const workers = await db
+        .select()
+        .from(factoryWorkers)
+        .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)))
+        .orderBy(factoryWorkers.fullName);
+
+      // Compute balance for each worker using SQL aggregation
+      const advanceTotals = await db
+        .select({
+          workerId: factoryWorkerAdvances.workerId,
+          total: sql<string>`COALESCE(SUM(${factoryWorkerAdvances.amount}), 0)`,
+        })
+        .from(factoryWorkerAdvances)
+        .where(eq(factoryWorkerAdvances.companyId, companyId))
+        .groupBy(factoryWorkerAdvances.workerId);
+
+      const payrollTotals = await db
+        .select({
+          workerId: factoryPayrolls.workerId,
+          total: sql<string>`COALESCE(SUM(${factoryPayrolls.netSalary}), 0)`,
+        })
+        .from(factoryPayrolls)
+        .where(and(
+          eq(factoryPayrolls.companyId, companyId),
+          sql`${factoryPayrolls.status} = 'PAID'`,
+        ))
+        .groupBy(factoryPayrolls.workerId);
+
+      const advanceMap = new Map(advanceTotals.map((r) => [r.workerId, parseFloat(r.total)]));
+      const payrollMap = new Map(payrollTotals.map((r) => [r.workerId, parseFloat(r.total)]));
+
+      const result = workers.map((w) => ({
+        ...w,
+        currentBalance: (advanceMap.get(w.id) ?? 0) - (payrollMap.get(w.id) ?? 0),
+      }));
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching factory workers with balances:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // GET /api/factory/workers - List workers
   app.get("/api/factory/workers", requireAuth, async (req: any, res: any) => {
     try {

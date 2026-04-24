@@ -319,25 +319,31 @@ export default function Accounts() {
     : [];
 
   const { data: factoryWorkersData = [] } = useQuery<any[]>({
-    queryKey: ["/api/factory/workers", selectedCompany?.id],
+    queryKey: ["/api/factory/workers/with-balances", selectedCompany?.id],
     enabled: appMode === "factory" && !!selectedCompany,
   });
 
   const factoryWorkerAccounts: Account[] = appMode === "factory"
     ? (Array.isArray(factoryWorkersData) ? factoryWorkersData : [])
         .filter((w: any) => w.active !== false)
-        .map((w: any) => ({
-          id: `factoryWorker-${w.id}`,
-          accountId: w.id,
-          type: "factoryWorker" as const,
-          name: w.fullName,
-          code: w.employeeCode || `FW-${w.id}`,
-          balance: 0,
-          balanceSide: null,
-          openingBalance: 0,
-          openingBalanceSide: null,
-          active: w.active ?? true,
-        }))
+        .map((w: any) => {
+          const bal = parseFloat(w.currentBalance ?? "0");
+          // Positive balance = worker owes us (advances > payroll) = Dr
+          // Negative balance = we owe worker (payroll > advances) = Cr
+          const side = bal >= 0 ? "Dr" : "Cr";
+          return {
+            id: `factoryWorker-${w.id}`,
+            accountId: w.id,
+            type: "factoryWorker" as const,
+            name: w.fullName,
+            code: w.employeeCode || `FW-${w.id}`,
+            balance: bal,
+            balanceSide: side,
+            openingBalance: 0,
+            openingBalanceSide: null,
+            active: w.active ?? true,
+          };
+        })
     : [];
 
   const accounts = [...baseAccounts, ...factorySupplierAccounts, ...factoryWorkerAccounts];
