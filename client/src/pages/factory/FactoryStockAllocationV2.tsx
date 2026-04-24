@@ -2,11 +2,12 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Loader2, RefreshCw, Package, Truck, Info } from "lucide-react";
+import { Loader2, RefreshCw, Package, Truck, Info, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import CreateProformaDrawer from "./CreateProformaDrawer";
 
 /* ─── V2 Proforma Mode types ──────────────────────────────────────────────── */
 interface StockTruthEntry {
@@ -62,6 +63,7 @@ export default function FactoryStockAllocationV2() {
   const [activeTab, setActiveTab] = useState<"proforma" | "loading">("proforma");
   const [visibleProformaIds, setVisibleProformaIds] = useState<Set<number>>(new Set());
   const [showInactiveProformas, setShowInactiveProformas] = useState(false);
+  const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
 
   const proformaQuery = useQuery<AllocationDataV2>({
     queryKey: ["/api/factory/v2/stock-allocation"],
@@ -179,14 +181,23 @@ export default function FactoryStockAllocationV2() {
           <h1 className="text-xl font-semibold">Stock Allocation</h1>
           <Badge variant="secondary" className="text-[11px] font-semibold tracking-wide">v2</Badge>
         </div>
-        <Button
-          variant="outline"
-          size="default"
-          onClick={() => activeTab === "proforma" ? proformaQuery.refetch() : loadingQuery.refetch()}
-          data-testid="button-refresh-allocation"
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="default"
+            onClick={() => setCreateDrawerOpen(true)}
+            data-testid="button-open-create-proforma"
+          >
+            <Plus className="h-4 w-4 mr-2" />Create Proforma
+          </Button>
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => activeTab === "proforma" ? proformaQuery.refetch() : loadingQuery.refetch()}
+            data-testid="button-refresh-allocation"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />Refresh
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "proforma" | "loading")} className="flex flex-col flex-1 min-h-0">
@@ -552,6 +563,13 @@ export default function FactoryStockAllocationV2() {
           )}
         </TabsContent>
       </Tabs>
+
+      <CreateProformaDrawer
+        open={createDrawerOpen}
+        onClose={() => setCreateDrawerOpen(false)}
+        articleRows={proformaComputed.articleRows}
+        onSuccess={() => proformaQuery.refetch()}
+      />
     </div>
   );
 }
