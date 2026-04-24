@@ -3235,22 +3235,55 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
   });
 
   // ─── Monthly Attendance Report ───────────────────────────────────────────────
-  // GET /api/factory/workers/attendance-report?year=YYYY&month=M
-  // Returns all active workers + attendance matrix for the given month.
+  // GET /api/factory/workers/attendance-report?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+  // Also supports legacy ?year=YYYY&month=M params.
+  // Returns all active workers + attendance matrix for the given date range.
   app.get("/api/factory/workers/attendance-report", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const year  = parseInt((req.query.year  as string) || String(new Date().getFullYear()));
-      const month = parseInt((req.query.month as string) || String(new Date().getMonth() + 1));
-      if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
-        return res.status(400).json({ message: "Invalid year or month" });
+      const DAY_ABBR = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+
+      let startDate: string;
+      let endDate: string;
+
+      if (req.query.startDate && req.query.endDate) {
+        startDate = req.query.startDate as string;
+        endDate   = req.query.endDate   as string;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+          return res.status(400).json({ message: "Invalid date format, use YYYY-MM-DD" });
+        }
+      } else {
+        const year  = parseInt((req.query.year  as string) || String(new Date().getFullYear()));
+        const month = parseInt((req.query.month as string) || String(new Date().getMonth() + 1));
+        if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+          return res.status(400).json({ message: "Invalid year or month" });
+        }
+        const daysInMonth = new Date(year, month, 0).getDate();
+        startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+        endDate   = `${year}-${String(month).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
       }
 
-      const daysInMonth = new Date(year, month, 0).getDate();
-      const startDate   = `${year}-${String(month).padStart(2, "0")}-01`;
-      const endDate     = `${year}-${String(month).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
+      // Build dates array
+      const dates: { date: string; label: string; abbr: string; isWeekend: boolean }[] = [];
+      const startMs = new Date(startDate + "T00:00:00").getTime();
+      const endMs   = new Date(endDate   + "T00:00:00").getTime();
+      if (isNaN(startMs) || isNaN(endMs) || startMs > endMs) {
+        return res.status(400).json({ message: "Invalid date range" });
+      }
+      const multiMonth = startDate.substring(0, 7) !== endDate.substring(0, 7);
+      const MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      for (let ms = startMs; ms <= endMs; ms += 86400000) {
+        const d   = new Date(ms);
+        const iso = d.toISOString().substring(0, 10);
+        const dow = d.getDay();
+        const dayNum = d.getDate();
+        const label = multiMonth
+          ? `${MONTH_ABBR[d.getMonth()]} ${dayNum}`
+          : String(dayNum);
+        dates.push({ date: iso, label, abbr: DAY_ABBR[dow], isWeekend: dow === 0 || dow === 6 });
+      }
 
       // All active workers for this company
       const workers = await db
@@ -3266,54 +3299,54 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
 
       if (workers.length === 0) {
         return res.json({
-          year, month, daysInMonth, workers: [],
+          startDate, endDate, dates, workers: [],
           dailySummary: {}, totals: { workers: 0, presentDays: 0, absentDays: 0, totalPossibleDays: 0 },
         });
       }
 
       const workerIds = workers.map((w: any) => w.id);
 
-      // Attendance rows for this month — filter by year+month via EXTRACT to avoid
-      // any date-string casting ambiguity in parameterized queries.
+      // Attendance rows for this date range
       const attRows = await db.execute(
         sql`SELECT worker_id AS "workerId",
-                   EXTRACT(DAY FROM attendance_date::date)::int AS day,
+                   attendance_date::date AS date,
                    status
             FROM factory_attendance
             WHERE company_id = ${companyId}
-              AND EXTRACT(YEAR  FROM attendance_date::date) = ${year}
-              AND EXTRACT(MONTH FROM attendance_date::date) = ${month}
+              AND attendance_date::date >= ${startDate}::date
+              AND attendance_date::date <= ${endDate}::date
               AND worker_id = ANY(${sql.raw(`ARRAY[${workerIds.join(",")}]`)})
             ORDER BY attendance_date`
       );
-      const attRecords: { workerId: number; day: number; status: string }[] =
+      const attRecords: { workerId: number; date: string; status: string }[] =
         ((attRows as any).rows ?? (attRows as any[])).map((r: any) => ({
           workerId: Number(r.workerId),
-          day:      Number(r.day),
+          date:     typeof r.date === "string" ? r.date.substring(0, 10) : new Date(r.date).toISOString().substring(0, 10),
           status:   r.status,
         }));
 
-      // Build per-worker attendance map: { workerId → { day → status } }
-      const workerAttMap = new Map<number, Map<number, string>>();
+      // Build per-worker attendance map: { workerId → { isoDate → status } }
+      const workerAttMap = new Map<number, Map<string, string>>();
       for (const r of attRecords) {
         if (!workerAttMap.has(r.workerId)) workerAttMap.set(r.workerId, new Map());
-        workerAttMap.get(r.workerId)!.set(r.day, r.status);
+        workerAttMap.get(r.workerId)!.set(r.date, r.status);
       }
 
-      // Build daily summary: { day → { present, absent } }
-      const dailySummary: Record<number, { present: number; absent: number }> = {};
-      for (let d = 1; d <= daysInMonth; d++) dailySummary[d] = { present: 0, absent: 0 };
+      // Build daily summary: { isoDate → { present, absent } }
+      const dailySummary: Record<string, { present: number; absent: number }> = {};
+      for (const { date } of dates) dailySummary[date] = { present: 0, absent: 0 };
       for (const r of attRecords) {
-        if (r.status === "Present") dailySummary[r.day].present++;
-        else if (r.status === "Absent") dailySummary[r.day].absent++;
+        if (!dailySummary[r.date]) dailySummary[r.date] = { present: 0, absent: 0 };
+        if (r.status === "Present") dailySummary[r.date].present++;
+        else if (r.status === "Absent") dailySummary[r.date].absent++;
       }
 
       let totalPresent = 0;
       let totalAbsent  = 0;
 
       const workerResults = workers.map((w: any) => {
-        const dayMap = workerAttMap.get(w.id) || new Map<number, string>();
-        const attendance: Record<number, string> = {};
+        const dayMap = workerAttMap.get(w.id) || new Map<string, string>();
+        const attendance: Record<string, string> = {};
         for (const [d, s] of dayMap) attendance[d] = s;
 
         let presentCount = 0;
@@ -3325,13 +3358,13 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         totalPresent += presentCount;
         totalAbsent  += absentCount;
 
-        const recordedCount   = presentCount + absentCount;
-        const attendancePct   = recordedCount > 0 ? Math.round((presentCount / recordedCount) * 100) : null;
+        const recordedCount = presentCount + absentCount;
+        const attendancePct = recordedCount > 0 ? Math.round((presentCount / recordedCount) * 100) : null;
 
         return {
-          id:             w.id,
-          employeeCode:   w.employeeCode,
-          fullName:       w.fullName,
+          id:           w.id,
+          employeeCode: w.employeeCode,
+          fullName:     w.fullName,
           attendance,
           presentCount,
           absentCount,
@@ -3341,16 +3374,16 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       });
 
       res.json({
-        year,
-        month,
-        daysInMonth,
+        startDate,
+        endDate,
+        dates,
         workers: workerResults,
         dailySummary,
         totals: {
-          workers:          workers.length,
-          presentDays:      totalPresent,
-          absentDays:       totalAbsent,
-          totalPossibleDays: workers.length * daysInMonth,
+          workers:           workers.length,
+          presentDays:       totalPresent,
+          absentDays:        totalAbsent,
+          totalPossibleDays: workers.length * dates.length,
         },
       });
     } catch (error: any) {
