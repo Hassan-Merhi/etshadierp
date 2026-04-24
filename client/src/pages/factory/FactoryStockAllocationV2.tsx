@@ -339,7 +339,9 @@ export default function FactoryStockAllocationV2() {
                         >
                           <td className="px-3 py-2 border-r sticky left-0 bg-inherit z-10">
                             <div className="font-medium truncate max-w-[220px]" title={row.displayName}>{row.displayName}</div>
-                            <div className="text-xs text-muted-foreground font-mono">{row.articleCode}</div>
+                            {row.displayName !== row.articleCode && (
+                              <div className="text-xs text-muted-foreground font-mono">{row.articleCode}</div>
+                            )}
                           </td>
 
                           {/* On Hand = free stock + in loading */}
@@ -484,7 +486,9 @@ export default function FactoryStockAllocationV2() {
                       >
                         <td className="px-3 py-2 border-r sticky left-0 bg-inherit z-10">
                           <div className="font-medium truncate max-w-[220px]" title={row.displayName}>{row.displayName}</div>
-                          <div className="text-xs text-muted-foreground font-mono">{row.articleCode}</div>
+                          {row.displayName !== row.articleCode && (
+                            <div className="text-xs text-muted-foreground font-mono">{row.articleCode}</div>
+                          )}
                         </td>
                         <td className="px-3 py-2 text-right border-r font-mono tabular-nums">{row.inStock}</td>
                         <td className={cn(
