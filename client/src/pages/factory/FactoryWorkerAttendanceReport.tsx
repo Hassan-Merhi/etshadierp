@@ -45,8 +45,8 @@ const MONTH_NAMES = [
 const DAY_ABBR = ["Su","Mo","Tu","We","Th","Fr","Sa"];
 
 /* ── Status cell ────────────────────────────────────────────────────────────── */
-function StatusCell({ status }: { status?: string }) {
-  if (!status) return (
+function StatusCell({ status, absentsOnly = false }: { status?: string; absentsOnly?: boolean }) {
+  if (!status || (absentsOnly && status !== "Absent")) return (
     <span className="text-muted-foreground/30 text-xs select-none">—</span>
   );
   if (status === "Present") return (
@@ -370,7 +370,7 @@ export default function FactoryWorkerAttendanceReport() {
                           data-testid={`cell-${worker.id}-day-${day}`}
                         >
                           <div className="flex items-center justify-center">
-                            <StatusCell status={worker.attendance[day]} />
+                            <StatusCell status={worker.attendance[day]} absentsOnly={filter === "absent"} />
                           </div>
                         </td>
                       ))}
