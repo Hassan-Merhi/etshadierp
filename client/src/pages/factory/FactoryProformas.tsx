@@ -158,7 +158,13 @@ export default function FactoryProformas() {
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      const msg = error.message || "";
+      const isStockError = msg.includes("insufficient") || msg.includes("free stock") || msg.includes("needs");
+      toast({
+        title: isStockError ? "Cannot activate — insufficient stock" : "Error",
+        description: isStockError ? "One or more articles don't have enough available stock to fulfil this proforma." : msg.slice(0, 200),
+        variant: "destructive",
+      });
     },
   });
 
