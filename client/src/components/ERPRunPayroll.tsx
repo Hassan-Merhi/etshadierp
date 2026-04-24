@@ -375,92 +375,81 @@ export default function ERPRunPayroll() {
     },
   });
 
-  // ── Print ─────────────────────────────────────────────────────────────────
+  // ── Helpers for the worker-salaries template ──────────────────────────────
+  function getRunDateHeaders(runDate: string): string[] {
+    const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const base = new Date(runDate + "T00:00:00");
+    return Array.from({ length: 10 }, (_, i) => {
+      const d = new Date(base);
+      d.setDate(d.getDate() + i);
+      return `${String(d.getDate()).padStart(2, "0")}-${MONTHS[d.getMonth()]}`;
+    });
+  }
+
+  function getWorkerCodeById(employeeId: number): string {
+    return workerById[employeeId]?.code || "";
+  }
+
+  interface TemplateRow { code: string; name: string; days: string[] }
+  function getRunTemplateRows(run: PayrollRun): TemplateRow[] {
+    return (run.items || []).map((it) => ({
+      code: getWorkerCodeById(it.employeeId),
+      name: it.employeeName,
+      days: Array<string>(10).fill(""),
+    }));
+  }
+
+  // ── Print (worker salaries template) ──────────────────────────────────────
   function printRun(run: PayrollRun) {
-    const items = run.items || [];
     const dateStr = run.date;
-    const notes = run.notes || "";
-    const totalBase = items.reduce((s, i) => s + parseFloat(i.baseSalary), 0);
-    const totalDed = items.reduce((s, i) => s + parseFloat(i.deduction), 0);
-    const totalNet = items.reduce((s, i) => s + parseFloat(i.netPay), 0);
+    const dateHeaders = getRunDateHeaders(dateStr);
+    const rows = getRunTemplateRows(run);
 
-    const groupMap: Record<string, typeof items> = {};
-    for (const it of items) {
-      const g = it.groupName || "Ungrouped";
-      if (!groupMap[g]) groupMap[g] = [];
-      groupMap[g].push(it);
-    }
+    const statusBadge = run.status === "PAID"
+      ? `<span style="background:#16a34a;color:#fff;font-weight:700;padding:2px 10px;border-radius:4px;font-size:11px">PAID</span>`
+      : `<span style="background:#ca8a04;color:#fff;font-weight:700;padding:2px 10px;border-radius:4px;font-size:11px">DRAFT</span>`;
 
-    const bodyRows = Object.entries(groupMap).map(([grp, members]) => {
-      const memberRows = members.map((m, i) => `
-        <tr style="background:${i % 2 === 0 ? "#fff" : "#f4f8fc"}">
-          <td style="padding:5px 8px;border-bottom:1px solid #e4e8ed">${m.employeeName}</td>
-          <td style="padding:5px 8px;border-bottom:1px solid #e4e8ed;text-align:right">${parseFloat(m.baseSalary).toFixed(2)}</td>
-          <td style="padding:5px 8px;border-bottom:1px solid #e4e8ed;text-align:right;color:${parseFloat(m.deduction) > 0 ? "#b45309" : "#999"}">${parseFloat(m.deduction) > 0 ? `-${parseFloat(m.deduction).toFixed(2)}` : "—"}</td>
-          <td style="padding:5px 8px;border-bottom:1px solid #e4e8ed;text-align:right;font-weight:600">${parseFloat(m.netPay).toFixed(2)}</td>
-          <td style="padding:5px 8px;border-bottom:1px solid #e4e8ed;text-align:center;color:#999">___________</td>
-        </tr>`).join("");
-      const gBase = members.reduce((s, m) => s + parseFloat(m.baseSalary), 0);
-      const gDed = members.reduce((s, m) => s + parseFloat(m.deduction), 0);
-      const gNet = members.reduce((s, m) => s + parseFloat(m.netPay), 0);
-      return `
-        <tr><td colspan="5" style="padding:6px 8px;background:#1e3a5f;color:#fff;font-weight:700;font-size:11px">${grp}</td></tr>
-        ${memberRows}
-        <tr style="background:#d6e4f0">
-          <td style="padding:5px 8px;font-weight:700;font-size:11px">${grp} — Total</td>
-          <td style="padding:5px 8px;text-align:right;font-weight:700">${gBase.toFixed(2)}</td>
-          <td style="padding:5px 8px;text-align:right;font-weight:700">${gDed > 0 ? `-${gDed.toFixed(2)}` : "—"}</td>
-          <td style="padding:5px 8px;text-align:right;font-weight:700">${gNet.toFixed(2)}</td>
-          <td style="padding:5px 8px"></td>
-        </tr>`;
+    const THcell = (txt: string) =>
+      `<th style="background:#000;color:#fff;font-weight:700;font-size:10px;padding:5px 4px;text-align:center;border:1px solid #000">${txt}</th>`;
+
+    const headerRow = [THcell("Code"), THcell("Name"), ...dateHeaders.map(THcell)].join("");
+
+    const bodyRows = rows.map((r, i) => {
+      const bg = i % 2 === 0 ? "#fff" : "#f0f0f0";
+      const dateCells = r.days.map(() =>
+        `<td style="border:1px solid #000;padding:5px 4px;background:${bg}"></td>`
+      ).join("");
+      return `<tr>
+        <td style="border:1px solid #000;padding:5px 4px;text-align:center;background:${bg};font-size:10px">${r.code}</td>
+        <td style="border:1px solid #000;padding:5px 6px;font-weight:700;font-size:10px;direction:rtl;text-align:center;background:${bg}">${r.name}</td>
+        ${dateCells}
+      </tr>`;
     }).join("");
 
-    const statusLine = run.status === "PAID"
-      ? `<div style="display:inline-block;background:#16a34a;color:#fff;font-weight:700;padding:3px 10px;border-radius:4px;font-size:11px;margin-bottom:8px">PAID</div>`
-      : `<div style="display:inline-block;background:#ca8a04;color:#fff;font-weight:700;padding:3px 10px;border-radius:4px;font-size:11px;margin-bottom:8px">DRAFT</div>`;
-
-    const html = `<!DOCTYPE html><html><head><title>Payroll Report — ${dateStr}</title>
+    const html = `<!DOCTYPE html><html><head><title>Worker Salaries — ${dateStr}</title>
       <style>
-        body{font-family:Arial,sans-serif;font-size:12px;margin:24px;color:#222}
-        h1{color:#1e3a5f;margin:0 0 2px}
-        table{width:100%;border-collapse:collapse;margin-top:12px}
-        th{background:#1e3a5f;color:#fff;padding:6px 8px;text-align:left;font-size:11px}
-        th:nth-child(n+2){text-align:right}
-        th:last-child{text-align:center}
-        @media print{button{display:none}.no-print{display:none}}
+        body{font-family:Arial,sans-serif;font-size:11px;margin:16px;color:#000}
+        table{border-collapse:collapse;width:100%}
+        @media print{
+          @page{size:A4 landscape;margin:12mm}
+          .no-print{display:none}
+          button{display:none}
+        }
       </style>
       </head><body>
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div>
-          <h1>Payroll Report</h1>
-          ${statusLine}
-          ${notes ? `<p style="color:#666;margin:2px 0 0;font-size:11px">${notes}</p>` : ""}
+          <h2 style="margin:0 0 4px;font-size:15px">Worker Salaries</h2>
+          <div style="font-size:11px;color:#444"><strong>Date:</strong> ${dateStr} &nbsp; ${statusBadge}</div>
         </div>
-        <div style="text-align:right;color:#555;font-size:11px">
-          <div><strong>Date:</strong> ${dateStr}</div>
-          <div><strong>Workers:</strong> ${items.length}</div>
-        </div>
+        <div style="font-size:11px;color:#555"><strong>Workers:</strong> ${rows.length}</div>
       </div>
       <table>
-        <thead className="sticky top-0 z-10 bg-muted/50"><tr>
-          <th>Worker</th>
-          <th style="text-align:right">Base Salary</th>
-          <th style="text-align:right">Deduction</th>
-          <th style="text-align:right">Net Pay</th>
-          <th style="text-align:center">Signature</th>
-        </tr></thead>
-        <tbody>${bodyRows}
-          <tr style="background:#1e3a5f;color:#fff">
-            <td style="padding:6px 8px;font-weight:700">GRAND TOTAL</td>
-            <td style="padding:6px 8px;text-align:right;font-weight:700">${totalBase.toFixed(2)}</td>
-            <td style="padding:6px 8px;text-align:right;font-weight:700">${totalDed > 0 ? `-${totalDed.toFixed(2)}` : "—"}</td>
-            <td style="padding:6px 8px;text-align:right;font-weight:700">${totalNet.toFixed(2)}</td>
-            <td style="padding:6px 8px"></td>
-          </tr>
-        </tbody>
+        <thead><tr>${headerRow}</tr></thead>
+        <tbody>${bodyRows}</tbody>
       </table>
-      <div class="no-print" style="margin-top:16px;text-align:right">
-        <button onclick="window.print()" style="padding:6px 16px;background:#1e3a5f;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">Print / Save PDF</button>
+      <div class="no-print" style="margin-top:14px;text-align:right">
+        <button onclick="window.print()" style="padding:6px 16px;background:#000;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">Print / Save PDF</button>
       </div>
       <script>window.onload=()=>window.print();</script>
     </body></html>`;
@@ -468,31 +457,79 @@ export default function ERPRunPayroll() {
     if (w) { w.document.write(html); w.document.close(); }
   }
 
-  // ── Excel export for a run ─────────────────────────────────────────────────
+  // ── Excel export (worker salaries template) ────────────────────────────────
   async function exportRunExcel(run: PayrollRun) {
-    const XLSXStyle = await import("xlsx-js-style");
-    const XLSX = XLSXStyle.default || XLSXStyle;
-    const items = run.items || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const XLSXStyle = (await import("xlsx-js-style")) as any;
+    const XLSX = XLSXStyle.default ?? XLSXStyle;
+
+    const dateHeaders = getRunDateHeaders(run.date);
+    const rows = getRunTemplateRows(run);
+
+    // Shared border style
+    const thinBlack = { style: "thin", color: { rgb: "000000" } };
+    const allBorders = { top: thinBlack, bottom: thinBlack, left: thinBlack, right: thinBlack };
+
+    // Header cell factory
+    const hCell = (v: string) => ({
+      v,
+      t: "s",
+      s: {
+        fill: { patternType: "solid", fgColor: { rgb: "000000" } },
+        font: { bold: true, color: { rgb: "FFFFFF" } },
+        alignment: { horizontal: "center", vertical: "center", wrapText: true },
+        border: allBorders,
+      },
+    });
+
+    // Data cell factory
+    const dCell = (v: string, isAlt: boolean, opts?: { bold?: boolean; center?: boolean }) => ({
+      v,
+      t: "s",
+      s: {
+        fill: { patternType: "solid", fgColor: { rgb: isAlt ? "F0F0F0" : "FFFFFF" } },
+        font: { bold: opts?.bold ?? false, color: { rgb: "000000" } },
+        alignment: {
+          horizontal: opts?.center ? "center" : "left",
+          vertical: "center",
+          wrapText: false,
+          readingOrder: 2, // RTL-friendly
+        },
+        border: allBorders,
+      },
+    });
+
+    // Build sheet data (any[][] avoids union-type mismatch between hCell / dCell shapes)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const wsData: any[][] = [
-      ["Payroll Report", "", "", "", run.date],
-      [],
-      ["Group", "Worker", "Base Salary", "Deduction", "Net Pay"],
+      [hCell("Code"), hCell("Name"), ...dateHeaders.map(hCell)],
     ];
-    for (const it of items) {
-      wsData.push([it.groupName || "Ungrouped", it.employeeName, parseFloat(it.baseSalary), parseFloat(it.deduction), parseFloat(it.netPay)]);
-    }
-    const totalBase = items.reduce((s, i) => s + parseFloat(i.baseSalary), 0);
-    const totalDed = items.reduce((s, i) => s + parseFloat(i.deduction), 0);
-    const totalNet = items.reduce((s, i) => s + parseFloat(i.netPay), 0);
-    wsData.push(["", "GRAND TOTAL", totalBase, totalDed, totalNet]);
+
+    rows.forEach((r, i) => {
+      const isAlt = i % 2 === 1;
+      wsData.push([
+        dCell(r.code, isAlt, { center: true }),
+        dCell(r.name, isAlt, { bold: true, center: true }),
+        ...r.days.map(() => dCell("", isAlt)),
+      ]);
+    });
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
-    ws["!cols"] = [{ wch: 18 }, { wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
-    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
-    ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: wsData.length - 1, c: 4 } });
+
+    // Column widths: A=5.36, B=17.18, C=7.91, D:L=13
+    ws["!cols"] = [
+      { wch: 5.36 },
+      { wch: 17.18 },
+      { wch: 7.91 },
+      ...Array(9).fill({ wch: 13 }),
+    ];
+
+    // Freeze top header row
+    ws["!freeze"] = { xSplit: 0, ySplit: 1 };
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Payroll");
-    XLSX.writeFile(wb, `payroll-run-${run.id}-${run.date}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    XLSX.writeFile(wb, `worker-salaries-template-${run.id}-${run.date}.xlsx`);
   }
 
   const isLoading = empLoading || groupsLoading;
