@@ -459,9 +459,9 @@ export function registerStockRoutes(app: Express) {
         JOIN containers c ON po.container_id = c.id
         LEFT JOIN suppliers s ON po.supplier_id = s.id
         WHERE po.company_id = ${companyId}
-          AND (c.offload_date IS NOT NULL OR c.import_date IS NOT NULL)
+          AND c.offload_date IS NOT NULL
           AND pli.item_name ILIKE ${'%' + q + '%'}
-        ORDER BY COALESCE(c.offload_date, c.import_date) DESC, pli.item_name
+        ORDER BY c.offload_date DESC, pli.item_name
       `);
       res.json(result.rows);
     } catch (error: any) {

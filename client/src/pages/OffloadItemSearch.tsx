@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Search, Package, Container, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -137,8 +136,7 @@ export default function OffloadItemSearch() {
                   <TableRow>
                     <TableHead>Item Name</TableHead>
                     <TableHead>Container</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead>Offload Date</TableHead>
                     <TableHead>PO #</TableHead>
                     <TableHead>Supplier</TableHead>
                     <TableHead className="text-right">Qty (KG)</TableHead>
@@ -148,8 +146,6 @@ export default function OffloadItemSearch() {
                 </TableHeader>
                 <TableBody>
                   {results.map((row, i) => {
-                    const displayDate = row.offloadDate || row.importDate;
-                    const isOffloaded = row.containerStatus === "OFFLOADED";
                     return (
                     <TableRow key={i} data-testid={`row-result-${i}`}>
                       <TableCell className="font-medium">{row.itemName}</TableCell>
@@ -157,12 +153,7 @@ export default function OffloadItemSearch() {
                         <span className="font-mono text-sm">{row.containerNumber}</span>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={isOffloaded ? "default" : "secondary"}>
-                          {row.containerStatus}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {displayDate ? format(new Date(displayDate), "dd MMM yyyy") : "—"}
+                        {row.offloadDate ? format(new Date(row.offloadDate), "dd MMM yyyy") : "—"}
                       </TableCell>
                       <TableCell>{row.poNumber}</TableCell>
                       <TableCell className="text-muted-foreground">{row.supplierName ?? "—"}</TableCell>
