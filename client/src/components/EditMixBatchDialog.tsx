@@ -229,7 +229,11 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
     setSelectedSourceId(id);
     if (addSourceType === "supplier") {
       const stock = supplierStock?.find(s => s.supplierId?.toString() === id);
-      if (stock) setWeightInput(stock.remainingKg);
+      if (stock) {
+        // Only prefill if remaining is positive; leave blank for over-use scenarios
+        const rem = parseFloat(stock.remainingKg);
+        setWeightInput(rem > 0 ? stock.remainingKg : "");
+      }
     } else {
       const b = existingBatches?.find(b => b.id.toString() === id);
       if (b) {
@@ -254,10 +258,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
       const stock = supplierStock?.find(s => s.supplierId?.toString() === selectedSourceId);
       if (!stock || !stock.supplierId) return;
       const available = parseFloat(stock.remainingKg);
-      if (weight > available + 0.001) {
-        toast({ title: "Exceeds available", description: `Only ${formatNumber(available)} kg available from this supplier`, variant: "destructive" });
-        return;
-      }
+      // Over-use allowed: no guard on weight > available
       const costPerKg = parseFloat(stock.costPerKg);
       setSelectedSources(prev => [...prev, {
         type: "supplier", sourceId: stock.supplierId!, label: stock.supplierName,

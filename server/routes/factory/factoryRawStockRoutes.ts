@@ -312,7 +312,8 @@ export function registerFactoryRawStockRoutes(app: Express) {
       for (const [suppId, rows] of rowsBySupplierId) {
         const reserved = reservedBySupplierId.get(suppId) || 0;
         const totalRemaining = rows.reduce((sum, r) => sum + parseFloat(r.remainingKg), 0);
-        const totalFree = Math.max(0, totalRemaining - reserved);
+        // Allow negative freeKg so over-used stock is visible in the UI
+        const totalFree = totalRemaining - reserved;
         if (rows.length === 1) {
           rows[0].reservedKg = reserved.toFixed(3);
           rows[0].freeKg = totalFree.toFixed(3);
@@ -502,28 +503,23 @@ export function registerFactoryRawStockRoutes(app: Express) {
 
       const totalFree = totalFreeFromRows + Math.max(0, adjFree);
 
-      if (deductKg > totalFree + 0.001) {
-        return res.status(400).json({
-          message: `Can only deduct up to ${totalFree.toFixed(3)} kg — the rest is already used in batches`,
-        });
-      }
+      // Allow over-use: no guard here — deduction can drive remaining stock negative
 
-      // Deduct from rows newest-first, respecting that received can't go below used
+      // Deduct from rows newest-first; allow received to go below used (negative stock)
       let remaining = deductKg;
       const updates: { id: number; newReceived: number }[] = [];
       for (const row of rows) {
         if (remaining <= 0) break;
         const received = parseFloat(row.receivedKg as string);
-        const used = parseFloat(row.usedKg as string);
-        const canDeduct = received - used;
-        const take = Math.min(remaining, canDeduct);
+        // Allow over-use: deduct from received up to its full amount (may leave usedKg > receivedKg)
+        const take = Math.min(remaining, received);
         if (take > 0) {
           updates.push({ id: row.id, newReceived: received - take });
           remaining -= take;
         }
       }
 
-      // Any remaining kg (sourced from adjustments) → create a REMOVE adjustment
+      // Any remaining kg after row deductions → create a REMOVE adjustment
       const adjDeductKg = remaining > 0.001 ? remaining : 0;
 
       let fxRate = 1;
@@ -2492,13 +2488,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
       }
 
       const totalKg = bales.reduce((sum, b) => sum + parseFloat(b.weightKg as string), 0);
-      const availableKg = parseFloat(rs.receivedKg as string) - parseFloat(rs.usedKg as string);
-
-      if (totalKg > availableKg + 0.001) {
-        return res.status(400).json({
-          message: `Not enough available kg (need ${totalKg.toFixed(3)}, have ${availableKg.toFixed(3)})`,
-        });
-      }
+      // Allow over-use: no availability guard — stock can go negative
 
       const costPerKg = parseFloat(rs.costPerKg as string);
       const totalCost = totalKg * costPerKg;

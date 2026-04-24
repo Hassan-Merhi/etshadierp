@@ -646,14 +646,11 @@ export function registerFactoryMixBatchRoutes(app: Express) {
 
           if (!rawStock) throw new Error(`Raw stock not found for container ${containerId}`);
 
-          const containerRemaining = parseFloat(rawStock.receivedKg) - parseFloat(rawStock.usedKg);
           const weight = parseFloat(weightKg);
-          if (weight > containerRemaining + 0.001) {
-            throw new Error(`Not enough raw stock for container ${containerId}. Available: ${containerRemaining.toFixed(3)} kg`);
-          }
 
           const costUsd = srcCostPerKg ? parseFloat(srcCostPerKg) : (parseFloat(rawStock.costPerKgUsd) || parseFloat(rawStock.costPerKg) || 0);
 
+          // Allow over-use: usedKg may exceed receivedKg, driving stock negative
           await tx
             .update(factoryRawStock)
             .set({ usedKg: sql`${factoryRawStock.usedKg} + ${weight}` })
@@ -806,12 +803,6 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             weightedCostSum += avail * (parseFloat(rs.costPerKgUsd) || parseFloat(rs.costPerKg) || 0);
           }
 
-          // Only check availability for container-backed suppliers; MANUAL suppliers
-          // have their stock tracked via adjustments, not factoryRawStock rows.
-          if (!isManualSupplier && weight > totalAvailable + 0.001) {
-            throw new Error(`Not enough stock from this supplier. Available: ${totalAvailable.toFixed(3)} kg`);
-          }
-
           if (isManualSupplier) {
             // MANUAL supplier — no container raw-stock rows to update.
             // Record a source entry with supplierId only so the raw-stock API
@@ -821,6 +812,8 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             addedCost += weight * cost;
             sourceRecords.push({ supplierId, weightKg: String(weight), costPerKg: String(cost), totalCost: String(weight * cost) });
           } else {
+            // FIFO deduction — allow over-use: any leftover after FIFO drains all rows
+            // is pushed onto the last row, driving its usedKg above receivedKg (negative stock).
             let toDeduct = weight;
             for (const rs of supplierRawStocks) {
               if (toDeduct <= 0.001) break;
@@ -831,6 +824,13 @@ export function registerFactoryMixBatchRoutes(app: Express) {
                 .set({ usedKg: sql`${factoryRawStock.usedKg} + ${take}` })
                 .where(eq(factoryRawStock.id, rs.id));
               toDeduct -= take;
+            }
+            // If there's still remaining kg (over-use), push it onto the last raw stock row
+            if (toDeduct > 0.001 && supplierRawStocks.length > 0) {
+              const lastRs = supplierRawStocks[supplierRawStocks.length - 1];
+              await tx.update(factoryRawStock)
+                .set({ usedKg: sql`${factoryRawStock.usedKg} + ${toDeduct}` })
+                .where(eq(factoryRawStock.id, lastRs.id));
             }
 
             const costUsed = srcCostPerKg
@@ -853,16 +853,13 @@ export function registerFactoryMixBatchRoutes(app: Express) {
 
           if (!rawStockRow) throw new Error(`Raw stock not found for container ${containerId}`);
 
-          const containerRemaining = parseFloat(rawStockRow.receivedKg) - parseFloat(rawStockRow.usedKg);
           const weight = parseFloat(weightKg);
-          if (weight > containerRemaining + 0.001) {
-            throw new Error(`Not enough raw stock for container ${containerId}. Available: ${containerRemaining.toFixed(3)} kg`);
-          }
 
           const costUsd = srcCostPerKg
             ? parseFloat(srcCostPerKg)
             : (parseFloat(rawStockRow.costPerKgUsd) || parseFloat(rawStockRow.costPerKg) || 0);
 
+          // Allow over-use: usedKg may exceed receivedKg, driving stock negative
           await tx.update(factoryRawStock)
             .set({ usedKg: sql`${factoryRawStock.usedKg} + ${weight}` })
             .where(eq(factoryRawStock.id, rawStockRow.id));

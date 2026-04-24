@@ -90,10 +90,11 @@ export function CreateMixBatchDialog({
     enabled: open,
   });
 
+  // Show all suppliers with a valid supplierId regardless of remaining stock
+  // (negative/zero remaining allowed — over-use is permitted)
   const availableSuppliers = supplierStock?.filter(
     (s) =>
       s.supplierId !== null &&
-      parseFloat(s.remainingKg) > 0.001 &&
       !selectedSources.some((sel) => sel.type === "supplier" && sel.sourceId === s.supplierId!)
   );
 
@@ -238,7 +239,9 @@ export function CreateMixBatchDialog({
     if (addSourceType === "supplier") {
       const stock = supplierStock?.find((s) => s.supplierId?.toString() === id);
       if (stock) {
-        setWeightInput(stock.remainingKg);
+        // Only prefill if remaining is positive; leave blank to let user enter their own for over-use
+        const rem = parseFloat(stock.remainingKg);
+        setWeightInput(rem > 0 ? stock.remainingKg : "");
       }
     } else {
       const batch = existingBatches?.find((b) => b.id.toString() === id);
@@ -266,10 +269,7 @@ export function CreateMixBatchDialog({
       if (!stock || !stock.supplierId) return;
 
       const available = parseFloat(stock.remainingKg);
-      if (weight > available + 0.001) {
-        toast({ title: "Exceeds available", description: `Only ${formatNumber(available)} kg available from this supplier`, variant: "destructive" });
-        return;
-      }
+      // Over-use allowed: no guard on weight > available
 
       const costPerKg = parseFloat(stock.costPerKg);
       setSelectedSources((prev) => [
