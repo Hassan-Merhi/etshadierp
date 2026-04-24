@@ -3282,7 +3282,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
             WHERE company_id = ${companyId}
               AND attendance_date >= ${startDate}
               AND attendance_date <= ${endDate}
-              AND worker_id = ANY(${workerIds})
+              AND worker_id = ANY(${sql.raw(`ARRAY[${workerIds.join(",")}]`)})
             ORDER BY attendance_date`
       );
       const attRecords: { workerId: number; day: number; status: string }[] =
