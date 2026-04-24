@@ -212,27 +212,58 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const { locationId, orderDate } = req.body;
       if (!locationId) return res.status(400).json({ message: "locationId is required" });
 
-      // Fetch the proforma (validate ownership via customerId join)
+      // Fetch the proforma
       const [proforma] = await db.select().from(customerProformas)
         .where(and(eq(customerProformas.id, proformaId), eq(customerProformas.companyId, companyId)));
       if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+      if (!proforma.isActive) return res.status(400).json({ message: "Proforma is inactive — cannot create a loading from it" });
 
       // Fetch proforma lines
       const lines = await db.select().from(customerProformaLines)
         .where(eq(customerProformaLines.proformaId, proformaId));
+      if (lines.length === 0) return res.status(400).json({ message: "Proforma has no lines — add article codes first" });
 
-      // Create the LOADING order
-      const [order] = await db.insert(customerOrders).values({
-        companyId,
-        customerId: proforma.customerId,
-        proformaIdUsed: proformaId,
-        locationId: parseInt(locationId),
-        orderDate: orderDate || getClientDate(req),
-        status: "LOADING",
-        loadingStartedAt: new Date(),
-      }).returning();
+      // ── Phase 4: compute how many bales are already in active loadings for this proforma ──
+      // alreadyLoaded = bales currently in LOADING or PENDING_VERIFICATION orders tied to this proforma
+      const alreadyLoadedRaw = await db.execute(
+        sql`SELECT fb.article_code as "articleCode", COUNT(*)::int as loaded
+            FROM customer_order_bales cob
+            JOIN factory_bales fb ON fb.id = cob.bale_id
+            JOIN customer_orders co ON co.id = cob.order_id
+            WHERE co.company_id = ${companyId}
+              AND co.proforma_id_used = ${proformaId}
+              AND co.status IN ('LOADING', 'PENDING_VERIFICATION')
+            GROUP BY fb.article_code`
+      );
+      const alreadyLoadedMap = new Map<string, number>(
+        ((alreadyLoadedRaw as any).rows || (alreadyLoadedRaw as any[])).map((r: any) => [r.articleCode, Number(r.loaded)])
+      );
 
-      // For each proforma line, grab available bales from stock at the location
+      // ── Validate: check if there is any remaining reservation capacity ──
+      const articleIssues: string[] = [];
+      for (const line of lines) {
+        if (!line.articleCode) continue;
+        const lineQty = Number(line.quantity) || 0;
+        const alreadyLoaded = alreadyLoadedMap.get(line.articleCode) || 0;
+        const remaining = Math.max(0, lineQty - alreadyLoaded);
+        if (remaining === 0) {
+          articleIssues.push(`${line.articleCode}: proforma quantity (${lineQty}) already fully loaded`);
+        }
+      }
+      // If ALL lines are exhausted, block creation
+      const linesWithCapacity = lines.filter(l => {
+        if (!l.articleCode) return false;
+        const lineQty = Number(l.quantity) || 0;
+        const alreadyLoaded = alreadyLoadedMap.get(l.articleCode) || 0;
+        return Math.max(0, lineQty - alreadyLoaded) > 0;
+      });
+      if (linesWithCapacity.length === 0) {
+        return res.status(400).json({
+          message: "All proforma lines are already fully loaded into active loading orders. No remaining reservation capacity.",
+          details: articleIssues,
+        });
+      }
+
       // Pre-fetch product names for all article codes in this proforma
       const proformaArticleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
       const proformaProductNameMap = new Map<string, string>();
@@ -249,13 +280,31 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         }
       }
 
+      // Create the LOADING order
+      const [order] = await db.insert(customerOrders).values({
+        companyId,
+        customerId: proforma.customerId,
+        proformaIdUsed: proformaId,
+        locationId: parseInt(locationId),
+        orderDate: orderDate || getClientDate(req),
+        status: "LOADING",
+        loadingStartedAt: new Date(),
+      }).returning();
+
       let totalBalesAdded = 0;
+      const insufficientStock: string[] = [];
+
       for (const line of lines) {
         if (!line.articleCode) continue;
-        const qty = line.quantity || 0;
-        if (qty <= 0) continue;
+        const lineQty = Number(line.quantity) || 0;
+        if (lineQty <= 0) continue;
 
-        // Find available bales at this location with matching articleCode
+        // ── Phase 4 core: only take up to remainingToLoad, not the full proforma qty ──
+        const alreadyLoaded = alreadyLoadedMap.get(line.articleCode) || 0;
+        const remainingToLoad = Math.max(0, lineQty - alreadyLoaded);
+        if (remainingToLoad === 0) continue; // fully loaded — skip silently
+
+        // Find available IN_STOCK bales at this location for this article code
         const available = await db.select().from(factoryBales)
           .where(and(
             eq(factoryBales.companyId, companyId),
@@ -264,7 +313,12 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
             eq(factoryBales.articleCode, line.articleCode),
           ))
           .orderBy(factoryBales.id)
-          .limit(qty);
+          .limit(remainingToLoad); // ← only up to the remaining reserved quantity
+
+        if (available.length === 0) {
+          insufficientStock.push(`${line.articleCode}: 0 eligible bales in stock (need ${remainingToLoad})`);
+          continue;
+        }
 
         for (const bale of available) {
           const resolvedBaleName = proformaProductNameMap.get(bale.articleCode || "") || bale.productName || bale.articleCode || bale.baleCode;
@@ -278,6 +332,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
             baleName: resolvedBaleName,
             priceUsed: line.pricePerBale,
           });
+          // Transition bale: IN_STOCK → RESERVED_FOR_ORDER (physically in a loading order now)
           await db.update(factoryBales)
             .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
             .where(eq(factoryBales.id, bale.id));
@@ -289,15 +344,20 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
       const [loadingCustomer] = await db.select({ legalName: customers.legalName })
         .from(customers).where(eq(customers.id, proforma.customerId));
+      const insufficientNote = insufficientStock.length > 0 ? ` (${insufficientStock.join(", ")})` : "";
       await writeDaybookEntry(db, {
         companyId,
         txDate: orderDate || getClientDate(req),
         txType: "LOADING_CREATED",
         referenceId: order.id,
-        description: `Loading created from proforma "${proforma.name}" for ${loadingCustomer?.legalName || "customer"} — ${totalBalesAdded} bale(s) added`,
+        description: `Loading created from proforma "${proforma.name}" for ${loadingCustomer?.legalName || "customer"} — ${totalBalesAdded} bale(s) added${insufficientNote}`,
       });
 
-      res.json({ order, balesAdded: totalBalesAdded });
+      res.json({
+        order,
+        balesAdded: totalBalesAdded,
+        ...(insufficientStock.length > 0 ? { warnings: insufficientStock } : {}),
+      });
     } catch (error: any) {
       console.error("Error creating loading from proforma:", error);
       res.status(400).json({ message: error.message });
