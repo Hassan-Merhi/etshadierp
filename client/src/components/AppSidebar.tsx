@@ -90,6 +90,7 @@ const navSections: NavSection[] = [
       { title: "Containers",         url: "/containers",         icon: Container },
       { title: "Stock Items",        url: "/stock-items",        icon: Package   },
       { title: "Stock Query",        url: "/stock-query",        icon: Search    },
+      { title: "Offload Item Search", url: "/offload-item-search", icon: Package  },
       { title: "Optional Vouchers",  url: "/optional-vouchers",  icon: FileText  },
     ],
   },

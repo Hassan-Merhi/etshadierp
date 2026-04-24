@@ -59,6 +59,7 @@ const VoucherEdit = lazy(() => import("@/pages/VoucherEdit"));
 const Payroll = lazy(() => import("@/pages/Payroll"));
 const ImportStockItems = lazy(() => import("@/pages/ImportStockItems"));
 const StockQuery = lazy(() => import("@/pages/StockQuery"));
+const OffloadItemSearch = lazy(() => import("@/pages/OffloadItemSearch"));
 const StockItemDetail = lazy(() => import("@/pages/StockItemDetail"));
 const FactoryStockItemDetail = lazy(() => import("@/pages/factory/FactoryStockItemDetail"));
 const SalesReport = lazy(() => import("@/pages/SalesReport"));
@@ -279,6 +280,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/import-stock-items" component={ImportStockItems} />
       <Route path="/stock-query/:id" component={StockItemDetail} />
       <Route path="/stock-query" component={StockQuery} />
+      <Route path="/offload-item-search" component={OffloadItemSearch} />
       <Route path="/location-summary"><Redirect to="/stock-query?tab=summary" /></Route>
       <Route path="/stock-transfer-order" component={StockTransferOrder} />
       <Route path="/stock-transfers" component={StockTransfers} />

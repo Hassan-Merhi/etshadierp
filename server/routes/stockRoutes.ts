@@ -433,8 +433,42 @@ export function registerStockRoutes(app: Express) {
     }
   });
 
+  // Offload item search — find all offloaded containers that contain a given item
+  app.get("/api/offload-item-search", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const q = (req.query.q as string || "").trim();
+      if (!q) return res.json([]);
+
+      const result = await db.execute(sql`
+        SELECT
+          pli.item_name       AS "itemName",
+          pli.quantity        AS "quantity",
+          pli.rate            AS "rate",
+          pli.line_total      AS "lineTotal",
+          po.po_number        AS "poNumber",
+          c.container_number  AS "containerNumber",
+          c.offload_date      AS "offloadDate",
+          po.currency         AS "currency",
+          s.name              AS "supplierName"
+        FROM po_line_items pli
+        JOIN purchase_orders po ON pli.po_id = po.id
+        JOIN containers c ON po.container_id = c.id
+        LEFT JOIN suppliers s ON po.supplier_id = s.id
+        WHERE po.company_id = ${companyId}
+          AND c.offload_date IS NOT NULL
+          AND pli.item_name ILIKE ${'%' + q + '%'}
+        ORDER BY c.offload_date DESC, pli.item_name
+      `);
+      res.json(result.rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Export last 4 sales per stock item (for Excel export)
-  app.get("/api/stock-items/last-sales-export", requireAuth, async (req, res) => {
+  app.get("/api/stock-items/last-sales-export", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
