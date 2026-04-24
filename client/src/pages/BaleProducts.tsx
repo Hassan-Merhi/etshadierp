@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X, AlertTriangle, FileSpreadsheet, EyeOff, Eye, AlertCircle, Palette } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -371,26 +372,86 @@ export default function BaleProducts() {
     });
   };
 
-  const handleExportExcel = async () => {
+  const handleExportExcel = async (priceType: "selling" | "production") => {
+    if (priceType === "selling" && hideSellingPriceBP) {
+      toast({ title: "Selling price is hidden for your account", variant: "destructive" });
+      return;
+    }
+    if (priceType === "production" && hideAvgRate) {
+      toast({ title: "Production price is hidden for your account", variant: "destructive" });
+      return;
+    }
     if (!activeProducts || activeProducts.length === 0) {
       toast({ title: "No products to export", variant: "destructive" });
       return;
     }
     try {
       const XLSX = await import("xlsx");
-      const exportData = activeProducts.map((p) => ({
-        "Article Code": p.articleCode || "",
-        Name: p.name || "",
-        Category: p.categoryId ? (categoryMap.get(p.categoryId) || "") : "",
-        "Weight Per Bale": p.weightPerBaleKg != null ? p.weightPerBaleKg : "",
-        "Production Price": p.productionPrice ? parseFloat(p.productionPrice) : 0,
-        "Selling Price": p.sellingPrice ? parseFloat(p.sellingPrice) : 0,
-      }));
-      const ws = XLSX.utils.json_to_sheet(exportData);
-      ws["!cols"] = [{ wch: 18 }, { wch: 40 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
+      const priceHeader = priceType === "selling" ? "Selling Price" : "Production Price";
+      const today = new Date().toISOString().slice(0, 10);
+      const subtitle = `Bale Products - ${priceHeader}`;
+      const fileName = priceType === "selling"
+        ? "bale_products_selling_price_export.xlsx"
+        : "bale_products_production_price_export.xlsx";
+
+      // Build header rows
+      const headerRows = [
+        ["HMD International Group", "", "", "", "", "", ""],
+        [subtitle,                  "", "", "", "", "", ""],
+        [`Price Type: ${priceHeader}`, "", "", "", "", "", ""],
+        [`Generated: ${today}`,     "", "", "", "", "", ""],
+        ["",                        "", "", "", "", "", ""],
+        ["#", "Article Code", "Name of Item", "Category", "Weight", priceHeader, "Order"],
+      ];
+
+      // Build data rows
+      const dataRows = activeProducts.map((p, i) => {
+        const rawPrice = priceType === "selling" ? p.sellingPrice : p.productionPrice;
+        const numPrice = rawPrice ? parseFloat(rawPrice) : 0;
+        return [
+          `#${i + 1}`,
+          p.articleCode || "",
+          p.name || "",
+          p.categoryId ? (categoryMap.get(p.categoryId) || "") : "",
+          p.weightPerBaleKg != null ? p.weightPerBaleKg : "",
+          numPrice,
+          "",
+        ];
+      });
+
+      const allRows = [...headerRows, ...dataRows];
+      const ws = XLSX.utils.aoa_to_sheet(allRows);
+
+      // Column widths — Article Code (col B) hidden
+      ws["!cols"] = [
+        { wch: 8 },
+        { wch: 18, hidden: true },
+        { wch: 40 },
+        { wch: 22 },
+        { wch: 14 },
+        { wch: 18 },
+        { wch: 16 },
+      ];
+
+      // Merge title rows across A:G (rows 0-3, 0-indexed)
+      ws["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } },
+        { s: { r: 2, c: 0 }, e: { r: 2, c: 6 } },
+        { s: { r: 3, c: 0 }, e: { r: 3, c: 6 } },
+      ];
+
+      // Freeze panes below header row (row 6 = index 5 is the table header)
+      ws["!freeze"] = { xSplit: 0, ySplit: 6 };
+
+      // Auto filter on table header row (row index 5)
+      const lastDataRow = headerRows.length + dataRows.length - 1;
+      ws["!autofilter"] = { ref: `A6:G${lastDataRow + 1}` };
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Bale Products");
-      XLSX.writeFile(wb, "bale_products_export.xlsx");
+      XLSX.writeFile(wb, fileName);
+      toast({ title: priceType === "selling" ? "Selling price export downloaded" : "Production price export downloaded" });
     } catch {
       toast({ title: "Export failed", variant: "destructive" });
     }
@@ -544,14 +605,25 @@ export default function BaleProducts() {
             <Tags className="h-4 w-4 mr-2" />
             Categories
           </Button>
-          <Button
-            variant="outline"
-            onClick={handleExportExcel}
-            data-testid="button-export-excel"
-          >
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
-            Export Excel
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" data-testid="button-export-excel">
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export Excel
+                <ChevronDown className="h-3 w-3 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Choose price type</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleExportExcel("selling")} data-testid="menu-export-selling-price">
+                Export Selling Price
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportExcel("production")} data-testid="menu-export-production-price">
+                Export Production Price
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             variant="outline"
             onClick={handleDownloadTemplate}
