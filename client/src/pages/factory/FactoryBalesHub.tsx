@@ -13,8 +13,11 @@ export default function FactoryBalesHub() {
     staleTime: 60000,
   });
 
-  const showBarcode = settings?.balesTabBarcodeEnabled !== false;
-  const showRemove  = settings?.balesTabRemoveEnabled  !== false;
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const hiddenTabs = myAccess?.hiddenCostFields ?? [];
+
+  const showBarcode = settings?.balesTabBarcodeEnabled !== false && !hiddenTabs.includes("hide_tab_bales_barcode");
+  const showRemove  = settings?.balesTabRemoveEnabled  !== false && !hiddenTabs.includes("hide_tab_bales_remove");
 
   const defaultTab = hash === "barcode" && showBarcode ? "barcode"
                    : hash === "remove"  && showRemove  ? "remove"

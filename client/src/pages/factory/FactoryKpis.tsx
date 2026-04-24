@@ -58,8 +58,11 @@ export default function FactoryKpis() {
     staleTime: 60000,
   });
 
-  const showWorkers = settings?.kpisTabWorkerPerformanceEnabled !== false;
-  const showMixes   = settings?.kpisTabMixEfficiencyEnabled    !== false;
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const hiddenTabs = myAccess?.hiddenCostFields ?? [];
+
+  const showWorkers = settings?.kpisTabWorkerPerformanceEnabled !== false && !hiddenTabs.includes("hide_tab_kpis_worker_performance");
+  const showMixes   = settings?.kpisTabMixEfficiencyEnabled    !== false && !hiddenTabs.includes("hide_tab_kpis_mix_efficiency");
 
   const dailyQuery = useQuery<DailyProduction[]>({
     queryKey: ["/api/factory/kpis/daily", from, to],

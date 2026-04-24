@@ -2182,7 +2182,10 @@
       staleTime: 60000,
     });
 
-    const showHistory = settings?.stockEntryTabHistoryEnabled !== false;
+    const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+    const hiddenTabs = myAccess?.hiddenCostFields ?? [];
+
+    const showHistory = settings?.stockEntryTabHistoryEnabled !== false && !hiddenTabs.includes("hide_tab_stockentry_history");
 
     return (
       <div className="space-y-4">

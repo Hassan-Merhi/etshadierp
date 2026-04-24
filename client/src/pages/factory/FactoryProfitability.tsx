@@ -91,7 +91,10 @@ export default function FactoryProfitability() {
     staleTime: 60000,
   });
 
-  const showContainers = settings?.profitabilityTabContainersEnabled !== false;
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const hiddenTabs = myAccess?.hiddenCostFields ?? [];
+
+  const showContainers = settings?.profitabilityTabContainersEnabled !== false && !hiddenTabs.includes("hide_tab_profitability_containers");
 
   const balesQuery = useQuery<BaleCost[]>({
     queryKey: ["/api/factory/profitability/bales", from, to],

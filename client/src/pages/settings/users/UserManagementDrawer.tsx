@@ -66,6 +66,29 @@ const FACTORY_COST_FIELDS = [
   { key: "bales_list_cost_per_kg", label: "Cost/kg Column" },
 ];
 
+const FACTORY_TABS: { key: string; label: string; group: string }[] = [
+  { key: "hide_tab_workers_payroll",          label: "Payroll",                 group: "Workers Hub" },
+  { key: "hide_tab_workers_attendance",       label: "Attendance",              group: "Workers Hub" },
+  { key: "hide_tab_workers_report",           label: "Report",                  group: "Workers Hub" },
+  { key: "hide_tab_workers_advances",         label: "Advances",                group: "Workers Hub" },
+  { key: "hide_tab_workers_bonuses",          label: "Bonuses",                 group: "Workers Hub" },
+  { key: "hide_tab_bales_barcode",            label: "Barcode Lookup",          group: "Bales Hub" },
+  { key: "hide_tab_bales_remove",             label: "Remove from Stock",       group: "Bales Hub" },
+  { key: "hide_tab_loadings_pending",         label: "Pending Loadings",        group: "Loadings Hub" },
+  { key: "hide_tab_stockentry_history",       label: "History",                 group: "Stock Entry" },
+  { key: "hide_tab_advances_repayments",      label: "Repayments",              group: "Advances" },
+  { key: "hide_tab_kpis_worker_performance",  label: "Worker Performance",      group: "KPIs" },
+  { key: "hide_tab_kpis_mix_efficiency",      label: "Mix Efficiency",          group: "KPIs" },
+  { key: "hide_tab_payroll_worker_master",    label: "Worker Master",           group: "Payroll" },
+  { key: "hide_tab_profitability_containers", label: "Container Profitability", group: "Profitability" },
+  { key: "hide_tab_workers_categories",       label: "Categories",              group: "Workers List" },
+  { key: "hide_tab_workerdetail_statement",   label: "Statement",               group: "Worker Profile" },
+  { key: "hide_tab_workerdetail_advances",    label: "Advances",                group: "Worker Profile" },
+  { key: "hide_tab_workerdetail_bales",       label: "Bales",                   group: "Worker Profile" },
+  { key: "hide_tab_workerdetail_documents",   label: "Documents",               group: "Worker Profile" },
+];
+const FACTORY_TAB_GROUPS = Array.from(new Set(FACTORY_TABS.map((t) => t.group)));
+
 interface UserManagementDrawerProps {
   user: any | null;
   open: boolean;
@@ -514,6 +537,50 @@ export function UserManagementDrawer({
                                   </div>
                                 );
                               })}
+                            </div>
+                          </div>
+                        )}
+
+                        {hasFactoryAccess && (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                Factory Tabs
+                              </p>
+                              <div className="flex gap-1.5">
+                                <Button variant="outline" size="sm" onClick={() => {
+                                  const allKeys = FACTORY_TABS.map((t) => t.key);
+                                  setHiddenCostFields((prev) => Array.from(new Set([...prev, ...allKeys])));
+                                }} data-testid="button-factory-tabs-hide-all">
+                                  <X className="h-3 w-3 mr-1" />Hide All
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => {
+                                  const allKeys = new Set(FACTORY_TABS.map((t) => t.key));
+                                  setHiddenCostFields((prev) => prev.filter((k) => !allKeys.has(k)));
+                                }} data-testid="button-factory-tabs-show-all">
+                                  <Check className="h-3 w-3 mr-1" />Show All
+                                </Button>
+                              </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground">Checked tabs will be hidden from this user.</p>
+                            <div className="space-y-3 border rounded-md p-3 max-h-52 overflow-y-auto">
+                              {FACTORY_TAB_GROUPS.map((group) => (
+                                <div key={group} className="space-y-1.5">
+                                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</span>
+                                  <div className="grid grid-cols-2 gap-1 mt-1">
+                                    {FACTORY_TABS.filter((t) => t.group === group).map((tab) => (
+                                      <div key={tab.key} className="flex items-center gap-2">
+                                        <Checkbox
+                                          checked={hiddenCostFields.includes(tab.key)}
+                                          onCheckedChange={() => toggleCostField(tab.key)}
+                                          data-testid={`checkbox-tab-${tab.key}`}
+                                        />
+                                        <span className="text-sm">{tab.label}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         )}

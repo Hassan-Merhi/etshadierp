@@ -44,11 +44,14 @@ export default function FactoryWorkersHub() {
     staleTime: 60000,
   });
 
-  const showPayroll    = settings?.workersTabPayrollEnabled    !== false;
-  const showAttendance = settings?.workersTabAttendanceEnabled !== false;
-  const showReport     = settings?.workersTabReportEnabled     !== false;
-  const showAdvances   = settings?.workersTabAdvancesEnabled   !== false;
-  const showBonuses    = settings?.workersTabBonusesEnabled    !== false;
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const hiddenTabs = myAccess?.hiddenCostFields ?? [];
+
+  const showPayroll    = settings?.workersTabPayrollEnabled    !== false && !hiddenTabs.includes("hide_tab_workers_payroll");
+  const showAttendance = settings?.workersTabAttendanceEnabled !== false && !hiddenTabs.includes("hide_tab_workers_attendance");
+  const showReport     = settings?.workersTabReportEnabled     !== false && !hiddenTabs.includes("hide_tab_workers_report");
+  const showAdvances   = settings?.workersTabAdvancesEnabled   !== false && !hiddenTabs.includes("hide_tab_workers_advances");
+  const showBonuses    = settings?.workersTabBonusesEnabled    !== false && !hiddenTabs.includes("hide_tab_workers_bonuses");
 
   const handleTabChange = (v: string) => {
     const newTab = v as TabValue;

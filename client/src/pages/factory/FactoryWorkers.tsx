@@ -65,7 +65,10 @@ export default function FactoryWorkers() {
     staleTime: 60000,
   });
 
-  const showCategories = settings?.workersTabCategoriesEnabled !== false;
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const hiddenTabs = myAccess?.hiddenCostFields ?? [];
+
+  const showCategories = settings?.workersTabCategoriesEnabled !== false && !hiddenTabs.includes("hide_tab_workers_categories");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 

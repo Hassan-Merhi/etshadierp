@@ -219,10 +219,13 @@ export default function FactoryWorkerDetail() {
     staleTime: 60000,
   });
 
-  const showStatement = tabSettings?.workerDetailTabStatementEnabled !== false;
-  const showAdvances  = tabSettings?.workerDetailTabAdvancesEnabled  !== false;
-  const showBales     = tabSettings?.workerDetailTabBalesEnabled      !== false;
-  const showDocuments = tabSettings?.workerDetailTabDocumentsEnabled  !== false;
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const hiddenTabs = myAccess?.hiddenCostFields ?? [];
+
+  const showStatement = tabSettings?.workerDetailTabStatementEnabled !== false && !hiddenTabs.includes("hide_tab_workerdetail_statement");
+  const showAdvances  = tabSettings?.workerDetailTabAdvancesEnabled  !== false && !hiddenTabs.includes("hide_tab_workerdetail_advances");
+  const showBales     = tabSettings?.workerDetailTabBalesEnabled      !== false && !hiddenTabs.includes("hide_tab_workerdetail_bales");
+  const showDocuments = tabSettings?.workerDetailTabDocumentsEnabled  !== false && !hiddenTabs.includes("hide_tab_workerdetail_documents");
 
   const { formatDisplayDate } = useDateFormat();
   const formatDate = (val: string | Date | null | undefined) => {

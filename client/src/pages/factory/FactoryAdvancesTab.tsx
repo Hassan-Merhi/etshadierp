@@ -71,7 +71,10 @@ export default function FactoryAdvancesTab() {
     staleTime: 60000,
   });
 
-  const showRepayments = settings?.advancesTabRepaymentsEnabled !== false;
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const hiddenTabs = myAccess?.hiddenCostFields ?? [];
+
+  const showRepayments = settings?.advancesTabRepaymentsEnabled !== false && !hiddenTabs.includes("hide_tab_advances_repayments");
 
   return (
     <Tabs value={showRepayments ? subTab : "advances"} onValueChange={setSubTab}>

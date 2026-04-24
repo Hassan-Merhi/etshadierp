@@ -12,7 +12,10 @@ export default function FactoryLoadingsHub() {
     staleTime: 60000,
   });
 
-  const showPending = settings?.loadingsTabPendingEnabled !== false;
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const hiddenTabs = myAccess?.hiddenCostFields ?? [];
+
+  const showPending = settings?.loadingsTabPendingEnabled !== false && !hiddenTabs.includes("hide_tab_loadings_pending");
 
   const defaultTab = hash === "pending" && showPending ? "pending" : "loadings";
 

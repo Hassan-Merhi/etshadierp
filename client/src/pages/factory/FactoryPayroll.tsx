@@ -91,7 +91,10 @@ export default function FactoryPayrollPage() {
     staleTime: 60000,
   });
 
-  const showWorkerMaster = settings?.payrollTabWorkerMasterEnabled !== false;
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const hiddenTabs = myAccess?.hiddenCostFields ?? [];
+
+  const showWorkerMaster = settings?.payrollTabWorkerMasterEnabled !== false && !hiddenTabs.includes("hide_tab_payroll_worker_master");
 
   const [companyId, setCompanyId] = useState<number | null>(null);
   const [filterStartDate, setFilterStartDate] = useState(thirtyDaysAgo);
