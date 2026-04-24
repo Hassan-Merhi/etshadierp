@@ -292,8 +292,8 @@ export function registerFactoryStockRoutes(app: Express) {
       const descParts = Array.from(productGroups.keys());
       const stockEntryDesc = `${result.bales.length} bale${result.bales.length !== 1 ? "s" : ""} - ${descParts.join(" | ")}`;
       const totalBaleValue = result.bales.reduce((sum: number, b: any) => {
-        const sellPrice = parseFloat((b._product?.sellingPrice) || "0");
-        return sum + sellPrice;
+        const prodPrice = parseFloat((b._product?.productionPrice) || "0");
+        return sum + prodPrice;
       }, 0);
       const baleMetaJson = JSON.stringify({
         bales: result.bales.map((b: any) => ({

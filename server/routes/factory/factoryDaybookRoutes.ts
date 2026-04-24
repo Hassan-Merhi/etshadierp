@@ -195,12 +195,18 @@ export function registerFactoryDaybookRoutes(app: Express) {
           });
       }
 
-      // ── 2b. Enrich zero-amount entries for BALE_STOCK_ENTRY and loading types ──
-      // These were written before amount-population was in place; derive on the fly.
-      const zeroRows = filteredDaybookRows.filter(
-        (r: any) => parseFloat(r.amountCurrency || "0") === 0 &&
-          ["BALE_STOCK_ENTRY", "LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(r.txType)
+      // ── 2b. Enrich BALE_STOCK_ENTRY (always re-derive from productionPrice) ──
+      // and zero-amount LOADING_SUBMITTED / ORDER_VERIFIED entries.
+      // BALE_STOCK_ENTRY is always re-derived so old entries stored as selling price
+      // are corrected to production price on the fly without a DB migration.
+      const baleStockAndZeroRows = filteredDaybookRows.filter(
+        (r: any) =>
+          r.txType === "BALE_STOCK_ENTRY" ||
+          (parseFloat(r.amountCurrency || "0") === 0 &&
+            ["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(r.txType))
       );
+      // Alias kept so the rest of the block compiles unchanged
+      const zeroRows = baleStockAndZeroRows;
 
       if (zeroRows.length > 0) {
         // BALE_STOCK_ENTRY: derive from bale IDs stored in metaJson
@@ -259,9 +265,11 @@ export function registerFactoryDaybookRoutes(app: Express) {
               }
             }
 
-            // Patch the filteredDaybookRows in-place
+            // Patch the filteredDaybookRows in-place.
+            // BALE_STOCK_ENTRY is always overwritten so old rows stored with
+            // selling price are corrected to production price on the fly.
             for (const row of filteredDaybookRows as any[]) {
-              if (row.txType === "BALE_STOCK_ENTRY" && parseFloat(row.amountCurrency || "0") === 0) {
+              if (row.txType === "BALE_STOCK_ENTRY") {
                 const derived = rowValueMap.get(row.id);
                 if (derived && derived > 0) {
                   row.amountCurrency = String(derived.toFixed(2));
