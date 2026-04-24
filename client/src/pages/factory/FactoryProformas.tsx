@@ -78,6 +78,7 @@ export default function FactoryProformas() {
   const [createLoadingLocationId, setCreateLoadingLocationId] = useState<string>("");
   const [transferProforma, setTransferProforma] = useState<Proforma | null>(null);
   const [transferTargetCustomerId, setTransferTargetCustomerId] = useState<string>("");
+  const [showInactive, setShowInactive] = useState(false);
 
   // Excel import state
   const [isExcelImportOpen, setIsExcelImportOpen] = useState(false);
@@ -519,7 +520,22 @@ export default function FactoryProformas() {
 
       {customerId && !proformasLoading && proformas.length > 0 && (
         <div className="space-y-4">
-          {proformas.map((proforma) => {
+          {(() => {
+            const inactiveCount = proformas.filter(p => !p.isActive).length;
+            return inactiveCount > 0 ? (
+              <div className="flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowInactive(v => !v)}
+                  data-testid="button-toggle-inactive-proformas"
+                >
+                  {showInactive ? `Hide inactive (${inactiveCount})` : `Show inactive (${inactiveCount})`}
+                </Button>
+              </div>
+            ) : null;
+          })()}
+          {proformas.filter(p => p.isActive || showInactive).map((proforma) => {
             const isExpanded = expandedProformaId === proforma.id;
             return (
               <Card key={proforma.id} data-testid={`card-proforma-${proforma.id}`}>
