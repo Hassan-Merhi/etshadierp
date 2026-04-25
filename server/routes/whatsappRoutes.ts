@@ -343,16 +343,17 @@ export function registerWhatsAppRoutes(app: Express) {
   // ── Send Net Position (all companies) to group + email NOW ──────────────────
 
   app.post("/api/daily-export/trigger-whatsapp", requireAuth, async (req, res) => {
-    try {
-      const { fromDate, toDate } = req.body as { fromDate?: string; toDate?: string };
-      const result = await triggerDailyWhatsAppSendNow(
-        fromDate || undefined,
-        toDate   || undefined,
-      );
-      res.json(result);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
+    const { fromDate, toDate } = req.body as { fromDate?: string; toDate?: string };
+
+    // Respond immediately — building the full ZIP and sending it can take >30 s for large
+    // company sets, which would timeout the browser request.  The result is recorded in
+    // daily_export_runs and is visible in the Backup Status card (auto-refreshes every 15 s).
+    res.json({ started: true, message: "WhatsApp export started. Check Backup Status below for the result." });
+
+    // Run the actual work asynchronously after the response is sent
+    triggerDailyWhatsAppSendNow(fromDate || undefined, toDate || undefined)
+      .then(r  => console.log(`[ManualWhatsApp] Completed: ${r.message}`))
+      .catch(e => console.error(`[ManualWhatsApp] Failed: ${e.message}`));
   });
 
   app.post("/api/whatsapp/send-np-all-now", requireAuth, async (req, res) => {

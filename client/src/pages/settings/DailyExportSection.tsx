@@ -499,7 +499,13 @@ export function DailyExportSection() {
       if (fromDate) body.fromDate = fromDate;
       if (toDate)   body.toDate   = toDate;
       const data = await apiRequest("POST", "/api/daily-export/trigger-whatsapp", body) as any;
-      toast({ title: "Sent via WhatsApp", description: data.message || "ZIP sent to configured group" });
+      toast({
+        title: "WhatsApp export started",
+        description: data.message || "Building ZIP and sending — check Backup Status below for the result.",
+      });
+      // Schedule several refetches to capture the result as it arrives
+      // (ZIP build + send can take 60–120 s for large company sets)
+      [5, 20, 45, 75, 120].forEach(s => setTimeout(() => refetchBackup(), s * 1000));
     } catch (e: any) {
       toast({ variant: "destructive", title: "WhatsApp send failed", description: e.message });
     } finally {
