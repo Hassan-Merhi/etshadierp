@@ -116,9 +116,8 @@ export function StockReportSection() {
       apiRequest("POST", "/api/whatsapp/send-stock-report", {
         companyId: rCompanyId, recipientId: rRecipientId,
       }),
-    onSuccess: async (res: any) => {
-      const body = await res.json().catch(() => ({}));
-      toast({ title: "Reports sent", description: body.message || "Done" });
+    onSuccess: (data: any) => {
+      toast({ title: "Reports sent", description: data?.message || "Done" });
     },
     onError: (e: any) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
   });

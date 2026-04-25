@@ -128,9 +128,8 @@ export function NetPositionExportSection() {
   const sendNow = useMutation({
     mutationFn: () =>
       apiRequest("POST", "/api/whatsapp/send-np-all-now", { recipientId: eff.recipientId }),
-    onSuccess: async (res: any) => {
-      const body = await res.json().catch(() => ({}));
-      toast({ title: "Net Position Export Sent", description: body.message || "Done" });
+    onSuccess: (data: any) => {
+      toast({ title: "Net Position Export Sent", description: data?.message || "Done" });
     },
     onError: (e: any) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
   });
