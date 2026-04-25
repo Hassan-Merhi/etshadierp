@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Search, Package, Clock, User, Scale, Hash, MapPin, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX, Ship, FileText, User2, Trash2, Pencil } from "lucide-react";
+import { Search, Package, Clock, User, Scale, Hash, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX, Ship, FileText, User2, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -339,39 +338,49 @@ export default function BarcodeLookup() {
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Identity */}
+                <CardContent className="space-y-3">
+                  {/* Row 1: Ref + Article Code (with Printed At) + Product Name (with Printed By) */}
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <InfoRow
-                      label="Reference Number"
-                      value={<span className="font-mono text-lg" data-testid="text-reference-number">{referenceResult.labelPrint.referenceNumber}</span>}
-                    />
-                    <InfoRow label="Article Code" value={<span data-testid="text-ref-article-code">{referenceResult.labelPrint.articleCode}</span>} />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Reference Number</p>
+                      <p className="font-mono text-lg font-semibold" data-testid="text-reference-number">{referenceResult.labelPrint.referenceNumber}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Article Code</p>
+                      <p className="font-medium" data-testid="text-ref-article-code">{referenceResult.labelPrint.articleCode || "—"}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1" data-testid="text-ref-printed-at">
+                        <Clock className="h-3 w-3" />
+                        {formatDateOnly(referenceResult.labelPrint.printedAt as any) ?? "N/A"}
+                      </p>
+                    </div>
                     {referenceResult.baleInfo?.productName && (
-                      <InfoRow label="Product Name" value={<span className="font-semibold" data-testid="text-bale-product-name">{referenceResult.baleInfo.productName}</span>} />
-                    )}
-                    {referenceResult.baleInfo && (
-                      <InfoRow label="Actual Weight" value={`${smartNum(referenceResult.baleInfo.weightKg)} KG`} />
-                    )}
-                    {referenceResult.baleInfo?.grade && (
-                      <InfoRow label="Grade" value={referenceResult.baleInfo.grade} />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Product Name</p>
+                        <p className="font-semibold" data-testid="text-bale-product-name">{referenceResult.baleInfo.productName}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1" data-testid="text-ref-printed-by">
+                          <User className="h-3 w-3" />
+                          {(referenceResult.labelPrint as any).printedByName || referenceResult.labelPrint.printedByUserId || "Unknown"}
+                        </p>
+                      </div>
                     )}
                   </div>
 
-                  <Separator />
-
-                  {/* Print / Scan */}
-                  <div className="flex flex-wrap items-start gap-6">
-                    <div>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> Printed At</p>
-                      <p className="font-medium" data-testid="text-ref-printed-at">{formatDateOnly(referenceResult.labelPrint.printedAt as any) ?? "N/A"}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1"><User className="h-3 w-3" /> Printed By</p>
-                      <p className="font-medium" data-testid="text-ref-printed-by">{(referenceResult.labelPrint as any).printedByName || referenceResult.labelPrint.printedByUserId || "Unknown"}</p>
-                    </div>
+                  {/* Row 2: Weight + Grade + Mark as Scanned */}
+                  <div className="flex items-center gap-6 flex-wrap">
+                    {referenceResult.baleInfo && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Actual Weight</p>
+                        <p className="font-medium">{smartNum(referenceResult.baleInfo.weightKg)} KG</p>
+                      </div>
+                    )}
+                    {referenceResult.baleInfo?.grade && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Grade</p>
+                        <p className="font-medium">{referenceResult.baleInfo.grade}</p>
+                      </div>
+                    )}
                     {!referenceResult.labelPrint.scannedAt && (
-                      <div className="flex items-end">
+                      <div className="ml-auto">
                         <Button
                           size="sm"
                           variant="outline"
@@ -384,36 +393,6 @@ export default function BarcodeLookup() {
                       </div>
                     )}
                   </div>
-
-                  {/* Worker + Location */}
-                  {(referenceResult.baleInfo?.workerName || referenceResult.locationInfo) && (
-                    <>
-                      <Separator />
-                      <div className="flex flex-wrap gap-6">
-                        {referenceResult.baleInfo?.workerName && (
-                          <div>
-                            <p className="text-sm text-muted-foreground flex items-center gap-1"><User className="h-3 w-3" /> Worker</p>
-                            <p className="font-medium" data-testid="text-bale-worker">{referenceResult.baleInfo.workerName}</p>
-                          </div>
-                        )}
-                        {referenceResult.locationInfo && (
-                          <div>
-                            <p className="text-sm text-muted-foreground flex items-center gap-1">
-                              <MapPin className="h-3 w-3" /> Current Location
-                            </p>
-                            <p className="font-medium" data-testid="text-bale-location">
-                              {referenceResult.locationInfo.name}
-                              {(referenceResult.locationInfo.city || referenceResult.locationInfo.state) && (
-                                <span className="text-muted-foreground font-normal text-sm ml-2">
-                                  ({[referenceResult.locationInfo.city, referenceResult.locationInfo.state].filter(Boolean).join(", ")})
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
                 </CardContent>
               </Card>
 
