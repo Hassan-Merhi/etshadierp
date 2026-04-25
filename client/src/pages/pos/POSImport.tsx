@@ -61,7 +61,8 @@ export default function POSImport() {
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [importedSale, setImportedSale] = useState<any>(null);
   const [printTime, setPrintTime] = useState<string>("");
-  const printRef = useRef<HTMLDivElement>(null);
+  const printRef   = useRef<HTMLDivElement>(null);
+  const errorsRef  = useRef<HTMLDivElement>(null);
 
   const fmtPrint = (n: number, prefix = "") => {
     const fixed = Math.abs(n).toFixed(2);
@@ -149,9 +150,13 @@ export default function POSImport() {
       } else {
         toast({
           title: "Validation failed",
-          description: `Found ${errorCount} error(s). Please fix them before importing.`,
+          description: `Found ${errorCount} error(s). Scroll down to see the full list.`,
           variant: "destructive",
         });
+        // Auto-scroll to the error list so the user sees them immediately
+        setTimeout(() => {
+          errorsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 100);
       }
     },
     onError: (error: any) => {
@@ -655,14 +660,22 @@ export default function POSImport() {
       </Card>
 
       {validationResult?.errors && validationResult.errors.length > 0 && (
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle className="text-destructive">Validation Errors</CardTitle>
+        <Card className="border-destructive" ref={errorsRef}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-destructive flex items-center gap-2">
+              <XCircle className="h-5 w-5" />
+              Validation Errors
+              <span className="ml-auto text-sm font-normal bg-destructive text-destructive-foreground rounded-full px-2 py-0.5">
+                {validationResult.errors.length} error{validationResult.errors.length !== 1 ? "s" : ""}
+              </span>
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">Fix these barcodes or remove the rows from your Excel file before importing.</p>
           </CardHeader>
           <CardContent>
-            <ul className="list-disc list-inside space-y-1">
+            <ul className="max-h-72 overflow-y-auto space-y-1.5 pr-1">
               {validationResult.errors.map((error: string, index: number) => (
-                <li key={index} className="text-sm text-destructive">
+                <li key={index} className="flex items-start gap-2 text-sm text-destructive bg-destructive/5 rounded px-2 py-1">
+                  <span className="font-mono text-xs text-muted-foreground shrink-0 mt-0.5 w-6 text-right">{index + 1}.</span>
                   {error}
                 </li>
               ))}
