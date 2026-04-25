@@ -261,6 +261,13 @@ export default function BarcodeLookup() {
     return new Date(dateStr).toLocaleDateString();
   };
 
+  const smartNum = (val: string | number) => {
+    const n = parseFloat(String(val));
+    if (isNaN(n)) return String(val);
+    if (n % 1 === 0) return n.toLocaleString();
+    return n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+  };
+
   const isLoading = referenceLookup.isPending;
 
   return (
@@ -333,98 +340,68 @@ export default function BarcodeLookup() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Identity section */}
+                  {/* Identity */}
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <InfoRow
                       label="Reference Number"
                       value={<span className="font-mono text-lg" data-testid="text-reference-number">{referenceResult.labelPrint.referenceNumber}</span>}
                     />
                     <InfoRow label="Article Code" value={<span data-testid="text-ref-article-code">{referenceResult.labelPrint.articleCode}</span>} />
-                    {referenceResult.baleInfo?.baleCode && (
-                      <InfoRow label="Bale Code" value={<span className="font-mono">{referenceResult.baleInfo.baleCode}</span>} />
-                    )}
                     {referenceResult.baleInfo?.productName && (
                       <InfoRow label="Product Name" value={<span className="font-semibold" data-testid="text-bale-product-name">{referenceResult.baleInfo.productName}</span>} />
                     )}
-                    <InfoRow label="Pieces" value={<span data-testid="text-ref-pieces">{referenceResult.labelPrint.pieces}</span>} />
-                    <InfoRow label="Approx Weight" value={<span data-testid="text-ref-weight">{referenceResult.labelPrint.approxWeightKg} KGS</span>} />
                     {referenceResult.baleInfo && (
-                      <InfoRow label="Actual Weight" value={`${parseFloat(referenceResult.baleInfo.weightKg).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} KG`} />
+                      <InfoRow label="Actual Weight" value={`${smartNum(referenceResult.baleInfo.weightKg)} KG`} />
                     )}
                     {referenceResult.baleInfo?.grade && (
                       <InfoRow label="Grade" value={referenceResult.baleInfo.grade} />
-                    )}
-                    {referenceResult.baleInfo?.totalCost && (
-                      <InfoRow label="Cost / Bale" value={parseFloat(referenceResult.baleInfo.totalCost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} />
                     )}
                   </div>
 
                   <Separator />
 
-                  {/* Print / Scan section */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {/* Print / Scan */}
+                  <div className="flex flex-wrap items-start gap-6">
                     <div>
                       <p className="text-sm text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> Printed At</p>
-                      <p className="font-medium" data-testid="text-ref-printed-at">{formatDate(referenceResult.labelPrint.printedAt as any) ?? "N/A"}</p>
+                      <p className="font-medium" data-testid="text-ref-printed-at">{formatDateOnly(referenceResult.labelPrint.printedAt as any) ?? "N/A"}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground flex items-center gap-1"><User className="h-3 w-3" /> Printed By</p>
                       <p className="font-medium" data-testid="text-ref-printed-by">{(referenceResult.labelPrint as any).printedByName || referenceResult.labelPrint.printedByUserId || "Unknown"}</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> Scanned At</p>
-                      <p className="font-medium" data-testid="text-ref-scanned-at">
-                        {referenceResult.labelPrint.scannedAt
-                          ? formatDate(referenceResult.labelPrint.scannedAt as any)
-                          : <Badge variant="outline">Not scanned yet</Badge>}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1"><User className="h-3 w-3" /> Scanned By</p>
-                      <p className="font-medium" data-testid="text-ref-scanned-by">
-                        {(referenceResult.labelPrint as any).scannedByName || referenceResult.labelPrint.scannedByUserId || "N/A"}
-                      </p>
-                      {!referenceResult.labelPrint.scannedAt && (
+                    {!referenceResult.labelPrint.scannedAt && (
+                      <div className="flex items-end">
                         <Button
                           size="sm"
                           variant="outline"
-                          className="mt-2"
                           disabled={markScanned.isPending}
                           onClick={() => markScanned.mutate(referenceResult.labelPrint!.referenceNumber)}
                           data-testid="button-mark-scanned"
                         >
                           {markScanned.isPending ? "Scanning..." : "Mark as Scanned"}
                         </Button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Production / Stock section */}
-                  {referenceResult.baleInfo && (referenceResult.baleInfo.workerName || referenceResult.baleInfo.pressedAt || referenceResult.baleInfo.finalizedAt || referenceResult.baleInfo.stockEntryDate || referenceResult.locationInfo) && (
+                  {/* Worker + Location */}
+                  {(referenceResult.baleInfo?.workerName || referenceResult.locationInfo) && (
                     <>
                       <Separator />
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {referenceResult.baleInfo.workerName && (
+                      <div className="flex flex-wrap gap-6">
+                        {referenceResult.baleInfo?.workerName && (
                           <div>
                             <p className="text-sm text-muted-foreground flex items-center gap-1"><User className="h-3 w-3" /> Worker</p>
                             <p className="font-medium" data-testid="text-bale-worker">{referenceResult.baleInfo.workerName}</p>
                           </div>
                         )}
-                        {referenceResult.baleInfo.pressedAt && (
-                          <InfoRow label="Pressed At" value={formatDate(referenceResult.baleInfo.pressedAt)} />
-                        )}
-                        {referenceResult.baleInfo.finalizedAt && (
-                          <InfoRow label="Finalized At" value={formatDate(referenceResult.baleInfo.finalizedAt)} />
-                        )}
-                        {referenceResult.baleInfo.stockEntryDate && (
-                          <InfoRow label="Stock Entry Date" value={formatDateOnly(referenceResult.baleInfo.stockEntryDate)} />
-                        )}
                         {referenceResult.locationInfo && (
-                          <div className="col-span-2 md:col-span-3">
-                            <p className="text-sm text-muted-foreground flex items-center gap-1 mb-1">
-                              <MapPin className="h-3.5 w-3.5" /> Current Location
+                          <div>
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                              <MapPin className="h-3 w-3" /> Current Location
                             </p>
-                            <p className="font-medium text-base" data-testid="text-bale-location">
+                            <p className="font-medium" data-testid="text-bale-location">
                               {referenceResult.locationInfo.name}
                               {(referenceResult.locationInfo.city || referenceResult.locationInfo.state) && (
                                 <span className="text-muted-foreground font-normal text-sm ml-2">
@@ -479,8 +456,8 @@ export default function BarcodeLookup() {
                           <InfoRow label="Shipping Company" value={o.shippingCompany} />
                         )}
                         <InfoRow label="Total Bales in Order" value={o.totalQtyBales.toLocaleString()} />
-                        <InfoRow label="This Bale — Price Used" value={parseFloat(o.priceUsed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} />
-                        <InfoRow label="This Bale — Weight" value={`${parseFloat(o.baleWeight).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} KG`} />
+                        <InfoRow label="This Bale — Price Used" value={smartNum(o.priceUsed)} />
+                        <InfoRow label="This Bale — Weight" value={`${smartNum(o.baleWeight)} KG`} />
                         {o.loadingStartedAt && (
                           <InfoRow label="Loading Started" value={formatDate(o.loadingStartedAt)} />
                         )}
@@ -530,10 +507,10 @@ export default function BarcodeLookup() {
                               <Badge variant="outline">{c.status}</Badge>
                             </div>
                             {c.weightKgUsed && (
-                              <InfoRow label="KG Used from This Container" value={`${parseFloat(c.weightKgUsed).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} KG`} />
+                              <InfoRow label="KG Used from This Container" value={`${smartNum(c.weightKgUsed)} KG`} />
                             )}
                             {c.ratePerKg && (
-                              <InfoRow label="Rate / KG" value={`${c.currencyCode} ${parseFloat(c.ratePerKg).toFixed(4)}`} />
+                              <InfoRow label="Rate / KG" value={`${c.currencyCode} ${smartNum(c.ratePerKg)}`} />
                             )}
                           </div>
                         </div>
@@ -564,8 +541,8 @@ export default function BarcodeLookup() {
                       {referenceResult.mixBatch.batchDate && (
                         <InfoRow label="Batch Date" value={formatDateOnly(referenceResult.mixBatch.batchDate)} />
                       )}
-                      <InfoRow label="Total Weight" value={`${parseFloat(referenceResult.mixBatch.totalWeightKg).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} KG`} />
-                      <InfoRow label="Cost / KG" value={parseFloat(referenceResult.mixBatch.costPerKg).toFixed(4)} />
+                      <InfoRow label="Total Weight" value={`${smartNum(referenceResult.mixBatch.totalWeightKg)} KG`} />
+                      <InfoRow label="Cost / KG" value={smartNum(referenceResult.mixBatch.costPerKg)} />
                       <div>
                         <p className="text-sm text-muted-foreground">Status</p>
                         <Badge variant="outline">{referenceResult.mixBatch.status}</Badge>
