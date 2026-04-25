@@ -249,6 +249,28 @@ export function registerExportRoutes(app: Express) {
     }
   });
 
+  // ── Force-cleanup stuck export runs ─────────────────────────────────────────
+  // Marks ALL 'running' rows as failed regardless of age. The UI only shows the
+  // button when a run has been running >5 min client-side, so this is safe.
+  app.post("/api/export/cleanup-stuck-runs", guard, async (_req: Request, res: Response) => {
+    try {
+      const r = await pool.query(`
+        UPDATE daily_export_runs
+           SET status         = 'failed',
+               finished_at    = NOW(),
+               skipped_reason = 'Manually dismissed — export did not complete (server restart or timeout)'
+         WHERE status = 'running'
+        RETURNING id, run_type
+      `);
+      const count = r.rowCount ?? 0;
+      console.log(`[ExportRun] Manual dismiss: cleared ${count} stuck run(s)`);
+      res.json({ cleared: count, ids: r.rows.map((x: any) => x.id) });
+    } catch (e: any) {
+      console.error("[ExportRun] Manual dismiss failed:", e.message);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // ── Backup status ───────────────────────────────────────────────────────────
 
   app.get("/api/export/backup-status", guard, async (_req: Request, res: Response) => {

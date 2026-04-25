@@ -240,20 +240,47 @@ function BackupStatusCard({ status, onRefresh, isRefreshing }: {
   onRefresh: () => void;
   isRefreshing: boolean;
 }) {
+  const { toast } = useToast();
+  const [dismissing, setDismissing] = useState(false);
+
   const hasAnyRun = status.recentRuns.length > 0;
+  const now = Date.now();
+  const stuckRuns = status.recentRuns.filter(
+    r => r.status === "running" && (now - new Date(r.startedAt).getTime()) > 5 * 60 * 1000
+  );
   const hasRunning = status.recentRuns.some(r => r.status === "running");
 
-  const headerIcon = hasRunning
-    ? <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-    : !hasAnyRun
-      ? <ShieldAlert className="h-4 w-4 text-muted-foreground" />
-      : status.recentRuns[0]?.status === "success"
-        ? <ShieldCheck className="h-4 w-4 text-green-600" />
-        : status.recentRuns[0]?.status === "partial_failed"
-          ? <AlertTriangle className="h-4 w-4 text-amber-500" />
-          : status.recentRuns[0]?.status === "failed"
-            ? <ShieldAlert className="h-4 w-4 text-destructive" />
-            : <ShieldCheck className="h-4 w-4 text-muted-foreground" />;
+  const dismissStuck = async () => {
+    setDismissing(true);
+    try {
+      const data = await apiRequest("POST", "/api/export/cleanup-stuck-runs") as any;
+      toast({
+        title: data.cleared > 0
+          ? `Dismissed ${data.cleared} stalled run${data.cleared === 1 ? "" : "s"}`
+          : "No stalled runs found",
+        description: data.cleared > 0 ? "They are now marked as failed." : undefined,
+      });
+      onRefresh();
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Dismiss failed", description: e.message });
+    } finally {
+      setDismissing(false);
+    }
+  };
+
+  const headerIcon = stuckRuns.length > 0
+    ? <AlertTriangle className="h-4 w-4 text-amber-500" />
+    : hasRunning
+      ? <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+      : !hasAnyRun
+        ? <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+        : status.recentRuns[0]?.status === "success"
+          ? <ShieldCheck className="h-4 w-4 text-green-600" />
+          : status.recentRuns[0]?.status === "partial_failed"
+            ? <AlertTriangle className="h-4 w-4 text-amber-500" />
+            : status.recentRuns[0]?.status === "failed"
+              ? <ShieldAlert className="h-4 w-4 text-destructive" />
+              : <ShieldCheck className="h-4 w-4 text-muted-foreground" />;
 
   return (
     <Card data-testid="card-backup-status">
@@ -263,22 +290,41 @@ function BackupStatusCard({ status, onRefresh, isRefreshing }: {
             {headerIcon}
             Backup Status
           </CardTitle>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={onRefresh}
-            disabled={isRefreshing}
-            data-testid="button-refresh-backup-status"
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-          </Button>
+          <div className="flex items-center gap-1">
+            {stuckRuns.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={dismissStuck}
+                disabled={dismissing}
+                data-testid="button-dismiss-stuck-runs"
+                className="text-xs h-8"
+              >
+                {dismissing
+                  ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  : <XCircle className="h-3 w-3 mr-1" />}
+                Dismiss stalled
+              </Button>
+            )}
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              data-testid="button-refresh-backup-status"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
         </div>
         <CardDescription>
-          {hasRunning
-            ? "A backup is currently in progress..."
-            : hasAnyRun
-              ? `Last ${status.recentRuns.length} run${status.recentRuns.length === 1 ? "" : "s"} — newest first`
-              : "No backup runs recorded yet"}
+          {stuckRuns.length > 0
+            ? `${stuckRuns.length} run${stuckRuns.length === 1 ? "" : "s"} appear stalled — click "Dismiss stalled" to clear`
+            : hasRunning
+              ? "A backup is currently in progress..."
+              : hasAnyRun
+                ? `Last ${status.recentRuns.length} run${status.recentRuns.length === 1 ? "" : "s"} — newest first`
+                : "No backup runs recorded yet"}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
