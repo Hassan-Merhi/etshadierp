@@ -704,13 +704,13 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
 
-      await db.insert(customerOrderCharges).values({
+      const [newCharge] = await db.insert(customerOrderCharges).values({
         orderId,
         name,
         amount: String(amount),
         chargeType: chargeType || "OTHER",
         ledgerAccountId: ledgerAccountId ? parseInt(ledgerAccountId) : null,
-      });
+      }).returning();
 
       await recalculateOrderTotals(db, orderId);
 
@@ -731,6 +731,44 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           await db.update(customerBalances)
             .set({ debitAmount: String(newGrandTotal), balance: String(newGrandTotal) })
             .where(eq(customerBalances.id, existingLedgerEntry.id));
+        }
+
+        // Create charge voucher if the charge has a ledger account (mirrors finalization logic)
+        const resolvedLedgerAccountId = newCharge?.ledgerAccountId;
+        const chargeAmt = parseFloat(String(amount) || "0");
+        if (newCharge && resolvedLedgerAccountId && chargeAmt > 0 && updatedOrder.invoiceNumber) {
+          const [customer] = await db.select({ ledgerAccountId: customers.ledgerAccountId })
+            .from(customers).where(eq(customers.id, order.customerId));
+          if (customer?.ledgerAccountId) {
+            const chargeVoucherNumber = `CHARGE-${updatedOrder.invoiceNumber}-${newCharge.id}-${Date.now()}`;
+            const chargeDesc = order.containerNumber
+              ? `${name} for offloaded container - ${order.containerNumber}`
+              : `${name} - ${updatedOrder.invoiceNumber}`;
+            const [chargeVoucher] = await db.insert(vouchers).values({
+              companyId,
+              voucherType: "Journal",
+              voucherNumber: chargeVoucherNumber,
+              voucherDate: updatedOrder.orderDate || new Date().toISOString().slice(0, 10),
+              description: chargeDesc,
+              totalAmount: String(chargeAmt),
+              sourceModule: "FACTORY",
+            }).returning();
+            await db.insert(voucherEntries).values({
+              voucherId: chargeVoucher.id,
+              ledgerAccountId: customer.ledgerAccountId,
+              customerId: order.customerId,
+              debitAmount: String(chargeAmt),
+              creditAmount: "0",
+              narration: chargeDesc,
+            });
+            await db.insert(voucherEntries).values({
+              voucherId: chargeVoucher.id,
+              ledgerAccountId: resolvedLedgerAccountId,
+              debitAmount: "0",
+              creditAmount: String(chargeAmt),
+              narration: chargeDesc,
+            });
+          }
         }
       }
 
@@ -775,6 +813,23 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           await db.update(customerBalances)
             .set({ debitAmount: String(newGrandTotal), balance: String(newGrandTotal) })
             .where(eq(customerBalances.id, existingLedgerEntry.id));
+        }
+
+        // Delete the charge voucher that was created during finalization (prevents orphaned entries)
+        if (order.invoiceNumber) {
+          const chargeVoucherPattern = `CHARGE-${order.invoiceNumber}-${chargeId}-%`;
+          const chargeVouchersToDelete = await db.select({ id: vouchers.id })
+            .from(vouchers)
+            .where(and(
+              eq(vouchers.companyId, companyId),
+              eq(vouchers.sourceModule, "FACTORY"),
+              sql`${vouchers.voucherNumber} LIKE ${chargeVoucherPattern}`
+            ));
+          if (chargeVouchersToDelete.length > 0) {
+            const vIds = chargeVouchersToDelete.map((v: any) => v.id);
+            await db.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
+            await db.delete(vouchers).where(inArray(vouchers.id, vIds));
+          }
         }
       }
 

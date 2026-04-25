@@ -414,16 +414,15 @@ export function registerFactorySuppliersRoutes(app: Express) {
         : [null];
 
       await db.transaction(async (tx: any) => {
-        // Soft-delete the auto-generated Payment voucher for this payment
+        // Hard-delete the auto-generated Payment voucher and its entries for this payment
         const payVoucherPattern = `FACTORY-PAY-${id}-%`;
-        const [linkedVoucher] = await tx.select({ id: vouchers.id })
+        const payVouchers = await tx.select({ id: vouchers.id })
           .from(vouchers)
-          .where(and(eq(vouchers.companyId, companyId), sql`${vouchers.voucherNumber} LIKE ${payVoucherPattern}`))
-          .limit(1);
-        if (linkedVoucher) {
-          await tx.update(vouchers)
-            .set({ deletedAt: new Date() })
-            .where(eq(vouchers.id, linkedVoucher.id));
+          .where(and(eq(vouchers.companyId, companyId), sql`${vouchers.voucherNumber} LIKE ${payVoucherPattern}`));
+        if (payVouchers.length > 0) {
+          const vIds = payVouchers.map((v: any) => v.id);
+          await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
+          await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
         }
         await tx.delete(factorySupplierPayments)
           .where(and(eq(factorySupplierPayments.id, id), eq(factorySupplierPayments.companyId, companyId)));

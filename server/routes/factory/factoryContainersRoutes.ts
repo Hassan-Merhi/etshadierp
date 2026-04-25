@@ -493,10 +493,99 @@ export function registerFactoryContainersRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
-      const [deleted] = await db
-        .delete(factoryContainers)
-        .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId)))
-        .returning();
+
+      let deleted: any;
+      await db.transaction(async (tx: any) => {
+        const [container] = await tx.select().from(factoryContainers)
+          .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId)));
+        if (!container) return;
+
+        // 1. Collect child raw stock and commission IDs for daybook cleanup
+        const rsRows = await tx.select({ id: factoryRawStock.id }).from(factoryRawStock)
+          .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, id)));
+        const rsIds = rsRows.map((r: any) => r.id);
+
+        const commRows = await tx.select({ id: factoryContainerCommissions.id }).from(factoryContainerCommissions)
+          .where(and(eq(factoryContainerCommissions.companyId, companyId), eq(factoryContainerCommissions.containerId, id)));
+        const commIds = commRows.map((r: any) => r.id);
+
+        // 2. Delete daybook entries
+        if (rsIds.length > 0) {
+          await tx.delete(factoryDaybookEntries).where(and(
+            eq(factoryDaybookEntries.companyId, companyId),
+            eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
+            inArray(factoryDaybookEntries.referenceId, rsIds)
+          ));
+        }
+        if (commIds.length > 0) {
+          await tx.delete(factoryDaybookEntries).where(and(
+            eq(factoryDaybookEntries.companyId, companyId),
+            eq(factoryDaybookEntries.txType, "COMMISSION"),
+            inArray(factoryDaybookEntries.referenceId, commIds)
+          ));
+        }
+        await tx.delete(factoryDaybookEntries).where(and(
+          eq(factoryDaybookEntries.companyId, companyId),
+          inArray(factoryDaybookEntries.txType, ["FREIGHT", "OTHER_CHARGE", "DUTY", "CONTAINER_IMPORT", "PURCHASE"]),
+          eq(factoryDaybookEntries.referenceId, id)
+        ));
+
+        // 3. Delete accounting vouchers and their entries
+        const containerVouchers = await tx.select({ id: vouchers.id }).from(vouchers).where(and(
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.sourceModule, "FACTORY"),
+          or(
+            ilike(vouchers.voucherNumber, `FACTORY-IMPORT-${id}-%`),
+            ilike(vouchers.voucherNumber, `FACTORY-COMM-${id}-%`),
+            ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${id}-%`),
+            ilike(vouchers.voucherNumber, `FACTORY-OC-${id}-%`)
+          )
+        ));
+        if (containerVouchers.length > 0) {
+          const vIds = containerVouchers.map((v: any) => v.id);
+          await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
+          await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
+        }
+
+        // 4. Delete FX allocations
+        await tx.delete(factoryFxAllocations).where(and(
+          eq(factoryFxAllocations.companyId, companyId),
+          eq(factoryFxAllocations.containerId, id)
+        ));
+
+        // 5. Delete mix batch sources
+        await tx.delete(factoryMixBatchSources).where(eq(factoryMixBatchSources.containerId, id));
+
+        // 6. Delete offload additional charges
+        await tx.delete(factoryOffloadAdditionalCharges).where(and(
+          eq(factoryOffloadAdditionalCharges.companyId, companyId),
+          eq(factoryOffloadAdditionalCharges.containerId, id)
+        ));
+
+        // 7. Delete pre-registered other charges
+        await tx.delete(factoryContainerOtherCharges).where(and(
+          eq(factoryContainerOtherCharges.companyId, companyId),
+          eq(factoryContainerOtherCharges.containerId, id)
+        ));
+
+        // 8. Delete commission records
+        await tx.delete(factoryContainerCommissions).where(and(
+          eq(factoryContainerCommissions.companyId, companyId),
+          eq(factoryContainerCommissions.containerId, id)
+        ));
+
+        // 9. Delete raw stock records
+        await tx.delete(factoryRawStock).where(and(
+          eq(factoryRawStock.companyId, companyId),
+          eq(factoryRawStock.containerId, id)
+        ));
+
+        // 10. Delete the container itself
+        const [d] = await tx.delete(factoryContainers)
+          .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId)))
+          .returning();
+        deleted = d;
+      });
 
       if (!deleted) return res.status(404).json({ message: "Container not found" });
       res.json(deleted);
