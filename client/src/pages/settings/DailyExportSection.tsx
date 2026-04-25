@@ -302,8 +302,7 @@ export function DailyExportSection() {
       const body: any = {};
       if (fromDate) body.fromDate = fromDate;
       if (toDate)   body.toDate   = toDate;
-      const res = await apiRequest("POST", "/api/daily-export/trigger-whatsapp", body) as any;
-      const data = await res.json().catch(() => ({}));
+      const data = await apiRequest("POST", "/api/daily-export/trigger-whatsapp", body) as any;
       toast({ title: "Sent via WhatsApp", description: data.message || "ZIP sent to configured group" });
     } catch (e: any) {
       toast({ variant: "destructive", title: "WhatsApp send failed", description: e.message });
@@ -315,9 +314,8 @@ export function DailyExportSection() {
   const sendNpToWa = useMutation({
     mutationFn: () =>
       apiRequest("POST", "/api/whatsapp/send-net-position", { startDate: npStart, endDate: npEnd }),
-    onSuccess: async (res: any) => {
-      const body = await res.json().catch(() => ({}));
-      toast({ title: "Sent via WhatsApp", description: body.message || "Net position report sent" });
+    onSuccess: (data: any) => {
+      toast({ title: "Sent via WhatsApp", description: data?.message || "Net position report sent" });
     },
     onError: (e: any) => toast({ variant: "destructive", title: "Send failed", description: e.message }),
   });

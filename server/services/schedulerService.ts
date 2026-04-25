@@ -102,6 +102,7 @@ async function runDailyWhatsAppSend(
   dailyZip: Buffer,
   dateLabel: string,
   companies: { id: number; name: string }[],
+  opts: { bypassAutoSendCheck?: boolean } = {},
 ): Promise<void> {
   try {
     const settings = await getWaSettings();
@@ -109,7 +110,8 @@ async function runDailyWhatsAppSend(
       console.log("[WhatsApp] WhatsApp is disabled — skipping daily ZIP send.");
       return;
     }
-    if (!settings?.dailyAutoSend) {
+    // Only enforce the dailyAutoSend toggle for the scheduled job, not manual triggers
+    if (!opts.bypassAutoSendCheck && !settings?.dailyAutoSend) {
       console.log("[WhatsApp] Daily auto-send toggle is off — skipping.");
       return;
     }
@@ -468,7 +470,7 @@ export async function triggerDailyWhatsAppSendNow(
   if (names.length === 0) {
     throw new Error("ZIP is empty — no companies exported successfully. WhatsApp send aborted.");
   }
-  await runDailyWhatsAppSend(zip, today, companies);
+  await runDailyWhatsAppSend(zip, today, companies, { bypassAutoSendCheck: true });
   const rangeLabel = (fromDate || toDate)
     ? ` (${fromDate || "start"} → ${toDate || "today"})`
     : " (full history)";

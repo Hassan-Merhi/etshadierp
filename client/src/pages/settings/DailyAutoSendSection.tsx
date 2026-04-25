@@ -52,9 +52,8 @@ export function DailyAutoSendSection() {
 
   const sendNow = useMutation({
     mutationFn: () => apiRequest("POST", "/api/daily-export/trigger-whatsapp"),
-    onSuccess: async (res: any) => {
-      const body = await res.json().catch(() => ({}));
-      toast({ title: "Daily export sent", description: body.message || "ZIP sent to WhatsApp group" });
+    onSuccess: (data: any) => {
+      toast({ title: "Daily export sent", description: data?.message || "ZIP sent to WhatsApp group" });
     },
     onError: (e: any) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
   });
