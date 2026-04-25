@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Package, Eye, EyeOff, BarChart3, ShoppingCart, Boxes } from "lucide-react";
+import { Eye, EyeOff, BarChart3, ShoppingCart, Boxes } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import hmdLogo from "@assets/WhatsApp_Image_2026-04-07_at_11.07.16_1775633971273.jpeg";
 
 const features = [
   {
@@ -66,42 +67,44 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left panel — branding */}
+      {/* Left panel — HMD branding */}
       <div
         className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 relative overflow-hidden"
         style={{
-          background: "linear-gradient(135deg, hsl(217 91% 22%) 0%, hsl(217 91% 35%) 55%, hsl(210 80% 48%) 100%)",
+          background: "linear-gradient(160deg, hsl(280 70% 18%) 0%, hsl(278 65% 26%) 50%, hsl(275 60% 32%) 100%)",
         }}
       >
         {/* Decorative circles */}
         <div
-          className="absolute -top-24 -right-24 w-96 h-96 rounded-full opacity-10"
-          style={{ background: "hsl(210 20% 98%)" }}
+          className="absolute -top-20 -right-20 w-80 h-80 rounded-full opacity-10"
+          style={{ background: "hsl(45 90% 60%)" }}
         />
         <div
-          className="absolute bottom-0 -left-16 w-72 h-72 rounded-full opacity-10"
-          style={{ background: "hsl(210 20% 98%)" }}
+          className="absolute bottom-0 -left-16 w-64 h-64 rounded-full opacity-10"
+          style={{ background: "hsl(45 90% 60%)" }}
         />
         <div
-          className="absolute top-1/2 right-8 w-40 h-40 rounded-full opacity-5"
-          style={{ background: "hsl(210 20% 98%)" }}
+          className="absolute top-1/2 right-10 w-32 h-32 rounded-full opacity-5"
+          style={{ background: "hsl(45 90% 60%)" }}
         />
 
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
-            <Package className="h-5 w-5 text-white" />
-          </div>
-          <span className="text-white font-semibold text-lg tracking-wide">ERP POS</span>
+          <img
+            src={hmdLogo}
+            alt="HMD International Group"
+            className="h-12 w-auto rounded-md object-cover"
+            style={{ aspectRatio: "1.6 / 1" }}
+          />
         </div>
 
         {/* Headline */}
         <div className="relative z-10 space-y-8">
           <div className="space-y-4">
-            <h2 className="text-4xl font-bold text-white leading-snug">
+            <h2 className="text-4xl font-bold leading-snug" style={{ color: "hsl(45 85% 70%)" }}>
               Run your business<br />with confidence.
             </h2>
-            <p className="text-white/70 text-base leading-relaxed max-w-sm">
+            <p className="text-base leading-relaxed max-w-sm" style={{ color: "hsl(280 20% 80%)" }}>
               Everything your team needs — from the stockroom to the checkout — in one unified platform.
             </p>
           </div>
@@ -110,32 +113,40 @@ export default function Login() {
           <div className="space-y-5">
             {features.map((f) => (
               <div key={f.title} className="flex items-start gap-4">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/15 backdrop-blur-sm">
-                  <f.icon className="h-4 w-4 text-white" />
+                <div
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md"
+                  style={{ background: "rgba(212,170,80,0.18)" }}
+                >
+                  <f.icon className="h-4 w-4" style={{ color: "hsl(45 85% 70%)" }} />
                 </div>
                 <div>
-                  <p className="text-white font-medium text-sm">{f.title}</p>
-                  <p className="text-white/60 text-sm">{f.description}</p>
+                  <p className="font-medium text-sm" style={{ color: "hsl(45 80% 82%)" }}>{f.title}</p>
+                  <p className="text-sm" style={{ color: "hsl(280 20% 68%)" }}>{f.description}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Footer note */}
-        <p className="relative z-10 text-white/40 text-xs">
-          &copy; {new Date().getFullYear()} ERP POS. All rights reserved.
+        {/* Footer */}
+        <p className="relative z-10 text-xs" style={{ color: "hsl(280 20% 50%)" }}>
+          &copy; {new Date().getFullYear()} HMD International Group. All rights reserved.
         </p>
       </div>
 
       {/* Right panel — form */}
       <div className="flex flex-1 flex-col items-center justify-center p-6 sm:p-12 bg-background">
         {/* Mobile logo */}
-        <div className="flex lg:hidden items-center gap-2 mb-10">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Package className="h-5 w-5" />
-          </div>
-          <span className="font-semibold text-base">ERP POS</span>
+        <div className="flex lg:hidden flex-col items-center gap-3 mb-10">
+          <img
+            src={hmdLogo}
+            alt="HMD International Group"
+            className="h-16 w-auto rounded-md object-cover"
+            style={{ aspectRatio: "1.6 / 1" }}
+          />
+          <span className="font-semibold text-sm text-muted-foreground tracking-widest uppercase">
+            International Group
+          </span>
         </div>
 
         <div className="w-full max-w-sm space-y-8">
@@ -143,7 +154,7 @@ export default function Login() {
           <div className="space-y-1">
             <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
             <p className="text-sm text-muted-foreground">
-              Sign in to your account to continue
+              Sign in to your HMD International Group account
             </p>
           </div>
 
