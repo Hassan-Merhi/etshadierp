@@ -59,7 +59,7 @@ function fmtKg(n: number) {
   return `${r.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} kg`;
 }
 
-type Preset = "today" | "yesterday" | "month" | "lastmonth" | "year" | "custom";
+type Preset = "today" | "yesterday" | "month" | "lastmonth" | "year" | "alltime" | "custom";
 
 interface ReportData {
   from: string | null;
@@ -780,17 +780,22 @@ export default function DailyProductionReport() {
       return { from: f, to: t };
     }
     if (preset === "year") return { from: yearStart(), to: todayStr() };
+    if (preset === "alltime") return { from: "", to: "" };
     return { from: customFrom, to: customTo };
   }, [preset, customFrom, customTo]);
 
   const { data, isLoading } = useQuery<ReportData>({
     queryKey: ["/api/factory/production-value-report", from, to],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/production-value-report?from=${from}&to=${to}`, { credentials: "include" });
+      const params = new URLSearchParams();
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      const qs = params.toString() ? `?${params.toString()}` : "";
+      const res = await fetch(`/api/factory/production-value-report${qs}`, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    enabled: !!from && !!to,
+    enabled: preset === "alltime" || (!!from && !!to),
   });
 
   const { data: ledger, isLoading: ledgerLoading, refetch: ledgerRefetch, isFetching: ledgerFetching } = useQuery<LedgerData>({
@@ -804,6 +809,7 @@ export default function DailyProductionReport() {
     { key: "month", label: "This Month" },
     { key: "lastmonth", label: "Last Month" },
     { key: "year", label: "This Year" },
+    { key: "alltime", label: "All Time" },
     { key: "custom", label: "Custom" },
   ];
 

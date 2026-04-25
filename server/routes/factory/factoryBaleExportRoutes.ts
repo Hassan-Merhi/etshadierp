@@ -895,7 +895,14 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       if (from) baleConditions.push(sql`COALESCE(DATE(${factoryBales.stockEntryDate}), DATE(${factoryBales.createdAt})) >= ${from}`);
       if (to)   baleConditions.push(sql`COALESCE(DATE(${factoryBales.stockEntryDate}), DATE(${factoryBales.createdAt})) <= ${to}`);
 
-      const mixBatchConditions: any[] = [eq(factoryMixBatches.companyId, companyId)];
+      // Exclude CARRY_FORWARD batches from the "Original Batches" total.
+      // CARRY_FORWARD batches represent leftover material from a parent batch whose weight is
+      // already counted in the parent's totalWeightKg.  Including them would double-count
+      // that leftover and inflate the raw-material total.
+      const mixBatchConditions: any[] = [
+        eq(factoryMixBatches.companyId, companyId),
+        sql`${factoryMixBatches.carryForwardFromId} IS NULL`,
+      ];
       if (from) mixBatchConditions.push(sql`COALESCE(${factoryMixBatches.batchDate}, DATE(${factoryMixBatches.createdAt})) >= ${from}`);
       if (to)   mixBatchConditions.push(sql`COALESCE(${factoryMixBatches.batchDate}, DATE(${factoryMixBatches.createdAt})) <= ${to}`);
 
@@ -1028,10 +1035,28 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       const totalMixCost = mixBatchRows.reduce((s: number, r: any) => s + parseFloat(r.totalCost || "0"), 0);
 
       // ── Balance on table ──
-      // Original batch weight − regular bales produced − wipers/garbage weight
+      // "Balance on Table" is a CURRENT STATE metric: how much raw material has been mixed into
+      // active batches but not yet turned into finished bales.  We compute it directly from the
+      // active-batch remaining (totalWeightKg − usedKg for OPEN/ACTIVE/CARRY_FORWARD batches)
+      // so that it is immune to date-filter mismatches between mix-batch dates and bale
+      // stock-entry dates, and is never affected by carry-forward double counting.
+      const [activeBalRow] = await db
+        .select({
+          weightKg: sql<string>`COALESCE(SUM(${factoryMixBatches.totalWeightKg}::numeric - ${factoryMixBatches.usedKg}::numeric), 0)`,
+          valueCost: sql<string>`COALESCE(SUM(
+            ${factoryMixBatches.totalCost}::numeric
+            * (1 - ${factoryMixBatches.usedKg}::numeric / NULLIF(${factoryMixBatches.totalWeightKg}::numeric, 0))
+          ), 0)`,
+        })
+        .from(factoryMixBatches)
+        .where(and(
+          eq(factoryMixBatches.companyId, companyId),
+          sql`${factoryMixBatches.status} IN ('OPEN', 'ACTIVE', 'CARRY_FORWARD')`,
+        ));
+
       const blendedCostPerKg = totalMixWeightKg > 0 ? totalMixCost / totalMixWeightKg : 0;
-      const balanceWeightKg = totalMixWeightKg - totalBaleWeightKg - totalWgWeightKg;
-      const balanceValue = balanceWeightKg * blendedCostPerKg;
+      const balanceWeightKg = parseFloat(activeBalRow?.weightKg || "0");
+      const balanceValue = parseFloat(activeBalRow?.valueCost || "0");
 
       // ── STATUS = Production value − Batch cost ──
       const statusValue = totalProductionValue - totalMixCost;
