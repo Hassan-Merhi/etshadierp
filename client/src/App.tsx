@@ -142,6 +142,7 @@ const FactoryWorkersHub = lazy(() => import("@/pages/factory/FactoryWorkersHub")
 const FactoryWorkerDetail = lazy(() => import("@/pages/factory/FactoryWorkerDetail"));
 const FactoryEmployeesHub = lazy(() => import("@/pages/factory/FactoryEmployeesHub"));
 const FactoryEmployeeDetail = lazy(() => import("@/pages/factory/FactoryEmployeeDetail"));
+const FactoryPayrollHub = lazy(() => import("@/pages/factory/FactoryPayrollHub"));
 const FactorySupplierReport = lazy(() => import("@/pages/factory/FactorySupplierReport"));
 const FactorySupplierStatement = lazy(() => import("@/pages/factory/FactorySupplierStatement"));
 const FactoryBrokerVisualStatement = lazy(() => import("@/pages/factory/FactoryBrokerVisualStatement"));
@@ -836,10 +837,11 @@ function AuthenticatedApp() {
                     <Route path="/factory/stock-allocation" component={FactoryStockAllocation} />
                     <Route path="/factory/customers/:id" component={FactoryCustomerStatement} />
                     <Route path="/factory/customers" component={FactoryCustomers} />
+                    <Route path="/factory/payroll-hub" component={FactoryPayrollHub} />
                     <Route path="/factory/employees/:id" component={FactoryEmployeeDetail} />
-                    <Route path="/factory/employees" component={FactoryEmployeesHub} />
+                    <Route path="/factory/employees"><Redirect to="/factory/payroll-hub" /></Route>
                     <Route path="/factory/workers/:id" component={FactoryWorkerDetail} />
-                    <Route path="/factory/workers" component={FactoryWorkersHub} />
+                    <Route path="/factory/workers"><Redirect to="/factory/payroll-hub" /></Route>
                     <Route path="/factory/worker-payroll"><Redirect to="/factory/workers?tab=payroll" /></Route>
                     <Route path="/factory/supplier-report" component={FactorySupplierReport} />
                     <Route path="/factory/supplier-statement" component={FactorySupplierStatement} />
