@@ -399,6 +399,7 @@ export function startScheduler() {
 
   // Run at 6:00 PM EST (America/New_York) every day
   cron.schedule("0 18 * * *", async () => {
+    console.log(`[DailyExport] 6 PM cron fired at ${new Date().toISOString()}`);
     const emailEnabled = await isScheduleEnabled();
 
     if (emailEnabled) {

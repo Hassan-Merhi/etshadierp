@@ -1593,6 +1593,22 @@ let migrationsDone = false;
       created_at          TIMESTAMP NOT NULL DEFAULT NOW()
     )`,
     `ALTER TABLE factory_bales ADD COLUMN IF NOT EXISTS import_batch_id INTEGER`,
+
+    // ── Seed singleton config rows so the scheduler always finds them ─────────
+    // export_settings (id=1): email credentials + schedule toggle
+    `INSERT INTO export_settings (id, gmail_user, gmail_app_password, schedule_enabled)
+     VALUES (1, '', '', false)
+     ON CONFLICT (id) DO NOTHING`,
+
+    // whatsapp_settings (id=1): Green API credentials + enable toggles
+    `INSERT INTO whatsapp_settings (id, instance_id, api_token, enabled, monthly_auto_send, daily_auto_send)
+     VALUES (1, '', '', false, false, false)
+     ON CONFLICT (id) DO NOTHING`,
+
+    // net_position_export_settings (id=1)
+    `INSERT INTO net_position_export_settings (id, frequency, send_hour, enabled, auto_send)
+     VALUES (1, 'daily', 18, false, false)
+     ON CONFLICT (id) DO NOTHING`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
