@@ -15,41 +15,39 @@ const features = [
   { icon: BarChart3,    title: "Business Analytics",    description: "Insights and reports to drive growth" },
 ];
 
-/* ── Theme-aware colour tokens ───────────────────────────── */
+/* ── Midnight Navy + Teal tokens ─────────────────────────── */
 const tokens = {
   light: {
-    /* Left panel */
-    panelBg:       "linear-gradient(150deg, hsl(280 72% 16%) 0%, hsl(278 66% 24%) 55%, hsl(274 58% 32%) 100%)",
-    blobColor:     "hsl(45 90% 65%)",
-    headlineColor: "hsl(45 85% 62%)",
-    bodyColor:     "hsl(280 12% 72%)",
-    featureTitleColor: "hsl(45 65% 84%)",
-    featureDescColor:  "hsl(280 12% 60%)",
-    iconBg:        "rgba(212,170,55,0.12)",
-    iconBorder:    "rgba(212,170,55,0.22)",
-    iconColor:     "hsl(45 85% 62%)",
-    footerColor:   "hsl(280 12% 38%)",
-    /* Right panel */
-    accentStripe:  "linear-gradient(90deg, hsl(278 65% 26%) 0%, hsl(45 85% 62%) 100%)",
-    brandLabel:    "hsl(278 65% 32%)",
-    signInBg:      "linear-gradient(135deg, hsl(278 66% 28%) 0%, hsl(278 60% 36%) 100%)",
+    panelBg:           "linear-gradient(150deg, hsl(222 72% 10%) 0%, hsl(221 68% 15%) 55%, hsl(218 62% 21%) 100%)",
+    blob:              "hsl(185 85% 55%)",
+    headlineColor:     "hsl(185 80% 68%)",
+    bodyColor:         "hsl(220 18% 68%)",
+    featureTitleColor: "hsl(185 65% 82%)",
+    featureDescColor:  "hsl(220 14% 55%)",
+    iconBg:            "rgba(32, 210, 200, 0.12)",
+    iconBorder:        "rgba(32, 210, 200, 0.22)",
+    iconColor:         "hsl(185 80% 68%)",
+    footerColor:       "hsl(220 14% 34%)",
+    accentStripe:      "linear-gradient(90deg, hsl(222 72% 18%) 0%, hsl(185 80% 48%) 100%)",
+    brandLabel:        "hsl(200 75% 35%)",
+    signInBg:          "linear-gradient(135deg, hsl(221 68% 22%) 0%, hsl(210 65% 32%) 100%)",
+    signInShadow:      "0 4px 18px rgba(15, 40, 100, 0.28)",
   },
   dark: {
-    /* Left panel — deeper, richer purple for dark mode */
-    panelBg:       "linear-gradient(150deg, hsl(280 60% 8%) 0%, hsl(278 58% 13%) 55%, hsl(274 52% 18%) 100%)",
-    blobColor:     "hsl(45 80% 50%)",
-    headlineColor: "hsl(45 80% 56%)",
-    bodyColor:     "hsl(280 10% 52%)",
-    featureTitleColor: "hsl(45 55% 70%)",
-    featureDescColor:  "hsl(280 10% 44%)",
-    iconBg:        "rgba(180,140,40,0.10)",
-    iconBorder:    "rgba(180,140,40,0.18)",
-    iconColor:     "hsl(45 80% 56%)",
-    footerColor:   "hsl(280 10% 28%)",
-    /* Right panel */
-    accentStripe:  "linear-gradient(90deg, hsl(278 58% 18%) 0%, hsl(45 80% 40%) 100%)",
-    brandLabel:    "hsl(278 50% 55%)",
-    signInBg:      "linear-gradient(135deg, hsl(278 58% 20%) 0%, hsl(278 52% 28%) 100%)",
+    panelBg:           "linear-gradient(150deg, hsl(222 72% 6%) 0%, hsl(221 68% 10%) 55%, hsl(218 62% 14%) 100%)",
+    blob:              "hsl(185 75% 45%)",
+    headlineColor:     "hsl(185 72% 60%)",
+    bodyColor:         "hsl(220 14% 50%)",
+    featureTitleColor: "hsl(185 58% 72%)",
+    featureDescColor:  "hsl(220 12% 42%)",
+    iconBg:            "rgba(32, 190, 185, 0.10)",
+    iconBorder:        "rgba(32, 190, 185, 0.18)",
+    iconColor:         "hsl(185 72% 60%)",
+    footerColor:       "hsl(220 12% 26%)",
+    accentStripe:      "linear-gradient(90deg, hsl(222 72% 12%) 0%, hsl(185 72% 38%) 100%)",
+    brandLabel:        "hsl(185 60% 50%)",
+    signInBg:          "linear-gradient(135deg, hsl(221 68% 16%) 0%, hsl(210 62% 24%) 100%)",
+    signInShadow:      "0 4px 18px rgba(8, 20, 55, 0.45)",
   },
 };
 
@@ -89,16 +87,21 @@ export default function Login() {
       {/* ══════════ LEFT — Branding panel ══════════ */}
       <div
         className="hidden lg:flex lg:w-[52%] shrink-0 flex-col justify-between p-14 relative overflow-hidden"
-        style={{ background: t.panelBg, transition: "background 0.35s ease" }}
+        style={{ background: t.panelBg, transition: "background 0.4s ease" }}
       >
-        {/* Subtle decorative circles */}
+        {/* Teal glow blobs */}
         <div
-          className="pointer-events-none absolute -top-24 -right-24 w-96 h-96 rounded-full opacity-[0.07]"
-          style={{ background: t.blobColor, transition: "background 0.35s ease" }}
+          className="pointer-events-none absolute -top-28 -right-28 w-[420px] h-[420px] rounded-full opacity-[0.08]"
+          style={{ background: t.blob, filter: "blur(2px)", transition: "background 0.4s ease" }}
         />
         <div
-          className="pointer-events-none absolute bottom-[-5rem] -left-16 w-72 h-72 rounded-full opacity-[0.07]"
-          style={{ background: t.blobColor, transition: "background 0.35s ease" }}
+          className="pointer-events-none absolute -bottom-20 -left-16 w-80 h-80 rounded-full opacity-[0.06]"
+          style={{ background: t.blob, filter: "blur(2px)", transition: "background 0.4s ease" }}
+        />
+        {/* Extra small accent dot top-left */}
+        <div
+          className="pointer-events-none absolute top-1/2 left-1/3 w-40 h-40 rounded-full opacity-[0.04]"
+          style={{ background: t.blob, transition: "background 0.4s ease" }}
         />
 
         {/* Logo */}
@@ -112,16 +115,21 @@ export default function Login() {
 
         {/* Headline + features */}
         <div className="relative z-10 space-y-10">
-          <div className="space-y-3">
+          <div className="space-y-4">
             <h2
-              className="text-[2.5rem] font-extrabold leading-tight tracking-tight"
-              style={{ color: t.headlineColor, transition: "color 0.35s ease" }}
+              className="text-[2.6rem] font-extrabold leading-tight tracking-tight"
+              style={{ color: t.headlineColor, transition: "color 0.4s ease" }}
             >
               Run your business<br />with confidence.
             </h2>
+            {/* Teal underline accent */}
+            <div
+              className="w-14 h-[3px] rounded-full"
+              style={{ background: t.headlineColor, opacity: 0.6, transition: "background 0.4s ease" }}
+            />
             <p
               className="text-[0.95rem] leading-relaxed max-w-xs"
-              style={{ color: t.bodyColor, transition: "color 0.35s ease" }}
+              style={{ color: t.bodyColor, transition: "color 0.4s ease" }}
             >
               Everything your team needs — from the stockroom to the checkout — in one unified platform.
             </p>
@@ -132,15 +140,19 @@ export default function Login() {
               <div key={f.title} className="flex items-start gap-4">
                 <div
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
-                  style={{ background: t.iconBg, border: `1px solid ${t.iconBorder}`, transition: "background 0.35s ease" }}
+                  style={{
+                    background: t.iconBg,
+                    border: `1px solid ${t.iconBorder}`,
+                    transition: "background 0.4s ease",
+                  }}
                 >
-                  <f.icon className="h-4 w-4" style={{ color: t.iconColor, transition: "color 0.35s ease" }} />
+                  <f.icon className="h-4 w-4" style={{ color: t.iconColor, transition: "color 0.4s ease" }} />
                 </div>
                 <div>
-                  <p className="font-semibold text-sm" style={{ color: t.featureTitleColor, transition: "color 0.35s ease" }}>
+                  <p className="font-semibold text-sm" style={{ color: t.featureTitleColor, transition: "color 0.4s ease" }}>
                     {f.title}
                   </p>
-                  <p className="text-sm mt-0.5" style={{ color: t.featureDescColor, transition: "color 0.35s ease" }}>
+                  <p className="text-sm mt-0.5" style={{ color: t.featureDescColor, transition: "color 0.4s ease" }}>
                     {f.description}
                   </p>
                 </div>
@@ -150,10 +162,7 @@ export default function Login() {
         </div>
 
         {/* Footer */}
-        <p
-          className="relative z-10 text-xs"
-          style={{ color: t.footerColor, transition: "color 0.35s ease" }}
-        >
+        <p className="relative z-10 text-xs" style={{ color: t.footerColor, transition: "color 0.4s ease" }}>
           &copy; {new Date().getFullYear()} HMD International Group. All rights reserved.
         </p>
       </div>
@@ -161,19 +170,18 @@ export default function Login() {
       {/* ══════════ RIGHT — Form panel ══════════ */}
       <div className="flex flex-1 flex-col min-h-screen relative">
 
-        {/* Thin gradient accent stripe */}
+        {/* Gradient accent stripe */}
         <div
           className="absolute top-0 left-0 right-0 h-[3px]"
-          style={{ background: t.accentStripe, transition: "background 0.35s ease" }}
+          style={{ background: t.accentStripe, transition: "background 0.4s ease" }}
         />
 
         {/* Top bar */}
         <div className="flex items-center justify-between px-8 pt-6 pb-2">
-          {/* Mobile brand name */}
           <div className="flex lg:hidden items-center">
             <span
               className="text-sm font-extrabold tracking-[0.2em] uppercase"
-              style={{ color: t.brandLabel, transition: "color 0.35s ease" }}
+              style={{ color: t.brandLabel, transition: "color 0.4s ease" }}
             >
               HMD
             </span>
@@ -186,11 +194,11 @@ export default function Login() {
         <div className="flex flex-1 items-center justify-center px-8 pb-10">
           <div className="w-full max-w-[360px] space-y-8">
 
-            {/* Brand label — desktop */}
+            {/* Brand label */}
             <div className="hidden lg:block">
               <span
                 className="text-[0.65rem] font-bold tracking-[0.28em] uppercase"
-                style={{ color: t.brandLabel, transition: "color 0.35s ease" }}
+                style={{ color: t.brandLabel, transition: "color 0.4s ease" }}
               >
                 HMD International Group
               </span>
@@ -247,8 +255,12 @@ export default function Login() {
                 type="submit"
                 data-testid="button-login"
                 disabled={loginMutation.isPending}
-                className="w-full h-10 rounded-md font-semibold text-sm text-white transition-all disabled:opacity-60"
-                style={{ background: t.signInBg }}
+                className="w-full h-10 rounded-md font-semibold text-sm text-white transition-all disabled:opacity-60 hover:opacity-90 active:scale-[0.98]"
+                style={{
+                  background: t.signInBg,
+                  boxShadow: t.signInShadow,
+                  transition: "background 0.4s ease, box-shadow 0.4s ease",
+                }}
               >
                 {loginMutation.isPending ? "Signing in…" : "Sign In"}
               </button>
