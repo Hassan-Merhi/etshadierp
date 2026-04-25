@@ -14,7 +14,11 @@ interface CurrencyContextType {
   isLoadingCompany: boolean;
   displayCurrency: string | null;
   isMultiCurrency: boolean;
+  /** Converts USD → display currency and formats with symbol */
   formatAmount: (amount: number | string, currency?: Currency) => string;
+  /** Formats amount as-is in the selected currency WITHOUT conversion.
+   *  Use this for values already stored in the display currency (e.g. customer balances in CFA). */
+  formatAmountRaw: (amount: number | string) => string;
   convertToDisplay: (usdAmount: number) => number;
   convertToUSD: (displayAmount: number) => number;
 }
@@ -118,6 +122,18 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     return displayAmount / exchangeRate;
   };
 
+  // Shows the raw number as-is with the correct currency symbol — no USD→CFA conversion.
+  // Use for amounts already stored in the display currency (e.g. customer balances).
+  const formatAmountRaw = (amount: number | string): string => {
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+    if (isNaN(numAmount)) return "";
+    if (selectedCurrency === "CFA") {
+      return `CFA ${Math.round(numAmount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    }
+    const isWhole = Math.abs(numAmount) % 1 === 0;
+    return `$ ${numAmount.toLocaleString(undefined, { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`;
+  };
+
   const formatAmount = (amount: number | string, currency?: Currency): string => {
     const curr = currency || selectedCurrency;
     const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
@@ -153,6 +169,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       displayCurrency,
       isMultiCurrency,
       formatAmount,
+      formatAmountRaw,
       convertToDisplay,
       convertToUSD
     }}>

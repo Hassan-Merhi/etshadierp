@@ -42,7 +42,7 @@ const formSchema = insertCustomerSchema.extend({
 export default function Customers() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
-  const { formatAmount } = useCurrencyContext();
+  const { formatAmount, formatAmountRaw } = useCurrencyContext();
   const [, navigate] = useLocation();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -344,7 +344,7 @@ export default function Customers() {
                     </button>
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatAmount(customer.balance || 0)}
+                    {formatAmountRaw(customer.balance || 0)}
                   </TableCell>
                   <TableCell className={`font-semibold text-sm ${drCrClass(customer.balanceSide || "Dr")}`}>{customer.balanceSide || "Dr"}</TableCell>
                   <TableCell>
@@ -392,7 +392,7 @@ export default function Customers() {
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <Badge variant="secondary" className={drCrClass(customer.balanceSide || "Dr")}>{customer.balanceSide || "Dr"}</Badge>
-                  <span className="font-mono font-semibold">{formatAmount(customer.balance || 0)}</span>
+                  <span className="font-mono font-semibold">{formatAmountRaw(customer.balance || 0)}</span>
                 </div>
               </div>
             </Card>
@@ -517,7 +517,7 @@ export default function Customers() {
               {statementCustomer?.legalName}
             </DialogTitle>
             <div className="flex items-center gap-3 pt-1 text-sm text-muted-foreground">
-              <span>Balance: <span className="font-mono font-semibold text-foreground">{formatAmount(statementCustomer?.balance || 0)}</span></span>
+              <span>Balance: <span className="font-mono font-semibold text-foreground">{formatAmountRaw(statementCustomer?.balance || 0)}</span></span>
               <Badge variant="secondary" className={drCrClass(statementCustomer?.balanceSide || "Dr")}>
                 {statementCustomer?.balanceSide || "Dr"}
               </Badge>
