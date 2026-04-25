@@ -137,21 +137,26 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
     username: string;
     onClose: () => void;
   }) {
-    const { data: presence } = useQuery<any>({
+    const { data: presenceRaw } = useQuery<any>({
       queryKey: ["/api/user-presence", userId],
       queryFn: () => apiRequest("GET", `/api/user-presence/${userId}`),
       refetchInterval: 5000,
     });
-    const { data: activity = [] } = useQuery<any[]>({
+    const { data: activityRaw } = useQuery<any>({
       queryKey: ["/api/user-presence", userId, "activity"],
       queryFn: () => apiRequest("GET", `/api/user-presence/${userId}/activity`),
       refetchInterval: 5000,
     });
-    const { data: screenFrame } = useQuery<any>({
+    const { data: screenFrameRaw } = useQuery<any>({
       queryKey: ["/api/screen-feed", userId],
       queryFn: () => apiRequest("GET", `/api/screen-feed/${userId}`),
       refetchInterval: 3000,
     });
+
+    // Guard against unexpected non-array / non-object responses
+    const presence   = presenceRaw && typeof presenceRaw === "object" && !Array.isArray(presenceRaw) ? presenceRaw : null;
+    const activity   = Array.isArray(activityRaw) ? activityRaw : [];
+    const screenFrame = screenFrameRaw && typeof screenFrameRaw === "object" && !Array.isArray(screenFrameRaw) ? screenFrameRaw : null;
 
     const isOnline = !!presence;
     const hasScreen = !!screenFrame?.dataUrl;
@@ -301,7 +306,8 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
     };
 
     // Group users by company
-    const groupedUsers = presenceData?.reduce((acc: any, presence: any) => {
+    const safePresenceData = Array.isArray(presenceData) ? presenceData : [];
+    const groupedUsers = safePresenceData.reduce((acc: any, presence: any) => {
       const companyId = presence.companyId || "unassigned";
       if (!acc[companyId]) {
         acc[companyId] = [];
@@ -327,7 +333,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
               <span>Loading active users...</span>
             </div>
           </Card>
-        ) : !presenceData || presenceData.length === 0 ? (
+        ) : safePresenceData.length === 0 ? (
           <Card className="p-6">
             <p className="text-muted-foreground">No active users at the moment.</p>
           </Card>
