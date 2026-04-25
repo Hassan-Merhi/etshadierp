@@ -18,7 +18,7 @@ export function registerScreenFeedRoutes(app: Express) {
   // GET: admin fetches latest frame for a specific user
   app.get("/api/screen-feed/:userId", requireAuth, (req, res) => {
     const role = req.session.currentRole;
-    if (!role || !["Admin", "Owner", "Manager", "Developer"].includes(role)) {
+    if (role !== "Developer") {
       return res.status(403).json({ message: "Access denied." });
     }
     const frame = screenFeedStore.get(req.params.userId);

@@ -264,7 +264,7 @@ export function registerAuthRoutes(app: Express) {
     requireAuth,
     async (req, res) => {
       const role = req.session.currentRole;
-      if (!role || !["Admin", "Owner", "Manager", "Developer"].includes(role)) {
+      if (role !== "Developer") {
         return res.status(403).json({ message: "Access denied." });
       }
       try {
@@ -289,7 +289,7 @@ export function registerAuthRoutes(app: Express) {
     requireAuth,
     async (req, res) => {
       const role = req.session.currentRole;
-      if (!role || !["Admin", "Owner", "Manager", "Developer"].includes(role)) {
+      if (role !== "Developer") {
         return res.status(403).json({ message: "Access denied." });
       }
       try {

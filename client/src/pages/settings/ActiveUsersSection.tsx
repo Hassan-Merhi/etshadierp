@@ -268,6 +268,9 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   export function ActiveUsersSection() {
     const [watchingUser, setWatchingUser] = useState<{ userId: string; username: string } | null>(null);
 
+    const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+    const isDeveloper = currentUser?.role === "Developer";
+
     const { data: presenceData, isLoading } = useQuery<any[]>({
       queryKey: ["/api/user-presence"],
       refetchInterval: 30000,
@@ -366,6 +369,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                           <TableCell className="text-muted-foreground">
                             {formatTimeAgo(presence.lastSeen)}
                           </TableCell>
+                          {isDeveloper && (
                           <TableCell>
                             <Button
                               size="sm"
@@ -377,6 +381,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                               Watch
                             </Button>
                           </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -390,15 +395,17 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                         <span className="font-medium text-sm">{presence.username}</span>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="text-xs">{presence.role || "—"}</Badge>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            data-testid={`button-watch-mobile-${presence.userId}`}
-                            onClick={() => setWatchingUser({ userId: presence.userId, username: presence.username })}
-                          >
-                            <Eye className="h-3.5 w-3.5 mr-1" />
-                            Watch
-                          </Button>
+                          {isDeveloper && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              data-testid={`button-watch-mobile-${presence.userId}`}
+                              onClick={() => setWatchingUser({ userId: presence.userId, username: presence.username })}
+                            >
+                              <Eye className="h-3.5 w-3.5 mr-1" />
+                              Watch
+                            </Button>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
