@@ -1744,6 +1744,29 @@ let migrationsDone = false;
       }
       console.log("✓ Database tables and columns verified/migrated");
 
+      // ── Clean up orphaned export run records ─────────────────────────────────
+      // If the server was restarted while a job was running (in-memory jobs are
+      // lost on restart), the daily_export_runs row stays at status='running'
+      // forever.  Mark any record that has been 'running' for >5 minutes as
+      // failed so the UI does not show a perpetual "In progress" spinner.
+      try {
+        const orphaned = await migrationClient.query(`
+          UPDATE daily_export_runs
+             SET status       = 'failed',
+                 finished_at  = NOW(),
+                 skipped_reason = 'Server restarted while export was in progress'
+           WHERE status       = 'running'
+             AND started_at   < NOW() - INTERVAL '5 minutes'
+          RETURNING id, run_type
+        `);
+        if (orphaned.rowCount && orphaned.rowCount > 0) {
+          console.log(`[ExportRun] Marked ${orphaned.rowCount} orphaned run(s) as failed (server restart):`,
+            orphaned.rows.map((r: any) => `#${r.id} ${r.run_type}`).join(", "));
+        }
+      } catch (e: any) {
+        console.warn("[ExportRun] Could not clean up orphaned runs:", e.message);
+      }
+
       // Backfill POS_EXPENSE daybook entries for any factory POS sales
       // that have expenses_json stored but no corresponding daybook rows yet
       try {

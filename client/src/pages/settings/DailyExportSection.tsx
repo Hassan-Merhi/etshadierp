@@ -164,6 +164,9 @@ function ChannelLine({ icon, label, attempted, success, error, attempts }: {
 
 function RunRow({ run }: { run: BackupRun }) {
   const isRunning = run.status === "running";
+  const isStuck   = isRunning && run.startedAt
+    ? (Date.now() - new Date(run.startedAt).getTime()) > 5 * 60 * 1000
+    : false;
 
   return (
     <div
@@ -213,6 +216,16 @@ function RunRow({ run }: { run: BackupRun }) {
           attempts={run.whatsappAttempts}
         />
       </div>
+
+      {/* Stuck warning — shown when a run has been "running" for >5 min */}
+      {isStuck && (
+        <div className="flex items-start gap-1.5 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1.5">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+          <p className="text-xs text-amber-800 dark:text-amber-300">
+            This run has been in progress for over 5 minutes. It may have stalled due to a server restart or network timeout. Refresh to see if it resolves, or try again.
+          </p>
+        </div>
+      )}
 
       {/* Skip / note */}
       {run.skippedReason && (
