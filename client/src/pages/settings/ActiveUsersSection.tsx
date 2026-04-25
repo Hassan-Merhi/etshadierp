@@ -96,10 +96,143 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 
 
+  function getPageLabel(route: string): string {
+    if (!route || route === "/") return "Dashboard";
+    const routeLabels: Record<string, string> = {
+      "/": "Dashboard",
+      "/dashboard": "Dashboard",
+      "/locations": "Locations",
+      "/locations/inventory": "Location Inventory",
+      "/stock-items": "Stock Items",
+      "/stock-groups": "Stock Groups",
+      "/ledger-accounts": "Ledger Accounts",
+      "/vouchers": "Vouchers",
+      "/vouchers/payment": "Payment Vouchers",
+      "/vouchers/receipt": "Receipt Vouchers",
+      "/vouchers/journal": "Journal Vouchers",
+      "/vouchers/sales": "Sales Vouchers",
+      "/purchase-orders": "Purchase Orders",
+      "/containers": "Containers",
+      "/containers/otw": "Containers OTW",
+      "/employees": "Employees",
+      "/customers": "Customers",
+      "/suppliers": "Suppliers",
+      "/bank-accounts": "Bank Accounts",
+      "/reports": "Reports",
+      "/reports/profit-loss": "Profit & Loss",
+      "/reports/balance-sheet": "Balance Sheet",
+      "/settings": "Settings",
+      "/pos": "Point of Sale",
+      "/pos/sales": "POS Sales",
+      "/chatbot": "AI Chatbot",
+      "/deleted-items": "Deleted Items",
+    };
+    if (routeLabels[route]) return routeLabels[route];
+    return route.replace(/^\//, "").replace(/-/g, " ").replace(/\//g, " > ")
+      .split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  }
+
+  function WatchUserDialog({ userId, username, onClose }: {
+    userId: string;
+    username: string;
+    onClose: () => void;
+  }) {
+    const { data: presence, dataUpdatedAt } = useQuery<any>({
+      queryKey: ["/api/user-presence", userId],
+      queryFn: () => apiRequest("GET", `/api/user-presence/${userId}`),
+      refetchInterval: 5000,
+    });
+    const { data: activity = [] } = useQuery<any[]>({
+      queryKey: ["/api/user-presence", userId, "activity"],
+      queryFn: () => apiRequest("GET", `/api/user-presence/${userId}/activity`),
+      refetchInterval: 5000,
+    });
+
+    const isOnline = !!presence;
+    const currentPage = presence?.currentRoute ? getPageLabel(presence.currentRoute) : null;
+
+    const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const timeAgo = (iso: string) => {
+      const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+      if (s < 5)  return "just now";
+      if (s < 60) return `${s}s ago`;
+      return `${Math.floor(s / 60)}m ago`;
+    };
+
+    return (
+      <Dialog open onOpenChange={open => !open && onClose()}>
+        <DialogContent className="max-w-lg" data-testid="dialog-watch-user">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {isOnline ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+                  </span>
+                  <span className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide">Live</span>
+                </span>
+              ) : (
+                <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40" />
+              )}
+              Watching: {username}
+            </DialogTitle>
+            <DialogDescription>
+              {isOnline
+                ? `Last seen ${timeAgo(presence.lastSeen)} · ${presence.companyName || "no company"} · ${presence.role || "—"}`
+                : "User is currently offline or inactive"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Current page */}
+            <div className="rounded-md border p-3 space-y-1">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Currently on</p>
+              {isOnline && currentPage ? (
+                <p className="text-lg font-semibold">{currentPage}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">Not active</p>
+              )}
+              {isOnline && presence.currentRoute && (
+                <p className="text-xs text-muted-foreground font-mono">{presence.currentRoute}</p>
+              )}
+            </div>
+
+            {/* Navigation history */}
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1">
+                <History className="h-3.5 w-3.5" /> Navigation history
+              </p>
+              {activity.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No history yet — navigation events will appear here as the user moves between pages.
+                </p>
+              ) : (
+                <div className="space-y-0 max-h-64 overflow-y-auto rounded-md border divide-y">
+                  {activity.map((evt: any) => (
+                    <div key={evt.id} className="flex items-center justify-between px-3 py-1.5 gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{getPageLabel(evt.route)}</p>
+                        <p className="text-xs text-muted-foreground font-mono truncate">{evt.route}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground shrink-0">{fmtTime(evt.occurredAt)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   export function ActiveUsersSection() {
+    const [watchingUser, setWatchingUser] = useState<{ userId: string; username: string } | null>(null);
+
     const { data: presenceData, isLoading } = useQuery<any[]>({
       queryKey: ["/api/user-presence"],
-      refetchInterval: 30000, // Refresh every 30 seconds
+      refetchInterval: 30000,
     });
 
     const { data: companies } = useQuery<any[]>({
@@ -124,42 +257,6 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
       if (!companyId || !companies) return "—";
       const company = companies.find((c: any) => c.id === companyId);
       return company?.name || "Unknown";
-    };
-
-    const getPageLabel = (route: string) => {
-      if (!route || route === "/") return "Dashboard";
-      const routeLabels: Record<string, string> = {
-        "/": "Dashboard",
-        "/dashboard": "Dashboard",
-        "/locations": "Locations",
-        "/locations/inventory": "Location Inventory",
-        "/stock-items": "Stock Items",
-        "/stock-groups": "Stock Groups",
-        "/ledger-accounts": "Ledger Accounts",
-        "/vouchers": "Vouchers",
-        "/vouchers/payment": "Payment Vouchers",
-        "/vouchers/receipt": "Receipt Vouchers",
-        "/vouchers/journal": "Journal Vouchers",
-        "/vouchers/sales": "Sales Vouchers",
-        "/purchase-orders": "Purchase Orders",
-        "/containers": "Containers",
-        "/containers/otw": "Containers OTW",
-        "/employees": "Employees",
-        "/customers": "Customers",
-        "/suppliers": "Suppliers",
-        "/bank-accounts": "Bank Accounts",
-        "/reports": "Reports",
-        "/reports/profit-loss": "Profit & Loss",
-        "/reports/balance-sheet": "Balance Sheet",
-        "/settings": "Settings",
-        "/pos": "Point of Sale",
-        "/pos/sales": "POS Sales",
-        "/chatbot": "AI Chatbot",
-        "/deleted-items": "Deleted Items",
-      };
-      if (routeLabels[route]) return routeLabels[route];
-      const cleanRoute = route.replace(/^\//, "").replace(/-/g, " ").replace(/\//g, " > ");
-      return cleanRoute.split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
     };
 
     // Group users by company
@@ -215,6 +312,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                         <TableHead>Role</TableHead>
                         <TableHead>Current Page</TableHead>
                         <TableHead>Last Active</TableHead>
+                        <TableHead className="w-16" />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -230,6 +328,17 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                           <TableCell className="text-muted-foreground">
                             {formatTimeAgo(presence.lastSeen)}
                           </TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              data-testid={`button-watch-${presence.userId}`}
+                              onClick={() => setWatchingUser({ userId: presence.userId, username: presence.username })}
+                            >
+                              <Eye className="h-3.5 w-3.5 mr-1" />
+                              Watch
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -239,9 +348,20 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                 <div className="sm:hidden divide-y">
                   {users.map((presence: any) => (
                     <div key={presence.id} data-testid={`row-presence-${presence.id}`} className="p-3 space-y-1">
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
                         <span className="font-medium text-sm">{presence.username}</span>
-                        <Badge variant="outline" className="text-xs">{presence.role || "—"}</Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">{presence.role || "—"}</Badge>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            data-testid={`button-watch-mobile-${presence.userId}`}
+                            onClick={() => setWatchingUser({ userId: presence.userId, username: presence.username })}
+                          >
+                            <Eye className="h-3.5 w-3.5 mr-1" />
+                            Watch
+                          </Button>
+                        </div>
                       </div>
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>{getPageLabel(presence.currentRoute)}</span>
@@ -253,6 +373,14 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
               </Card>
             ))}
           </div>
+        )}
+
+        {watchingUser && (
+          <WatchUserDialog
+            userId={watchingUser.userId}
+            username={watchingUser.username}
+            onClose={() => setWatchingUser(null)}
+          />
         )}
       </div>
     );

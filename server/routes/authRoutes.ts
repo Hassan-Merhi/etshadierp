@@ -15,6 +15,7 @@ import {
   locations,
   loginHistory,
   updatePresenceSchema,
+  userActivityLog,
   userCompanyRoles,
   userLocations,
   userPresence,
@@ -199,7 +200,7 @@ export function registerAuthRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid request body" });
       }
 
-      const { route } = parseResult.data;
+      const { route, type } = parseResult.data;
       const sessionId = req.sessionID;
       const userId = req.user!.id;
       const username = req.user!.username;
@@ -210,7 +211,7 @@ export function registerAuthRoutes(app: Express) {
       // Respond immediately — presence writes are best-effort.
       res.status(204).end();
 
-      // Single-query upsert in the background.
+      // Upsert current presence row.
       db.insert(userPresence).values({
         sessionId,
         userId,
@@ -232,6 +233,74 @@ export function registerAuthRoutes(app: Express) {
       }).catch((err: any) => {
         console.error("[Presence] Heartbeat upsert error:", err.message);
       });
+
+      // Log route changes to activity log so admins can watch navigation history.
+      if (type === "route_change") {
+        db.insert(userActivityLog).values({
+          userId,
+          username,
+          companyId,
+          companyName,
+          route,
+        }).catch((err: any) => {
+          console.error("[ActivityLog] Insert error:", err.message);
+        });
+
+        // Prune: keep only last 200 entries per user (fire-and-forget).
+        db.execute(
+          sql`DELETE FROM user_activity_log WHERE user_id = ${userId}
+              AND id NOT IN (
+                SELECT id FROM user_activity_log WHERE user_id = ${userId}
+                ORDER BY occurred_at DESC LIMIT 200
+              )`
+        ).catch(() => {});
+      }
+    }
+  );
+
+  // GET: Fetch a single user's current presence (for Watch panel polling).
+  app.get(
+    "/api/user-presence/:userId",
+    requireAuth,
+    async (req, res) => {
+      const role = req.session.currentRole;
+      if (!role || !["Admin", "Owner", "Manager", "Developer"].includes(role)) {
+        return res.status(403).json({ message: "Access denied." });
+      }
+      try {
+        const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+        const rows = await db.select().from(userPresence)
+          .where(and(
+            eq(userPresence.userId, req.params.userId),
+            gt(userPresence.lastSeen, twoMinutesAgo),
+          ))
+          .orderBy(desc(userPresence.lastSeen))
+          .limit(1);
+        res.json(rows[0] || null);
+      } catch (e: any) {
+        res.status(500).json({ message: e.message });
+      }
+    }
+  );
+
+  // GET: Fetch navigation activity history for a user (for Watch panel).
+  app.get(
+    "/api/user-presence/:userId/activity",
+    requireAuth,
+    async (req, res) => {
+      const role = req.session.currentRole;
+      if (!role || !["Admin", "Owner", "Manager", "Developer"].includes(role)) {
+        return res.status(403).json({ message: "Access denied." });
+      }
+      try {
+        const rows = await db.select().from(userActivityLog)
+          .where(eq(userActivityLog.userId, req.params.userId))
+          .orderBy(desc(userActivityLog.occurredAt))
+          .limit(50);
+        res.json(rows);
+      } catch (e: any) {
+        res.status(500).json({ message: e.message });
+      }
     }
   );
 

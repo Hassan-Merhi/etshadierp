@@ -1618,6 +1618,18 @@ let migrationsDone = false;
       created_at          timestamp NOT NULL DEFAULT now()
     )`,
 
+    // User navigation activity log (for admin Watch User feature)
+    `CREATE TABLE IF NOT EXISTS user_activity_log (
+      id          serial PRIMARY KEY,
+      user_id     varchar NOT NULL,
+      username    text NOT NULL,
+      company_id  integer,
+      company_name text,
+      route       text NOT NULL,
+      occurred_at timestamp NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_user_activity_log_user ON user_activity_log(user_id, occurred_at DESC)`,
+
     // ── Seed singleton config rows so the scheduler always finds them ─────────
     // export_settings (id=1): email credentials + schedule toggle
     `INSERT INTO export_settings (id, gmail_user, gmail_app_password, schedule_enabled)

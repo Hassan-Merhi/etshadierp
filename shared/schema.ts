@@ -2127,9 +2127,22 @@ export type UserPresence = typeof userPresence.$inferSelect;
 
 export const updatePresenceSchema = z.object({
   route: z.string(),
+  type: z.enum(["route_change", "heartbeat"]).optional().default("heartbeat"),
 });
 
 export type UpdatePresence = z.infer<typeof updatePresenceSchema>;
+
+// Tracks every route navigation per user so admins can see navigation history
+export const userActivityLog = pgTable("user_activity_log", {
+  id:          serial("id").primaryKey(),
+  userId:      varchar("user_id").notNull(),
+  username:    text("username").notNull(),
+  companyId:   integer("company_id"),
+  companyName: text("company_name"),
+  route:       text("route").notNull(),
+  occurredAt:  timestamp("occurred_at").notNull().defaultNow(),
+});
+export type UserActivityLog = typeof userActivityLog.$inferSelect;
 
 // POS Shifts table - tracks POS user work sessions
 export const posShifts = pgTable("pos_shifts", {
