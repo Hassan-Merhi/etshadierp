@@ -15,8 +15,6 @@ interface Bucket {
 }
 
 function fmt(n: number) {
-  if (n >= 1_000_000) return (n / 1_000_000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + "M";
-  if (n >= 1_000) return (n / 1_000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + "k";
   return n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
