@@ -108,7 +108,6 @@ const navSections: NavSection[] = [
     items: [
       { title: "Location Inventory", url: "/factory/location-inventory", icon: MapPin    },
       { title: "Factory Stock OTW",   url: "/factory/stock-otw",          icon: Ship      },
-      { title: "Stock Query",        url: "/factory/stock-query",        icon: Database  },
       { title: "Containers",         url: "/factory/containers",         icon: Container },
     ],
   },

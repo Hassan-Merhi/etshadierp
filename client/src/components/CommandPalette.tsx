@@ -96,7 +96,6 @@ const factoryPages: PageEntry[] = [
   { label: "Factory Daybook", description: "Daily transaction log", path: "/factory/daybook", icon: Calendar },
   { label: "Location Inventory", description: "Stock levels by location", path: "/factory/location-inventory", icon: MapPin },
   { label: "Factory Stock OTW", description: "Factory containers on the way", path: "/factory/stock-otw", icon: Truck },
-  { label: "Stock Query", description: "Search and query stock", path: "/factory/stock-query", icon: Search },
   { label: "Bale Relabeling", description: "Relabel and reassign bales", path: "/factory/bale-relabeling", icon: Archive },
   { label: "Workers", description: "Worker and payroll management", path: "/factory/workers", icon: Users },
   { label: "Employees", description: "Employee records and details", path: "/factory/employees", icon: Users },
