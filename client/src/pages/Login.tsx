@@ -7,7 +7,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/components/ThemeProvider";
-import hmdLogoColor from "@assets/WhatsApp_Image_2026-04-07_at_11.07.16_1775633971273.jpeg";
+import hmdLogoColor from "../assets/hmd-logo.jpeg";
 
 const features = [
   { icon: Boxes,        title: "Inventory Management", description: "Real-time stock tracking across all locations" },
