@@ -500,7 +500,7 @@ export function registerVoucherRoutes(app: Express) {
           // Create entries based on voucher type
           for (const entry of entries) {
             const amount = entry.amount;
-            const narration = `${voucherType} - ${entry.accountName}`;
+            const narration = notes || null;
 
             // Determine account field for entry account
             const entryAccountField: any = {};
@@ -764,7 +764,7 @@ export function registerVoucherRoutes(app: Express) {
           // Create new entries based on voucher type
           for (const entry of entries) {
             const amount = entry.amount;
-            const narration = `${voucherType} - ${entry.accountName}`;
+            const narration = notes || null;
 
             // Determine account field for entry account
             const entryAccountField: any = {};
@@ -983,7 +983,7 @@ export function registerVoucherRoutes(app: Express) {
           // Create entries
           for (const entry of entries) {
             const amount = entry.amount;
-            const narration = `Journal - ${entry.accountName}`;
+            const narration = notes || null;
 
             // Determine account field
             const accountField: any = {};
@@ -1158,7 +1158,7 @@ export function registerVoucherRoutes(app: Express) {
           // Create new entries
           for (const entry of entries) {
             const amount = entry.amount;
-            const narration = `Journal - ${entry.accountName}`;
+            const narration = notes || null;
 
             // Determine account field
             const accountField: any = {};

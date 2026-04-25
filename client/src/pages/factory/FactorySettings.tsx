@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -110,6 +110,53 @@ interface RenamePreviewItem {
   code: string;
   currentName: string;
   newName: string;
+}
+
+function MigrateVoucherDescriptionsCard() {
+  const { toast } = useToast();
+  const [result, setResult] = useState<{ chargesFixed: number; narrationFixed: number } | null>(null);
+  const migrateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/factory/migrate-voucher-descriptions");
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      setResult(data);
+      toast({ title: "Update complete", description: `Fixed ${data.chargesFixed} charge entries and ${data.narrationFixed} narrations.` });
+    },
+    onError: (error: any) => {
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Wrench className="h-5 w-5 text-muted-foreground" />
+          Fix Old Voucher Descriptions
+        </CardTitle>
+        <CardDescription>
+          Updates old charge descriptions to use container numbers, and cleans up auto-generated narrations on payments, receipts, and journals to show only the description you wrote.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {result && (
+          <p className="text-sm text-muted-foreground">
+            Last run: fixed {result.chargesFixed} charge entries and {result.narrationFixed} narration entries.
+          </p>
+        )}
+        <Button
+          onClick={() => migrateMutation.mutate()}
+          disabled={migrateMutation.isPending}
+          data-testid="button-migrate-voucher-descriptions"
+        >
+          {migrateMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wrench className="h-4 w-4 mr-2" />}
+          Run Update
+        </Button>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function FactorySettings() {
@@ -1052,6 +1099,9 @@ export default function FactorySettings() {
           <OfflinePrepPanel />
         </CardContent>
       </Card>
+
+      {/* ── Data Maintenance ─────────────────────────────────── */}
+      <MigrateVoucherDescriptionsCard />
     </div>
   );
 }

@@ -918,12 +918,15 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
               if (chargeAmount <= 0) continue;
               // Create a voucher for each charge
               const chargeVoucherNumber = `CHARGE-${invoiceNumber}-${charge.id}-${Date.now()}`;
+              const chargeDesc = order.containerNumber
+                ? `${charge.name} for offloaded container - ${order.containerNumber}`
+                : `${charge.name} - ${invoiceNumber}`;
               const [chargeVoucher] = await tx.insert(vouchers).values({
                 companyId,
                 voucherType: "Journal",
                 voucherNumber: chargeVoucherNumber,
                 voucherDate: today,
-                description: `${charge.name} - ${invoiceNumber}`,
+                description: chargeDesc,
                 totalAmount: String(chargeAmount),
                 sourceModule: "FACTORY",
               }).returning();
@@ -934,7 +937,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
                 customerId: order.customerId,
                 debitAmount: String(chargeAmount),
                 creditAmount: "0",
-                narration: `${charge.name} billed to customer - ${invoiceNumber}`,
+                narration: chargeDesc,
               });
               // Cr Charge Account (freight/other charges income account)
               await tx.insert(voucherEntries).values({
@@ -942,7 +945,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
                 ledgerAccountId: charge.ledgerAccountId!,
                 debitAmount: "0",
                 creditAmount: String(chargeAmount),
-                narration: `${charge.name} - ${invoiceNumber}`,
+                narration: chargeDesc,
               });
             }
           }
