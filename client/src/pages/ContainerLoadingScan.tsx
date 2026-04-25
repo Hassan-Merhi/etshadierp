@@ -285,7 +285,7 @@ export default function ContainerLoadingScan() {
       toast({ title: "Loading finalized", description: "Loading has been sent for office verification" });
       setShowFinalizeDialog(false);
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
-      navigate("/factory/sales/pending-invoices");
+      navigate("/factory/invoicing?tab=invoices");
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;

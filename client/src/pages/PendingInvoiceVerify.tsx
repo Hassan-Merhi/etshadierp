@@ -180,7 +180,7 @@ export default function PendingInvoiceVerify() {
     onSuccess: () => {
       toast({ title: "Order verified", description: "The order has been approved and verified" });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
-      navigate("/factory/sales/pending-invoices");
+      navigate("/factory/invoicing?tab=invoices");
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -195,7 +195,7 @@ export default function PendingInvoiceVerify() {
     onSuccess: () => {
       toast({ title: "Returned to loading", description: "The order has been returned for further loading" });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
-      navigate("/factory/sales/pending-invoices");
+      navigate("/factory/invoicing?tab=invoices");
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -390,7 +390,7 @@ export default function PendingInvoiceVerify() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/factory/sales/pending-invoices")}
+            onClick={() => navigate("/factory/invoicing?tab=invoices")}
             data-testid="button-back"
           >
             <ArrowLeft className="h-5 w-5" />

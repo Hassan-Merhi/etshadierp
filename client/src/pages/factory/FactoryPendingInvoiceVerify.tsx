@@ -110,7 +110,7 @@ export default function FactoryPendingInvoiceVerify() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
-  useEscapeBack(() => navigate("/factory/invoicing?tab=pending"));
+  useEscapeBack(() => navigate("/factory/invoicing?tab=invoices"));
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const params = useParams<{ id: string }>();
@@ -196,7 +196,7 @@ export default function FactoryPendingInvoiceVerify() {
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       toast({ title: "Returned to loading", description: "The order has been returned for further loading" });
-      navigate("/factory/invoicing?tab=pending");
+      navigate("/factory/invoicing?tab=invoices");
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
@@ -367,7 +367,7 @@ export default function FactoryPendingInvoiceVerify() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/factory/invoicing?tab=pending")}
+            onClick={() => navigate("/factory/invoicing?tab=invoices")}
             data-testid="button-back"
           >
             <ArrowLeft className="h-5 w-5" />

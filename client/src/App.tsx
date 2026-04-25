@@ -155,7 +155,6 @@ const FactoryProformas = lazy(() => import("@/pages/factory/FactoryProformas"));
 const FactoryStockAllocation = lazy(() => import("@/pages/factory/FactoryStockAllocationV2"));
 const ProformaAddLine = lazy(() => import("@/pages/factory/ProformaAddLine"));
 const FactoryPriceList = lazy(() => import("@/pages/factory/FactoryPriceList"));
-const FactoryPendingInvoices = lazy(() => import("@/pages/factory/FactoryPendingInvoices"));
 const FactoryPendingInvoiceVerify = lazy(() => import("@/pages/factory/FactoryPendingInvoiceVerify"));
 const FactoryPendingLoadings = lazy(() => import("@/pages/factory/FactoryPendingLoadings"));
 const FactoryContainerLoadingScan = lazy(() => import("@/pages/factory/FactoryContainerLoadingScan"));

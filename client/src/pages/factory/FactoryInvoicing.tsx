@@ -1,14 +1,13 @@
 import { useLocation, useSearch } from "wouter";
 import FactoryProformas from "@/pages/factory/FactoryProformas";
-import FactoryPendingInvoices from "@/pages/factory/FactoryPendingInvoices";
 import FactoryInvoices from "@/pages/factory/FactoryInvoices";
 
-type InvoicingTab = "proformas" | "pending" | "invoices";
+type InvoicingTab = "proformas" | "invoices";
 
 function getTab(search: string): InvoicingTab {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const t = params.get("tab");
-  if (t === "pending" || t === "invoices") return t;
+  if (t === "invoices") return t;
   return "proformas";
 }
 
@@ -19,7 +18,6 @@ export default function FactoryInvoicing() {
 
   const tabs: { key: InvoicingTab; label: string }[] = [
     { key: "proformas", label: "Proformas" },
-    { key: "pending",   label: "Pending Invoices" },
     { key: "invoices",  label: "Invoices" },
   ];
 
@@ -57,7 +55,6 @@ export default function FactoryInvoicing() {
 
       <div className="flex-1 overflow-auto min-h-0">
         {activeTab === "proformas" && <FactoryProformas />}
-        {activeTab === "pending"   && <FactoryPendingInvoices />}
         {activeTab === "invoices"  && <FactoryInvoices />}
       </div>
     </div>
