@@ -1578,6 +1578,21 @@ let migrationsDone = false;
       follower_location_id integer NOT NULL,
       created_at timestamp NOT NULL DEFAULT now()
     )`,
+
+    // ── Apr 2026 — Bale Import Batch tracking ─────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS factory_bale_import_batches (
+      id                  SERIAL PRIMARY KEY,
+      company_id          INTEGER NOT NULL,
+      file_name           TEXT NOT NULL,
+      bale_count          INTEGER NOT NULL DEFAULT 0,
+      error_count         INTEGER NOT NULL DEFAULT 0,
+      total_weight_kg     DECIMAL(15,3) NOT NULL DEFAULT 0,
+      imported_by_user_id VARCHAR(100),
+      imported_by_name    TEXT,
+      notes               TEXT,
+      created_at          TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `ALTER TABLE factory_bales ADD COLUMN IF NOT EXISTS import_batch_id INTEGER`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
