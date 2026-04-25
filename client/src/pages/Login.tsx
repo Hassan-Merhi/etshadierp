@@ -6,6 +6,7 @@ import { Eye, EyeOff, BarChart3, ShoppingCart, Boxes } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import hmdLogo from "@assets/WhatsApp_Image_2026-04-07_at_11.07.16_1775633971273.jpeg";
 
 const features = [
@@ -52,7 +53,6 @@ export default function Login() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!username || !password) {
       toast({
         title: "Error",
@@ -61,67 +61,71 @@ export default function Login() {
       });
       return;
     }
-
     loginMutation.mutate({ username, password });
   };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left panel — HMD branding */}
+    <div className="min-h-screen flex bg-background">
+
+      {/* ── Left branding panel (desktop only) ── */}
       <div
-        className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 relative overflow-hidden"
+        className="hidden lg:flex lg:w-[52%] flex-col justify-between p-14 relative overflow-hidden shrink-0"
         style={{
-          background: "linear-gradient(160deg, hsl(280 70% 18%) 0%, hsl(278 65% 26%) 50%, hsl(275 60% 32%) 100%)",
+          background:
+            "linear-gradient(160deg, hsl(280 70% 18%) 0%, hsl(278 65% 26%) 55%, hsl(275 58% 34%) 100%)",
         }}
       >
-        {/* Decorative circles */}
-        <div
-          className="absolute -top-20 -right-20 w-80 h-80 rounded-full opacity-10"
-          style={{ background: "hsl(45 90% 60%)" }}
-        />
-        <div
-          className="absolute bottom-0 -left-16 w-64 h-64 rounded-full opacity-10"
-          style={{ background: "hsl(45 90% 60%)" }}
-        />
-        <div
-          className="absolute top-1/2 right-10 w-32 h-32 rounded-full opacity-5"
-          style={{ background: "hsl(45 90% 60%)" }}
-        />
+        {/* decorative blobs */}
+        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full opacity-10"
+          style={{ background: "hsl(45 90% 60%)" }} />
+        <div className="absolute bottom-0 -left-20 w-72 h-72 rounded-full opacity-10"
+          style={{ background: "hsl(45 90% 60%)" }} />
+        <div className="absolute top-1/2 right-10 w-36 h-36 rounded-full opacity-5"
+          style={{ background: "hsl(45 90% 60%)" }} />
 
         {/* Logo */}
-        <div className="relative z-10 flex items-center gap-3">
+        <div className="relative z-10">
           <img
             src={hmdLogo}
             alt="HMD International Group"
-            className="h-12 w-auto rounded-md object-cover"
+            className="h-14 w-auto rounded-lg object-cover"
             style={{ aspectRatio: "1.6 / 1" }}
           />
         </div>
 
-        {/* Headline */}
-        <div className="relative z-10 space-y-8">
-          <div className="space-y-4">
-            <h2 className="text-4xl font-bold leading-snug" style={{ color: "hsl(45 85% 70%)" }}>
+        {/* Headline + features */}
+        <div className="relative z-10 space-y-10">
+          <div className="space-y-3">
+            <h2
+              className="text-4xl font-bold leading-tight"
+              style={{ color: "hsl(45 85% 70%)" }}
+            >
               Run your business<br />with confidence.
             </h2>
-            <p className="text-base leading-relaxed max-w-sm" style={{ color: "hsl(280 20% 80%)" }}>
+            <p
+              className="text-base leading-relaxed max-w-xs"
+              style={{ color: "hsl(280 20% 78%)" }}
+            >
               Everything your team needs — from the stockroom to the checkout — in one unified platform.
             </p>
           </div>
 
-          {/* Feature list */}
           <div className="space-y-5">
             {features.map((f) => (
               <div key={f.title} className="flex items-start gap-4">
                 <div
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md"
-                  style={{ background: "rgba(212,170,80,0.18)" }}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md"
+                  style={{ background: "rgba(212,170,80,0.15)" }}
                 >
                   <f.icon className="h-4 w-4" style={{ color: "hsl(45 85% 70%)" }} />
                 </div>
                 <div>
-                  <p className="font-medium text-sm" style={{ color: "hsl(45 80% 82%)" }}>{f.title}</p>
-                  <p className="text-sm" style={{ color: "hsl(280 20% 68%)" }}>{f.description}</p>
+                  <p className="font-semibold text-sm" style={{ color: "hsl(45 75% 84%)" }}>
+                    {f.title}
+                  </p>
+                  <p className="text-sm" style={{ color: "hsl(280 20% 65%)" }}>
+                    {f.description}
+                  </p>
                 </div>
               </div>
             ))}
@@ -129,89 +133,109 @@ export default function Login() {
         </div>
 
         {/* Footer */}
-        <p className="relative z-10 text-xs" style={{ color: "hsl(280 20% 50%)" }}>
+        <p className="relative z-10 text-xs" style={{ color: "hsl(280 20% 45%)" }}>
           &copy; {new Date().getFullYear()} HMD International Group. All rights reserved.
         </p>
       </div>
 
-      {/* Right panel — form */}
-      <div className="flex flex-1 flex-col items-center justify-center p-6 sm:p-12 bg-background">
-        {/* Mobile logo */}
-        <div className="flex lg:hidden flex-col items-center gap-3 mb-10">
-          <img
-            src={hmdLogo}
-            alt="HMD International Group"
-            className="h-16 w-auto rounded-md object-cover"
-            style={{ aspectRatio: "1.6 / 1" }}
-          />
-          <span className="font-semibold text-sm text-muted-foreground tracking-widest uppercase">
-            International Group
-          </span>
+      {/* ── Right form panel ── */}
+      <div className="flex flex-1 flex-col min-h-screen">
+
+        {/* Top bar with theme toggle */}
+        <div className="flex items-center justify-between px-6 py-4">
+          {/* Mobile-only logo */}
+          <div className="flex lg:hidden items-center gap-2">
+            <img
+              src={hmdLogo}
+              alt="HMD International Group"
+              className="h-9 w-auto rounded-md object-cover"
+              style={{ aspectRatio: "1.6 / 1" }}
+            />
+            <span className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">
+              International Group
+            </span>
+          </div>
+          {/* Spacer on desktop so toggle stays right */}
+          <div className="hidden lg:block" />
+
+          {/* Theme toggle — always visible */}
+          <ThemeToggle />
         </div>
 
-        <div className="w-full max-w-sm space-y-8">
-          {/* Heading */}
-          <div className="space-y-1">
-            <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
-            <p className="text-sm text-muted-foreground">
-              Sign in to your HMD International Group account
-            </p>
-          </div>
+        {/* Centered form */}
+        <div className="flex flex-1 items-center justify-center px-6 pb-12">
+          <div className="w-full max-w-sm space-y-8">
 
-          {/* Form */}
-          <form onSubmit={handleLogin} className="space-y-5" noValidate>
-            <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="Enter your username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                data-testid="input-username"
-                autoComplete="username"
-              />
+            {/* Heading */}
+            <div className="space-y-1">
+              <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
+              <p className="text-sm text-muted-foreground">
+                Sign in to your HMD International Group account
+              </p>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
+            {/* Form */}
+            <form onSubmit={handleLogin} className="space-y-5" noValidate>
+
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
                 <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  data-testid="input-password"
-                  autoComplete="current-password"
-                  className="pr-10"
+                  id="username"
+                  type="text"
+                  placeholder="Enter your username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  data-testid="input-username"
+                  autoComplete="username"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  data-testid="button-toggle-password"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover-elevate rounded-sm"
-                  tabIndex={-1}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </button>
               </div>
-            </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              data-testid="button-login"
-              disabled={loginMutation.isPending}
-            >
-              {loginMutation.isPending ? "Signing in..." : "Sign In"}
-            </Button>
-          </form>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                {/* Wrapper must be block-level, not flex, so absolute child positions correctly */}
+                <div className="block relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    data-testid="input-password"
+                    autoComplete="current-password"
+                    className="pr-10"
+                    style={
+                      {
+                        /* Hide browser-native password reveal icon */
+                        WebkitTextSecurity: showPassword ? "none" : undefined,
+                      } as React.CSSProperties
+                    }
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    data-testid="button-toggle-password"
+                    tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground"
+                  >
+                    {showPassword
+                      ? <EyeOff className="h-4 w-4" />
+                      : <Eye className="h-4 w-4" />
+                    }
+                  </button>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full"
+                data-testid="button-login"
+                disabled={loginMutation.isPending}
+              >
+                {loginMutation.isPending ? "Signing in…" : "Sign In"}
+              </Button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
