@@ -118,7 +118,6 @@ const navSections: NavSection[] = [
     items: [
       { title: "Vouchers", url: "/factory/vouchers", icon: FileText  },
       { title: "Accounts", url: "/factory/accounts", icon: Landmark  },
-      { title: "Agents",   url: "/factory/agents",   icon: UserRound },
     ],
   },
   {
@@ -314,6 +313,7 @@ export function FactorySidebar({ user }: { user?: any }) {
           {settings?.daybookEnabled !== false && !myAccess?.hiddenCostFields?.includes("hide_tab_daybook") && (
             <FlatLink href="/factory/daybook" icon={BookOpen} label="Daybook" color="#3b82f6" testId="link-factory-daybook" />
           )}
+          <FlatLink href="/factory/agents" icon={UserRound} label="Agents" color="#3b82f6" testId="link-factory-agents" />
         </div>
 
         {/* Collapsible sections */}
