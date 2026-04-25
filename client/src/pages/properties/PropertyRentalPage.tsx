@@ -1,4 +1,5 @@
 import { useState, useMemo, createContext, useContext, useRef, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -15,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog, ChevronsUpDown, Trash2 } from "lucide-react";
+import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog, ChevronsUpDown, Trash2, ClipboardList } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 
@@ -148,11 +149,13 @@ interface Props {
   pageIcon: React.ReactNode;
   testIdPrefix: string;
   apiBase?: string;
+  paymentsLogUrl?: string;
 }
 
-export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, testIdPrefix, apiBase = "/api/properties/rental" }: Props) {
+export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, testIdPrefix, apiBase = "/api/properties/rental", paymentsLogUrl }: Props) {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [openUnitId, setOpenUnitId] = useState<number | null>(null);
   const [createUnitOpen, setCreateUnitOpen] = useState(false);
   const [confirmDeleteUnitId, setConfirmDeleteUnitId] = useState<number | null>(null);
@@ -233,7 +236,13 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
               <p className="text-xs text-muted-foreground">Click any unit to manage payments, modify rent, post guarantee, or end the contract.</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {paymentsLogUrl && (
+              <Button variant="outline" size="sm" onClick={() => navigate(paymentsLogUrl)} data-testid={`button-${testIdPrefix}-payments-log`}>
+                <ClipboardList className="h-4 w-4 mr-1" />
+                Payments Log
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => runMonthly.mutate()} disabled={runMonthly.isPending} data-testid={`button-${testIdPrefix}-run-monthly`}>
               <RefreshCw className={`h-4 w-4 mr-1 ${runMonthly.isPending ? "animate-spin" : ""}`} />
               Run Monthly Update
