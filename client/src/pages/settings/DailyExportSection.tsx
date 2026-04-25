@@ -36,6 +36,9 @@ import {
   Info,
   MessageSquare,
   Send,
+  RefreshCw,
+  ShieldCheck,
+  ShieldAlert,
 } from "lucide-react";
 
 interface Recipient { id: number; email: string; active: boolean; created_at: string; }
@@ -43,6 +46,194 @@ interface ExportSettings { gmailUser: string; scheduleEnabled: boolean; lastRunA
 interface Company { id: number; name: string; code: string; }
 interface JobStep { time: string; message: string; type: "info" | "success" | "error" | "warning"; }
 interface JobStatus { status: "running" | "done" | "error"; steps: JobStep[]; error?: string; hasZip: boolean; }
+
+interface BackupRun {
+  id: number; runType: string; status: string;
+  startedAt: string; finishedAt?: string;
+  zipSizeBytes?: number; companiesCount?: number; companyFilesCount?: number;
+  skippedCompanies?: string; skippedReason?: string;
+  emailAttempted?: boolean; emailSuccess?: boolean; emailError?: string; emailAttempts?: number;
+  whatsappAttempted?: boolean; whatsappSuccess?: boolean; whatsappError?: string; whatsappAttempts?: number;
+}
+interface BackupReadiness {
+  emailScheduleEnabled: boolean; gmailConfigured: boolean; emailRecipientCount: number;
+  whatsappEnabled: boolean; whatsappDailyAutoSend: boolean;
+  whatsappDailyRecipientId: number | null; whatsappDailyRecipientActive: boolean;
+  companiesCount: number;
+}
+interface BackupStatus {
+  latestRun: BackupRun | null;
+  recentRuns: Pick<BackupRun, "id" | "runType" | "status" | "startedAt" | "finishedAt" | "zipSizeBytes">[];
+  readiness: BackupReadiness;
+  issues: string[];
+}
+
+function fmtBytes(bytes?: number): string {
+  if (!bytes) return "—";
+  const mb = bytes / 1024 / 1024;
+  return mb >= 1 ? `${mb.toFixed(1)} MB` : `${(bytes / 1024).toFixed(0)} KB`;
+}
+
+function fmtTime(iso?: string): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString();
+}
+
+function runTypeLabel(t: string): string {
+  switch (t) {
+    case "scheduled":         return "Scheduled";
+    case "manual_email":      return "Manual — Email";
+    case "manual_whatsapp":   return "Manual — WhatsApp";
+    case "manual_download":   return "Manual — Download";
+    default: return t;
+  }
+}
+
+function BackupStatusCard({ status, onRefresh, isRefreshing }: {
+  status: BackupStatus;
+  onRefresh: () => void;
+  isRefreshing: boolean;
+}) {
+  const run = status.latestRun;
+
+  const statusColor =
+    !run                         ? "text-muted-foreground" :
+    run.status === "success"     ? "text-green-600 dark:text-green-400" :
+    run.status === "skipped"     ? "text-amber-600 dark:text-amber-400" :
+    run.status === "partial_failed" ? "text-amber-600 dark:text-amber-400" :
+    run.status === "running"     ? "text-blue-600 dark:text-blue-400" :
+                                   "text-destructive";
+
+  const statusIcon =
+    !run || run.status === "running" ? <Loader2 className={`h-4 w-4 ${run ? "animate-spin text-blue-500" : ""}`} /> :
+    run.status === "success"         ? <ShieldCheck className="h-4 w-4 text-green-600" /> :
+    run.status === "skipped"         ? <Info className="h-4 w-4 text-amber-500" /> :
+    run.status === "partial_failed"  ? <AlertTriangle className="h-4 w-4 text-amber-500" /> :
+                                       <ShieldAlert className="h-4 w-4 text-destructive" />;
+
+  const statusText =
+    !run                            ? "No runs recorded yet" :
+    run.status === "success"        ? "Backup succeeded" :
+    run.status === "skipped"        ? "Skipped — both channels disabled" :
+    run.status === "partial_failed" ? "Partial success — one channel failed" :
+    run.status === "running"        ? "Backup in progress..." :
+                                      "Backup failed";
+
+  function ChannelRow({ label, attempted, success, error, attempts }: {
+    label: string; attempted?: boolean; success?: boolean; error?: string; attempts?: number;
+  }) {
+    if (!attempted) return (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Info className="h-3 w-3 shrink-0" />
+        <span>{label}: not attempted</span>
+      </div>
+    );
+    if (success) return (
+      <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
+        <CheckCircle2 className="h-3 w-3 shrink-0" />
+        <span>{label}: sent{attempts && attempts > 1 ? ` (attempt ${attempts})` : ""}</span>
+      </div>
+    );
+    return (
+      <div className="space-y-0.5">
+        <div className="flex items-center gap-2 text-xs text-destructive">
+          <XCircle className="h-3 w-3 shrink-0" />
+          <span>{label}: failed{attempts && attempts > 1 ? ` after ${attempts} attempt(s)` : ""}</span>
+        </div>
+        {error && <p className="text-xs text-muted-foreground pl-5 break-all">{error}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <Card data-testid="card-backup-status">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <CardTitle className="text-base flex items-center gap-2">
+            {statusIcon}
+            Backup Status
+          </CardTitle>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            data-testid="button-refresh-backup-status"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+        <CardDescription className={statusText.startsWith("No") ? "" : statusColor}>
+          {statusText}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {run && (
+          <>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+              <div className="text-muted-foreground">Type</div>
+              <div>{runTypeLabel(run.runType)}</div>
+              <div className="text-muted-foreground">Started</div>
+              <div>{fmtTime(run.startedAt)}</div>
+              {run.finishedAt && <>
+                <div className="text-muted-foreground">Finished</div>
+                <div>{fmtTime(run.finishedAt)}</div>
+              </>}
+              {run.zipSizeBytes && <>
+                <div className="text-muted-foreground">ZIP size</div>
+                <div>{fmtBytes(run.zipSizeBytes)}</div>
+              </>}
+              {run.companyFilesCount !== undefined && run.companyFilesCount !== null && <>
+                <div className="text-muted-foreground">Companies</div>
+                <div>{run.companyFilesCount}{run.skippedCompanies ? ` (${run.skippedCompanies.split(",").length} skipped)` : ""}</div>
+              </>}
+            </div>
+
+            <div className="space-y-2">
+              <ChannelRow
+                label="Email"
+                attempted={run.emailAttempted}
+                success={run.emailSuccess}
+                error={run.emailError}
+                attempts={run.emailAttempts}
+              />
+              <ChannelRow
+                label="WhatsApp"
+                attempted={run.whatsappAttempted}
+                success={run.whatsappSuccess}
+                error={run.whatsappError}
+                attempts={run.whatsappAttempts}
+              />
+            </div>
+
+            {(run.skippedReason) && (
+              <p className="text-xs text-muted-foreground">{run.skippedReason}</p>
+            )}
+          </>
+        )}
+
+        {status.issues.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" /> Configuration issues blocking automatic send:
+            </p>
+            <ul className="space-y-0.5">
+              {status.issues.map((issue, i) => (
+                <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                  <span className="shrink-0 mt-0.5">•</span>{issue}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {!run && status.issues.length === 0 && (
+          <p className="text-xs text-muted-foreground">No backup runs recorded yet. Run a backup to see status here.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function StepIcon({ type }: { type: JobStep["type"] }) {
   if (type === "success") return <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0 mt-0.5" />;
@@ -295,6 +486,11 @@ export function DailyExportSection() {
   });
   const waReady = !!(waSettings?.enabled && waSettings?.dailyRecipientId);
 
+  const { data: backupStatus, isFetching: backupFetching, refetch: refetchBackup } = useQuery<BackupStatus>({
+    queryKey: ["/api/export/backup-status"],
+    refetchInterval: 15000,
+  });
+
   const [sendingWa, setSendingWa] = useState(false);
   const sendViaWhatsApp = async () => {
     setSendingWa(true);
@@ -308,6 +504,7 @@ export function DailyExportSection() {
       toast({ variant: "destructive", title: "WhatsApp send failed", description: e.message });
     } finally {
       setSendingWa(false);
+      refetchBackup();
     }
   };
 
@@ -333,6 +530,15 @@ export function DailyExportSection() {
           Export all data — accounts, transactions, inventory, payroll, containers, production, and more — for every company. One Excel file per company, bundled in a zip.
         </p>
       </div>
+
+      {/* Backup Status */}
+      {backupStatus && (
+        <BackupStatusCard
+          status={backupStatus}
+          onRefresh={() => refetchBackup()}
+          isRefreshing={backupFetching}
+        />
+      )}
 
       {/* Companies overview */}
       <Card>
@@ -703,7 +909,7 @@ export function DailyExportSection() {
           jobId={activeJobId}
           mode={activeMode}
           open={progressOpen}
-          onClose={() => { setProgressOpen(false); setActiveJobId(""); }}
+          onClose={() => { setProgressOpen(false); setActiveJobId(""); refetchBackup(); }}
         />
       )}
     </div>

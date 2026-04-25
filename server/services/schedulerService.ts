@@ -8,6 +8,10 @@ import { generateNetPositionExcel } from "../helpers/generateNetPositionExcel";
 import { generateStockPdf } from "../helpers/generateStockPdf";
 import { storage } from "../storage";
 import { buildFullExportZip } from "../helpers/buildFullExportZip";
+import { retryAsync, isEmailConfigError, isWaConfigError } from "../helpers/retryAsync";
+import { createExportRun, updateExportRun, finishExportRun } from "../helpers/exportRunTracker";
+
+const WHATSAPP_ATTACHMENT_LIMIT_MB = 15;
 
 let schedulerStarted = false;
 
@@ -47,87 +51,156 @@ async function buildNetPositionZip(
   });
 }
 
-async function runDailyExport(retryCount = 0): Promise<void> {
-  const MAX_RETRIES = 3;
-  console.log(`[DailyExport] Starting daily export (attempt ${retryCount + 1}/${MAX_RETRIES + 1})...`);
+async function runDailyExport(): Promise<void> {
+  const cronFiredAt = new Date().toISOString();
+  console.log(`[DailyExport] 6 PM cron executed at ${cronFiredAt}`);
+
+  // ── Check what's enabled BEFORE any expensive work ──────────────────────
+  const emailEnabled  = await isScheduleEnabled();
+  const waSettings    = await getWaSettings();
+  const whatsappReady = !!(
+    waSettings?.enabled &&
+    waSettings?.dailyAutoSend &&
+    waSettings?.dailyRecipientId
+  );
+
+  console.log(`[DailyExport] Email enabled: ${emailEnabled} | WhatsApp ready: ${whatsappReady}`);
+
+  if (!emailEnabled && !whatsappReady) {
+    console.log("[DailyExport] Email schedule and WhatsApp daily auto-send are both disabled. Nothing to send.");
+    const rid = await createExportRun("scheduled");
+    await finishExportRun(rid, { status: "skipped", skippedReason: "Email schedule and WhatsApp daily auto-send are both disabled." });
+    return;
+  }
+
+  const runId = await createExportRun("scheduled");
+  console.log(`[DailyExport] Run id=${runId} started.`);
 
   try {
-    // ── Check what's enabled BEFORE any expensive work ──────────────────────
-    const emailEnabled = await isScheduleEnabled();
-    const waSettings   = await getWaSettings();
-    const whatsappReady = !!(
-      waSettings?.enabled &&
-      waSettings?.dailyAutoSend &&
-      waSettings?.dailyRecipientId
-    );
-
-    console.log(`[DailyExport] Email enabled: ${emailEnabled}`);
-    console.log(`[DailyExport] WhatsApp ready: ${whatsappReady}`);
-
-    if (!emailEnabled && !whatsappReady) {
-      console.log("[DailyExport] Email schedule and WhatsApp daily auto-send are both disabled. Nothing to send.");
-      return;
-    }
-
     const companies = await fetchAllCompanies();
     if (!companies || companies.length === 0) {
       console.log("[DailyExport] No companies found — skipping export.");
+      await finishExportRun(runId, { status: "failed", skippedReason: "No companies found." });
       return;
     }
 
     const today = getTodayLabel();
     console.log(`[DailyExport] Building full-history export for ${companies.length} company/companies (label: ${today})`);
 
-    // Build the ZIP once — shared by both email and WhatsApp paths below
     const { zip, names, skipped } = await buildFullExportZip(companies, undefined, undefined);
 
-    if (skipped.length > 0) {
-      console.warn(`[DailyExport] Skipped ${skipped.length} companies: ${skipped.join(", ")}`);
+    if (!names.length || !zip.length) {
+      console.error("[DailyExport] ZIP is empty — no companies exported successfully. Nothing will be sent.");
+      await finishExportRun(runId, {
+        status: "failed",
+        companiesCount: companies.length,
+        skippedReason: "Export ZIP is empty — no companies exported successfully.",
+      });
+      return;
     }
 
-    // ── Email path ──────────────────────────────────────────────────────────
+    const zipSizeBytes = zip.length;
+    const zipSizeMb    = (zipSizeBytes / 1024 / 1024).toFixed(1);
+    console.log(`[DailyExport] Run ${runId} — ZIP ready: ${zipSizeMb} MB, ${names.length} companies${skipped.length ? `, ${skipped.length} skipped: ${skipped.join(", ")}` : ""}`);
+
+    await updateExportRun(runId, {
+      companiesCount:    companies.length,
+      companyFilesCount: names.length,
+      zipSizeBytes,
+      skippedCompanies:  skipped.join(", ") || null,
+    });
+
+    // ── Email (retried up to 3×, 2 min between attempts) ───────────────────
+    let emailSuccess  = false;
+    let emailError: string | undefined;
+    let emailAttempts = 0;
+
     if (emailEnabled) {
-      const emailResult = await sendExportEmail(zip, today, names);
-      if (emailResult.success) {
-        console.log(`[DailyExport] Email sent successfully for ${names.length} companies.`);
+      await updateExportRun(runId, { emailAttempted: true });
+      console.log("[DailyExport] Sending email (up to 3 attempts, 2 min delay)...");
+
+      const emailRes = await retryAsync({
+        label:       "DailyExport/Email",
+        attempts:    3,
+        delayMs:     2 * 60 * 1000,
+        fn:          () => sendExportEmail(zip, today, names),
+        isSuccess:   r => r.success,
+        shouldRetry: r => !r.error || !isEmailConfigError(r.error),
+        onAttempt:   n => { emailAttempts = n; console.log(`[DailyExport] Email attempt ${n}/3...`); },
+      });
+
+      emailSuccess  = emailRes.result.success;
+      emailAttempts = emailRes.attempts;
+      emailError    = emailRes.result.error;
+
+      if (emailSuccess) {
+        console.log(`[DailyExport] Email sent successfully (attempt ${emailAttempts}).`);
         await pool.query(`UPDATE export_settings SET last_run_at = now() WHERE id = 1`).catch(() => {});
       } else {
-        console.error(`[DailyExport] Email failed: ${emailResult.error}`);
-        if (retryCount < MAX_RETRIES) {
-          console.log(`[DailyExport] Retrying email in 10 minutes...`);
-          // Schedule a retry for email only — do NOT return here so WhatsApp still
-          // runs on this first attempt (retries skip WhatsApp since it's already sent).
-          setTimeout(() => runDailyExport(retryCount + 1), 10 * 60 * 1000);
-        } else {
-          console.error(`[DailyExport] All ${MAX_RETRIES + 1} email attempts failed. Giving up until next scheduled run.`);
-        }
+        console.error(`[DailyExport] Email failed after ${emailAttempts} attempt(s): ${emailError}`);
       }
     } else {
       console.log("[DailyExport] Email schedule is disabled — skipping email.");
     }
 
-    // ── WhatsApp path (first attempt only — retries are email-only) ─────────
-    // WhatsApp is sent once alongside the first email attempt (or in place of it).
-    // Email retries (retryCount > 0) skip WhatsApp because it was already sent.
-    if (retryCount === 0) {
-      const waResult = await runDailyWhatsAppSend(zip, today, companies);
-      if (waResult.sent) {
-        console.log("[DailyExport] WhatsApp daily ZIP sent successfully.");
-      } else if (waResult.skipped) {
-        console.log(`[DailyExport] WhatsApp skipped: ${waResult.skipReason}.`);
+    // ── WhatsApp (retried up to 3×, 2 min between attempts) ────────────────
+    let waSuccess  = false;
+    let waError: string | undefined;
+    let waAttempts = 0;
+
+    if (whatsappReady) {
+      await updateExportRun(runId, { whatsappAttempted: true });
+      console.log("[DailyExport] Sending via WhatsApp (up to 3 attempts, 2 min delay)...");
+
+      const waRes = await retryAsync({
+        label:       "DailyExport/WhatsApp",
+        attempts:    3,
+        delayMs:     2 * 60 * 1000,
+        fn:          () => runDailyWhatsAppSend(zip, today, companies),
+        isSuccess:   r => r.sent,
+        shouldRetry: r => !r.skipped && (!r.error || !isWaConfigError(r.error)),
+        onAttempt:   n => { waAttempts = n; console.log(`[DailyExport] WhatsApp attempt ${n}/3...`); },
+      });
+
+      waSuccess  = waRes.result.sent;
+      waAttempts = waRes.attempts;
+      waError    = waRes.result.error || waRes.result.skipReason;
+
+      if (waSuccess) {
+        console.log(`[DailyExport] WhatsApp sent successfully (attempt ${waAttempts}).`);
+      } else if (waRes.result.skipped) {
+        console.log(`[DailyExport] WhatsApp skipped: ${waError}.`);
       } else {
-        console.error(`[DailyExport] WhatsApp send failed: ${waResult.error}`);
+        console.error(`[DailyExport] WhatsApp failed after ${waAttempts} attempt(s): ${waError}`);
       }
     } else {
-      console.log("[DailyExport] WhatsApp already sent on first attempt — skipping on email retry.");
+      console.log("[DailyExport] WhatsApp not ready — skipping WhatsApp send.");
     }
 
+    // ── Determine final run status ──────────────────────────────────────────
+    const bothSucceeded = (!emailEnabled || emailSuccess) && (!whatsappReady || waSuccess);
+    const atLeastOne    = (emailEnabled && emailSuccess) || (whatsappReady && waSuccess);
+    const finalStatus   = bothSucceeded ? "success" : atLeastOne ? "partial_failed" : "failed";
+
+    console.log(
+      `[DailyExport] Run ${runId} finished — status: ${finalStatus}` +
+      ` | email: ${emailEnabled ? (emailSuccess ? "ok" : "failed") : "n/a"}` +
+      ` | wa: ${whatsappReady ? (waSuccess ? "ok" : "failed") : "n/a"}`,
+    );
+
+    await finishExportRun(runId, {
+      status:           finalStatus,
+      emailSuccess,
+      emailError:       emailError ?? null,
+      emailAttempts,
+      whatsappSuccess:  waSuccess,
+      whatsappError:    waError ?? null,
+      whatsappAttempts: waAttempts,
+    });
+
   } catch (err: any) {
-    console.error(`[DailyExport] Unexpected error:`, err?.stack || err?.message || err);
-    if (retryCount < MAX_RETRIES) {
-      console.log(`[DailyExport] Retrying in 10 minutes...`);
-      setTimeout(() => runDailyExport(retryCount + 1), 10 * 60 * 1000);
-    }
+    console.error(`[DailyExport] Unexpected error in run ${runId}:`, err?.stack || err?.message || err);
+    await finishExportRun(runId, { status: "failed", skippedReason: err?.message || "Unexpected error" }).catch(() => {});
   }
 }
 
@@ -175,10 +248,18 @@ async function runDailyWhatsAppSend(
     return skip(`Daily export recipient id=${recipientId} not found or inactive`);
   }
 
+  // ZIP size check — WhatsApp has a lower attachment limit than email
+  const zipSizeMb = dailyZip.length / 1024 / 1024;
+  if (zipSizeMb > WHATSAPP_ATTACHMENT_LIMIT_MB) {
+    const msg = `ZIP is too large for WhatsApp. Size: ${zipSizeMb.toFixed(1)} MB (limit: ${WHATSAPP_ATTACHMENT_LIMIT_MB} MB).`;
+    console.error(`[WhatsApp] ${msg}`);
+    return { sent: false, skipped: false, error: msg };
+  }
+
   const chatId      = rRow.rows[0].chat_id as string;
   const zipFileName = `DailyExport_${dateLabel}.zip`;
   const zipCaption  = `Daily Company Export — ${dateLabel}\nAll companies included.`;
-  console.log(`[WhatsApp] Sending daily export ZIP to ${chatId}…`);
+  console.log(`[WhatsApp] Sending daily export ZIP (${zipSizeMb.toFixed(1)} MB) to ${chatId}…`);
 
   try {
     const zipRes = await sendWhatsAppFileToChatId(chatId, dailyZip, zipFileName, zipCaption, "application/zip");
@@ -483,37 +564,86 @@ export function startScheduler() {
 
 /** Manually trigger the daily ZIP → WhatsApp send (bypasses the dailyAutoSend schedule toggle).
  *  Pass fromDate / toDate (YYYY-MM-DD) to scope the export; omit for full history.
+ *  Retries up to 3 times (30 s between attempts) on actual send failures.
+ *  Records the attempt in daily_export_runs.
  *  Throws an Error with a human-readable message if WhatsApp is not configured or the send fails.
  */
 export async function triggerDailyWhatsAppSendNow(
   fromDate?: string,
   toDate?: string,
 ): Promise<{ message: string }> {
+  const runId = await createExportRun("manual_whatsapp");
+  console.log(`[ManualWhatsApp] Run id=${runId} started.`);
+
   const companies = await fetchAllCompanies();
   if (!companies || companies.length === 0) {
+    await finishExportRun(runId, { status: "failed", skippedReason: "No companies found." });
     throw new Error("No companies found.");
   }
 
   const today = getTodayLabel();
-  // buildFullExportZip throws if the ZIP would be empty — propagates to the route handler
-  const { zip, names, skipped } = await buildFullExportZip(companies, fromDate, toDate);
+  let zip: Buffer, names: string[], skipped: string[];
+  try {
+    ({ zip, names, skipped } = await buildFullExportZip(companies, fromDate, toDate));
+  } catch (err: any) {
+    await finishExportRun(runId, { status: "failed", skippedReason: err.message });
+    throw err;
+  }
+
+  await updateExportRun(runId, {
+    companiesCount:    companies.length,
+    companyFilesCount: names.length,
+    zipSizeBytes:      zip.length,
+    skippedCompanies:  skipped.join(", ") || null,
+    whatsappAttempted: true,
+  });
 
   const rangeLabel  = (fromDate || toDate) ? ` (${fromDate || "start"} → ${toDate || "today"})` : " (full history)";
   const skippedNote = skipped.length > 0 ? ` (${skipped.length} skipped)` : "";
 
-  const waResult = await runDailyWhatsAppSend(zip, today, companies, { bypassAutoSendCheck: true });
+  // Retry up to 3× with 30-second delays (manual trigger is interactive — shorter delay)
+  const waRes = await retryAsync({
+    label:       "ManualWhatsApp",
+    attempts:    3,
+    delayMs:     30 * 1000,
+    fn:          () => runDailyWhatsAppSend(zip, today, companies, { bypassAutoSendCheck: true }),
+    isSuccess:   r => r.sent,
+    shouldRetry: r => !r.skipped && (!r.error || !isWaConfigError(r.error)),
+    onAttempt:   n => console.log(`[ManualWhatsApp] Attempt ${n}/3...`),
+  });
 
-  if (waResult.skipped) {
+  const result = waRes.result;
+
+  if (result.skipped) {
+    await finishExportRun(runId, {
+      status:           "failed",
+      whatsappSuccess:  false,
+      whatsappError:    result.skipReason,
+      whatsappAttempts: waRes.attempts,
+    });
     throw new Error(
-      `WhatsApp not configured or not ready: ${waResult.skipReason}. ` +
+      `WhatsApp not configured or not ready: ${result.skipReason}. ` +
       `Please enable WhatsApp and select a Daily Export recipient in WhatsApp settings.`,
     );
   }
 
-  if (!waResult.sent) {
-    throw new Error(`WhatsApp send failed: ${waResult.error || "Unknown error"}`);
+  if (!result.sent) {
+    await finishExportRun(runId, {
+      status:           "failed",
+      whatsappSuccess:  false,
+      whatsappError:    result.error || "Unknown error",
+      whatsappAttempts: waRes.attempts,
+    });
+    throw new Error(`WhatsApp send failed after ${waRes.attempts} attempt(s): ${result.error || "Unknown error"}`);
   }
 
+  await finishExportRun(runId, {
+    status:           "success",
+    whatsappSuccess:  true,
+    whatsappAttempts: waRes.attempts,
+  });
+
+  console.log(`[ManualWhatsApp] Run ${runId} succeeded (attempt ${waRes.attempts}).`);
   return { message: `Daily ZIP sent to WhatsApp — ${names.length} companies${rangeLabel}${skippedNote}.` };
 }
 

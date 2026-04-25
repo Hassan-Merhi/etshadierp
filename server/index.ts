@@ -1594,6 +1594,30 @@ let migrationsDone = false;
     )`,
     `ALTER TABLE factory_bales ADD COLUMN IF NOT EXISTS import_batch_id INTEGER`,
 
+    // Daily export run tracking
+    `CREATE TABLE IF NOT EXISTS daily_export_runs (
+      id                  serial PRIMARY KEY,
+      run_type            text NOT NULL,
+      started_at          timestamp NOT NULL DEFAULT now(),
+      finished_at         timestamp,
+      status              text NOT NULL DEFAULT 'running',
+      zip_size_bytes      integer,
+      companies_count     integer,
+      company_files_count integer,
+      skipped_companies   text,
+      email_attempted     boolean DEFAULT false,
+      email_success       boolean DEFAULT false,
+      email_error         text,
+      email_attempts      integer DEFAULT 0,
+      whatsapp_attempted  boolean DEFAULT false,
+      whatsapp_success    boolean DEFAULT false,
+      whatsapp_error      text,
+      whatsapp_attempts   integer DEFAULT 0,
+      skipped_reason      text,
+      details             jsonb,
+      created_at          timestamp NOT NULL DEFAULT now()
+    )`,
+
     // ── Seed singleton config rows so the scheduler always finds them ─────────
     // export_settings (id=1): email credentials + schedule toggle
     `INSERT INTO export_settings (id, gmail_user, gmail_app_password, schedule_enabled)
