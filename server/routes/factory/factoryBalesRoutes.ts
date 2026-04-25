@@ -876,7 +876,10 @@ export function registerFactoryBalesRoutes(app: Express) {
 
       const { from, to } = req.query as { from?: string; to?: string };
 
-      const conditions: any[] = [eq(factoryBales.companyId, companyId)];
+      const conditions: any[] = [
+        eq(factoryBales.companyId, companyId),
+        not(inArray(factoryBales.status, ["DELETED", "REMOVED"])),
+      ];
       if (from) conditions.push(sql`COALESCE(${factoryBales.stockEntryDate}, ${factoryBales.createdAt}::date) >= ${from}::date`);
       if (to)   conditions.push(sql`COALESCE(${factoryBales.stockEntryDate}, ${factoryBales.createdAt}::date) <= ${to}::date`);
 
@@ -1404,7 +1407,11 @@ export function registerFactoryBalesRoutes(app: Express) {
 
       const { status, mixBatchId, pressingBatchId, locationId, productId } = req.query;
 
-      const conditions: any[] = [eq(factoryBales.companyId, companyId)];
+      const conditions: any[] = [
+        eq(factoryBales.companyId, companyId),
+        // Always exclude deleted/removed bales from the history view
+        not(inArray(factoryBales.status, ["DELETED", "REMOVED"])),
+      ];
 
       if (status) conditions.push(eq(factoryBales.status, status as string));
       if (mixBatchId) conditions.push(eq(factoryBales.mixBatchId, parseInt(mixBatchId as string)));
