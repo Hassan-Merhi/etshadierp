@@ -1,9 +1,21 @@
 import type { Express } from "express";
 import { requireAuth } from "../auth";
-import { screenFeedStore } from "../screenFeedStore";
+import { screenFeedStore, watcherPollStore } from "../screenFeedStore";
+
+// How long (ms) after a watcher's last GET we still consider the user "being watched"
+const WATCHER_TIMEOUT_MS = 5000;
 
 export function registerScreenFeedRoutes(app: Express) {
-  // POST: watched user uploads their screenshot frame + recent clicks (fire-and-forget)
+  // GET: watched user asks "is anyone watching me right now?"
+  // Must be registered BEFORE /:userId to avoid route conflict.
+  app.get("/api/screen-feed/being-watched", requireAuth, (req, res) => {
+    const userId   = req.user!.id;
+    const lastPoll = watcherPollStore.get(userId) ?? 0;
+    const watched  = (Date.now() - lastPoll) < WATCHER_TIMEOUT_MS;
+    res.json({ watched });
+  });
+
+  // POST: watched user uploads their screenshot frame + recent clicks
   app.post("/api/screen-feed", requireAuth, (req, res) => {
     const { dataUrl, clicks } = req.body ?? {};
     if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
@@ -11,26 +23,31 @@ export function registerScreenFeedRoutes(app: Express) {
     }
     const userId   = req.user!.id;
     const username = req.user!.username;
-    // Keep only clicks from the last 8 seconds and cap at 50
-    const now = Date.now();
+    const now      = Date.now();
     const safeClicks = Array.isArray(clicks)
-      ? clicks.filter((c: any) => c && typeof c.x === "number" && typeof c.y === "number" && (now - c.ts) < 8000).slice(-50)
+      ? clicks
+          .filter((c: any) => c && typeof c.x === "number" && typeof c.y === "number" && (now - c.ts) < 8000)
+          .slice(-50)
       : [];
     screenFeedStore.set(userId, { dataUrl, capturedAt: new Date(), userId, username, clicks: safeClicks });
     res.status(204).end();
   });
 
-  // GET: admin fetches latest frame + clicks for a specific user
+  // GET: Developer polls the latest frame + clicks for a specific watched user.
+  // Recording this poll is what signals "a watcher is active".
   app.get("/api/screen-feed/:userId", requireAuth, (req, res) => {
     const role = req.session.currentRole;
     if (role !== "Developer") {
       return res.status(403).json({ message: "Access denied." });
     }
+    // Record that someone is watching this user right now
+    watcherPollStore.set(req.params.userId, Date.now());
+
     const frame = screenFeedStore.get(req.params.userId);
     if (!frame) return res.json(null);
     res.json({
       dataUrl:    frame.dataUrl,
-      capturedAt: frame.capturedAt,
+      capturedAt: frame.capturedAt.toISOString(),
       username:   frame.username,
       clicks:     frame.clicks,
     });

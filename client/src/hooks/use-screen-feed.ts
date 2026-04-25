@@ -1,7 +1,11 @@
 import { useEffect, useRef } from "react";
 import html2canvas from "html2canvas";
 
+// How often to check if a Developer is watching us (cheap GET, no canvas)
+const POLL_INTERVAL_MS    = 3000;
+// How often to capture + upload a frame while being watched
 const CAPTURE_INTERVAL_MS = 2000;
+// Max time to wait for html2canvas before giving up
 const CAPTURE_TIMEOUT_MS  = 8000;
 const CLICK_RETAIN_MS     = 8000;
 
@@ -37,59 +41,103 @@ if (typeof window !== "undefined") {
   }, { capture: true });
 }
 
+async function captureAndUpload() {
+  try {
+    const canvas = await Promise.race([
+      html2canvas(document.body, {
+        scale:                  0.35,
+        useCORS:                true,
+        logging:                false,
+        allowTaint:             true,
+        foreignObjectRendering: true,
+        x:           window.scrollX,
+        y:           window.scrollY,
+        width:       window.innerWidth,
+        height:      window.innerHeight,
+        scrollX:    -window.scrollX,
+        scrollY:    -window.scrollY,
+        windowWidth:  window.innerWidth,
+        windowHeight: window.innerHeight,
+        imageTimeout: 500,
+        ignoreElements: (el) =>
+          el.getAttribute("data-screenfeed-ignore") === "true",
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), CAPTURE_TIMEOUT_MS)
+      ),
+    ]);
+
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.45);
+    const cutoff  = Date.now() - CLICK_RETAIN_MS;
+    const clicks  = clickBuffer.filter(c => c.ts >= cutoff);
+
+    fetch("/api/screen-feed", {
+      method:      "POST",
+      headers:     { "Content-Type": "application/json" },
+      credentials: "include",
+      body:        JSON.stringify({ dataUrl, clicks }),
+    }).catch(() => {});
+  } catch {
+    // html2canvas timed out or failed — silently skip
+  }
+}
+
 export function useScreenFeed() {
-  const busyRef = useRef(false);
+  const busyRef    = useRef(false);
+  const watchedRef = useRef(false);
+  const captureRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    const capture = async () => {
-      if (busyRef.current) return;
-      busyRef.current = true;
-      try {
-        // Capture only the visible viewport using SVG-based rendering (much faster)
-        const canvas = await Promise.race([
-          html2canvas(document.body, {
-            scale:                 0.35,   // lower scale = faster + smaller payload
-            useCORS:               true,
-            logging:               false,
-            allowTaint:            true,
-            foreignObjectRendering: true,  // SVG path: dramatically faster for complex UIs
-            x:           window.scrollX,
-            y:           window.scrollY,
-            width:       window.innerWidth,
-            height:      window.innerHeight,
-            scrollX:    -window.scrollX,
-            scrollY:    -window.scrollY,
-            windowWidth:  window.innerWidth,
-            windowHeight: window.innerHeight,
-            imageTimeout: 500,            // don't wait long for images
-            ignoreElements: (el) =>
-              el.getAttribute("data-screenfeed-ignore") === "true",
-          }),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("timeout")), CAPTURE_TIMEOUT_MS)
-          ),
-        ]);
+    const startCapturing = () => {
+      if (captureRef.current) return; // already running
+      // Capture immediately, then on interval
+      if (!busyRef.current) {
+        busyRef.current = true;
+        captureAndUpload().finally(() => { busyRef.current = false; });
+      }
+      captureRef.current = setInterval(async () => {
+        if (busyRef.current) return;
+        busyRef.current = true;
+        await captureAndUpload().finally(() => { busyRef.current = false; });
+      }, CAPTURE_INTERVAL_MS);
+    };
 
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.45);
-        const cutoff  = Date.now() - CLICK_RETAIN_MS;
-        const clicks  = clickBuffer.filter(c => c.ts >= cutoff);
-
-        fetch("/api/screen-feed", {
-          method:      "POST",
-          headers:     { "Content-Type": "application/json" },
-          credentials: "include",
-          body:        JSON.stringify({ dataUrl, clicks }),
-        }).catch(() => {});
-      } catch {
-        // Capture failed or timed out — reset and retry next interval
-      } finally {
-        busyRef.current = false;
+    const stopCapturing = () => {
+      if (captureRef.current) {
+        clearInterval(captureRef.current);
+        captureRef.current = null;
       }
     };
 
-    // Delay the first capture by 2 seconds to let the page fully settle
-    const firstTimer = setTimeout(capture, 2000);
-    const id = setInterval(capture, CAPTURE_INTERVAL_MS);
-    return () => { clearTimeout(firstTimer); clearInterval(id); };
+    const pollWatcherStatus = async () => {
+      try {
+        const res  = await fetch("/api/screen-feed/being-watched", { credentials: "include" });
+        const data = await res.json();
+        const nowWatched = Boolean(data?.watched);
+
+        if (nowWatched && !watchedRef.current) {
+          watchedRef.current = true;
+          startCapturing();
+        } else if (!nowWatched && watchedRef.current) {
+          watchedRef.current = false;
+          stopCapturing();
+        }
+      } catch {
+        // Network error — stop capturing if was running
+        if (watchedRef.current) {
+          watchedRef.current = false;
+          stopCapturing();
+        }
+      }
+    };
+
+    // Check immediately, then every POLL_INTERVAL_MS
+    pollWatcherStatus();
+    const pollId = setInterval(pollWatcherStatus, POLL_INTERVAL_MS);
+
+    return () => {
+      clearInterval(pollId);
+      stopCapturing();
+    };
   }, []);
 }
