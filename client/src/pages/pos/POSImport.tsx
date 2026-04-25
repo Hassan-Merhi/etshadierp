@@ -84,7 +84,7 @@ export default function POSImport() {
   });
 
   const { data: customers = [] } = useQuery<Customer[]>({
-    queryKey: ["/api/customers"],
+    queryKey: ["/api/customers/for-pos"],
     enabled: isCreditSale,
   });
 
@@ -227,6 +227,7 @@ export default function POSImport() {
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/for-pos"] });
       
       const location = locations.find(l => l.id === parseInt(selectedLocation));
       const customer = customers.find(c => c.id === parseInt(selectedCustomer));

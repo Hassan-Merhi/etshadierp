@@ -24,6 +24,20 @@ import { format } from "date-fns";
 import { z } from "zod";
 
 export function registerCustomerRoutes(app: Express) {
+  // Lean endpoint for POS credit-sale customer picker — id + legalName only.
+  // Must be registered before /api/customers to avoid route shadowing.
+  app.get("/api/customers/for-pos", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const list = await storage.getAllCustomers(req.session.currentCompanyId);
+      res.json(list.map((c: any) => ({ id: c.id, legalName: c.legalName })));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/customers", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
