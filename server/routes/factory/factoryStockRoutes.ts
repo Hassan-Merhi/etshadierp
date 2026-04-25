@@ -1139,6 +1139,85 @@ export function registerFactoryStockRoutes(app: Express) {
       baleSheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: baleCols.length } };
       baleSheet.views = [{ state: "frozen", ySplit: 1 }];
 
+      // Sheet 4: Garbage & Wiper Bale Details (with reference numbers)
+      const HEADER_ORANGE = "FF7B3F00";
+      const ROW_WG_DETAIL_ALT = "FFFFF8F0";
+
+      const garbageBales = sortedBales.filter(b => {
+        const pid = b.productId ?? 0;
+        const cat = productCategoryNameMap.get(pid) || b.category || "";
+        return isWiperOrGarbage(cat);
+      });
+
+      const garbageDetailSheet = workbook.addWorksheet("Garbage & Wiper Details");
+      const garbageBaleCols: any[] = [
+        { header: "Bale Ref #", key: "referenceNumber", width: 24 },
+        { header: "Bale Code", key: "baleCode", width: 18 },
+        { header: "Article Code", key: "articleCode", width: 18 },
+        { header: "Product Name", key: "productName", width: 38 },
+        { header: "Category", key: "category", width: 22 },
+        { header: "Grade", key: "grade", width: 12 },
+        { header: "Weight (kg)", key: "weightKg", width: 14 },
+      ];
+      if (includeCost) {
+        garbageBaleCols.push({ header: "Cost/kg", key: "costPerKg", width: 14 });
+        garbageBaleCols.push({ header: "Total Cost", key: "totalCost", width: 14 });
+      }
+      garbageDetailSheet.columns = garbageBaleCols;
+      styleHeaderRow(garbageDetailSheet.getRow(1), HEADER_ORANGE);
+
+      let gbTotalKg = 0;
+      garbageBales.forEach((b, idx) => {
+        const pid = b.productId ?? 0;
+        const w = parseFloat(String(b.weightKg || "0"));
+        gbTotalKg += w;
+        const rd: any = {
+          referenceNumber: b.referenceNumber,
+          baleCode: b.baleCode || "",
+          articleCode: b.articleCode || "",
+          productName: b.productName || "",
+          category: productCategoryNameMap.get(pid) || b.category || "",
+          grade: (b as any).grade || "",
+          weightKg: w,
+        };
+        if (includeCost) {
+          rd.costPerKg = parseFloat(String(b.costPerKg || "0"));
+          rd.totalCost = parseFloat(String(b.totalCost || "0"));
+        }
+        const exRow = garbageDetailSheet.addRow(rd);
+        applyDataRow(exRow, idx % 2 === 1, ROW_WG_DETAIL_ALT);
+        exRow.getCell("weightKg").numFmt = NUM_FMT;
+        if (includeCost) { exRow.getCell("costPerKg").numFmt = NUM_FMT; exRow.getCell("totalCost").numFmt = NUM_FMT; }
+      });
+
+      // Totals row for garbage sheet
+      if (garbageBales.length > 0) {
+        garbageDetailSheet.addRow({});
+        const gtd: any = {
+          referenceNumber: "",
+          baleCode: "",
+          articleCode: "",
+          productName: `TOTAL — ${garbageBales.length} bales`,
+          category: "",
+          grade: "",
+          weightKg: parseFloat(gbTotalKg.toFixed(2)),
+        };
+        if (includeCost) {
+          gtd.costPerKg = "";
+          gtd.totalCost = parseFloat(garbageBales.reduce((s, b) => s + parseFloat(String(b.totalCost || "0")), 0).toFixed(2));
+        }
+        const gtr = garbageDetailSheet.addRow(gtd);
+        gtr.font = { bold: true };
+        gtr.eachCell({ includeEmpty: false }, (cell: any) => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TOTAL_BG } };
+        });
+        gtr.getCell("weightKg").numFmt = NUM_FMT;
+        if (includeCost) gtr.getCell("totalCost").numFmt = NUM_FMT;
+      }
+
+      garbageDetailSheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: garbageBaleCols.length } };
+      garbageDetailSheet.views = [{ state: "frozen", ySplit: 1 }];
+
       const dateStr = getClientDate(req);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="inventory_location_${locationId}_${dateStr}.xlsx"`);
@@ -1406,6 +1485,89 @@ export function registerFactoryStockRoutes(app: Express) {
 
       baleSheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: baleCols.length } };
       baleSheet.views = [{ state: "frozen", ySplit: 1 }];
+
+      // Sheet 4: Garbage & Wiper Bale Details (individual ref numbers)
+      const HEADER_ORANGE_ALL = "FF7B3F00";
+      const ROW_WG_DETAIL_ALT_ALL = "FFFFF8F0";
+      const TOTAL_BG_ALL = "FFE8F0FE";
+
+      const garbageBalesAll = bales.filter(b => {
+        const pid = b.productId ?? 0;
+        const cat = productCategoryNameMap.get(pid) || b.category || "";
+        return isWiperOrGarbage(cat);
+      });
+
+      const garbageDetailSheetAll = workbook.addWorksheet("Garbage & Wiper Details");
+      const garbageBaleColsAll: any[] = [
+        { header: "Location", key: "locationName", width: 22 },
+        { header: "Bale Ref #", key: "referenceNumber", width: 24 },
+        { header: "Bale Code", key: "baleCode", width: 18 },
+        { header: "Article Code", key: "articleCode", width: 18 },
+        { header: "Product Name", key: "productName", width: 38 },
+        { header: "Category", key: "category", width: 22 },
+        { header: "Grade", key: "grade", width: 12 },
+        { header: "Weight (kg)", key: "weightKg", width: 14 },
+      ];
+      if (includeCost) {
+        garbageBaleColsAll.push({ header: "Cost/kg", key: "costPerKg", width: 14 });
+        garbageBaleColsAll.push({ header: "Total Cost", key: "totalCost", width: 14 });
+      }
+      garbageDetailSheetAll.columns = garbageBaleColsAll;
+      styleHeaderRow(garbageDetailSheetAll.getRow(1), HEADER_ORANGE_ALL);
+
+      let gbTotalKgAll = 0;
+      garbageBalesAll.forEach((b, idx) => {
+        const locId = b.erpLocationId ?? 0;
+        const pid   = b.productId ?? 0;
+        const w = parseFloat(String(b.weightKg || "0"));
+        gbTotalKgAll += w;
+        const rd: any = {
+          locationName: locationMap.get(locId) || `Location #${locId}`,
+          referenceNumber: b.referenceNumber,
+          baleCode: b.baleCode || "",
+          articleCode: b.articleCode || "",
+          productName: b.productName || "",
+          category: productCategoryNameMap.get(pid) || b.category || "",
+          grade: (b as any).grade || "",
+          weightKg: w,
+        };
+        if (includeCost) {
+          rd.costPerKg = parseFloat(String(b.costPerKg || "0"));
+          rd.totalCost = parseFloat(String(b.totalCost || "0"));
+        }
+        const exRow = garbageDetailSheetAll.addRow(rd);
+        applyDataRow(exRow, idx % 2 === 1, ROW_WG_DETAIL_ALT_ALL);
+        exRow.getCell("weightKg").numFmt = NUM_FMT;
+        if (includeCost) { exRow.getCell("costPerKg").numFmt = NUM_FMT; exRow.getCell("totalCost").numFmt = NUM_FMT; }
+      });
+
+      if (garbageBalesAll.length > 0) {
+        garbageDetailSheetAll.addRow({});
+        const gtd: any = {
+          locationName: "GRAND TOTAL",
+          referenceNumber: "",
+          baleCode: "",
+          articleCode: "",
+          productName: `${garbageBalesAll.length} garbage/wiper bales`,
+          category: "",
+          grade: "",
+          weightKg: parseFloat(gbTotalKgAll.toFixed(2)),
+        };
+        if (includeCost) {
+          gtd.costPerKg = "";
+          gtd.totalCost = parseFloat(garbageBalesAll.reduce((s, b) => s + parseFloat(String(b.totalCost || "0")), 0).toFixed(2));
+        }
+        const gtr = garbageDetailSheetAll.addRow(gtd);
+        gtr.font = { bold: true };
+        gtr.eachCell({ includeEmpty: false }, (cell: any) => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TOTAL_BG_ALL } };
+        });
+        gtr.getCell("weightKg").numFmt = NUM_FMT;
+        if (includeCost) gtr.getCell("totalCost").numFmt = NUM_FMT;
+      }
+
+      garbageDetailSheetAll.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: garbageBaleColsAll.length } };
+      garbageDetailSheetAll.views = [{ state: "frozen", ySplit: 1 }];
 
       const dateStr = getClientDate(req);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
