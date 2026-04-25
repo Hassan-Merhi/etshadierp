@@ -42,6 +42,7 @@ import {
   factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
   factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
   factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+  factoryBaleImportBatches,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -2314,15 +2315,27 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { bales } = req.body;
+      const { bales, fileName } = req.body;
       if (!Array.isArray(bales) || bales.length === 0) {
         return res.status(400).json({ message: "No bales provided" });
       }
+
+      // Create import batch record upfront
+      const [batch] = await db.insert(factoryBaleImportBatches).values({
+        companyId,
+        fileName: fileName || "unknown.xlsx",
+        baleCount: 0,
+        errorCount: 0,
+        totalWeightKg: "0",
+        importedByUserId: String(req.session?.userId || ""),
+        importedByName: req.session?.userName || req.session?.username || null,
+      }).returning();
 
       const maxRef = await db.select({ maxRef: sql`MAX(CAST(SUBSTRING(reference_number FROM 4) AS INTEGER))` }).from(factoryBales).where(eq(factoryBales.companyId, companyId));
       let nextRef = Math.max((maxRef[0]?.maxRef || 0) + 1, 100876);
 
       let imported = 0;
+      let totalWeightKg = 0;
       const errors: string[] = [];
 
       for (let i = 0; i < bales.length; i++) {
@@ -2360,13 +2373,20 @@ export function registerFactoryBalesRoutes(app: Express) {
             totalCost,
             status,
             finalizedAt: status === "IN_STOCK" ? new Date() : null,
+            importBatchId: batch.id,
           });
           imported++;
+          totalWeightKg += weight;
           nextRef++;
         } catch (err: any) {
           errors.push(`Row ${i + 1}: ${err.message}`);
         }
       }
+
+      // Update batch record with final counts
+      await db.update(factoryBaleImportBatches)
+        .set({ baleCount: imported, errorCount: errors.length, totalWeightKg: totalWeightKg.toFixed(3) })
+        .where(eq(factoryBaleImportBatches.id, batch.id));
 
       // Sync the sequence table so future stock entries don't collide with imported refs
       const [existingSeq] = await db
@@ -2388,9 +2408,48 @@ export function registerFactoryBalesRoutes(app: Express) {
         });
       }
 
-      res.json({ imported, errors });
+      res.json({ imported, errors, batchId: batch.id });
     } catch (error: any) {
       console.error("Error importing bales:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Bale Import Batches – list ─────────────────────────────────────────────
+  app.get("/api/factory/bale-import-batches", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const batches = await db.select()
+        .from(factoryBaleImportBatches)
+        .where(eq(factoryBaleImportBatches.companyId, companyId))
+        .orderBy(desc(factoryBaleImportBatches.createdAt));
+
+      res.json(batches);
+    } catch (error: any) {
+      console.error("Error fetching bale import batches:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Bale Import Batches – bales in a batch ────────────────────────────────
+  app.get("/api/factory/bale-import-batches/:id/bales", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const batchId = parseInt(req.params.id);
+      if (isNaN(batchId)) return res.status(400).json({ message: "Invalid batch id" });
+
+      const bales = await db.select()
+        .from(factoryBales)
+        .where(and(eq(factoryBales.companyId, companyId), eq(factoryBales.importBatchId, batchId)))
+        .orderBy(asc(factoryBales.referenceNumber));
+
+      res.json(bales);
+    } catch (error: any) {
+      console.error("Error fetching bales for batch:", error);
       res.status(500).json({ message: error.message });
     }
   });

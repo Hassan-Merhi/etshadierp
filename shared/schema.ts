@@ -2774,6 +2774,7 @@ export const factoryBales = pgTable("factory_bales", {
   finalizedAt: timestamp("finalized_at"),
   finalizedBy: integer("finalized_by"),
   stockEntryDate: date("stock_entry_date"),
+  importBatchId: integer("import_batch_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
@@ -2822,6 +2823,27 @@ export const factoryBaleSequences = pgTable("factory_bale_sequences", {
 }));
 
 export type FactoryBaleSequence = typeof factoryBaleSequences.$inferSelect;
+
+export const factoryBaleImportBatches = pgTable("factory_bale_import_batches", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  fileName: text("file_name").notNull(),
+  baleCount: integer("bale_count").notNull().default(0),
+  errorCount: integer("error_count").notNull().default(0),
+  totalWeightKg: decimal("total_weight_kg", { precision: 15, scale: 3 }).notNull().default("0"),
+  importedByUserId: varchar("imported_by_user_id", { length: 100 }),
+  importedByName: text("imported_by_name"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertFactoryBaleImportBatchSchema = createInsertSchema(factoryBaleImportBatches).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFactoryBaleImportBatch = z.infer<typeof insertFactoryBaleImportBatchSchema>;
+export type FactoryBaleImportBatch = typeof factoryBaleImportBatches.$inferSelect;
 
 export const factoryContainerCommissions = pgTable("factory_container_commissions", {
   id: serial("id").primaryKey(),

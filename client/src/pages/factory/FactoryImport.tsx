@@ -417,6 +417,7 @@ function BaleImport() {
   const [rows, setRows] = useState<BaleRow[]>([{ ...EMPTY_BALE }]);
   const [csvData, setCsvData] = useState<BaleRow[]>([]);
   const [result, setResult] = useState<{ imported: number; errors: string[] } | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string>("import.xlsx");
   const { toast } = useToast();
 
   const { data: baleProducts } = useQuery<FactoryBaleProduct[]>({
@@ -432,7 +433,7 @@ function BaleImport() {
 
   const importMutation = useMutation({
     mutationFn: async (bales: BaleRow[]) => {
-      const res = await factoryApiRequest("POST", "/api/factory/import/bales", { bales });
+      const res = await factoryApiRequest("POST", "/api/factory/import/bales", { bales, fileName: uploadedFileName });
       return res.json();
     },
     onSuccess: (data) => {
@@ -449,6 +450,7 @@ function BaleImport() {
     const file = e.target.files?.[0];
     if (!file) return;
     const ext = file.name.split(".").pop()?.toLowerCase();
+    setUploadedFileName(file.name);
 
     if (ext === "csv" || ext === "txt") {
       Papa.parse(file, {
