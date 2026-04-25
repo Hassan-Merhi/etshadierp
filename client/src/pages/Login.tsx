@@ -9,7 +9,6 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/components/ThemeProvider";
 import hmdLogo from "../assets/hmd-logo.jpeg";
 
-/* ── Feature list ───────────────────────────────────────── */
 const features = [
   { icon: Boxes,        title: "Inventory Management",  description: "Real-time stock tracking across all locations" },
   { icon: ShoppingCart, title: "Point of Sale",          description: "Fast, reliable checkout for every team" },
@@ -17,11 +16,23 @@ const features = [
   { icon: BarChart3,    title: "Business Analytics",     description: "Live reports to drive smarter decisions" },
 ];
 
-/* ── Theme tokens ───────────────────────────────────────── */
 const tk = {
   light: {
-    panelBg:     "linear-gradient(150deg, hsl(222 72% 10%) 0%, hsl(221 68% 15%) 55%, hsl(218 62% 21%) 100%)",
+    /* left navy panel */
+    leftBg:      "linear-gradient(150deg, hsl(222 72% 10%) 0%, hsl(221 68% 15%) 55%, hsl(218 62% 21%) 100%)",
+    /* right — soft tinted, NOT white */
+    rightBg:     "linear-gradient(145deg, hsl(210 45% 94%) 0%, hsl(196 35% 95%) 45%, hsl(200 25% 97%) 100%)",
+    /* bridge: left-edge glow bleeding into the right panel */
+    bridge:      "linear-gradient(to right, hsl(221 68% 20% / 0.35) 0%, transparent 100%)",
+    /* cyan glow behind card */
+    cardGlow:    "radial-gradient(ellipse 60% 50% at 50% 50%, hsl(185 80% 68% / 0.12) 0%, transparent 70%)",
+    /* card glass */
+    cardBg:      "rgba(255,255,255,0.72)",
+    cardBorder:  "rgba(185,215,230,0.55)",
+    cardShadow:  "0 8px 40px rgba(20,60,120,0.10), 0 1px 4px rgba(20,60,120,0.06)",
+    /* blobs */
     blob:        "hsl(185 85% 55%)",
+    /* text */
     headline:    "hsl(185 80% 70%)",
     body:        "hsl(220 18% 65%)",
     fTitle:      "hsl(185 60% 84%)",
@@ -31,12 +42,21 @@ const tk = {
     iconColor:   "hsl(185 80% 68%)",
     footer:      "hsl(220 14% 32%)",
     stripe:      "linear-gradient(90deg, hsl(222 72% 18%) 0%, hsl(185 80% 48%) 100%)",
-    brandLabel:  "hsl(200 70% 36%)",
+    brandLabel:  "hsl(200 65% 38%)",
     btnBg:       "linear-gradient(135deg, hsl(221 68% 22%) 0%, hsl(210 65% 32%) 100%)",
     btnShadow:   "0 4px 18px rgba(15,40,100,0.26)",
+    /* mobile logo: on light tinted bg, show normally */
+    mobileLogoFilter: "none",
   },
   dark: {
-    panelBg:     "linear-gradient(150deg, hsl(222 72% 6%) 0%, hsl(221 68% 10%) 55%, hsl(218 62% 14%) 100%)",
+    leftBg:      "linear-gradient(150deg, hsl(222 72% 6%) 0%, hsl(221 68% 10%) 55%, hsl(218 62% 14%) 100%)",
+    /* right dark: slightly lighter navy, distinct but harmonious */
+    rightBg:     "linear-gradient(145deg, hsl(220 50% 9%) 0%, hsl(217 44% 11%) 50%, hsl(215 38% 13%) 100%)",
+    bridge:      "linear-gradient(to right, hsl(185 72% 40% / 0.10) 0%, transparent 100%)",
+    cardGlow:    "radial-gradient(ellipse 60% 50% at 50% 50%, hsl(185 70% 55% / 0.07) 0%, transparent 70%)",
+    cardBg:      "rgba(255,255,255,0.04)",
+    cardBorder:  "rgba(100,160,185,0.14)",
+    cardShadow:  "0 8px 40px rgba(0,0,0,0.35), 0 1px 4px rgba(0,0,0,0.25)",
     blob:        "hsl(185 75% 45%)",
     headline:    "hsl(185 72% 62%)",
     body:        "hsl(220 14% 48%)",
@@ -50,17 +70,19 @@ const tk = {
     brandLabel:  "hsl(185 60% 50%)",
     btnBg:       "linear-gradient(135deg, hsl(221 68% 16%) 0%, hsl(210 62% 24%) 100%)",
     btnShadow:   "0 4px 18px rgba(8,20,55,0.45)",
+    mobileLogoFilter: "brightness(1.15)",
   },
 };
 
 export default function Login() {
-  const { toast }                         = useToast();
-  const { theme }                         = useTheme();
-  const [username, setUsername]           = useState("");
-  const [password, setPassword]           = useState("");
-  const [showPassword, setShowPassword]   = useState(false);
+  const { toast }                       = useToast();
+  const { theme }                       = useTheme();
+  const [username, setUsername]         = useState("");
+  const [password, setPassword]         = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const t = tk[theme as "light" | "dark"] ?? tk.light;
+  const isLight = (theme as string) !== "dark";
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: { username: string; password: string }) => {
@@ -84,15 +106,17 @@ export default function Login() {
   };
 
   return (
-    /* h-screen + overflow-hidden on desktop → no vertical scroll */
-    <div className="flex flex-col lg:flex-row lg:h-screen lg:overflow-hidden bg-background">
+    <div
+      className="flex flex-col lg:flex-row lg:h-screen lg:overflow-hidden"
+      style={{ background: t.rightBg, transition: "background 0.4s ease" }}
+    >
 
-      {/* ════════════════════════════════════════
+      {/* ═══════════════════════════════════════
           LEFT — Branding panel (desktop only)
-      ════════════════════════════════════════ */}
+      ═══════════════════════════════════════ */}
       <div
         className="hidden lg:flex lg:w-[48%] shrink-0 flex-col justify-between px-12 py-10 relative overflow-hidden"
-        style={{ background: t.panelBg, transition: "background 0.4s ease" }}
+        style={{ background: t.leftBg, transition: "background 0.4s ease" }}
       >
         {/* Teal glow blobs */}
         <div className="pointer-events-none absolute -top-24 -right-24 w-96 h-96 rounded-full opacity-[0.09]"
@@ -100,17 +124,27 @@ export default function Login() {
         <div className="pointer-events-none absolute -bottom-16 -left-12 w-72 h-72 rounded-full opacity-[0.07]"
           style={{ background: t.blob, filter: "blur(4px)", transition: "background 0.4s ease" }} />
 
-        {/* ── Logo: mix-blend-mode:screen makes purple bg invisible on navy ── */}
-        <div className="relative z-10">
-          <img
-            src={hmdLogo}
-            alt="HMD International Group"
-            className="w-44 h-auto object-contain rounded-xl"
-            style={{ mixBlendMode: "screen" }}
-          />
+        {/* Logo — glass container so the purple jpg bg feels intentional */}
+        <div className="relative z-10 w-fit">
+          <div
+            className="rounded-2xl p-2 overflow-hidden"
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(100,180,200,0.18)",
+              boxShadow: "0 2px 16px rgba(0,0,0,0.30)",
+              backdropFilter: "blur(6px)",
+            }}
+          >
+            <img
+              src={hmdLogo}
+              alt="HMD International Group"
+              className="w-40 h-auto object-contain rounded-xl"
+              style={{ mixBlendMode: "screen" }}
+            />
+          </div>
         </div>
 
-        {/* ── Headline + feature list ── */}
+        {/* Headline + features */}
         <div className="relative z-10 space-y-7">
           <div className="space-y-3">
             <h2
@@ -127,7 +161,6 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Feature rows */}
           <div className="space-y-3.5">
             {features.map((f) => (
               <div key={f.title} className="flex items-center gap-3">
@@ -155,44 +188,71 @@ export default function Login() {
         </p>
       </div>
 
-      {/* ════════════════════════════════════════
-          RIGHT — Form panel
-      ════════════════════════════════════════ */}
+      {/* ═══════════════════════════════════════
+          RIGHT — Form panel (glass/tinted)
+      ═══════════════════════════════════════ */}
       <div className="flex flex-1 flex-col lg:overflow-y-auto relative">
 
-        {/* Gradient accent stripe at top */}
+        {/* Bridge: left-edge glow bleeding from the navy */}
+        <div
+          className="hidden lg:block pointer-events-none absolute top-0 left-0 bottom-0 w-32 z-0"
+          style={{ background: t.bridge, transition: "background 0.4s ease" }}
+        />
+
+        {/* Soft cyan radial glow centred behind the card */}
+        <div
+          className="pointer-events-none absolute inset-0 z-0"
+          style={{ background: t.cardGlow, transition: "background 0.4s ease" }}
+        />
+
+        {/* Gradient accent stripe */}
         <div className="absolute top-0 left-0 right-0 h-[3px] z-10"
           style={{ background: t.stripe, transition: "background 0.4s ease" }} />
 
         {/* Top bar */}
-        <div className="flex items-center justify-between px-6 pt-6 pb-2">
-          {/* Mobile: show logo blended on bg-background */}
+        <div className="relative z-10 flex items-center justify-between px-6 pt-5 pb-2">
+          {/* Mobile logo */}
           <div className="flex lg:hidden items-center gap-2">
             <img
               src={hmdLogo}
               alt="HMD International Group"
-              className="h-8 w-auto object-contain rounded-md dark:invert"
+              className="h-8 w-auto object-contain rounded-md"
+              style={{ mixBlendMode: "multiply", filter: t.mobileLogoFilter }}
             />
           </div>
           <div className="hidden lg:block" />
 
           {/* Theme toggle */}
           <div
-            className="rounded-lg p-1"
-            style={{ background: "transparent" }}
+            className="rounded-lg border p-0.5"
+            style={{
+              background: isLight ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.06)",
+              borderColor: isLight ? "rgba(185,215,230,0.50)" : "rgba(100,160,185,0.18)",
+              backdropFilter: "blur(8px)",
+              transition: "background 0.4s ease, border-color 0.4s ease",
+            }}
           >
             <ThemeToggle />
           </div>
         </div>
 
-        {/* Centered form */}
-        <div className="flex flex-1 items-center justify-center px-6 py-10">
+        {/* Centred form */}
+        <div className="relative z-10 flex flex-1 items-center justify-center px-6 py-10">
           <div className="w-full max-w-[420px]">
 
-            {/* Subtle card */}
-            <div className="bg-card border border-border rounded-xl shadow-sm p-8 space-y-7">
-
-              {/* Brand label — desktop */}
+            {/* Glass card */}
+            <div
+              className="rounded-2xl p-8 space-y-7"
+              style={{
+                background: t.cardBg,
+                border: `1px solid ${t.cardBorder}`,
+                boxShadow: t.cardShadow,
+                backdropFilter: "blur(14px)",
+                WebkitBackdropFilter: "blur(14px)",
+                transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
+              }}
+            >
+              {/* Brand label */}
               <div className="space-y-0.5">
                 <span
                   className="hidden lg:block text-[0.6rem] font-bold tracking-[0.3em] uppercase"
@@ -250,7 +310,7 @@ export default function Login() {
                   type="submit"
                   data-testid="button-login"
                   disabled={loginMutation.isPending}
-                  className="w-full h-10 rounded-md font-semibold text-sm text-white transition-opacity hover:opacity-90 active:scale-[0.985] disabled:opacity-60 mt-1"
+                  className="w-full h-10 rounded-md font-semibold text-sm text-white hover:opacity-90 active:scale-[0.985] disabled:opacity-60 mt-1"
                   style={{
                     background: t.btnBg,
                     boxShadow: t.btnShadow,
