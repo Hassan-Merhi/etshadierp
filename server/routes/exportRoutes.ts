@@ -258,11 +258,9 @@ export function registerExportRoutes(app: Express) {
         SELECT * FROM daily_export_runs ORDER BY created_at DESC LIMIT 1
       `).catch(() => ({ rows: [] as any[] }));
 
-      // Recent runs (last 10, summary only)
+      // Recent runs — full detail for all 10 so UI can render each independently
       const recentQ = await pool.query(`
-        SELECT id, run_type, status, started_at, finished_at,
-               email_success, whatsapp_success, zip_size_bytes
-        FROM daily_export_runs ORDER BY created_at DESC LIMIT 10
+        SELECT * FROM daily_export_runs ORDER BY created_at DESC LIMIT 10
       `).catch(() => ({ rows: [] as any[] }));
 
       // Readiness data
@@ -319,14 +317,24 @@ export function registerExportRoutes(app: Express) {
           skippedReason:      row.skipped_reason,
         } : null,
         recentRuns: recentQ.rows.map((r: any) => ({
-          id:              r.id,
-          runType:         r.run_type,
-          status:          r.status,
-          startedAt:       r.started_at,
-          finishedAt:      r.finished_at,
-          emailSuccess:    r.email_success,
-          whatsappSuccess: r.whatsapp_success,
-          zipSizeBytes:    r.zip_size_bytes,
+          id:                r.id,
+          runType:           r.run_type,
+          status:            r.status,
+          startedAt:         r.started_at,
+          finishedAt:        r.finished_at,
+          zipSizeBytes:      r.zip_size_bytes,
+          companiesCount:    r.companies_count,
+          companyFilesCount: r.company_files_count,
+          skippedCompanies:  r.skipped_companies,
+          skippedReason:     r.skipped_reason,
+          emailAttempted:    r.email_attempted,
+          emailSuccess:      r.email_success,
+          emailError:        r.email_error,
+          emailAttempts:     r.email_attempts,
+          whatsappAttempted: r.whatsapp_attempted,
+          whatsappSuccess:   r.whatsapp_success,
+          whatsappError:     r.whatsapp_error,
+          whatsappAttempts:  r.whatsapp_attempts,
         })),
         readiness: {
           emailScheduleEnabled:        !!es.schedule_enabled,

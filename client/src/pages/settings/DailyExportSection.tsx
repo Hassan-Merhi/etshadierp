@@ -63,7 +63,7 @@ interface BackupReadiness {
 }
 interface BackupStatus {
   latestRun: BackupRun | null;
-  recentRuns: Pick<BackupRun, "id" | "runType" | "status" | "startedAt" | "finishedAt" | "zipSizeBytes">[];
+  recentRuns: BackupRun[];
   readiness: BackupReadiness;
   issues: string[];
 }
@@ -89,68 +89,165 @@ function runTypeLabel(t: string): string {
   }
 }
 
+function runTypeBadgeClass(t: string): string {
+  switch (t) {
+    case "scheduled":       return "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300";
+    case "manual_email":    return "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300";
+    case "manual_whatsapp": return "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300";
+    case "manual_download": return "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300";
+    default: return "bg-muted text-muted-foreground";
+  }
+}
+
+function RunStatusBadge({ status }: { status: string }) {
+  if (status === "success") return (
+    <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-medium">
+      <CheckCircle2 className="h-3 w-3" /> Success
+    </span>
+  );
+  if (status === "partial_failed") return (
+    <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 font-medium">
+      <AlertTriangle className="h-3 w-3" /> Partial success
+    </span>
+  );
+  if (status === "failed") return (
+    <span className="inline-flex items-center gap-1 text-xs text-destructive font-medium">
+      <XCircle className="h-3 w-3" /> Failed
+    </span>
+  );
+  if (status === "skipped") return (
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground font-medium">
+      <Info className="h-3 w-3" /> Skipped
+    </span>
+  );
+  if (status === "running") return (
+    <span className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 font-medium">
+      <Loader2 className="h-3 w-3 animate-spin" /> In progress
+    </span>
+  );
+  return <span className="text-xs text-muted-foreground">{status}</span>;
+}
+
+function ChannelLine({ icon, label, attempted, success, error, attempts }: {
+  icon: React.ReactNode;
+  label: string;
+  attempted?: boolean;
+  success?: boolean;
+  error?: string;
+  attempts?: number;
+}) {
+  if (!attempted) return (
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <span className="shrink-0">{icon}</span>
+      <span className="font-medium">{label}:</span>
+      <span>not attempted</span>
+    </div>
+  );
+  if (success) return (
+    <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
+      <CheckCircle2 className="h-3 w-3 shrink-0" />
+      <span className="font-medium">{label}:</span>
+      <span>sent{attempts && attempts > 1 ? ` (attempt ${attempts})` : ""}</span>
+    </div>
+  );
+  return (
+    <div className="space-y-0.5">
+      <div className="flex items-center gap-1.5 text-xs text-destructive">
+        <XCircle className="h-3 w-3 shrink-0" />
+        <span className="font-medium">{label}:</span>
+        <span>failed{attempts && attempts > 1 ? ` after ${attempts} attempt(s)` : ""}</span>
+      </div>
+      {error && <p className="text-xs text-muted-foreground pl-5 break-words">{error}</p>}
+    </div>
+  );
+}
+
+function RunRow({ run }: { run: BackupRun }) {
+  const isRunning = run.status === "running";
+
+  return (
+    <div
+      className="rounded-md border p-3 space-y-2.5"
+      data-testid={`run-row-${run.id}`}
+    >
+      {/* Top: type badge + status + time */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${runTypeBadgeClass(run.runType)}`}>
+          {runTypeLabel(run.runType)}
+        </span>
+        <RunStatusBadge status={run.status} />
+        <span className="text-xs text-muted-foreground ml-auto">
+          {fmtTime(run.startedAt)}
+        </span>
+      </div>
+
+      {/* Meta: ZIP size + companies */}
+      {(run.zipSizeBytes || run.companyFilesCount != null) && (
+        <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+          {run.zipSizeBytes ? <span>ZIP: {fmtBytes(run.zipSizeBytes)}</span> : null}
+          {run.companyFilesCount != null
+            ? <span>{run.companyFilesCount} compan{run.companyFilesCount === 1 ? "y" : "ies"}{run.skippedCompanies ? ` (${run.skippedCompanies.split(",").filter(Boolean).length} skipped)` : ""}</span>
+            : null}
+          {run.finishedAt && !isRunning
+            ? <span>finished {fmtTime(run.finishedAt)}</span>
+            : null}
+        </div>
+      )}
+
+      {/* Channel results */}
+      <div className="space-y-1.5 pl-0.5">
+        <ChannelLine
+          icon={<Mail className="h-3 w-3" />}
+          label="Email"
+          attempted={run.emailAttempted}
+          success={run.emailSuccess}
+          error={run.emailError}
+          attempts={run.emailAttempts}
+        />
+        <ChannelLine
+          icon={<MessageSquare className="h-3 w-3" />}
+          label="WhatsApp"
+          attempted={run.whatsappAttempted}
+          success={run.whatsappSuccess}
+          error={run.whatsappError}
+          attempts={run.whatsappAttempts}
+        />
+      </div>
+
+      {/* Skip / note */}
+      {run.skippedReason && (
+        <p className="text-xs text-muted-foreground pl-0.5">{run.skippedReason}</p>
+      )}
+    </div>
+  );
+}
+
 function BackupStatusCard({ status, onRefresh, isRefreshing }: {
   status: BackupStatus;
   onRefresh: () => void;
   isRefreshing: boolean;
 }) {
-  const run = status.latestRun;
+  const hasAnyRun = status.recentRuns.length > 0;
+  const hasRunning = status.recentRuns.some(r => r.status === "running");
 
-  const statusColor =
-    !run                         ? "text-muted-foreground" :
-    run.status === "success"     ? "text-green-600 dark:text-green-400" :
-    run.status === "skipped"     ? "text-amber-600 dark:text-amber-400" :
-    run.status === "partial_failed" ? "text-amber-600 dark:text-amber-400" :
-    run.status === "running"     ? "text-blue-600 dark:text-blue-400" :
-                                   "text-destructive";
-
-  const statusIcon =
-    !run || run.status === "running" ? <Loader2 className={`h-4 w-4 ${run ? "animate-spin text-blue-500" : ""}`} /> :
-    run.status === "success"         ? <ShieldCheck className="h-4 w-4 text-green-600" /> :
-    run.status === "skipped"         ? <Info className="h-4 w-4 text-amber-500" /> :
-    run.status === "partial_failed"  ? <AlertTriangle className="h-4 w-4 text-amber-500" /> :
-                                       <ShieldAlert className="h-4 w-4 text-destructive" />;
-
-  const statusText =
-    !run                            ? "No runs recorded yet" :
-    run.status === "success"        ? "Backup succeeded" :
-    run.status === "skipped"        ? "Skipped — both channels disabled" :
-    run.status === "partial_failed" ? "Partial success — one channel failed" :
-    run.status === "running"        ? "Backup in progress..." :
-                                      "Backup failed";
-
-  function ChannelRow({ label, attempted, success, error, attempts }: {
-    label: string; attempted?: boolean; success?: boolean; error?: string; attempts?: number;
-  }) {
-    if (!attempted) return (
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Info className="h-3 w-3 shrink-0" />
-        <span>{label}: not attempted</span>
-      </div>
-    );
-    if (success) return (
-      <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
-        <CheckCircle2 className="h-3 w-3 shrink-0" />
-        <span>{label}: sent{attempts && attempts > 1 ? ` (attempt ${attempts})` : ""}</span>
-      </div>
-    );
-    return (
-      <div className="space-y-0.5">
-        <div className="flex items-center gap-2 text-xs text-destructive">
-          <XCircle className="h-3 w-3 shrink-0" />
-          <span>{label}: failed{attempts && attempts > 1 ? ` after ${attempts} attempt(s)` : ""}</span>
-        </div>
-        {error && <p className="text-xs text-muted-foreground pl-5 break-all">{error}</p>}
-      </div>
-    );
-  }
+  const headerIcon = hasRunning
+    ? <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+    : !hasAnyRun
+      ? <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+      : status.recentRuns[0]?.status === "success"
+        ? <ShieldCheck className="h-4 w-4 text-green-600" />
+        : status.recentRuns[0]?.status === "partial_failed"
+          ? <AlertTriangle className="h-4 w-4 text-amber-500" />
+          : status.recentRuns[0]?.status === "failed"
+            ? <ShieldAlert className="h-4 w-4 text-destructive" />
+            : <ShieldCheck className="h-4 w-4 text-muted-foreground" />;
 
   return (
     <Card data-testid="card-backup-status">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <CardTitle className="text-base flex items-center gap-2">
-            {statusIcon}
+            {headerIcon}
             Backup Status
           </CardTitle>
           <Button
@@ -163,63 +260,25 @@ function BackupStatusCard({ status, onRefresh, isRefreshing }: {
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </Button>
         </div>
-        <CardDescription className={statusText.startsWith("No") ? "" : statusColor}>
-          {statusText}
+        <CardDescription>
+          {hasRunning
+            ? "A backup is currently in progress..."
+            : hasAnyRun
+              ? `Last ${status.recentRuns.length} run${status.recentRuns.length === 1 ? "" : "s"} — newest first`
+              : "No backup runs recorded yet"}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {run && (
-          <>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-              <div className="text-muted-foreground">Type</div>
-              <div>{runTypeLabel(run.runType)}</div>
-              <div className="text-muted-foreground">Started</div>
-              <div>{fmtTime(run.startedAt)}</div>
-              {run.finishedAt && <>
-                <div className="text-muted-foreground">Finished</div>
-                <div>{fmtTime(run.finishedAt)}</div>
-              </>}
-              {run.zipSizeBytes && <>
-                <div className="text-muted-foreground">ZIP size</div>
-                <div>{fmtBytes(run.zipSizeBytes)}</div>
-              </>}
-              {run.companyFilesCount !== undefined && run.companyFilesCount !== null && <>
-                <div className="text-muted-foreground">Companies</div>
-                <div>{run.companyFilesCount}{run.skippedCompanies ? ` (${run.skippedCompanies.split(",").length} skipped)` : ""}</div>
-              </>}
-            </div>
-
-            <div className="space-y-2">
-              <ChannelRow
-                label="Email"
-                attempted={run.emailAttempted}
-                success={run.emailSuccess}
-                error={run.emailError}
-                attempts={run.emailAttempts}
-              />
-              <ChannelRow
-                label="WhatsApp"
-                attempted={run.whatsappAttempted}
-                success={run.whatsappSuccess}
-                error={run.whatsappError}
-                attempts={run.whatsappAttempts}
-              />
-            </div>
-
-            {(run.skippedReason) && (
-              <p className="text-xs text-muted-foreground">{run.skippedReason}</p>
-            )}
-          </>
-        )}
-
+        {/* Configuration issues */}
         {status.issues.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" /> Configuration issues blocking automatic send:
+          <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-1">
+            <p className="text-xs font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              {status.issues.length === 1 ? "1 issue" : `${status.issues.length} issues`} blocking automatic send
             </p>
             <ul className="space-y-0.5">
               {status.issues.map((issue, i) => (
-                <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                <li key={i} className="text-xs text-amber-800 dark:text-amber-300 flex items-start gap-1.5">
                   <span className="shrink-0 mt-0.5">•</span>{issue}
                 </li>
               ))}
@@ -227,8 +286,17 @@ function BackupStatusCard({ status, onRefresh, isRefreshing }: {
           </div>
         )}
 
-        {!run && status.issues.length === 0 && (
-          <p className="text-xs text-muted-foreground">No backup runs recorded yet. Run a backup to see status here.</p>
+        {/* Run history */}
+        {hasAnyRun ? (
+          <div className="space-y-2">
+            {status.recentRuns.map(run => (
+              <RunRow key={run.id} run={run} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            No backup runs recorded yet. Trigger a manual send or wait for the 6 PM scheduled run.
+          </p>
         )}
       </CardContent>
     </Card>
