@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
+import { addDays, format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +18,7 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
-  ChevronDown, ChevronRight, FlaskConical, PackageCheck, Scale,
+  ChevronDown, ChevronRight, ChevronLeft, FlaskConical, PackageCheck, Scale,
   TrendingUp, TrendingDown, Minus, Tag, Trash2,
   Package, ShoppingCart, AlertTriangle, Truck, RefreshCw, Layers,
 } from "lucide-react";
@@ -784,6 +785,15 @@ export default function DailyProductionReport() {
     return { from: customFrom, to: customTo };
   }, [preset, customFrom, customTo]);
 
+  const stepDates = useCallback((n: number) => {
+    const fmt = "yyyy-MM-dd";
+    const baseFrom = from || todayStr();
+    const baseTo   = to   || todayStr();
+    setCustomFrom(format(addDays(new Date(baseFrom + "T00:00:00"), n), fmt));
+    setCustomTo(  format(addDays(new Date(baseTo   + "T00:00:00"), n), fmt));
+    setPreset("custom");
+  }, [from, to]);
+
   const { data, isLoading } = useQuery<ReportData>({
     queryKey: ["/api/factory/production-value-report", from, to],
     queryFn: async () => {
@@ -835,7 +845,17 @@ export default function DailyProductionReport() {
         <TabsContent value="production" className="flex-1 overflow-y-auto p-4 gap-4 flex flex-col mt-0 data-[state=inactive]:hidden">
       {/* Date filter + Pie chart row */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="icon"
+            variant="outline"
+            onClick={() => stepDates(-1)}
+            data-testid="button-date-prev"
+            title="Previous day"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+
           <Select value={preset} onValueChange={(v) => setPreset(v as Preset)}>
             <SelectTrigger className="w-40" data-testid="select-preset">
               <SelectValue />
@@ -848,6 +868,7 @@ export default function DailyProductionReport() {
               ))}
             </SelectContent>
           </Select>
+
           {preset === "custom" && (
             <div className="flex items-center gap-2 flex-wrap">
               <input
@@ -867,6 +888,16 @@ export default function DailyProductionReport() {
               />
             </div>
           )}
+
+          <Button
+            size="icon"
+            variant="outline"
+            onClick={() => stepDates(1)}
+            data-testid="button-date-next"
+            title="Next day"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
 
         {/* Compact pie charts — same row as date picker */}
