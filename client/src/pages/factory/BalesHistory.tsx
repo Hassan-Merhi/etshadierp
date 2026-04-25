@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Printer, Trash2, Search, Package, Filter, CheckSquare, RefreshCw, Pencil, Check, X } from "lucide-react";
+import { Printer, Trash2, Search, Package, Filter, CheckSquare, RefreshCw, Pencil, Check, X, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,11 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function BalesHistory() {
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportFrom, setExportFrom] = useState("");
+  const [exportTo, setExportTo] = useState("");
+  const [exportLoading, setExportLoading] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [batchFilter, setBatchFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -69,6 +74,32 @@ export default function BalesHistory() {
   const { toast } = useToast();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
+
+  const handleExport = async () => {
+    setExportLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (exportFrom) params.set("from", exportFrom);
+      if (exportTo)   params.set("to", exportTo);
+      const url = `/api/factory/bales/stock-register.xlsx${params.toString() ? `?${params}` : ""}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Export failed" }));
+        throw new Error(err.message);
+      }
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `stock_register${exportFrom && exportTo ? `_${exportFrom}_to_${exportTo}` : "_all"}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      setShowExportDialog(false);
+    } catch (err: any) {
+      toast({ title: "Export Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setExportLoading(false);
+    }
+  };
 
   const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hiddenCostFields: string[] }>({
     queryKey: ["/api/factory/my-access"],
@@ -360,6 +391,15 @@ export default function BalesHistory() {
           <h2 className="text-lg font-semibold">Bales History</h2>
           <Badge variant="secondary" data-testid="badge-total-bales">{totalBales} bales</Badge>
           <Badge variant="outline" data-testid="badge-total-weight">{formatLabelNum(totalWeight)} kg</Badge>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowExportDialog(true)}
+            data-testid="button-export-stock-register"
+          >
+            <Download className="h-3.5 w-3.5 mr-1.5" />
+            Export Register
+          </Button>
         </div>
         <Card className="border-dashed">
           <CardContent className="py-2 px-4">
@@ -742,6 +782,49 @@ export default function BalesHistory() {
                 }
               }}
             >No Banner (Blank)</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Stock Register Export Dialog ── */}
+      <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Export Stock Register</DialogTitle>
+            <DialogDescription>
+              Exports all bales (all statuses) to Excel with reference numbers, article codes, product names, weights, dates and more. Leave dates blank to export everything.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground mb-1">From Date</p>
+                <Input
+                  type="date"
+                  value={exportFrom}
+                  onChange={(e) => setExportFrom(e.target.value)}
+                  data-testid="input-export-from"
+                />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground mb-1">To Date</p>
+                <Input
+                  type="date"
+                  value={exportTo}
+                  onChange={(e) => setExportTo(e.target.value)}
+                  data-testid="input-export-to"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowExportDialog(false)} disabled={exportLoading}>
+              Cancel
+            </Button>
+            <Button onClick={handleExport} disabled={exportLoading} data-testid="button-confirm-export">
+              <Download className="h-4 w-4 mr-2" />
+              {exportLoading ? "Exporting..." : "Download Excel"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
