@@ -138,11 +138,9 @@ export default function FactoryBaleProductHistory() {
     );
   };
 
-  const formatNumber = (num: number, decimals = 2) => {
-    return num.toLocaleString(undefined, {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    });
+  const formatNumber = (num: number) => {
+    if (num % 1 === 0) return num.toLocaleString();
+    return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 });
   };
 
   if (isLoading) {
@@ -481,11 +479,9 @@ export function FactoryBaleProductMonthDetail() {
   ];
   const monthName = monthNames[parseInt(month)] || month;
 
-  const formatNumber = (num: number, decimals = 2) => {
-    return num.toLocaleString(undefined, {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    });
+  const formatNumber = (num: number) => {
+    if (num % 1 === 0) return num.toLocaleString();
+    return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 });
   };
 
   const formatDateTime = (dateStr: string) => {
@@ -561,7 +557,13 @@ export function FactoryBaleProductMonthDetail() {
                       {bale.baleCode}
                     </TableCell>
                     <TableCell data-testid={`text-reference-${bale.id}`}>
-                      {bale.referenceNumber}
+                      <button
+                        className="font-mono text-sm text-primary underline-offset-2 hover:underline cursor-pointer"
+                        onClick={() => navigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bale.referenceNumber)}`)}
+                        data-testid={`button-ref-lookup-${bale.id}`}
+                      >
+                        {bale.referenceNumber}
+                      </button>
                     </TableCell>
                     <TableCell
                       className="text-right font-mono"
@@ -635,8 +637,14 @@ export function FactoryBaleProductMonthDetail() {
                     {bale.status}
                   </Badge>
                 </div>
-                <div className="text-xs text-muted-foreground mb-2">
-                  Ref: {bale.referenceNumber}
+                <div className="text-xs mb-2">
+                  <button
+                    className="font-mono text-primary underline-offset-2 hover:underline cursor-pointer"
+                    onClick={() => navigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bale.referenceNumber)}`)}
+                    data-testid={`button-ref-lookup-mobile-${bale.id}`}
+                  >
+                    {bale.referenceNumber}
+                  </button>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   <div>
