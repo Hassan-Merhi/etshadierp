@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { getExportPriceVisibility } from "../../helpers/exportVisibility";
 import { syncProformaReservations, isFactoryV2Company, computeFreeToPromise } from "./_stockReservationHelper";
 import type { Express } from "express";
 import { db } from "../../db";
@@ -1009,6 +1010,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         prods.forEach((p: any) => { if (p.articleCode) { wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0")); nameMap.set(p.articleCode, p.name || ""); } });
       }
 
+      const { hideSelling: hideSellingExcel } = await getExportPriceVisibility(req);
+
       const baseCurrency = (company as any)?.baseCurrency || "USD";
       const currencySymbolMap: Record<string, string> = {
         USD: "$ ", GBP: "£", EUR: "€", CFA: "CFA ", XOF: "CFA ", XAF: "CFA ",
@@ -1023,17 +1026,18 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("Proforma Invoice");
 
-      const COL_COUNT = 8;
-      sheet.columns = [
+      const COL_COUNT = hideSellingExcel ? 6 : 8;
+      const baseCols: any[] = [
         { key: "num", width: 6 },
         { key: "articleCode", width: 18 },
         { key: "productName", width: 32 },
         { key: "qty", width: 12 },
         { key: "kgPerBale", width: 13 },
-        { key: "pricePerBale", width: 14 },
-        { key: "totalKg", width: 13 },
-        { key: "totalPrice", width: 15 },
       ];
+      if (!hideSellingExcel) baseCols.push({ key: "pricePerBale", width: 14 });
+      baseCols.push({ key: "totalKg", width: 13 });
+      if (!hideSellingExcel) baseCols.push({ key: "totalPrice", width: 15 });
+      sheet.columns = baseCols;
 
       try {
         const pxLogo = path.join(process.cwd(), "server", "hmd-logo.png");
@@ -1064,7 +1068,11 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
       sheet.addRow([]);
 
-      const hdrRow = sheet.addRow(["#", "Article Code", "Product Name", "Qty (Bales)", "Kg / Bale", "Price / Bale", "Total KG", "Total Price"]);
+      const hdrCells = ["#", "Article Code", "Product Name", "Qty (Bales)", "Kg / Bale"];
+      if (!hideSellingExcel) hdrCells.push("Price / Bale");
+      hdrCells.push("Total KG");
+      if (!hideSellingExcel) hdrCells.push("Total Price");
+      const hdrRow = sheet.addRow(hdrCells);
       hdrRow.eachCell((cell) => {
         cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F3864" } };
@@ -1082,23 +1090,33 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         totalKgAll += totalKg;
         totalPriceAll += totalPrice;
 
-        const dr = sheet.addRow([idx + 1, line.articleCode, nameMap.get(line.articleCode) || line.productName || "", qty, fmtKg(kgPerBale), fmtPrice(price), fmtKg(totalKg), fmtPrice(totalPrice)]);
+        const rowArr: any[] = [idx + 1, line.articleCode, nameMap.get(line.articleCode) || line.productName || "", qty, fmtKg(kgPerBale)];
+        if (!hideSellingExcel) rowArr.push(fmtPrice(price));
+        rowArr.push(fmtKg(totalKg));
+        if (!hideSellingExcel) rowArr.push(fmtPrice(totalPrice));
+        const dr = sheet.addRow(rowArr);
         dr.getCell(4).alignment = { horizontal: "right" };
         dr.getCell(5).alignment = { horizontal: "right" };
         dr.getCell(6).alignment = { horizontal: "right" };
-        dr.getCell(7).alignment = { horizontal: "right" };
-        dr.getCell(8).alignment = { horizontal: "right" };
+        if (!hideSellingExcel) {
+          dr.getCell(7).alignment = { horizontal: "right" };
+          dr.getCell(8).alignment = { horizontal: "right" };
+        }
         if (idx % 2 === 1) {
           dr.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5F5F5" } }; });
         }
       });
 
       sheet.addRow([]);
-      const totRow = sheet.addRow(["", "", "GRAND TOTAL", totalQty, "", "", fmtKg(totalKgAll), fmtPrice(totalPriceAll)]);
+      const totArr: any[] = ["", "", "GRAND TOTAL", totalQty, ""];
+      if (!hideSellingExcel) totArr.push("");
+      totArr.push(fmtKg(totalKgAll));
+      if (!hideSellingExcel) totArr.push(fmtPrice(totalPriceAll));
+      const totRow = sheet.addRow(totArr);
       totRow.eachCell((cell) => { cell.font = { bold: true }; });
       totRow.getCell(4).alignment = { horizontal: "right" };
-      totRow.getCell(7).alignment = { horizontal: "right" };
-      totRow.getCell(8).alignment = { horizontal: "right" };
+      totRow.getCell(hideSellingExcel ? 6 : 7).alignment = { horizontal: "right" };
+      if (!hideSellingExcel) totRow.getCell(8).alignment = { horizontal: "right" };
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename=proforma_${proforma.name.replace(/\s+/g, "_")}.xlsx`);
@@ -1137,6 +1155,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes as string[])));
         prods.forEach((p: any) => { if (p.articleCode) { wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0")); nameMap.set(p.articleCode, p.name || ""); } });
       }
+
+      const { hideSelling: hideSellingPdf } = await getExportPriceVisibility(req);
 
       const baseCurrencyPdf = (company as any)?.baseCurrency || "USD";
       const currencySymbolMapPdf: Record<string, string> = {
@@ -1184,12 +1204,20 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       doc.moveDown(1);
 
       // ── Table ──
-      // Columns: # | Article Code | Product Name | Qty | Kg/Bale | Price/Bale | Total KG | Total Price
+      // Columns: # | Article Code | Product Name | Qty | Kg/Bale | [Price/Bale] | Total KG | [Total Price]
       // x positions (left edge), total usable width = 515 (40..555)
-      const colX  = [40,  62,  132, 310, 355, 403, 455, 508];
-      const colW  = [22,  70,  178,  45,  48,  52,  53,  47];
-      const colHdr= ["#","Code","Product Name","Qty","Kg/Bale","Pr/Bale","Total KG","Total Price"];
-      const colAlign: Array<"left"|"right"|"center"> = ["center","center","center","center","center","center","center","center"];
+      let colX: number[], colW: number[], colHdr: string[], colAlign: Array<"left"|"right"|"center">;
+      if (hideSellingPdf) {
+        colX     = [40,  62,  132, 310, 355, 403];
+        colW     = [22,  70,  178,  45,  48, 152];
+        colHdr   = ["#","Code","Product Name","Qty","Kg/Bale","Total KG"];
+        colAlign = ["center","center","center","center","center","center"];
+      } else {
+        colX     = [40,  62,  132, 310, 355, 403, 455, 508];
+        colW     = [22,  70,  178,  45,  48,  52,  53,  47];
+        colHdr   = ["#","Code","Product Name","Qty","Kg/Bale","Pr/Bale","Total KG","Total Price"];
+        colAlign = ["center","center","center","center","center","center","center","center"];
+      }
 
       const tableTop = doc.y + 4;
 
@@ -1225,7 +1253,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           doc.fillColor("#000000");
         }
 
-        const vals = [String(idx + 1), line.articleCode, nameMap.get(line.articleCode) || line.productName || "", String(qty), fmtKgPdf(kgPerBale), fmtPricePdf(price), fmtKgPdf(totalKg), fmtPricePdf(totalPrice)];
+        const vals = hideSellingPdf
+          ? [String(idx + 1), line.articleCode, nameMap.get(line.articleCode) || line.productName || "", String(qty), fmtKgPdf(kgPerBale), fmtKgPdf(totalKg)]
+          : [String(idx + 1), line.articleCode, nameMap.get(line.articleCode) || line.productName || "", String(qty), fmtKgPdf(kgPerBale), fmtPricePdf(price), fmtKgPdf(totalKg), fmtPricePdf(totalPrice)];
         vals.forEach((v, i) => {
           doc.text(v, colX[i] + 2, y + 3, { width: colW[i] - 4, align: colAlign[i] });
         });
@@ -1241,7 +1271,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       // Grand total row
       doc.rect(40, y, 515, 16).fill("#EFF3FB");
       doc.fillColor("#000000").font("Helvetica-Bold").fontSize(8);
-      const totVals = ["", "", "GRAND TOTAL", String(totalQty), "", "", fmtKgPdf(totalKgAll), fmtPricePdf(totalPriceAll)];
+      const totVals = hideSellingPdf
+        ? ["", "", "GRAND TOTAL", String(totalQty), "", fmtKgPdf(totalKgAll)]
+        : ["", "", "GRAND TOTAL", String(totalQty), "", "", fmtKgPdf(totalKgAll), fmtPricePdf(totalPriceAll)];
       totVals.forEach((v, i) => {
         if (v) doc.text(v, colX[i] + 2, y + 4, { width: colW[i] - 4, align: colAlign[i] });
       });

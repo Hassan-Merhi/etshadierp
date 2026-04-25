@@ -601,6 +601,29 @@ export function UserManagementDrawer({
                         </div>
 
                         <div className="space-y-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Export &amp; Print Visibility</p>
+                          <p className="text-xs text-muted-foreground">Checked items will be hidden from this user's exports, PDFs, prints, invoices, proformas, and reports.</p>
+                          <div className="space-y-1.5 border rounded-md p-3">
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                checked={hiddenCostFields.includes("hide_export_selling_price")}
+                                onCheckedChange={() => toggleCostField("hide_export_selling_price")}
+                                data-testid="checkbox-cost-hide_export_selling_price"
+                              />
+                              <span className="text-sm">Hide Selling Prices in Exports/Prints</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                checked={hiddenCostFields.includes("hide_export_cost_price")}
+                                onCheckedChange={() => toggleCostField("hide_export_cost_price")}
+                                data-testid="checkbox-cost-hide_export_cost_price"
+                              />
+                              <span className="text-sm">Hide Cost / Production Prices in Exports/Prints</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
                           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Daybook Restrictions</p>
                           <div className="border rounded-md p-3">
                             <div className="flex items-center gap-2">

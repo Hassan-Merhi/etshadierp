@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { getExportPriceVisibility } from "../../helpers/exportVisibility";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -901,8 +902,9 @@ export function registerFactoryStockRoutes(app: Express) {
       if (isNaN(locationId)) return res.status(400).json({ message: "Invalid location ID" });
 
       const [fCfg] = await db.select({ hideAvgCost: factorySettings.hideAvgCost, hideSellingPrice: factorySettings.hideSellingPrice }).from(factorySettings).where(eq(factorySettings.companyId, companyId)).limit(1);
-      const includeCost = req.query.includeCost !== "0" && !fCfg?.hideAvgCost;
-      const includeSellPrice = req.query.includeSellPrice !== "0" && !fCfg?.hideSellingPrice;
+      const userVis = await getExportPriceVisibility(req);
+      const includeCost = req.query.includeCost !== "0" && !fCfg?.hideAvgCost && !userVis.hideCost;
+      const includeSellPrice = req.query.includeSellPrice !== "0" && !fCfg?.hideSellingPrice && !userVis.hideSelling;
 
       // Only IN_STOCK — exclude FINALIZED and RESERVED
       const bales = await db
@@ -1155,7 +1157,8 @@ export function registerFactoryStockRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const [fCfgAll] = await db.select({ hideAvgCost: factorySettings.hideAvgCost, hideSellingPrice: factorySettings.hideSellingPrice }).from(factorySettings).where(eq(factorySettings.companyId, companyId)).limit(1);
-      const includeCost = req.query.includeCost !== "0" && !fCfgAll?.hideAvgCost;
+      const userVisAll = await getExportPriceVisibility(req);
+      const includeCost = req.query.includeCost !== "0" && !fCfgAll?.hideAvgCost && !userVisAll.hideCost;
 
       // Only IN_STOCK — exclude FINALIZED and RESERVED
       const bales = await db

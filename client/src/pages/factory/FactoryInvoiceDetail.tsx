@@ -103,6 +103,11 @@ export default function FactoryInvoiceDetail() {
     enabled: !!orderId,
   });
 
+  const { data: myAccess } = useQuery<{ hiddenCostFields: string[] }>({
+    queryKey: ["/api/factory/my-access"],
+  });
+  const hideExportSelling = (myAccess?.hiddenCostFields ?? []).includes("hide_export_selling_price");
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "DRAFT":
@@ -539,13 +544,13 @@ export default function FactoryInvoiceDetail() {
               <TableHead className="text-right">Qty</TableHead>
               <TableHead className="text-right">Weight/Bale</TableHead>
               <TableHead className="text-right">Total Weight</TableHead>
-              <TableHead className="text-right">
+              <TableHead className={`text-right${hideExportSelling ? " print:hidden" : ""}`}>
                 Price/Bale
                 {(isVerifiedStatus || order.status === "FINALIZED") && (
                   <Pencil className="inline ml-1 h-3 w-3 text-muted-foreground" />
                 )}
               </TableHead>
-              <TableHead className="text-right">Total Price</TableHead>
+              <TableHead className={`text-right${hideExportSelling ? " print:hidden" : ""}`}>Total Price</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -574,7 +579,7 @@ export default function FactoryInvoiceDetail() {
                   <TableCell className="text-right font-mono" data-testid={`text-total-weight-${idx}`}>
                     {Number(line.totalWeight || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </TableCell>
-                  <TableCell className="text-right font-mono" data-testid={`text-price-per-bale-${idx}`}>
+                  <TableCell className={`text-right font-mono${hideExportSelling ? " print:hidden" : ""}`} data-testid={`text-price-per-bale-${idx}`}>
                     {(isVerifiedStatus || order.status === "FINALIZED") ? (
                       editingArticleCode === line.articleCode ? (
                         <Input
@@ -608,7 +613,7 @@ export default function FactoryInvoiceDetail() {
                       Number(line.pricePerBale || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
                     )}
                   </TableCell>
-                  <TableCell className="text-right font-mono font-semibold" data-testid={`text-total-price-${idx}`}>
+                  <TableCell className={`text-right font-mono font-semibold${hideExportSelling ? " print:hidden" : ""}`} data-testid={`text-total-price-${idx}`}>
                     {Number(line.totalPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </TableCell>
                 </TableRow>
@@ -619,7 +624,7 @@ export default function FactoryInvoiceDetail() {
       </Card>
 
       {(freightCharges.length > 0 || otherCharges.length > 0) && (
-        <Card className="p-4 mb-6">
+        <Card className={`p-4 mb-6${hideExportSelling ? " print:hidden" : ""}`}>
           <h3 className="font-semibold mb-3" data-testid="text-charges-header">Freight &amp; Charges</h3>
           <div className="space-y-2">
             {freightCharges.map((charge, idx) => (
@@ -642,7 +647,7 @@ export default function FactoryInvoiceDetail() {
         </Card>
       )}
 
-      <Card className="p-4">
+      <Card className={`p-4${hideExportSelling ? " print:hidden" : ""}`}>
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2 text-sm">
             <span>Subtotal (Bales)</span>

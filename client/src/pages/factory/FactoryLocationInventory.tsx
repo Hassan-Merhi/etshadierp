@@ -297,10 +297,12 @@ export default function FactoryLocationInventory() {
   const perUserHidden = myAccess?.hiddenCostFields ?? [];
   const hideSellingPrice = !!factorySettingsData?.hideSellingPrice
     || perUserHidden.includes("inventory_sell_price")
-    || perUserHidden.includes("inventory_sell_value");
+    || perUserHidden.includes("inventory_sell_value")
+    || perUserHidden.includes("hide_export_selling_price");
   const hideAvgCost = !!factorySettingsData?.hideAvgCost
     || perUserHidden.includes("inventory_avg_rate")
-    || perUserHidden.includes("inventory_total_value");
+    || perUserHidden.includes("inventory_total_value")
+    || perUserHidden.includes("hide_export_cost_price");
 
   const { data: inventoryData = [], isLoading: inventoryLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: selectedLocation

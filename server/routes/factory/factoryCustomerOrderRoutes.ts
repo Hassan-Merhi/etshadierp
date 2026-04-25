@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { getExportPriceVisibility } from "../../helpers/exportVisibility";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -1392,6 +1393,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const orderId = parseInt(req.params.id);
       if (isNaN(orderId)) return res.status(400).json({ message: "Invalid order ID" });
 
+      const { hideSelling: hideSellingXls1 } = await getExportPriceVisibility(req);
+
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
@@ -1533,7 +1536,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       sheet.addRow([]);
 
       // ── Table header ──
-      const hdrRow = sheet.addRow(["#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt", "Price/Bale", "Total"]);
+      const hdrRow = sheet.addRow(["#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt", ...(hideSellingXls1 ? [] : ["Price/Bale", "Total"])]);
       hdrRow.height = 24;
       hdrRow.eachCell((cell: any) => {
         cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
@@ -1548,16 +1551,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         totalQty += g.qty;
         totalWtAll += g.totalWt;
         totalAll += g.total;
-        const dr = sheet.addRow([
-          idx + 1,
-          g.articleCode,
-          g.productName,
-          g.qty,
-          fmtNum(g.wtPerBale),
-          fmtNum(g.totalWt),
-          fmtMoney(g.pricePerBale),
-          fmtMoney(g.total),
-        ]);
+        const rowCells: any[] = [idx + 1, g.articleCode, g.productName, g.qty, fmtNum(g.wtPerBale), fmtNum(g.totalWt)];
+        if (!hideSellingXls1) { rowCells.push(fmtMoney(g.pricePerBale)); rowCells.push(fmtMoney(g.total)); }
+        const dr = sheet.addRow(rowCells);
         dr.height = 20;
         dr.eachCell((cell: any) => { cell.font = { size: 11 }; });
         if (idx % 2 === 1) {
@@ -1567,13 +1563,17 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         dr.getCell(4).alignment = { horizontal: "right" };
         dr.getCell(5).alignment = { horizontal: "right" };
         dr.getCell(6).alignment = { horizontal: "right" };
-        dr.getCell(7).alignment = { horizontal: "right" };
-        dr.getCell(8).alignment = { horizontal: "right" };
+        if (!hideSellingXls1) {
+          dr.getCell(7).alignment = { horizontal: "right" };
+          dr.getCell(8).alignment = { horizontal: "right" };
+        }
         setBorder(dr);
       });
 
       // ── Totals row ──
-      const totRow = sheet.addRow(["", "", "Totals", totalQty, "", fmtNum(totalWtAll), "", fmtMoney(totalAll)]);
+      const totRowCells: any[] = ["", "", "Totals", totalQty, "", fmtNum(totalWtAll)];
+      if (!hideSellingXls1) { totRowCells.push(""); totRowCells.push(fmtMoney(totalAll)); }
+      const totRow = sheet.addRow(totRowCells);
       totRow.height = 22;
       totRow.eachCell((cell: any) => {
         cell.font = { bold: true, size: 11, color: { argb: WHITE } };
@@ -1583,55 +1583,56 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       totRow.getCell(3).alignment = { horizontal: "center" };
       totRow.getCell(4).alignment = { horizontal: "right" };
       totRow.getCell(6).alignment = { horizontal: "right" };
-      totRow.getCell(8).alignment = { horizontal: "right" };
+      if (!hideSellingXls1) totRow.getCell(8).alignment = { horizontal: "right" };
 
       sheet.addRow([]);
 
-      // ── Financial summary block ──
-      const subtotal = parseFloat(order.subtotalBales || "0");
-      const freight = parseFloat(order.freightAmount || "0");
-      const otherChargesTotal = parseFloat(order.otherChargesTotal || "0");
-      const grandTotal = parseFloat(order.grandTotal || "0");
+      // ── Financial summary block (omit when selling prices are hidden) ──
+      if (!hideSellingXls1) {
+        const subtotal = parseFloat(order.subtotalBales || "0");
+        const freight = parseFloat(order.freightAmount || "0");
+        const otherChargesTotal = parseFloat(order.otherChargesTotal || "0");
+        const grandTotal = parseFloat(order.grandTotal || "0");
 
-      const otherChargeLines = orderCharges.filter((ch: any) => ch.chargeType !== "FREIGHT");
-      const chargeRows: [string, number][] = otherChargeLines.length > 0
-        ? otherChargeLines.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
-        : otherChargesTotal > 0
-          ? [["Other Charges", otherChargesTotal]]
-          : [];
+        const otherChargeLines = orderCharges.filter((ch: any) => ch.chargeType !== "FREIGHT");
+        const chargeRows: [string, number][] = otherChargeLines.length > 0
+          ? otherChargeLines.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
+          : otherChargesTotal > 0
+            ? [["Other Charges", otherChargesTotal]]
+            : [];
 
-      const summaryData: [string, number][] = [
-        ["Subtotal (Bales)", subtotal],
-        ...(freight > 0 ? [["Freight", freight] as [string, number]] : []),
-        ...chargeRows,
-        ["Grand Total", grandTotal],
-      ];
+        const summaryData: [string, number][] = [
+          ["Subtotal (Bales)", subtotal],
+          ...(freight > 0 ? [["Freight", freight] as [string, number]] : []),
+          ...chargeRows,
+          ["Grand Total", grandTotal],
+        ];
 
-      // Header row for summary
-      const sumHdr = sheet.addRow(["", "", "", "", "", "", "Name", "Amount"]);
-      sumHdr.height = 22;
-      sumHdr.getCell(7).font = { bold: true, color: { argb: WHITE }, size: 11 };
-      sumHdr.getCell(8).font = { bold: true, color: { argb: WHITE }, size: 11 };
-      setFill(sumHdr.getCell(7), DARK_BLUE);
-      setFill(sumHdr.getCell(8), DARK_BLUE);
-      sumHdr.getCell(7).alignment = { horizontal: "center" };
-      sumHdr.getCell(8).alignment = { horizontal: "center" };
+        const sumHdr = sheet.addRow(["", "", "", "", "", "", "Name", "Amount"]);
+        sumHdr.height = 22;
+        sumHdr.getCell(7).font = { bold: true, color: { argb: WHITE }, size: 11 };
+        sumHdr.getCell(8).font = { bold: true, color: { argb: WHITE }, size: 11 };
+        setFill(sumHdr.getCell(7), DARK_BLUE);
+        setFill(sumHdr.getCell(8), DARK_BLUE);
+        sumHdr.getCell(7).alignment = { horizontal: "center" };
+        sumHdr.getCell(8).alignment = { horizontal: "center" };
 
-      summaryData.forEach(([label, amount], idx) => {
-        const sr = sheet.addRow(["", "", "", "", "", "", label as string, fmtMoney(amount as number)]);
-        sr.height = 20;
-        const isGrandTotal = idx === summaryData.length - 1;
-        const bg = isGrandTotal ? DARK_BLUE : (idx % 2 === 0 ? WHITE : LIGHT_GRAY);
-        const fg = isGrandTotal ? WHITE : "FF000000";
-        setFill(sr.getCell(7), bg);
-        setFill(sr.getCell(8), bg);
-        sr.getCell(7).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
-        sr.getCell(8).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
-        sr.getCell(7).alignment = { horizontal: "left" };
-        sr.getCell(8).alignment = { horizontal: "right" };
-        sr.getCell(7).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
-        sr.getCell(8).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
-      });
+        summaryData.forEach(([label, amount], idx) => {
+          const sr = sheet.addRow(["", "", "", "", "", "", label as string, fmtMoney(amount as number)]);
+          sr.height = 20;
+          const isGrandTotal = idx === summaryData.length - 1;
+          const bg = isGrandTotal ? DARK_BLUE : (idx % 2 === 0 ? WHITE : LIGHT_GRAY);
+          const fg = isGrandTotal ? WHITE : "FF000000";
+          setFill(sr.getCell(7), bg);
+          setFill(sr.getCell(8), bg);
+          sr.getCell(7).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
+          sr.getCell(8).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
+          sr.getCell(7).alignment = { horizontal: "left" };
+          sr.getCell(8).alignment = { horizontal: "right" };
+          sr.getCell(7).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
+          sr.getCell(8).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
+        });
+      }
 
       const dateStr = getClientDate(req);
       const fileName = `invoice_${invoiceNum.replace(/[^a-zA-Z0-9]/g, "_")}_${dateStr}.xlsx`;
@@ -2124,6 +2125,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
+      const { hideSelling: hideSellingXls2 } = await getExportPriceVisibility(req);
       const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
       const [order] = await db
         .select({
@@ -2269,7 +2271,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       sheet.addRow([]);
 
       // ── Table header ──
-      const hdrRow = sheet.addRow(["#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt", "Price/Bale", "Total"]);
+      const hdrRow = sheet.addRow(["#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt", ...(hideSellingXls2 ? [] : ["Price/Bale", "Total"])]);
       hdrRow.height = 24;
       hdrRow.eachCell((cell: any) => {
         cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
@@ -2284,16 +2286,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         totalQty += g.qty;
         totalWtAll += g.totalWt;
         totalAll += g.total;
-        const dr = sheet.addRow([
-          idx + 1,
-          g.articleCode,
-          g.productName,
-          g.qty,
-          fmtNum(g.wtPerBale),
-          fmtNum(g.totalWt),
-          fmtMoney(g.pricePerBale),
-          fmtMoney(g.total),
-        ]);
+        const rowCells2: any[] = [idx + 1, g.articleCode, g.productName, g.qty, fmtNum(g.wtPerBale), fmtNum(g.totalWt)];
+        if (!hideSellingXls2) { rowCells2.push(fmtMoney(g.pricePerBale)); rowCells2.push(fmtMoney(g.total)); }
+        const dr = sheet.addRow(rowCells2);
         dr.height = 20;
         dr.eachCell((cell: any) => { cell.font = { size: 11 }; });
         if (idx % 2 === 1) {
@@ -2303,13 +2298,17 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         dr.getCell(4).alignment = { horizontal: "right" };
         dr.getCell(5).alignment = { horizontal: "right" };
         dr.getCell(6).alignment = { horizontal: "right" };
-        dr.getCell(7).alignment = { horizontal: "right" };
-        dr.getCell(8).alignment = { horizontal: "right" };
+        if (!hideSellingXls2) {
+          dr.getCell(7).alignment = { horizontal: "right" };
+          dr.getCell(8).alignment = { horizontal: "right" };
+        }
         setBorder(dr);
       });
 
       // ── Totals row ──
-      const totRow = sheet.addRow(["", "", "Totals", totalQty, "", fmtNum(totalWtAll), "", fmtMoney(totalAll)]);
+      const totRowCells2: any[] = ["", "", "Totals", totalQty, "", fmtNum(totalWtAll)];
+      if (!hideSellingXls2) { totRowCells2.push(""); totRowCells2.push(fmtMoney(totalAll)); }
+      const totRow = sheet.addRow(totRowCells2);
       totRow.height = 22;
       totRow.eachCell((cell: any) => {
         cell.font = { bold: true, size: 11, color: { argb: WHITE } };
@@ -2320,18 +2319,19 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       sheet.addRow([]);
 
-      // ── Financial summary block ──
-      const subtotal = parseFloat(order.subtotalBales || "0");
-      const freight = parseFloat(order.freightAmount || "0");
-      const otherChargesTotal2 = parseFloat(order.otherChargesTotal || "0");
-      const grandTotal = parseFloat(order.grandTotal || "0");
+      // ── Financial summary block (omit when selling prices are hidden) ──
+      if (!hideSellingXls2) {
+        const subtotal = parseFloat(order.subtotalBales || "0");
+        const freight = parseFloat(order.freightAmount || "0");
+        const otherChargesTotal2 = parseFloat(order.otherChargesTotal || "0");
+        const grandTotal = parseFloat(order.grandTotal || "0");
 
-      const otherChargeLines2 = orderCharges2.filter((ch: any) => ch.chargeType !== "FREIGHT");
-      const chargeRows2: [string, number][] = otherChargeLines2.length > 0
-        ? otherChargeLines2.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
-        : otherChargesTotal2 > 0
-          ? [["Other Charges", otherChargesTotal2]]
-          : [];
+        const otherChargeLines2 = orderCharges2.filter((ch: any) => ch.chargeType !== "FREIGHT");
+        const chargeRows2: [string, number][] = otherChargeLines2.length > 0
+          ? otherChargeLines2.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
+          : otherChargesTotal2 > 0
+            ? [["Other Charges", otherChargesTotal2]]
+            : [];
 
       const summaryData: [string, number][] = [
         ["Subtotal (Bales)", subtotal],
@@ -2340,30 +2340,31 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         ["Grand Total", grandTotal],
       ];
 
-      const sumHdr = sheet.addRow(["", "", "", "", "", "", "Name", "Amount"]);
-      sumHdr.height = 22;
-      sumHdr.getCell(7).font = { bold: true, color: { argb: WHITE }, size: 11 };
-      sumHdr.getCell(8).font = { bold: true, color: { argb: WHITE }, size: 11 };
-      setFill(sumHdr.getCell(7), DARK_BLUE);
-      setFill(sumHdr.getCell(8), DARK_BLUE);
-      sumHdr.getCell(7).alignment = { horizontal: "center" };
-      sumHdr.getCell(8).alignment = { horizontal: "center" };
+        const sumHdr = sheet.addRow(["", "", "", "", "", "", "Name", "Amount"]);
+        sumHdr.height = 22;
+        sumHdr.getCell(7).font = { bold: true, color: { argb: WHITE }, size: 11 };
+        sumHdr.getCell(8).font = { bold: true, color: { argb: WHITE }, size: 11 };
+        setFill(sumHdr.getCell(7), DARK_BLUE);
+        setFill(sumHdr.getCell(8), DARK_BLUE);
+        sumHdr.getCell(7).alignment = { horizontal: "center" };
+        sumHdr.getCell(8).alignment = { horizontal: "center" };
 
-      summaryData.forEach(([label, amount], idx) => {
-        const sr = sheet.addRow(["", "", "", "", "", "", label, fmtMoney(amount)]);
-        sr.height = 20;
-        const isGrandTotal = idx === summaryData.length - 1;
-        const bg = isGrandTotal ? DARK_BLUE : (idx % 2 === 0 ? WHITE : LIGHT_GRAY);
-        const fg = isGrandTotal ? WHITE : "FF000000";
-        setFill(sr.getCell(7), bg);
-        setFill(sr.getCell(8), bg);
-        sr.getCell(7).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
-        sr.getCell(8).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
-        sr.getCell(7).alignment = { horizontal: "left" };
-        sr.getCell(8).alignment = { horizontal: "right" };
-        sr.getCell(7).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
-        sr.getCell(8).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
-      });
+        summaryData.forEach(([label, amount], idx) => {
+          const sr = sheet.addRow(["", "", "", "", "", "", label, fmtMoney(amount)]);
+          sr.height = 20;
+          const isGrandTotal = idx === summaryData.length - 1;
+          const bg = isGrandTotal ? DARK_BLUE : (idx % 2 === 0 ? WHITE : LIGHT_GRAY);
+          const fg = isGrandTotal ? WHITE : "FF000000";
+          setFill(sr.getCell(7), bg);
+          setFill(sr.getCell(8), bg);
+          sr.getCell(7).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
+          sr.getCell(8).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
+          sr.getCell(7).alignment = { horizontal: "left" };
+          sr.getCell(8).alignment = { horizontal: "right" };
+          sr.getCell(7).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
+          sr.getCell(8).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
+        });
+      } // end if (!hideSellingXls2)
 
       const dateStr = getClientDate(req);
       const fileName = `invoice_${invoiceNum.replace(/[^a-zA-Z0-9]/g, "_")}_${dateStr}.xlsx`;
@@ -2492,6 +2493,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
+      const { hideSelling: hideSellingHtml } = await getExportPriceVisibility(req);
       const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
       const [order] = await db
         .select({
@@ -2561,8 +2563,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           <td>${fmtNum(line.qty)}</td>
           <td>${fmtNum(line.weightPerBale)}</td>
           <td>${fmtNum(line.totalWeight)}</td>
-          <td>${fmtMoney(line.pricePerBale)}</td>
-          <td>${fmtMoney(line.totalPrice)}</td>
+          ${hideSellingHtml ? "" : `<td>${fmtMoney(line.pricePerBale)}</td>`}
+          ${hideSellingHtml ? "" : `<td>${fmtMoney(line.totalPrice)}</td>`}
         </tr>`;
       });
 
@@ -2672,7 +2674,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
     <colgroup>
       <col class="col-num"><col class="col-article"><col class="col-product">
       <col class="col-qty"><col class="col-wt-bale"><col class="col-total-wt">
-      <col class="col-price"><col class="col-total">
+      ${hideSellingHtml ? "" : `<col class="col-price"><col class="col-total">`}
     </colgroup>
     <thead><tr>
       <th>#</th>
@@ -2681,8 +2683,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       <th>Qty</th>
       <th>Wt/Bale</th>
       <th>Total Wt</th>
-      <th>Price/Bale</th>
-      <th>Total</th>
+      ${hideSellingHtml ? "" : `<th>Price/Bale</th><th>Total</th>`}
     </tr></thead>
     <tbody>${linesHtml}</tbody>
     <tfoot><tr>
@@ -2690,11 +2691,11 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       <td>${fmtNum(order.totalQtyBales)}</td>
       <td></td>
       <td></td>
-      <td></td>
-      <td>${fmtMoney(order.subtotalBales)}</td>
+      ${hideSellingHtml ? "" : `<td></td><td>${fmtMoney(order.subtotalBales)}</td>`}
     </tr></tfoot>
   </table>
 
+  ${hideSellingHtml ? "" : `
   <div class="totals-wrap">
     <table class="totals-table">
       <tr><td>Subtotal (Bales)</td><td>${fmtMoney(order.subtotalBales)}</td></tr>
@@ -2710,6 +2711,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       <tr class="grand"><td>Grand Total</td><td>${fmtMoney(order.grandTotal)}</td></tr>
     </table>
   </div>
+  `}
 </div>
 
 </body></html>`;
