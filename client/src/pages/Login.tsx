@@ -7,7 +7,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import hmdLogo from "@assets/WhatsApp_Image_2026-04-07_at_11.07.16_1775633971273.jpeg";
+import hmdLogo from "@assets/WhatsApp_Image_2026-04-07_at_11.07.16_1775552894976.jpeg";
 
 const features = [
   {
@@ -85,12 +85,14 @@ export default function Login() {
 
         {/* Logo */}
         <div className="relative z-10">
-          <img
-            src={hmdLogo}
-            alt="HMD International Group"
-            className="h-14 w-auto rounded-lg object-cover"
-            style={{ aspectRatio: "1.6 / 1" }}
-          />
+          <div className="inline-flex items-center justify-center bg-white rounded-xl px-4 py-2 shadow-md">
+            <img
+              src={hmdLogo}
+              alt="HMD International Group"
+              className="h-10 w-auto object-contain"
+              style={{ maxWidth: "160px" }}
+            />
+          </div>
         </div>
 
         {/* Headline + features */}
@@ -148,12 +150,9 @@ export default function Login() {
             <img
               src={hmdLogo}
               alt="HMD International Group"
-              className="h-9 w-auto rounded-md object-cover"
-              style={{ aspectRatio: "1.6 / 1" }}
+              className="h-8 w-auto object-contain dark:invert"
+              style={{ maxWidth: "130px" }}
             />
-            <span className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">
-              International Group
-            </span>
           </div>
           {/* Spacer on desktop so toggle stays right */}
           <div className="hidden lg:block" />
