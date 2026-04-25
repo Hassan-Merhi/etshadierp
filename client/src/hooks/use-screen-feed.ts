@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import html2canvas from "html2canvas";
 
-const CAPTURE_INTERVAL_MS = 1500;
-const CAPTURE_TIMEOUT_MS  = 4000; // abort if html2canvas hangs
+const CAPTURE_INTERVAL_MS = 2000;
+const CAPTURE_TIMEOUT_MS  = 8000;
 const CLICK_RETAIN_MS     = 8000;
 
 export interface ClickEvent {
@@ -45,22 +45,32 @@ export function useScreenFeed() {
       if (busyRef.current) return;
       busyRef.current = true;
       try {
-        // Race html2canvas against a timeout so it can't hang indefinitely
+        // Capture only the visible viewport using SVG-based rendering (much faster)
         const canvas = await Promise.race([
           html2canvas(document.body, {
-            scale:      0.5,
-            useCORS:    true,
-            logging:    false,
-            allowTaint: true,
+            scale:                 0.35,   // lower scale = faster + smaller payload
+            useCORS:               true,
+            logging:               false,
+            allowTaint:            true,
+            foreignObjectRendering: true,  // SVG path: dramatically faster for complex UIs
+            x:           window.scrollX,
+            y:           window.scrollY,
+            width:       window.innerWidth,
+            height:      window.innerHeight,
+            scrollX:    -window.scrollX,
+            scrollY:    -window.scrollY,
+            windowWidth:  window.innerWidth,
+            windowHeight: window.innerHeight,
+            imageTimeout: 500,            // don't wait long for images
             ignoreElements: (el) =>
               el.getAttribute("data-screenfeed-ignore") === "true",
           }),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("html2canvas timeout")), CAPTURE_TIMEOUT_MS)
+            setTimeout(() => reject(new Error("timeout")), CAPTURE_TIMEOUT_MS)
           ),
         ]);
 
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.4);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.45);
         const cutoff  = Date.now() - CLICK_RETAIN_MS;
         const clicks  = clickBuffer.filter(c => c.ts >= cutoff);
 
@@ -71,13 +81,15 @@ export function useScreenFeed() {
           body:        JSON.stringify({ dataUrl, clicks }),
         }).catch(() => {});
       } catch {
-        // html2canvas failed or timed out — try again next interval
+        // Capture failed or timed out — reset and retry next interval
       } finally {
         busyRef.current = false;
       }
     };
 
+    // Delay the first capture by 2 seconds to let the page fully settle
+    const firstTimer = setTimeout(capture, 2000);
     const id = setInterval(capture, CAPTURE_INTERVAL_MS);
-    return () => clearInterval(id);
+    return () => { clearTimeout(firstTimer); clearInterval(id); };
   }, []);
 }

@@ -276,7 +276,14 @@ export function registerAuthRoutes(app: Express) {
           ))
           .orderBy(desc(userPresence.lastSeen))
           .limit(1);
-        res.json(rows[0] || null);
+        if (!rows[0]) return res.json(null);
+        // Explicitly serialize date to ISO string so clients parse it reliably
+        res.json({
+          ...rows[0],
+          lastSeen: rows[0].lastSeen instanceof Date
+            ? rows[0].lastSeen.toISOString()
+            : String(rows[0].lastSeen),
+        });
       } catch (e: any) {
         res.status(500).json({ message: e.message });
       }
@@ -297,7 +304,13 @@ export function registerAuthRoutes(app: Express) {
           .where(eq(userActivityLog.userId, req.params.userId))
           .orderBy(desc(userActivityLog.occurredAt))
           .limit(50);
-        res.json(rows);
+        // Serialize dates to ISO strings for reliable client-side parsing
+        res.json(rows.map(r => ({
+          ...r,
+          occurredAt: r.occurredAt instanceof Date
+            ? r.occurredAt.toISOString()
+            : String(r.occurredAt),
+        })));
       } catch (e: any) {
         res.status(500).json({ message: e.message });
       }
