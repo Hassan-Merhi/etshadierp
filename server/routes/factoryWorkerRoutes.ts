@@ -334,6 +334,14 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
 
       // Load existing workers for fast lookup
       const existingWorkers = await db.select().from(factoryWorkers).where(eq(factoryWorkers.companyId, companyId));
+
+      // Determine next HMD code number for auto-assignment during import
+      const importPrefix = "HMD";
+      let nextHmdNum = existingWorkers.reduce((max, w: any) => {
+        if (!w.employeeCode) return max;
+        const m = w.employeeCode.match(new RegExp(`^${importPrefix}(\\d+)$`));
+        return m ? Math.max(max, parseInt(m[1], 10)) : max;
+      }, 0);
       const byCode = new Map(existingWorkers.filter((w: any) => w.employeeCode).map((w: any) => [w.employeeCode, w]));
       const byPassport = new Map(existingWorkers.filter((w: any) => w.passportNumber).map((w: any) => [w.passportNumber, w]));
       const byNationalId = new Map(existingWorkers.filter((w: any) => w.nationalId).map((w: any) => [w.nationalId, w]));
@@ -379,7 +387,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           } else {
             const [newWorker] = await db.insert(factoryWorkers).values({ ...mapped, companyId }).returning();
             if (!newWorker.employeeCode) {
-              await db.update(factoryWorkers).set({ employeeCode: `FW-${companyId}-${newWorker.id}` }).where(eq(factoryWorkers.id, newWorker.id));
+              nextHmdNum++;
+              const autoCode = `${importPrefix}${String(nextHmdNum).padStart(3, "0")}`;
+              await db.update(factoryWorkers).set({ employeeCode: autoCode }).where(eq(factoryWorkers.id, newWorker.id));
             }
             created++;
           }
@@ -498,7 +508,18 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const [worker] = await db.insert(factoryWorkers).values(parsed).returning();
 
       if (!worker.employeeCode) {
-        const code = `FW-${companyId}-${worker.id}`;
+        const prefix = "HMD";
+        const existing = await db
+          .select({ employeeCode: factoryWorkers.employeeCode })
+          .from(factoryWorkers)
+          .where(eq(factoryWorkers.companyId, companyId));
+        const maxNum = existing.reduce((max, w) => {
+          if (!w.employeeCode) return max;
+          const m = w.employeeCode.match(new RegExp(`^${prefix}(\\d+)$`));
+          if (!m) return max;
+          return Math.max(max, parseInt(m[1], 10));
+        }, 0);
+        const code = `${prefix}${String(maxNum + 1).padStart(3, "0")}`;
         const [updated] = await db
           .update(factoryWorkers)
           .set({ employeeCode: code })
