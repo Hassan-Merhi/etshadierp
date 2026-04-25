@@ -1,6 +1,5 @@
 import {
   Package,
-  Tags,
   Container,
   History,
   BarChart3,
@@ -30,7 +29,6 @@ import {
   Gauge,
   MessageCircle,
   AlertTriangle,
-  Boxes,
   ChevronDown,
   LayoutGrid,
   Scale,
@@ -82,8 +80,7 @@ const navSections: NavSection[] = [
     label: "Bales",
     color: "#eab308",
     items: [
-      { title: "Bales & Lookup",  url: "/factory/bales-hub",          icon: History   },
-      { title: "Bale Products",   url: "/factory/bale-products",      icon: Tags      },
+      { title: "Bale Explorer",    url: "/factory/bales-hub",          icon: History   },
     ],
   },
   {
