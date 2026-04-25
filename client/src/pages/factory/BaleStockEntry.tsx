@@ -20,6 +20,10 @@
   import {
     Popover, PopoverContent, PopoverTrigger,
   } from "@/components/ui/popover";
+  import {
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+  } from "@/components/ui/dropdown-menu";
+  import { ChevronDown } from "lucide-react";
   import { Skeleton } from "@/components/ui/skeleton";
   import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
   import { useToast } from "@/hooks/use-toast";
@@ -1468,30 +1472,53 @@
                 <LayoutList className="h-4 w-4" />
               </Button>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const exportDate = dateFilter || new Date().toLocaleDateString('en-CA');
-                window.open(`/api/factory/bales/export-full.xlsx?date=${exportDate}`, "_blank");
-              }}
-              data-testid="button-export-bales-full"
-              title={`Export all bale data for ${dateFilter || "today"} as Excel (for backup/reimport)`}
-            >
-              <FileSpreadsheet className="h-4 w-4 mr-1" />
-              Export Bales ({dateFilter || "Today"})
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => reimportFileRef.current?.click()}
-              disabled={reimportMutation.isPending || reimporting}
-              data-testid="button-reimport-bales"
-              title="Reimport bales from exported Excel with original reference numbers"
-            >
-              <Upload className="h-4 w-4 mr-1" />
-              {reimportMutation.isPending ? "Reimporting..." : "Reimport Bales"}
-            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" data-testid="button-tools-menu">
+                  Tools
+                  <ChevronDown className="h-3.5 w-3.5 ml-1.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Export / Import</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() => {
+                    const exportDate = dateFilter || new Date().toLocaleDateString('en-CA');
+                    window.open(`/api/factory/bales/export-full.xlsx?date=${exportDate}`, "_blank");
+                  }}
+                  data-testid="button-export-bales-full"
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Export Bales ({dateFilter || "Today"})
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => reimportFileRef.current?.click()}
+                  disabled={reimportMutation.isPending || reimporting}
+                  data-testid="button-reimport-bales"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {reimportMutation.isPending ? "Reimporting..." : "Reimport Bales"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => window.open("/api/factory/bales/export-names.xlsx", "_blank")}
+                  data-testid="button-export-bale-names"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Names
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => namesFileRef.current?.click()}
+                  disabled={bulkUpdateNamesMutation.isPending || importingNames}
+                  data-testid="button-import-bale-names"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {bulkUpdateNamesMutation.isPending ? "Importing..." : "Import Names"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <input
               ref={reimportFileRef}
               type="file"
@@ -1507,27 +1534,6 @@
               }}
               data-testid="input-reimport-bales"
             />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.open("/api/factory/bales/export-names.xlsx", "_blank")}
-              data-testid="button-export-bale-names"
-              title="Download all bales as Excel to edit product names"
-            >
-              <Download className="h-4 w-4 mr-1" />
-              Export Names
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => namesFileRef.current?.click()}
-              disabled={bulkUpdateNamesMutation.isPending || importingNames}
-              data-testid="button-import-bale-names"
-              title="Upload edited Excel to update product names"
-            >
-              <Upload className="h-4 w-4 mr-1" />
-              {bulkUpdateNamesMutation.isPending ? "Importing..." : "Import Names"}
-            </Button>
             <input
               ref={namesFileRef}
               type="file"
@@ -1543,11 +1549,12 @@
               }}
               data-testid="input-import-bale-names"
             />
+
             {filteredBales && filteredBales.length > 0 && (
               <>
                 <Button variant="outline" size="sm" onClick={selectAll} data-testid="button-select-all">Select All</Button>
                 {selectedBaleIds.size > 0 && (
-                  <Button variant="outline" size="sm" onClick={clearSelection} data-testid="button-clear-selection">Clear</Button>
+                  <Button variant="ghost" size="sm" onClick={clearSelection} data-testid="button-clear-selection">Clear</Button>
                 )}
               </>
             )}
