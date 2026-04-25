@@ -19,6 +19,9 @@ interface CurrencyContextType {
   /** Formats amount as-is in the selected currency WITHOUT conversion.
    *  Use this for values already stored in the display currency (e.g. customer balances in CFA). */
   formatAmountRaw: (amount: number | string) => string;
+  /** For amounts stored in CFA: shows CFA as-is, divides by rate to show USD.
+   *  e.g. CFA 5,600,000 ÷ 551 = $10,162 when in USD mode. */
+  formatCashAmount: (amount: number | string) => string;
   convertToDisplay: (usdAmount: number) => number;
   convertToUSD: (displayAmount: number) => number;
 }
@@ -134,6 +137,22 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     return `$ ${numAmount.toLocaleString(undefined, { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`;
   };
 
+  // For cash/sales amounts stored in CFA:
+  //   CFA mode  → show raw CFA (no change)
+  //   USD mode  → divide CFA by exchange rate to get USD equivalent
+  // e.g. CFA 5,600,000 at rate 551 → $10,162 USD
+  const formatCashAmount = (amount: number | string): string => {
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+    if (isNaN(numAmount)) return "";
+    if (selectedCurrency === "USD" && exchangeRate) {
+      const usdAmount = numAmount / exchangeRate;
+      const isWhole = Math.abs(usdAmount) % 1 === 0;
+      return `$ ${usdAmount.toLocaleString(undefined, { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`;
+    }
+    // CFA mode (or no exchange rate) — show raw CFA
+    return `CFA ${Math.round(numAmount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  };
+
   const formatAmount = (amount: number | string, currency?: Currency): string => {
     const curr = currency || selectedCurrency;
     const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
@@ -170,6 +189,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       isMultiCurrency,
       formatAmount,
       formatAmountRaw,
+      formatCashAmount,
       convertToDisplay,
       convertToUSD
     }}>

@@ -85,7 +85,7 @@ interface InventoryItem {
 
 export default function POSDaybook() {
   const { formatDisplayDate } = useDateFormat();
-  const { formatAmount } = useCurrencyContext();
+  const { formatCashAmount } = useCurrencyContext();
   const { selectedCompany } = useCompany();
   const isMaliCompany = selectedCompany?.name?.toLowerCase().includes('mali');
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherWithItems | null>(null);
@@ -504,7 +504,7 @@ export default function POSDaybook() {
               <Skeleton className="h-6 w-20" />
             ) : (
               <div className="text-lg md:text-2xl font-semibold" data-testid="text-total-sales">
-                {formatAmount(totalSales)}
+                {formatCashAmount(totalSales)}
               </div>
             )}
           </CardContent>
@@ -522,7 +522,7 @@ export default function POSDaybook() {
               <Skeleton className="h-6 w-20" />
             ) : (
               <div className="text-lg md:text-2xl font-semibold" data-testid="text-avg-transaction">
-                {formatAmount(salesTransactionCount > 0 ? totalSales / salesTransactionCount : 0)}
+                {formatCashAmount(salesTransactionCount > 0 ? totalSales / salesTransactionCount : 0)}
               </div>
             )}
           </CardContent>
@@ -633,7 +633,7 @@ export default function POSDaybook() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs font-semibold">
-                          {formatAmount(voucher.totalAmount)}
+                          {formatCashAmount(voucher.totalAmount)}
                         </TableCell>
                         <TableCell className="max-w-xs truncate text-xs hidden md:table-cell">
                           {voucher.description || "-"}
@@ -850,7 +850,7 @@ export default function POSDaybook() {
                                         <div className="text-xs text-muted-foreground">{item.stockItemCode || ""}</div>
                                       </div>
                                       <div className="text-sm font-mono">
-                                        {formatAmount(parseFloat(item.lastSellingPrice || item.averageRate))}
+                                        {formatCashAmount(parseFloat(item.lastSellingPrice || item.averageRate))}
                                       </div>
                                     </div>
                                   </CommandItem>
@@ -913,15 +913,15 @@ export default function POSDaybook() {
                             </TableCell>
                             {canSeeProfitCost && (
                               <TableCell className="text-right font-mono text-muted-foreground">
-                                {formatAmount(parseFloat(item.costPrice || "0"))}
+                                {formatCashAmount(parseFloat(item.costPrice || "0"))}
                               </TableCell>
                             )}
                             <TableCell className="text-right font-mono font-semibold">
-                              {formatAmount(parseFloat(item.totalSales))}
+                              {formatCashAmount(parseFloat(item.totalSales))}
                             </TableCell>
                             {canSeeProfitCost && (
                               <TableCell className={`text-right font-mono font-semibold ${isPositiveProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                {formatAmount(profit)}
+                                {formatCashAmount(profit)}
                               </TableCell>
                             )}
                             <TableCell>
@@ -948,13 +948,13 @@ export default function POSDaybook() {
                       <div className="text-sm">
                         <span className="text-muted-foreground">Total Cost: </span>
                         <span className="font-mono font-semibold">
-                          {formatAmount(editedItems.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0))}
+                          {formatCashAmount(editedItems.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0))}
                         </span>
                       </div>
                       <div className="text-sm">
                         <span className="text-muted-foreground">Total Profit: </span>
                         <span className="font-mono font-semibold text-green-600 dark:text-green-400">
-                          {formatAmount(editedItems.reduce((sum, item) => sum + parseFloat(item.profit || "0"), 0))}
+                          {formatCashAmount(editedItems.reduce((sum, item) => sum + parseFloat(item.profit || "0"), 0))}
                         </span>
                       </div>
                     </div>
@@ -962,7 +962,7 @@ export default function POSDaybook() {
                   <div className="text-sm">
                     <span className="text-muted-foreground">Total Sales: </span>
                     <span className="font-mono font-semibold">
-                      {formatAmount(editedItems.reduce((sum, item) => sum + parseFloat(item.totalSales), 0))}
+                      {formatCashAmount(editedItems.reduce((sum, item) => sum + parseFloat(item.totalSales), 0))}
                     </span>
                   </div>
                 </div>
@@ -1016,29 +1016,29 @@ export default function POSDaybook() {
                               {formatNumber(parseFloat(item.quantity), 0)}
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              {formatAmount(parseFloat(item.sellingPrice))}
+                              {formatCashAmount(parseFloat(item.sellingPrice))}
                             </TableCell>
                             {canSeeProfitCost && (
                               <TableCell className="text-right font-mono text-muted-foreground">
-                                {formatAmount(parseFloat(item.costPrice || "0"))}
+                                {formatCashAmount(parseFloat(item.costPrice || "0"))}
                               </TableCell>
                             )}
                             <TableCell className="text-right font-mono font-semibold">
-                              {formatAmount(parseFloat(item.totalSales))}
+                              {formatCashAmount(parseFloat(item.totalSales))}
                             </TableCell>
                             {canSeeProfitCost && (
                               <TableCell className={`text-right font-mono font-semibold ${isPositiveProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                {formatAmount(profit)}
+                                {formatCashAmount(profit)}
                               </TableCell>
                             )}
                             {canSeeProfitCost && (
                               <TableCell className="text-right font-mono text-muted-foreground">
-                                {formatAmount(parseFloat(item.configuredPrice || "0"))}
+                                {formatCashAmount(parseFloat(item.configuredPrice || "0"))}
                               </TableCell>
                             )}
                             {canSeeProfitCost && (
                               <TableCell className={`text-right font-mono font-semibold ${isHassansProfitPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                {formatAmount(hassansProfit)}
+                                {formatCashAmount(hassansProfit)}
                               </TableCell>
                             )}
                             {canSeeProfitCost && (
@@ -1057,7 +1057,7 @@ export default function POSDaybook() {
                   <div className="text-sm">
                     <span className="text-muted-foreground">Total Sales: </span>
                     <span className="font-mono font-semibold">
-                      {formatAmount(voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.totalSales), 0))}
+                      {formatCashAmount(voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.totalSales), 0))}
                     </span>
                   </div>
                   {canSeeProfitCost && (
@@ -1065,25 +1065,25 @@ export default function POSDaybook() {
                       <div className="text-sm">
                         <span className="text-muted-foreground">Total Cost: </span>
                         <span className="font-mono font-semibold">
-                          {formatAmount(voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.totalCost || "0"), 0))}
+                          {formatCashAmount(voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.totalCost || "0"), 0))}
                         </span>
                       </div>
                       <div className="text-sm">
                         <span className="text-muted-foreground">Total Profit: </span>
                         <span className="font-mono font-semibold text-green-600 dark:text-green-400">
-                          {formatAmount(voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.profit || "0"), 0))}
+                          {formatCashAmount(voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.profit || "0"), 0))}
                         </span>
                       </div>
                       <div className="text-sm">
                         <span className="text-muted-foreground">Hassan's Total: </span>
                         <span className="font-mono font-semibold">
-                          {formatAmount(voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.hassansTotal || "0"), 0))}
+                          {formatCashAmount(voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.hassansTotal || "0"), 0))}
                         </span>
                       </div>
                       <div className="text-sm">
                         <span className="text-muted-foreground">Hassan's Profit: </span>
                         <span className={`font-mono font-semibold ${voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.hassansProfit || "0"), 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {formatAmount(voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.hassansProfit || "0"), 0))}
+                          {formatCashAmount(voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.hassansProfit || "0"), 0))}
                         </span>
                       </div>
                     </>

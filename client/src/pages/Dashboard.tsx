@@ -166,7 +166,7 @@ type FactoryDashboardKPIs = {
 export default function Dashboard() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
-  const { formatAmount } = useCurrencyContext();
+  const { formatAmount, formatCashAmount } = useCurrencyContext();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const [, setLocation] = useLocation();
@@ -723,19 +723,19 @@ export default function Dashboard() {
               <div className="p-4 sm:p-5 text-center">
                 <p className="text-xs text-muted-foreground mb-1">Available</p>
                 <p className="text-xl sm:text-2xl font-bold font-mono text-chart-2" data-testid="text-total-available">
-                  {formatAmount(totalAvailable)}
+                  {formatCashAmount(totalAvailable)}
                 </p>
               </div>
               <div className="p-4 sm:p-5 text-center">
                 <p className="text-xs text-muted-foreground mb-1">To Pay</p>
                 <p className="text-xl sm:text-2xl font-bold font-mono text-destructive" data-testid="text-total-payable">
-                  {formatAmount(totalPayable)}
+                  {formatCashAmount(totalPayable)}
                 </p>
               </div>
               <div className="p-4 sm:p-5 text-center">
                 <p className="text-xs text-muted-foreground mb-1">Net</p>
                 <p className={cn("text-xl sm:text-2xl font-bold font-mono", netCashPosition >= 0 ? "text-chart-2" : "text-destructive")} data-testid="text-net-position">
-                  {formatAmount(netCashPosition)}
+                  {formatCashAmount(netCashPosition)}
                 </p>
               </div>
             </div>
@@ -827,7 +827,7 @@ export default function Dashboard() {
                         >
                           <GripVertical className="h-4 w-4 text-muted-foreground/60 shrink-0" />
                           <span className="flex-1 text-sm font-medium truncate">{dca.account.name}</span>
-                          <span className="text-sm font-bold font-mono text-chart-2 shrink-0" data-testid={`text-balance-${dca.id}`}>{formatAmount(balance)}</span>
+                          <span className="text-sm font-bold font-mono text-chart-2 shrink-0" data-testid={`text-balance-${dca.id}`}>{formatCashAmount(balance)}</span>
                           <Button
                             size="icon"
                             variant="ghost"
@@ -842,7 +842,7 @@ export default function Dashboard() {
                     })}
                     <div className="flex items-center justify-between py-2 px-2 bg-chart-2/10 rounded font-semibold mt-1">
                       <span className="text-sm">Total Available</span>
-                      <span className="text-sm font-mono text-chart-2">{formatAmount(totalAvailable)}</span>
+                      <span className="text-sm font-mono text-chart-2">{formatCashAmount(totalAvailable)}</span>
                     </div>
                   </div>
                 )}
@@ -925,7 +925,7 @@ export default function Dashboard() {
                       >
                         <GripVertical className="h-4 w-4 text-muted-foreground/60 shrink-0" />
                         <span className="flex-1 text-sm font-medium truncate">{account.name}</span>
-                        <span className="text-sm font-bold font-mono text-destructive shrink-0" data-testid={`text-payable-${account.id}`}>{formatAmount(Math.abs(account.balance))}</span>
+                        <span className="text-sm font-bold font-mono text-destructive shrink-0" data-testid={`text-payable-${account.id}`}>{formatCashAmount(Math.abs(account.balance))}</span>
                         <Button
                           size="icon"
                           variant="ghost"
@@ -939,7 +939,7 @@ export default function Dashboard() {
                     ))}
                     <div className="flex items-center justify-between py-2 px-2 bg-destructive/10 rounded font-semibold mt-1">
                       <span className="text-sm">Total To Pay</span>
-                      <span className="text-sm font-mono text-destructive">{formatAmount(totalPayable)}</span>
+                      <span className="text-sm font-mono text-destructive">{formatCashAmount(totalPayable)}</span>
                     </div>
                   </div>
                 )}

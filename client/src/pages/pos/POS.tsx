@@ -220,7 +220,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     enabled: !!editVoucherId,
   });
 
-  const { selectedCurrency, exchangeRate: dailyExchangeRate, convertToUSD, displayCurrency, formatAmount } = useCurrencyContext();
+  const { selectedCurrency, exchangeRate: dailyExchangeRate, convertToUSD, displayCurrency, formatAmount, formatAmountRaw } = useCurrencyContext();
   // Use global currency from context (force USD if company doesn't have dual-currency enabled)
   const activeCurrency: Currency = displayCurrency ? selectedCurrency : "USD";
   // Use the daily exchange rate from context
@@ -1699,7 +1699,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               <p className="text-xs text-muted-foreground pl-0 sm:pl-6" data-testid="text-customer-balance">
                 Balance:{" "}
                 <span className={selectedCustomer.balanceSide === "Dr" ? "text-destructive font-medium" : "text-green-600 dark:text-green-400 font-medium"}>
-                  {formatAmount(selectedCustomer.balance)} {selectedCustomer.balanceSide === "Dr" ? "owed" : "credit"}
+                  {formatAmountRaw(selectedCustomer.balance)} {selectedCustomer.balanceSide === "Dr" ? "owed" : "credit"}
                 </span>
               </p>
             )}
