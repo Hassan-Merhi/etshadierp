@@ -138,10 +138,31 @@ export default function FactoryBaleProductHistory() {
     );
   };
 
-  const formatNumber = (num: number) => {
+  const formatNumber = (num: number, _decimals?: number) => {
     if (num % 1 === 0) return num.toLocaleString();
     return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 });
   };
+
+  const formatDateTime = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    return `${formatDisplayDate(d)} ${time}`;
+  };
+
+  const [showAllBales, setShowAllBales] = useState(false);
+
+  const { data: allBalesData, isLoading: allBalesLoading } = useQuery<{ bales: BaleDetail[] }>({
+    queryKey: ["/api/factory/bale-product-history", productId, locationId, "all-bales", { year: selectedYear }],
+    queryFn: async () => {
+      const response = await fetch(
+        `/api/factory/bale-product-history/${productId}/${locationId}/all-bales?year=${selectedYear}`,
+        { credentials: "include" }
+      );
+      if (!response.ok) throw new Error("Failed to fetch");
+      return response.json();
+    },
+    enabled: showAllBales && parseInt(productId) > 0 && parseInt(locationId) > 0,
+  });
 
   if (isLoading) {
     return (
@@ -206,10 +227,18 @@ export default function FactoryBaleProductHistory() {
       </div>
 
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2 flex-wrap">
           <CardTitle className="text-lg" data-testid="text-table-title">
             Monthly Bale Stock Movement — {selectedYear}
           </CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAllBales((v) => !v)}
+            data-testid="button-show-all-bales"
+          >
+            {showAllBales ? "Hide All Bales" : "Show All Months"}
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="hidden md:block overflow-x-auto">
@@ -415,6 +444,133 @@ export default function FactoryBaleProductHistory() {
           </div>
         </CardContent>
       </Card>
+
+      {showAllBales && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg" data-testid="text-all-bales-title">
+              All Bales — {selectedYear}
+              {allBalesData && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  ({allBalesData.bales.length} bale{allBalesData.bales.length !== 1 ? "s" : ""})
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {allBalesLoading ? (
+              <div className="space-y-2">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className="hidden md:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Bale Code</TableHead>
+                        <TableHead>Reference</TableHead>
+                        <TableHead className="text-right">Weight (KG)</TableHead>
+                        {!hiddenCost.includes("bale_history_cost_per_kg") && <TableHead className="text-right">Cost/KG</TableHead>}
+                        {!hiddenCost.includes("bale_history_total_cost") && <TableHead className="text-right">Total Cost</TableHead>}
+                        <TableHead>Status</TableHead>
+                        <TableHead>Date/Time</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {allBalesData?.bales.map((bale) => (
+                        <TableRow key={bale.id} data-testid={`row-all-bale-${bale.id}`}>
+                          <TableCell className="font-medium font-mono">{bale.baleCode}</TableCell>
+                          <TableCell>
+                            <button
+                              className="font-mono text-sm text-primary underline-offset-2 hover:underline cursor-pointer"
+                              onClick={() => navigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bale.referenceNumber)}`)}
+                              data-testid={`button-all-ref-lookup-${bale.id}`}
+                            >
+                              {bale.referenceNumber}
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatNumber(bale.weightKg)} KG
+                          </TableCell>
+                          {!hiddenCost.includes("bale_history_cost_per_kg") && (
+                            <TableCell className="text-right font-mono">{formatAmount(bale.costPerKg)}</TableCell>
+                          )}
+                          {!hiddenCost.includes("bale_history_total_cost") && (
+                            <TableCell className="text-right font-mono">{formatAmount(bale.totalCost)}</TableCell>
+                          )}
+                          <TableCell>
+                            {bale.status === "DELETED" || bale.status === "REMOVED" ? (
+                              <Badge variant="destructive">Deleted</Badge>
+                            ) : bale.status === "DISPATCHED" ? (
+                              <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">Dispatched</Badge>
+                            ) : (
+                              <Badge variant="secondary">{bale.status}</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDateTime(bale.createdAt)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {(!allBalesData || allBalesData.bales.length === 0) && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                            No bales found for {selectedYear}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div className="md:hidden space-y-2">
+                  {allBalesData?.bales.map((bale) => (
+                    <div key={bale.id} className="p-3 rounded-md border text-sm" data-testid={`card-all-bale-${bale.id}`}>
+                      <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                        <span className="font-medium font-mono">{bale.baleCode}</span>
+                        <Badge variant="secondary">{bale.status}</Badge>
+                      </div>
+                      <div className="text-xs mb-2">
+                        <button
+                          className="font-mono text-primary underline-offset-2 hover:underline cursor-pointer"
+                          onClick={() => navigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bale.referenceNumber)}`)}
+                        >
+                          {bale.referenceNumber}
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <div className="text-muted-foreground">Weight</div>
+                          <div className="font-mono">{formatNumber(bale.weightKg)} KG</div>
+                        </div>
+                        {!hiddenCost.includes("bale_history_cost_per_kg") && (
+                          <div>
+                            <div className="text-muted-foreground">Cost/KG</div>
+                            <div className="font-mono">{formatAmount(bale.costPerKg)}</div>
+                          </div>
+                        )}
+                        {!hiddenCost.includes("bale_history_total_cost") && (
+                          <div>
+                            <div className="text-muted-foreground">Total</div>
+                            <div className="font-mono">{formatAmount(bale.totalCost)}</div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-2">{formatDateTime(bale.createdAt)}</div>
+                    </div>
+                  ))}
+                  {(!allBalesData || allBalesData.bales.length === 0) && (
+                    <div className="text-center text-muted-foreground py-8">No bales found for {selectedYear}</div>
+                  )}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

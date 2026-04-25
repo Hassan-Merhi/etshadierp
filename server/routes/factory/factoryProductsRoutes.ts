@@ -835,6 +835,50 @@ export function registerFactoryProductsRoutes(app: Express) {
     }
   });
 
+  app.get("/api/factory/bale-product-history/:productId/:locationId/all-bales", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const productId = parseInt(req.params.productId);
+      const locationId = parseInt(req.params.locationId);
+      const year = req.query.year ? parseInt(req.query.year as string) : null;
+
+      const conditions = [
+        eq(factoryBales.companyId, companyId),
+        eq(factoryBales.productId, productId),
+        eq(factoryBales.erpLocationId, locationId),
+      ];
+
+      if (year) {
+        const startDate = new Date(year, 0, 1);
+        const endDate = new Date(year + 1, 0, 1);
+        conditions.push(sql`${factoryBales.createdAt} >= ${startDate}`);
+        conditions.push(sql`${factoryBales.createdAt} < ${endDate}`);
+      }
+
+      const bales = await db
+        .select({
+          id: factoryBales.id,
+          baleCode: factoryBales.baleCode,
+          referenceNumber: factoryBales.referenceNumber,
+          weightKg: factoryBales.weightKg,
+          costPerKg: factoryBales.costPerKg,
+          totalCost: factoryBales.totalCost,
+          status: factoryBales.status,
+          createdAt: factoryBales.createdAt,
+        })
+        .from(factoryBales)
+        .where(and(...conditions))
+        .orderBy(desc(factoryBales.createdAt));
+
+      res.json({ bales });
+    } catch (error: any) {
+      console.error("Error fetching all bale details:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/factory/bale-products/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
