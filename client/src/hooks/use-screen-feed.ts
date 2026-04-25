@@ -1,17 +1,17 @@
 import { useEffect, useRef } from "react";
 import html2canvas from "html2canvas";
 
-const CAPTURE_INTERVAL_MS = 1500; // faster refresh
-const CLICK_RETAIN_MS     = 8000; // keep clicks for 8 seconds
+const CAPTURE_INTERVAL_MS = 1500;
+const CAPTURE_TIMEOUT_MS  = 4000; // abort if html2canvas hangs
+const CLICK_RETAIN_MS     = 8000;
 
 export interface ClickEvent {
-  x:     number; // fraction of viewport width (0-1)
-  y:     number; // fraction of viewport height (0-1)
-  label: string; // text / tag of clicked element
-  ts:    number; // epoch ms
+  x:     number;
+  y:     number;
+  label: string;
+  ts:    number;
 }
 
-// Shared click buffer — populated by the event listener, drained on each upload
 const clickBuffer: ClickEvent[] = [];
 
 function trimLabel(el: HTMLElement): string {
@@ -23,11 +23,9 @@ function trimLabel(el: HTMLElement): string {
   return txt.slice(0, 60);
 }
 
-// Attach click listener once (at module level so it survives hook unmounts)
 if (typeof window !== "undefined") {
   window.addEventListener("click", (e: MouseEvent) => {
     const target = e.target as HTMLElement;
-    // Ignore clicks inside the Watch dialog itself
     if (target.closest("[data-screenfeed-ignore='true']")) return;
     clickBuffer.push({
       x:     e.clientX / window.innerWidth,
@@ -35,7 +33,6 @@ if (typeof window !== "undefined") {
       label: trimLabel(target),
       ts:    Date.now(),
     });
-    // Cap buffer size
     if (clickBuffer.length > 50) clickBuffer.shift();
   }, { capture: true });
 }
@@ -48,19 +45,24 @@ export function useScreenFeed() {
       if (busyRef.current) return;
       busyRef.current = true;
       try {
-        const canvas = await html2canvas(document.body, {
-          scale:      0.5,
-          useCORS:    true,
-          logging:    false,
-          allowTaint: true,
-          ignoreElements: (el) =>
-            el.getAttribute("data-screenfeed-ignore") === "true",
-        });
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.4);
+        // Race html2canvas against a timeout so it can't hang indefinitely
+        const canvas = await Promise.race([
+          html2canvas(document.body, {
+            scale:      0.5,
+            useCORS:    true,
+            logging:    false,
+            allowTaint: true,
+            ignoreElements: (el) =>
+              el.getAttribute("data-screenfeed-ignore") === "true",
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("html2canvas timeout")), CAPTURE_TIMEOUT_MS)
+          ),
+        ]);
 
-        // Flush recent clicks (last CLICK_RETAIN_MS)
-        const cutoff = Date.now() - CLICK_RETAIN_MS;
-        const clicks = clickBuffer.filter(c => c.ts >= cutoff);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.4);
+        const cutoff  = Date.now() - CLICK_RETAIN_MS;
+        const clicks  = clickBuffer.filter(c => c.ts >= cutoff);
 
         fetch("/api/screen-feed", {
           method:      "POST",
@@ -69,7 +71,7 @@ export function useScreenFeed() {
           body:        JSON.stringify({ dataUrl, clicks }),
         }).catch(() => {});
       } catch {
-        // Silently ignore capture errors
+        // html2canvas failed or timed out — try again next interval
       } finally {
         busyRef.current = false;
       }

@@ -167,13 +167,20 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
     const now = Date.now();
     const recentClicks = clicks.filter(c => (now - c.ts) < 4000);
 
-    const fmtTime = (iso: string) =>
-      new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    const timeAgo = (iso: string) => {
-      const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    const fmtTime = (val: string | Date | null | undefined) => {
+      if (!val) return "—";
+      const d = new Date(val as string);
+      return isNaN(d.getTime()) ? "—" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    };
+    const timeAgo = (val: string | Date | null | undefined) => {
+      if (!val) return "unknown";
+      const d = new Date(val as string);
+      if (isNaN(d.getTime())) return "unknown";
+      const s = Math.floor((Date.now() - d.getTime()) / 1000);
       if (s < 5)  return "just now";
       if (s < 60) return `${s}s ago`;
-      return `${Math.floor(s / 60)}m ago`;
+      if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+      return `${Math.floor(s / 3600)}h ago`;
     };
 
     return (
