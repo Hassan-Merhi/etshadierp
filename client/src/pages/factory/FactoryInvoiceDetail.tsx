@@ -12,7 +12,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation, useRoute } from "wouter";
 import { useEscapeBack } from "@/hooks/use-escape-back";
-import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw, Container, Pencil, RotateCcw, Hammer } from "lucide-react";
+import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw, Container, Pencil, RotateCcw, Hammer, ChevronDown, GitCompare } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { useState, useRef } from "react";
 import {
@@ -307,6 +315,10 @@ export default function FactoryInvoiceDetail() {
   const isPendingVerification = order.status === "PENDING_VERIFICATION";
   const isVerifiedStatus = order.status === "VERIFIED";
   const isLoadingStatus = order.status === "LOADING";
+  const isFinalized = order.status === "FINALIZED";
+
+  const [revertDialogOpen, setRevertDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   return (
     <div className="flex flex-col h-full p-6 overflow-y-auto">
@@ -357,7 +369,8 @@ export default function FactoryInvoiceDetail() {
             </div>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Primary context action */}
           {order.status === "DRAFT" && (
             <Button
               variant="outline"
@@ -374,135 +387,146 @@ export default function FactoryInvoiceDetail() {
               data-testid="button-go-to-verify"
             >
               {isPendingVerification ? (
-                <>
-                  <ClipboardCheck className="mr-2 h-4 w-4" />
-                  View Verification
-                </>
+                <><ClipboardCheck className="mr-2 h-4 w-4" />View Verification</>
               ) : isVerifiedStatus ? (
-                <>
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Charges &amp; Finalize
-                </>
+                <><CheckCircle className="mr-2 h-4 w-4" />Charges &amp; Finalize</>
               ) : (
-                <>
-                  <ClipboardCheck className="mr-2 h-4 w-4" />
-                  View Loading
-                </>
+                <><ClipboardCheck className="mr-2 h-4 w-4" />View Loading</>
               )}
             </Button>
           )}
-          {order.status !== "CANCELLED" && (
-            <Button
-              variant="outline"
-              onClick={() => repriceProductionMutation.mutate()}
-              disabled={repriceProductionMutation.isPending}
-              data-testid="button-apply-production-prices"
-            >
-              <Hammer className={`mr-2 h-4 w-4 ${repriceProductionMutation.isPending ? "animate-spin" : ""}`} />
-              Apply Production Prices
-            </Button>
-          )}
-          {(order.status === "VERIFIED" || order.status === "FINALIZED") && (
-            <Button
-              variant="outline"
-              onClick={() => repriceMutation.mutate()}
-              disabled={repriceMutation.isPending}
-              data-testid="button-apply-prices"
-            >
-              <RefreshCw className={`mr-2 h-4 w-4 ${repriceMutation.isPending ? "animate-spin" : ""}`} />
-              Apply Selling Prices
-            </Button>
-          )}
-          {order.status === "FINALIZED" && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="outline"
+
+          {/* Actions dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" data-testid="button-actions-menu">
+                Actions
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {(isLoadingStatus || isFinalized) && (
+                <>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">View</DropdownMenuLabel>
+                  <DropdownMenuItem
+                    onClick={() => navigate(`/factory/sales/pending-invoices/${order.id}/verify`)}
+                    data-testid="button-proforma-vs-loaded"
+                  >
+                    <GitCompare className="h-4 w-4" />
+                    Proforma vs Loaded
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+
+              <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Pricing</DropdownMenuLabel>
+              {order.status !== "CANCELLED" && (
+                <DropdownMenuItem
+                  onClick={() => repriceProductionMutation.mutate()}
+                  disabled={repriceProductionMutation.isPending}
+                  data-testid="button-apply-production-prices"
+                >
+                  <Hammer className={`h-4 w-4 ${repriceProductionMutation.isPending ? "animate-spin" : ""}`} />
+                  Apply Production Prices
+                </DropdownMenuItem>
+              )}
+              {(isVerifiedStatus || isFinalized) && (
+                <DropdownMenuItem
+                  onClick={() => repriceMutation.mutate()}
+                  disabled={repriceMutation.isPending}
+                  data-testid="button-apply-prices"
+                >
+                  <RefreshCw className={`h-4 w-4 ${repriceMutation.isPending ? "animate-spin" : ""}`} />
+                  Apply Selling Prices
+                </DropdownMenuItem>
+              )}
+
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Export</DropdownMenuLabel>
+              <DropdownMenuItem onClick={handleExportExcel} data-testid="button-export-excel">
+                <FileSpreadsheet className="h-4 w-4" />
+                Download Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportPdf} data-testid="button-export-pdf">
+                <FileDown className="h-4 w-4" />
+                Download PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportLoadingStatus} data-testid="button-export-loading-status">
+                <Container className="h-4 w-4" />
+                Loading Status
+              </DropdownMenuItem>
+
+              {(isFinalized || order.status !== "FINALIZED") && order.status !== "CANCELLED" && (
+                <DropdownMenuSeparator />
+              )}
+              {isFinalized && (
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onSelect={() => setRevertDialogOpen(true)}
                   data-testid="button-unfinalize"
                 >
-                  <RotateCcw className="mr-2 h-4 w-4" />
+                  <RotateCcw className="h-4 w-4" />
                   Revert to Draft
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Revert invoice to Draft?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will un-finalize {order.invoiceNumber || `Order #${order.id}`} and return it to Draft status.
-                    The invoice number will be cleared and bales will be returned to "Reserved" state.
-                    Any recorded payments must be reversed first.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel data-testid="button-cancel-unfinalize">Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => unfinalizeMutation.mutate()}
-                    disabled={unfinalizeMutation.isPending}
-                    data-testid="button-confirm-unfinalize"
-                  >
-                    {unfinalizeMutation.isPending ? "Reverting…" : "Revert to Draft"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-          <Button
-            variant="outline"
-            onClick={handleExportExcel}
-            data-testid="button-export-excel"
-          >
-            <FileSpreadsheet className="mr-2 h-4 w-4" />
-            Download Excel
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleExportPdf}
-            data-testid="button-export-pdf"
-          >
-            <FileDown className="mr-2 h-4 w-4" />
-            Download PDF
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleExportLoadingStatus}
-            data-testid="button-export-loading-status"
-          >
-            <Container className="mr-2 h-4 w-4" />
-            Loading Status
-          </Button>
-          {order.status !== "FINALIZED" && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="text-destructive"
+                </DropdownMenuItem>
+              )}
+              {order.status !== "FINALIZED" && order.status !== "CANCELLED" && (
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onSelect={() => setDeleteDialogOpen(true)}
                   data-testid="button-delete-invoice"
                 >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will permanently delete order {order.invoiceNumber || `#${order.id}`} for {order.customerName}.
-                    Any bales assigned to this order will be returned to stock. This cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => deleteMutation.mutate(order.id)}
-                    data-testid="button-confirm-delete"
-                  >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
+                  <Trash2 className="h-4 w-4" />
+                  Delete Invoice
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
+
+        {/* Controlled dialogs outside dropdown */}
+        <AlertDialog open={revertDialogOpen} onOpenChange={setRevertDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Revert invoice to Draft?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will un-finalize {order.invoiceNumber || `Order #${order.id}`} and return it to Draft status.
+                The invoice number will be cleared and bales will be returned to "Reserved" state.
+                Any recorded payments must be reversed first.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-unfinalize">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => unfinalizeMutation.mutate()}
+                disabled={unfinalizeMutation.isPending}
+                data-testid="button-confirm-unfinalize"
+              >
+                {unfinalizeMutation.isPending ? "Reverting…" : "Revert to Draft"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete order {order.invoiceNumber || `#${order.id}`} for {order.customerName}.
+                Any bales assigned to this order will be returned to stock. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteMutation.mutate(order.id)}
+                data-testid="button-confirm-delete"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       <Card className="overflow-x-auto mb-6">
