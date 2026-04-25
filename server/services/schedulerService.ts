@@ -52,6 +52,23 @@ async function runDailyExport(retryCount = 0): Promise<void> {
   console.log(`[DailyExport] Starting daily export (attempt ${retryCount + 1}/${MAX_RETRIES + 1})...`);
 
   try {
+    // ── Check what's enabled BEFORE any expensive work ──────────────────────
+    const emailEnabled = await isScheduleEnabled();
+    const waSettings   = await getWaSettings();
+    const whatsappReady = !!(
+      waSettings?.enabled &&
+      waSettings?.dailyAutoSend &&
+      waSettings?.dailyRecipientId
+    );
+
+    console.log(`[DailyExport] Email enabled: ${emailEnabled}`);
+    console.log(`[DailyExport] WhatsApp ready: ${whatsappReady}`);
+
+    if (!emailEnabled && !whatsappReady) {
+      console.log("[DailyExport] Email schedule and WhatsApp daily auto-send are both disabled. Nothing to send.");
+      return;
+    }
+
     const companies = await fetchAllCompanies();
     if (!companies || companies.length === 0) {
       console.log("[DailyExport] No companies found — skipping export.");
@@ -68,8 +85,7 @@ async function runDailyExport(retryCount = 0): Promise<void> {
       console.warn(`[DailyExport] Skipped ${skipped.length} companies: ${skipped.join(", ")}`);
     }
 
-    // ── Email path (gated by schedule_enabled in export_settings) ──────────
-    const emailEnabled = await isScheduleEnabled();
+    // ── Email path ──────────────────────────────────────────────────────────
     if (emailEnabled) {
       const emailResult = await sendExportEmail(zip, today, names);
       if (emailResult.success) {
@@ -78,10 +94,10 @@ async function runDailyExport(retryCount = 0): Promise<void> {
       } else {
         console.error(`[DailyExport] Email failed: ${emailResult.error}`);
         if (retryCount < MAX_RETRIES) {
-          console.log(`[DailyExport] Retrying in 10 minutes...`);
+          console.log(`[DailyExport] Retrying email in 10 minutes...`);
+          // Schedule a retry for email only — do NOT return here so WhatsApp still
+          // runs on this first attempt (retries skip WhatsApp since it's already sent).
           setTimeout(() => runDailyExport(retryCount + 1), 10 * 60 * 1000);
-          // Return early so WhatsApp isn't sent twice on retry
-          return;
         } else {
           console.error(`[DailyExport] All ${MAX_RETRIES + 1} email attempts failed. Giving up until next scheduled run.`);
         }
@@ -90,14 +106,20 @@ async function runDailyExport(retryCount = 0): Promise<void> {
       console.log("[DailyExport] Email schedule is disabled — skipping email.");
     }
 
-    // ── WhatsApp path (gated by WA settings internally) ────────────────────
-    const waResult = await runDailyWhatsAppSend(zip, today, companies);
-    if (waResult.sent) {
-      console.log("[DailyExport] WhatsApp daily ZIP sent successfully.");
-    } else if (waResult.skipped) {
-      console.log(`[DailyExport] WhatsApp skipped: ${waResult.skipReason}.`);
+    // ── WhatsApp path (first attempt only — retries are email-only) ─────────
+    // WhatsApp is sent once alongside the first email attempt (or in place of it).
+    // Email retries (retryCount > 0) skip WhatsApp because it was already sent.
+    if (retryCount === 0) {
+      const waResult = await runDailyWhatsAppSend(zip, today, companies);
+      if (waResult.sent) {
+        console.log("[DailyExport] WhatsApp daily ZIP sent successfully.");
+      } else if (waResult.skipped) {
+        console.log(`[DailyExport] WhatsApp skipped: ${waResult.skipReason}.`);
+      } else {
+        console.error(`[DailyExport] WhatsApp send failed: ${waResult.error}`);
+      }
     } else {
-      console.error(`[DailyExport] WhatsApp send failed: ${waResult.error}`);
+      console.log("[DailyExport] WhatsApp already sent on first attempt — skipping on email retry.");
     }
 
   } catch (err: any) {
