@@ -1,8 +1,16 @@
-interface ScreenFrame {
+export interface ClickEvent {
+  x:     number;
+  y:     number;
+  label: string;
+  ts:    number;
+}
+
+export interface ScreenFrame {
   dataUrl:     string;
   capturedAt:  Date;
   userId:      string;
   username:    string;
+  clicks:      ClickEvent[];
 }
 
 // One frame per user, kept in memory only — ephemeral by design.

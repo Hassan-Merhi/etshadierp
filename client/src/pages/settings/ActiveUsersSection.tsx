@@ -154,12 +154,18 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
     });
 
     // Guard against unexpected non-array / non-object responses
-    const presence   = presenceRaw && typeof presenceRaw === "object" && !Array.isArray(presenceRaw) ? presenceRaw : null;
-    const activity   = Array.isArray(activityRaw) ? activityRaw : [];
+    const presence    = presenceRaw && typeof presenceRaw === "object" && !Array.isArray(presenceRaw) ? presenceRaw : null;
+    const activity    = Array.isArray(activityRaw) ? activityRaw : [];
     const screenFrame = screenFrameRaw && typeof screenFrameRaw === "object" && !Array.isArray(screenFrameRaw) ? screenFrameRaw : null;
+    const clicks: Array<{ x: number; y: number; label: string; ts: number }> =
+      Array.isArray(screenFrame?.clicks) ? screenFrame.clicks : [];
 
     const isOnline = !!presence;
     const hasScreen = !!screenFrame?.dataUrl;
+
+    // Only show clicks from the last 4 seconds so stale dots fade naturally
+    const now = Date.now();
+    const recentClicks = clicks.filter(c => (now - c.ts) < 4000);
 
     const fmtTime = (iso: string) =>
       new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -216,20 +222,65 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
               </p>
               <div className="rounded-md border overflow-hidden bg-muted/30 min-h-40 flex items-center justify-center">
                 {hasScreen ? (
-                  <img
-                    src={screenFrame.dataUrl}
-                    alt="Live screen of user"
-                    className="w-full block"
-                    data-testid="img-screen-feed"
-                  />
+                  <div className="relative w-full">
+                    <img
+                      src={screenFrame.dataUrl}
+                      alt="Live screen of user"
+                      className="w-full block"
+                      data-testid="img-screen-feed"
+                    />
+                    {/* Click dot overlays */}
+                    {recentClicks.map((click, i) => {
+                      const ageSec = (now - click.ts) / 1000;
+                      const opacity = Math.max(0, 1 - ageSec / 4);
+                      return (
+                        <div
+                          key={i}
+                          title={click.label}
+                          style={{
+                            position:  "absolute",
+                            left:      `${click.x * 100}%`,
+                            top:       `${click.y * 100}%`,
+                            transform: "translate(-50%, -50%)",
+                            opacity,
+                            pointerEvents: "none",
+                          }}
+                        >
+                          <span className="relative flex h-4 w-4">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-4 w-4 bg-orange-500 border-2 border-white" />
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 ) : (
                   <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
                     <Clock className="h-8 w-8 opacity-30" />
                     <p className="text-sm">Waiting for first frame…</p>
-                    <p className="text-xs">Updates every 3 seconds</p>
+                    <p className="text-xs">Updates every 1.5 seconds</p>
                   </div>
                 )}
               </div>
+
+              {/* Recent click log */}
+              {clicks.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                    Recent clicks
+                  </p>
+                  <div className="rounded-md border divide-y max-h-24 overflow-y-auto">
+                    {[...clicks].reverse().slice(0, 8).map((click, i) => (
+                      <div key={i} className="flex items-center justify-between px-2 py-1 gap-2 text-xs">
+                        <span className="truncate text-muted-foreground">{click.label || "—"}</span>
+                        <span className="shrink-0 text-muted-foreground/60">
+                          {new Date(click.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Navigation history sidebar */}
