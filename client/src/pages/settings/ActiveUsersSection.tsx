@@ -137,7 +137,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
     username: string;
     onClose: () => void;
   }) {
-    const { data: presence, dataUpdatedAt } = useQuery<any>({
+    const { data: presence } = useQuery<any>({
       queryKey: ["/api/user-presence", userId],
       queryFn: () => apiRequest("GET", `/api/user-presence/${userId}`),
       refetchInterval: 5000,
@@ -147,11 +147,17 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
       queryFn: () => apiRequest("GET", `/api/user-presence/${userId}/activity`),
       refetchInterval: 5000,
     });
+    const { data: screenFrame } = useQuery<any>({
+      queryKey: ["/api/screen-feed", userId],
+      queryFn: () => apiRequest("GET", `/api/screen-feed/${userId}`),
+      refetchInterval: 3000,
+    });
 
     const isOnline = !!presence;
-    const currentPage = presence?.currentRoute ? getPageLabel(presence.currentRoute) : null;
+    const hasScreen = !!screenFrame?.dataUrl;
 
-    const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const fmtTime = (iso: string) =>
+      new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
     const timeAgo = (iso: string) => {
       const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
       if (s < 5)  return "just now";
@@ -161,7 +167,11 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
 
     return (
       <Dialog open onOpenChange={open => !open && onClose()}>
-        <DialogContent className="max-w-lg" data-testid="dialog-watch-user">
+        <DialogContent
+          className="max-w-4xl"
+          data-testid="dialog-watch-user"
+          data-screenfeed-ignore="true"
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {isOnline ? (
@@ -176,48 +186,76 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                 <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40" />
               )}
               Watching: {username}
+              {isOnline && presence && (
+                <span className="text-sm font-normal text-muted-foreground ml-1">
+                  · {presence.companyName || "no company"} · {presence.role || "—"}
+                  · last seen {timeAgo(presence.lastSeen)}
+                </span>
+              )}
             </DialogTitle>
-            <DialogDescription>
-              {isOnline
-                ? `Last seen ${timeAgo(presence.lastSeen)} · ${presence.companyName || "no company"} · ${presence.role || "—"}`
-                : "User is currently offline or inactive"}
-            </DialogDescription>
+            {!isOnline && (
+              <DialogDescription>User is currently offline or inactive.</DialogDescription>
+            )}
           </DialogHeader>
 
-          <div className="space-y-4">
-            {/* Current page */}
-            <div className="rounded-md border p-3 space-y-1">
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Currently on</p>
-              {isOnline && currentPage ? (
-                <p className="text-lg font-semibold">{currentPage}</p>
-              ) : (
-                <p className="text-sm text-muted-foreground italic">Not active</p>
-              )}
-              {isOnline && presence.currentRoute && (
-                <p className="text-xs text-muted-foreground font-mono">{presence.currentRoute}</p>
-              )}
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-4">
+            {/* Live screenshot feed */}
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1">
+                <Eye className="h-3.5 w-3.5" /> Live screen
+                {screenFrame?.capturedAt && (
+                  <span className="ml-auto normal-case font-normal">
+                    captured {timeAgo(screenFrame.capturedAt)}
+                  </span>
+                )}
+              </p>
+              <div className="rounded-md border overflow-hidden bg-muted/30 min-h-40 flex items-center justify-center">
+                {hasScreen ? (
+                  <img
+                    src={screenFrame.dataUrl}
+                    alt="Live screen of user"
+                    className="w-full block"
+                    data-testid="img-screen-feed"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
+                    <Clock className="h-8 w-8 opacity-30" />
+                    <p className="text-sm">Waiting for first frame…</p>
+                    <p className="text-xs">Updates every 3 seconds</p>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Navigation history */}
-            <div className="space-y-2">
+            {/* Navigation history sidebar */}
+            <div className="space-y-2 min-w-0">
               <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1">
-                <History className="h-3.5 w-3.5" /> Navigation history
+                <History className="h-3.5 w-3.5" /> Page history
               </p>
               {activity.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  No history yet — navigation events will appear here as the user moves between pages.
+                  No history yet — pages appear here as the user navigates.
                 </p>
               ) : (
-                <div className="space-y-0 max-h-64 overflow-y-auto rounded-md border divide-y">
+                <div className="max-h-96 overflow-y-auto rounded-md border divide-y text-sm">
                   {activity.map((evt: any) => (
-                    <div key={evt.id} className="flex items-center justify-between px-3 py-1.5 gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{getPageLabel(evt.route)}</p>
+                    <div key={evt.id} className="px-3 py-2 space-y-0.5">
+                      <p className="font-medium leading-tight truncate">{getPageLabel(evt.route)}</p>
+                      <div className="flex items-center justify-between gap-2">
                         <p className="text-xs text-muted-foreground font-mono truncate">{evt.route}</p>
+                        <p className="text-xs text-muted-foreground shrink-0">{fmtTime(evt.occurredAt)}</p>
                       </div>
-                      <p className="text-xs text-muted-foreground shrink-0">{fmtTime(evt.occurredAt)}</p>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Current page pill */}
+              {isOnline && presence?.currentRoute && (
+                <div className="rounded-md border p-2 space-y-0.5 bg-muted/30">
+                  <p className="text-xs text-muted-foreground">Currently on</p>
+                  <p className="text-sm font-semibold">{getPageLabel(presence.currentRoute)}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{presence.currentRoute}</p>
                 </div>
               )}
             </div>

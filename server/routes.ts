@@ -19,6 +19,7 @@ import { registerFactoryIntelligenceRoutes } from "./routes/factoryIntelligenceR
 import { registerFactoryAttendanceRoutes } from "./routes/factoryAttendanceRoutes";
 import { registerSupplierProformaRoutes } from "./routes/supplierProformaRoutes";
 import { registerAuthRoutes } from "./routes/authRoutes";
+import { registerScreenFeedRoutes } from "./routes/screenFeedRoutes";
 import { registerLocationRoutes } from "./routes/locationRoutes";
 import { registerInventoryRoutes } from "./routes/inventoryRoutes";
 import { registerLedgerRoutes } from "./routes/ledgerRoutes";
@@ -1093,6 +1094,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   registerAuthRoutes(app);
+  registerScreenFeedRoutes(app);
 
   // Locations
   registerLocationRoutes(app);

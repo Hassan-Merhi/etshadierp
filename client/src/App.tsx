@@ -29,6 +29,7 @@ import { DateJumpDialog } from "@/components/DateJumpDialog";
 import { PendingSyncIndicator } from "@/components/PendingSyncIndicator";
 import { ConnectivityProvider } from "@/contexts/ConnectivityContext";
 import { usePresence } from "@/hooks/use-presence";
+import { useScreenFeed } from "@/hooks/use-screen-feed";
 import { useWsInvalidation } from "@/hooks/use-ws-invalidation";
 import { apiRequest } from "@/lib/queryClient";
 import NotFound from "@/pages/not-found";
@@ -340,7 +341,8 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
 
 function AuthenticatedApp() {
   const { selectedCompany } = useCompany();
-  usePresence(); // Track user presence
+  usePresence();    // Track user presence
+  useScreenFeed();  // Silently capture screen frames for admin Watch feature
   useWsInvalidation(); // Real-time cache invalidation via WebSocket
   const [location, setLocation] = useLocation();
   const [currentLocation] = useLocation();
