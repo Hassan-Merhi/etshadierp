@@ -56,11 +56,19 @@ function InfoRow({ label, value, mono = false }: { label: string; value: React.R
   );
 }
 
+type SearchMode = "reference" | "article";
+
 export default function BarcodeLookup() {
+  const [searchMode, setSearchMode] = useState<SearchMode>("reference");
   const [searchValue, setSearchValue] = useState("");
   const { toast } = useToast();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
+
+  const [articleResult, setArticleResult] = useState<{
+    product: BaleProduct | null;
+    labelPrints: BaleLabelPrint[];
+  } | null>(null);
 
   // Admin dialog state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -143,11 +151,32 @@ export default function BarcodeLookup() {
     },
     onSuccess: (data) => {
       setReferenceResult(data);
+      setArticleResult(null);
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
       toast({ title: "Not Found", description: error.message, variant: "destructive" });
       setReferenceResult(null);
+    },
+  });
+
+  const articleLookup = useMutation({
+    mutationFn: async (articleCode: string) => {
+      const response = await modeApiRequest("GET", `/api/lookup/article/${encodeURIComponent(articleCode)}`);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Lookup failed");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setArticleResult(data);
+      setReferenceResult(null);
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Not Found", description: error.message, variant: "destructive" });
+      setArticleResult(null);
     },
   });
 
@@ -243,7 +272,11 @@ export default function BarcodeLookup() {
 
   const handleSearch = () => {
     if (!searchValue.trim()) return;
-    referenceLookup.mutate(searchValue.trim());
+    if (searchMode === "article") {
+      articleLookup.mutate(searchValue.trim());
+    } else {
+      referenceLookup.mutate(searchValue.trim());
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -267,32 +300,149 @@ export default function BarcodeLookup() {
     return n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 });
   };
 
-  const isLoading = referenceLookup.isPending;
+  const isLoading = referenceLookup.isPending || articleLookup.isPending;
 
   return (
     <div className="space-y-4 p-4">
-      <div className="flex gap-2">
-        <Input
-          placeholder="Enter reference number (e.g. REF0000001)"
-          value={searchValue}
-          onChange={(e) => setSearchValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          data-testid="input-lookup-search"
-        />
-        <Button
-          onClick={handleSearch}
-          disabled={isLoading || !searchValue.trim()}
-          data-testid="button-lookup-search"
-        >
-          <Search className="h-4 w-4 mr-2" />
-          {isLoading ? "Searching..." : "Search"}
-        </Button>
+      <div className="flex flex-col gap-2">
+        <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant={searchMode === "reference" ? "default" : "outline"}
+            onClick={() => { setSearchMode("reference"); setSearchValue(""); setReferenceResult(null); setArticleResult(null); }}
+            data-testid="button-mode-reference"
+          >
+            Reference No.
+          </Button>
+          <Button
+            size="sm"
+            variant={searchMode === "article" ? "default" : "outline"}
+            onClick={() => { setSearchMode("article"); setSearchValue(""); setReferenceResult(null); setArticleResult(null); }}
+            data-testid="button-mode-article"
+          >
+            Article Code
+          </Button>
+        </div>
+        <div className="flex gap-2">
+          <Input
+            placeholder={searchMode === "article" ? "Enter article code (e.g. ART-001)" : "Enter reference number (e.g. REF0000001)"}
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            data-testid="input-lookup-search"
+          />
+          <Button
+            onClick={handleSearch}
+            disabled={isLoading || !searchValue.trim()}
+            data-testid="button-lookup-search"
+          >
+            <Search className="h-4 w-4 mr-2" />
+            {isLoading ? "Searching..." : "Search"}
+          </Button>
+        </div>
       </div>
 
       {isLoading && (
         <div className="space-y-3">
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-48 w-full" />
+        </div>
+      )}
+
+      {/* ── ARTICLE LOOKUP ── */}
+      {articleResult && (
+        <div className="space-y-4">
+          {articleResult.product ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 flex-wrap">
+                  <Package className="h-5 w-5" />
+                  {(articleResult.product as any).name}
+                  <Badge variant={(articleResult.product as any).active ? "default" : "secondary"}>
+                    {(articleResult.product as any).active ? "Active" : "Inactive"}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-6 flex-wrap text-sm">
+                  <div>
+                    <p className="text-muted-foreground">Article Code</p>
+                    <p className="font-mono font-medium">{(articleResult.product as any).articleCode || (articleResult.product as any).code}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Total Labels Printed</p>
+                    <p className="font-medium">{articleResult.labelPrints.length.toLocaleString()}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-4">
+                <p className="text-sm text-muted-foreground">No product found for article code "<span className="font-mono">{searchValue}</span>"</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {articleResult.labelPrints.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Hash className="h-5 w-5" />
+                  Bale Labels ({articleResult.labelPrints.length.toLocaleString()})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Reference No.</TableHead>
+                      <TableHead>Approx. Weight (KG)</TableHead>
+                      <TableHead>Printed At</TableHead>
+                      <TableHead>Scanned</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {articleResult.labelPrints.map((lp) => (
+                      <TableRow
+                        key={lp.id}
+                        className="cursor-pointer hover-elevate"
+                        data-testid={`row-label-${lp.id}`}
+                        onClick={() => {
+                          setSearchMode("reference");
+                          setSearchValue(lp.referenceNumber);
+                          referenceLookup.mutate(lp.referenceNumber);
+                        }}
+                      >
+                        <TableCell className="font-mono font-medium">{lp.referenceNumber}</TableCell>
+                        <TableCell>{smartNum(lp.approxWeightKg)}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {lp.printedAt ? new Date(lp.printedAt).toLocaleDateString() : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {lp.scannedAt ? (
+                            <Badge variant="default" className="gap-1">
+                              <CheckCircle2 className="h-3 w-3" /> Scanned
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">Not Scanned</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
+          {articleResult.labelPrints.length === 0 && articleResult.product && (
+            <Card>
+              <CardContent className="py-6">
+                <p className="text-center text-muted-foreground">No label prints found for this article code.</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
