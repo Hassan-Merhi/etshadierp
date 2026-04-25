@@ -480,10 +480,10 @@ export async function buildCompanyWorkbook(data: CompanyExportData): Promise<Buf
 
   // ── Factory Enriched Detail Views ─────────────────────────────────────────
   addSheet(wb, "Factory Bale Production", data.factoryBaleDetail);
-  addSheet(wb, "Factory Worker Advances", data.factoryWorkerAdvancesDetail);
+  addSheet(wb, "Factory Wkr Advances Detail", data.factoryWorkerAdvancesDetail);
   addSheet(wb, "Factory Payroll Detail", data.factoryPayrollDetail);
   addSheet(wb, "Factory Container Detail", data.factoryContainerDetail);
-  addSheet(wb, "Factory Supplier Payments", data.factorySupplierPaymentsDetail);
+  addSheet(wb, "Factory Supplier Pay Detail", data.factorySupplierPaymentsDetail);
   addSheet(wb, "Factory Raw Stock Detail", data.factoryRawStockDetail);
   addSheet(wb, "Factory Mix Batch Detail", data.factoryMixBatchDetail);
   addSheet(wb, "Factory POS Sales Detail", data.factoryPosSalesDetail);
