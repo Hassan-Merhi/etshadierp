@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Search, Package, Tag, Clock, User, Scale, Hash, MapPin, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX, Ship, FileText, User2, Trash2, Pencil } from "lucide-react";
+import { Search, Package, Clock, User, Scale, Hash, MapPin, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX, Ship, FileText, User2, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,8 +27,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import type { BaleProduct, BaleLabelPrint } from "@shared/schema";
-
-type LookupTab = "article" | "reference";
 
 function BaleStatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: any }> = {
@@ -60,7 +58,6 @@ function InfoRow({ label, value, mono = false }: { label: string; value: React.R
 }
 
 export default function BarcodeLookup() {
-  const [activeTab, setActiveTab] = useState<LookupTab>("article");
   const [searchValue, setSearchValue] = useState("");
   const { toast } = useToast();
   const appMode = useAppMode();
@@ -71,11 +68,6 @@ export default function BarcodeLookup() {
   const [showChangeProductDialog, setShowChangeProductDialog] = useState(false);
   const [changeProductSearch, setChangeProductSearch] = useState("");
   const [selectedNewProductId, setSelectedNewProductId] = useState<number | null>(null);
-
-  const [articleResult, setArticleResult] = useState<{
-    product: BaleProduct | null;
-    labelPrints: BaleLabelPrint[];
-  } | null>(null);
 
   const [referenceResult, setReferenceResult] = useState<{
     labelPrint: BaleLabelPrint | null;
@@ -141,26 +133,6 @@ export default function BarcodeLookup() {
     } | null;
   } | null>(null);
 
-  const articleLookup = useMutation({
-    mutationFn: async (code: string) => {
-      const response = await modeApiRequest("GET", `/api/lookup/article/${encodeURIComponent(code)}`);
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.message || "Lookup failed");
-      }
-      return response.json();
-    },
-    onSuccess: (data) => {
-      setArticleResult(data);
-      setReferenceResult(null);
-    },
-    onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
-      toast({ title: "Not Found", description: error.message, variant: "destructive" });
-      setArticleResult(null);
-    },
-  });
-
   const referenceLookup = useMutation({
     mutationFn: async (refNum: string) => {
       const response = await modeApiRequest("GET", `/api/lookup/reference/${encodeURIComponent(refNum)}`);
@@ -172,7 +144,6 @@ export default function BarcodeLookup() {
     },
     onSuccess: (data) => {
       setReferenceResult(data);
-      setArticleResult(null);
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -266,7 +237,6 @@ export default function BarcodeLookup() {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get("ref");
     if (ref) {
-      setActiveTab("reference");
       setSearchValue(ref);
       setTimeout(() => referenceLookup.mutate(ref), 0);
     }
@@ -274,22 +244,11 @@ export default function BarcodeLookup() {
 
   const handleSearch = () => {
     if (!searchValue.trim()) return;
-    if (activeTab === "article") {
-      articleLookup.mutate(searchValue.trim());
-    } else {
-      referenceLookup.mutate(searchValue.trim());
-    }
+    referenceLookup.mutate(searchValue.trim());
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") handleSearch();
-  };
-
-  const handleTabChange = (tab: LookupTab) => {
-    setActiveTab(tab);
-    setSearchValue("");
-    setArticleResult(null);
-    setReferenceResult(null);
   };
 
   const formatDate = (dateStr: string | null | undefined) => {
@@ -302,32 +261,13 @@ export default function BarcodeLookup() {
     return new Date(dateStr).toLocaleDateString();
   };
 
-  const isLoading = articleLookup.isPending || referenceLookup.isPending;
+  const isLoading = referenceLookup.isPending;
 
   return (
     <div className="space-y-4 p-4">
-      <div className="flex items-center gap-2 border-b pb-3">
-        <Button
-          variant={activeTab === "article" ? "default" : "ghost"}
-          onClick={() => handleTabChange("article")}
-          data-testid="tab-lookup-article"
-        >
-          <Tag className="h-4 w-4 mr-2" />
-          Search by ARTICLE
-        </Button>
-        <Button
-          variant={activeTab === "reference" ? "default" : "ghost"}
-          onClick={() => handleTabChange("reference")}
-          data-testid="tab-lookup-reference"
-        >
-          <Hash className="h-4 w-4 mr-2" />
-          Search by REFERENCE
-        </Button>
-      </div>
-
       <div className="flex gap-2">
         <Input
-          placeholder={activeTab === "article" ? "Enter article code (e.g. HMD01000)" : "Enter reference number (e.g. REF0000001)"}
+          placeholder="Enter reference number (e.g. REF0000001)"
           value={searchValue}
           onChange={(e) => setSearchValue(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -350,88 +290,8 @@ export default function BarcodeLookup() {
         </div>
       )}
 
-      {/* ── ARTICLE LOOKUP ── */}
-      {activeTab === "article" && articleResult && (
-        <div className="space-y-4">
-          {articleResult.product ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 flex-wrap">
-                  <Package className="h-5 w-5" />
-                  Product Details
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <InfoRow label="Article Code" value={<span className="font-mono" data-testid="text-article-code">{(articleResult.product as any).articleCode || (articleResult.product as any).code}</span>} />
-                  <InfoRow label="Product Name" value={<span data-testid="text-product-name">{(articleResult.product as any).name}</span>} />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Status</p>
-                    <Badge variant={(articleResult.product as any).active ? "default" : "secondary"} data-testid="badge-product-status">
-                      {(articleResult.product as any).active ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
-                  {(articleResult.product as any).description && (
-                    <div className="col-span-2">
-                      <InfoRow label="Description" value={(articleResult.product as any).description} />
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="py-6">
-                <p className="text-center text-muted-foreground">No product found for article code "{searchValue}"</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {articleResult.labelPrints.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 flex-wrap">
-                  <Clock className="h-5 w-5" />
-                  Label Print History ({articleResult.labelPrints.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Reference</TableHead>
-                      <TableHead>Pieces</TableHead>
-                      <TableHead>Weight (kg)</TableHead>
-                      <TableHead>Printed At</TableHead>
-                      <TableHead>Scanned At</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {articleResult.labelPrints.map((lp) => (
-                      <TableRow key={lp.id} data-testid={`row-label-print-${lp.id}`}>
-                        <TableCell className="font-mono font-medium">{lp.referenceNumber}</TableCell>
-                        <TableCell>{lp.pieces}</TableCell>
-                        <TableCell>{lp.approxWeightKg}</TableCell>
-                        <TableCell>{formatDate(lp.printedAt as any)}</TableCell>
-                        <TableCell>{lp.scannedAt ? formatDate(lp.scannedAt as any) : <Badge variant="outline">Not scanned</Badge>}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          ) : articleResult.product ? (
-            <Card>
-              <CardContent className="py-6">
-                <p className="text-center text-muted-foreground">No labels printed yet for this article code</p>
-              </CardContent>
-            </Card>
-          ) : null}
-        </div>
-      )}
-
       {/* ── REFERENCE LOOKUP ── */}
-      {activeTab === "reference" && referenceResult && (
+      {referenceResult && (
         <div className="space-y-4">
           {referenceResult.labelPrint ? (
             <>
