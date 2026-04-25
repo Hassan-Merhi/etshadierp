@@ -11,8 +11,15 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
+  Tabs, TabsContent, TabsList, TabsTrigger,
+} from "@/components/ui/tabs";
+import {
+  Collapsible, CollapsibleContent, CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   ChevronDown, ChevronRight, FlaskConical, PackageCheck, Scale,
   TrendingUp, TrendingDown, Minus, Tag, Trash2,
+  Package, ShoppingCart, AlertTriangle, Truck, RefreshCw, Layers,
 } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -561,7 +568,205 @@ function MiniPieChart({
   );
 }
 
+// ─────────────────────────────────────────────
+// Bale Ledger tab — types, helpers, component
+// ─────────────────────────────────────────────
+
+interface BaleDetail { ref: string; weightKg: number; totalCost: number; }
+interface BucketRow {
+  productId: number | null; productName: string; articleCode: string;
+  categoryName: string; baleCount: number; totalWeightKg: number;
+  totalCost: number; baleDetails: BaleDetail[];
+}
+interface SectionTotal { baleCount: number; totalWeightKg: number; totalCost: number; }
+interface LedgerData {
+  currentStock: BucketRow[]; wasteStock: BucketRow[];
+  sold: BucketRow[]; wasteDispatched: BucketRow[]; pendingLoading: BucketRow[];
+  totals: {
+    currentStock: SectionTotal; wasteStock: SectionTotal; sold: SectionTotal;
+    wasteDispatched: SectionTotal; pendingLoading: SectionTotal; grand: SectionTotal;
+  };
+}
+
+function fmtL(n: number) { return new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 }).format(n); }
+function fmtNL(n: number) { return new Intl.NumberFormat("en-US").format(n); }
+function fmtML(n: number): string {
+  if (n === 0) return "$0";
+  const r = Math.round(n * 100) / 100;
+  return r % 1 === 0
+    ? "$" + new Intl.NumberFormat("en-US").format(r)
+    : "$" + new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(r);
+}
+function groupByCategory(rows: BucketRow[]): { category: string; items: BucketRow[] }[] {
+  const map = new Map<string, BucketRow[]>();
+  for (const row of rows) {
+    const cat = row.categoryName || "—";
+    if (!map.has(cat)) map.set(cat, []);
+    map.get(cat)!.push(row);
+  }
+  return Array.from(map.entries()).map(([category, items]) => ({ category, items }));
+}
+
+interface LedgerSectionProps {
+  title: string; subtitle: string; icon: React.ReactNode; badgeColor: string;
+  rows: BucketRow[]; total: SectionTotal; defaultOpen?: boolean; showSoldPrice?: boolean;
+}
+function LedgerSection({ title, subtitle, icon, badgeColor, rows, total, defaultOpen = false, showSoldPrice = false }: LedgerSectionProps) {
+  const [open, setOpen] = useState(defaultOpen);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  function toggleRow(key: string) {
+    setExpandedRows((prev) => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
+  }
+  const avgRate = total.baleCount > 0 && total.totalCost > 0 ? total.totalCost / total.baleCount : 0;
+  const groups = groupByCategory(rows);
+  const colSpan = showSoldPrice ? 7 : 5;
+  return (
+    <Card>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CollapsibleTrigger asChild>
+          <CardHeader className="cursor-pointer hover-elevate select-none py-3 px-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                {open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                <div className="flex items-center gap-2">
+                  {icon}
+                  <div>
+                    <CardTitle className="text-sm">{title}</CardTitle>
+                    <p className="text-xs text-muted-foreground font-normal mt-0.5">{subtitle}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 text-xs flex-wrap">
+                <Badge variant="outline" className={`text-xs ${badgeColor}`}>{fmtNL(total.baleCount)} bales</Badge>
+                <span className="text-muted-foreground">{fmtL(total.totalWeightKg)} kg</span>
+                <span className="font-semibold">{fmtML(total.totalCost)}</span>
+                {avgRate > 0 && <span className="text-muted-foreground">avg {fmtML(avgRate)}/bale</span>}
+              </div>
+            </div>
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="p-0">
+            {rows.length === 0 ? (
+              <p className="text-sm text-muted-foreground p-4 pt-0 text-center">No records.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs py-2 px-3">Product</TableHead>
+                    <TableHead className="text-xs py-2 px-3 text-right">Bales</TableHead>
+                    <TableHead className="text-xs py-2 px-3 text-right">Weight (kg)</TableHead>
+                    <TableHead className="text-xs py-2 px-3 text-right">Avg Sell/Bale</TableHead>
+                    <TableHead className="text-xs py-2 px-3 text-right">Total Sell Value</TableHead>
+                    {showSoldPrice && (<><TableHead className="text-xs py-2 px-3 text-right">Avg Sold Rate</TableHead><TableHead className="text-xs py-2 px-3 text-right">Total Sold</TableHead></>)}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {groups.map(({ category, items }) => {
+                    const catBales = items.reduce((s, r) => s + r.baleCount, 0);
+                    const catWeight = items.reduce((s, r) => s + r.totalWeightKg, 0);
+                    const catCost = items.reduce((s, r) => s + r.totalCost, 0);
+                    const catAvg = catBales > 0 && catCost > 0 ? catCost / catBales : 0;
+                    return [
+                      <TableRow key={`cat-${category}`} className="bg-muted/40">
+                        <TableCell colSpan={colSpan} className="py-1.5 px-3 text-xs font-semibold text-muted-foreground tracking-wide">
+                          <div className="flex items-center justify-between gap-4 flex-wrap">
+                            <span>{category}</span>
+                            <div className="flex items-center gap-4 font-normal">
+                              <span>{fmtNL(catBales)} bales</span>
+                              <span>{fmtL(catWeight)} kg</span>
+                              {catAvg > 0 && <span>avg {fmtML(catAvg)}/bale</span>}
+                              {catCost > 0 && <span className="font-semibold">{fmtML(catCost)}</span>}
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>,
+                      ...items.flatMap((r, i) => {
+                        const rowKey = `${category}-${r.productId ?? "null"}-${i}`;
+                        const isOpen = expandedRows.has(rowKey);
+                        const rowAvgRate = r.baleCount > 0 && r.totalCost > 0 ? r.totalCost / r.baleCount : 0;
+                        const hasBaleDetails = r.baleDetails.some((d) => d.ref || d.totalCost > 0);
+                        return [
+                          <TableRow key={rowKey} className={isOpen ? "bg-muted/10" : ""}>
+                            <TableCell className="py-2 px-3 pl-5">
+                              <button className="text-xs font-medium text-left hover:underline cursor-pointer flex items-center gap-1 group" onClick={() => toggleRow(rowKey)}>
+                                {isOpen ? <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0" /> : <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />}
+                                {r.productName}
+                              </button>
+                            </TableCell>
+                            <TableCell className="py-2 px-3 text-right text-xs">{fmtNL(r.baleCount)}</TableCell>
+                            <TableCell className="py-2 px-3 text-right text-xs">{fmtL(r.totalWeightKg)}</TableCell>
+                            <TableCell className="py-2 px-3 text-right text-xs text-muted-foreground">{rowAvgRate > 0 ? fmtML(rowAvgRate) : "—"}</TableCell>
+                            <TableCell className="py-2 px-3 text-right text-xs font-medium">{r.totalCost > 0 ? fmtML(r.totalCost) : "—"}</TableCell>
+                            {showSoldPrice && (<><TableCell className="py-2 px-3 text-right text-xs text-muted-foreground">—</TableCell><TableCell className="py-2 px-3 text-right text-xs text-muted-foreground">—</TableCell></>)}
+                          </TableRow>,
+                          isOpen && hasBaleDetails ? (
+                            <TableRow key={`${rowKey}-detail`} className="bg-muted/20">
+                              <TableCell colSpan={colSpan} className="py-0 px-0">
+                                <div className="pl-8 pr-3 py-2">
+                                  <table className="w-full text-xs">
+                                    <thead className="sticky top-0 z-10 bg-muted/50">
+                                      <tr className="border-b border-border/50">
+                                        <th className="text-left py-1 pr-4 font-medium text-muted-foreground">Ref #</th>
+                                        <th className="text-right py-1 pr-4 font-medium text-muted-foreground">Weight (kg)</th>
+                                        <th className="text-right py-1 pr-4 font-medium text-muted-foreground">Qty</th>
+                                        <th className="text-right py-1 pr-4 font-medium text-muted-foreground">Avg Cost/Bale</th>
+                                        <th className="text-right py-1 font-medium text-muted-foreground">Total Cost</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {r.baleDetails.map((d, di) => (
+                                        <tr key={di} className="border-b border-border/20 last:border-0">
+                                          <td className="py-1 pr-4 font-mono">{d.ref || "—"}</td>
+                                          <td className="py-1 pr-4 text-right text-muted-foreground">{fmtL(d.weightKg)}</td>
+                                          <td className="py-1 pr-4 text-right text-muted-foreground">1</td>
+                                          <td className="py-1 pr-4 text-right text-muted-foreground">{d.totalCost > 0 ? fmtML(d.totalCost) : "—"}</td>
+                                          <td className="py-1 text-right font-medium">{d.totalCost > 0 ? fmtML(d.totalCost) : "—"}</td>
+                                        </tr>
+                                      ))}
+                                      {r.baleDetails.length > 1 && (
+                                        <tr className="font-semibold border-t border-border/50">
+                                          <td className="py-1 pr-4 text-muted-foreground">Total</td>
+                                          <td className="py-1 pr-4 text-right">{fmtL(r.totalWeightKg)}</td>
+                                          <td className="py-1 pr-4 text-right">{r.baleCount}</td>
+                                          <td className="py-1 pr-4 text-right">{rowAvgRate > 0 ? fmtML(rowAvgRate) : "—"}</td>
+                                          <td className="py-1 text-right">{r.totalCost > 0 ? fmtML(r.totalCost) : "—"}</td>
+                                        </tr>
+                                      )}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ) : isOpen ? (
+                            <TableRow key={`${rowKey}-empty`} className="bg-muted/20">
+                              <TableCell colSpan={colSpan} className="py-2 px-5 text-xs text-muted-foreground italic">No individual bale records found.</TableCell>
+                            </TableRow>
+                          ) : null,
+                        ].filter(Boolean);
+                      }),
+                    ];
+                  })}
+                  <TableRow className="bg-muted/30 font-semibold">
+                    <TableCell className="text-xs py-2 px-3">Subtotal</TableCell>
+                    <TableCell className="text-right text-xs py-2 px-3">{fmtNL(total.baleCount)}</TableCell>
+                    <TableCell className="text-right text-xs py-2 px-3">{fmtL(total.totalWeightKg)}</TableCell>
+                    <TableCell className="text-right text-xs py-2 px-3 text-muted-foreground">{avgRate > 0 ? fmtML(avgRate) : "—"}</TableCell>
+                    <TableCell className="text-right text-xs py-2 px-3">{total.totalCost > 0 ? fmtML(total.totalCost) : "—"}</TableCell>
+                    {showSoldPrice && (<><TableCell className="text-right text-xs py-2 px-3 text-muted-foreground">—</TableCell><TableCell className="text-right text-xs py-2 px-3 text-muted-foreground">—</TableCell></>)}
+                  </TableRow>
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
+  );
+}
+
 export default function DailyProductionReport() {
+  const [activeTab, setActiveTab] = useState("production");
   const [preset, setPreset] = useState<Preset>("today");
   const [customFrom, setCustomFrom] = useState(todayStr());
   const [customTo, setCustomTo] = useState(todayStr());
@@ -588,6 +793,11 @@ export default function DailyProductionReport() {
     enabled: !!from && !!to,
   });
 
+  const { data: ledger, isLoading: ledgerLoading, refetch: ledgerRefetch, isFetching: ledgerFetching } = useQuery<LedgerData>({
+    queryKey: ["/api/factory/bale-ledger"],
+    staleTime: 30_000,
+  });
+
   const presets: { key: Preset; label: string }[] = [
     { key: "today", label: "Today" },
     { key: "yesterday", label: "Yesterday" },
@@ -599,15 +809,24 @@ export default function DailyProductionReport() {
 
   const statusValue = data?.summary.statusValue ?? 0;
   const statusPositive = statusValue >= 0;
+  const grand = ledger?.totals.grand;
 
   return (
-    <div className="flex flex-col h-full p-4 overflow-y-auto gap-4">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold">Production Report</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">Raw material vs output summary</p>
+      <div className="px-4 pt-4 pb-3 border-b flex-shrink-0">
+        <h1 className="text-xl font-bold">Production Analytics</h1>
+        <p className="text-xs text-muted-foreground mt-0.5">Manufacturing overview — output metrics &amp; bale lifecycle</p>
       </div>
 
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 overflow-hidden">
+        <TabsList className="mx-4 mt-3 mb-0 flex-shrink-0 w-fit" data-testid="tabs-production-analytics">
+          <TabsTrigger value="production" data-testid="tab-production">Production</TabsTrigger>
+          <TabsTrigger value="ledger" data-testid="tab-ledger">Bale Ledger</TabsTrigger>
+        </TabsList>
+
+        {/* ── Production tab ── */}
+        <TabsContent value="production" className="flex-1 overflow-y-auto p-4 gap-4 flex flex-col mt-0 data-[state=inactive]:hidden">
       {/* Date filter + Pie chart row */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex flex-wrap items-center gap-3">
@@ -980,6 +1199,128 @@ export default function DailyProductionReport() {
           </div>
         )}
       </ExpandableCard>
+        </TabsContent>
+
+        {/* ── Bale Ledger tab ── */}
+        <TabsContent value="ledger" className="flex-1 overflow-y-auto p-4 gap-3 flex flex-col mt-0 data-[state=inactive]:hidden">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-sm text-muted-foreground">Complete lifecycle view — stock in hand, wipers/garbages, sold, and waste</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => ledgerRefetch()} disabled={ledgerFetching} data-testid="button-refresh-ledger" className="gap-2">
+              <RefreshCw className={`w-4 h-4 ${ledgerFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
+
+          {ledgerLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3, 4].map((i) => (
+                <Card key={i}>
+                  <CardHeader className="py-3 px-4">
+                    <Skeleton className="h-5 w-64" />
+                    <Skeleton className="h-3 w-48 mt-1" />
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <>
+              <LedgerSection
+                title="Current Stock — In Hand"
+                subtitle="Bales in stock (IN_STOCK / FINALIZED), excluding wipers and garbages"
+                icon={<Package className="w-4 h-4 text-green-600" />}
+                badgeColor="text-green-700 border-green-200"
+                rows={ledger?.currentStock || []}
+                total={ledger?.totals.currentStock || { baleCount: 0, totalWeightKg: 0, totalCost: 0 }}
+              />
+              <LedgerSection
+                title="Wipers & Garbages — In Hand"
+                subtitle="Waste-category bales currently in stock (IN_STOCK / FINALIZED)"
+                icon={<AlertTriangle className="w-4 h-4 text-amber-500" />}
+                badgeColor="text-amber-700 border-amber-200"
+                rows={ledger?.wasteStock || []}
+                total={ledger?.totals.wasteStock || { baleCount: 0, totalWeightKg: 0, totalCost: 0 }}
+              />
+              <LedgerSection
+                title="Stock Sold"
+                subtitle="Bales that have been dispatched and sold to customers"
+                icon={<ShoppingCart className="w-4 h-4 text-blue-600" />}
+                badgeColor="text-blue-700 border-blue-200"
+                rows={ledger?.sold || []}
+                total={ledger?.totals.sold || { baleCount: 0, totalWeightKg: 0, totalCost: 0 }}
+                showSoldPrice={true}
+              />
+              <LedgerSection
+                title="Pending Loading / Verified"
+                subtitle="Bales reserved for orders currently in Loading, Pending Verification, or Verified status"
+                icon={<Truck className="w-4 h-4 text-purple-500" />}
+                badgeColor="text-purple-700 border-purple-200"
+                rows={ledger?.pendingLoading || []}
+                total={ledger?.totals.pendingLoading || { baleCount: 0, totalWeightKg: 0, totalCost: 0 }}
+              />
+              <LedgerSection
+                title="Waste Dispatched"
+                subtitle="Bales removed from stock via waste disposal (Waste Dispatch records)"
+                icon={<Trash2 className="w-4 h-4 text-destructive" />}
+                badgeColor="text-destructive border-destructive/30"
+                rows={ledger?.wasteDispatched || []}
+                total={ledger?.totals.wasteDispatched || { baleCount: 0, totalWeightKg: 0, totalCost: 0 }}
+              />
+
+              {grand && (
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <div>
+                        <p className="font-bold text-sm">Total Production (All Time)</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Sum of all sections — complete production output</p>
+                      </div>
+                      <div className="flex items-center gap-6 flex-wrap">
+                        <div className="text-center">
+                          <p className="text-xl font-bold" data-testid="grand-total-bales">{fmtNL(grand.baleCount)}</p>
+                          <p className="text-xs text-muted-foreground">total bales</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xl font-bold" data-testid="grand-total-weight">{fmtL(grand.totalWeightKg)}</p>
+                          <p className="text-xs text-muted-foreground">kg produced</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xl font-bold" data-testid="grand-total-cost">{fmtML(grand.totalCost)}</p>
+                          <p className="text-xs text-muted-foreground">total sell value</p>
+                        </div>
+                        {grand.baleCount > 0 && grand.totalCost > 0 && (
+                          <div className="text-center">
+                            <p className="text-xl font-bold">{fmtML(grand.totalCost / grand.baleCount)}</p>
+                            <p className="text-xs text-muted-foreground">avg/bale</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {ledger && (
+                      <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 border-t pt-4 sm:grid-cols-5">
+                        {[
+                          { label: "In Hand (Regular)", bales: ledger.totals.currentStock.baleCount, kg: ledger.totals.currentStock.totalWeightKg, cost: ledger.totals.currentStock.totalCost, color: "text-green-600" },
+                          { label: "In Hand (Waste Cat.)", bales: ledger.totals.wasteStock.baleCount, kg: ledger.totals.wasteStock.totalWeightKg, cost: ledger.totals.wasteStock.totalCost, color: "text-amber-600" },
+                          { label: "Pending Loading / Verified", bales: ledger.totals.pendingLoading.baleCount, kg: ledger.totals.pendingLoading.totalWeightKg, cost: ledger.totals.pendingLoading.totalCost, color: "text-purple-600" },
+                          { label: "Sold", bales: ledger.totals.sold.baleCount, kg: ledger.totals.sold.totalWeightKg, cost: ledger.totals.sold.totalCost, color: "text-blue-600" },
+                          { label: "Waste Dispatched", bales: ledger.totals.wasteDispatched.baleCount, kg: ledger.totals.wasteDispatched.totalWeightKg, cost: ledger.totals.wasteDispatched.totalCost, color: "text-destructive" },
+                        ].map((s) => (
+                          <div key={s.label} className="text-xs">
+                            <p className={`font-semibold ${s.color}`}>{s.label}</p>
+                            <p className="text-muted-foreground">{fmtNL(s.bales)} bales · {fmtL(s.kg)} kg</p>
+                            {s.cost > 0 && <p className="font-medium">{fmtML(s.cost)}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -26,7 +26,6 @@ import {
   Award,
   Beaker,
   Trash2,
-  Layers,
   DollarSign,
   Gauge,
   MessageCircle,
@@ -67,7 +66,7 @@ const navSections: NavSection[] = [
     label: "Overview",
     color: "#3b82f6",
     items: [
-      { title: "Production Report", url: "/factory/production-report", icon: BarChart3 },
+      { title: "Production Analytics", url: "/factory/production-report", icon: BarChart3 },
     ],
   },
   {
@@ -85,7 +84,6 @@ const navSections: NavSection[] = [
     items: [
       { title: "Bales & Lookup",  url: "/factory/bales-hub",          icon: History   },
       { title: "Bale Products",   url: "/factory/bale-products",      icon: Tags      },
-      { title: "Bale Ledger",     url: "/factory/bale-ledger",        icon: Layers    },
     ],
   },
   {

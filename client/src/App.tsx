@@ -863,7 +863,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/intelligence/waste" component={FactoryWaste} />
                     <Route path="/factory/waste-dispatch" component={WasteDispatchPage} />
                     <Route path="/factory/pos" component={FactoryPOS} />
-                    <Route path="/factory/bale-ledger" component={BaleLedger} />
+                    <Route path="/factory/bale-ledger">{() => <Redirect to="/factory/production-report" />}</Route>
                     <Route path="/factory/intelligence/settings" component={FactoryIntelSettings} />
                     <Route path="/factory/chat" component={Chat} />
                     <Route path="/factory/conflicts" component={ConflictCenter} />
