@@ -181,30 +181,21 @@ export function registerStatsRoutes(app: Express) {
       const currentCfaRate = cfaRateRows.length > 0 ? parseFloat(cfaRateRows[0].rate) : 0;
 
       if (currentCfaRate > 0) {
-        const revaluedAccountIds = new Set(
-          companyAccounts
-            .filter(a => a.accountType === "Cash" || a.accountType === "Bank" || a.accountType === "Asset")
-            .map(a => a.id)
-        );
-        // Adjust forUs Cash/Bank/Asset accounts: raw CFA value → USD value
+        // Revalue ALL balance-sheet accounts (forUs = assets, onUs = liabilities).
+        // For a CFA company every ledger balance is stored in CFA — divide by rate to get USD.
         for (const acc of forUsAccounts) {
-          if (revaluedAccountIds.has(acc.id)) {
-            const oldVal = acc.value;
-            const newVal = round2(oldVal / currentCfaRate);
-            forUsTotal = round2(forUsTotal - oldVal + newVal);
-            classified.forUsTotal = forUsTotal;
-            acc.value = newVal;
-          }
+          const oldVal = acc.value;
+          const newVal = round2(oldVal / currentCfaRate);
+          forUsTotal = round2(forUsTotal - oldVal + newVal);
+          classified.forUsTotal = forUsTotal;
+          acc.value = newVal;
         }
-        // Adjust onUs Cash/Bank/Asset accounts (overdrafts/liabilities in CFA)
         for (const acc of onUsAccounts) {
-          if (revaluedAccountIds.has(acc.id)) {
-            const oldVal = acc.value;
-            const newVal = round2(oldVal / currentCfaRate);
-            onUsTotal = round2(onUsTotal - oldVal + newVal);
-            classified.onUsTotal = onUsTotal;
-            acc.value = newVal;
-          }
+          const oldVal = acc.value;
+          const newVal = round2(oldVal / currentCfaRate);
+          onUsTotal = round2(onUsTotal - oldVal + newVal);
+          classified.onUsTotal = onUsTotal;
+          acc.value = newVal;
         }
       }
 
