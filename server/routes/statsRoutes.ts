@@ -329,15 +329,18 @@ export function registerStatsRoutes(app: Express) {
           workerAdvances += netBalance;
         }
       }
-      if (workerLiabilities > 0) {
-        onUsTotal += workerLiabilities;
-        categoryTotals["liability_Workers"] = (categoryTotals["liability_Workers"] || 0) + workerLiabilities;
-        onUsAccounts.push({ name: "Workers/Employees Payable", code: "COMPUTED", value: workerLiabilities, category: "Workers" });
+      // For CFA companies, worker balances are in CFA → convert to USD
+      const workerLiabilitiesDisplay = currentCfaRate > 0 ? round2(workerLiabilities / currentCfaRate) : workerLiabilities;
+      const workerAdvancesDisplay    = currentCfaRate > 0 ? round2(workerAdvances    / currentCfaRate) : workerAdvances;
+      if (workerLiabilitiesDisplay > 0) {
+        onUsTotal += workerLiabilitiesDisplay;
+        categoryTotals["liability_Workers"] = (categoryTotals["liability_Workers"] || 0) + workerLiabilitiesDisplay;
+        onUsAccounts.push({ name: "Workers/Employees Payable", code: "COMPUTED", value: workerLiabilitiesDisplay, category: "Workers" });
       }
-      if (workerAdvances > 0) {
-        forUsTotal += workerAdvances;
-        categoryTotals["asset_Worker Advances"] = (categoryTotals["asset_Worker Advances"] || 0) + workerAdvances;
-        forUsAccounts.push({ name: "Worker Advances (Prepaid)", code: "COMPUTED", value: workerAdvances, category: "Worker Advances" });
+      if (workerAdvancesDisplay > 0) {
+        forUsTotal += workerAdvancesDisplay;
+        categoryTotals["asset_Worker Advances"] = (categoryTotals["asset_Worker Advances"] || 0) + workerAdvancesDisplay;
+        forUsAccounts.push({ name: "Worker Advances (Prepaid)", code: "COMPUTED", value: workerAdvancesDisplay, category: "Worker Advances" });
       }
 
       // Add Suppliers (only for parent company or if no parent set)
@@ -355,21 +358,26 @@ export function registerStatsRoutes(app: Express) {
             const netBalance = opening + balance.credit - balance.debit;
             if (netBalance > 0) {
               supplierLiabilities += netBalance;
-              onUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: netBalance, category: "Supplier" });
+              const displayVal = currentCfaRate > 0 ? round2(netBalance / currentCfaRate) : netBalance;
+              onUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: displayVal, category: "Supplier" });
             } else if (netBalance < 0) {
               supplierAssets += Math.abs(netBalance);
-              forUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: Math.abs(netBalance), category: "Supplier Overpayment" });
+              const displayVal = currentCfaRate > 0 ? round2(Math.abs(netBalance) / currentCfaRate) : Math.abs(netBalance);
+              forUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: displayVal, category: "Supplier Overpayment" });
             }
           }
         }
         
-        if (supplierLiabilities > 0) {
-          onUsTotal += supplierLiabilities;
-          categoryTotals["liability_Suppliers"] = supplierLiabilities;
+        // For CFA companies, supplier balances are in CFA → convert to USD
+        const supplierLiabilitiesDisplay = currentCfaRate > 0 ? round2(supplierLiabilities / currentCfaRate) : supplierLiabilities;
+        const supplierAssetsDisplay      = currentCfaRate > 0 ? round2(supplierAssets      / currentCfaRate) : supplierAssets;
+        if (supplierLiabilitiesDisplay > 0) {
+          onUsTotal += supplierLiabilitiesDisplay;
+          categoryTotals["liability_Suppliers"] = supplierLiabilitiesDisplay;
         }
-        if (supplierAssets > 0) {
-          forUsTotal += supplierAssets;
-          categoryTotals["asset_Supplier Overpayment"] = supplierAssets;
+        if (supplierAssetsDisplay > 0) {
+          forUsTotal += supplierAssetsDisplay;
+          categoryTotals["asset_Supplier Overpayment"] = supplierAssetsDisplay;
         }
       }
 
