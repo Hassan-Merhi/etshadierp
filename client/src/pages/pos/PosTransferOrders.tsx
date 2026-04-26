@@ -293,19 +293,23 @@ function EditableTransferDetail({
   const removeExtra = (idx: number) => setExtraItems(p => p.filter((_, i) => i !== idx));
 
   const handleSave = () => {
-    const baseItems = myItems.map(item => {
-      const delta = getDeltaNum(item.id);
-      const original = parseFloat(item.quantity) || 0;
-      return {
-        stockItemId: item.stockItemId,
-        stockItemName: item.stockItemName,
-        sourceLocationId: item.sourceLocationId ?? detail.sourceLocationId,
-        sourceLocationName: item.sourceLocationName ?? detail.sourceLocationName,
-        originalQuantity: item.quantity,
-        delta: String(delta),
-        newQuantity: String(original + delta),
-      };
-    });
+    // Only send items whose delta is non-zero (supports both + and - adjustments)
+    const changedBaseItems = myItems
+      .map(item => {
+        const delta = getDeltaNum(item.id);
+        const original = parseFloat(item.quantity) || 0;
+        return {
+          stockItemId: item.stockItemId,
+          stockItemName: item.stockItemName,
+          sourceLocationId: item.sourceLocationId ?? detail.sourceLocationId,
+          sourceLocationName: item.sourceLocationName ?? detail.sourceLocationName,
+          originalQuantity: item.quantity,
+          delta: String(delta),
+          newQuantity: String(original + delta),
+        };
+      })
+      .filter(item => parseFloat(item.delta) !== 0);
+
     const myLocationName = myItems[0]?.sourceLocationName ?? detail.sourceLocationName;
     const newItems = extraItems
       .map(e => ({ ...e, qty: parseFloat(e.qtyDraft) || 0 }))
@@ -319,7 +323,8 @@ function EditableTransferDetail({
         delta: String(e.qty),
         newQuantity: String(e.qty),
       }));
-    const allItems = [...baseItems, ...newItems];
+
+    const allItems = [...changedBaseItems, ...newItems];
     if (allItems.length === 0) {
       toast({ title: "No changes", description: "Adjust at least one item quantity.", variant: "destructive" });
       return;
@@ -403,7 +408,7 @@ function EditableTransferDetail({
                     <input
                       ref={el => { deltaRefs.current[`base-${item.id}`] = el; }}
                       type="text"
-                      inputMode="numeric"
+                      inputMode="text"
                       placeholder="0"
                       value={deltas[item.id] ?? ""}
                       onChange={e => setDeltaVal(item.id, e.target.value)}
