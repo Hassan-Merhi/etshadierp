@@ -137,13 +137,24 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     return `$ ${numAmount.toLocaleString(undefined, { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`;
   };
 
-  // For cash/sales amounts stored in CFA:
-  //   CFA mode  → show raw CFA (no change)
-  //   USD mode  → divide CFA by exchange rate to get USD equivalent
-  // e.g. CFA 5,600,000 at rate 551 → $10,162 USD
+  // For cash/balance amounts. Behaviour depends on the company's base currency:
+  //   baseCurrency=USD → amounts are in USD. USD mode: show as-is. CFA mode: multiply by rate.
+  //   baseCurrency=CFA → amounts are in CFA. USD mode: divide by rate. CFA mode: show as-is.
   const formatCashAmount = (amount: number | string): string => {
     const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
     if (isNaN(numAmount)) return "";
+
+    if (baseCurrency === "USD") {
+      // Amounts are already in USD — same behaviour as formatAmount
+      if (selectedCurrency === "CFA" && exchangeRate) {
+        const cfaAmount = numAmount * exchangeRate;
+        return `CFA ${Math.round(cfaAmount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+      }
+      const isWhole = Math.abs(numAmount) % 1 === 0;
+      return `$ ${numAmount.toLocaleString(undefined, { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`;
+    }
+
+    // baseCurrency=CFA: amounts stored in CFA
     if (selectedCurrency === "USD" && exchangeRate) {
       const usdAmount = numAmount / exchangeRate;
       const isWhole = Math.abs(usdAmount) % 1 === 0;
