@@ -55,6 +55,10 @@ export function registerStatsRoutes(app: Express) {
       // Rounding helper — defined early so it is available throughout the handler
       const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
+      // Fetch company to know its base currency (CFA vs USD)
+      const companyRecord = await storage.getCompanyById(companyId);
+      const companyBaseCurrency = companyRecord?.baseCurrency || "USD";
+
       // Get all ledger accounts for this company
       const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
 
@@ -161,16 +165,19 @@ export function registerStatsRoutes(app: Express) {
 
       // CFA revaluation: Cash accounts hold physical CFA units whose USD worth changes with the rate.
       // Expenses, loans, receivables are locked at their historical CFA values — do NOT revalue them.
-      // Only revalue if this company has a USD→CFA exchange rate defined.
-      const cfaRateRows = await db.select()
-        .from(exchangeRates)
-        .where(and(
-          eq(exchangeRates.companyId, companyId),
-          eq(exchangeRates.fromCurrency, "USD"),
-          eq(exchangeRates.toCurrency, "CFA"),
-        ))
-        .orderBy(desc(exchangeRates.effectiveDate))
-        .limit(1);
+      // Only revalue if this company's base currency IS CFA (not a USD company that happens to have
+      // a CFA exchange rate stored for reference/inter-company purposes).
+      const cfaRateRows = companyBaseCurrency === "CFA"
+        ? await db.select()
+            .from(exchangeRates)
+            .where(and(
+              eq(exchangeRates.companyId, companyId),
+              eq(exchangeRates.fromCurrency, "USD"),
+              eq(exchangeRates.toCurrency, "CFA"),
+            ))
+            .orderBy(desc(exchangeRates.effectiveDate))
+            .limit(1)
+        : [];
       const currentCfaRate = cfaRateRows.length > 0 ? parseFloat(cfaRateRows[0].rate) : 0;
 
       if (currentCfaRate > 0) {
