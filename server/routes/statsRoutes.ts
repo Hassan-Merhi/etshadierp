@@ -181,12 +181,14 @@ export function registerStatsRoutes(app: Express) {
       const currentCfaRate = cfaRateRows.length > 0 ? parseFloat(cfaRateRows[0].rate) : 0;
 
       if (currentCfaRate > 0) {
-        const cashAccountIds = new Set(
-          companyAccounts.filter(a => a.accountType === "Cash").map(a => a.id)
+        const revaluedAccountIds = new Set(
+          companyAccounts
+            .filter(a => a.accountType === "Cash" || a.accountType === "Bank" || a.accountType === "Asset")
+            .map(a => a.id)
         );
-        // Adjust forUs Cash accounts: raw CFA value → USD value
+        // Adjust forUs Cash/Bank/Asset accounts: raw CFA value → USD value
         for (const acc of forUsAccounts) {
-          if (cashAccountIds.has(acc.id)) {
+          if (revaluedAccountIds.has(acc.id)) {
             const oldVal = acc.value;
             const newVal = round2(oldVal / currentCfaRate);
             forUsTotal = round2(forUsTotal - oldVal + newVal);
@@ -194,9 +196,9 @@ export function registerStatsRoutes(app: Express) {
             acc.value = newVal;
           }
         }
-        // Adjust onUs Cash accounts (overdrafts in CFA)
+        // Adjust onUs Cash/Bank/Asset accounts (overdrafts/liabilities in CFA)
         for (const acc of onUsAccounts) {
-          if (cashAccountIds.has(acc.id)) {
+          if (revaluedAccountIds.has(acc.id)) {
             const oldVal = acc.value;
             const newVal = round2(oldVal / currentCfaRate);
             onUsTotal = round2(onUsTotal - oldVal + newVal);
