@@ -50,6 +50,36 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
+// ── Ownership helpers ──────────────────────────────────────────────────────────
+
+/** Returns true only if the container exists AND belongs to companyId. */
+async function verifyContainerOwnership(containerId: number, companyId: number): Promise<boolean> {
+  const rows = await db.select({ id: containers.id })
+    .from(containers)
+    .where(and(eq(containers.id, containerId), eq(containers.companyId, companyId)));
+  return rows.length > 0;
+}
+
+/** Returns the containerId for a freight row — or null if not found / wrong company. */
+async function getFreightContainerId(freightId: number, companyId: number): Promise<number | null> {
+  const rows = await db.select({ containerId: containerFreight.containerId })
+    .from(containerFreight)
+    .where(and(eq(containerFreight.id, freightId), eq(containerFreight.companyId, companyId)));
+  return rows.length > 0 ? rows[0].containerId : null;
+}
+
+// Safe file-serving: normalise the path and reject traversal attempts.
+function safeSendFile(res: any, folder: string, filename: string) {
+  const safeFolder = path.basename(folder);
+  const safeFile  = path.basename(filename);
+  if (!safeFolder || !safeFile || safeFolder !== folder || safeFile !== filename) {
+    return res.status(400).json({ message: "Invalid file path" });
+  }
+  const filePath = path.join(process.cwd(), "uploads", safeFolder, safeFile);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
+  res.sendFile(filePath);
+}
+
 export function registerFactoryDocsUsersRoutes(app: Express) {
   app.get("/api/factory/container-doc-types", requireAuth, async (req: any, res: any) => {
     try {
@@ -74,6 +104,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
   app.get("/api/factory/containers/:containerId/documents", requireAuth, async (req: any, res: any) => {
     try {
       const containerId = Number(req.params.containerId);
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId || !(await verifyContainerOwnership(containerId, companyId))) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const docs = await db.select().from(containerDocuments).where(eq(containerDocuments.containerId, containerId));
       const docTypes = await db.select().from(containerDocumentTypes).orderBy(containerDocumentTypes.label);
       const requiredTypes = docTypes.filter((dt: any) => dt.isRequired);
@@ -114,6 +148,12 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
           const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
           const docTypeId = Number(req.body.docTypeId);
           if (!companyId || !docTypeId) return res.status(400).json({ message: "Missing companyId or docTypeId" });
+
+          if (!(await verifyContainerOwnership(containerId, companyId))) {
+            // Remove the uploaded temp file before rejecting
+            if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+            return res.status(403).json({ message: "Access denied" });
+          }
 
           const storageKey = `container-docs/${req.file.filename}`;
           const [doc] = await db.insert(containerDocuments).values({
@@ -164,6 +204,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const docId = Number(req.params.docId);
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
 
+      if (!companyId || !(await verifyContainerOwnership(containerId, companyId))) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
       const [deleted] = await db.delete(containerDocuments)
         .where(and(eq(containerDocuments.id, docId), eq(containerDocuments.containerId, containerId)))
         .returning();
@@ -198,13 +242,37 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/uploads/:folder/:filename", async (req: any, res: any) => {
+  // Authenticated, path-traversal-safe file serving.
+  // Only the document's owner company can download a container-doc file.
+  app.get("/api/factory/uploads/:folder/:filename", requireAuth, async (req: any, res: any) => {
     try {
-      const path = await import("path");
-      const fs = await import("fs");
-      const filePath = path.default.join(process.cwd(), "uploads", req.params.folder, req.params.filename);
-      if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
-      res.sendFile(filePath);
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(403).json({ message: "Access denied" });
+
+      const folder   = String(req.params.folder);
+      const filename = String(req.params.filename);
+
+      // Reject any path-traversal attempts
+      if (
+        folder.includes("..") || folder.includes("/") || folder.includes("\\") ||
+        filename.includes("..") || filename.includes("/") || filename.includes("\\")
+      ) {
+        return res.status(400).json({ message: "Invalid file path" });
+      }
+
+      // For container-doc files, verify the requesting company owns a document with that key
+      const storageKey = `${folder}/${filename}`;
+      if (folder === "container-docs") {
+        const [doc] = await db
+          .select({ companyId: containerDocuments.companyId })
+          .from(containerDocuments)
+          .where(eq(containerDocuments.storageKey, storageKey));
+        if (!doc || doc.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      safeSendFile(res, folder, filename);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -215,6 +283,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
   app.get("/api/factory/containers/:containerId/freight", requireAuth, async (req: any, res: any) => {
     try {
       const containerId = Number(req.params.containerId);
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId || !(await verifyContainerOwnership(containerId, companyId))) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const freightRows = await db.select().from(containerFreight).where(eq(containerFreight.containerId, containerId));
       const freightWithPayments = await Promise.all(freightRows.map(async (fr: any) => {
         const payments = await db.select().from(containerFreightPayments)
@@ -235,6 +307,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const containerId = Number(req.params.containerId);
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      if (!(await verifyContainerOwnership(containerId, companyId))) {
+        return res.status(403).json({ message: "Access denied" });
+      }
 
       const [row] = await db.insert(containerFreight).values({
         companyId,
@@ -273,9 +349,13 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const containerId = Number(req.params.containerId);
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
 
+      if (!companyId || !(await verifyContainerOwnership(containerId, companyId))) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
       await db.delete(containerFreightPayments).where(eq(containerFreightPayments.containerFreightId, freightId));
       const [deleted] = await db.delete(containerFreight)
-        .where(and(eq(containerFreight.id, freightId), eq(containerFreight.containerId, containerId)))
+        .where(and(eq(containerFreight.id, freightId), eq(containerFreight.containerId, containerId), eq(containerFreight.companyId, companyId)))
         .returning();
       if (!deleted) return res.status(404).json({ message: "Freight not found" });
 
@@ -304,6 +384,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const freightId = Number(req.params.freightId);
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // Verify the freight belongs to this company (via its container)
+      const freightContainerId = await getFreightContainerId(freightId, companyId);
+      if (freightContainerId === null) return res.status(403).json({ message: "Access denied" });
 
       const [payment] = await db.insert(containerFreightPayments).values({
         companyId,
@@ -347,8 +431,13 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const paymentId = Number(req.params.paymentId);
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
 
+      // Verify the freight belongs to this company
+      if (!companyId || (await getFreightContainerId(freightId, companyId)) === null) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
       const [deleted] = await db.delete(containerFreightPayments)
-        .where(and(eq(containerFreightPayments.id, paymentId), eq(containerFreightPayments.containerFreightId, freightId)))
+        .where(and(eq(containerFreightPayments.id, paymentId), eq(containerFreightPayments.containerFreightId, freightId), eq(containerFreightPayments.companyId, companyId)))
         .returning();
       if (!deleted) return res.status(404).json({ message: "Payment not found" });
 
@@ -427,7 +516,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         return res.status(400).json({ message: "Edit reason is required" });
       }
 
-      const canEdit = session.role === "admin" || session.daybookEditDays > 0;
+      const currentRole = (session.currentRole || session.role || "").toLowerCase();
+      const canEdit = ["admin", "owner", "developer"].includes(currentRole) || session.daybookEditDays > 0;
       if (!canEdit) return res.status(403).json({ message: "You do not have permission to edit daybook entries" });
 
       let existing: any;
@@ -465,13 +555,15 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         realEntryId = inserted.id;
       } else {
         // ── Real daybook entry ────────────────────────────────────────────────
-        const [found] = await db.select().from(factoryDaybookEntries).where(eq(factoryDaybookEntries.id, rawEntryId));
+        const [found] = await db.select().from(factoryDaybookEntries)
+          .where(and(eq(factoryDaybookEntries.id, rawEntryId), eq(factoryDaybookEntries.companyId, companyId)));
         if (!found) return res.status(404).json({ message: "Daybook entry not found" });
         existing = found;
         realEntryId = rawEntryId;
       }
 
-      if (session.role !== "admin" && session.daybookEditDays) {
+      const isPrivilegedRole = ["admin", "owner", "developer"].includes(currentRole);
+      if (!isPrivilegedRole && session.daybookEditDays) {
         const entryDate = new Date(existing.txDate);
         const cutoff = new Date();
         cutoff.setDate(cutoff.getDate() - session.daybookEditDays);

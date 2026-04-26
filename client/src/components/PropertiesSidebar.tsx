@@ -10,7 +10,7 @@ import {
   ArrowLeftRight,
 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useState, useEffect } from "react";
 
@@ -81,7 +81,7 @@ export function PropertiesSidebar({ user }: { user?: any }) {
   const NavLink = ({ item, color }: { item: NavItem; color: string }) => {
     const isActive = location === item.url;
     return (
-      <a
+      <Link
         href={item.url}
         data-testid={`link-properties-${item.url.split("/").pop()}`}
         className={`flex items-center gap-2.5 rounded-md py-1.5 text-sm transition-colors ${
@@ -93,7 +93,7 @@ export function PropertiesSidebar({ user }: { user?: any }) {
       >
         <item.icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color } : {}} />
         <span className="flex-1 leading-tight">{item.title}</span>
-      </a>
+      </Link>
     );
   };
 
@@ -102,7 +102,7 @@ export function PropertiesSidebar({ user }: { user?: any }) {
   }) => {
     const isActive = location === href;
     return (
-      <a
+      <Link
         href={href}
         data-testid={testId}
         className={`flex items-center gap-2.5 rounded-md py-1.5 text-sm transition-colors ${
@@ -114,7 +114,7 @@ export function PropertiesSidebar({ user }: { user?: any }) {
       >
         <Icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color } : {}} />
         <span className="flex-1 leading-tight">{label}</span>
-      </a>
+      </Link>
     );
   };
 

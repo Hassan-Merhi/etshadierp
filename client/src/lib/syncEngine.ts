@@ -150,7 +150,10 @@ async function processLegacyItem(
   try {
     const res = await fetch(item.url, {
       method: item.method,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(item.clientDate ? { "X-Client-Date": item.clientDate } : {}),
+      },
       credentials: "include",
       body: item.body || undefined,
     });

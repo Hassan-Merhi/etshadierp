@@ -35,7 +35,7 @@ import {
   Store,
 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -250,7 +250,7 @@ export function FactorySidebar({ user }: { user?: any }) {
   const NavLink = ({ item, color }: { item: NavItem; color: string }) => {
     const isActive = location === item.url;
     return (
-      <a
+      <Link
         href={item.url}
         data-testid={`link-factory-${item.url.split("/").pop()}`}
         className={`flex items-center gap-2.5 rounded-md py-1.5 text-sm transition-colors ${
@@ -262,7 +262,7 @@ export function FactorySidebar({ user }: { user?: any }) {
       >
         <item.icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color } : {}} />
         <span className="flex-1 leading-tight">{item.title}</span>
-      </a>
+      </Link>
     );
   };
 
@@ -271,7 +271,7 @@ export function FactorySidebar({ user }: { user?: any }) {
   }) => {
     const isActive = location === href;
     return (
-      <a
+      <Link
         href={href}
         data-testid={testId}
         className={`flex items-center gap-2.5 rounded-md py-1.5 text-sm transition-colors ${
@@ -286,7 +286,7 @@ export function FactorySidebar({ user }: { user?: any }) {
         {badge != null && badge > 0 && (
           <Badge variant="default" className="text-xs min-w-5 justify-center">{badge}</Badge>
         )}
-      </a>
+      </Link>
     );
   };
 

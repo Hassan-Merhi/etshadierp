@@ -27,6 +27,7 @@ import { generateStockPdf } from "../helpers/generateStockPdf";
 import { sendExportEmail } from "../services/emailService";
 import { triggerDailyWhatsAppSendNow } from "../services/schedulerService";
 import archiver from "archiver";
+import { getClientDate } from "../lib/dateUtils";
 
 export function registerWhatsAppRoutes(app: Express) {
   // ── Settings (singleton row id=1) ──────────────────────────────────────────
@@ -191,7 +192,7 @@ export function registerWhatsAppRoutes(app: Express) {
       const company      = allCompanies.find((c: any) => c.id === companyId);
       const companyName  = company?.name || "Company";
 
-      const endDate   = (req.body.endDate   as string) || new Date().toISOString().split("T")[0];
+      const endDate   = (req.body.endDate   as string) || getClientDate(req);
       const startDate = (req.body.startDate as string) || (() => {
         const d = new Date(endDate);
         d.setFullYear(d.getFullYear() - 1);
@@ -363,8 +364,8 @@ export function registerWhatsAppRoutes(app: Express) {
       const allCompanies = await storage.getAllCompanies() as any[];
       if (!allCompanies.length) return res.status(400).json({ message: "No companies found" });
 
-      const today    = new Date().toISOString().split("T")[0];
-      const year     = new Date().getUTCFullYear();
+      const today    = getClientDate(req);
+      const year     = new Date(today).getFullYear();
       const npStart  = `${year}-01-01`;
       const npEnd    = today;
 
@@ -455,8 +456,8 @@ export function registerWhatsAppRoutes(app: Express) {
       if (!rResult.rows.length) return res.status(404).json({ message: "Recipient not found or inactive" });
       const chatId = rResult.rows[0].chat_id as string;
 
-      const today    = new Date().toISOString().split("T")[0];
-      const yearStart = `${new Date().getUTCFullYear()}-01-01`;
+      const today    = getClientDate(req);
+      const yearStart = `${new Date(today).getFullYear()}-01-01`;
 
       // 1. Stock PDF
       console.log(`[WhatsApp] Generating stock PDF for ${company.name}…`);

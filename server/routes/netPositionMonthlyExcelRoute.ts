@@ -7,6 +7,7 @@ import type { Express } from "express";
 import { requireAuth } from "../auth";
 import { storage } from "../storage";
 import { generateNetPositionExcel, generateMonthEnds } from "../helpers/generateNetPositionExcel";
+import { getClientDate } from "../lib/dateUtils";
 
 export function registerNetPositionMonthlyExcelRoute(app: Express) {
   app.get("/api/reports/net-position-monthly-excel", requireAuth, async (req, res) => {
@@ -25,7 +26,7 @@ export function registerNetPositionMonthlyExcelRoute(app: Express) {
       const companyName  = company?.name || "Company";
 
       const startDate = (req.query.startDate as string) || "";
-      const endDate   = (req.query.endDate   as string) || new Date().toISOString().split("T")[0];
+      const endDate   = (req.query.endDate   as string) || getClientDate(req);
       if (!startDate) return res.status(400).json({ message: "startDate is required" });
       if (generateMonthEnds(startDate, endDate).length === 0) {
         return res.status(400).json({ message: "No months in range" });

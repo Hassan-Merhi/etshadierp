@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { db } from "./db";
 import { userLocations } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
+import { getClientDate } from "./lib/dateUtils";
 
 // Authentication middleware - checks if user is logged in.
 // Uses ONLY session data — zero database calls — to avoid pool exhaustion
@@ -83,7 +84,7 @@ export function canModifyDate(dateField: string = "voucherDate") {
     // Manager and POS users can only modify today's date
     const isPOS = req.user.role.startsWith("POS");
     if (req.user.role === "Manager" || isPOS) {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getClientDate(req);
       const recordDate = req.body[dateField];
       
       if (recordDate && recordDate !== today) {

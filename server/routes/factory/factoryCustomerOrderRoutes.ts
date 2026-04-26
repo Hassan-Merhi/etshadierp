@@ -748,7 +748,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
               companyId,
               voucherType: "Journal",
               voucherNumber: chargeVoucherNumber,
-              voucherDate: updatedOrder.orderDate || new Date().toISOString().slice(0, 10),
+              voucherDate: updatedOrder.orderDate || getClientDate(req),
               description: chargeDesc,
               totalAmount: String(chargeAmt),
               sourceModule: "FACTORY",

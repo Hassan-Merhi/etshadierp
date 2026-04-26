@@ -112,7 +112,7 @@ export async function apiRequest(
     if (networkFail && isSafeToQueue(method, url)) {
       const description = getDescriptionForRequest(url);
       const body = data ? JSON.stringify(data) : "";
-      enqueueRequest(url, method, body, description);
+      enqueueRequest(url, method, body, description, getAppDate());
       const offlineError: any = new Error(`Saved offline — will sync when connected`);
       offlineError.name = "OfflineQueued";
       offlineError.description = description;

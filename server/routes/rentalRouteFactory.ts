@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { db } from "../db";
 import { requireAuth } from "../auth";
+import { getClientDate } from "../lib/dateUtils";
 import {
   propertyUnits,
   propertyContracts,
@@ -121,7 +122,7 @@ async function maybeRunAutoTransfer(
       const toClearing = await getOrCreateClearing(cfg.destCompanyId);
       const baseDesc = `Auto rent transfer - ${unitLabel}`;
       const desc = notes ? `${baseDesc} - ${notes}` : baseDesc;
-      const ts = Date.now();
+      const txId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
       const outNarration = notes
         ? `Transfer out to ${toCompany.name} - ${notes}`
@@ -132,7 +133,7 @@ async function maybeRunAutoTransfer(
 
       // Voucher in FROM company (Payment — money leaves)
       const [fromVoucher] = await db.insert(vouchers).values({
-        companyId, voucherNumber: `TR-OUT-${ts}`,
+        companyId, voucherNumber: `TR-OUT-${txId}`,
         voucherType: "Payment", voucherDate: transferDate as any,
         description: `${desc} → ${toCompany.name}`, totalAmount: amount, optional: false,
       }).returning();
@@ -144,7 +145,7 @@ async function maybeRunAutoTransfer(
       // Voucher in TO company (Receipt — money arrives)
       // DR destLedgerAccountId (cash/account receives money), CR toClearing (clearing settled)
       const [toVoucher] = await db.insert(vouchers).values({
-        companyId: cfg.destCompanyId, voucherNumber: `TR-IN-${ts + 1}`,
+        companyId: cfg.destCompanyId, voucherNumber: `TR-IN-${txId}`,
         voucherType: "Receipt", voucherDate: transferDate as any,
         description: notes ? `Transfer from ${fromCompany.name} - ${notes}` : `Transfer from ${fromCompany.name}`,
         totalAmount: amount, optional: false,
@@ -760,7 +761,7 @@ export function registerRentalRoutes(
 
       const [unit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, contract.unitId));
       const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
-      const dateStr = paymentDate || new Date().toISOString().slice(0, 10);
+      const dateStr = paymentDate || getClientDate(req);
 
       await db.transaction(async (tx) => {
         await tx.update(propertyContracts).set({
@@ -776,7 +777,7 @@ export function registerRentalRoutes(
             const depositAccountId = await findOrCreateLedgerAccount(tx, companyId, "Security Deposits Paid", "Asset", "SEC-DEP-PAID");
             const narration = `Guarantee paid - ${unitLabel}`;
             const [v] = await tx.insert(vouchers).values({
-              companyId, voucherNumber: `GUAR-${Date.now()}-${id}`,
+              companyId, voucherNumber: `GUAR-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${id}`,
               voucherType: "Payment", voucherDate: dateStr as any,
               description: narration, totalAmount: amount, currency: "USD", sourceModule: "ERP",
             }).returning();
@@ -789,7 +790,7 @@ export function registerRentalRoutes(
             const depositAccountId = await findOrCreateLedgerAccount(tx, companyId, "Tenant Deposits", "Liability", "TENANT-DEP");
             const narration = `Guarantee deposit - ${unitLabel}`;
             const [v] = await tx.insert(vouchers).values({
-              companyId, voucherNumber: `GUAR-${Date.now()}-${id}`,
+              companyId, voucherNumber: `GUAR-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${id}`,
               voucherType: "Receipt", voucherDate: dateStr as any,
               description: narration, totalAmount: amount, currency: "USD", sourceModule: "ERP",
             }).returning();
@@ -855,7 +856,7 @@ export function registerRentalRoutes(
 
       const [unit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, contract.unitId));
       const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
-      const dateStr = paymentDate || new Date().toISOString().slice(0, 10);
+      const dateStr = paymentDate || getClientDate(req);
 
       const tenantPays = module === "ERP" || module === "FACTORY";
       let voucherId: number | null = null;
@@ -864,7 +865,7 @@ export function registerRentalRoutes(
           ? `Guarantee moved to cash - ${unitLabel} - ${notes}`
           : `Guarantee moved to cash - ${unitLabel}`;
         const [v] = await tx.insert(vouchers).values({
-          companyId, voucherNumber: `GUAR-CASH-${Date.now()}-${id}`,
+          companyId, voucherNumber: `GUAR-CASH-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${id}`,
           voucherType: "Journal", voucherDate: dateStr as any,
           description: narration, totalAmount: amount, currency: "USD", sourceModule: "ERP",
         }).returning();
@@ -981,7 +982,7 @@ export function registerRentalRoutes(
             const expenseAccountId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
             const narration = `Rent paid - ${unitLabel} - ${monthSpan}`;
             const [v] = await tx.insert(vouchers).values({
-              companyId, voucherNumber: `RENT-${Date.now()}-${contract.id}`,
+              companyId, voucherNumber: `RENT-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`,
               voucherType: "Payment", voucherDate: data.paymentDate as any,
               description: narration, totalAmount: data.amount, currency: "USD", sourceModule: "ERP",
             }).returning();
@@ -994,7 +995,7 @@ export function registerRentalRoutes(
             const incomeAccountId = await findOrCreateLedgerAccount(tx, companyId, incomeAccountName, "Income", "RENT-INC", "Indirect Income");
             const narration = `Rent received - ${unitLabel} - ${monthSpan}`;
             const [v] = await tx.insert(vouchers).values({
-              companyId, voucherNumber: `RENT-${Date.now()}-${contract.id}`,
+              companyId, voucherNumber: `RENT-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`,
               voucherType: "Receipt", voucherDate: data.paymentDate as any,
               description: narration, totalAmount: data.amount, currency: "USD", sourceModule: "ERP",
             }).returning();

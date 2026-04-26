@@ -13,6 +13,7 @@ export interface QueueItem {
   timestamp: number;
   status: QueueItemStatus;
   failReason?: string;
+  clientDate?: string;
 }
 
 function readQueue(): QueueItem[] {
@@ -36,7 +37,8 @@ export function enqueueRequest(
   url: string,
   method: string,
   body: string,
-  description: string
+  description: string,
+  clientDate?: string
 ): string {
   const queue = readQueue();
   const upperMethod = method.toUpperCase();
@@ -70,7 +72,7 @@ export function enqueueRequest(
   }
 
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const item: QueueItem = { id, url, method: upperMethod, body, description, timestamp: Date.now(), status: "pending" };
+  const item: QueueItem = { id, url, method: upperMethod, body, description, timestamp: Date.now(), status: "pending", clientDate };
   const currentQueue = readQueue();
   currentQueue.push(item);
   writeQueue(currentQueue);

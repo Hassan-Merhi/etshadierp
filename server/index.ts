@@ -4,6 +4,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import path from "path";
 import fs from "fs";
+import { randomBytes } from "crypto";
 import { registerRoutes } from "./routes";
 import { setupWS } from "./wsServer";
 import { startScheduler } from "./services/schedulerService";
@@ -67,14 +68,15 @@ declare module 'express-session' {
   }
 }
 
+// General API body limit is 2 MB. Upload routes specify their own higher limit via multer.
 app.use(express.json({
-  limit: "50mb",
+  limit: "2mb",
   verify: (req, _res, buf) => {
     req.rawBody = buf;
   }
 }));
-app.use(express.urlencoded({ extended: false, limit: "50mb" }));
-app.use("/uploads", express.static("uploads"));
+app.use(express.urlencoded({ extended: false, limit: "2mb" }));
+// /uploads is NOT served publicly — file access goes through authenticated endpoints.
 
 // Trust proxy for HTTPS termination
 // This is required for both Replit (development) and Render (production)
@@ -98,7 +100,7 @@ if (!process.env.SESSION_SECRET) {
 
 const sessionConfig: session.SessionOptions = {
   name: 'erp.session',
-  secret: process.env.SESSION_SECRET || require('crypto').randomBytes(32).toString('hex'),
+  secret: process.env.SESSION_SECRET || randomBytes(32).toString('hex'),
   resave: false,
   saveUninitialized: false,
   rolling: true,
@@ -159,33 +161,17 @@ app.use((req, res, next) => {
   next();
 });
 
+// Structured request logging — never logs response bodies to avoid leaking sensitive data.
 app.use((req, res, next) => {
   const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
+  const reqPath = req.path;
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
+    if (reqPath.startsWith("/api")) {
+      // Intentionally omit response body — it may contain vouchers, balances, passwords, or documents.
+      log(`${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`);
     }
   });
-
   next();
 });
 

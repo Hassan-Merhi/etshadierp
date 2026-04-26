@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
 import { ROUTE_TO_FEATURE } from "@shared/schema";
@@ -284,7 +284,7 @@ export function AppSidebar({ user }: { user?: any }) {
     const isActive = location === item.url;
     const unread   = item.url === "/chat" ? (chatUnread?.count || 0) : 0;
     return (
-      <a
+      <Link
         href={item.url}
         data-testid={`link-${item.url}`}
         className={`flex items-center gap-2.5 rounded-md py-1.5 text-sm transition-colors ${
@@ -299,7 +299,7 @@ export function AppSidebar({ user }: { user?: any }) {
         {unread > 0 && (
           <Badge variant="default" className="text-xs min-w-5 justify-center" data-testid="badge-chat-unread">{unread}</Badge>
         )}
-      </a>
+      </Link>
     );
   };
 
@@ -308,7 +308,7 @@ export function AppSidebar({ user }: { user?: any }) {
   }) => {
     const isActive = location === href;
     return (
-      <a
+      <Link
         href={href}
         data-testid={testId}
         className={`flex items-center gap-2.5 rounded-md py-1.5 text-sm transition-colors ${
@@ -323,7 +323,7 @@ export function AppSidebar({ user }: { user?: any }) {
         {badge != null && badge > 0 && (
           <Badge variant="default" className="text-xs min-w-5 justify-center">{badge}</Badge>
         )}
-      </a>
+      </Link>
     );
   };
 
@@ -362,7 +362,7 @@ export function AppSidebar({ user }: { user?: any }) {
                 >
                   <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
                 </span>
-                <a
+                <Link
                   href={item.url}
                   draggable={false}
                   data-testid={`link-${item.url}`}
@@ -378,7 +378,7 @@ export function AppSidebar({ user }: { user?: any }) {
                   {unread > 0 && (
                     <Badge variant="default" className="text-xs min-w-5 justify-center">{unread}</Badge>
                   )}
-                </a>
+                </Link>
               </div>
             );
           })}
