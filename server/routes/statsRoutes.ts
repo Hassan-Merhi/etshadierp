@@ -52,6 +52,9 @@ export function registerStatsRoutes(app: Express) {
       // the balance sheet is always a point-in-time snapshot (as of toDate), not a period.
       const toDate = req.query.toDate ? String(req.query.toDate) : null;
 
+      // Rounding helper — defined early so it is available throughout the handler
+      const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
       // Get all ledger accounts for this company
       const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
 
@@ -393,10 +396,6 @@ export function registerStatsRoutes(app: Express) {
         forUsAccounts.push({ name: "Stock On The Way", code: "STOCK_OTW", value: stockOtwValue, category: "Stock OTW" });
       }
 
-      // ============ ROUNDING HELPER ============
-      // Helper to round currency values to 2 decimal places (prevents floating point noise)
-      const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
-
       // Build breakdowns from category totals (with rounding)
       for (const [key, value] of Object.entries(categoryTotals)) {
         if (value === 0) continue;
@@ -518,6 +517,7 @@ export function registerStatsRoutes(app: Express) {
         expensesTotal,
       });
     } catch (error: any) {
+      console.error("[/api/stats/net-profit] Unhandled error:", error);
       res.status(500).json({ message: error.message });
     }
   });
