@@ -155,6 +155,7 @@ const FactoryInvoiceCreate = lazy(() => import("@/pages/factory/FactoryInvoiceCr
 const FactoryInvoiceDetail = lazy(() => import("@/pages/factory/FactoryInvoiceDetail"));
 const FactoryProformas = lazy(() => import("@/pages/factory/FactoryProformas"));
 const FactoryStockAllocation = lazy(() => import("@/pages/factory/FactoryStockAllocationV2"));
+const FactoryStockAllocationV3 = lazy(() => import("@/pages/factory/FactoryStockAllocationV3"));
 const ProformaAddLine = lazy(() => import("@/pages/factory/ProformaAddLine"));
 const FactoryPriceList = lazy(() => import("@/pages/factory/FactoryPriceList"));
 const FactoryPendingInvoiceVerify = lazy(() => import("@/pages/factory/FactoryPendingInvoiceVerify"));
@@ -838,6 +839,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/sales/proformas/:proformaId/add-line" component={ProformaAddLine} />
                     <Route path="/factory/invoicing" component={FactoryInvoicing} />
                     <Route path="/factory/stock-allocation" component={FactoryStockAllocation} />
+                    <Route path="/factory/stock-allocation-v3" component={FactoryStockAllocationV3} />
                     <Route path="/factory/customers/:id" component={FactoryCustomerStatement} />
                     <Route path="/factory/customers" component={FactoryCustomers} />
                     <Route path="/factory/payroll-hub" component={FactoryPayrollHub} />
