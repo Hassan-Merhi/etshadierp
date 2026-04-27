@@ -302,7 +302,7 @@ export default function Analytics() {
   const { formatAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
-  const [selectedPeriod, setSelectedPeriod] = useState("all");
+  const [selectedPeriod, setSelectedPeriod] = useState("month");
   const [rangeStart, setRangeStart] = useState("");
   const [rangeEnd, setRangeEnd] = useState("");
   const [detailsPeriod, setDetailsPeriod] = useState("all");
@@ -1637,7 +1637,7 @@ export default function Analytics() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {salesData.map((location) => (
+                  {[...salesData].sort((a, b) => (a.locationName ?? "").localeCompare(b.locationName ?? "")).map((location) => (
                     <TableRow key={location.locationId}>
                       <TableCell className="font-medium">{location.locationName}</TableCell>
                       <TableCell className="text-right font-mono">
@@ -1679,7 +1679,7 @@ export default function Analytics() {
               </Table>
               </div>
               <div className="md:hidden space-y-3">
-                {salesData.map((location) => (
+                {[...salesData].sort((a, b) => (a.locationName ?? "").localeCompare(b.locationName ?? "")).map((location) => (
                   <Card key={location.locationId} className="hover-elevate cursor-pointer" onClick={() => setSelectedLocationForDetails(location.locationId)}>
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between gap-2">
