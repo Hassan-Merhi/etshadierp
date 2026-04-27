@@ -55,6 +55,7 @@ interface CustomerOrder {
   customerName: string;
   containerNumber?: string | null;
   proformaName?: string | null;
+  destination?: string | null;
 }
 
 type StatusFilter = "LOADING" | "PENDING" | "VERIFIED" | "FINALIZED" | "ALL";
@@ -237,10 +238,10 @@ export default function FactoryInvoices() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Invoice #</TableHead>
                 <TableHead>Customer</TableHead>
                 {!hideProformaCol && <TableHead>Proforma</TableHead>}
                 <TableHead>Container</TableHead>
+                <TableHead>Destination</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Bales</TableHead>
@@ -267,9 +268,6 @@ export default function FactoryInvoices() {
                     onClick={() => handleRowClick(order)}
                     data-testid={`row-order-${order.id}`}
                   >
-                    <TableCell className="font-mono" data-testid={`text-invoice-number-${order.id}`}>
-                      {order.invoiceNumber || `#${order.id}`}
-                    </TableCell>
                     <TableCell data-testid={`text-customer-name-${order.id}`}>
                       {order.customerName}
                     </TableCell>
@@ -280,6 +278,9 @@ export default function FactoryInvoices() {
                     )}
                     <TableCell className="font-mono text-sm" data-testid={`text-container-${order.id}`}>
                       {order.containerNumber || <span className="text-muted-foreground/50">—</span>}
+                    </TableCell>
+                    <TableCell className="text-sm" data-testid={`text-destination-${order.id}`}>
+                      {order.destination || <span className="text-muted-foreground/50">—</span>}
                     </TableCell>
                     <TableCell className="font-mono text-sm" data-testid={`text-order-date-${order.id}`}>
                       {order.orderDate ? formatDisplayDate(order.orderDate) : "-"}
