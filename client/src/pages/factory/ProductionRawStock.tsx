@@ -415,6 +415,7 @@ function SupplierCategoriesDialog({
     fullSuppliers.filter(s => s.supplierCategoryId === catId).length;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
         <DialogHeader>
@@ -552,6 +553,7 @@ function SupplierCategoriesDialog({
       </DialogContent>
     </Dialog>
     {AdminDialog}
+    </>
   );
 }
 
