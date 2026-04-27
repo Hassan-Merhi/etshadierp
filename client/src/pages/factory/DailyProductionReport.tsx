@@ -36,6 +36,11 @@ function monthStart() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 }
+function monthEnd() {
+  const d = new Date();
+  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  return last.toISOString().slice(0, 10);
+}
 function lastMonthRange(): [string, string] {
   const now = new Date();
   const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -775,7 +780,7 @@ export default function DailyProductionReport() {
   const { from, to } = useMemo(() => {
     if (preset === "today") return { from: todayStr(), to: todayStr() };
     if (preset === "yesterday") return { from: yesterdayStr(), to: yesterdayStr() };
-    if (preset === "month") return { from: monthStart(), to: todayStr() };
+    if (preset === "month") return { from: monthStart(), to: monthEnd() };
     if (preset === "lastmonth") {
       const [f, t] = lastMonthRange();
       return { from: f, to: t };

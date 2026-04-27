@@ -438,7 +438,9 @@ export default function Analytics() {
       startDate = endDate;
     } else if (selectedPeriod === "month") {
       const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       startDate = firstDayOfMonth.toLocaleDateString('en-CA');
+      endDate = lastDayOfMonth.toLocaleDateString('en-CA');
     } else if (selectedPeriod === "year") {
       const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
       startDate = firstDayOfYear.toLocaleDateString('en-CA');
@@ -472,7 +474,9 @@ export default function Analytics() {
       startDate = endDate;
     } else if (detailsPeriod === "month") {
       const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       startDate = firstDayOfMonth.toLocaleDateString('en-CA');
+      endDate = lastDayOfMonth.toLocaleDateString('en-CA');
     } else if (detailsPeriod === "year") {
       const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
       startDate = firstDayOfYear.toLocaleDateString('en-CA');

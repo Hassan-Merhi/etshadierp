@@ -72,7 +72,8 @@ function getDateRange(
   }
 
   if (period === "this_month") {
-    return { startDate: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`, endDate: today };
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { startDate: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`, endDate: fmt(lastDay) };
   }
 
   if (period === "this_year") {
