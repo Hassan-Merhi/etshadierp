@@ -10,7 +10,8 @@ import {
 import type { FactorySheet } from "@shared/schema";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
-type SheetRow = { label: string; cells: (number | null)[] };
+type CellValue = number | string | null;
+type SheetRow = { label: string; cells: CellValue[] };
 
 interface LocalSheet {
   id: number | null; // null = not yet saved
@@ -47,16 +48,26 @@ function calcDiff(rows: SheetRow[], colCount: number): (number | null)[] {
 }
 
 // ── Cell value formatting ──────────────────────────────────────────────────────
-function fmt(v: number | null): string {
+function fmt(v: CellValue): string {
   if (v === null || v === undefined) return "";
+  if (typeof v === "string") return v;
   return v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 4 });
 }
 
-function parseNum(s: string): number | null {
-  const cleaned = s.replace(/,/g, "").trim();
-  if (cleaned === "" || cleaned === "-") return null;
+// Parse cell input: try to parse as number; if it looks like an in-progress
+// negative number (just "-") or is non-numeric text, store as a string so the
+// user can keep typing without losing their input.
+function parseCellValue(s: string): CellValue {
+  if (s === "" || s === null || s === undefined) return null;
+  const trimmed = s.trim();
+  if (trimmed === "") return null;
+  // Intermediate negative sign — preserve it as a string so typing continues
+  if (trimmed === "-") return "-";
+  const cleaned = trimmed.replace(/,/g, "");
   const n = Number(cleaned);
-  return isNaN(n) ? null : n;
+  if (!isNaN(n)) return n;
+  // Non-numeric text — store as string
+  return s;
 }
 
 // ── Tab name editor ────────────────────────────────────────────────────────────
@@ -350,7 +361,7 @@ export default function FactorySheets() {
       const rows = s.rows.map((r, i) => {
         if (i !== rowIdx) return r;
         const cells = [...r.cells];
-        cells[colIdx] = parseNum(val);
+        cells[colIdx] = parseCellValue(val);
         return { ...r, cells };
       });
       return { ...s, rows };
@@ -542,17 +553,17 @@ export default function FactorySheets() {
                     {activeSheet.columns.map((_, ci) => {
                       const val = row.cells[ci];
                       const isNeg = typeof val === "number" && val < 0;
+                      const isText = typeof val === "string" && val !== "-";
                       return (
                         <td
                           key={ci}
                           className="border border-border px-1 py-0.5"
                         >
                           <Input
-                            value={val === null || val === undefined ? "" : String(val)}
+                            value={fmt(val)}
                             onChange={e => setCell(ri, ci, e.target.value)}
-                            className={`h-7 text-xs text-right border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-1 tabular-nums ${isNeg ? "text-red-500" : ""}`}
+                            className={`h-7 text-xs border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-1 tabular-nums ${isNeg ? "text-red-500" : ""} ${isText ? "text-left" : "text-right"}`}
                             data-testid={`input-cell-${ri}-${ci}`}
-                            inputMode="decimal"
                           />
                         </td>
                       );
