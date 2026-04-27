@@ -106,7 +106,7 @@ export interface SalaryAdvance {
 export function getThisMonthRange() {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('en-CA');
-  const end = new Date().toLocaleDateString('en-CA');
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toLocaleDateString('en-CA');
   return { start, end };
 }
 
