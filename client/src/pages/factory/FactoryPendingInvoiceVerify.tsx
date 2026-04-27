@@ -522,7 +522,7 @@ export default function FactoryPendingInvoiceVerify() {
                           <TableHead>Product</TableHead>
                           <TableHead className="text-right">Qty</TableHead>
                           <TableHead className="text-right">Weight</TableHead>
-                          <TableHead className="text-right">Price</TableHead>
+                          {isAdminOrOwner && <TableHead className="text-right">Price</TableHead>}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -534,7 +534,7 @@ export default function FactoryPendingInvoiceVerify() {
                             <TableCell className="text-sm">{group.productName}</TableCell>
                             <TableCell className="text-right font-mono">{group.qty}</TableCell>
                             <TableCell className="text-right font-mono">{(group.totalWeight || 0).toFixed(2)}</TableCell>
-                            <TableCell className="text-right font-mono">{(group.totalPrice || 0).toFixed(2)}</TableCell>
+                            {isAdminOrOwner && <TableCell className="text-right font-mono">{(group.totalPrice || 0).toFixed(2)}</TableCell>}
                           </TableRow>
                         ))}
                       </TableBody>
