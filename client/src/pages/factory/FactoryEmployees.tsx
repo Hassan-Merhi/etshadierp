@@ -166,18 +166,26 @@ export default function FactoryEmployees() {
     },
   });
 
-  const filtered = employees.filter((e) => {
-    const matchesSearch =
-      !search ||
-      `${e.firstName} ${e.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
-      (e.code || "").toLowerCase().includes(search.toLowerCase()) ||
-      (e.department || "").toLowerCase().includes(search.toLowerCase());
-    const matchesStatus =
-      statusFilter === "All" ||
-      (statusFilter === "Active" && e.active) ||
-      (statusFilter === "Inactive" && !e.active);
-    return matchesSearch && matchesStatus;
-  });
+  function parseCodeNum(code: string | null | undefined): number {
+    if (!code) return Infinity;
+    const m = code.match(/(\d+)$/);
+    return m ? parseInt(m[1], 10) : Infinity;
+  }
+
+  const filtered = employees
+    .filter((e) => {
+      const matchesSearch =
+        !search ||
+        `${e.firstName} ${e.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
+        (e.code || "").toLowerCase().includes(search.toLowerCase()) ||
+        (e.department || "").toLowerCase().includes(search.toLowerCase());
+      const matchesStatus =
+        statusFilter === "All" ||
+        (statusFilter === "Active" && e.active) ||
+        (statusFilter === "Inactive" && !e.active);
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => parseCodeNum(a.code) - parseCodeNum(b.code));
 
   const fmt = (val: string | number | null | undefined) => {
     const n = parseFloat(String(val || 0));
@@ -245,9 +253,9 @@ export default function FactoryEmployees() {
 
       {/* List */}
       {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {[...Array(8)].map((_, i) => (
-            <Skeleton key={i} className="h-44 w-full rounded-md" />
+        <div className="flex flex-col gap-2">
+          {[...Array(6)].map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-md" />
           ))}
         </div>
       ) : filtered.length === 0 ? (
@@ -262,83 +270,95 @@ export default function FactoryEmployees() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div className="flex flex-col gap-2">
           {filtered.map((emp) => {
             const fullName = `${emp.firstName} ${emp.lastName}`;
             const balance = parseFloat(emp.currentBalance || "0");
             return (
               <Card
                 key={emp.id}
-                className="cursor-pointer hover-elevate"
+                className="cursor-pointer hover-elevate group"
                 onClick={() => navigate(`/factory/employees/${emp.id}`)}
                 data-testid={`card-employee-${emp.id}`}
               >
-                <CardContent className="p-4 flex flex-col gap-3">
-                  {/* Top row: avatar + badge */}
-                  <div className="flex items-start justify-between">
-                    <Avatar className={`h-12 w-12 ${getAvatarColor(fullName)}`}>
+                <CardContent className="px-4 py-3">
+                  <div className="flex items-center gap-4 flex-wrap">
+
+                    {/* Avatar */}
+                    <Avatar className={`h-10 w-10 shrink-0 ${getAvatarColor(fullName)}`}>
                       <AvatarFallback className={`text-sm font-semibold ${getAvatarColor(fullName)}`}>
                         {getInitials(fullName)}
                       </AvatarFallback>
                     </Avatar>
-                    <Badge
-                      variant="outline"
-                      className={emp.active
-                        ? "bg-primary text-primary-foreground border-primary text-xs"
-                        : "border-red-400 text-red-600 dark:text-red-400 text-xs"}
-                    >
-                      {emp.active ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
 
-                  {/* Name + department */}
-                  <div className="min-w-0">
-                    <div className="font-semibold text-sm leading-tight truncate">{fullName}</div>
-                    <div className="text-xs text-muted-foreground truncate mt-0.5">
-                      {emp.department || "No department"}
+                    {/* Name + department */}
+                    <div className="flex-1 min-w-36">
+                      <div className="font-semibold text-sm leading-tight">{fullName}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {emp.department || <span className="opacity-40">—</span>}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Code + balance row */}
-                  <div className="flex items-end justify-between mt-auto">
-                    <span className="font-mono text-xs text-muted-foreground">{emp.code}</span>
-                    <span className={`font-mono text-xs font-semibold ${balance < 0 ? "text-red-600 dark:text-red-400" : balance > 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
-                      {fmt(emp.currentBalance)}
-                    </span>
-                  </div>
+                    {/* Code */}
+                    <div className="shrink-0 min-w-20">
+                      <p className="text-xs text-muted-foreground">Code</p>
+                      <p className="text-sm font-mono font-medium">{emp.code}</p>
+                    </div>
 
-                  {/* Action buttons */}
-                  <div className="flex items-center gap-1 border-t pt-2 -mx-4 px-3" onClick={(e) => e.stopPropagation()}>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => openEdit(emp)}
-                      data-testid={`button-edit-employee-${emp.id}`}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    {emp.active ? (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setEndingContractEmployee(emp)}
-                        data-testid={`button-end-contract-${emp.id}`}
-                        title="End Contract"
+                    {/* Salary */}
+                    <div className="shrink-0 min-w-20">
+                      <p className="text-xs text-muted-foreground">Salary</p>
+                      <p className="text-sm font-medium">{fmt(emp.monthlySalary)}</p>
+                    </div>
+
+                    {/* Balance */}
+                    <div className="shrink-0 min-w-24">
+                      <p className="text-xs text-muted-foreground">Balance</p>
+                      <p className={`text-sm font-semibold ${balance < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                        {fmt(emp.currentBalance)}
+                      </p>
+                    </div>
+
+                    {/* Deposits */}
+                    <div className="shrink-0 min-w-20 hidden sm:block">
+                      <p className="text-xs text-muted-foreground">Deposits</p>
+                      <p className="text-sm font-medium">{fmt(emp.totalDeposits)}</p>
+                    </div>
+
+                    {/* Withdrawals */}
+                    <div className="shrink-0 min-w-24 hidden sm:block">
+                      <p className="text-xs text-muted-foreground">Withdrawals</p>
+                      <p className="text-sm font-medium">{fmt(emp.totalWithdrawals)}</p>
+                    </div>
+
+                    {/* Status */}
+                    <div className="shrink-0">
+                      <Badge
+                        variant="outline"
+                        className={`text-xs no-default-active-elevate ${emp.active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "border-red-400 text-red-600 dark:text-red-400"}`}
                       >
-                        <UserX className="h-3.5 w-3.5 text-destructive" />
+                        {emp.active ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-1 shrink-0 md:invisible md:group-hover:visible" onClick={(e) => e.stopPropagation()}>
+                      <Button size="icon" variant="ghost" onClick={() => openEdit(emp)} data-testid={`button-edit-employee-${emp.id}`}>
+                        <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                    ) : (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => reactivateMutation.mutate(emp.id)}
-                        disabled={reactivateMutation.isPending}
-                        data-testid={`button-reactivate-${emp.id}`}
-                        title="Reactivate"
-                      >
-                        <UserCheck className="h-3.5 w-3.5 text-green-600" />
-                      </Button>
-                    )}
+                      {emp.active ? (
+                        <Button size="icon" variant="ghost" onClick={() => setEndingContractEmployee(emp)} data-testid={`button-end-contract-${emp.id}`} title="End Contract">
+                          <UserX className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      ) : (
+                        <Button size="icon" variant="ghost" onClick={() => reactivateMutation.mutate(emp.id)} disabled={reactivateMutation.isPending} data-testid={`button-reactivate-${emp.id}`} title="Reactivate">
+                          <UserCheck className="h-3.5 w-3.5 text-green-600" />
+                        </Button>
+                      )}
+                    </div>
+
                   </div>
                 </CardContent>
               </Card>
