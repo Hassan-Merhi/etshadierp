@@ -4528,3 +4528,64 @@ export const insertFactorySheetSchema = createInsertSchema(factorySheets).omit({
 });
 export type FactorySheet = typeof factorySheets.$inferSelect;
 export type InsertFactorySheet = z.infer<typeof insertFactorySheetSchema>;
+
+// ── Stock Allocation v3.0 — isolated test module ──────────────────────────────
+// These tables are SEPARATE from customer_orders / customer_order_bales.
+// The existing production bale-scanning flow is NOT affected.
+
+export const factoryV3Loads = pgTable("factory_v3_loads", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  proformaId: integer("proforma_id").notNull(),
+  loadName: text("load_name").notNull(),
+  expectedLoadDate: date("expected_load_date").notNull(),
+  notes: text("notes"),
+  // status: expected_to_load | loading | finalized | cancelled
+  status: text("status").notNull().default("expected_to_load"),
+  createdBy: integer("created_by"),
+  createdByName: text("created_by_name"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  startedAt: timestamp("started_at"),
+  finalizedAt: timestamp("finalized_at"),
+  finalizedBy: integer("finalized_by"),
+  finalizedByName: text("finalized_by_name"),
+  cancelledAt: timestamp("cancelled_at"),
+});
+
+export const insertFactoryV3LoadSchema = createInsertSchema(factoryV3Loads).omit({
+  id: true,
+  createdAt: true,
+  startedAt: true,
+  finalizedAt: true,
+  cancelledAt: true,
+});
+export type FactoryV3Load = typeof factoryV3Loads.$inferSelect;
+export type InsertFactoryV3Load = z.infer<typeof insertFactoryV3LoadSchema>;
+
+// Bales linked to a v3 load. Phase: 'expected' (pre-planned) or 'scanned' (physically loaded).
+export const factoryV3LoadBales = pgTable("factory_v3_load_bales", {
+  id: serial("id").primaryKey(),
+  loadId: integer("load_id").notNull(),
+  baleId: integer("bale_id").notNull(),
+  baleReference: varchar("bale_reference", { length: 100 }).notNull(),
+  articleCode: varchar("article_code", { length: 50 }),
+  productName: text("product_name"),
+  weightKg: decimal("weight_kg", { precision: 15, scale: 3 }).notNull().default("0"),
+  // phase: expected (added during setup) | scanned (physically loaded during loading)
+  phase: text("phase").notNull().default("scanned"),
+  addedBy: integer("added_by"),
+  addedByName: text("added_by_name"),
+  addedAt: timestamp("added_at").notNull().defaultNow(),
+  removedBy: integer("removed_by"),
+  removedByName: text("removed_by_name"),
+  removedAt: timestamp("removed_at"),
+  notes: text("notes"),
+});
+
+export const insertFactoryV3LoadBaleSchema = createInsertSchema(factoryV3LoadBales).omit({
+  id: true,
+  addedAt: true,
+  removedAt: true,
+});
+export type FactoryV3LoadBale = typeof factoryV3LoadBales.$inferSelect;
+export type InsertFactoryV3LoadBale = z.infer<typeof insertFactoryV3LoadBaleSchema>;

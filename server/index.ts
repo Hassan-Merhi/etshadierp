@@ -1631,6 +1631,45 @@ let migrationsDone = false;
     `INSERT INTO net_position_export_settings (id, frequency, send_hour, enabled, auto_send)
      VALUES (1, 'daily', 18, false, false)
      ON CONFLICT (id) DO NOTHING`,
+
+    // ── Stock Allocation v3.0 — isolated test tables (Apr 2026) ───────────────
+    `CREATE TABLE IF NOT EXISTS factory_v3_loads (
+      id                  SERIAL PRIMARY KEY,
+      company_id          INTEGER NOT NULL,
+      proforma_id         INTEGER NOT NULL,
+      load_name           TEXT NOT NULL,
+      expected_load_date  DATE NOT NULL,
+      notes               TEXT,
+      status              TEXT NOT NULL DEFAULT 'expected_to_load',
+      created_by          INTEGER,
+      created_by_name     TEXT,
+      created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
+      started_at          TIMESTAMP,
+      finalized_at        TIMESTAMP,
+      finalized_by        INTEGER,
+      finalized_by_name   TEXT,
+      cancelled_at        TIMESTAMP
+    )`,
+    `CREATE INDEX IF NOT EXISTS factory_v3_loads_company_idx ON factory_v3_loads (company_id, status)`,
+    `CREATE TABLE IF NOT EXISTS factory_v3_load_bales (
+      id              SERIAL PRIMARY KEY,
+      load_id         INTEGER NOT NULL REFERENCES factory_v3_loads(id) ON DELETE CASCADE,
+      bale_id         INTEGER NOT NULL,
+      bale_reference  VARCHAR(100) NOT NULL,
+      article_code    VARCHAR(50),
+      product_name    TEXT,
+      weight_kg       DECIMAL(15,3) NOT NULL DEFAULT 0,
+      phase           TEXT NOT NULL DEFAULT 'scanned',
+      added_by        INTEGER,
+      added_by_name   TEXT,
+      added_at        TIMESTAMP NOT NULL DEFAULT NOW(),
+      removed_by      INTEGER,
+      removed_by_name TEXT,
+      removed_at      TIMESTAMP,
+      notes           TEXT
+    )`,
+    `CREATE INDEX IF NOT EXISTS factory_v3_load_bales_load_idx ON factory_v3_load_bales (load_id)`,
+    `CREATE INDEX IF NOT EXISTS factory_v3_load_bales_bale_idx  ON factory_v3_load_bales (bale_id)`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
