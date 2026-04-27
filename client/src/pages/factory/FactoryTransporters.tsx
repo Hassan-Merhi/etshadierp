@@ -92,6 +92,7 @@ function ChargeDialog({ transporterId, open, onClose }: { transporterId: number;
   });
 
   return (
+    <>
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Record Charge</DialogTitle></DialogHeader>
@@ -129,6 +130,7 @@ function ChargeDialog({ transporterId, open, onClose }: { transporterId: number;
       </DialogContent>
     </Dialog>
     {AdminDialog}
+    </>
   );
 }
 
@@ -163,6 +165,7 @@ function PaymentDialog({ transporterId, open, onClose }: { transporterId: number
   });
 
   return (
+    <>
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Record Payment</DialogTitle></DialogHeader>
@@ -200,6 +203,7 @@ function PaymentDialog({ transporterId, open, onClose }: { transporterId: number
       </DialogContent>
     </Dialog>
     {AdminDialog}
+    </>
   );
 }
 
@@ -381,6 +385,7 @@ function AddTransporterDialog({ open, onClose }: { open: boolean; onClose: () =>
   });
 
   return (
+    <>
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Add Transporter</DialogTitle></DialogHeader>
@@ -408,6 +413,7 @@ function AddTransporterDialog({ open, onClose }: { open: boolean; onClose: () =>
       </DialogContent>
     </Dialog>
     {AdminDialog}
+    </>
   );
 }
 
