@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Search, Package, Clock, User, Scale, Hash, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX, Ship, FileText, User2, Trash2, Pencil } from "lucide-react";
+import { Search, Package, Clock, User, Scale, Hash, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX, Ship, FileText, User2, Trash2, Pencil, ArchiveRestore } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -261,6 +261,26 @@ export default function BarcodeLookup() {
     },
   });
 
+  const returnToStockMutation = useMutation({
+    mutationFn: async (baleId: number) => {
+      const response = await modeApiRequest("PATCH", `/api/factory/bales/${baleId}/status`, { status: "IN_STOCK" });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Failed to return bale to stock");
+      }
+      return response.json();
+    },
+    onSuccess: (_data, _baleId) => {
+      if (referenceResult?.labelPrint?.referenceNumber) {
+        referenceLookup.mutate(referenceResult.labelPrint.referenceNumber);
+      }
+      toast({ title: "Returned to Stock", description: "Bale status set back to In Stock." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get("ref");
@@ -462,6 +482,18 @@ export default function BarcodeLookup() {
                     </CardTitle>
                     {isAdmin && (
                       <div className="flex items-center gap-2 flex-wrap">
+                        {(referenceResult.baleInfo?.status === "DELETED" || referenceResult.baleInfo?.status === "REMOVED") && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={returnToStockMutation.isPending}
+                            onClick={() => referenceResult.baleInfo && returnToStockMutation.mutate(referenceResult.baleInfo.id)}
+                            data-testid="button-return-to-stock"
+                          >
+                            <ArchiveRestore className="h-3.5 w-3.5 mr-1" />
+                            {returnToStockMutation.isPending ? "Restoring…" : "Return to Stock"}
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
