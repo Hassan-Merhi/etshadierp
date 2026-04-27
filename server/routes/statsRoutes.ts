@@ -381,13 +381,21 @@ export function registerStatsRoutes(app: Express) {
         }
       }
 
-      // Stock OTW — historical as of toDate (containers that were in transit on that date)
-      // A container was OTW on toDate if: importDate ≤ toDate AND (offloadDate IS NULL OR offloadDate > toDate)
+      // Stock OTW — historical as of toDate (containers that were in transit on that date).
+      // Rule: a container was OTW as of toDate if it was imported by then AND either
+      //   (a) it is still OTW (never formally offloaded via the offload workflow), OR
+      //   (b) it was formally offloaded AFTER toDate (so it was still in transit as of toDate).
+      // A manually-entered tracking offloadDate does NOT indicate a formal offload — only
+      // status='OFFLOADED' (set by the offload workflow) is authoritative. This keeps the
+      // date-filtered result consistent with the no-filter query (status = 'OTW').
       const otwContainersQuery = toDate
         ? and(
             eq(containers.companyId, companyId),
             lte(containers.importDate, toDate),
-            or(isNull(containers.offloadDate), sql`${containers.offloadDate} > ${toDate}`)
+            or(
+              eq(containers.status, "OTW"),
+              and(eq(containers.status, "OFFLOADED"), sql`${containers.offloadDate} > ${toDate}`)
+            )
           )
         : and(eq(containers.companyId, companyId), eq(containers.status, "OTW"));
       const otwContainers = await db.select().from(containers).where(otwContainersQuery).execute();
@@ -676,11 +684,16 @@ export function registerStatsRoutes(app: Express) {
       }
 
       // ── 6. OTW containers — historical as of toDate ───────────────────────
+      // Same logic as the main endpoint: use status='OFFLOADED' (not offloadDate) as the
+      // authoritative indicator that a container left OTW status.
       const excelOtwQuery = toDate
         ? and(
             eq(containers.companyId, companyId),
             lte(containers.importDate, toDate),
-            or(isNull(containers.offloadDate), sql`${containers.offloadDate} > ${toDate}`)
+            or(
+              eq(containers.status, "OTW"),
+              and(eq(containers.status, "OFFLOADED"), sql`${containers.offloadDate} > ${toDate}`)
+            )
           )
         : and(eq(containers.companyId, companyId), eq(containers.status, "OTW"));
       const otwContainers = await db.select().from(containers).where(excelOtwQuery).execute();
