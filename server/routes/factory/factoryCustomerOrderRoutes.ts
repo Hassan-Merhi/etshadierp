@@ -2632,8 +2632,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
-      const { hideSelling: hideSellingHtml } = await getExportPriceVisibility(req);
-      const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
+      const { hideSelling: hideSellingPdf } = await getExportPriceVisibility(req);
+
       const [order] = await db
         .select({
           id: customerOrders.id,
@@ -2658,7 +2658,6 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const lines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
       const charges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
 
-      // Build nameMap for invoice HTML export
       const invArticleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
       const invNameMap = new Map<string, string>();
       if (invArticleCodes.length > 0) {
@@ -2674,189 +2673,191 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         return na.localeCompare(nb);
       });
 
-      // Read logo for embedding in HTML
-      const invLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
-      let invLogoDataUri = "";
-      try {
-        if (fs.existsSync(invLogoPath)) {
-          const logoB64 = fs.readFileSync(invLogoPath).toString("base64");
-          invLogoDataUri = `data:image/jpeg;base64,${logoB64}`;
-        }
-      } catch {}
+      // ── PDFKit setup ──────────────────────────────────────────────────────────
+      const PDFDocument = (await import("pdfkit")).default;
+      const doc = new PDFDocument({ margin: 40, size: "A4" });
+      const invoiceLabel = order.invoiceNumber || `INV-${String(orderId).padStart(6, "0")}`;
+      const safeLabel = invoiceLabel.replace(/[^a-zA-Z0-9_-]/g, "_");
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename=${safeLabel}.pdf`);
+      doc.pipe(res);
 
-      const fmtNum = (val: any): string => {
+      const PAGE_W = doc.page.width;   // 595
+      const L = 40, R = PAGE_W - 40;  // left / right margin x
+      const USABLE = R - L;            // 515
+
+      const fmtN = (val: any) => {
         const n = parseFloat(val);
         if (isNaN(n)) return val ?? "";
-        return n % 1 === 0
-          ? n.toLocaleString("en-US")
-          : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return n % 1 === 0 ? n.toLocaleString("en-US") : n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
       };
-      const fmtMoney = (val: any): string => `$${fmtNum(val)}`;
+      const fmtM = (val: any) => `$${fmtN(val)}`;
 
-      let linesHtml = "";
-      sortedLines.forEach((line: any, idx: number) => {
-        linesHtml += `<tr>
-          <td>${idx + 1}</td>
-          <td>${line.articleCode}</td>
-          <td>${invNameMap.get(line.articleCode) || line.baleName || ""}</td>
-          <td>${fmtNum(line.qty)}</td>
-          <td>${fmtNum(line.weightPerBale)}</td>
-          <td>${fmtNum(line.totalWeight)}</td>
-          ${hideSellingHtml ? "" : `<td>${fmtMoney(line.pricePerBale)}</td>`}
-          ${hideSellingHtml ? "" : `<td>${fmtMoney(line.totalPrice)}</td>`}
-        </tr>`;
-      });
+      // ── Logo ─────────────────────────────────────────────────────────────────
+      const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+      if (fs.existsSync(logoPath)) {
+        try { doc.image(logoPath, (PAGE_W - 200) / 2, 40, { width: 200 }); } catch {}
+      }
+      const afterLogo = Math.max(doc.y, 80) + 8;
 
-      let chargesHtml = "";
-      for (const charge of charges) {
-        chargesHtml += `<tr><td>${charge.name}</td><td>${charge.chargeType}</td><td>${fmtMoney(charge.amount)}</td></tr>`;
+      // ── Title ─────────────────────────────────────────────────────────────────
+      doc.fontSize(11).font("Helvetica").fillColor("#555555")
+        .text("COMMERCIAL INVOICE", L, afterLogo, { width: USABLE, align: "center" });
+
+      // ── Divider ───────────────────────────────────────────────────────────────
+      const divY = doc.y + 6;
+      doc.moveTo(L, divY).lineTo(R, divY).lineWidth(0.5).strokeColor("#cccccc").stroke();
+      doc.lineWidth(1).strokeColor("#000000");
+
+      // ── Meta block ───────────────────────────────────────────────────────────
+      const metaY = divY + 12;
+      const dateStr = order.orderDate
+        ? new Date(order.orderDate + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+        : "-";
+      const metaItems: [string, string][] = [
+        ["Invoice No.", invoiceLabel],
+        ["Customer", order.customerName || "-"],
+        ["Date", dateStr],
+        ...(order.containerNumber ? [["Container", order.containerNumber] as [string, string]] : []),
+      ];
+      let mY = metaY;
+      doc.font("Helvetica").fontSize(9).fillColor("#000000");
+      for (const [label, value] of metaItems) {
+        doc.font("Helvetica-Bold").text(`${label}  `, L, mY, { continued: true })
+          .font("Helvetica").text(value);
+        mY = doc.y + 2;
       }
 
-      const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Invoice ${order.invoiceNumber || "DRAFT"}</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, sans-serif; font-size: 12px; color: #1a1a2e; background: #fff; }
+      doc.moveDown(0.8);
 
-  /* ── Top header bar ── */
-  .top-bar { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%); color: #fff; padding: 18px 32px; display: flex; align-items: center; gap: 20px; }
-  .top-bar-logo { height: 70px; width: auto; flex-shrink: 0; filter: brightness(0) invert(1); }
-  .top-bar-text h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 4px; }
-  .top-bar-text .subtitle { font-size: 11px; color: #a8c0e8; letter-spacing: 1px; text-transform: uppercase; }
+      // ── Column layout ─────────────────────────────────────────────────────────
+      let colX: number[], colW: number[], colHdr: string[], colAlign: Array<"left" | "right" | "center">;
+      if (hideSellingPdf) {
+        colX     = [40,  62,  132, 382, 428, 476];
+        colW     = [22,  70,  250,  46,  48,  79];
+        colHdr   = ["#", "Code", "Product", "Qty", "Wt/Bale", "Total Wt"];
+        colAlign = ["center","center","left","center","center","center"];
+      } else {
+        colX     = [40,  62,  132, 310, 356, 402, 450, 503];
+        colW     = [22,  70,  178,  46,  46,  48,  53,  52];
+        colHdr   = ["#", "Code", "Product", "Qty", "Wt/Bale", "Total Wt", "Price/Bale", "Total"];
+        colAlign = ["center","center","left","center","center","center","center","center"];
+      }
 
-  /* ── Invoice meta strip ── */
-  .meta-strip { display: flex; gap: 0; border-bottom: 3px solid #e94560; }
-  .meta-box { flex: 1; padding: 10px 16px; border-right: 1px solid #e8edf5; background: #f7f9fc; }
-  .meta-box:last-child { border-right: none; }
-  .meta-box .label { font-size: 9px; font-weight: 700; color: #7a8ba0; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }
-  .meta-box .value { font-size: 13px; font-weight: 600; color: #1a1a2e; }
+      // ── Table header row ──────────────────────────────────────────────────────
+      const tblTop = doc.y + 4;
+      const HDR_H = 16;
+      doc.rect(L, tblTop, USABLE, HDR_H).fill("#1F3864");
+      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8);
+      colHdr.forEach((h, i) => {
+        doc.text(h, colX[i] + 2, tblTop + 4, { width: colW[i] - 4, align: colAlign[i] });
+      });
+      doc.fillColor("#000000").font("Helvetica").fontSize(8);
 
-  /* ── Section heading ── */
-  .section-heading { background: #e94560; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 5px 16px; margin: 0; }
+      // ── Table rows ────────────────────────────────────────────────────────────
+      const ROW_H = 14;
+      let y = tblTop + HDR_H;
+      let totalQty = 0, totalWt = 0, totalAmt = 0;
 
-  /* ── Lines table ── */
-  .lines-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .lines-table col.col-num     { width: 32px; }
-  .lines-table col.col-article { width: 90px; }
-  .lines-table col.col-product { width: 130px; }
-  .lines-table col.col-qty     { width: 42px; }
-  .lines-table col.col-wt-bale { width: 72px; }
-  .lines-table col.col-total-wt{ width: 78px; }
-  .lines-table col.col-price   { width: 72px; }
-  .lines-table col.col-total   { width: 78px; }
-  .lines-table thead tr { background: #16213e; color: #fff; }
-  .lines-table thead th { padding: 7px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; border: none; white-space: nowrap; text-align: center; }
-  .lines-table tbody td { padding: 5px 8px; font-size: 11px; border-bottom: 1px solid #eaeff5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
-  .lines-table tbody tr:nth-child(even) { background: #f4f7fb; }
-  .lines-table tbody tr:hover { background: #e8f0fe; }
-  .lines-table tfoot td { padding: 6px 8px; font-size: 11px; font-weight: 600; background: #eef2f9; border-top: 2px solid #16213e; text-align: center; }
+      for (let idx = 0; idx < sortedLines.length; idx++) {
+        const line = sortedLines[idx] as any;
+        const qty = parseFloat(line.qty || "0");
+        const wtBale = parseFloat(line.weightPerBale || "0");
+        const totWt = parseFloat(line.totalWeight || "0") || qty * wtBale;
+        const price = parseFloat(line.pricePerBale || "0");
+        const totPrice = parseFloat(line.totalPrice || "0") || qty * price;
+        totalQty += qty;
+        totalWt += totWt;
+        totalAmt += totPrice;
 
-  /* ── Charges table ── */
-  .charges-table { width: 60%; border-collapse: collapse; margin: 0 0 0 0; }
-  .charges-table thead tr { background: #0f3460; color: #fff; }
-  .charges-table thead th { padding: 6px 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; border: none; text-align: center; }
-  .charges-table tbody td { padding: 5px 10px; font-size: 11px; border-bottom: 1px solid #eaeff5; text-align: center; }
-  .charges-table tbody tr:nth-child(even) { background: #f4f7fb; }
+        if (y + ROW_H > doc.page.height - 60) {
+          doc.addPage();
+          y = 40;
+        }
+        if (idx % 2 === 1) {
+          doc.rect(L, y, USABLE, ROW_H).fill("#F4F7FB");
+          doc.fillColor("#000000");
+        }
+        const productName = invNameMap.get(line.articleCode) || line.baleName || "";
+        const vals = hideSellingPdf
+          ? [String(idx + 1), line.articleCode || "", productName, fmtN(qty), fmtN(wtBale), fmtN(totWt)]
+          : [String(idx + 1), line.articleCode || "", productName, fmtN(qty), fmtN(wtBale), fmtN(totWt), fmtM(price), fmtM(totPrice)];
+        vals.forEach((v, i) => {
+          doc.text(v, colX[i] + 2, y + 3, { width: colW[i] - 4, align: colAlign[i], lineBreak: false });
+        });
+        y += ROW_H;
+      }
 
-  /* ── Totals box ── */
-  .totals-wrap { display: flex; justify-content: flex-end; padding: 16px 0; }
-  .totals-table { width: 280px; border-collapse: collapse; }
-  .totals-table td { padding: 5px 12px; font-size: 12px; border-bottom: 1px solid #eaeff5; }
-  .totals-table td:last-child { text-align: right; font-weight: 600; }
-  .totals-table tr.grand { background: #e94560; color: #fff; }
-  .totals-table tr.grand td { font-size: 14px; font-weight: 700; border: none; padding: 8px 12px; }
+      // ── Totals row ────────────────────────────────────────────────────────────
+      y += 2;
+      doc.moveTo(L, y).lineTo(R, y).lineWidth(0.5).strokeColor("#888888").stroke();
+      doc.lineWidth(1).strokeColor("#000000");
+      y += 4;
+      doc.rect(L, y, USABLE, 16).fill("#EEF2F9");
+      doc.fillColor("#000000").font("Helvetica-Bold").fontSize(8);
+      const totVals = hideSellingPdf
+        ? ["", "", "TOTALS", fmtN(totalQty), "", fmtN(totalWt)]
+        : ["", "", "TOTALS", fmtN(totalQty), "", fmtN(totalWt), "", fmtM(totalAmt)];
+      totVals.forEach((v, i) => {
+        if (v) doc.text(v, colX[i] + 2, y + 4, { width: colW[i] - 4, align: colAlign[i], lineBreak: false });
+      });
+      y += 20;
 
-  .content { padding: 0 0 24px; }
+      // ── Charges & grand-total summary (admin only) ────────────────────────────
+      if (!hideSellingPdf) {
+        const freightCharges = charges.filter((ch: any) => ch.chargeType === "FREIGHT");
+        const otherCharges = charges.filter((ch: any) => ch.chargeType !== "FREIGHT");
+        const hasCharges = freightCharges.length > 0 || otherCharges.length > 0;
 
-  @page { size: A4; margin: 0; }
-  @media print {
-    html, body { margin: 0; padding: 0; width: 210mm; }
-    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    .top-bar { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    .meta-strip { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    .section-heading { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    .lines-table thead tr { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    .lines-table tbody tr:nth-child(even) { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    .lines-table tbody tr:hover { background: transparent !important; }
-    .totals-table tr.grand { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    .charges-table thead tr { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  }
-</style></head><body>
-
-<div class="top-bar">
-  ${invLogoDataUri ? `<img class="top-bar-logo" src="${invLogoDataUri}" alt="HMD International Group" />` : ""}
-  <div class="top-bar-text">
-    <h1>HMD INTERNATIONAL GROUP</h1>
-    <div class="subtitle">Commercial Invoice</div>
-  </div>
-</div>
-
-<div class="meta-strip">
-  <div class="meta-box">
-    <div class="label">Invoice No.</div>
-    <div class="value">${order.invoiceNumber || "DRAFT"}</div>
-  </div>
-  <div class="meta-box">
-    <div class="label">Customer</div>
-    <div class="value">${order.customerName || "-"}</div>
-  </div>
-  <div class="meta-box">
-    <div class="label">Date</div>
-    <div class="value">${order.orderDate}</div>
-  </div>
-  ${order.containerNumber ? `<div class="meta-box"><div class="label">Container</div><div class="value">${order.containerNumber}</div></div>` : ""}
-</div>
-
-<div class="content">
-  <div class="section-heading">Order Lines</div>
-  <table class="lines-table">
-    <colgroup>
-      <col class="col-num"><col class="col-article"><col class="col-product">
-      <col class="col-qty"><col class="col-wt-bale"><col class="col-total-wt">
-      ${hideSellingHtml ? "" : `<col class="col-price"><col class="col-total">`}
-    </colgroup>
-    <thead><tr>
-      <th>#</th>
-      <th>Article Code</th>
-      <th>Product</th>
-      <th>Qty</th>
-      <th>Wt/Bale</th>
-      <th>Total Wt</th>
-      ${hideSellingHtml ? "" : `<th>Price/Bale</th><th>Total</th>`}
-    </tr></thead>
-    <tbody>${linesHtml}</tbody>
-    <tfoot><tr>
-      <td colspan="3" style="color:#555">Totals</td>
-      <td>${fmtNum(order.totalQtyBales)}</td>
-      <td></td>
-      <td></td>
-      ${hideSellingHtml ? "" : `<td></td><td>${fmtMoney(order.subtotalBales)}</td>`}
-    </tr></tfoot>
-  </table>
-
-  ${hideSellingHtml ? "" : `
-  <div class="totals-wrap">
-    <table class="totals-table">
-      <tr><td>Subtotal (Bales)</td><td>${fmtMoney(order.subtotalBales)}</td></tr>
-      ${parseFloat(order.freightAmount || "0") > 0 ? `<tr><td>Freight</td><td>${fmtMoney(order.freightAmount)}</td></tr>` : ""}
-      ${(() => {
-          const otherLines = charges.filter((ch: any) => ch.chargeType !== "FREIGHT");
-          if (otherLines.length > 0) {
-            return otherLines.map((ch: any) => `<tr><td>${ch.name}</td><td>${fmtMoney(ch.amount)}</td></tr>`).join("\n      ");
+        if (hasCharges) {
+          y += 8;
+          doc.font("Helvetica-Bold").fontSize(9).fillColor("#000000").text("Freight & Charges", L, y);
+          y = doc.y + 4;
+          doc.font("Helvetica").fontSize(8);
+          for (const ch of [...freightCharges, ...otherCharges]) {
+            doc.text(ch.name || ch.chargeType, L + 10, y, { continued: true })
+              .text(fmtM(ch.amount), { align: "right", width: USABLE - 10 });
+            y = doc.y + 2;
           }
-          const otherTotal = parseFloat(order.otherChargesTotal || "0");
-          return otherTotal > 0 ? `<tr><td>Other Charges</td><td>${fmtMoney(order.otherChargesTotal)}</td></tr>` : "";
-        })()}
-      <tr class="grand"><td>Grand Total</td><td>${fmtMoney(order.grandTotal)}</td></tr>
-    </table>
-  </div>
-  `}
-</div>
+          y += 4;
+        }
 
-</body></html>`;
+        // Summary box
+        const summaryRows: [string, string, boolean][] = [
+          ["Subtotal (Bales)", fmtM(order.subtotalBales), false],
+        ];
+        const freight = parseFloat(order.freightAmount || "0");
+        if (freight > 0) summaryRows.push(["Freight", fmtM(freight), false]);
+        const otherTotal = parseFloat(order.otherChargesTotal || "0");
+        if (otherCharges.length > 0) {
+          for (const ch of otherCharges) summaryRows.push([ch.name || "Other", fmtM(ch.amount), false]);
+        } else if (otherTotal > 0) {
+          summaryRows.push(["Other Charges", fmtM(otherTotal), false]);
+        }
+        summaryRows.push(["Grand Total", fmtM(order.grandTotal), true]);
 
-      res.setHeader("Content-Type", "text/html");
-      res.send(html);
+        const BOX_W = 220;
+        const boxX = R - BOX_W;
+        doc.font("Helvetica").fontSize(9);
+        for (const [label, value, isGrand] of summaryRows) {
+          if (y + 18 > doc.page.height - 40) { doc.addPage(); y = 40; }
+          if (isGrand) {
+            doc.rect(boxX, y, BOX_W, 18).fill("#1F3864");
+            doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(10);
+            doc.text(label, boxX + 8, y + 4, { continued: true })
+              .text(value, { align: "right", width: BOX_W - 16 });
+            doc.fillColor("#000000").font("Helvetica").fontSize(9);
+          } else {
+            doc.moveTo(boxX, y + 16).lineTo(R, y + 16).lineWidth(0.3).strokeColor("#cccccc").stroke();
+            doc.lineWidth(1).strokeColor("#000000");
+            doc.text(label, boxX + 8, y + 4, { continued: true })
+              .text(value, { align: "right", width: BOX_W - 16 });
+          }
+          y += 18;
+        }
+      }
+
+      doc.end();
     } catch (error: any) {
       console.error("Error exporting order to PDF:", error);
       res.status(500).json({ message: error.message });

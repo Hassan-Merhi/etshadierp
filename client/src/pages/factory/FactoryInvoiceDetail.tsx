@@ -308,8 +308,12 @@ export default function FactoryInvoiceDetail() {
 
   const handleExportPdf = () => {
     if (!orderId) return;
-    if (!navigator.onLine) { window.print(); return; }
-    window.open(`/api/factory/customer-orders/${orderId}/export-pdf`, "_blank");
+    const a = document.createElement("a");
+    a.href = `/api/factory/customer-orders/${orderId}/export-pdf`;
+    a.download = "";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const handleExportLoadingStatus = () => {
