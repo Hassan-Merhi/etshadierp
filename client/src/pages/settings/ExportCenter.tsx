@@ -22,6 +22,7 @@ import {
   MessageSquare, Send, RefreshCw, ShieldCheck, ShieldAlert, Users, TrendingUp,
   Settings2, Zap,
 } from "lucide-react";
+import { StockReportSection } from "./StockReportSection";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -948,6 +949,9 @@ export function ExportCenter() {
               </div>
             )}
           </div>
+
+          {/* Stock + Net Position Report for a specific company */}
+          <StockReportSection />
 
         </TabsContent>
 
