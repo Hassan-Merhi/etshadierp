@@ -69,8 +69,10 @@ export default function FactoryInvoices() {
   const [customerFilter, setCustomerFilter] = useState<string>("all");
 
   const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const isAdmin = myAccess?.fullAccess === true;
   const hidden: string[] = myAccess?.hiddenCostFields ?? [];
-  const hideProformaCol = hidden.includes("hide_invoicing_proforma_col");
+  // Non-admins never see the proforma column; admins only lose it if manually restricted
+  const hideProformaCol = !isAdmin || hidden.includes("hide_invoicing_proforma_col");
   const hideTotalsUsd = hidden.includes("hide_invoicing_totals_usd");
 
   const { data: customers = [] } = useQuery<Customer[]>({
