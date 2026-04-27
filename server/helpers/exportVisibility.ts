@@ -10,7 +10,13 @@ export interface ExportPriceVisibility {
 export async function getExportPriceVisibility(req: any): Promise<ExportPriceVisibility> {
   try {
     const userId = req.user?.id ? String(req.user.id) : null;
-    if (!userId) return { hideSelling: false, hideCost: false };
+    if (!userId) return { hideSelling: true, hideCost: true };
+
+    // Non-admin / non-owner users never see prices in exports
+    const role: string = req.user?.role || "";
+    if (role !== "Admin" && role !== "Owner") {
+      return { hideSelling: true, hideCost: true };
+    }
 
     const [profile] = await db
       .select({ hiddenCostFields: factoryUserProfiles.hiddenCostFields })
