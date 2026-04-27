@@ -1141,9 +1141,23 @@ export default function DailyProductionReport() {
                 </div>
                 <div className="flex items-center justify-between py-1">
                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Garbage</span>
-                  <span className="text-sm font-bold">
+                  <span className="text-sm font-bold flex items-center gap-2">
                     <span className="font-bold">{data?.wipersGarbage.totalGarbageQty ?? 0}</span>
-                    <span className="text-xs font-normal text-muted-foreground ml-3">{fmtKg(data?.wipersGarbage.totalGarbageKg ?? 0)}</span>
+                    <span className="text-xs font-normal text-muted-foreground">{fmtKg(data?.wipersGarbage.totalGarbageKg ?? 0)}</span>
+                    {(() => {
+                      const garbageKg = data?.wipersGarbage.totalGarbageKg ?? 0;
+                      const rawKg = data?.rawMaterial.totalWeightKg ?? 0;
+                      const pct = rawKg > 0 ? (garbageKg / rawKg) * 100 : 0;
+                      return (
+                        <span
+                          className={`text-xs font-semibold px-1.5 py-0.5 rounded-sm tabular-nums ${pct > 10 ? "bg-red-200 text-red-800 dark:bg-red-900/50 dark:text-red-300" : pct > 5 ? "bg-amber-200 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300" : "bg-green-200 text-green-800 dark:bg-green-900/50 dark:text-green-300"}`}
+                          data-testid="text-garbage-pct"
+                          title="Garbage as % of original batch input"
+                        >
+                          {pct.toFixed(1)}%
+                        </span>
+                      );
+                    })()}
                   </span>
                 </div>
                 <StatRow label="Value" value={fmtMoney(data?.wipersGarbage.totalValue ?? 0)} />
