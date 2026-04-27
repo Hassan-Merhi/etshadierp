@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
-import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User, Upload, ArrowLeft, FileDown, ChevronDown, Plus, Pencil, X } from "lucide-react";
+import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User, Upload, ArrowLeft, FileDown, ChevronDown, Plus, Pencil, X, Send } from "lucide-react";
 import { utils, writeFile } from "@/lib/excelHelper";
 import {
   DropdownMenu,
@@ -280,6 +280,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
   const [saleJustCompleted, setSaleJustCompleted] = useState(false);
   const [showStockPrompt, setShowStockPrompt] = useState(false);
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
 
   // Reset sale state when POS user switches location
   const prevLocationRef = useRef<number | null>(null);
@@ -614,6 +615,26 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     contentRef: stockPrintRef,
     documentTitle: `STK_${(activeLocation?.name || "Location").replace(/\s+/g, "_")}_${new Date().toLocaleDateString('en-CA')}`,
   });
+
+  const handleSendWhatsAppReport = async () => {
+    setSendingWhatsApp(true);
+    try {
+      const res = await apiRequest("POST", "/api/pos/send-shift-report", {
+        locationId: activeLocation?.id,
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast({ title: "Failed to send", description: body.message || "WhatsApp send failed.", variant: "destructive" });
+      } else {
+        toast({ title: "Sent", description: "Stock report sent to WhatsApp group." });
+        setShowStockPrompt(false);
+      }
+    } catch {
+      toast({ title: "Error", description: "Could not reach the server.", variant: "destructive" });
+    } finally {
+      setSendingWhatsApp(false);
+    }
+  };
 
   // Save draft mutation
   const saveDraftMutation = useMutation({
@@ -2550,15 +2571,27 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       <AlertDialog open={showStockPrompt} onOpenChange={setShowStockPrompt}>
         <AlertDialogContent className="max-w-sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Print Stock?</AlertDialogTitle>
+            <AlertDialogTitle>Stock Report</AlertDialogTitle>
             <AlertDialogDescription>
-              Would you like to print the current stock report for <strong>{activeLocation?.name}</strong>?
+              What would you like to do with the stock report for <strong>{activeLocation?.name}</strong>?
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:gap-2">
             <Button variant="outline" onClick={() => setShowStockPrompt(false)} data-testid="button-skip-stock-print">
               Skip
             </Button>
+            {(activeLocation as any)?.whatsappGroupChatId && (
+              <Button
+                variant="outline"
+                onClick={handleSendWhatsAppReport}
+                disabled={sendingWhatsApp}
+                className="gap-2"
+                data-testid="button-send-whatsapp-report"
+              >
+                <Send className="h-4 w-4" />
+                {sendingWhatsApp ? "Sending…" : "Send to WhatsApp"}
+              </Button>
+            )}
             <Button
               onClick={() => { setShowStockPrompt(false); handleStockPrint(); }}
               disabled={stockInventoryLoading}

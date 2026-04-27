@@ -147,14 +147,19 @@ export function registerLocationRoutes(app: Express) {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const { name } = req.body;
+      const { name, whatsappGroupChatId } = req.body;
       if (!name || typeof name !== "string" || !name.trim()) {
         return res.status(400).json({ message: "name is required" });
       }
 
+      const updatePayload: Record<string, any> = { name: name.trim() };
+      if (whatsappGroupChatId !== undefined) {
+        updatePayload.whatsappGroupChatId = whatsappGroupChatId || null;
+      }
+
       const [updated] = await db
         .update(locations)
-        .set({ name: name.trim() })
+        .set(updatePayload)
         .where(eq(locations.id, locationId))
         .returning();
 

@@ -1681,6 +1681,7 @@ let migrationsDone = false;
     `ALTER TABLE stored_files ADD COLUMN IF NOT EXISTS folder_id integer REFERENCES file_folders(id) ON DELETE SET NULL`,
     `ALTER TABLE stored_files ADD COLUMN IF NOT EXISTS display_name text`,
     `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS destination text`,
+    `ALTER TABLE locations ADD COLUMN IF NOT EXISTS whatsapp_group_chat_id text`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

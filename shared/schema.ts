@@ -145,6 +145,7 @@ export const locations = pgTable("locations", {
   active: boolean("active").notNull().default(true),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  whatsappGroupChatId: text("whatsapp_group_chat_id"),
 });
 
 export const insertLocationSchema = createInsertSchema(locations).omit({

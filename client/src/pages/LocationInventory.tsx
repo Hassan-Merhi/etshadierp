@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
-import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown, Globe, Eye, Pencil, FileSpreadsheet } from "lucide-react";
+import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown, Globe, Eye, Pencil, FileSpreadsheet, MessageCircle, Check } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { format } from "date-fns";
@@ -148,6 +148,12 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [renamingLocation, setRenamingLocation] = useState<Location | null>(null);
   const [renameInput, setRenameInput] = useState("");
 
+  // WhatsApp group dialog state
+  const [waGroupDialogOpen, setWaGroupDialogOpen] = useState(false);
+  const [waGroupLocation, setWaGroupLocation] = useState<Location | null>(null);
+  const [waGroupSearch, setWaGroupSearch] = useState("");
+  const [waGroupSelectedId, setWaGroupSelectedId] = useState<string>("");
+
   // Print handler
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -185,6 +191,42 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     setRenamingLocation(loc);
     setRenameInput(loc.name);
     setRenameDialogOpen(true);
+  };
+
+  // WhatsApp group chats (fetched only when dialog is open)
+  const { data: waChats = [], isLoading: waChatsLoading } = useQuery<{ id: string; name: string; type: string }[]>({
+    queryKey: ["/api/whatsapp/chats"],
+    enabled: waGroupDialogOpen,
+    staleTime: 60_000,
+  });
+
+  const waGroupMutation = useMutation({
+    mutationFn: async ({ id, name, whatsappGroupChatId }: { id: number; name: string; whatsappGroupChatId: string | null }) => {
+      const res = await apiRequest("PATCH", `/api/locations/${id}`, { name, whatsappGroupChatId });
+      return res.json();
+    },
+    onSuccess: (updated) => {
+      toast({
+        title: updated.whatsappGroupChatId ? "WhatsApp group assigned" : "WhatsApp group removed",
+        description: updated.whatsappGroupChatId
+          ? `Group linked to ${updated.name}.`
+          : `Group unlinked from ${updated.name}.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      if (selectedLocationLocal?.id === updated.id) setSelectedLocationLocal(updated);
+      setWaGroupDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const openWaGroupDialog = (loc: Location, e?: { stopPropagation: () => void }) => {
+    e?.stopPropagation();
+    setWaGroupLocation(loc);
+    setWaGroupSelectedId((loc as any).whatsappGroupChatId ?? "");
+    setWaGroupSearch("");
+    setWaGroupDialogOpen(true);
   };
 
   // Fetch all locations (only for non-POS users)
@@ -1608,6 +1650,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => openWaGroupDialog(location, e)}
+                                data-testid={`button-wa-group-location-${location.id}`}
+                                title={(location as any).whatsappGroupChatId ? "Change WhatsApp group" : "Set WhatsApp group"}
+                              >
+                                <MessageCircle className={`h-4 w-4 ${(location as any).whatsappGroupChatId ? "text-green-600 dark:text-green-400" : ""}`} />
+                              </Button>
                             </div>
                           </td>
                         </tr>
@@ -1911,6 +1962,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 title="Rename location"
               >
                 <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => openWaGroupDialog(selectedLocationLocal, e)}
+                data-testid="button-wa-group-selected-location"
+                title={(selectedLocationLocal as any).whatsappGroupChatId ? "Change WhatsApp group" : "Set WhatsApp group"}
+              >
+                <MessageCircle className={`h-4 w-4 ${(selectedLocationLocal as any).whatsappGroupChatId ? "text-green-600 dark:text-green-400" : ""}`} />
               </Button>
             </div>
             <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
@@ -3052,6 +3112,85 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* WhatsApp Group Dialog */}
+      <Dialog open={waGroupDialogOpen} onOpenChange={(open) => { if (!open) setWaGroupDialogOpen(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Set WhatsApp Group</DialogTitle>
+            <DialogDescription>
+              Choose the WhatsApp group that <strong>{waGroupLocation?.name}</strong> will send stock reports to. Leave unset to keep the feature off for this location.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <input
+                className="flex h-9 w-full rounded-md border border-input bg-transparent pl-8 pr-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                placeholder="Search groups…"
+                value={waGroupSearch}
+                onChange={(e) => setWaGroupSearch(e.target.value)}
+                data-testid="input-wa-group-search"
+              />
+            </div>
+            {waChatsLoading ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">Loading groups…</p>
+            ) : (
+              <div className="max-h-56 overflow-y-auto rounded-md border divide-y">
+                <button
+                  className={`w-full text-left px-3 py-2 text-sm hover-elevate ${!waGroupSelectedId ? "bg-muted font-medium" : ""}`}
+                  onClick={() => setWaGroupSelectedId("")}
+                  data-testid="button-wa-group-none"
+                >
+                  None (disable)
+                </button>
+                {waChats
+                  .filter((c) => c.type === "group" && c.name.toLowerCase().includes(waGroupSearch.toLowerCase()))
+                  .map((chat) => (
+                    <button
+                      key={chat.id}
+                      className={`w-full text-left px-3 py-2 text-sm hover-elevate flex items-center gap-2 ${waGroupSelectedId === chat.id ? "bg-muted font-medium" : ""}`}
+                      onClick={() => setWaGroupSelectedId(chat.id)}
+                      data-testid={`button-wa-group-${chat.id}`}
+                    >
+                      <MessageCircle className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="truncate">{chat.name}</span>
+                      {waGroupSelectedId === chat.id && <Check className="h-4 w-4 ml-auto shrink-0 text-green-600 dark:text-green-400" />}
+                    </button>
+                  ))}
+                {!waChatsLoading && waChats.filter((c) => c.type === "group").length === 0 && (
+                  <p className="text-sm text-muted-foreground px-3 py-4 text-center">No groups found. Make sure WhatsApp is configured.</p>
+                )}
+              </div>
+            )}
+            {waGroupSelectedId && (
+              <p className="text-xs text-muted-foreground">
+                Selected: <code className="font-mono">{waGroupSelectedId}</code>
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWaGroupDialogOpen(false)} data-testid="button-wa-group-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (waGroupLocation) {
+                  waGroupMutation.mutate({
+                    id: waGroupLocation.id,
+                    name: waGroupLocation.name,
+                    whatsappGroupChatId: waGroupSelectedId || null,
+                  });
+                }
+              }}
+              disabled={waGroupMutation.isPending}
+              data-testid="button-wa-group-save"
+            >
+              {waGroupMutation.isPending ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Rename Location Dialog */}
       <Dialog open={renameDialogOpen} onOpenChange={(open) => { if (!open) setRenameDialogOpen(false); }}>
