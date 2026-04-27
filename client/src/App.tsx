@@ -902,7 +902,7 @@ function AuthenticatedApp() {
           onOpenChange={setPaletteOpen}
           hasErpAccess={false}
           hasFactoryAccess={hasFactoryAccess}
-          isAdminOwner={isAdminOwner}
+          isAdminOwner={user?.role === "Admin" || user?.role === "Developer"}
           hasDashboardAccess={hasDashboardAccess}
         />
         {leaveConfirmDialog}
@@ -961,7 +961,7 @@ function AuthenticatedApp() {
         onOpenChange={setPaletteOpen}
         hasErpAccess={hasErpAccess}
         hasFactoryAccess={false}
-        isAdminOwner={isAdminOwner}
+        isAdminOwner={user?.role === "Admin" || user?.role === "Developer"}
         hasDashboardAccess={hasDashboardAccess}
       />
       {leaveConfirmDialog}
