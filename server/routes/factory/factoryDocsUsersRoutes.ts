@@ -100,6 +100,11 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         return res.status(401).json({ message: "Invalid username or password." });
       }
 
+      // Confirm the user account is active
+      if (!targetUser.active) {
+        return res.status(403).json({ message: "This account is inactive and cannot authorize actions." });
+      }
+
       // Verify password (bcrypt or legacy SHA256)
       const valid = await (async () => {
         if (isLegacySHA256Hash(targetUser.password)) {

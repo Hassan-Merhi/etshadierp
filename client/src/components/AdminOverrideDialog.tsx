@@ -47,6 +47,7 @@ export function AdminOverrideDialog({
     },
     onError: async (err: any) => {
       const body = err?.response ? await err.response.json().catch(() => null) : null;
+      setPassword("");
       setErrorMsg(body?.message || "Invalid credentials. Please try again.");
     },
   });

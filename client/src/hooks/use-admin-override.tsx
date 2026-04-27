@@ -4,6 +4,21 @@ import { AdminOverrideDialog } from "@/components/AdminOverrideDialog";
 
 const ADMIN_ROLES = ["Admin", "Owner", "Developer"];
 
+/**
+ * Module-level cache — when a non-admin successfully verifies admin credentials,
+ * we remember it for 5 minutes so they don't have to re-enter on every action.
+ * This resets on full page reload which is intentional.
+ */
+let adminOverrideGrantedUntil = 0;
+
+export function setAdminOverrideCache() {
+  adminOverrideGrantedUntil = Date.now() + 5 * 60 * 1000;
+}
+
+export function clearAdminOverrideCache() {
+  adminOverrideGrantedUntil = 0;
+}
+
 interface UseAdminOverrideReturn {
   wrapAdminAction: (fn: () => void, label?: string) => void;
   AdminDialog: React.ReactNode;
@@ -11,9 +26,12 @@ interface UseAdminOverrideReturn {
 
 /**
  * useAdminOverride — wraps any destructive factory action with an admin
- * credential check. If the current user is already an admin/owner/developer,
- * the action fires immediately. Otherwise an overlay dialog is shown asking
- * for admin username + password before the action is allowed to proceed.
+ * credential check.
+ *
+ * - If the current user is already Admin/Owner/Developer, the action fires immediately.
+ * - If a non-admin recently verified admin credentials (within 5 min), fires immediately.
+ * - Otherwise shows the Admin Authorization dialog asking for admin credentials.
+ *   On success the action fires and the 5-minute cache is set.
  *
  * Usage:
  *   const { wrapAdminAction, AdminDialog } = useAdminOverride();
@@ -30,7 +48,7 @@ export function useAdminOverride(): UseAdminOverrideReturn {
 
   const wrapAdminAction = useCallback(
     (fn: () => void, label?: string) => {
-      if (isAdmin) {
+      if (isAdmin || Date.now() < adminOverrideGrantedUntil) {
         fn();
       } else {
         setActionLabel(label);
@@ -44,6 +62,7 @@ export function useAdminOverride(): UseAdminOverrideReturn {
     const action = pendingAction;
     setPendingAction(null);
     setActionLabel(undefined);
+    setAdminOverrideCache();
     if (action) action();
   }, [pendingAction]);
 
