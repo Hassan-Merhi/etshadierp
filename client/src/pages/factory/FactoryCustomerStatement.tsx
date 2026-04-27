@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, FileSpreadsheet, X } from "lucide-react";
+import { ArrowLeft, Download, FileSpreadsheet, X, ExternalLink } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { drCrClass } from "@/lib/formatNumber";
 import { useState, useEffect, useMemo } from "react";
@@ -369,13 +369,23 @@ export default function FactoryCustomerStatement() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredHistory.map((entry) => (
-                <TableRow key={entry.id} data-testid={`row-balance-${entry.id}`}>
+              filteredHistory.map((entry) => {
+                const isInvoice = entry.referenceType === "INVOICE" && entry.referenceId;
+                return (
+                <TableRow
+                  key={entry.id}
+                  data-testid={`row-balance-${entry.id}`}
+                  className={isInvoice ? "cursor-pointer hover-elevate" : undefined}
+                  onClick={isInvoice ? () => navigate(`/factory/sales/invoices/${entry.referenceId}`) : undefined}
+                >
                   <TableCell className="text-sm font-mono whitespace-nowrap" data-testid={`text-balance-date-${entry.id}`}>
                     {entry.transactionDate ? formatDisplayDate(entry.transactionDate) : "-"}
                   </TableCell>
                   <TableCell data-testid={`text-balance-type-${entry.id}`}>
-                    <Badge variant="outline" className="text-xs">{entry.transactionType}</Badge>
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant="outline" className="text-xs">{entry.transactionType}</Badge>
+                      {isInvoice && <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />}
+                    </div>
                   </TableCell>
                   <TableCell className="text-sm font-mono text-muted-foreground whitespace-nowrap" data-testid={`text-balance-container-${entry.id}`}>
                     {entry.containerNumber || "-"}
@@ -401,7 +411,7 @@ export default function FactoryCustomerStatement() {
                   <TableCell>
                     <Badge variant="outline" className={`text-xs font-semibold ${drCrClass(entry.runningBalanceSide)}`}>{entry.runningBalanceSide}</Badge>
                   </TableCell>
-                  <TableCell className="min-w-[160px]">
+                  <TableCell className="min-w-[160px]" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="text"
                       value={rowNotes[entry.id] ?? ""}
@@ -414,7 +424,8 @@ export default function FactoryCustomerStatement() {
                     />
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>
