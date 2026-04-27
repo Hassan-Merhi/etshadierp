@@ -364,7 +364,7 @@ export default function FactorySettings() {
 
   useEffect(() => {
     if (data) {
-      setSettings(data);
+      setSettings({ ...defaultSettings, ...data });
     }
   }, [data]);
 
