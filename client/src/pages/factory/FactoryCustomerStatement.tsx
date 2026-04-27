@@ -6,11 +6,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, FileText, User, Download, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, Download, FileSpreadsheet, X } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { drCrClass } from "@/lib/formatNumber";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -23,21 +24,6 @@ interface CustomerInfo {
   openingBalanceSide: string | null;
   active: boolean;
   statementNote: string | null;
-}
-
-interface Invoice {
-  id: number;
-  invoiceNumber: string;
-  orderDate: string;
-  grandTotal: string;
-  subtotalBales: string;
-  freightAmount: string;
-  otherChargesTotal: string;
-  totalQtyBales: number;
-  containerNumber: string | null;
-  destination: string | null;
-  status: string;
-  createdAt: string;
 }
 
 interface BalanceEntry {
@@ -53,6 +39,8 @@ interface BalanceEntry {
   currency: string;
   containerNumber: string | null;
   destination: string | null;
+  totalQtyBales: number | null;
+  totalWeightKg: number | null;
   runningBalance: number;
   runningBalanceSide: string;
   rowNote: string | null;
@@ -60,7 +48,7 @@ interface BalanceEntry {
 
 interface StatementData {
   customer: CustomerInfo;
-  invoices: Invoice[];
+  invoices: any[];
   balanceHistory: BalanceEntry[];
   currentBalance: number;
   currentBalanceSide: string;
@@ -76,6 +64,11 @@ function fmtMoney(value: number): string {
   return `$${abs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function fmtNum(value: number): string {
+  if (value % 1 === 0) return Math.round(value).toLocaleString();
+  return value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
 export default function FactoryCustomerStatement() {
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
@@ -83,17 +76,20 @@ export default function FactoryCustomerStatement() {
   useEscapeBack(() => navigate("/factory/customers"));
   const params = useParams<{ id: string }>();
   const customerId = params.id;
-  const [activeTab, setActiveTab] = useState<"invoices" | "statement">("invoices");
-  const [draftNote, setDraftNote] = useState<string | null>(null); // null = not yet loaded
-  const [rowNotes, setRowNotes] = useState<Record<number, string>>({}); // per-entry draft notes
+
+  const [draftNote, setDraftNote] = useState<string | null>(null);
+  const [rowNotes, setRowNotes] = useState<Record<number, string>>({});
   const [savingRowNote, setSavingRowNote] = useState<number | null>(null);
+
+  const [filterDestination, setFilterDestination] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
 
   const { data: statement, isLoading } = useQuery<StatementData>({
     queryKey: [`/api/factory/customers/${customerId}/statement`],
     enabled: !!customerId,
   });
 
-  // Initialise draft note and row notes once data loads
   useEffect(() => {
     if (statement?.customer && draftNote === null) {
       setDraftNote(statement.customer.statementNote ?? "");
@@ -138,6 +134,39 @@ export default function FactoryCustomerStatement() {
     }
   };
 
+  const filteredHistory = useMemo(() => {
+    if (!statement?.balanceHistory) return [];
+    return statement.balanceHistory.filter((entry) => {
+      if (filterDestination) {
+        const dest = entry.destination?.toLowerCase() ?? "";
+        if (!dest.includes(filterDestination.toLowerCase())) return false;
+      }
+      if (filterDateFrom && entry.transactionDate) {
+        if (entry.transactionDate.toString().slice(0, 10) < filterDateFrom) return false;
+      }
+      if (filterDateTo && entry.transactionDate) {
+        if (entry.transactionDate.toString().slice(0, 10) > filterDateTo) return false;
+      }
+      return true;
+    });
+  }, [statement?.balanceHistory, filterDestination, filterDateFrom, filterDateTo]);
+
+  const totals = useMemo(() => {
+    let totalBales = 0;
+    let totalAmountDebit = 0;
+    let totalAmountCredit = 0;
+    let totalKg = 0;
+    for (const entry of filteredHistory) {
+      totalAmountDebit += parseFloat(entry.debitAmount || "0");
+      totalAmountCredit += parseFloat(entry.creditAmount || "0");
+      if (entry.totalQtyBales != null) totalBales += entry.totalQtyBales;
+      if (entry.totalWeightKg != null) totalKg += entry.totalWeightKg;
+    }
+    return { totalBales, totalAmountDebit, totalAmountCredit, totalKg };
+  }, [filteredHistory]);
+
+  const hasFilters = filterDestination || filterDateFrom || filterDateTo;
+
   if (isLoading) {
     return (
       <div className="flex flex-col h-full p-6 space-y-4">
@@ -160,18 +189,14 @@ export default function FactoryCustomerStatement() {
     );
   }
 
-  const { customer, invoices, balanceHistory, currentBalance, currentBalanceSide, openingBalance, openingBalanceSide } = statement;
+  const { customer, currentBalance, currentBalanceSide, openingBalance, openingBalanceSide } = statement;
   const hasOpeningBalance = Number(openingBalance || 0) !== 0;
 
   return (
     <div className="flex flex-col h-full p-6 overflow-y-auto">
+      {/* Header */}
       <div className="flex flex-wrap items-center gap-2 mb-6">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/factory/customers")}
-          data-testid="button-back"
-        >
+        <Button variant="ghost" size="icon" onClick={() => navigate("/factory/customers")} data-testid="button-back">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1 min-w-0">
@@ -212,6 +237,7 @@ export default function FactoryCustomerStatement() {
         </div>
       </div>
 
+      {/* Balance cards */}
       <div className={`grid grid-cols-1 gap-4 mb-6 ${hasOpeningBalance ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
         <Card>
           <CardContent className="pt-4">
@@ -236,171 +262,175 @@ export default function FactoryCustomerStatement() {
         <Card>
           <CardContent className="pt-4">
             <p className="text-xs text-muted-foreground mb-1">Total Invoices</p>
-            <p className="text-2xl font-bold" data-testid="text-total-invoices">{invoices.length}</p>
+            <p className="text-2xl font-bold" data-testid="text-total-invoices">{statement.invoices.length}</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="flex items-center gap-2 mb-4">
-        <Button
-          variant={activeTab === "invoices" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setActiveTab("invoices")}
-          data-testid="button-tab-invoices"
-        >
-          <FileText className="mr-2 h-4 w-4" />
-          Invoices ({invoices.length})
-        </Button>
-        <Button
-          variant={activeTab === "statement" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setActiveTab("statement")}
-          data-testid="button-tab-statement"
-        >
-          <User className="mr-2 h-4 w-4" />
-          Statement ({balanceHistory.length})
-        </Button>
+      {/* Filters */}
+      <div className="flex flex-wrap items-end gap-3 mb-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground font-medium">Destination</label>
+          <Input
+            value={filterDestination}
+            onChange={(e) => setFilterDestination(e.target.value)}
+            placeholder="Filter by destination…"
+            className="w-48"
+            data-testid="input-filter-destination"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground font-medium">Date From</label>
+          <Input
+            type="date"
+            value={filterDateFrom}
+            onChange={(e) => setFilterDateFrom(e.target.value)}
+            className="w-40"
+            data-testid="input-filter-date-from"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground font-medium">Date To</label>
+          <Input
+            type="date"
+            value={filterDateTo}
+            onChange={(e) => setFilterDateTo(e.target.value)}
+            className="w-40"
+            data-testid="input-filter-date-to"
+          />
+        </div>
+        {hasFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { setFilterDestination(""); setFilterDateFrom(""); setFilterDateTo(""); }}
+            data-testid="button-clear-filters"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Clear
+          </Button>
+        )}
+        <p className="text-xs text-muted-foreground ml-auto self-end">
+          {filteredHistory.length} of {statement.balanceHistory.length} rows
+        </p>
       </div>
 
-      {activeTab === "invoices" && (
-        <Card className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Invoice #</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Container</TableHead>
-                <TableHead>Destination</TableHead>
-                <TableHead className="text-right">Bales</TableHead>
-                <TableHead className="text-right">Subtotal</TableHead>
-                <TableHead className="text-right">Charges</TableHead>
-                <TableHead className="text-right">Grand Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {invoices.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8" data-testid="text-no-invoices">
-                    No finalized invoices yet
-                  </TableCell>
-                </TableRow>
-              ) : (
-                invoices.map((inv) => (
-                  <TableRow
-                    key={inv.id}
-                    className="cursor-pointer hover-elevate"
-                    onClick={() => navigate(`/factory/sales/invoices/${inv.id}`)}
-                    data-testid={`row-invoice-${inv.id}`}
-                  >
-                    <TableCell className="font-mono font-semibold" data-testid={`text-invoice-number-${inv.id}`}>
-                      {inv.invoiceNumber || `#${inv.id}`}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground" data-testid={`text-invoice-date-${inv.id}`}>
-                      {inv.orderDate ? formatDisplayDate(inv.orderDate) : "-"}
-                    </TableCell>
-                    <TableCell className="text-sm font-mono text-muted-foreground" data-testid={`text-invoice-container-${inv.id}`}>
-                      {inv.containerNumber || "-"}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground" data-testid={`text-invoice-destination-${inv.id}`}>
-                      {inv.destination || "-"}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm" data-testid={`text-invoice-bales-${inv.id}`}>
-                      {inv.totalQtyBales ?? "-"}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm" data-testid={`text-invoice-subtotal-${inv.id}`}>
-                      {fmtMoney(Number(inv.subtotalBales || 0))}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm" data-testid={`text-invoice-charges-${inv.id}`}>
-                      {fmtMoney(Number(inv.freightAmount || 0) + Number(inv.otherChargesTotal || 0))}
-                    </TableCell>
-                    <TableCell className="text-right font-mono font-bold" data-testid={`text-invoice-total-${inv.id}`}>
-                      {fmtMoney(Number(inv.grandTotal || 0))}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+      {/* Totals bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <Card>
+          <CardContent className="py-3 px-4">
+            <p className="text-xs text-muted-foreground mb-0.5">Total Bales</p>
+            <p className="text-lg font-bold font-mono" data-testid="text-total-bales">
+              {fmtNum(totals.totalBales)}
+            </p>
+          </CardContent>
         </Card>
-      )}
+        <Card>
+          <CardContent className="py-3 px-4">
+            <p className="text-xs text-muted-foreground mb-0.5">Total Kg</p>
+            <p className="text-lg font-bold font-mono" data-testid="text-total-kg">
+              {fmtNum(totals.totalKg)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-3 px-4">
+            <p className="text-xs text-muted-foreground mb-0.5">Total Invoiced</p>
+            <p className="text-lg font-bold font-mono" data-testid="text-total-debit">
+              {fmtMoney(totals.totalAmountDebit)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-3 px-4">
+            <p className="text-xs text-muted-foreground mb-0.5">Total Paid</p>
+            <p className="text-lg font-bold font-mono" data-testid="text-total-credit">
+              {fmtMoney(totals.totalAmountCredit)}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
-      {activeTab === "statement" && (
-        <Card className="overflow-x-auto">
-          <Table>
-            <TableHeader>
+      {/* Statement table */}
+      <Card className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead>Container</TableHead>
+              <TableHead>Destination</TableHead>
+              <TableHead className="text-right">Bales</TableHead>
+              <TableHead className="text-right">Kg</TableHead>
+              <TableHead className="text-right">Debit</TableHead>
+              <TableHead className="text-right">Credit</TableHead>
+              <TableHead className="text-right">Balance</TableHead>
+              <TableHead>Side</TableHead>
+              <TableHead className="min-w-[160px]">Note</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredHistory.length === 0 ? (
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Container</TableHead>
-                <TableHead>Destination</TableHead>
-                <TableHead className="text-right">Debit</TableHead>
-                <TableHead className="text-right">Credit</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
-                <TableHead>Side</TableHead>
-                <TableHead className="min-w-[160px]">Note</TableHead>
+                <TableCell colSpan={12} className="text-center text-muted-foreground py-8" data-testid="text-no-transactions">
+                  {hasFilters ? "No rows match the current filters" : "No transactions yet"}
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {balanceHistory.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8" data-testid="text-no-transactions">
-                    No transactions yet
+            ) : (
+              filteredHistory.map((entry) => (
+                <TableRow key={entry.id} data-testid={`row-balance-${entry.id}`}>
+                  <TableCell className="text-sm font-mono whitespace-nowrap" data-testid={`text-balance-date-${entry.id}`}>
+                    {entry.transactionDate ? formatDisplayDate(entry.transactionDate) : "-"}
+                  </TableCell>
+                  <TableCell data-testid={`text-balance-type-${entry.id}`}>
+                    <Badge variant="outline" className="text-xs">{entry.transactionType}</Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground" dir="ltr" data-testid={`text-balance-desc-${entry.id}`}>
+                    {entry.description || "-"}
+                  </TableCell>
+                  <TableCell className="text-sm font-mono text-muted-foreground whitespace-nowrap" data-testid={`text-balance-container-${entry.id}`}>
+                    {entry.containerNumber || "-"}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground" data-testid={`text-balance-destination-${entry.id}`}>
+                    {entry.destination || "-"}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-bales-${entry.id}`}>
+                    {entry.totalQtyBales != null ? fmtNum(entry.totalQtyBales) : "-"}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-kg-${entry.id}`}>
+                    {entry.totalWeightKg != null ? fmtNum(entry.totalWeightKg) : "-"}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-debit-${entry.id}`}>
+                    {Number(entry.debitAmount || 0) > 0 ? fmtMoney(Number(entry.debitAmount)) : "-"}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-credit-${entry.id}`}>
+                    {Number(entry.creditAmount || 0) > 0 ? fmtMoney(Number(entry.creditAmount)) : "-"}
+                  </TableCell>
+                  <TableCell className="text-right font-mono font-semibold" data-testid={`text-balance-running-${entry.id}`}>
+                    {fmtMoney(Math.abs(entry.runningBalance))}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={`text-xs font-semibold ${drCrClass(entry.runningBalanceSide)}`}>{entry.runningBalanceSide}</Badge>
+                  </TableCell>
+                  <TableCell className="min-w-[160px]">
+                    <input
+                      type="text"
+                      value={rowNotes[entry.id] ?? ""}
+                      onChange={(e) => setRowNotes((prev) => ({ ...prev, [entry.id]: e.target.value }))}
+                      onBlur={() => saveRowNote(entry.id, rowNotes[entry.id] ?? "")}
+                      placeholder="Add note…"
+                      disabled={savingRowNote === entry.id}
+                      className="w-full text-xs bg-transparent border border-border rounded px-2 py-1 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                      data-testid={`input-row-note-${entry.id}`}
+                    />
                   </TableCell>
                 </TableRow>
-              ) : (
-                balanceHistory.map((entry) => (
-                  <TableRow key={entry.id} data-testid={`row-balance-${entry.id}`}>
-                    <TableCell className="text-sm font-mono" data-testid={`text-balance-date-${entry.id}`}>
-                      {entry.transactionDate ? formatDisplayDate(entry.transactionDate) : "-"}
-                    </TableCell>
-                    <TableCell data-testid={`text-balance-type-${entry.id}`}>
-                      <Badge variant="outline" className="text-xs">{entry.transactionType}</Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground" dir="ltr" data-testid={`text-balance-desc-${entry.id}`}>
-                      {entry.description || "-"}
-                    </TableCell>
-                    <TableCell className="text-sm font-mono text-muted-foreground" data-testid={`text-balance-container-${entry.id}`}>
-                      {entry.containerNumber || "-"}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground" data-testid={`text-balance-destination-${entry.id}`}>
-                      {entry.destination || "-"}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-debit-${entry.id}`}>
-                      {Number(entry.debitAmount || 0) > 0
-                        ? fmtMoney(Number(entry.debitAmount))
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-credit-${entry.id}`}>
-                      {Number(entry.creditAmount || 0) > 0
-                        ? fmtMoney(Number(entry.creditAmount))
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="text-right font-mono font-semibold" data-testid={`text-balance-running-${entry.id}`}>
-                      {fmtMoney(Math.abs(entry.runningBalance))}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={`text-xs font-semibold ${drCrClass(entry.runningBalanceSide)}`}>{entry.runningBalanceSide}</Badge>
-                    </TableCell>
-                    <TableCell className="min-w-[160px]">
-                      <input
-                        type="text"
-                        value={rowNotes[entry.id] ?? ""}
-                        onChange={(e) => setRowNotes((prev) => ({ ...prev, [entry.id]: e.target.value }))}
-                        onBlur={() => saveRowNote(entry.id, rowNotes[entry.id] ?? "")}
-                        placeholder="Add note…"
-                        disabled={savingRowNote === entry.id}
-                        className="w-full text-xs bg-transparent border border-border rounded px-2 py-1 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
-                        data-testid={`input-row-note-${entry.id}`}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </Card>
-      )}
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Card>
 
       {/* Statement Note */}
       <Card className="mt-4">

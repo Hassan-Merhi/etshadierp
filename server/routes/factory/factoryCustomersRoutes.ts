@@ -339,6 +339,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
           freightAmount: customerOrders.freightAmount,
           otherChargesTotal: customerOrders.otherChargesTotal,
           totalQtyBales: customerOrders.totalQtyBales,
+          totalWeightKg: sql<string>`COALESCE((SELECT SUM(cob.weight) FROM customer_order_bales cob WHERE cob.order_id = ${customerOrders.id}), 0)`,
           containerNumber: customerOrders.containerNumber,
           destination: customerOrders.destination,
           status: customerOrders.status,
@@ -352,12 +353,18 @@ export function registerFactoryCustomersRoutes(app: Express) {
         ))
         .orderBy(desc(customerOrders.createdAt));
 
-      // Build orderId → containerNumber and destination maps for enriching statement rows
+      // Build orderId → various field maps for enriching statement rows
       const containerByOrderId = new Map<number, string | null>(
         invoices.map((inv: any) => [inv.id, inv.containerNumber ?? null])
       );
       const destinationByOrderId = new Map<number, string | null>(
         invoices.map((inv: any) => [inv.id, inv.destination ?? null])
+      );
+      const totalQtyBalesByOrderId = new Map<number, number>(
+        invoices.map((inv: any) => [inv.id, inv.totalQtyBales ?? 0])
+      );
+      const totalWeightKgByOrderId = new Map<number, number>(
+        invoices.map((inv: any) => [inv.id, parseFloat(inv.totalWeightKg ?? "0")])
       );
 
       // Auto-sync: update any INVOICE-type balance rows whose debitAmount differs from
@@ -474,10 +481,20 @@ export function registerFactoryCustomersRoutes(app: Express) {
           row.referenceType === "INVOICE" && row.referenceId
             ? (destinationByOrderId.get(row.referenceId) ?? null)
             : null;
+        const totalQtyBales =
+          row.referenceType === "INVOICE" && row.referenceId
+            ? (totalQtyBalesByOrderId.get(row.referenceId) ?? null)
+            : null;
+        const totalWeightKg =
+          row.referenceType === "INVOICE" && row.referenceId
+            ? (totalWeightKgByOrderId.get(row.referenceId) ?? null)
+            : null;
         return {
           ...row,
           containerNumber,
           destination,
+          totalQtyBales,
+          totalWeightKg,
           runningBalance,
           runningBalanceSide: runningBalance >= 0 ? "Dr" : "Cr",
         };
