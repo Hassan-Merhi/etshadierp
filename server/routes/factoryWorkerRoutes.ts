@@ -227,6 +227,27 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     }
   });
 
+  // GET /api/factory/workers/document-counts - Document count per worker
+  app.get("/api/factory/workers/document-counts", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const rows = await db
+        .select({
+          workerId: factoryWorkerDocuments.workerId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(factoryWorkerDocuments)
+        .where(eq(factoryWorkerDocuments.companyId, companyId))
+        .groupBy(factoryWorkerDocuments.workerId);
+      const result: Record<number, number> = {};
+      for (const row of rows) result[row.workerId] = row.count;
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // GET /api/factory/workers/template.xlsx - Download Excel import template
   app.get("/api/factory/workers/template.xlsx", requireAuth, async (req: any, res: any) => {
     try {

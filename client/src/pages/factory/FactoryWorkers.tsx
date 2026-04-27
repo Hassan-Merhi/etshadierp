@@ -110,6 +110,16 @@ export default function FactoryWorkers() {
     },
   });
 
+  const { data: docCounts = {} } = useQuery<Record<number, number>>({
+    queryKey: ["/api/factory/workers/document-counts"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/workers/document-counts", { credentials: "include" });
+      if (!res.ok) return {};
+      return res.json();
+    },
+    staleTime: 0,
+  });
+
   // ── Categories ─────────────────────────────────────────────────────────────
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<FactoryWorkerCategory | null>(null);
@@ -628,12 +638,19 @@ export default function FactoryWorkers() {
               <Card className="hover-elevate h-full">
                 <CardContent className="p-4 flex flex-col h-full">
                   <div className="flex items-start justify-between mb-3">
-                    <Avatar className={`h-12 w-12 text-sm font-semibold ${getAvatarColor(worker.fullName)}`}>
-                      {worker.photoUrl ? <AvatarImage src={worker.photoUrl} /> : null}
-                      <AvatarFallback className={getAvatarColor(worker.fullName)}>
-                        {getInitials(worker.fullName)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <div className="relative shrink-0">
+                      <Avatar className={`h-12 w-12 text-sm font-semibold ${getAvatarColor(worker.fullName)}`}>
+                        {worker.photoUrl ? <AvatarImage src={worker.photoUrl} /> : null}
+                        <AvatarFallback className={getAvatarColor(worker.fullName)}>
+                          {getInitials(worker.fullName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span
+                        className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background ${(docCounts[worker.id] ?? 0) > 0 ? "bg-green-500" : "bg-red-400"}`}
+                        title={(docCounts[worker.id] ?? 0) > 0 ? `${docCounts[worker.id]} document(s) uploaded` : "No documents uploaded"}
+                        data-testid={`dot-docs-${worker.id}`}
+                      />
+                    </div>
                     <Badge
                       variant={worker.active ? "default" : "secondary"}
                       className="text-xs no-default-active-elevate"
