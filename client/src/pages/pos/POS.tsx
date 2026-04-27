@@ -1552,20 +1552,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          {!editVoucherId && (activeLocation as any)?.whatsappGroupChatId && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSendWhatsAppReport}
-              disabled={sendingWhatsApp}
-              className="gap-1 sm:gap-2"
-              data-testid="button-send-whatsapp-report"
-            >
-              <Send className="h-4 w-4" />
-              <span className="hidden sm:inline">{sendingWhatsApp ? "Sending…" : "Send Stock"}</span>
-              <span className="sm:hidden">{sendingWhatsApp ? "…" : "WA"}</span>
-            </Button>
-          )}
           {saleJustCompleted && !editVoucherId ? (
             <Button
               size="sm"
