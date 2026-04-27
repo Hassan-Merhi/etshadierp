@@ -4508,3 +4508,23 @@ export const insertLocationPriceGroupSchema = createInsertSchema(locationPriceGr
 
 export type LocationPriceGroup = typeof locationPriceGroups.$inferSelect;
 export type InsertLocationPriceGroup = z.infer<typeof insertLocationPriceGroupSchema>;
+
+// ── Factory Sheets ────────────────────────────────────────────────────────────
+// Flexible manual spreadsheet feature for factory mode.
+// Each row = one tab/sheet. columns and rows stored as JSON.
+export const factorySheets = pgTable("factory_sheets", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  name: text("name").notNull(),
+  orderIndex: integer("order_index").notNull().default(0),
+  columns: jsonb("columns").notNull().default([]),
+  rows: jsonb("rows").notNull().default([]),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertFactorySheetSchema = createInsertSchema(factorySheets).omit({
+  id: true,
+  updatedAt: true,
+});
+export type FactorySheet = typeof factorySheets.$inferSelect;
+export type InsertFactorySheet = z.infer<typeof insertFactorySheetSchema>;
