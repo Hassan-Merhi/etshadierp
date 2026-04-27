@@ -68,7 +68,7 @@ function workerCodeNum(code: string | null): number {
   const m = code.match(/(\d+)$/);
   return m ? parseInt(m[1], 10) : Infinity;
 }
-const CYCLE: Record<string, string> = { Present: "Absent", Absent: "", "": "Present" };
+const CYCLE: Record<string, string> = { Present: "Absent", Absent: "Leave", Leave: "HalfDay", HalfDay: "", "": "Present" };
 const MONTH_NAMES = [
   "January","February","March","April","May","June",
   "July","August","September","October","November","December",
@@ -130,6 +130,36 @@ function StatusPill({
         )}
       >
         A
+      </span>
+    );
+  }
+  if (status === "Leave") {
+    return (
+      <span
+        tabIndex={editable ? 0 : -1}
+        onClick={onClick}
+        onKeyDown={onKeyDown}
+        className={cn(
+          "inline-flex items-center justify-center w-5 h-5 rounded-sm bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-[10px] font-bold select-none",
+          editable && "cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring",
+        )}
+      >
+        L
+      </span>
+    );
+  }
+  if (status === "HalfDay") {
+    return (
+      <span
+        tabIndex={editable ? 0 : -1}
+        onClick={onClick}
+        onKeyDown={onKeyDown}
+        className={cn(
+          "inline-flex items-center justify-center w-5 h-5 rounded-sm bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold select-none",
+          editable && "cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring",
+        )}
+      >
+        H
       </span>
     );
   }
@@ -556,7 +586,7 @@ export default function FactoryWorkerAttendanceReport() {
           {editMode && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2 print:hidden">
               <Pencil className="h-3.5 w-3.5 shrink-0" />
-              Click a cell to cycle: Present → Absent → Clear. Or press <kbd className="mx-1 px-1 rounded border text-[10px]">P</kbd> / <kbd className="mx-1 px-1 rounded border text-[10px]">A</kbd> when focused.
+              Click a cell to cycle: P → A → L → H → Clear. Or press <kbd className="mx-1 px-1 rounded border text-[10px]">P</kbd> <kbd className="mx-1 px-1 rounded border text-[10px]">A</kbd> <kbd className="mx-1 px-1 rounded border text-[10px]">L</kbd> <kbd className="mx-1 px-1 rounded border text-[10px]">H</kbd> when focused. <kbd className="mx-1 px-1 rounded border text-[10px]">Del</kbd> clears.
             </div>
           )}
 
@@ -643,17 +673,18 @@ export default function FactoryWorkerAttendanceReport() {
                                 editable={editMode}
                                 onClick={editMode ? () => cycleCell(worker.id, date, status) : undefined}
                                 onKeyDown={editMode ? (e) => {
-                                  if (e.key === "p" || e.key === "P") {
+                                  const setStatus = (val: string) => {
                                     e.preventDefault();
                                     const key = `${worker.id}|${date}`;
-                                    const newP = { ...pending, [key]: "Present" };
+                                    const newP = { ...pending, [key]: val };
                                     setPending(newP); flushPending(newP);
-                                  } else if (e.key === "a" || e.key === "A") {
-                                    e.preventDefault();
-                                    const key = `${worker.id}|${date}`;
-                                    const newP = { ...pending, [key]: "Absent" };
-                                    setPending(newP); flushPending(newP);
-                                  } else if (e.key === " " || e.key === "Enter") {
+                                  };
+                                  if (e.key === "p" || e.key === "P") setStatus("Present");
+                                  else if (e.key === "a" || e.key === "A") setStatus("Absent");
+                                  else if (e.key === "l" || e.key === "L") setStatus("Leave");
+                                  else if (e.key === "h" || e.key === "H") setStatus("HalfDay");
+                                  else if (e.key === "Delete" || e.key === "Backspace") setStatus("");
+                                  else if (e.key === " " || e.key === "Enter") {
                                     e.preventDefault();
                                     cycleCell(worker.id, date, status);
                                   }
