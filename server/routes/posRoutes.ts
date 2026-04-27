@@ -1172,12 +1172,29 @@ export function registerPosRoutes(app: Express) {
   // POS Customers - GET endpoint (for POS users with canAccessCustomers permission)
   app.get("/api/pos/customers", requireAuth, async (req, res) => {
     try {
-      if (!req.user?.canAccessCustomers) {
-        return res.status(403).json({ message: "Access denied: You do not have permission to access customers" });
-      }
-
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
+      }
+
+      // If session flag is missing/false, check DB directly as a fallback
+      // (covers stale sessions that predate the canAccessCustomers session field)
+      let hasAccess = req.user?.canAccessCustomers ?? false;
+      if (!hasAccess && req.session.userId && req.session.currentCompanyId) {
+        const [roleRow] = await db
+          .select({ canAccessCustomers: userCompanyRoles.canAccessCustomers })
+          .from(userCompanyRoles)
+          .where(and(
+            eq(userCompanyRoles.userId, String(req.session.userId)),
+            eq(userCompanyRoles.companyId, req.session.currentCompanyId),
+          ));
+        if (roleRow?.canAccessCustomers) {
+          hasAccess = true;
+          req.session.canAccessCustomers = true;
+        }
+      }
+
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Access denied: You do not have permission to access customers" });
       }
 
       const customers = await storage.getAllCustomers(req.session.currentCompanyId);
