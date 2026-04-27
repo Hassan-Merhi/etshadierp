@@ -92,7 +92,6 @@ const navSections: NavSection[] = [
       { title: "Customers",        url: "/factory/customers",              icon: Users          },
       { title: "Invoicing",        url: "/factory/invoicing",              icon: FileText       },
       { title: "Stock Allocation", url: "/factory/stock-allocation",       icon: LayoutGrid     },
-      { title: "Stock Allocation v3", url: "/factory/stock-allocation-v3", icon: LayoutGrid     },
       { title: "Loadings",         url: "/factory/sales/loadings",         icon: Container      },
     ],
   },
@@ -165,7 +164,6 @@ export const FACTORY_NAV_PAGES: { key: string; label: string; group: string }[] 
   ...navSections.flatMap(s =>
     s.items.map(item => ({ key: item.url.replace(/^\//, ""), label: item.title, group: s.label }))
   ),
-  { key: "factory/stock-allocation-v3", label: "Stock Allocation v3", group: "Sales" },
   { key: "factory/dashboard", label: "Dashboard", group: "Overview" },
   { key: "factory/daybook",   label: "Daybook",   group: "Other"    },
   { key: "factory/chat",      label: "Chat",      group: "Other"    },
