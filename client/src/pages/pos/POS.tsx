@@ -2572,7 +2572,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           <AlertDialogHeader>
             <AlertDialogTitle>Stock Report</AlertDialogTitle>
             <AlertDialogDescription>
-              What would you like to do with the stock report for <strong>{activeLocation?.name}</strong>?
+              {(activeLocation as any)?.whatsappGroupChatId
+                ? <>Print the stock report for <strong>{activeLocation?.name}</strong>. It will also be sent to the WhatsApp group automatically.</>
+                : <>What would you like to do with the stock report for <strong>{activeLocation?.name}</strong>?</>
+              }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:gap-2">
@@ -2580,7 +2583,13 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               Skip
             </Button>
             <Button
-              onClick={() => { setShowStockPrompt(false); handleStockPrint(); }}
+              onClick={() => {
+                setShowStockPrompt(false);
+                handleStockPrint();
+                if ((activeLocation as any)?.whatsappGroupChatId) {
+                  handleSendWhatsAppReport();
+                }
+              }}
               disabled={stockInventoryLoading}
               className="gap-2"
               data-testid="button-confirm-stock-print"
