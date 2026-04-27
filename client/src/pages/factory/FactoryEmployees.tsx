@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Plus, Search, Pencil, Users, UserX, UserCheck, AlertTriangle, CheckCircle2, RefreshCw, Loader2 } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -189,7 +192,8 @@ export default function FactoryEmployees() {
 
   const fmt = (val: string | number | null | undefined) => {
     const n = parseFloat(String(val || 0));
-    return isNaN(n) ? "$0.00" : `$${n.toFixed(2)}`;
+    if (isNaN(n)) return "$0";
+    return n % 1 === 0 ? `$${n.toLocaleString()}` : `$${n.toFixed(2)}`;
   };
 
   function openCreate() {
@@ -228,26 +232,18 @@ export default function FactoryEmployees() {
             data-testid="input-employee-search"
           />
         </div>
-        <div className="flex gap-1">
-          {["Active", "Inactive", "All"].map((s) => (
-            <Button
-              key={s}
-              size="sm"
-              variant={statusFilter === s ? "default" : "outline"}
-              onClick={() => setStatusFilter(s)}
-              data-testid={`button-filter-${s.toLowerCase()}`}
-            >
-              {s}
-            </Button>
-          ))}
-        </div>
-        <Button size="sm" variant="outline" onClick={() => setRecalcConfirmOpen(true)} data-testid="button-recalculate-balances">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Recalculate Balances
-        </Button>
-        <Button size="sm" onClick={openCreate} data-testid="button-create-employee">
-          <Plus className="h-4 w-4 mr-2" />
-          New Employee
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-32" data-testid="select-employee-status">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Active">Active</SelectItem>
+            <SelectItem value="Inactive">Inactive</SelectItem>
+            <SelectItem value="All">All</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button size="icon" onClick={openCreate} data-testid="button-create-employee" title="New Employee">
+          <Plus className="h-4 w-4" />
         </Button>
       </div>
 
