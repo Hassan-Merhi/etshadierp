@@ -51,7 +51,7 @@ type FormData = z.infer<typeof formSchema>;
 
 export default function POSCustomers() {
   const { toast } = useToast();
-  const { formatAmountRaw } = useCurrencyContext();
+  const { formatCashAmount } = useCurrencyContext();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -148,7 +148,7 @@ export default function POSCustomers() {
               <Skeleton className="h-6 w-20" />
             ) : (
               <div className="text-lg md:text-2xl font-semibold" data-testid="text-total-receivables">
-                {formatAmountRaw(totalReceivables)}
+                {formatCashAmount(totalReceivables)}
               </div>
             )}
           </CardContent>
@@ -331,7 +331,7 @@ export default function POSCustomers() {
                         {customer.phone || "-"}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
-                        {formatAmountRaw(customer.balance || 0)}
+                        {formatCashAmount(customer.balance || 0)}
                       </TableCell>
                       <TableCell>
                         <Badge 
