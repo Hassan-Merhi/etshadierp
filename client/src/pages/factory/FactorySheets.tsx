@@ -368,6 +368,78 @@ export default function FactorySheets() {
     });
   };
 
+  // ── Keyboard navigation ───────────────────────────────────────────────────
+  const focusCell = useCallback((ri: number, ci: number) => {
+    const el = document.querySelector(
+      `[data-testid="input-cell-${ri}-${ci}"]`
+    ) as HTMLInputElement | null;
+    if (el) { el.focus(); el.select(); }
+  }, []);
+
+  const handleCellKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>, ri: number, ci: number) => {
+      const sheet = localSheets[activeIdx];
+      if (!sheet) return;
+      const rowCount = sheet.rows.length;
+      const colCount = sheet.columns.length;
+
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (ri >= rowCount - 1) {
+          // Last row → create new row then focus it
+          updateSheet(s => ({
+            ...s,
+            rows: [...s.rows, { label: `Row ${s.rows.length + 1}`, cells: Array(s.columns.length).fill(null) }],
+          }));
+          setTimeout(() => focusCell(rowCount, ci), 30);
+        } else {
+          focusCell(ri + 1, ci);
+        }
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          if (ci > 0) focusCell(ri, ci - 1);
+          else if (ri > 0) focusCell(ri - 1, colCount - 1);
+        } else {
+          if (ci < colCount - 1) focusCell(ri, ci + 1);
+          else if (ri < rowCount - 1) focusCell(ri + 1, 0);
+        }
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (ri > 0) focusCell(ri - 1, ci);
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (ri < rowCount - 1) focusCell(ri + 1, ci);
+      } else if (e.key === "ArrowLeft") {
+        const input = e.currentTarget;
+        if (input.selectionStart === 0 && input.selectionEnd === 0 && ci > 0) {
+          e.preventDefault();
+          focusCell(ri, ci - 1);
+        }
+      } else if (e.key === "ArrowRight") {
+        const input = e.currentTarget;
+        if (input.selectionStart === input.value.length && ci < colCount - 1) {
+          e.preventDefault();
+          focusCell(ri, ci + 1);
+        }
+      }
+    },
+    [localSheets, activeIdx, focusCell, updateSheet]
+  );
+
+  // Ctrl+I → add column
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === "i") {
+        e.preventDefault();
+        addColumn();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIdx, localSheets]);
+
   // ── Render ────────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
@@ -562,6 +634,7 @@ export default function FactorySheets() {
                           <Input
                             value={fmt(val)}
                             onChange={e => setCell(ri, ci, e.target.value)}
+                            onKeyDown={e => handleCellKeyDown(e, ri, ci)}
                             className={`h-7 text-xs border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-1 tabular-nums ${isNeg ? "text-red-500" : ""} ${isText ? "text-left" : "text-right"}`}
                             data-testid={`input-cell-${ri}-${ci}`}
                             dir="auto"
