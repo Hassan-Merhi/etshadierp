@@ -444,6 +444,42 @@ export function registerAccountRoutes(app: Express) {
   });
 
   // Get all accounts for voucher sidebar (optimized format with balances)
+  app.get("/api/vouchers/search", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const q = ((req.query.q as string) || "").trim();
+      if (!q) return res.json([]);
+
+      const results = await db
+        .select({
+          id: vouchers.id,
+          voucherNumber: vouchers.voucherNumber,
+          voucherType: vouchers.voucherType,
+          voucherDate: vouchers.voucherDate,
+          description: vouchers.description,
+          totalAmount: vouchers.totalAmount,
+          currency: vouchers.currency,
+          locationName: vouchers.locationName,
+        })
+        .from(vouchers)
+        .where(
+          and(
+            eq(vouchers.companyId, req.session.currentCompanyId),
+            isNull(vouchers.deletedAt),
+            ilike(vouchers.voucherNumber, `%${q}%`)
+          )
+        )
+        .orderBy(desc(vouchers.voucherDate))
+        .limit(20);
+
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/accounts/voucher-sidebar", requireAuth, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {

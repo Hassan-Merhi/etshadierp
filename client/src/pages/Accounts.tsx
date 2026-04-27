@@ -48,6 +48,7 @@ import {
   FileDown,
   RotateCcw,
   History,
+  ArrowUpRight,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -224,6 +225,7 @@ export default function Accounts() {
   });
 
   const [editSearchTerm, setEditSearchTerm] = useState("");
+  const [voucherSearchTerm, setVoucherSearchTerm] = useState("");
   const [expandedParents, setExpandedParents] = useState<Set<string>>(
     new Set(),
   );
@@ -504,6 +506,17 @@ export default function Accounts() {
       return res.json();
     },
     enabled: !!selectedAccount && !!prePeriodAccountType && showDeletedVouchers,
+  });
+
+  const { data: voucherSearchResults = [], isLoading: voucherSearchLoading } = useQuery<any[]>({
+    queryKey: ["/api/vouchers/search", voucherSearchTerm],
+    queryFn: async () => {
+      if (!voucherSearchTerm.trim()) return [];
+      const res = await fetch(`/api/vouchers/search?q=${encodeURIComponent(voucherSearchTerm.trim())}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: voucherSearchTerm.trim().length > 0,
   });
 
   const restoreVoucherMutation = useMutation({
@@ -1710,6 +1723,9 @@ export default function Accounts() {
           </TabsTrigger>
           <TabsTrigger value="alter" data-testid="tab-alter">
             Alter Account
+          </TabsTrigger>
+          <TabsTrigger value="find" data-testid="tab-find-voucher">
+            Find Voucher
           </TabsTrigger>
         </TabsList>
 
@@ -3403,6 +3419,104 @@ export default function Accounts() {
                     </Form>
                   </CardContent>
                 </Card>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="find" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Find Voucher</CardTitle>
+              <p className="text-sm text-muted-foreground">Search by voucher number to quickly open and edit any transaction</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="Type a voucher number (e.g. REC-001, PAY-045…)"
+                  value={voucherSearchTerm}
+                  onChange={(e) => setVoucherSearchTerm(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-voucher-search"
+                />
+              </div>
+
+              {voucherSearchLoading && (
+                <p className="text-sm text-muted-foreground py-4 text-center">Searching…</p>
+              )}
+
+              {!voucherSearchLoading && voucherSearchTerm.trim().length > 0 && voucherSearchResults.length === 0 && (
+                <p className="text-sm text-muted-foreground py-8 text-center">No vouchers found matching &ldquo;{voucherSearchTerm}&rdquo;</p>
+              )}
+
+              {voucherSearchResults.length > 0 && (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="text-xs h-8">Voucher #</TableHead>
+                      <TableHead className="text-xs h-8">Date</TableHead>
+                      <TableHead className="text-xs h-8">Type</TableHead>
+                      <TableHead className="text-xs h-8">Description</TableHead>
+                      <TableHead className="text-xs h-8">Location</TableHead>
+                      <TableHead className="text-xs h-8 text-right">Amount</TableHead>
+                      <TableHead className="text-xs h-8"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {voucherSearchResults.map((v: any) => {
+                      const voucherTypeMap: Record<string, string> = {
+                        Payment: "payment",
+                        Receipt: "receipt",
+                        Journal: "journal",
+                        Consumption: "adjustment",
+                        Production: "adjustment",
+                        Mixed: "adjustment",
+                        StockTransfer: "transfer",
+                        "Stock Transfer": "transfer",
+                        "Credit Note": "credit-note",
+                        "Debit Note": "credit-note",
+                      };
+                      const base = appMode === "factory" ? "/factory" : "";
+                      const tabName = voucherTypeMap[v.voucherType];
+                      const handleOpen = () => {
+                        if (tabName) {
+                          navigate(`${base}/vouchers?edit=${v.id}&tab=${tabName}`);
+                        } else {
+                          navigate(`${base}/vouchers/${v.id}/edit`);
+                        }
+                      };
+                      return (
+                        <TableRow
+                          key={v.id}
+                          className="text-xs cursor-pointer hover-elevate"
+                          onClick={handleOpen}
+                          data-testid={`row-voucher-${v.id}`}
+                        >
+                          <TableCell className="py-2 font-mono font-medium">{v.voucherNumber}</TableCell>
+                          <TableCell className="py-2 text-muted-foreground whitespace-nowrap">{v.voucherDate}</TableCell>
+                          <TableCell className="py-2">{v.voucherType}</TableCell>
+                          <TableCell className="py-2 max-w-[200px] truncate text-muted-foreground">{v.description || "-"}</TableCell>
+                          <TableCell className="py-2 text-muted-foreground">{v.locationName || "-"}</TableCell>
+                          <TableCell className="py-2 text-right font-medium tabular-nums">
+                            {parseFloat(v.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {v.currency}
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => { e.stopPropagation(); handleOpen(); }}
+                              data-testid={`button-open-voucher-${v.id}`}
+                            >
+                              <ArrowUpRight className="h-3 w-3 mr-1" />
+                              Open
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
