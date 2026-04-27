@@ -86,6 +86,7 @@ import { ActiveUsersSection } from "./settings/ActiveUsersSection";
 import { DataToolsTab } from "./settings/DataToolsTab";
 import { fmtDate, fieldLabel, fmtValue, getRecordLabel, getChangesSummary, tableShortName, AuditLogDialog, EditLogTable } from "./settings/AuditLog";
 import { PosSettingsTab } from "./settings/PosSettingsTab";
+import { PosWhatsAppSection } from "./settings/PosWhatsAppSection";
 import { ExportAccountsSection } from "./settings/ExportAccountsSection";
 import { DailyExportSection } from "./settings/DailyExportSection";
 import { WhatsAppExportSection } from "./settings/WhatsAppExportSection";
@@ -683,6 +684,7 @@ import { UsersSection } from "./settings/UsersSection";
         items: appMode !== "factory" ? [
           { key: "pos-settings", label: "POS Settings", icon: ShoppingCart, devOnly: true },
           { key: "price-groups", label: "Price Groups", icon: Layers },
+          { key: "pos-whatsapp", label: "WhatsApp Groups", icon: MessageCircle },
         ] : [],
       },
       {
@@ -1243,6 +1245,10 @@ import { UsersSection } from "./settings/UsersSection";
 
           {activeSection === "price-groups" && (
             <PriceGroupsTab />
+          )}
+
+          {activeSection === "pos-whatsapp" && (
+            <PosWhatsAppSection />
           )}
 
           {activeSection === "system" && (
