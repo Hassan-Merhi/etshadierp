@@ -354,23 +354,31 @@ export default function FactoryWorkers() {
     }
   };
 
+  function parseCodeNumber(code: string | null | undefined): number {
+    if (!code) return Infinity;
+    const m = code.match(/(\d+)$/);
+    return m ? parseInt(m[1], 10) : Infinity;
+  }
+
   const filteredWorkers = useMemo(() => {
     if (!workers) return [];
-    return workers.filter((w) => {
-      if (statusFilter === "Active" && !w.active) return false;
-      if (statusFilter === "Inactive" && w.active) return false;
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        return (
-          w.fullName?.toLowerCase().includes(q) ||
-          w.employeeCode?.toLowerCase().includes(q) ||
-          w.position?.toLowerCase().includes(q) ||
-          w.department?.toLowerCase().includes(q) ||
-          w.phone1?.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
+    return workers
+      .filter((w) => {
+        if (statusFilter === "Active" && !w.active) return false;
+        if (statusFilter === "Inactive" && w.active) return false;
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          return (
+            w.fullName?.toLowerCase().includes(q) ||
+            w.employeeCode?.toLowerCase().includes(q) ||
+            w.position?.toLowerCase().includes(q) ||
+            w.department?.toLowerCase().includes(q) ||
+            w.phone1?.toLowerCase().includes(q)
+          );
+        }
+        return true;
+      })
+      .sort((a, b) => parseCodeNumber(a.employeeCode) - parseCodeNumber(b.employeeCode));
   }, [workers, statusFilter, searchQuery]);
 
   const activeCount = workers?.filter((w) => w.active).length ?? 0;
@@ -627,7 +635,7 @@ export default function FactoryWorkers() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="flex flex-col gap-2">
           {filteredWorkers.map((worker) => (
             <div
               key={worker.id}
@@ -635,49 +643,67 @@ export default function FactoryWorkers() {
               onClick={() => setLocation(`/factory/workers/${worker.id}`)}
               data-testid={`card-worker-${worker.id}`}
             >
-              <Card className="hover-elevate h-full">
-                <CardContent className="p-4 flex flex-col h-full">
-                  <div className="flex items-start justify-between mb-3">
+              <Card className="hover-elevate">
+                <CardContent className="px-4 py-3">
+                  <div className="flex items-center gap-4 flex-wrap">
+
+                    {/* Avatar + doc dot */}
                     <div className="relative shrink-0">
-                      <Avatar className={`h-12 w-12 text-sm font-semibold ${getAvatarColor(worker.fullName)}`}>
+                      <Avatar className={`h-10 w-10 text-sm font-semibold ${getAvatarColor(worker.fullName)}`}>
                         {worker.photoUrl ? <AvatarImage src={worker.photoUrl} /> : null}
                         <AvatarFallback className={getAvatarColor(worker.fullName)}>
                           {getInitials(worker.fullName)}
                         </AvatarFallback>
                       </Avatar>
                       <span
-                        className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background ${(docCounts[worker.id] ?? 0) > 0 ? "bg-green-500" : "bg-red-400"}`}
+                        className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background ${(docCounts[worker.id] ?? 0) > 0 ? "bg-green-500" : "bg-red-400"}`}
                         title={(docCounts[worker.id] ?? 0) > 0 ? `${docCounts[worker.id]} document(s) uploaded` : "No documents uploaded"}
                         data-testid={`dot-docs-${worker.id}`}
                       />
                     </div>
-                    <Badge
-                      variant={worker.active ? "default" : "secondary"}
-                      className="text-xs no-default-active-elevate"
-                      data-testid={`badge-status-${worker.id}`}
-                    >
-                      {worker.active ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
 
-                  <div className="flex-1">
-                    <p className="font-semibold text-sm leading-tight" data-testid={`text-name-${worker.id}`}>
-                      {worker.fullName}
-                    </p>
-                    {worker.position && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{worker.position}</p>
-                    )}
-                    {worker.department && (
-                      <p className="text-xs text-muted-foreground">{worker.department}</p>
-                    )}
-                  </div>
+                    {/* Name + sub info */}
+                    <div className="flex-1 min-w-36">
+                      <p className="font-semibold text-sm leading-tight" data-testid={`text-name-${worker.id}`}>
+                        {worker.fullName}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {[worker.position, worker.department].filter(Boolean).join(" · ") || <span className="opacity-40">—</span>}
+                      </p>
+                    </div>
 
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t">
-                    <span className="text-xs text-muted-foreground font-mono" data-testid={`text-code-${worker.id}`}>
-                      {worker.employeeCode || "—"}
-                    </span>
+                    {/* Code */}
+                    <div className="shrink-0 min-w-20">
+                      <p className="text-xs text-muted-foreground">Code</p>
+                      <p className="text-sm font-mono font-medium" data-testid={`text-code-${worker.id}`}>
+                        {worker.employeeCode || "—"}
+                      </p>
+                    </div>
+
+                    {/* Salary */}
+                    {worker.baseSalary && (
+                      <div className="shrink-0 min-w-20">
+                        <p className="text-xs text-muted-foreground">Salary</p>
+                        <p className="text-sm font-medium">
+                          ${parseFloat(worker.baseSalary).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Status badge */}
+                    <div className="shrink-0">
+                      <Badge
+                        variant={worker.active ? "default" : "secondary"}
+                        className="text-xs no-default-active-elevate"
+                        data-testid={`badge-status-${worker.id}`}
+                      >
+                        {worker.active ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+
+                    {/* Action buttons */}
                     <div
-                      className="flex gap-1 visible md:invisible md:group-hover:visible"
+                      className="flex gap-1 shrink-0 visibility-hidden md:invisible md:group-hover:visible"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Button size="icon" variant="ghost" onClick={() => openEdit(worker)} data-testid={`button-edit-worker-${worker.id}`}>
@@ -699,6 +725,7 @@ export default function FactoryWorkers() {
                         </Button>
                       )}
                     </div>
+
                   </div>
                 </CardContent>
               </Card>
