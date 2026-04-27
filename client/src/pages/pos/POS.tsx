@@ -40,6 +40,19 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -206,6 +219,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const customerAccounts = (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc: any) => acc.accountType === "Asset");
 
   const [isCreditSale, setIsCreditSale] = useState(false);
+  const [customerComboOpen, setCustomerComboOpen] = useState(false);
 
   // Fetch POS customers to show balance on credit sales
   const { data: posCustomers = [] } = useQuery<any[]>({
@@ -1682,18 +1696,45 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           <div className="flex flex-col gap-1 col-span-2 sm:col-span-1">
             <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
-              <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-                <SelectTrigger className="w-full sm:w-44" data-testid="select-customer">
-                  <SelectValue placeholder="Customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customerAccounts.map((acc: any) => (
-                    <SelectItem key={acc.id} value={String(acc.id)}>
-                      {acc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={customerComboOpen} onOpenChange={setCustomerComboOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full sm:w-44 justify-between font-normal"
+                    data-testid="select-customer"
+                  >
+                    <span className="truncate">
+                      {selectedCustomerId
+                        ? (customerAccounts.find((a: any) => String(a.id) === selectedCustomerId)?.name || "Customer")
+                        : "Select customer…"}
+                    </span>
+                    <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-1" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search customer…" data-testid="input-customer-search" />
+                    <CommandList>
+                      <CommandEmpty>No customer found.</CommandEmpty>
+                      <CommandGroup>
+                        {customerAccounts.map((acc: any) => (
+                          <CommandItem
+                            key={acc.id}
+                            value={acc.name}
+                            onSelect={() => {
+                              setSelectedCustomerId(String(acc.id));
+                              setCustomerComboOpen(false);
+                            }}
+                          >
+                            <Check className={`mr-2 h-4 w-4 shrink-0 ${selectedCustomerId === String(acc.id) ? "opacity-100" : "opacity-0"}`} />
+                            {acc.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             {selectedCustomer && (
               <p className="text-xs text-muted-foreground pl-0 sm:pl-6" data-testid="text-customer-balance">
