@@ -327,14 +327,6 @@ export default function FactoryCustomerStatement() {
         </Card>
         <Card>
           <CardContent className="py-3 px-4">
-            <p className="text-xs text-muted-foreground mb-0.5">Total Kg</p>
-            <p className="text-lg font-bold font-mono" data-testid="text-total-kg">
-              {fmtNum(totals.totalKg)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-3 px-4">
             <p className="text-xs text-muted-foreground mb-0.5">Total Invoiced</p>
             <p className="text-lg font-bold font-mono" data-testid="text-total-debit">
               {fmtMoney(totals.totalAmountDebit)}
@@ -358,7 +350,6 @@ export default function FactoryCustomerStatement() {
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead>Description</TableHead>
               <TableHead>Container</TableHead>
               <TableHead>Destination</TableHead>
               <TableHead className="text-right">Bales</TableHead>
@@ -373,7 +364,7 @@ export default function FactoryCustomerStatement() {
           <TableBody>
             {filteredHistory.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-center text-muted-foreground py-8" data-testid="text-no-transactions">
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-8" data-testid="text-no-transactions">
                   {hasFilters ? "No rows match the current filters" : "No transactions yet"}
                 </TableCell>
               </TableRow>
@@ -385,9 +376,6 @@ export default function FactoryCustomerStatement() {
                   </TableCell>
                   <TableCell data-testid={`text-balance-type-${entry.id}`}>
                     <Badge variant="outline" className="text-xs">{entry.transactionType}</Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground" dir="ltr" data-testid={`text-balance-desc-${entry.id}`}>
-                    {entry.description || "-"}
                   </TableCell>
                   <TableCell className="text-sm font-mono text-muted-foreground whitespace-nowrap" data-testid={`text-balance-container-${entry.id}`}>
                     {entry.containerNumber || "-"}
