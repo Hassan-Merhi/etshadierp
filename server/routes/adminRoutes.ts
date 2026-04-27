@@ -30,7 +30,7 @@ import {
   insertDashboardAccountSelectionSchema,
   creditNoteItems, creditNotes, insertCreditNoteSchema,
   pendingBarcodes, insertPendingBarcodeSchema,
-  storedFiles, spreadsheets, liveSpreadsheets,
+  storedFiles, fileFolders, spreadsheets, liveSpreadsheets,
   agentAccounts, insertAgentAccountSchema,
   freightAccounts,
   snapshotPinnedAccounts,
@@ -3331,6 +3331,61 @@ export function registerAdminRoutes(app: Express) {
     }
   );
 
+  // ── File Folders ──────────────────────────────────────────────
+  app.get("/api/file-folders", requireAuth, async (req: any, res) => {
+    try {
+      const companyId = req.session?.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company context" });
+      const folders = await db.select().from(fileFolders)
+        .where(eq(fileFolders.companyId, companyId))
+        .orderBy(asc(fileFolders.name));
+      res.json(folders);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.post("/api/file-folders", requireAuth, async (req: any, res) => {
+    try {
+      const companyId = req.session?.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company context" });
+      const { name } = req.body;
+      if (!name?.trim()) return res.status(400).json({ message: "Folder name required" });
+      const [folder] = await db.insert(fileFolders).values({ companyId, name: name.trim() }).returning();
+      res.json(folder);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.patch("/api/file-folders/:id", requireAuth, async (req: any, res) => {
+    try {
+      const companyId = req.session?.currentCompanyId;
+      const folderId = parseInt(req.params.id);
+      const { name } = req.body;
+      if (!name?.trim()) return res.status(400).json({ message: "Folder name required" });
+      const [updated] = await db.update(fileFolders)
+        .set({ name: name.trim() })
+        .where(and(eq(fileFolders.id, folderId), eq(fileFolders.companyId, companyId)))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Folder not found" });
+      res.json(updated);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.delete("/api/file-folders/:id", requireAuth, async (req: any, res) => {
+    try {
+      const companyId = req.session?.currentCompanyId;
+      const folderId = parseInt(req.params.id);
+      const filesInFolder = await db.select({ id: storedFiles.id }).from(storedFiles)
+        .where(and(eq(storedFiles.companyId, companyId), eq(storedFiles.folderId, folderId)));
+      if (filesInFolder.length > 0) {
+        return res.status(409).json({ message: `Folder has ${filesInFolder.length} file(s). Move or delete them first.`, fileCount: filesInFolder.length });
+      }
+      const [deleted] = await db.delete(fileFolders)
+        .where(and(eq(fileFolders.id, folderId), eq(fileFolders.companyId, companyId)))
+        .returning({ id: fileFolders.id });
+      if (!deleted) return res.status(404).json({ message: "Folder not found" });
+      res.json({ message: "Folder deleted" });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
   // ── File Storage ─────────────────────────────────────────────
   app.get("/api/files", requireAuth, async (req: any, res) => {
     try {
@@ -3339,7 +3394,9 @@ export function registerAdminRoutes(app: Express) {
       const files = await db
         .select({
           id: storedFiles.id,
+          folderId: storedFiles.folderId,
           fileName: storedFiles.fileName,
+          displayName: storedFiles.displayName,
           fileType: storedFiles.fileType,
           fileSize: storedFiles.fileSize,
           description: storedFiles.description,
@@ -3360,11 +3417,14 @@ export function registerAdminRoutes(app: Express) {
       const companyId = req.session?.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company context" });
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-      const { description } = req.body;
+      const { description, folderId } = req.body;
       const fileData = req.file.buffer.toString("base64");
+      const folderIdNum = folderId ? parseInt(folderId) : null;
       const [inserted] = await db.insert(storedFiles).values({
         companyId,
+        folderId: folderIdNum,
         fileName: req.file.originalname,
+        displayName: null,
         fileType: req.file.mimetype,
         fileSize: req.file.size,
         fileData,
@@ -3377,6 +3437,23 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  app.patch("/api/files/:id", requireAuth, async (req: any, res) => {
+    try {
+      const companyId = req.session?.currentCompanyId;
+      const fileId = parseInt(req.params.id);
+      const { displayName, folderId } = req.body;
+      const updates: any = {};
+      if (displayName !== undefined) updates.displayName = displayName || null;
+      if (folderId !== undefined) updates.folderId = folderId === null ? null : parseInt(folderId);
+      if (Object.keys(updates).length === 0) return res.status(400).json({ message: "Nothing to update" });
+      const [updated] = await db.update(storedFiles).set(updates)
+        .where(and(eq(storedFiles.id, fileId), eq(storedFiles.companyId, companyId)))
+        .returning({ id: storedFiles.id });
+      if (!updated) return res.status(404).json({ message: "File not found" });
+      res.json({ message: "File updated" });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
   app.get("/api/files/:id/download", requireAuth, async (req: any, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
@@ -3386,8 +3463,27 @@ export function registerAdminRoutes(app: Express) {
       );
       if (!file) return res.status(404).json({ message: "File not found" });
       const buffer = Buffer.from(file.fileData, "base64");
+      const outName = file.displayName || file.fileName;
       res.set("Content-Type", file.fileType);
-      res.set("Content-Disposition", `attachment; filename="${encodeURIComponent(file.fileName)}"`);
+      res.set("Content-Disposition", `attachment; filename="${encodeURIComponent(outName)}"`);
+      res.set("Content-Length", buffer.length.toString());
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/files/:id/preview", requireAuth, async (req: any, res) => {
+    try {
+      const companyId = req.session?.currentCompanyId;
+      const fileId = parseInt(req.params.id);
+      const [file] = await db.select().from(storedFiles).where(
+        and(eq(storedFiles.id, fileId), eq(storedFiles.companyId, companyId))
+      );
+      if (!file) return res.status(404).json({ message: "File not found" });
+      const buffer = Buffer.from(file.fileData, "base64");
+      res.set("Content-Type", file.fileType);
+      res.set("Content-Disposition", `inline; filename="${encodeURIComponent(file.displayName || file.fileName)}"`);
       res.set("Content-Length", buffer.length.toString());
       res.send(buffer);
     } catch (error: any) {

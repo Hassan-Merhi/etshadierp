@@ -3895,10 +3895,22 @@ export const insertSupplierContainerLoadedItemSchema = createInsertSchema(suppli
 export type InsertSupplierContainerLoadedItem = z.infer<typeof insertSupplierContainerLoadedItemSchema>;
 export type SupplierContainerLoadedItem = typeof supplierContainerLoadedItems.$inferSelect;
 
+export const fileFolders = pgTable("file_folders", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+export const insertFileFolderSchema = createInsertSchema(fileFolders).omit({ id: true, createdAt: true });
+export type InsertFileFolder = z.infer<typeof insertFileFolderSchema>;
+export type FileFolder = typeof fileFolders.$inferSelect;
+
 export const storedFiles = pgTable("stored_files", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
+  folderId: integer("folder_id"),
   fileName: text("file_name").notNull(),
+  displayName: text("display_name"),
   fileType: text("file_type").notNull(),
   fileSize: integer("file_size").notNull(),
   fileData: text("file_data").notNull(),
@@ -3918,6 +3930,8 @@ export const insertStoredFileSchema = createInsertSchema(storedFiles).omit({
   fileData: z.string().min(1),
   description: z.string().optional(),
   uploadedBy: z.string().optional().nullable(),
+  folderId: z.number().optional().nullable(),
+  displayName: z.string().optional().nullable(),
 });
 
 export type InsertStoredFile = z.infer<typeof insertStoredFileSchema>;

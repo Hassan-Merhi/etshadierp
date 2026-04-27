@@ -1670,6 +1670,14 @@ let migrationsDone = false;
     )`,
     `CREATE INDEX IF NOT EXISTS factory_v3_load_bales_load_idx ON factory_v3_load_bales (load_id)`,
     `CREATE INDEX IF NOT EXISTS factory_v3_load_bales_bale_idx  ON factory_v3_load_bales (bale_id)`,
+    `CREATE TABLE IF NOT EXISTS file_folders (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      name text NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `ALTER TABLE stored_files ADD COLUMN IF NOT EXISTS folder_id integer REFERENCES file_folders(id) ON DELETE SET NULL`,
+    `ALTER TABLE stored_files ADD COLUMN IF NOT EXISTS display_name text`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
