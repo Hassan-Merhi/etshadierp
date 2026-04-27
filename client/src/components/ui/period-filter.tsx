@@ -51,16 +51,21 @@ function getPresetDates(preset: PeriodPreset): { fromDate: string; toDate: strin
         fromDate: formatDate(startOfMonth(today)),
         toDate: formatDate(endOfMonth(today)),
       };
-    case "last_1_month":
+    case "last_1_month": {
+      const lastMonth = subMonths(today, 1);
       return {
-        fromDate: formatDate(subMonths(today, 1)),
-        toDate: formatDate(today),
+        fromDate: formatDate(startOfMonth(lastMonth)),
+        toDate: formatDate(endOfMonth(lastMonth)),
       };
-    case "last_6_months":
+    }
+    case "last_6_months": {
+      const sixMonthsAgo = subMonths(today, 6);
+      const lastMonth = subMonths(today, 1);
       return {
-        fromDate: formatDate(subMonths(today, 6)),
-        toDate: formatDate(today),
+        fromDate: formatDate(startOfMonth(sixMonthsAgo)),
+        toDate: formatDate(endOfMonth(lastMonth)),
       };
+    }
     case "this_year":
       return {
         fromDate: formatDate(startOfYear(today)),
