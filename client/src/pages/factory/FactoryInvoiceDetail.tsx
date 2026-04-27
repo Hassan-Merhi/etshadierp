@@ -90,6 +90,8 @@ export default function FactoryInvoiceDetail() {
   const [, navigate] = useLocation();
   const [editingArticleCode, setEditingArticleCode] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [revertDialogOpen, setRevertDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   useEscapeBack(() => navigate("/factory/invoicing?tab=invoices"));
   const appMode = useAppMode();
@@ -321,9 +323,6 @@ export default function FactoryInvoiceDetail() {
   const isVerifiedStatus = order.status === "VERIFIED";
   const isLoadingStatus = order.status === "LOADING";
   const isFinalized = order.status === "FINALIZED";
-
-  const [revertDialogOpen, setRevertDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   return (
     <div className="flex flex-col h-full p-6 overflow-y-auto">
