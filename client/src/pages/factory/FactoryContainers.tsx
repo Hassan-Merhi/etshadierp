@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAdminOverride } from "@/hooks/use-admin-override";
 import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search, ArrowDown, AlertTriangle, RotateCcw, CheckSquare, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,6 +52,7 @@ interface ContainerWithSupplier extends FactoryContainer {
 }
 
 export default function FactoryContainers() {
+  const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const [createOpen, setCreateOpen] = useState(false);
   const [editingContainer, setEditingContainer] = useState<ContainerWithSupplier | null>(null);
   const [expandedSuppliers, setExpandedSuppliers] = useState<Set<string>>(new Set(["__all__"]));
@@ -621,7 +623,10 @@ export default function FactoryContainers() {
 
   const handleSubmit = () => {
     if (editingContainer) {
-      updateMutation.mutate({ id: editingContainer.id, data: formData });
+      wrapAdminAction(
+        () => updateMutation.mutate({ id: editingContainer.id, data: formData }),
+        "Update Container",
+      );
     } else {
       createMutation.mutate(formData);
     }
@@ -1643,7 +1648,7 @@ export default function FactoryContainers() {
             <Button
               variant="destructive"
               disabled={bulkDeleteMutation.isPending}
-              onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+              onClick={() => wrapAdminAction(() => bulkDeleteMutation.mutate(Array.from(selectedIds)), "Bulk Delete Containers")}
               data-testid="button-confirm-bulk-delete"
             >
               {bulkDeleteMutation.isPending ? "Deleting..." : `Delete ${selectedIds.size} Container${selectedIds.size !== 1 ? "s" : ""}`}
@@ -1671,7 +1676,7 @@ export default function FactoryContainers() {
             <Button
               variant="destructive"
               disabled={deleteMutation.isPending}
-              onClick={() => { if (pendingDeleteId !== null) deleteMutation.mutate(pendingDeleteId); }}
+              onClick={() => wrapAdminAction(() => { if (pendingDeleteId !== null) deleteMutation.mutate(pendingDeleteId); }, "Delete Container")}
               data-testid="button-confirm-delete-container"
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete Container"}
@@ -1870,7 +1875,7 @@ export default function FactoryContainers() {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => reversingContainer && reverseOffloadMutation.mutate(reversingContainer.id)}
+              onClick={() => wrapAdminAction(() => reversingContainer && reverseOffloadMutation.mutate(reversingContainer.id), "Reverse Offload")}
               disabled={reverseOffloadMutation.isPending}
               data-testid="button-confirm-reverse-offload"
             >
@@ -1880,6 +1885,7 @@ export default function FactoryContainers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {AdminDialog}
     </div>
   );
 }

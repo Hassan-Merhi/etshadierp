@@ -1,5 +1,6 @@
 import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
+import { checkFactoryAdmin } from "./factory/_helpers";
 import { eq, and, sql, asc, gte, lte, desc, inArray, isNull } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import path from "path";
@@ -82,6 +83,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
   app.post("/api/factory/payroll/generate", requireAuth, async (req: any, res: any) => {
     try {
+      if (!checkFactoryAdmin(req, res)) return;
       const { companyId, startDate, endDate } = req.body;
       if (!companyId || !startDate || !endDate) {
         return res.status(400).json({ message: "companyId, startDate, and endDate are required" });
@@ -400,6 +402,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
   app.post("/api/factory/payroll/:id/undo", requireAuth, async (req: any, res: any) => {
     try {
+      if (!checkFactoryAdmin(req, res)) return;
       const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : ((req.session as any).factoryCompanyId || (req.session as any).currentCompanyId);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 

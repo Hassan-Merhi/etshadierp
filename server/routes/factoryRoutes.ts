@@ -54,6 +54,26 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // FACTORY ADMIN GUARD — blocks PUT / PATCH / DELETE for non-admins unless
+  // they have a valid admin-override session token
+  // ─────────────────────────────────────────────────────────────────────────────
+  app.use("/api/factory", (req: any, res: any, next: any) => {
+    if (!["PUT", "PATCH", "DELETE"].includes(req.method)) return next();
+    if (!req.session?.userId) return next(); // unauthenticated — let requireAuth handle it
+
+    const role = req.session?.currentRole as string | undefined;
+    if (["Admin", "Owner", "Developer"].includes(role || "")) return next();
+
+    const overrideUntil = req.session?.factoryAdminOverrideUntil as number | undefined;
+    if (overrideUntil && Date.now() < overrideUntil) return next();
+
+    return res.status(403).json({
+      message: "Admin authorization required for this action.",
+      requiresAdminOverride: true,
+    });
+  });
+
   registerFactoryStockRoutes(app);
   registerFactorySuppliersRoutes(app);
   registerFactoryProductsRoutes(app);

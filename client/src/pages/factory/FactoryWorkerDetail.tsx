@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
@@ -204,6 +205,7 @@ function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, formatDa
 }
 
 export default function FactoryWorkerDetail() {
+  const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const [, navigate] = useLocation();
   useEscapeBack(() => navigate("/factory/workers"));
   const [, params] = useRoute("/factory/workers/:id");
@@ -681,7 +683,7 @@ export default function FactoryWorkerDetail() {
                   <Button
                     variant="outline"
                     className="w-full text-green-600 border-green-600"
-                    onClick={() => reactivateMutation.mutate()}
+                    onClick={() => wrapAdminAction(() => reactivateMutation.mutate(), "Reactivate Worker")}
                     disabled={reactivateMutation.isPending}
                     data-testid="button-reactivate-worker"
                   >
@@ -1127,13 +1129,13 @@ export default function FactoryWorkerDetail() {
                         <div className="flex items-end gap-2 mt-auto pt-4">
                           <Button
                             size="sm"
-                            onClick={() => createAdvanceMutation.mutate({
+                            onClick={() => wrapAdminAction(() => createAdvanceMutation.mutate({
                               advanceDate,
                               amount: advanceAmount,
                               notes: advanceNotes,
                               repaymentType: advanceRepaymentType,
                               ...(advanceCashAccountId ? { cashAccountId: parseInt(advanceCashAccountId) } : {}),
-                            })}
+                            }), "Save Advance")}
                             disabled={!advanceAmount || parseFloat(advanceAmount) <= 0 || createAdvanceMutation.isPending}
                             data-testid="button-save-advance"
                           >
@@ -1287,13 +1289,13 @@ export default function FactoryWorkerDetail() {
                           Cancel
                         </Button>
                         <Button
-                          onClick={() => repaymentMutation.mutate({
+                          onClick={() => wrapAdminAction(() => repaymentMutation.mutate({
                             advanceId: repayAdvanceId,
                             repaymentDate: repayDate,
                             amount: repayAmount,
                             cashAccountId: repayCashAccountId ? parseInt(repayCashAccountId) : undefined,
                             notes: repayNotes || undefined,
-                          })}
+                          }), "Record Repayment")}
                           disabled={!repayAmount || parseFloat(repayAmount) <= 0 || repaymentMutation.isPending}
                           data-testid="button-submit-repay"
                         >
@@ -1603,7 +1605,7 @@ export default function FactoryWorkerDetail() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setFixAcctOpen(false)}>Cancel</Button>
             <Button
-              onClick={() => fixAcctTargetId && fixAcctMutation.mutate({ id: fixAcctTargetId, cashId: fixAcctCashId })}
+              onClick={() => wrapAdminAction(() => fixAcctTargetId && fixAcctMutation.mutate({ id: fixAcctTargetId, cashId: fixAcctCashId }), "Generate Entry")}
               disabled={fixAcctMutation.isPending || !fixAcctCashId}
               data-testid="button-confirm-fix-acct"
             >
@@ -1631,7 +1633,7 @@ export default function FactoryWorkerDetail() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setPayOpen(false)}>Cancel</Button>
             <Button
-              onClick={() => payTargetId && markPaidMutation.mutate({ id: payTargetId, cashId: payCashAccountId })}
+              onClick={() => wrapAdminAction(() => payTargetId && markPaidMutation.mutate({ id: payTargetId, cashId: payCashAccountId }), "Confirm Payment")}
               disabled={markPaidMutation.isPending}
               data-testid="button-confirm-pay"
             >
@@ -1704,7 +1706,7 @@ export default function FactoryWorkerDetail() {
             <Button
               variant="destructive"
               disabled={deleteDocMutation.isPending}
-              onClick={() => { if (pendingDeleteDocId !== null) { deleteDocMutation.mutate(pendingDeleteDocId); setPendingDeleteDocId(null); } }}
+              onClick={() => wrapAdminAction(() => { if (pendingDeleteDocId !== null) { deleteDocMutation.mutate(pendingDeleteDocId); setPendingDeleteDocId(null); } }, "Delete Document")}
               data-testid="button-confirm-delete-doc"
             >
               {deleteDocMutation.isPending ? "Deleting..." : "Delete Document"}
@@ -1712,6 +1714,7 @@ export default function FactoryWorkerDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {AdminDialog}
     </div>
   );
 }

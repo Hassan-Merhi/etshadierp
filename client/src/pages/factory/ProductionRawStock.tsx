@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef } from "react";
 import { useLocation } from "wouter";
+import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Container, Package, Plus, ArrowDown, AlertTriangle, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, FlaskConical, FileSpreadsheet, FileText, SlidersHorizontal, PlusCircle, MinusCircle, History, ArrowUpCircle, ArrowDownCircle, FlaskRound, Tag, ChevronRight, ChevronDown, Folder, FolderOpen } from "lucide-react";
@@ -314,12 +315,14 @@ function SupplierCategoriesDialog({
   onClose,
   suppliers,
 }: {
+
   open: boolean;
   onClose: () => void;
   suppliers: { id: number; name: string; supplierCategoryId?: number | null }[];
 }) {
   const { toast } = useToast();
   const [newCatName, setNewCatName] = useState("");
+  const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -433,11 +436,11 @@ function SupplierCategoriesDialog({
                 placeholder="e.g. Cyprus, Australia…"
                 value={newCatName}
                 onChange={e => setNewCatName(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && newCatName.trim()) createMutation.mutate(newCatName); }}
+                onKeyDown={e => { if (e.key === "Enter" && newCatName.trim()) wrapAdminAction(() => createMutation.mutate(newCatName), "Create Category"); }}
                 data-testid="input-new-category-name"
               />
               <Button
-                onClick={() => { if (newCatName.trim()) createMutation.mutate(newCatName); }}
+                onClick={() => { if (newCatName.trim()) wrapAdminAction(() => createMutation.mutate(newCatName), "Create Category"); }}
                 disabled={!newCatName.trim() || createMutation.isPending}
                 data-testid="button-create-category"
               >
@@ -461,7 +464,7 @@ function SupplierCategoriesDialog({
                         value={editingName}
                         onChange={e => setEditingName(e.target.value)}
                         onKeyDown={e => {
-                          if (e.key === "Enter" && editingName.trim()) renameMutation.mutate({ id: cat.id, name: editingName });
+                          if (e.key === "Enter" && editingName.trim()) wrapAdminAction(() => renameMutation.mutate({ id: cat.id, name: editingName }), "Rename Category");
                           if (e.key === "Escape") setEditingId(null);
                         }}
                         className="h-7 text-sm flex-1"
@@ -475,7 +478,7 @@ function SupplierCategoriesDialog({
                     </span>
                     {editingId === cat.id ? (
                       <>
-                        <Button size="sm" variant="ghost" onClick={() => { if (editingName.trim()) renameMutation.mutate({ id: cat.id, name: editingName }); }} data-testid={`button-save-rename-${cat.id}`}>
+                        <Button size="sm" variant="ghost" onClick={() => { if (editingName.trim()) wrapAdminAction(() => renameMutation.mutate({ id: cat.id, name: editingName }), "Rename Category"); }} data-testid={`button-save-rename-${cat.id}`}>
                           <Check className="h-3.5 w-3.5" />
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
@@ -509,7 +512,7 @@ function SupplierCategoriesDialog({
                     <Select
                       value={sup.supplierCategoryId != null ? String(sup.supplierCategoryId) : "none"}
                       onValueChange={val => {
-                        assignMutation.mutate({ supplierId: sup.id, categoryId: val === "none" ? null : parseInt(val) });
+                        wrapAdminAction(() => assignMutation.mutate({ supplierId: sup.id, categoryId: val === "none" ? null : parseInt(val) }), "Assign Category");
                       }}
                     >
                       <SelectTrigger className="h-7 w-40 text-xs" data-testid={`select-supplier-category-${sup.id}`}>
@@ -540,7 +543,7 @@ function SupplierCategoriesDialog({
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => { if (deletingId) deleteMutation.mutate(deletingId); }}>
+              <AlertDialogAction onClick={() => { if (deletingId) wrapAdminAction(() => deleteMutation.mutate(deletingId!), "Delete Category"); }}>
                 Delete
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -548,10 +551,12 @@ function SupplierCategoriesDialog({
         </AlertDialog>
       </DialogContent>
     </Dialog>
+    {AdminDialog}
   );
 }
 
 export default function ProductionRawStock() {
+  const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { formatDisplayDate } = useDateFormat();
   const [offloadDialogOpen, setOffloadDialogOpen] = useState(false);
   const [offloadDate, setOffloadDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
@@ -2058,7 +2063,7 @@ export default function ProductionRawStock() {
             <Button variant="outline" onClick={() => setDeleteBatchId(null)} data-testid="button-cancel-delete-batch">Cancel</Button>
             <Button
               variant="destructive"
-              onClick={() => deleteBatchId && deleteBatchMutation.mutate(deleteBatchId)}
+              onClick={() => wrapAdminAction(() => deleteBatchId && deleteBatchMutation.mutate(deleteBatchId), "Delete Batch")}
               disabled={deleteBatchMutation.isPending}
               data-testid="button-confirm-delete-batch"
             >
@@ -2254,7 +2259,7 @@ export default function ProductionRawStock() {
                   </Button>
                   <Button
                     disabled={!canSubmit}
-                    onClick={() => {
+                    onClick={() => wrapAdminAction(() => {
                       if (!addToBatchSource || !addToBatchTargetId) return;
                       addToBatchMutation.mutate({
                         batchId: parseInt(addToBatchTargetId),
@@ -2262,7 +2267,7 @@ export default function ProductionRawStock() {
                         weightKg: addToBatchKg,
                         costPerKg: addToBatchCost,
                       });
-                    }}
+                    }, "Add to Batch")}
                     data-testid="button-confirm-add-to-batch"
                   >
                     {addToBatchMutation.isPending ? "Adding..." : "Add to Batch"}
@@ -2852,7 +2857,7 @@ export default function ProductionRawStock() {
               Cancel
             </Button>
             <Button
-              onClick={handleOffload}
+              onClick={() => wrapAdminAction(handleOffload, "Confirm Offload")}
               disabled={offloadMutation.isPending || !selectedContainerId}
               data-testid="button-confirm-offload"
             >
@@ -3155,7 +3160,7 @@ export default function ProductionRawStock() {
                 Cancel
               </Button>
               <Button
-                onClick={handleSubmitOpeningBalance}
+                onClick={() => wrapAdminAction(handleSubmitOpeningBalance, "Add Opening Balance")}
                 disabled={openingBalanceMutation.isPending || !obSupplierName.trim()}
                 data-testid="button-confirm-ob"
               >
@@ -3221,7 +3226,7 @@ export default function ProductionRawStock() {
                 Cancel
               </Button>
               <Button
-                onClick={() => {
+                onClick={() => wrapAdminAction(() => {
                   if (confirmDutyContainerId && confirmDutyAmount) {
                     confirmDutyMutation.mutate({
                       containerId: confirmDutyContainerId,
@@ -3230,7 +3235,7 @@ export default function ProductionRawStock() {
                       txDate: confirmDutyDate,
                     });
                   }
-                }}
+                }, "Confirm Duty")}
                 disabled={confirmDutyMutation.isPending || !confirmDutyAmount}
                 data-testid="button-submit-confirm-duty"
               >
@@ -3364,7 +3369,7 @@ export default function ProductionRawStock() {
                         data-testid="button-confirm-assign"
                         onClick={() => {
                           if (!assigningRawStock) return;
-                          assignMutation.mutate({ rawStockId: assigningRawStock.rawStockId, baleIds: Array.from(selectedBaleIds) });
+                          wrapAdminAction(() => assignMutation.mutate({ rawStockId: assigningRawStock.rawStockId, baleIds: Array.from(selectedBaleIds) }), "Assign Bales");
                         }}
                       >
                         {assignMutation.isPending ? "Assigning..." : `Assign ${selectedBaleIds.size} Bale${selectedBaleIds.size !== 1 ? "s" : ""}`}
@@ -3402,7 +3407,7 @@ export default function ProductionRawStock() {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => confirmDeleteAdjId !== null && deleteAdjustmentMutation.mutate(confirmDeleteAdjId)}
+              onClick={() => wrapAdminAction(() => confirmDeleteAdjId !== null && deleteAdjustmentMutation.mutate(confirmDeleteAdjId), "Delete Adjustment")}
               disabled={deleteAdjustmentMutation.isPending}
               data-testid="button-delete-adj-confirm"
             >
@@ -3928,6 +3933,7 @@ export default function ProductionRawStock() {
           queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
         }}
       />
+      {AdminDialog}
     </div>
   );
 }

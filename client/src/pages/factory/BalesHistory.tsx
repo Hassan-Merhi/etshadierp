@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAdminOverride } from "@/hooks/use-admin-override";
 import { Printer, Trash2, Search, Package, Filter, CheckSquare, RefreshCw, Pencil, Check, X, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -53,6 +54,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function BalesHistory() {
+  const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportFrom, setExportFrom] = useState("");
   const [exportTo, setExportTo] = useState("");
@@ -210,7 +212,7 @@ export default function BalesHistory() {
 
   const saveEditName = (baleId: number) => {
     if (editingNameValue.trim()) {
-      updateProductName.mutate({ id: baleId, name: editingNameValue.trim() });
+      wrapAdminAction(() => updateProductName.mutate({ id: baleId, name: editingNameValue.trim() }), "Update Bale Name");
     } else {
       setEditingNameId(null);
     }
@@ -516,7 +518,7 @@ export default function BalesHistory() {
               <Button
                 size="sm"
                 disabled={!bulkStatus || bulkUpdateStatus.isPending}
-                onClick={() => bulkUpdateStatus.mutate({ ids: Array.from(selectedIds), status: bulkStatus })}
+                onClick={() => wrapAdminAction(() => bulkUpdateStatus.mutate({ ids: Array.from(selectedIds), status: bulkStatus }), "Bulk Update Status")}
                 data-testid="button-bulk-update"
               >
                 {bulkUpdateStatus.isPending ? "Updating..." : "Apply"}
@@ -617,7 +619,7 @@ export default function BalesHistory() {
                         <TableCell>
                           <Select
                             value={bale.status}
-                            onValueChange={(val) => updateStatus.mutate({ id: bale.id, status: val })}
+                            onValueChange={(val) => wrapAdminAction(() => updateStatus.mutate({ id: bale.id, status: val }), "Update Bale Status")}
                           >
                             <SelectTrigger className="w-[140px] h-8 text-xs" data-testid={`select-status-${bale.id}`}>
                               <Badge variant={(STATUS_COLORS[bale.status] || "secondary") as any} className="text-xs">
@@ -691,7 +693,7 @@ export default function BalesHistory() {
             <Button variant="outline" onClick={() => setDeleteConfirm(null)} data-testid="button-cancel-delete">Cancel</Button>
             <Button
               variant="destructive"
-              onClick={() => deleteConfirm && deleteBale.mutate(deleteConfirm)}
+              onClick={() => wrapAdminAction(() => deleteConfirm && deleteBale.mutate(deleteConfirm), "Delete Bale")}
               disabled={deleteBale.isPending}
               data-testid="button-confirm-delete"
             >
@@ -717,7 +719,7 @@ export default function BalesHistory() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setRepackConfirm(null)} data-testid="button-cancel-repack">Cancel</Button>
             <Button
-              onClick={() => repackConfirm && repackBale.mutate(repackConfirm.bale.id)}
+              onClick={() => wrapAdminAction(() => repackConfirm && repackBale.mutate(repackConfirm.bale.id), "Repack Bale")}
               disabled={repackBale.isPending}
               data-testid="button-confirm-repack"
             >
@@ -828,6 +830,7 @@ export default function BalesHistory() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {AdminDialog}
     </div>
   );
 }

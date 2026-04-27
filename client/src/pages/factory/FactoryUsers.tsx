@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAdminOverride } from "@/hooks/use-admin-override";
 import { Users, Plus, Pencil, Shield, Check, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,6 +60,7 @@ const ALL_FACTORY_PAGES = FACTORY_NAV_PAGES;
 const PAGE_GROUPS = Array.from(new Set(ALL_FACTORY_PAGES.map(p => p.group)));
 
 export default function FactoryUsers() {
+  const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const [createOpen, setCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<FactoryUser | null>(null);
   const [deletingUser, setDeletingUser] = useState<FactoryUser | null>(null);
@@ -194,30 +196,36 @@ export default function FactoryUsers() {
   const handleSubmit = () => {
     if (editingUser) {
       const isPrivileged = isAdminOrOwner(editingUser);
-      updateMutation.mutate({
-        userId: editingUser.id,
-        data: {
-          username: formData.username !== editingUser.username ? formData.username : undefined,
+      wrapAdminAction(
+        () => updateMutation.mutate({
+          userId: editingUser.id,
+          data: {
+            username: formData.username !== editingUser.username ? formData.username : undefined,
+            displayName: formData.displayName,
+            pageAccess: Array.from(selectedPages),
+            password: formData.password || undefined,
+            hasErpAccess: isPrivileged ? true : formData.hasErpAccess,
+            hasFactoryAccess: isPrivileged ? true : formData.hasFactoryAccess,
+            hiddenCostFields: isPrivileged ? [] : hiddenCostFields,
+            hideAllCosts: isPrivileged ? false : hideAllCosts,
+          },
+        }),
+        "Update User",
+      );
+    } else {
+      wrapAdminAction(
+        () => createMutation.mutate({
+          username: formData.username,
+          password: formData.password,
           displayName: formData.displayName,
           pageAccess: Array.from(selectedPages),
-          password: formData.password || undefined,
-          hasErpAccess: isPrivileged ? true : formData.hasErpAccess,
-          hasFactoryAccess: isPrivileged ? true : formData.hasFactoryAccess,
-          hiddenCostFields: isPrivileged ? [] : hiddenCostFields,
-          hideAllCosts: isPrivileged ? false : hideAllCosts,
-        },
-      });
-    } else {
-      createMutation.mutate({
-        username: formData.username,
-        password: formData.password,
-        displayName: formData.displayName,
-        pageAccess: Array.from(selectedPages),
-        hasErpAccess: formData.hasErpAccess,
-        hasFactoryAccess: formData.hasFactoryAccess,
-        hiddenCostFields,
-        hideAllCosts,
-      });
+          hasErpAccess: formData.hasErpAccess,
+          hasFactoryAccess: formData.hasFactoryAccess,
+          hiddenCostFields,
+          hideAllCosts,
+        }),
+        "Create User",
+      );
     }
   };
 
@@ -625,7 +633,7 @@ export default function FactoryUsers() {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => deletingUser && deleteMutation.mutate(deletingUser.id)}
+              onClick={() => wrapAdminAction(() => deletingUser && deleteMutation.mutate(deletingUser.id), "Remove User")}
               disabled={deleteMutation.isPending}
               data-testid="button-confirm-delete-user"
             >
@@ -634,6 +642,7 @@ export default function FactoryUsers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {AdminDialog}
     </div>
   );
 }

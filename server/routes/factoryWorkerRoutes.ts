@@ -1,5 +1,6 @@
 import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
+import { checkFactoryAdmin } from "./factory/_helpers";
 import { eq, and, desc, sql, ilike, gte, lte, inArray, isNotNull } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
@@ -639,6 +640,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
   // POST /api/factory/workers/:id/end-contract - End contract
   app.post("/api/factory/workers/:id/end-contract", requireAuth, async (req: any, res: any) => {
     try {
+      if (!checkFactoryAdmin(req, res)) return;
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
@@ -876,6 +878,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
   // POST /api/factory/workers/:id/settle-and-end - Settlement calculation + end contract
   app.post("/api/factory/workers/:id/settle-and-end", requireAuth, async (req: any, res: any) => {
     try {
+      if (!checkFactoryAdmin(req, res)) return;
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 

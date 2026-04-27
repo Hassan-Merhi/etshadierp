@@ -81,6 +81,74 @@ function safeSendFile(res: any, folder: string, filename: string) {
 }
 
 export function registerFactoryDocsUsersRoutes(app: Express) {
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ADMIN OVERRIDE VERIFICATION
+  // Validates admin credentials and grants a 10-minute session override token
+  // that allows non-admin users to perform admin-only actions after approval.
+  // ─────────────────────────────────────────────────────────────────────────────
+  app.post("/api/factory/admin-verify", requireAuth, async (req: any, res: any) => {
+    try {
+      const { username, password } = req.body as { username?: string; password?: string };
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required." });
+      }
+
+      // Look up the user
+      const [targetUser] = await db.select().from(users).where(eq(users.username, username));
+      if (!targetUser) {
+        return res.status(401).json({ message: "Invalid username or password." });
+      }
+
+      // Verify password (bcrypt or legacy SHA256)
+      const valid = await (async () => {
+        if (isLegacySHA256Hash(targetUser.password)) {
+          return verifySupervisorPassword(password, targetUser.password);
+        }
+        return bcrypt.compare(password, targetUser.password);
+      })();
+
+      if (!valid) {
+        return res.status(401).json({ message: "Invalid username or password." });
+      }
+
+      // Confirm the user has an admin-level role (Admin / Owner / Developer)
+      const ADMIN_ROLES = ["Admin", "Owner", "Developer"];
+      const companyId = req.session?.factoryCompanyId || req.session?.currentCompanyId;
+
+      let hasAdminRole = false;
+      if (companyId) {
+        const [roleRow] = await db
+          .select({ role: userCompanyRoles.role })
+          .from(userCompanyRoles)
+          .where(and(eq(userCompanyRoles.userId, targetUser.id), eq(userCompanyRoles.companyId, companyId)));
+        if (roleRow && ADMIN_ROLES.includes(roleRow.role)) hasAdminRole = true;
+      }
+
+      // Fallback: check any company role
+      if (!hasAdminRole) {
+        const anyAdminRole = await db
+          .select({ role: userCompanyRoles.role })
+          .from(userCompanyRoles)
+          .where(and(eq(userCompanyRoles.userId, targetUser.id), inArray(userCompanyRoles.role, ADMIN_ROLES)));
+        if (anyAdminRole.length > 0) hasAdminRole = true;
+      }
+
+      if (!hasAdminRole) {
+        return res.status(403).json({ message: "The provided credentials do not belong to an admin user." });
+      }
+
+      // Grant a 10-minute override window in the session
+      const expiresAt = Date.now() + 10 * 60 * 1000;
+      req.session.factoryAdminOverrideUntil = expiresAt;
+      req.session.factoryAdminOverrideBy = targetUser.username;
+
+      return res.json({ success: true, expiresAt, adminUsername: targetUser.username });
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/factory/container-doc-types", requireAuth, async (req: any, res: any) => {
     try {
       const rows = await db.select().from(containerDocumentTypes).orderBy(containerDocumentTypes.label);

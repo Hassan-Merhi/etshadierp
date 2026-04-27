@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
@@ -64,6 +65,7 @@ function AccountSelect({ accounts, value, onChange, placeholder, filter }: {
 // CHARGE DIALOG
 // ─────────────────────────────────────────────────────────────
 function ChargeDialog({ transporterId, open, onClose }: { transporterId: number; open: boolean; onClose: () => void }) {
+  const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { toast } = useToast();
   const [amount, setAmount] = useState("");
   const [txDate, setTxDate] = useState(new Date().toISOString().slice(0, 10));
@@ -120,12 +122,13 @@ function ChargeDialog({ transporterId, open, onClose }: { transporterId: number;
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => charge.mutate()} disabled={!amount || !expenseAccountId || charge.isPending} data-testid="button-save-charge">
+          <Button onClick={() => wrapAdminAction(() => charge.mutate(), "Record Charge")} disabled={!amount || !expenseAccountId || charge.isPending} data-testid="button-save-charge">
             {charge.isPending ? "Saving…" : "Record Charge"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    {AdminDialog}
   );
 }
 
@@ -133,6 +136,7 @@ function ChargeDialog({ transporterId, open, onClose }: { transporterId: number;
 // PAYMENT DIALOG
 // ─────────────────────────────────────────────────────────────
 function PaymentDialog({ transporterId, open, onClose }: { transporterId: number; open: boolean; onClose: () => void }) {
+  const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { toast } = useToast();
   const [amount, setAmount] = useState("");
   const [txDate, setTxDate] = useState(new Date().toISOString().slice(0, 10));
@@ -189,12 +193,13 @@ function PaymentDialog({ transporterId, open, onClose }: { transporterId: number
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => pay.mutate()} disabled={!amount || !cashAccountId || pay.isPending} data-testid="button-save-payment">
+          <Button onClick={() => wrapAdminAction(() => pay.mutate(), "Record Payment")} disabled={!amount || !cashAccountId || pay.isPending} data-testid="button-save-payment">
             {pay.isPending ? "Saving…" : "Record Payment"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    {AdminDialog}
   );
 }
 
@@ -202,6 +207,7 @@ function PaymentDialog({ transporterId, open, onClose }: { transporterId: number
 // STATEMENT VIEW (detail page)
 // ─────────────────────────────────────────────────────────────
 function TransporterStatement({ transporterId, onBack }: { transporterId: number; onBack: () => void }) {
+  const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { toast } = useToast();
   const [chargeOpen, setChargeOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -318,7 +324,7 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
                         ${fmt(tx.runningBalance)}
                       </td>
                       <td className="px-3 py-2 print:hidden">
-                        <Button variant="ghost" size="icon" onClick={() => setPendingDelete(() => () => deleteTx.mutate(tx.id))} data-testid={`button-delete-tx-${tx.id}`}>
+                        <Button variant="ghost" size="icon" onClick={() => wrapAdminAction(() => setPendingDelete(() => () => deleteTx.mutate(tx.id)), "Delete Transaction")} data-testid={`button-delete-tx-${tx.id}`}>
                           <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                         </Button>
                       </td>
@@ -349,6 +355,7 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
         title="Delete Entry"
         description="This will delete the transaction and reverse its accounting entries. Are you sure?"
       />
+      {AdminDialog}
     </div>
   );
 }
@@ -357,6 +364,7 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
 // ADD TRANSPORTER DIALOG
 // ─────────────────────────────────────────────────────────────
 function AddTransporterDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -393,12 +401,13 @@ function AddTransporterDialog({ open, onClose }: { open: boolean; onClose: () =>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => create.mutate()} disabled={!name || create.isPending} data-testid="button-create-transporter">
+          <Button onClick={() => wrapAdminAction(() => create.mutate(), "Create Transporter")} disabled={!name || create.isPending} data-testid="button-create-transporter">
             {create.isPending ? "Creating…" : "Create"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    {AdminDialog}
   );
 }
 
@@ -406,6 +415,7 @@ function AddTransporterDialog({ open, onClose }: { open: boolean; onClose: () =>
 // MAIN PAGE — list
 // ─────────────────────────────────────────────────────────────
 export default function FactoryTransporters() {
+  const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [addOpen, setAddOpen] = useState(false);
 
@@ -509,6 +519,7 @@ export default function FactoryTransporters() {
       </Card>
 
       <AddTransporterDialog open={addOpen} onClose={() => setAddOpen(false)} />
+      {AdminDialog}
     </div>
   );
 }

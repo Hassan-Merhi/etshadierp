@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -167,6 +168,7 @@ interface StatementResponse {
 }
 
 export default function FactorySuppliers() {
+  const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { formatDisplayDate } = useDateFormat();
   const [createOpen, setCreateOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<FactorySupplier | null>(null);
@@ -1799,7 +1801,7 @@ export default function FactorySuppliers() {
                         amount: dispAmt,
                         amountIsNeg: false,
                         notes: p.notes,
-                        onDelete: () => { setPendingDelete(() => () => deletePaymentMutation.mutate(p.id)); },
+                        onDelete: () => { wrapAdminAction(() => setPendingDelete(() => () => deletePaymentMutation.mutate(p.id)), "Delete Payment"); },
                         nativeImpact: -toNative(amt, cc, fxRate),
                         rowCc: cc, rowNativeAmt: -amt,
                       };
@@ -1845,7 +1847,7 @@ export default function FactorySuppliers() {
                         notes: t.notes,
                         nativeImpact: isOut ? -toNative(fromAmt, fromCc, toUsd / (fromAmt || 1)) : 0,
                         rowCc: isOut ? fromCc : "USD", rowNativeAmt: isOut ? -fromAmt : toUsd,
-                        onDelete: () => { setPendingDelete(() => () => deleteFxTransferMutation.mutate(t.id)); },
+                        onDelete: () => { wrapAdminAction(() => setPendingDelete(() => () => deleteFxTransferMutation.mutate(t.id)), "Delete FX Transfer"); },
                       };
                     }),
                     ...(statementData.offloadCharges || []).map((oc: any) => {
@@ -1875,7 +1877,7 @@ export default function FactorySuppliers() {
                       amountIsNeg: true,
                       notes: null,
                       onEdit: () => setEditObComm({ rawStockId: oc.rawStockId, amount: oc.amount, currencyCode: oc.currencyCode, personName: oc.personName || "", notes: "" }),
-                      onDelete: () => { setPendingDelete(() => () => deleteObCommissionMutation.mutate(oc.rawStockId)); },
+                      onDelete: () => { wrapAdminAction(() => setPendingDelete(() => () => deleteObCommissionMutation.mutate(oc.rawStockId)), "Delete Commission"); },
                       nativeImpact: -toNative(parseFloat(oc.amount || "0"), oc.currencyCode || "USD"),
                       rowCc: oc.currencyCode || "USD", rowNativeAmt: -parseFloat(oc.amount || "0"),
                     })),
@@ -2127,12 +2129,12 @@ export default function FactorySuppliers() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setFxConversionOpen(false)}>Cancel</Button>
               <Button
-                onClick={() => {
+                onClick={() => wrapAdminAction(() => {
                   fxConversionMutation.mutate({
                     ...fxConversionForm,
                     sourceType: fxSourceType,
                   } as any);
-                }}
+                }, "Record FX Conversion")}
                 disabled={
                   !fxConversionForm.amount ||
                   !fxConversionForm.fxRateToUsd ||
@@ -2452,7 +2454,7 @@ export default function FactorySuppliers() {
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
-                              onClick={() => { setPendingDelete(() => () => permanentDeleteMutation.mutate(sup.id)); }}
+                              onClick={() => { wrapAdminAction(() => setPendingDelete(() => () => permanentDeleteMutation.mutate(sup.id)), "Delete Supplier"); }}
                               data-testid={`button-delete-supplier-${sup.id}`}
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
@@ -2664,7 +2666,7 @@ export default function FactorySuppliers() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setPaymentDialogSupplier(null)}>Cancel</Button>
             <Button
-              onClick={() => paymentMutation.mutate(paymentForm)}
+              onClick={() => wrapAdminAction(() => paymentMutation.mutate(paymentForm), "Record Payment")}
               disabled={!paymentForm.amount || !paymentForm.date || paymentMutation.isPending}
               variant={isOverpayment ? "destructive" : "default"}
               data-testid="button-submit-payment"
@@ -2809,7 +2811,7 @@ export default function FactorySuppliers() {
               Cancel
             </Button>
             <Button
-              onClick={handleSubmit}
+              onClick={() => wrapAdminAction(handleSubmit, editingSupplier ? "Update Supplier" : "Create Supplier")}
               disabled={!formData.name || createMutation.isPending || updateMutation.isPending}
               data-testid="button-save-supplier"
             >
@@ -2855,13 +2857,13 @@ export default function FactorySuppliers() {
             <Button variant="outline" onClick={() => setEditObComm(null)}>Cancel</Button>
             <Button
               disabled={updateObCommissionMutation.isPending || !editObComm?.amount}
-              onClick={() => editObComm && updateObCommissionMutation.mutate({
+              onClick={() => wrapAdminAction(() => editObComm && updateObCommissionMutation.mutate({
                 rawStockId: editObComm.rawStockId,
                 commissionAmount: editObComm.amount,
                 commissionCurrencyCode: editObComm.currencyCode,
                 commissionPersonName: editObComm.personName,
                 commissionNotes: editObComm.notes,
-              })}
+              }), "Save Commission")}
             >
               {updateObCommissionMutation.isPending ? "Saving..." : "Save"}
             </Button>
@@ -2898,7 +2900,7 @@ export default function FactorySuppliers() {
               Cancel
             </Button>
             <Button
-              onClick={() => obEditSupplier && obEditMutation.mutate({ id: obEditSupplier.id, openingBalance: obEditValue })}
+              onClick={() => wrapAdminAction(() => obEditSupplier && obEditMutation.mutate({ id: obEditSupplier.id, openingBalance: obEditValue }), "Save Opening Balance")}
               disabled={obEditMutation.isPending || !obEditValue}
               data-testid="button-ob-edit-save"
             >
@@ -3008,7 +3010,7 @@ export default function FactorySuppliers() {
                   Back to Edit
                 </Button>
                 <Button
-                  onClick={() => bulkFxMutation.mutate()}
+                  onClick={() => wrapAdminAction(() => bulkFxMutation.mutate(), "Record Bulk FX Settlement")}
                   disabled={bulkFxMutation.isPending}
                   data-testid="button-bulk-fx-confirm"
                 >
@@ -3116,6 +3118,7 @@ export default function FactorySuppliers() {
         onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
         onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
       />
+      {AdminDialog}
     </div>
   );
 }

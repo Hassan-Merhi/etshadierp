@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useAdminOverride } from "@/hooks/use-admin-override";
 import { addDays, format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useLocation } from "wouter";
@@ -413,6 +414,7 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
 }
 
 export default function FactoryDaybook() {
+  const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -1457,7 +1459,7 @@ export default function FactoryDaybook() {
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={() => setEditEntry(null)} data-testid="button-cancel-edit">Cancel</Button>
-                  <Button disabled={!editReason.trim() || editMutation.isPending} onClick={handleEditSubmit} data-testid="button-submit-edit">
+                  <Button disabled={!editReason.trim() || editMutation.isPending} onClick={() => wrapAdminAction(handleEditSubmit, "Edit Entry")} data-testid="button-submit-edit">
                     {editMutation.isPending ? "Saving..." : "Save Changes"}
                   </Button>
                 </div>
@@ -1487,7 +1489,7 @@ export default function FactoryDaybook() {
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-void">Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => voidEntry && voidMutation.mutate(voidEntry.id)}
+              onClick={() => wrapAdminAction(() => voidEntry && voidMutation.mutate(voidEntry.id), "Void Entry")}
               disabled={voidMutation.isPending}
               className="bg-destructive text-destructive-foreground"
               data-testid="button-confirm-void"
@@ -1497,6 +1499,7 @@ export default function FactoryDaybook() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {AdminDialog}
     </div>
   );
 }

@@ -176,6 +176,24 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
 }
 
 /**
+ * Inline helper for destructive POST handlers that need admin access.
+ * Returns true if the request is allowed; returns false and sends 403 if not.
+ * Use in POST handlers that aren't covered by the global PUT/PATCH/DELETE guard:
+ *   if (!checkFactoryAdmin(req, res)) return;
+ */
+export function checkFactoryAdmin(req: any, res: any): boolean {
+  const role = req.session?.currentRole as string | undefined;
+  if (["Admin", "Owner", "Developer"].includes(role || "")) return true;
+  const overrideUntil = req.session?.factoryAdminOverrideUntil as number | undefined;
+  if (overrideUntil && Date.now() < overrideUntil) return true;
+  res.status(403).json({
+    message: "Admin authorization required for this action.",
+    requiresAdminOverride: true,
+  });
+  return false;
+}
+
+/**
  * Returns true if the logged-in user has "hideAllCosts" enabled.
  * Admins and owners always return false (they always see costs).
  */

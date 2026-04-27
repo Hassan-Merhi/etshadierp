@@ -6,7 +6,7 @@ import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
 import {
   writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword,
+  isLegacySHA256Hash, verifySupervisorPassword, checkFactoryAdmin,
 } from "./_helpers";
 import {
   factorySuppliers, factoryCategories, factoryBaleProducts,
@@ -901,6 +901,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
   app.post("/api/factory/bale-products/bulk-toggle-active", requireAuth, async (req: any, res: any) => {
     try {
+      if (!checkFactoryAdmin(req, res)) return;
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
@@ -958,6 +959,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
   app.post("/api/factory/bale-products/bulk-rename-apply", requireAuth, async (req: any, res: any) => {
     try {
+      if (!checkFactoryAdmin(req, res)) return;
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
@@ -986,13 +988,9 @@ export function registerFactoryProductsRoutes(app: Express) {
   // POST /api/factory/bale-products/merge — merge source products into target
   app.post("/api/factory/bale-products/merge", requireAuth, async (req: any, res: any) => {
     try {
+      if (!checkFactoryAdmin(req, res)) return;
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-
-      const role = req.user?.role || (req.session as any).currentRole;
-      if (!["Admin", "Owner", "Developer"].includes(role)) {
-        return res.status(403).json({ message: "Admin, Owner, or Developer role required" });
-      }
 
       const { targetId, sourceIds } = req.body;
       if (!targetId || !Array.isArray(sourceIds) || sourceIds.length === 0) {

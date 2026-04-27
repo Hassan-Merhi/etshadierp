@@ -6,7 +6,7 @@ import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
 import {
   writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword,
+  isLegacySHA256Hash, verifySupervisorPassword, checkFactoryAdmin,
 } from "./_helpers";
 import {
   factorySuppliers, factoryCategories, factoryBaleProducts,
@@ -373,6 +373,7 @@ export function registerFactoryContainersRoutes(app: Express) {
   // ── Bulk cascade-delete containers ───────────────────────────────────────────
   app.post("/api/factory/containers/bulk-delete", requireAuth, async (req: any, res: any) => {
     try {
+      if (!checkFactoryAdmin(req, res)) return;
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useRoute, useLocation } from "wouter";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 import {
@@ -86,6 +87,7 @@ function fmt(val: string | number | null | undefined) {
 }
 
 export default function FactoryEmployeeDetail() {
+  const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const [, navigate] = useLocation();
   useEscapeBack(() => navigate("/factory/workers?tab=employees"));
   const [, params] = useRoute("/factory/employees/:id");
@@ -403,7 +405,7 @@ export default function FactoryEmployeeDetail() {
                   variant="outline"
                   className="w-full"
                   size="sm"
-                  onClick={() => recalcMutation.mutate()}
+                  onClick={() => wrapAdminAction(() => recalcMutation.mutate(), "Recalculate Balance")}
                   disabled={recalcMutation.isPending}
                   data-testid="button-recalculate-balance"
                 >
@@ -501,7 +503,7 @@ export default function FactoryEmployeeDetail() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button onClick={() => updateMutation.mutate(editForm)} disabled={updateMutation.isPending} data-testid="button-save-edit">
+            <Button onClick={() => wrapAdminAction(() => updateMutation.mutate(editForm), "Save Employee")} disabled={updateMutation.isPending} data-testid="button-save-edit">
               {updateMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
@@ -541,7 +543,7 @@ export default function FactoryEmployeeDetail() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDepositOpen(false)}>Cancel</Button>
-            <Button onClick={() => depositMutation.mutate()} disabled={depositMutation.isPending || !depositAmount} data-testid="button-confirm-deposit">
+            <Button onClick={() => wrapAdminAction(() => depositMutation.mutate(), "Post Deposit")} disabled={depositMutation.isPending || !depositAmount} data-testid="button-confirm-deposit">
               {depositMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Posting...</> : <><TrendingUp className="h-4 w-4 mr-2" />Post Deposit</>}
             </Button>
           </DialogFooter>
@@ -597,12 +599,13 @@ export default function FactoryEmployeeDetail() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setWithdrawOpen(false)}>Cancel</Button>
-            <Button onClick={() => withdrawMutation.mutate()} disabled={withdrawMutation.isPending || !withdrawAmount || !withdrawCashAccountId} data-testid="button-confirm-withdraw">
+            <Button onClick={() => wrapAdminAction(() => withdrawMutation.mutate(), "Post Withdrawal")} disabled={withdrawMutation.isPending || !withdrawAmount || !withdrawCashAccountId} data-testid="button-confirm-withdraw">
               {withdrawMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Posting...</> : <><TrendingDown className="h-4 w-4 mr-2" />Post Withdrawal</>}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {AdminDialog}
     </div>
   );
 }

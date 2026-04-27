@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAdminOverride } from "@/hooks/use-admin-override";
 import { queryClient } from "@/lib/queryClient";
 import { Banknote, Plus, Users, Loader2, ArrowDownCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ function fmt(v: string | number | null | undefined) {
 const today = () => new Date().toLocaleDateString('en-CA');
 
 export default function FactoryEmployeeWithdrawalsTab() {
+  const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { toast } = useToast();
   const [mode, setMode] = useState<"single" | "bulk">("single");
   const [singleOpen, setSingleOpen] = useState(false);
@@ -294,7 +296,7 @@ export default function FactoryEmployeeWithdrawalsTab() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setSingleOpen(false)}>Cancel</Button>
             <Button
-              onClick={() => singleMutation.mutate()}
+              onClick={() => wrapAdminAction(() => singleMutation.mutate(), "Record Withdrawal")}
               disabled={singleMutation.isPending || !singleForm.employeeId || !singleForm.amount || !singleForm.cashAccountId}
               data-testid="button-confirm-single-withdraw"
             >
@@ -365,7 +367,7 @@ export default function FactoryEmployeeWithdrawalsTab() {
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setBulkOpen(false)}>Cancel</Button>
             <Button
-              onClick={() => bulkMutation.mutate()}
+              onClick={() => wrapAdminAction(() => bulkMutation.mutate(), "Record Bulk Withdrawal")}
               disabled={bulkMutation.isPending || !bulkForm.cashAccountId || bulkTotal <= 0}
               data-testid="button-confirm-bulk-withdraw"
             >
@@ -375,6 +377,7 @@ export default function FactoryEmployeeWithdrawalsTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {AdminDialog}
     </div>
   );
 }

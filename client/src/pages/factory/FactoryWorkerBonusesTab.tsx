@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAdminOverride } from "@/hooks/use-admin-override";
 import { queryClient } from "@/lib/queryClient";
 import { Plus, Trash2, Gift, Loader2, HardHat, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ function fmt(val: string | number | null | undefined) {
 const today = () => new Date().toLocaleDateString('en-CA');
 
 export default function FactoryWorkerBonusesTab() {
+  const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { toast } = useToast();
   const [workerFilter, setWorkerFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "paid">("all");
@@ -326,7 +328,7 @@ export default function FactoryWorkerBonusesTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={() => addMutation.mutate()} disabled={addMutation.isPending || !addForm.workerId || !addForm.amount} data-testid="button-confirm-add-worker-bonus">
+            <Button onClick={() => wrapAdminAction(() => addMutation.mutate(), "Credit Bonus")} disabled={addMutation.isPending || !addForm.workerId || !addForm.amount} data-testid="button-confirm-add-worker-bonus">
               {addMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Save Bonus
             </Button>
@@ -363,7 +365,7 @@ export default function FactoryWorkerBonusesTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPayOpen(null)}>Cancel</Button>
-            <Button onClick={() => payMutation.mutate()} disabled={payMutation.isPending || !payForm.cashAccountId} data-testid="button-confirm-pay-bonus">
+            <Button onClick={() => wrapAdminAction(() => payMutation.mutate(), "Pay Bonus")} disabled={payMutation.isPending || !payForm.cashAccountId} data-testid="button-confirm-pay-bonus">
               {payMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Mark Paid
             </Button>
@@ -381,13 +383,14 @@ export default function FactoryWorkerBonusesTab() {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => deleteConfirm && deleteMutation.mutate(deleteConfirm.id)} disabled={deleteMutation.isPending} data-testid="button-confirm-delete-worker-bonus">
+            <Button variant="destructive" onClick={() => wrapAdminAction(() => deleteConfirm && deleteMutation.mutate(deleteConfirm.id), "Reverse Bonus")} disabled={deleteMutation.isPending} data-testid="button-confirm-delete-worker-bonus">
               {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Delete
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {AdminDialog}
     </div>
   );
 }
