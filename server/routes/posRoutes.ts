@@ -1432,5 +1432,93 @@ export function registerPosRoutes(app: Express) {
     }
   });
 
+  // ── POS Send Invoice to WhatsApp ──────────────────────────────────────────
+  app.post("/api/pos/send-invoice-whatsapp", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { voucherId } = req.body;
+      if (!voucherId) return res.status(400).json({ message: "voucherId is required" });
+
+      // Fetch the voucher
+      const [voucher] = await db
+        .select()
+        .from(vouchers)
+        .where(and(eq(vouchers.id, parseInt(voucherId)), eq(vouchers.companyId, companyId)))
+        .limit(1);
+
+      if (!voucher) return res.status(404).json({ message: "Voucher not found" });
+
+      // Fetch the location for this voucher
+      const locationId = voucher.locationId;
+      if (!locationId) return res.status(400).json({ message: "Voucher has no location" });
+
+      const [location] = await db
+        .select()
+        .from(locations)
+        .where(and(eq(locations.id, locationId), eq(locations.companyId, companyId)))
+        .limit(1);
+
+      if (!location) return res.status(404).json({ message: "Location not found" });
+      if (!location.whatsappGroupChatId) {
+        return res.status(400).json({ message: "WhatsApp group not configured for this location" });
+      }
+
+      // Fetch sale items with stock item names
+      const items = await db
+        .select({
+          name: stockItems.name,
+          quantity: salesItems.quantity,
+          sellingPrice: salesItems.sellingPrice,
+          totalSales: salesItems.totalSales,
+        })
+        .from(salesItems)
+        .innerJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
+        .where(eq(salesItems.voucherId, voucher.id));
+
+      const dateStr = voucher.voucherDate;
+      const senderName = req.user?.username || "POS";
+
+      const itemLines = items.map((item) => {
+        const qty = parseFloat(item.quantity);
+        const rate = parseFloat(item.sellingPrice);
+        const total = parseFloat(item.totalSales);
+        const qtyStr = qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(3).replace(/\.?0+$/, "");
+        return `  • ${item.name} × ${qtyStr} @ $${rate.toFixed(2)} = $${total.toFixed(2)}`;
+      });
+
+      const totalAmount = parseFloat(voucher.totalAmount);
+      const creditLine = voucher.isCreditSale ? "\n💳 *CREDIT SALE*" : "";
+
+      const message = [
+        `🧾 *POS Invoice — ${voucher.voucherNumber}*`,
+        `📍 ${location.name}  |  📅 ${dateStr}`,
+        `👤 ${senderName}`,
+        creditLine,
+        ``,
+        `*Items:*`,
+        ...itemLines,
+        ``,
+        `━━━━━━━━━━━━━━━━`,
+        `💰 *Total: $${totalAmount.toFixed(2)}*`,
+        voucher.description ? `\n📝 ${voucher.description}` : "",
+      ]
+        .filter((l) => l !== undefined && l !== null)
+        .join("\n")
+        .trim();
+
+      const result = await sendWhatsAppTextToChatIdPos(location.whatsappGroupChatId, message);
+      if (!result.success) {
+        return res.status(502).json({ message: result.error ?? "Failed to send WhatsApp message" });
+      }
+
+      res.json({ success: true, message: "Invoice sent to WhatsApp" });
+    } catch (error: any) {
+      console.error("[/api/pos/send-invoice-whatsapp]", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Stock Transfers - LIST all for current company (with location names and item counts)
 }

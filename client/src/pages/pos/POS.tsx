@@ -281,6 +281,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const [saleJustCompleted, setSaleJustCompleted] = useState(false);
   const [showStockPrompt, setShowStockPrompt] = useState(false);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const [sendingInvoiceWhatsApp, setSendingInvoiceWhatsApp] = useState(false);
 
   // Reset sale state when POS user switches location
   const prevLocationRef = useRef<number | null>(null);
@@ -632,6 +633,25 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       toast({ title: "Error", description: "Could not reach the server.", variant: "destructive" });
     } finally {
       setSendingWhatsApp(false);
+    }
+  };
+
+  const handleSendInvoiceWhatsApp = async () => {
+    const voucherId = savedSale?.voucher?.id;
+    if (!voucherId) return;
+    setSendingInvoiceWhatsApp(true);
+    try {
+      const res = await apiRequest("POST", "/api/pos/send-invoice-whatsapp", { voucherId });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast({ title: "Failed to send", description: body.message || "WhatsApp send failed.", variant: "destructive" });
+      } else {
+        toast({ title: "Sent", description: "Invoice sent to WhatsApp group." });
+      }
+    } catch {
+      toast({ title: "Error", description: "Could not reach the server.", variant: "destructive" });
+    } finally {
+      setSendingInvoiceWhatsApp(false);
     }
   };
 
@@ -2472,6 +2492,18 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               <Button variant="outline" onClick={handleNewSale} className="gap-2" data-testid="button-new-sale-print">
                 <Plus className="h-4 w-4" />
                 New Sale
+              </Button>
+            )}
+            {(activeLocation as any)?.whatsappGroupChatId && (
+              <Button
+                variant="outline"
+                onClick={handleSendInvoiceWhatsApp}
+                disabled={sendingInvoiceWhatsApp}
+                className="gap-2"
+                data-testid="button-send-whatsapp-invoice"
+              >
+                <Send className="h-4 w-4" />
+                {sendingInvoiceWhatsApp ? "Sending…" : "Send to WhatsApp"}
               </Button>
             )}
             <Button onClick={handlePrint} className="gap-2" data-testid="button-print-invoice">
