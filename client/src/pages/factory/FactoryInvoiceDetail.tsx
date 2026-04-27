@@ -691,7 +691,7 @@ export default function FactoryInvoiceDetail() {
         </Table>
       </Card>
 
-      {(freightCharges.length > 0 || otherCharges.length > 0) && (
+      {isAdmin && (freightCharges.length > 0 || otherCharges.length > 0) && (
         <Card className={`p-4 mb-6${hideExportSelling ? " print:hidden" : ""}`}>
           <h3 className="font-semibold mb-3" data-testid="text-charges-header">Freight &amp; Charges</h3>
           <div className="space-y-2">
@@ -715,20 +715,24 @@ export default function FactoryInvoiceDetail() {
         </Card>
       )}
 
-      <Card className={`p-4${hideExportSelling ? " print:hidden" : ""}`}>
+      <Card className="p-4">
         <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2 text-sm">
-            <span>Subtotal (Bales)</span>
-            <span className="font-mono" data-testid="text-subtotal">{subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-          </div>
-          <div className="flex items-center justify-between gap-2 text-sm">
-            <span>Total Charges</span>
-            <span className="font-mono" data-testid="text-total-charges">{totalCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-          </div>
-          <div className="border-t pt-2 flex items-center justify-between gap-2">
-            <span className="font-semibold">Grand Total</span>
-            <span className="font-mono font-bold text-lg" data-testid="text-grand-total">{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-          </div>
+          {isAdmin && (
+            <>
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <span>Subtotal (Bales)</span>
+                <span className="font-mono" data-testid="text-subtotal">{subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <span>Total Charges</span>
+                <span className="font-mono" data-testid="text-total-charges">{totalCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div className="border-t pt-2 flex items-center justify-between gap-2">
+                <span className="font-semibold">Grand Total</span>
+                <span className="font-mono font-bold text-lg" data-testid="text-grand-total">{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+              </div>
+            </>
+          )}
           <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
             <span>Total Bales Qty</span>
             <span data-testid="text-total-bales-qty">{totalBalesQty}</span>
