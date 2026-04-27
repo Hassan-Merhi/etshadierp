@@ -124,6 +124,7 @@ export default function FactoryInvoiceDetail() {
     enabled: !!order?.customerId,
   });
   const hideExportSelling = (myAccess?.hiddenCostFields ?? []).includes("hide_export_selling_price");
+  const isAdmin = myAccess?.fullAccess === true;
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -450,7 +451,7 @@ export default function FactoryInvoiceDetail() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              {(isLoadingStatus || isFinalized) && (
+              {isAdmin && (isLoadingStatus || isFinalized) && (
                 <>
                   <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">View</DropdownMenuLabel>
                   <DropdownMenuItem
@@ -464,42 +465,46 @@ export default function FactoryInvoiceDetail() {
                 </>
               )}
 
-              <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Pricing</DropdownMenuLabel>
-              {order.status !== "CANCELLED" && (
-                <DropdownMenuItem
-                  onClick={() => repriceProductionMutation.mutate()}
-                  disabled={repriceProductionMutation.isPending}
-                  data-testid="button-apply-production-prices"
-                >
-                  <Hammer className={`h-4 w-4 ${repriceProductionMutation.isPending ? "animate-spin" : ""}`} />
-                  Apply Production Prices
-                </DropdownMenuItem>
-              )}
-              {(isVerifiedStatus || isFinalized) && (
-                <DropdownMenuItem
-                  onClick={() => repriceMutation.mutate()}
-                  disabled={repriceMutation.isPending}
-                  data-testid="button-apply-prices"
-                >
-                  <RefreshCw className={`h-4 w-4 ${repriceMutation.isPending ? "animate-spin" : ""}`} />
-                  Apply Selling Prices
-                </DropdownMenuItem>
-              )}
-              {order.status !== "CANCELLED" && (
-                <DropdownMenuItem
-                  onClick={() => {
-                    setSelectedProformaId("");
-                    setShowProformaDialog(true);
-                  }}
-                  disabled={applyProformaMutation.isPending}
-                  data-testid="button-apply-proforma-prices"
-                >
-                  <DollarSign className="h-4 w-4" />
-                  Apply Proforma Prices
-                </DropdownMenuItem>
+              {isAdmin && (
+                <>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Pricing</DropdownMenuLabel>
+                  {order.status !== "CANCELLED" && (
+                    <DropdownMenuItem
+                      onClick={() => repriceProductionMutation.mutate()}
+                      disabled={repriceProductionMutation.isPending}
+                      data-testid="button-apply-production-prices"
+                    >
+                      <Hammer className={`h-4 w-4 ${repriceProductionMutation.isPending ? "animate-spin" : ""}`} />
+                      Apply Production Prices
+                    </DropdownMenuItem>
+                  )}
+                  {(isVerifiedStatus || isFinalized) && (
+                    <DropdownMenuItem
+                      onClick={() => repriceMutation.mutate()}
+                      disabled={repriceMutation.isPending}
+                      data-testid="button-apply-prices"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${repriceMutation.isPending ? "animate-spin" : ""}`} />
+                      Apply Selling Prices
+                    </DropdownMenuItem>
+                  )}
+                  {order.status !== "CANCELLED" && (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setSelectedProformaId("");
+                        setShowProformaDialog(true);
+                      }}
+                      disabled={applyProformaMutation.isPending}
+                      data-testid="button-apply-proforma-prices"
+                    >
+                      <DollarSign className="h-4 w-4" />
+                      Apply Proforma Prices
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                </>
               )}
 
-              <DropdownMenuSeparator />
               <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Export</DropdownMenuLabel>
               <DropdownMenuItem onClick={handleExportExcel} data-testid="button-export-excel">
                 <FileSpreadsheet className="h-4 w-4" />
@@ -509,15 +514,17 @@ export default function FactoryInvoiceDetail() {
                 <FileDown className="h-4 w-4" />
                 Download PDF
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportLoadingStatus} data-testid="button-export-loading-status">
-                <Container className="h-4 w-4" />
-                Loading Status
-              </DropdownMenuItem>
+              {isAdmin && (
+                <DropdownMenuItem onClick={handleExportLoadingStatus} data-testid="button-export-loading-status">
+                  <Container className="h-4 w-4" />
+                  Loading Status
+                </DropdownMenuItem>
+              )}
 
-              {(isFinalized || order.status !== "FINALIZED") && order.status !== "CANCELLED" && (
+              {isAdmin && (isFinalized || order.status !== "FINALIZED") && order.status !== "CANCELLED" && (
                 <DropdownMenuSeparator />
               )}
-              {isFinalized && (
+              {isAdmin && isFinalized && (
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
                   onSelect={() => setRevertDialogOpen(true)}
