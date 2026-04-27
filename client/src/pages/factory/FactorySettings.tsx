@@ -547,6 +547,8 @@ export default function FactorySettings() {
           </CardHeader>
           <CardContent className="divide-y">
             {toggleItem("Daybook", "daybookEnabled")}
+            {toggleItem("Analytics", "analyticsEnabled")}
+            {toggleItem("Financial Snapshot", "financialSnapshotEnabled")}
           </CardContent>
         </Card>
 
@@ -556,9 +558,6 @@ export default function FactorySettings() {
             <CardDescription>Disable tabs you don't use — they will be hidden from all users</CardDescription>
           </CardHeader>
           <CardContent className="divide-y">
-            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Reports</p>
-            {toggleItem("Analytics", "analyticsEnabled")}
-            {toggleItem("Financial Snapshot", "financialSnapshotEnabled")}
             <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Workers Hub</p>
             {toggleItem("Payroll tab", "workersTabPayrollEnabled")}
             {toggleItem("Attendance tab", "workersTabAttendanceEnabled")}
