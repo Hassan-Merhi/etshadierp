@@ -3292,6 +3292,8 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           employeeCode: factoryWorkers.employeeCode,
           fullName:     factoryWorkers.fullName,
           active:       factoryWorkers.active,
+          baseSalary:   factoryWorkers.baseSalary,
+          salaryType:   factoryWorkers.salaryType,
         })
         .from(factoryWorkers)
         .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)))
@@ -3341,6 +3343,26 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         else if (r.status === "Absent") dailySummary[r.date].absent++;
       }
 
+      // Fetch paid payrolls overlapping the date range for these workers
+      const paidPayrollRows = await db.execute(
+        sql`SELECT worker_id AS "workerId", net_salary AS "netSalary"
+            FROM factory_payrolls
+            WHERE company_id = ${companyId}
+              AND status = 'PAID'
+              AND period_start <= ${endDate}::date
+              AND period_end   >= ${startDate}::date
+              AND worker_id = ANY(${sql.raw(`ARRAY[${workerIds.join(",")}]`)})`
+      );
+      const paidPayrollList: { workerId: number; netSalary: string }[] =
+        ((paidPayrollRows as any).rows ?? (paidPayrollRows as any[])).map((r: any) => ({
+          workerId: Number(r.workerId),
+          netSalary: r.netSalary ?? "0",
+        }));
+      const paidSalaryMap = new Map<number, number>();
+      for (const r of paidPayrollList) {
+        paidSalaryMap.set(r.workerId, (paidSalaryMap.get(r.workerId) || 0) + parseFloat(r.netSalary));
+      }
+
       let totalPresent = 0;
       let totalAbsent  = 0;
 
@@ -3370,6 +3392,9 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           absentCount,
           recordedCount,
           attendancePct,
+          baseSalary:   w.baseSalary ?? "0",
+          salaryType:   w.salaryType ?? "Monthly",
+          paidSalary:   (paidSalaryMap.get(w.id) || 0).toFixed(2),
         };
       });
 

@@ -26,6 +26,9 @@ interface WorkerReportRow {
   absentCount: number;
   recordedCount: number;
   attendancePct: number | null;
+  baseSalary: string;
+  salaryType: string;
+  paidSalary: string;
 }
 interface AttendanceReportData {
   startDate: string;
@@ -69,6 +72,38 @@ function workerCodeNum(code: string | null): number {
   return m ? parseInt(m[1], 10) : Infinity;
 }
 const CYCLE: Record<string, string> = { Present: "Absent", Absent: "Leave", Leave: "HalfDay", HalfDay: "", "": "Present" };
+
+/* ── Salary helpers ─────────────────────────────────────────────────────────── */
+function daysInCalendarMonth(isoDate: string): number {
+  const [yr, mo] = isoDate.substring(0, 7).split("-").map(Number);
+  return new Date(yr, mo, 0).getDate();
+}
+
+function computeWorkerExpectedSalary(
+  worker: WorkerReportRow,
+  dates: DateEntry[],
+): number {
+  if (worker.salaryType !== "Monthly") return 0;
+  const monthly = parseFloat(worker.baseSalary || "0");
+  if (!monthly || !dates.length) return 0;
+  let earned = 0;
+  for (const d of dates) {
+    const dailyRate = monthly / daysInCalendarMonth(d.date);
+    if (d.isWeekend) {
+      earned += dailyRate;
+    } else {
+      const status = worker.attendance[d.date];
+      if (status === "Present") earned += dailyRate;
+      else if (status === "HalfDay") earned += dailyRate * 0.5;
+      else if (status === "Leave") earned += dailyRate;
+    }
+  }
+  return earned;
+}
+
+function fmtCurrency(n: number): string {
+  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 const MONTH_NAMES = [
   "January","February","March","April","May","June",
   "July","August","September","October","November","December",
@@ -318,6 +353,18 @@ export default function FactoryWorkerAttendanceReport() {
     return ws;
   }, [sortedWorkers, filter, hideFullAbsent]);
 
+  /* Salary KPIs — computed from currently filtered workers */
+  const salaryKpi = useMemo(() => {
+    if (!data || !data.dates.length) return null;
+    let totalExpected = 0;
+    let totalPaid = 0;
+    for (const w of filteredWorkers) {
+      totalExpected += computeWorkerExpectedSalary(w, data.dates);
+      totalPaid     += parseFloat(w.paidSalary || "0");
+    }
+    return { totalExpected, totalPaid, totalRemaining: totalExpected - totalPaid };
+  }, [filteredWorkers, data]);
+
   /* Counts for filter badges */
   const absentCount  = sortedWorkers.filter(w => w.absentCount > 0).length;
   const presentCount = sortedWorkers.filter(w => w.absentCount === 0).length;
@@ -556,14 +603,21 @@ export default function FactoryWorkerAttendanceReport() {
           <div className="hidden print:block mb-4">
             <h1 className="text-xl font-bold">Worker Attendance Report</h1>
             <p className="text-sm text-gray-600">{rangeLabel}</p>
+            {salaryKpi && (
+              <div className="mt-2 text-sm text-gray-700 flex gap-6">
+                <span>Expected: {fmtCurrency(salaryKpi.totalExpected)}</span>
+                <span>Paid: {fmtCurrency(salaryKpi.totalPaid)}</span>
+                <span>Remaining: {fmtCurrency(salaryKpi.totalRemaining)}</span>
+              </div>
+            )}
           </div>
 
           {/* ── Summary cards ───────────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 gap-3 print:grid-cols-2">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <Card>
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground font-medium mb-1">Workers</p>
-                <p className="text-2xl font-bold tabular-nums" data-testid="stat-total-workers">{data.totals.workers}</p>
+                <p className="text-2xl font-bold tabular-nums" data-testid="stat-total-workers">{filteredWorkers.length}</p>
               </CardContent>
             </Card>
             <Card>
@@ -578,6 +632,43 @@ export default function FactoryWorkerAttendanceReport() {
                 )} data-testid="stat-attendance-pct">
                   {overallPct !== null ? `${overallPct}%` : "—"}
                 </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground font-medium mb-1">Expected Salary</p>
+                <p className="text-xl font-bold tabular-nums text-foreground" data-testid="stat-expected-salary">
+                  {salaryKpi ? fmtCurrency(salaryKpi.totalExpected) : "—"}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground font-medium mb-1">Paid Salary</p>
+                <p className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400" data-testid="stat-paid-salary">
+                  {salaryKpi ? fmtCurrency(salaryKpi.totalPaid) : "—"}
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="border-amber-300 dark:border-amber-700">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground font-medium mb-1">Remaining Salary</p>
+                <p className={cn(
+                  "text-xl font-bold tabular-nums",
+                  !salaryKpi ? "text-muted-foreground" :
+                  salaryKpi.totalRemaining < 0 ? "text-blue-600 dark:text-blue-400" :
+                  salaryKpi.totalRemaining === 0 ? "text-emerald-600 dark:text-emerald-400" :
+                  "text-amber-600 dark:text-amber-400",
+                )} data-testid="stat-remaining-salary">
+                  {salaryKpi ? (
+                    salaryKpi.totalRemaining < 0
+                      ? `Overpaid ${fmtCurrency(Math.abs(salaryKpi.totalRemaining))}`
+                      : fmtCurrency(salaryKpi.totalRemaining)
+                  ) : "—"}
+                </p>
+                {salaryKpi && salaryKpi.totalRemaining < 0 && (
+                  <p className="text-[10px] text-blue-500 dark:text-blue-400 mt-0.5">Overpaid</p>
+                )}
               </CardContent>
             </Card>
           </div>
