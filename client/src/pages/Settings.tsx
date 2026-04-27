@@ -64,7 +64,7 @@
   import { useAppMode } from "@/contexts/AppModeContext";
   import { getApiRequest } from "@/lib/factoryApi";
   import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, Zap } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -92,6 +92,7 @@ import { WhatsAppExportSection } from "./settings/WhatsAppExportSection";
 import { StockReportSection } from "./settings/StockReportSection";
 import { NetPositionExportSection } from "./settings/NetPositionExportSection";
 import { DailyAutoSendSection } from "./settings/DailyAutoSendSection";
+import { ExportCenter } from "./settings/ExportCenter";
 import { FileStorageTab } from "./settings/FileStorageTab";
 import { BulkRenameTab } from "./settings/BulkRenameTab";
 import { LoginHistoryTab } from "./settings/LoginHistoryTab";
@@ -674,8 +675,7 @@ import { UsersSection } from "./settings/UsersSection";
           { key: "edit-log", label: "Edit Log", icon: History },
           { key: "files", label: "File Storage", icon: Upload },
           { key: "export-accounts", label: "Export Accounts", icon: Download },
-          { key: "daily-export", label: "Daily Export", icon: Download },
-          { key: "np-export", label: "Net Position Export", icon: TrendingUp },
+          { key: "export-center", label: "Export Center", icon: Zap },
         ],
       },
       {
@@ -1177,18 +1177,8 @@ import { UsersSection } from "./settings/UsersSection";
             <ExportAccountsSection />
           )}
 
-          {activeSection === "daily-export" && (
-            <>
-              <DailyExportSection />
-              <DailyAutoSendSection />
-              <WhatsAppExportSection />
-              <StockReportSection />
-              <NetPositionExportSection />
-            </>
-          )}
-
-          {activeSection === "np-export" && (
-            <NetPositionExportSection />
+          {activeSection === "export-center" && (
+            <ExportCenter />
           )}
 
           {activeSection === "fiscal" && (
