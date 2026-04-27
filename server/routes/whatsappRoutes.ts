@@ -17,6 +17,8 @@ import { pool } from "../db";
 import { storage } from "../storage";
 import {
   getWaSettings,
+  getWaSettingsById,
+  getPosWaSettings,
   normaliseChatId,
   fetchGreenApiChats,
   sendWhatsAppFile,
@@ -167,6 +169,62 @@ export function registerWhatsAppRoutes(app: Express) {
       const s = await getWaSettings();
       if (!s?.instanceId || !s?.apiToken) {
         return res.status(400).json({ message: "WhatsApp credentials not configured" });
+      }
+      const chats = await fetchGreenApiChats(s.instanceId, s.apiToken);
+      res.json(chats);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── POS WhatsApp instance (id=2) settings & chats ──────────────────────────
+
+  app.get("/api/whatsapp/settings/pos", requireAuth, async (_req, res) => {
+    try {
+      const s = await getWaSettingsById(2);
+      if (!s) {
+        return res.json({ instanceId: "", apiToken: "", enabled: true, hasCredentials: false });
+      }
+      res.json({
+        instanceId:     s.instanceId,
+        apiToken:       s.apiToken ? "••••••" : "",
+        enabled:        s.enabled,
+        hasCredentials: !!(s.instanceId && s.apiToken),
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.put("/api/whatsapp/settings/pos", requireAuth, async (req, res) => {
+    try {
+      const body     = req.body as Record<string, any>;
+      const existing = await getWaSettingsById(2);
+
+      const instanceId = body.instanceId ?? existing?.instanceId ?? "";
+      const apiToken   = body.apiToken   ?? existing?.apiToken   ?? "";
+      const enabled    = body.enabled !== undefined ? body.enabled : (existing?.enabled ?? true);
+
+      await pool.query(`
+        INSERT INTO whatsapp_settings (id, instance_id, api_token, enabled)
+        VALUES (2, $1, $2, $3)
+        ON CONFLICT (id) DO UPDATE SET
+          instance_id = EXCLUDED.instance_id,
+          api_token   = CASE WHEN $2 = '' OR $2 = '••••••' THEN whatsapp_settings.api_token ELSE EXCLUDED.api_token END,
+          enabled     = EXCLUDED.enabled
+      `, [instanceId, apiToken, enabled]);
+
+      res.json({ message: "Saved" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/whatsapp/chats/pos", requireAuth, async (_req, res) => {
+    try {
+      const s = await getPosWaSettings();
+      if (!s?.instanceId || !s?.apiToken) {
+        return res.status(400).json({ message: "POS WhatsApp credentials not configured" });
       }
       const chats = await fetchGreenApiChats(s.instanceId, s.apiToken);
       res.json(chats);

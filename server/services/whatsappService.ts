@@ -43,8 +43,13 @@ export function normaliseChatId(raw: string): string {
 // ─── DB reads ─────────────────────────────────────────────────────────────────
 
 export async function getWaSettings(): Promise<WaSettings | null> {
+  return getWaSettingsById(1);
+}
+
+export async function getWaSettingsById(id: number): Promise<WaSettings | null> {
   const res = await pool.query(
-    "SELECT instance_id, api_token, enabled, monthly_auto_send, daily_auto_send, daily_recipient_id FROM whatsapp_settings WHERE id = 1",
+    "SELECT instance_id, api_token, enabled, monthly_auto_send, daily_auto_send, daily_recipient_id FROM whatsapp_settings WHERE id = $1",
+    [id],
   );
   if (!res.rows?.length) return null;
   const r = res.rows[0];
@@ -107,12 +112,45 @@ interface SendResult {
   error?:  string;
 }
 
+/** Resolve the active WhatsApp settings for POS sending: use instance 2 if configured, else instance 1 */
+export async function getPosWaSettings(): Promise<WaSettings | null> {
+  const pos = await getWaSettingsById(2);
+  if (pos?.instanceId && pos?.apiToken) return pos;
+  return getWaSettingsById(1);
+}
+
 /** Send a plain text message to one specific chatId */
 export async function sendWhatsAppTextToChatId(
   chatId:  string,
   message: string,
 ): Promise<{ success: boolean; error?: string }> {
   const settings = await getWaSettings();
+  if (!settings?.instanceId || !settings?.apiToken) {
+    return { success: false, error: "WhatsApp credentials not configured" };
+  }
+  if (!settings.enabled) {
+    return { success: false, error: "WhatsApp sending is disabled" };
+  }
+
+  const url = baseUrl(settings.instanceId, settings.apiToken, "sendMessage");
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chatId, message }),
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    return { success: false, error: `Green API ${response.status}: ${body}` };
+  }
+  return { success: true };
+}
+
+/** Send a plain text message via the POS instance (id=2 with fallback to id=1) */
+export async function sendWhatsAppTextToChatIdPos(
+  chatId:  string,
+  message: string,
+): Promise<{ success: boolean; error?: string }> {
+  const settings = await getPosWaSettings();
   if (!settings?.instanceId || !settings?.apiToken) {
     return { success: false, error: "WhatsApp credentials not configured" };
   }

@@ -195,7 +195,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
   // WhatsApp group chats (fetched only when dialog is open)
   const { data: waChats = [], isLoading: waChatsLoading } = useQuery<{ id: string; name: string; type: string }[]>({
-    queryKey: ["/api/whatsapp/chats"],
+    queryKey: ["/api/whatsapp/chats/pos"],
     enabled: waGroupDialogOpen,
     staleTime: 60_000,
   });

@@ -39,7 +39,7 @@ import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
-import { sendWhatsAppTextToChatId } from "../services/whatsappService";
+import { sendWhatsAppTextToChatIdPos } from "../services/whatsappService";
 
 
 export function registerPosRoutes(app: Express) {
@@ -1403,7 +1403,7 @@ export function registerPosRoutes(app: Express) {
         .join("\n")
         .trim();
 
-      const result = await sendWhatsAppTextToChatId(location.whatsappGroupChatId, message);
+      const result = await sendWhatsAppTextToChatIdPos(location.whatsappGroupChatId, message);
       if (!result.success) {
         return res.status(502).json({ message: result.error ?? "Failed to send WhatsApp message" });
       }
