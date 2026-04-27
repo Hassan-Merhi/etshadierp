@@ -26,7 +26,13 @@ function sumBales(orders: OrderLike[]) {
   return orders.reduce((s, o) => s + (o.totalQtyBales || 0), 0);
 }
 
-export function InvoiceSummaryBar({ orders }: { orders: OrderLike[] }) {
+export function InvoiceSummaryBar({
+  orders,
+  hideTotalsUsd = false,
+}: {
+  orders: OrderLike[];
+  hideTotalsUsd?: boolean;
+}) {
   const buckets: Bucket[] = [
     {
       label: "Pending Verification",
@@ -73,7 +79,9 @@ export function InvoiceSummaryBar({ orders }: { orders: OrderLike[] }) {
         <span className="font-semibold text-foreground text-sm">{orders.length} orders total</span>
         <span><span className="font-medium text-foreground">{totalBales.toLocaleString()}</span> bales</span>
         <span><span className="font-medium text-foreground">{fmt(totalWeight)}</span> kg</span>
-        <span><span className="font-medium text-foreground">${fmt(totalAmount)}</span></span>
+        {!hideTotalsUsd && (
+          <span><span className="font-medium text-foreground">${fmt(totalAmount)}</span></span>
+        )}
       </div>
       {/* Per-status breakdown */}
       <div className="flex flex-wrap gap-x-6 gap-y-2">
@@ -91,7 +99,9 @@ export function InvoiceSummaryBar({ orders }: { orders: OrderLike[] }) {
                 <div className="text-muted-foreground mt-0.5 flex flex-wrap gap-x-3">
                   <span><span className="font-medium text-foreground">{bales.toLocaleString()}</span> bales</span>
                   <span><span className="font-medium text-foreground">{fmt(weight)}</span> kg</span>
-                  <span><span className="font-medium text-foreground">${fmt(amount)}</span></span>
+                  {!hideTotalsUsd && (
+                    <span><span className="font-medium text-foreground">${fmt(amount)}</span></span>
+                  )}
                 </div>
               </div>
             </div>

@@ -1,25 +1,33 @@
 import { useLocation, useSearch } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import FactoryProformas from "@/pages/factory/FactoryProformas";
 import FactoryInvoices from "@/pages/factory/FactoryInvoices";
 
 type InvoicingTab = "proformas" | "invoices";
 
-function getTab(search: string): InvoicingTab {
+function getTab(search: string, hideProformas: boolean): InvoicingTab {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const t = params.get("tab");
-  if (t === "invoices") return t;
-  return "proformas";
+  if (t === "invoices") return "invoices";
+  if (t === "proformas" && !hideProformas) return "proformas";
+  return hideProformas ? "invoices" : "proformas";
 }
 
 export default function FactoryInvoicing() {
   const [, navigate] = useLocation();
   const search = useSearch();
-  const activeTab = getTab(search);
 
-  const tabs: { key: InvoicingTab; label: string }[] = [
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const hidden: string[] = myAccess?.hiddenCostFields ?? [];
+  const hideProformasTab = hidden.includes("hide_invoicing_proformas_tab");
+
+  const activeTab = getTab(search, hideProformasTab);
+
+  const allTabs: { key: InvoicingTab; label: string }[] = [
     { key: "proformas", label: "Proformas" },
-    { key: "invoices",  label: "Invoices" },
+    { key: "invoices",  label: "Invoices"  },
   ];
+  const tabs = allTabs.filter(t => !(t.key === "proformas" && hideProformasTab));
 
   const goTo = (tab: InvoicingTab) => {
     navigate(`/factory/invoicing?tab=${tab}`);
@@ -54,8 +62,8 @@ export default function FactoryInvoicing() {
       </div>
 
       <div className="flex-1 overflow-auto min-h-0">
-        {activeTab === "proformas" && <FactoryProformas />}
-        {activeTab === "invoices"  && <FactoryInvoices />}
+        {activeTab === "proformas" && !hideProformasTab && <FactoryProformas />}
+        {activeTab === "invoices" && <FactoryInvoices />}
       </div>
     </div>
   );

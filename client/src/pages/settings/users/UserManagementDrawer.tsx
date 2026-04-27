@@ -89,6 +89,9 @@ const FACTORY_TABS: { key: string; label: string; group: string }[] = [
   { key: "hide_tab_workerdetail_documents",   label: "Documents",               group: "Worker Profile" },
   { key: "hide_tab_daybook",                  label: "Daybook",                 group: "Sidebar Pages" },
   { key: "hide_tab_agents",                   label: "Agents",                  group: "Sidebar Pages" },
+  { key: "hide_invoicing_proformas_tab",      label: "Proformas Tab",           group: "Invoicing" },
+  { key: "hide_invoicing_proforma_col",       label: "Proforma Column",         group: "Invoicing" },
+  { key: "hide_invoicing_totals_usd",         label: "Total Amounts (USD)",     group: "Invoicing" },
 ];
 const FACTORY_TAB_GROUPS = Array.from(new Set(FACTORY_TABS.map((t) => t.group)));
 

@@ -68,6 +68,11 @@ export default function FactoryInvoices() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("LOADING");
   const [customerFilter, setCustomerFilter] = useState<string>("all");
 
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const hidden: string[] = myAccess?.hiddenCostFields ?? [];
+  const hideProformaCol = hidden.includes("hide_invoicing_proforma_col");
+  const hideTotalsUsd = hidden.includes("hide_invoicing_totals_usd");
+
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/factory/customers"],
   });
@@ -217,7 +222,7 @@ export default function FactoryInvoices() {
         </div>
       )}
 
-      {!isLoading && filteredOrders.length > 0 && <InvoiceSummaryBar orders={filteredOrders} />}
+      {!isLoading && filteredOrders.length > 0 && <InvoiceSummaryBar orders={filteredOrders} hideTotalsUsd={hideTotalsUsd} />}
 
       {isLoading ? (
         <div className="space-y-3">
@@ -232,20 +237,20 @@ export default function FactoryInvoices() {
               <TableRow>
                 <TableHead>Invoice #</TableHead>
                 <TableHead>Customer</TableHead>
-                <TableHead>Proforma</TableHead>
+                {!hideProformaCol && <TableHead>Proforma</TableHead>}
                 <TableHead>Container</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Bales</TableHead>
                 <TableHead className="text-right">Weight (kg)</TableHead>
-                <TableHead className="text-right">Total</TableHead>
+                {!hideTotalsUsd && <TableHead className="text-right">Total</TableHead>}
                 <TableHead className="w-[120px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredOrders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8" data-testid="text-no-orders">
+                  <TableCell colSpan={10 - (hideProformaCol ? 1 : 0) - (hideTotalsUsd ? 1 : 0)} className="text-center text-muted-foreground py-8" data-testid="text-no-orders">
                     <div className="flex flex-col items-center gap-2">
                       <Package className="h-10 w-10 opacity-40" />
                       <p>No invoices found</p>
@@ -266,9 +271,11 @@ export default function FactoryInvoices() {
                     <TableCell data-testid={`text-customer-name-${order.id}`}>
                       {order.customerName}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground" data-testid={`text-proforma-${order.id}`}>
-                      {order.proformaName || <span className="text-muted-foreground/50">—</span>}
-                    </TableCell>
+                    {!hideProformaCol && (
+                      <TableCell className="text-sm text-muted-foreground" data-testid={`text-proforma-${order.id}`}>
+                        {order.proformaName || <span className="text-muted-foreground/50">—</span>}
+                      </TableCell>
+                    )}
                     <TableCell className="font-mono text-sm" data-testid={`text-container-${order.id}`}>
                       {order.containerNumber || <span className="text-muted-foreground/50">—</span>}
                     </TableCell>
@@ -286,9 +293,11 @@ export default function FactoryInvoices() {
                         ? parseFloat(order.totalWeightKg).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
                         : "-"}
                     </TableCell>
-                    <TableCell className="text-right font-mono font-semibold" data-testid={`text-grand-total-${order.id}`}>
-                      ${parseFloat(order.grandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                    </TableCell>
+                    {!hideTotalsUsd && (
+                      <TableCell className="text-right font-mono font-semibold" data-testid={`text-grand-total-${order.id}`}>
+                        ${parseFloat(order.grandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
