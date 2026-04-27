@@ -3077,7 +3077,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         .innerJoin(customers, eq(customerOrders.customerId, customers.id))
         .where(and(
           eq(customerOrders.companyId, companyId),
-          inArray(customerOrders.status, ["PENDING", "VERIFIED", "LOADING"]),
+          inArray(customerOrders.status, ["PENDING_VERIFICATION", "VERIFIED", "LOADING"]),
         ))
         .orderBy(desc(customerOrders.orderDate));
 
@@ -3089,7 +3089,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         totalQtyBales: r.totalQtyBales ?? 0,
       });
 
-      const pendingOrders  = (pendingVerifiedRows as any[]).filter(r => r.status === "PENDING").map(mapOrder);
+      const pendingOrders  = (pendingVerifiedRows as any[]).filter(r => r.status === "PENDING_VERIFICATION").map(mapOrder);
       const verifiedOrders = (pendingVerifiedRows as any[]).filter(r => r.status === "VERIFIED").map(mapOrder);
       const loadingOrders  = (pendingVerifiedRows as any[]).filter(r => r.status === "LOADING").map(mapOrder);
 
