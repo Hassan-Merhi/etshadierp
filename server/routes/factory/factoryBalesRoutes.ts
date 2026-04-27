@@ -1587,7 +1587,6 @@ export function registerFactoryBalesRoutes(app: Express) {
       if (!workerId) return res.status(400).json({ message: "workerId is required" });
       const [bale] = await db.select().from(factoryBales).where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
       if (!bale) return res.status(404).json({ message: "Bale not found" });
-      if (bale.stockEntryDate && bale.finalizedBy) return res.status(403).json({ message: "Worker assignment is locked for stock-entry bales once a worker has been set." });
       const [updated] = await db.update(factoryBales).set({ finalizedBy: parseInt(workerId), updatedAt: new Date() }).where(eq(factoryBales.id, id)).returning();
       res.json(updated);
     } catch (error: any) {

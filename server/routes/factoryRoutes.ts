@@ -65,6 +65,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     // Bale deletion is open to all authenticated factory users — no admin override needed
     if (req.method === "DELETE" && /^\/bales\/\d+$/.test(req.path)) return next();
 
+    // Worker assignment / reassignment is open to all authenticated factory users
+    if (req.method === "PATCH" && /^\/bales\/\d+\/assign-worker$/.test(req.path)) return next();
+    if (req.method === "PATCH" && req.path === "/bales/bulk-assign-worker") return next();
+
     const role = req.session?.currentRole as string | undefined;
     if (["Admin", "Owner", "Developer"].includes(role || "")) return next();
 
