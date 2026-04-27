@@ -509,6 +509,10 @@ export default function FactoryDaybook() {
   // ── Client-side filters (search, amount range, status) ────────────────────
   const filteredEntries = useMemo(() => {
     let result = entries;
+    // Non-admins only see their own entries
+    if (!isAdminOrOwner && currentUser?.id) {
+      result = result.filter((e) => e.createdBy === currentUser.id);
+    }
     if (statusFilter === "exclude") result = result.filter((e) => !e.optional);
     else if (statusFilter === "only") result = result.filter((e) => e.optional);
     if (searchQuery.trim()) {
@@ -1177,8 +1181,8 @@ export default function FactoryDaybook() {
                     <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
                         <TableHead className="w-full">Date</TableHead>
-                        <TableHead className="text-right whitespace-nowrap">Amount</TableHead>
-                        {hasNonUsdC && <TableHead className="text-right whitespace-nowrap">FX Rate</TableHead>}
+                        {isAdminOrOwner && <TableHead className="text-right whitespace-nowrap">Amount</TableHead>}
+                        {isAdminOrOwner && hasNonUsdC && <TableHead className="text-right whitespace-nowrap">FX Rate</TableHead>}
                         <TableHead className="w-0 p-0"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1206,13 +1210,15 @@ export default function FactoryDaybook() {
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell className="py-4 text-right">
-                                <div className="font-mono font-semibold">{currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}</div>
-                                {row.currencyCode !== "USD" && (
-                                  <div className="text-xs text-muted-foreground font-mono mt-0.5">{row.currencyCode}</div>
-                                )}
-                              </TableCell>
-                              {hasNonUsdC && (
+                              {isAdminOrOwner && (
+                                <TableCell className="py-4 text-right">
+                                  <div className="font-mono font-semibold">{currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}</div>
+                                  {row.currencyCode !== "USD" && (
+                                    <div className="text-xs text-muted-foreground font-mono mt-0.5">{row.currencyCode}</div>
+                                  )}
+                                </TableCell>
+                              )}
+                              {isAdminOrOwner && hasNonUsdC && (
                                 <TableCell className="py-4 text-right font-mono text-muted-foreground text-sm">
                                   {row.currencyCode === "USD" ? "—" : row.fxRateToUsd ? parseFloat(row.fxRateToUsd).toFixed(4) : "mixed"}
                                 </TableCell>
@@ -1312,9 +1318,11 @@ export default function FactoryDaybook() {
                             <Badge variant="outline" className="text-xs text-muted-foreground">Hidden</Badge>
                           )}
                         </div>
-                        <span className="font-mono font-medium text-sm whitespace-nowrap">
-                          {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency || "0"))}
-                        </span>
+                        {isAdminOrOwner && (
+                          <span className="font-mono font-medium text-sm whitespace-nowrap">
+                            {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency || "0"))}
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {formatDisplayDate(entry.txDate + "T00:00:00")}
@@ -1335,8 +1343,8 @@ export default function FactoryDaybook() {
                     <TableRow>
                       <TableHead className="whitespace-nowrap">Date</TableHead>
                       <TableHead className="w-full">Description</TableHead>
-                      <TableHead className="text-right whitespace-nowrap">Amount</TableHead>
-                      {hasNonUsd && <TableHead className="text-right whitespace-nowrap">FX Rate</TableHead>}
+                      {isAdminOrOwner && <TableHead className="text-right whitespace-nowrap">Amount</TableHead>}
+                      {isAdminOrOwner && hasNonUsd && <TableHead className="text-right whitespace-nowrap">FX Rate</TableHead>}
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1384,13 +1392,15 @@ export default function FactoryDaybook() {
                           <TableCell className="py-4 max-w-xs truncate" title={formatDaybookDescription(entry)}>
                             {formatDaybookDescription(entry)}
                           </TableCell>
-                          <TableCell className="py-4 text-right">
-                            <div className="font-mono font-semibold">{currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency || "0"))}</div>
-                            {entry.currencyCode !== "USD" && parseFloat(entry.amountUsd || "0") > 0 && (
-                              <div className="text-xs text-muted-foreground font-mono mt-0.5">${formatNumber(parseFloat(entry.amountUsd))}</div>
-                            )}
-                          </TableCell>
-                          {hasNonUsd && (
+                          {isAdminOrOwner && (
+                            <TableCell className="py-4 text-right">
+                              <div className="font-mono font-semibold">{currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency || "0"))}</div>
+                              {entry.currencyCode !== "USD" && parseFloat(entry.amountUsd || "0") > 0 && (
+                                <div className="text-xs text-muted-foreground font-mono mt-0.5">${formatNumber(parseFloat(entry.amountUsd))}</div>
+                              )}
+                            </TableCell>
+                          )}
+                          {isAdminOrOwner && hasNonUsd && (
                             <TableCell className="py-4 text-right font-mono text-muted-foreground text-sm">
                               {entry.currencyCode === "USD" ? "—" : parseFloat(entry.fxRateToUsd).toFixed(4)}
                             </TableCell>
