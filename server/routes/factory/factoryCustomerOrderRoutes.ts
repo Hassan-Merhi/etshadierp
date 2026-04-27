@@ -82,6 +82,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           totalWeightKg: sql<string>`COALESCE((SELECT SUM(cob.weight) FROM customer_order_bales cob WHERE cob.order_id = ${customerOrders.id}), 0)`,
           containerNumber: customerOrders.containerNumber,
           shippingCompany: customerOrders.shippingCompany,
+          destination: customerOrders.destination,
           locationId: customerOrders.locationId,
           loadingStartedAt: customerOrders.loadingStartedAt,
           loadingFinalizedAt: customerOrders.loadingFinalizedAt,
@@ -126,6 +127,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           containerNumber: customerOrders.containerNumber,
           shippingCompany: customerOrders.shippingCompany,
           containerNotes: customerOrders.containerNotes,
+          destination: customerOrders.destination,
           verifiedByUserId: customerOrders.verifiedByUserId,
           verifiedAt: customerOrders.verifiedAt,
           loadingStartedAt: customerOrders.loadingStartedAt,
@@ -2189,7 +2191,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
-      const { containerNumber, shippingCompany, containerNotes } = req.body;
+      const { containerNumber, shippingCompany, containerNotes, destination } = req.body;
 
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
@@ -2199,6 +2201,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (containerNumber !== undefined) updateData.containerNumber = containerNumber;
       if (shippingCompany !== undefined) updateData.shippingCompany = shippingCompany;
       if (containerNotes !== undefined) updateData.containerNotes = containerNotes;
+      if (destination !== undefined) updateData.destination = destination || null;
 
       const [updated] = await db.update(customerOrders).set(updateData)
         .where(eq(customerOrders.id, orderId)).returning();

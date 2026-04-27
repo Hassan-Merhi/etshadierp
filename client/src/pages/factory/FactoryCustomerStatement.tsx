@@ -35,6 +35,7 @@ interface Invoice {
   otherChargesTotal: string;
   totalQtyBales: number;
   containerNumber: string | null;
+  destination: string | null;
   status: string;
   createdAt: string;
 }
@@ -51,6 +52,7 @@ interface BalanceEntry {
   balance: string;
   currency: string;
   containerNumber: string | null;
+  destination: string | null;
   runningBalance: number;
   runningBalanceSide: string;
   rowNote: string | null;
@@ -268,6 +270,7 @@ export default function FactoryCustomerStatement() {
                 <TableHead>Invoice #</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Container</TableHead>
+                <TableHead>Destination</TableHead>
                 <TableHead className="text-right">Bales</TableHead>
                 <TableHead className="text-right">Subtotal</TableHead>
                 <TableHead className="text-right">Charges</TableHead>
@@ -277,7 +280,7 @@ export default function FactoryCustomerStatement() {
             <TableBody>
               {invoices.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8" data-testid="text-no-invoices">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8" data-testid="text-no-invoices">
                     No finalized invoices yet
                   </TableCell>
                 </TableRow>
@@ -297,6 +300,9 @@ export default function FactoryCustomerStatement() {
                     </TableCell>
                     <TableCell className="text-sm font-mono text-muted-foreground" data-testid={`text-invoice-container-${inv.id}`}>
                       {inv.containerNumber || "-"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground" data-testid={`text-invoice-destination-${inv.id}`}>
+                      {inv.destination || "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm" data-testid={`text-invoice-bales-${inv.id}`}>
                       {inv.totalQtyBales ?? "-"}
@@ -327,6 +333,7 @@ export default function FactoryCustomerStatement() {
                 <TableHead>Type</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Container</TableHead>
+                <TableHead>Destination</TableHead>
                 <TableHead className="text-right">Debit</TableHead>
                 <TableHead className="text-right">Credit</TableHead>
                 <TableHead className="text-right">Balance</TableHead>
@@ -337,7 +344,7 @@ export default function FactoryCustomerStatement() {
             <TableBody>
               {balanceHistory.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8" data-testid="text-no-transactions">
+                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8" data-testid="text-no-transactions">
                     No transactions yet
                   </TableCell>
                 </TableRow>
@@ -355,6 +362,9 @@ export default function FactoryCustomerStatement() {
                     </TableCell>
                     <TableCell className="text-sm font-mono text-muted-foreground" data-testid={`text-balance-container-${entry.id}`}>
                       {entry.containerNumber || "-"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground" data-testid={`text-balance-destination-${entry.id}`}>
+                      {entry.destination || "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-debit-${entry.id}`}>
                       {Number(entry.debitAmount || 0) > 0

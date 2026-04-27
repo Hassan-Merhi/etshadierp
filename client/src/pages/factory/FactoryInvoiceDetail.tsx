@@ -80,6 +80,7 @@ interface OrderDetail {
   customerCode: string;
   containerNumber?: string | null;
   shippingCompany?: string | null;
+  destination?: string | null;
   lines: OrderLine[];
   bales: OrderBale[];
   charges: OrderCharge[];
@@ -415,6 +416,14 @@ export default function FactoryInvoiceDetail() {
               <p className="text-sm text-muted-foreground">Shipping</p>
               <p className="font-semibold" data-testid="text-shipping-company">
                 {order.shippingCompany}
+              </p>
+            </div>
+          )}
+          {order.destination && (
+            <div>
+              <p className="text-sm text-muted-foreground">Destination</p>
+              <p className="font-semibold" data-testid="text-destination">
+                {order.destination}
               </p>
             </div>
           )}

@@ -340,6 +340,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
           otherChargesTotal: customerOrders.otherChargesTotal,
           totalQtyBales: customerOrders.totalQtyBales,
           containerNumber: customerOrders.containerNumber,
+          destination: customerOrders.destination,
           status: customerOrders.status,
           createdAt: customerOrders.createdAt,
         })
@@ -351,9 +352,12 @@ export function registerFactoryCustomersRoutes(app: Express) {
         ))
         .orderBy(desc(customerOrders.createdAt));
 
-      // Build orderId → containerNumber map for enriching statement rows
+      // Build orderId → containerNumber and destination maps for enriching statement rows
       const containerByOrderId = new Map<number, string | null>(
         invoices.map((inv: any) => [inv.id, inv.containerNumber ?? null])
+      );
+      const destinationByOrderId = new Map<number, string | null>(
+        invoices.map((inv: any) => [inv.id, inv.destination ?? null])
       );
 
       // Auto-sync: update any INVOICE-type balance rows whose debitAmount differs from
@@ -466,9 +470,14 @@ export function registerFactoryCustomersRoutes(app: Express) {
           row.referenceType === "INVOICE" && row.referenceId
             ? (containerByOrderId.get(row.referenceId) ?? null)
             : null;
+        const destination =
+          row.referenceType === "INVOICE" && row.referenceId
+            ? (destinationByOrderId.get(row.referenceId) ?? null)
+            : null;
         return {
           ...row,
           containerNumber,
+          destination,
           runningBalance,
           runningBalanceSide: runningBalance >= 0 ? "Dr" : "Cr",
         };

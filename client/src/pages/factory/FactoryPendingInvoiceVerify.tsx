@@ -104,6 +104,7 @@ interface OrderDetail {
   containerNumber?: string;
   shippingCompany?: string;
   containerNotes?: string;
+  destination?: string;
 }
 
 export default function FactoryPendingInvoiceVerify() {
@@ -119,6 +120,7 @@ export default function FactoryPendingInvoiceVerify() {
   const [containerNumber, setContainerNumber] = useState("");
   const [shippingCompany, setShippingCompany] = useState("");
   const [containerNotes, setContainerNotes] = useState("");
+  const [destination, setDestination] = useState("");
   const [containerInitialized, setContainerInitialized] = useState(false);
 
   const [chargeName, setChargeName] = useState("");
@@ -185,6 +187,7 @@ export default function FactoryPendingInvoiceVerify() {
       setContainerNumber(orderDetail.containerNumber || "");
       setShippingCompany(orderDetail.shippingCompany || "");
       setContainerNotes(orderDetail.containerNotes || "");
+      setDestination(orderDetail.destination || "");
       setContainerInitialized(true);
     }
   }, [orderDetail, containerInitialized]);
@@ -219,7 +222,7 @@ export default function FactoryPendingInvoiceVerify() {
   });
 
   const assignContainerMutation = useMutation({
-    mutationFn: async (data: { containerNumber: string; shippingCompany: string; containerNotes: string }) => {
+    mutationFn: async (data: { containerNumber: string; shippingCompany: string; containerNotes: string; destination: string }) => {
       await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/assign-container`, data);
     },
     onSuccess: () => {
@@ -643,6 +646,15 @@ export default function FactoryPendingInvoiceVerify() {
                 data-testid="input-shipping-company"
               />
             </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Destination</label>
+              <Input
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+                placeholder="e.g. Rotterdam, UK"
+                data-testid="input-destination"
+              />
+            </div>
           </div>
           <div>
             <label className="text-sm font-medium mb-1 block">Container Notes</label>
@@ -655,7 +667,7 @@ export default function FactoryPendingInvoiceVerify() {
           </div>
           <Button
             variant="outline"
-            onClick={() => assignContainerMutation.mutate({ containerNumber, shippingCompany, containerNotes })}
+            onClick={() => assignContainerMutation.mutate({ containerNumber, shippingCompany, containerNotes, destination })}
             disabled={assignContainerMutation.isPending}
             data-testid="button-save-container"
           >
