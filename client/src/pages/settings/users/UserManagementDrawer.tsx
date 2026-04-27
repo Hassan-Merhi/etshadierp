@@ -88,6 +88,7 @@ const FACTORY_TABS: { key: string; label: string; group: string }[] = [
   { key: "hide_tab_workerdetail_bales",       label: "Bales",                   group: "Worker Profile" },
   { key: "hide_tab_workerdetail_documents",   label: "Documents",               group: "Worker Profile" },
   { key: "hide_tab_daybook",                  label: "Daybook",                 group: "Sidebar Pages" },
+  { key: "hide_tab_agents",                   label: "Agents",                  group: "Sidebar Pages" },
 ];
 const FACTORY_TAB_GROUPS = Array.from(new Set(FACTORY_TABS.map((t) => t.group)));
 
