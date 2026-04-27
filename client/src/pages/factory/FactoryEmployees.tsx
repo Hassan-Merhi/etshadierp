@@ -299,36 +299,12 @@ export default function FactoryEmployees() {
                       </div>
                     </div>
 
-                    {/* Code */}
-                    <div className="shrink-0 min-w-20">
-                      <p className="text-xs text-muted-foreground">Code</p>
-                      <p className="text-sm font-mono font-medium">{emp.code}</p>
-                    </div>
-
-                    {/* Salary */}
-                    <div className="shrink-0 min-w-20">
-                      <p className="text-xs text-muted-foreground">Salary</p>
-                      <p className="text-sm font-medium">{fmt(emp.monthlySalary)}</p>
-                    </div>
-
                     {/* Balance */}
                     <div className="shrink-0 min-w-24">
                       <p className="text-xs text-muted-foreground">Balance</p>
                       <p className={`text-sm font-semibold ${balance < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
                         {fmt(emp.currentBalance)}
                       </p>
-                    </div>
-
-                    {/* Deposits */}
-                    <div className="shrink-0 min-w-20 hidden sm:block">
-                      <p className="text-xs text-muted-foreground">Deposits</p>
-                      <p className="text-sm font-medium">{fmt(emp.totalDeposits)}</p>
-                    </div>
-
-                    {/* Withdrawals */}
-                    <div className="shrink-0 min-w-24 hidden sm:block">
-                      <p className="text-xs text-muted-foreground">Withdrawals</p>
-                      <p className="text-sm font-medium">{fmt(emp.totalWithdrawals)}</p>
                     </div>
 
                     {/* Status */}
