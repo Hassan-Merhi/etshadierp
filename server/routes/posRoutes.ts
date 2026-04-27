@@ -64,6 +64,7 @@ export function registerPosRoutes(app: Express) {
       // Determine account type and ID by validating against actual database records
       let accountType: string;
       let accountId: number;
+      let customerAccount: any = null;
 
       if (isCreditSale) {
         // Credit sales must use a customer receivable ledger account (Asset type)
@@ -73,7 +74,7 @@ export function registerPosRoutes(app: Express) {
           });
         }
 
-        const [customerAccount] = await db
+        const [fetchedCustomerAccount] = await db
           .select()
           .from(ledgerAccounts)
           .where(
@@ -84,18 +85,19 @@ export function registerPosRoutes(app: Express) {
           )
           .limit(1);
 
-        if (!customerAccount) {
+        if (!fetchedCustomerAccount) {
           return res.status(400).json({
             message: "Invalid customer account - account not found or does not belong to this company",
           });
         }
 
-        if (customerAccount.accountType !== "Asset") {
+        if (fetchedCustomerAccount.accountType !== "Asset") {
           return res.status(400).json({
-            message: `Invalid customer account type: ${customerAccount.accountType}. Credit sales require Asset-type accounts (customer receivables).`,
+            message: `Invalid customer account type: ${fetchedCustomerAccount.accountType}. Credit sales require Asset-type accounts (customer receivables).`,
           });
         }
 
+        customerAccount = fetchedCustomerAccount;
         accountType = "credit";
         accountId = paymentAccountId;
       } else if (cashAccountId) {
@@ -481,12 +483,6 @@ export function registerPosRoutes(app: Express) {
       saleItems = txResult.saleItems;
 
       const result = { voucher, saleItems };
-
-      // Get customer details for credit sales
-      let customerAccount = null;
-      if (isCreditSale) {
-        customerAccount = await storage.getLedgerAccountById(accountId);
-      }
 
       // ── Intercompany POS auto-transfer (non-blocking, cash sales only) ──
       if (!isCreditSale && accountType === "cash") {
