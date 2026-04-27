@@ -547,8 +547,6 @@ export default function FactorySettings() {
           </CardHeader>
           <CardContent className="divide-y">
             {toggleItem("Daybook", "daybookEnabled")}
-            {toggleItem("Analytics", "analyticsEnabled")}
-            {toggleItem("Financial Snapshot", "financialSnapshotEnabled")}
           </CardContent>
         </Card>
 

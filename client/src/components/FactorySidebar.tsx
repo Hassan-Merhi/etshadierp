@@ -51,6 +51,7 @@ interface NavItem {
   adminOnly?: boolean;
   featureFlag?: string;
   featureFlagDefaultOn?: boolean;
+  hideKey?: string;
   requiresExplicitAccess?: boolean;
 }
 
@@ -127,8 +128,8 @@ const navSections: NavSection[] = [
     label: "Reports",
     color: "#06b6d4",
     items: [
-      { title: "Analytics",           url: "/factory/analytics",          icon: TrendingUp, featureFlag: "analyticsEnabled",         featureFlagDefaultOn: true },
-      { title: "Financial Snapshot",  url: "/factory/financial-snapshot", icon: LayoutGrid,  featureFlag: "financialSnapshotEnabled",  featureFlagDefaultOn: true },
+      { title: "Analytics",           url: "/factory/analytics",          icon: TrendingUp, adminOnly: true },
+      { title: "Financial Snapshot",  url: "/factory/financial-snapshot", icon: LayoutGrid,  adminOnly: true },
     ],
   },
   {
@@ -220,6 +221,7 @@ export function FactorySidebar({ user }: { user?: any }) {
         }
         if (myAccess && !myAccess.fullAccess && myAccess.pageKeys.length > 0)
           if (!myAccess.pageKeys.includes(item.url.replace(/^\//, ""))) return false;
+        if (item.hideKey && myAccess?.hiddenCostFields?.includes(item.hideKey)) return false;
         if (item.requiresExplicitAccess && !isAdmin && myAccess) {
           if (myAccess.fullAccess) return false;
           if (!myAccess.pageKeys.includes(item.url.replace(/^\//, ""))) return false;
