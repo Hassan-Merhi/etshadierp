@@ -1629,6 +1629,11 @@ let migrationsDone = false;
      VALUES (1, '', '', false, false, false)
      ON CONFLICT (id) DO NOTHING`,
 
+    // whatsapp_settings (id=2): POS-specific Green API instance (optional; enabled by default so fallback to id=1 works)
+    `INSERT INTO whatsapp_settings (id, instance_id, api_token, enabled, monthly_auto_send, daily_auto_send)
+     VALUES (2, '', '', true, false, false)
+     ON CONFLICT (id) DO NOTHING`,
+
     // net_position_export_settings (id=1)
     `INSERT INTO net_position_export_settings (id, frequency, send_hour, enabled, auto_send)
      VALUES (1, 'daily', 18, false, false)

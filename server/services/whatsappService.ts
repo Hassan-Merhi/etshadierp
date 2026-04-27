@@ -112,11 +112,15 @@ interface SendResult {
   error?:  string;
 }
 
-/** Resolve the active WhatsApp settings for POS sending: use instance 2 if configured, else instance 1 */
+/** Resolve the active WhatsApp settings for POS sending: use instance 2 if configured, else instance 1.
+ *  When falling back to instance 1 we override enabled=true because POS sends are always manual —
+ *  the main instance's enabled flag controls scheduled factory reports, not POS. */
 export async function getPosWaSettings(): Promise<WaSettings | null> {
   const pos = await getWaSettingsById(2);
   if (pos?.instanceId && pos?.apiToken) return pos;
-  return getWaSettingsById(1);
+  const main = await getWaSettingsById(1);
+  if (main?.instanceId && main?.apiToken) return { ...main, enabled: true };
+  return null;
 }
 
 /** Send a plain text message to one specific chatId */
