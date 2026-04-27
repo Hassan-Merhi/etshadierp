@@ -293,7 +293,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                 <div className="p-8 text-center text-muted-foreground">No {unitType === "WAREHOUSE" ? "warehouses" : "shops"} yet. Add your first unit above.</div>
               ) : (
                 <table className="w-full text-sm">
-                  <thead className="bg-muted/50 border-b">
+                  <thead className="bg-muted/50 border-b sticky top-0 z-10">
                     <tr>
                       <th className="text-left px-3 py-2 font-semibold">Unit</th>
                       <th className="text-left px-3 py-2 font-semibold">Tenant</th>

@@ -524,7 +524,7 @@ export default function FactoryPayrollPage() {
           ) : (
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead>Employee Code</TableHead>
                     <TableHead>Worker Name</TableHead>
@@ -819,7 +819,7 @@ export default function FactoryPayrollPage() {
           <Card>
             <CardContent className="pt-0 overflow-x-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead className="whitespace-nowrap">Code</TableHead>
                     <TableHead className="whitespace-nowrap">Full Name</TableHead>

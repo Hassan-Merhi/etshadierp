@@ -164,7 +164,7 @@ function BatchRow({ group, expanded, toggleGroup, selectedIds, setSelectedIds, s
       {isExpanded && (
         <div className="overflow-x-auto bg-muted/30">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-muted/30">
               <TableRow>
                 <TableHead className="w-10 pl-8"></TableHead>
                 <TableHead>Worker</TableHead>

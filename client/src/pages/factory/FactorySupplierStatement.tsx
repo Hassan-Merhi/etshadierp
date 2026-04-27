@@ -224,7 +224,7 @@ export default function FactorySupplierStatement() {
                 <CardContent>
                   <div className="overflow-x-auto">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-10 bg-background">
                         <TableRow>
                           <TableHead>Container</TableHead>
                           <TableHead>Date</TableHead>
@@ -471,7 +471,7 @@ export default function FactorySupplierStatement() {
               <CardContent>
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
                         <TableHead>Container</TableHead>
                         <TableHead>Purchase Supplier</TableHead>

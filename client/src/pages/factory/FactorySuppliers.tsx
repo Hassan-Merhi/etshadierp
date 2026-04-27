@@ -1325,7 +1325,7 @@ export default function FactorySuppliers() {
                 {!collapsedStmtSections.has("currencyPools") && <CardContent className="p-0">
                   <div className="overflow-x-auto">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-10 bg-background">
                         <TableRow>
                           <TableHead>Currency</TableHead>
                           <TableHead className="text-right">Containers</TableHead>
@@ -1548,7 +1548,7 @@ export default function FactorySuppliers() {
                           </button>
                           {!ledgerCollapsed && <div className="overflow-x-auto rounded-md border">
                             <Table>
-                              <TableHeader>
+                              <TableHeader className="sticky top-0 z-10 bg-background">
                                 <TableRow className="bg-muted/50">
                                   <TableHead className="text-xs h-8">Date</TableHead>
                                   <TableHead className="text-xs h-8">Type</TableHead>
@@ -1919,7 +1919,7 @@ export default function FactorySuppliers() {
                   return (
                     <div className="overflow-x-auto">
                       <Table>
-                        <TableHeader>
+                        <TableHeader className="sticky top-0 z-10 bg-background">
                           <TableRow>
                             <TableHead>Date</TableHead>
                             <TableHead>Type</TableHead>

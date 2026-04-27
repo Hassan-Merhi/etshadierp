@@ -560,7 +560,7 @@ export default function FactorySheets() {
         <div className="flex-1 overflow-auto p-4">
           <div className="inline-block min-w-full">
             <table className="border-collapse text-sm" data-testid="grid-table">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr>
                   {/* Row-label header */}
                   <th className="border border-border bg-muted px-2 py-1.5 text-left font-medium text-muted-foreground min-w-[180px]">
