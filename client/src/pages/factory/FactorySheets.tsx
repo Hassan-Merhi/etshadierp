@@ -564,6 +564,7 @@ export default function FactorySheets() {
                             onChange={e => setCell(ri, ci, e.target.value)}
                             className={`h-7 text-xs border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-1 tabular-nums ${isNeg ? "text-red-500" : ""} ${isText ? "text-left" : "text-right"}`}
                             data-testid={`input-cell-${ri}-${ci}`}
+                            dir="auto"
                           />
                         </td>
                       );
