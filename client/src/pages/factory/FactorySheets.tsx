@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Plus, Trash2, Download, Upload, Save, X, Check, TableProperties,
+  Plus, Trash2, Download, Upload, Save, X, Check, TableProperties, FileDown,
 } from "lucide-react";
 import type { FactorySheet } from "@shared/schema";
 
@@ -140,6 +140,9 @@ export default function FactorySheets() {
   const [activeIdx, setActiveIdx] = useState(0);
   const [localSheets, setLocalSheets] = useState<LocalSheet[]>([]);
   const [initialised, setInitialised] = useState(false);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const silentSaveRef = useRef(false);
 
   // ── Load from server ─────────────────────────────────────────────────────
   const { data: apiSheets, isLoading } = useQuery<FactorySheet[]>({
@@ -155,6 +158,21 @@ export default function FactorySheets() {
 
   const activeSheet = localSheets[activeIdx] ?? null;
   const isDirty = localSheets.some(s => s.dirty);
+
+  // ── Autosave — 2 s debounce after any dirty change ────────────────────────
+  useEffect(() => {
+    const hasSaveable = localSheets.some(s => s.dirty && s.id !== null);
+    if (!hasSaveable) return;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      silentSaveRef.current = true;
+      saveMutation.mutate(localSheets);
+    }, 2000);
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localSheets]);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
   const updateSheet = useCallback((fn: (s: LocalSheet) => LocalSheet) => {
@@ -191,9 +209,17 @@ export default function FactorySheets() {
     onSuccess: () => {
       setLocalSheets(prev => prev.map(s => ({ ...s, dirty: false })));
       queryClient.invalidateQueries({ queryKey: ["/api/factory/sheets"] });
-      toast({ title: "Saved", description: "All sheets saved." });
+      const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      setSavedAt(now);
+      if (!silentSaveRef.current) {
+        toast({ title: "Saved", description: "All sheets saved." });
+      }
+      silentSaveRef.current = false;
     },
-    onError: (e: any) => toast({ title: "Save failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => {
+      silentSaveRef.current = false;
+      toast({ title: "Save failed", description: e.message, variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -367,6 +393,16 @@ export default function FactorySheets() {
         <Button
           size="sm"
           variant="outline"
+          onClick={() => window.open("/api/factory/sheets/template", "_blank")}
+          data-testid="button-download-template"
+        >
+          <FileDown className="h-3.5 w-3.5 mr-1.5" />
+          Template
+        </Button>
+
+        <Button
+          size="sm"
+          variant="outline"
           onClick={() => fileInputRef.current?.click()}
           disabled={importMutation.isPending}
           data-testid="button-import-excel"
@@ -386,9 +422,18 @@ export default function FactorySheets() {
           Export Excel
         </Button>
 
+        {savedAt && !isDirty && (
+          <span className="text-xs text-muted-foreground" data-testid="text-autosaved">
+            Autosaved {savedAt}
+          </span>
+        )}
+
         <Button
           size="sm"
-          onClick={() => saveMutation.mutate(localSheets)}
+          onClick={() => {
+            silentSaveRef.current = false;
+            saveMutation.mutate(localSheets);
+          }}
           disabled={!isDirty || saveMutation.isPending}
           data-testid="button-save-sheets"
         >

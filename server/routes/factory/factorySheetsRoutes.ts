@@ -174,6 +174,43 @@ export function registerFactorySheetsRoutes(app: Express) {
     }
   });
 
+  // ── Template download ─────────────────────────────────────────────────────
+  app.get("/api/factory/sheets/template", requireAuth, async (_req, res) => {
+    try {
+      const wb = xlsxUtils.book_new();
+
+      // Sheet 1 — Production Tracking example
+      const sheet1: any[][] = [
+        ["Label", "Week 1", "Week 2", "Week 3", "Week 4"],
+        ["Target",  150,  150,  150,  150],
+        ["Actual",  120,  135,  140,  155],
+        ["Variance", -30, -15, -10,    5],
+      ];
+      const ws1 = xlsxUtils.aoa_to_sheet(sheet1);
+      ws1["!cols"] = [{ wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+      xlsxUtils.book_append_sheet(wb, ws1, "Production Tracking");
+
+      // Sheet 2 — Inventory example
+      const sheet2: any[][] = [
+        ["Label",        "Mon", "Tue", "Wed", "Thu", "Fri"],
+        ["Opening Stock", 500,   470,   490,   460,  480],
+        ["Received",      100,   150,    80,   120,   90],
+        ["Dispatched",    130,   130,   110,   100,  140],
+        ["Closing Stock", 470,   490,   460,   480,  430],
+      ];
+      const ws2 = xlsxUtils.aoa_to_sheet(sheet2);
+      ws2["!cols"] = [{ wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+      xlsxUtils.book_append_sheet(wb, ws2, "Inventory");
+
+      const buf: Buffer = writeExcel(wb, { type: "buffer", bookType: "xlsx" });
+      res.setHeader("Content-Disposition", 'attachment; filename="factory-sheets-template.xlsx"');
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.send(buf);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── Export all sheets as styled .xlsx ─────────────────────────────────────
   app.get("/api/factory/sheets/export", requireAuth, async (req, res) => {
     try {
