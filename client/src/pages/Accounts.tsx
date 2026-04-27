@@ -185,7 +185,7 @@ export default function Accounts() {
     if (urlStartDate && urlEndDate) {
       return { fromDate: urlStartDate, toDate: urlEndDate, preset: "custom" as const };
     }
-    return getDefaultPeriodValue("last_1_month");
+    return getDefaultPeriodValue("this_month");
   });
   const [accountToEdit, setAccountToEdit] = useState<LedgerAccount | null>(
     null,
