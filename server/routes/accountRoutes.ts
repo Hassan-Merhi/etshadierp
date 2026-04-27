@@ -452,6 +452,10 @@ export function registerAccountRoutes(app: Express) {
       const q = ((req.query.q as string) || "").trim();
       if (!q) return res.json([]);
 
+      // Strip currency symbols / commas so "$3,967" → "3967" for amount matching
+      const amountQ = q.replace(/[$,\s]/g, "");
+      const isNumericSearch = /^\d+(\.\d+)?$/.test(amountQ);
+
       const results = await db
         .select({
           id: vouchers.id,
@@ -468,7 +472,12 @@ export function registerAccountRoutes(app: Express) {
           and(
             eq(vouchers.companyId, req.session.currentCompanyId),
             isNull(vouchers.deletedAt),
-            ilike(vouchers.voucherNumber, `%${q}%`)
+            or(
+              ilike(vouchers.voucherNumber, `%${q}%`),
+              isNumericSearch
+                ? sql`CAST(${vouchers.totalAmount} AS TEXT) LIKE ${"%" + amountQ + "%"}`
+                : sql`false`,
+            )
           )
         )
         .orderBy(desc(vouchers.voucherDate))
