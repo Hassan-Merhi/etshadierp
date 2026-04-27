@@ -1735,14 +1735,14 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           eq(customerBalances.transactionType, "SALE"),
         ));
 
-        // Delete charge journal vouchers created during finalization (sourceModule FACTORY, description contains invoice number)
+        // Delete charge journal vouchers created during finalization (voucherNumber starts with CHARGE-[invoiceNumber]-)
         if (order.invoiceNumber) {
           const chargeVouchers = await tx.select({ id: vouchers.id })
             .from(vouchers)
             .where(and(
               eq(vouchers.companyId, companyId),
               eq(vouchers.sourceModule, "FACTORY"),
-              sql`${vouchers.description} LIKE ${"CHARGE-" + order.invoiceNumber + "-%"}`,
+              sql`${vouchers.voucherNumber} LIKE ${"CHARGE-" + order.invoiceNumber + "-%"}`,
             ));
           for (const cv of chargeVouchers) {
             await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, cv.id));
