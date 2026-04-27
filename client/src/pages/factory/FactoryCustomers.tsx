@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Search, Phone, User, Trash2, FileText, RotateCcw, History, Clock } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 interface Customer {
   id: number;
@@ -31,6 +32,7 @@ interface Customer {
 
 export default function FactoryCustomers() {
   const { toast } = useToast();
+  const { formatCashAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -265,9 +267,7 @@ export default function FactoryCustomers() {
                       <TableCell className="text-right font-mono">
                         {customer.balance !== undefined ? (
                           <span data-testid={`text-customer-balance-${customer.id}`}>
-                            {customer.balance % 1 === 0
-                              ? `$${Math.round(customer.balance).toLocaleString()}`
-                              : `$${customer.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}{" "}
+                            {formatCashAmount(customer.balance)}{" "}
                             <span className={`text-xs font-semibold ${drCrClass(customer.balanceSide)}`}>{customer.balanceSide}</span>
                           </span>
                         ) : (
