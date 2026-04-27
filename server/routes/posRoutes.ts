@@ -1432,6 +1432,41 @@ export function registerPosRoutes(app: Express) {
     }
   });
 
+  // ── POS Customer Transactions (statement) ────────────────────────────────
+  app.get("/api/pos/customers/:id/transactions", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const customerId = parseInt(req.params.id);
+      if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
+
+      const customer = await storage.getCustomerById(customerId);
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      if (customer.companyId !== companyId) return res.status(403).json({ message: "Access denied" });
+
+      const { startDate, endDate } = req.query;
+      let transactions: any[] = [];
+      if (customer.ledgerAccountId) {
+        transactions = await storage.getVoucherEntriesByLedger(
+          customer.ledgerAccountId,
+          startDate as string | undefined,
+          endDate as string | undefined,
+        );
+      } else {
+        transactions = await storage.getVoucherEntriesByCustomer(
+          customerId,
+          startDate as string | undefined,
+          endDate as string | undefined,
+        );
+      }
+
+      res.json(transactions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ── POS Send Invoice to WhatsApp ──────────────────────────────────────────
   app.post("/api/pos/send-invoice-whatsapp", requireAuth, async (req, res) => {
     try {

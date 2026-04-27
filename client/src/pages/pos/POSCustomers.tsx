@@ -70,13 +70,14 @@ export default function POSCustomers() {
     queryKey: ["/api/pos/customers"],
   });
 
-  // Fetch transactions when a customer is selected
-  const { data: ledgerTxns = [], isLoading: txnsLoading } = useQuery<any[]>({
-    queryKey: ["/api/customers", statementCustomer?.id, "transactions"],
+  // Fetch transactions when a customer is selected — uses POS-specific endpoint
+  const { data: ledgerTxnsRaw, isLoading: txnsLoading } = useQuery<any>({
+    queryKey: ["/api/pos/customers", statementCustomer?.id, "transactions"],
     queryFn: () =>
-      fetch(`/api/customers/${statementCustomer!.id}/transactions`).then((r) => r.json()),
+      fetch(`/api/pos/customers/${statementCustomer!.id}/transactions`).then((r) => r.json()),
     enabled: !!statementCustomer?.id,
   });
+  const ledgerTxns: any[] = Array.isArray(ledgerTxnsRaw) ? ledgerTxnsRaw : [];
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
