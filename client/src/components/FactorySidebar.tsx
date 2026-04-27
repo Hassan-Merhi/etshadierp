@@ -33,6 +33,7 @@ import {
   LayoutGrid,
   Scale,
   Store,
+  Table,
 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
 import { useLocation, Link } from "wouter";
@@ -126,6 +127,7 @@ const navSections: NavSection[] = [
     items: [
       { title: "Analytics",           url: "/factory/analytics",          icon: TrendingUp },
       { title: "Financial Snapshot",  url: "/factory/financial-snapshot", icon: LayoutGrid  },
+      { title: "Factory Sheets",      url: "/factory/sheets",             icon: Table       },
     ],
   },
   {
