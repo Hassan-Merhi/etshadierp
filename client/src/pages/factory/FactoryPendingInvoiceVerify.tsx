@@ -14,7 +14,7 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation, useParams } from "wouter";
 import { useEscapeBack } from "@/hooks/use-escape-back";
-import { ArrowLeft, Check, RotateCcw, Ship, Truck, AlertTriangle, CheckCircle, Package, Trash2, Plus, Wrench } from "lucide-react";
+import { ArrowLeft, Check, RotateCcw, Ship, Truck, AlertTriangle, CheckCircle, Package, Trash2, Plus, Wrench, DollarSign } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -135,6 +135,9 @@ export default function FactoryPendingInvoiceVerify() {
   const [showFixBalesDialog, setShowFixBalesDialog] = useState(false);
   const [invoiceDate, setInvoiceDate] = useState(new Date().toLocaleDateString("en-CA"));
 
+  const [showProformaDialog, setShowProformaDialog] = useState(false);
+  const [selectedProformaId, setSelectedProformaId] = useState<string>("");
+
   const { data: verification, isLoading: verificationLoading } = useQuery<VerificationSummary>({
     queryKey: ["/api/factory/customer-orders", orderId, "verification"],
     queryFn: async () => {
@@ -164,6 +167,17 @@ export default function FactoryPendingInvoiceVerify() {
   const { data: ledgerAccounts = [] } = useQuery<{ id: number; name: string; code: string; accountType: string }[]>({
     queryKey: ["/api/ledger-accounts"],
     enabled: true,
+  });
+
+  const { data: proformas = [] } = useQuery<{ id: number; name: string; lines: { articleCode: string; pricePerBale: string }[] }[]>({
+    queryKey: ["/api/factory/customer-proformas", orderDetail?.customerId],
+    queryFn: async () => {
+      if (!orderDetail?.customerId) return [];
+      const res = await fetch(`/api/factory/customer-proformas?customerId=${orderDetail.customerId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch proformas");
+      return res.json();
+    },
+    enabled: !!orderDetail?.customerId,
   });
 
   useEffect(() => {
@@ -274,6 +288,24 @@ export default function FactoryPendingInvoiceVerify() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId, "verification"] });
       setShowFixBalesDialog(false);
+    },
+    onError: (error: Error) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const applyProformaMutation = useMutation({
+    mutationFn: async (proformaId: number) => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/apply-proforma-prices`, { proformaId });
+      return res;
+    },
+    onSuccess: (data: any) => {
+      const repriced = data?.repriced ?? 0;
+      toast({ title: "Proforma prices applied", description: `${repriced} bale${repriced !== 1 ? "s" : ""} updated` });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+      setShowProformaDialog(false);
+      setSelectedProformaId("");
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
@@ -726,15 +758,29 @@ export default function FactoryPendingInvoiceVerify() {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <Button
-          variant="outline"
-          onClick={() => setShowReturnDialog(true)}
-          disabled={returnToLoadingMutation.isPending}
-          data-testid="button-return-to-loading"
-        >
-          <RotateCcw className="mr-2 h-4 w-4" />
-          Return to Loading
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowReturnDialog(true)}
+            disabled={returnToLoadingMutation.isPending}
+            data-testid="button-return-to-loading"
+          >
+            <RotateCcw className="mr-2 h-4 w-4" />
+            Return to Loading
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSelectedProformaId("");
+              setShowProformaDialog(true);
+            }}
+            disabled={applyProformaMutation.isPending}
+            data-testid="button-apply-proforma-prices"
+          >
+            <DollarSign className="mr-2 h-4 w-4" />
+            Apply Proforma Prices
+          </Button>
+        </div>
 
         <div className="flex items-center gap-2">
           {isPending && (
@@ -921,6 +967,69 @@ export default function FactoryPendingInvoiceVerify() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showProformaDialog} onOpenChange={setShowProformaDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Apply Proforma Prices</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Select a proforma to apply its article prices to all matching bales in this order. Only bales with a matching article code will be updated.
+            </p>
+            {proformas.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">No proformas found for this customer.</p>
+            ) : (
+              <Select value={selectedProformaId} onValueChange={setSelectedProformaId}>
+                <SelectTrigger data-testid="select-proforma">
+                  <SelectValue placeholder="Select a proforma..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {proformas.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)} data-testid={`option-proforma-${p.id}`}>
+                      {p.name} ({p.lines.length} line{p.lines.length !== 1 ? "s" : ""})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {selectedProformaId && (() => {
+              const pf = proformas.find(p => String(p.id) === selectedProformaId);
+              if (!pf || pf.lines.length === 0) return null;
+              return (
+                <div className="rounded-md border p-3 space-y-1 max-h-48 overflow-y-auto">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Price lines in this proforma:</p>
+                  {pf.lines.map((l, i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{l.articleCode}</span>
+                      <span className="font-medium">${parseFloat(l.pricePerBale).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowProformaDialog(false)}
+                data-testid="button-cancel-proforma"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (selectedProformaId) applyProformaMutation.mutate(parseInt(selectedProformaId));
+                }}
+                disabled={!selectedProformaId || applyProformaMutation.isPending}
+                data-testid="button-confirm-proforma"
+              >
+                <DollarSign className="mr-2 h-4 w-4" />
+                Apply Prices
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
