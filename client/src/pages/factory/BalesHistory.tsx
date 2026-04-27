@@ -693,7 +693,7 @@ export default function BalesHistory() {
             <Button variant="outline" onClick={() => setDeleteConfirm(null)} data-testid="button-cancel-delete">Cancel</Button>
             <Button
               variant="destructive"
-              onClick={() => wrapAdminAction(() => deleteConfirm && deleteBale.mutate(deleteConfirm), "Delete Bale")}
+              onClick={() => deleteConfirm && deleteBale.mutate(deleteConfirm)}
               disabled={deleteBale.isPending}
               data-testid="button-confirm-delete"
             >

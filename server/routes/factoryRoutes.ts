@@ -62,6 +62,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     if (!["PUT", "PATCH", "DELETE"].includes(req.method)) return next();
     if (!req.session?.userId) return next(); // unauthenticated — let requireAuth handle it
 
+    // Bale deletion is open to all authenticated factory users — no admin override needed
+    if (req.method === "DELETE" && /^\/bales\/\d+$/.test(req.path)) return next();
+
     const role = req.session?.currentRole as string | undefined;
     if (["Admin", "Owner", "Developer"].includes(role || "")) return next();
 
