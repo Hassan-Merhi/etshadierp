@@ -57,7 +57,7 @@ interface CustomerOrder {
   proformaName?: string | null;
 }
 
-type StatusFilter = "LOADING" | "PENDING_VERIFIED" | "FINALIZED" | "ALL";
+type StatusFilter = "LOADING" | "PENDING" | "VERIFIED" | "FINALIZED" | "ALL";
 
 export default function FactoryInvoices() {
   const { toast } = useToast();
@@ -119,21 +119,23 @@ export default function FactoryInvoices() {
     },
   });
 
-  const loadingCount        = allOrders.filter(o => o.status === "LOADING").length;
-  const pendingVerifiedCount = allOrders.filter(o => o.status === "PENDING_VERIFICATION" || o.status === "VERIFIED").length;
-  const finalizedCount      = allOrders.filter(o => o.status === "FINALIZED").length;
+  const loadingCount  = allOrders.filter(o => o.status === "LOADING").length;
+  const pendingCount  = allOrders.filter(o => o.status === "PENDING_VERIFICATION").length;
+  const verifiedCount = allOrders.filter(o => o.status === "VERIFIED").length;
+  const finalizedCount = allOrders.filter(o => o.status === "FINALIZED").length;
 
   const filteredOrders =
-    statusFilter === "LOADING"         ? allOrders.filter(o => o.status === "LOADING") :
-    statusFilter === "PENDING_VERIFIED" ? allOrders.filter(o => o.status === "PENDING_VERIFICATION" || o.status === "VERIFIED") :
-    statusFilter === "FINALIZED"        ? allOrders.filter(o => o.status === "FINALIZED") :
+    statusFilter === "LOADING"  ? allOrders.filter(o => o.status === "LOADING") :
+    statusFilter === "PENDING"  ? allOrders.filter(o => o.status === "PENDING_VERIFICATION") :
+    statusFilter === "VERIFIED" ? allOrders.filter(o => o.status === "VERIFIED") :
+    statusFilter === "FINALIZED" ? allOrders.filter(o => o.status === "FINALIZED") :
     allOrders;
 
-  const filters: { key: StatusFilter; label: string; count: number }[] = [
-    { key: "LOADING",         label: "Loading",          count: loadingCount },
-    { key: "PENDING_VERIFIED", label: "Pending + Verified", count: pendingVerifiedCount },
-    { key: "FINALIZED",        label: "Finalized",          count: finalizedCount },
-    { key: "ALL",              label: "All",                count: allOrders.length },
+  const statusFilters: { key: StatusFilter; label: string; count: number }[] = [
+    { key: "LOADING",  label: "Loading",  count: loadingCount  },
+    { key: "PENDING",  label: "Pending",  count: pendingCount  },
+    { key: "VERIFIED", label: "Verified", count: verifiedCount },
+    { key: "FINALIZED", label: "Finalized", count: finalizedCount },
   ];
 
   const getStatusBadge = (status: string) => {
@@ -165,35 +167,47 @@ export default function FactoryInvoices() {
 
   return (
     <div className="flex flex-col h-full p-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-5">
-        <div className="flex flex-wrap items-center gap-2" data-testid="filter-tabs">
-          {filters.map((f) => (
+      <div className="flex flex-col gap-2 mb-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-1.5" data-testid="filter-tabs">
+            {statusFilters.map((f) => (
+              <Button
+                key={f.key}
+                variant={statusFilter === f.key ? "default" : "outline"}
+                size="sm"
+                onClick={() => setStatusFilter(f.key)}
+                data-testid={`button-filter-${f.key.toLowerCase()}`}
+                className="text-xs px-3"
+              >
+                {f.label} <span className="ml-1 opacity-70">({f.count})</span>
+              </Button>
+            ))}
             <Button
-              key={f.key}
-              variant={statusFilter === f.key ? "default" : "outline"}
+              variant={statusFilter === "ALL" ? "secondary" : "ghost"}
               size="sm"
-              onClick={() => setStatusFilter(f.key)}
-              data-testid={`button-filter-${f.key.toLowerCase()}`}
+              onClick={() => setStatusFilter("ALL")}
+              data-testid="button-filter-all"
+              className="text-xs px-3 text-muted-foreground"
             >
-              {f.label} ({f.count})
+              All ({allOrders.length})
             </Button>
-          ))}
-        </div>
+          </div>
 
-        <div className="w-56">
-          <Select value={customerFilter} onValueChange={setCustomerFilter}>
-            <SelectTrigger data-testid="select-customer-filter">
-              <SelectValue placeholder="All customers" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Customers</SelectItem>
-              {customers.map((c) => (
-                <SelectItem key={c.id} value={c.id.toString()} data-testid={`select-customer-option-${c.id}`}>
-                  {c.legalName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="w-56">
+            <Select value={customerFilter} onValueChange={setCustomerFilter}>
+              <SelectTrigger data-testid="select-customer-filter">
+                <SelectValue placeholder="All customers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Customers</SelectItem>
+                {customers.map((c) => (
+                  <SelectItem key={c.id} value={c.id.toString()} data-testid={`select-customer-option-${c.id}`}>
+                    {c.legalName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
