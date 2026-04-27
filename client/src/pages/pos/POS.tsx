@@ -627,7 +627,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         toast({ title: "Failed to send", description: body.message || "WhatsApp send failed.", variant: "destructive" });
       } else {
         toast({ title: "Sent", description: "Stock report sent to WhatsApp group." });
-        setShowStockPrompt(false);
       }
     } catch {
       toast({ title: "Error", description: "Could not reach the server.", variant: "destructive" });
@@ -1553,6 +1552,20 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          {!editVoucherId && (activeLocation as any)?.whatsappGroupChatId && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSendWhatsAppReport}
+              disabled={sendingWhatsApp}
+              className="gap-1 sm:gap-2"
+              data-testid="button-send-whatsapp-report"
+            >
+              <Send className="h-4 w-4" />
+              <span className="hidden sm:inline">{sendingWhatsApp ? "Sending…" : "Send Stock"}</span>
+              <span className="sm:hidden">{sendingWhatsApp ? "…" : "WA"}</span>
+            </Button>
+          )}
           {saleJustCompleted && !editVoucherId ? (
             <Button
               size="sm"
@@ -2580,18 +2593,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             <Button variant="outline" onClick={() => setShowStockPrompt(false)} data-testid="button-skip-stock-print">
               Skip
             </Button>
-            {(activeLocation as any)?.whatsappGroupChatId && (
-              <Button
-                variant="outline"
-                onClick={handleSendWhatsAppReport}
-                disabled={sendingWhatsApp}
-                className="gap-2"
-                data-testid="button-send-whatsapp-report"
-              >
-                <Send className="h-4 w-4" />
-                {sendingWhatsApp ? "Sending…" : "Send to WhatsApp"}
-              </Button>
-            )}
             <Button
               onClick={() => { setShowStockPrompt(false); handleStockPrint(); }}
               disabled={stockInventoryLoading}
