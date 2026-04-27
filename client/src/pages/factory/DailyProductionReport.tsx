@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { addDays, format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -798,6 +798,19 @@ export default function DailyProductionReport() {
     setCustomTo(  format(addDays(new Date(baseTo   + "T00:00:00"), n), fmt));
     setPreset("custom");
   }, [from, to]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      const isBack    = e.key === "-" || e.code === "Minus";
+      const isForward = (e.key === "+" && e.shiftKey) || (e.code === "Equal" && e.shiftKey) || e.key === "=";
+      if (isBack)    { e.preventDefault(); stepDates(-1); }
+      else if (isForward) { e.preventDefault(); stepDates(1); }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [stepDates]);
 
   const { data, isLoading } = useQuery<ReportData>({
     queryKey: ["/api/factory/production-value-report", from, to],
