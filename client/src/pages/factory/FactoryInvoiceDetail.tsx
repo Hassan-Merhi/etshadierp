@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation, useRoute } from "wouter";
 import { useEscapeBack } from "@/hooks/use-escape-back";
-import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw, Container, Pencil, RotateCcw, Hammer, ChevronDown, GitCompare } from "lucide-react";
+import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw, Container, Pencil, RotateCcw, Hammer, ChevronDown, GitCompare, DollarSign } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { useState, useRef } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -92,6 +94,8 @@ export default function FactoryInvoiceDetail() {
   const [editValue, setEditValue] = useState("");
   const [revertDialogOpen, setRevertDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [showProformaDialog, setShowProformaDialog] = useState(false);
+  const [selectedProformaId, setSelectedProformaId] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
   useEscapeBack(() => navigate("/factory/invoicing?tab=invoices"));
   const appMode = useAppMode();
@@ -107,6 +111,17 @@ export default function FactoryInvoiceDetail() {
 
   const { data: myAccess } = useQuery<{ hiddenCostFields: string[] }>({
     queryKey: ["/api/factory/my-access"],
+  });
+
+  const { data: proformas = [] } = useQuery<{ id: number; name: string; lines: { articleCode: string; pricePerBale: string }[] }[]>({
+    queryKey: ["/api/factory/customer-proformas", order?.customerId],
+    queryFn: async () => {
+      if (!order?.customerId) return [];
+      const res = await fetch(`/api/factory/customer-proformas?customerId=${order.customerId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch proformas");
+      return res.json();
+    },
+    enabled: !!order?.customerId,
   });
   const hideExportSelling = (myAccess?.hiddenCostFields ?? []).includes("hide_export_selling_price");
 
@@ -231,6 +246,32 @@ export default function FactoryInvoiceDetail() {
         toast({ title: "Production prices applied", description: `Updated ${data.repriced} bale(s) to production prices.` });
       }
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
+    },
+    onError: (error: any) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const applyProformaMutation = useMutation({
+    mutationFn: async (proformaId: number) => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/apply-proforma-prices`, { proformaId });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to apply proforma prices");
+      }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      const repriced = data?.repriced ?? 0;
+      if (repriced === 0) {
+        toast({ title: "No changes", description: "All bale prices already match the selected proforma — no updates needed." });
+      } else {
+        toast({ title: "Proforma prices applied", description: `Updated ${repriced} bale(s).` });
+      }
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
+      setShowProformaDialog(false);
+      setSelectedProformaId("");
     },
     onError: (error: any) => {
       if (error?._handledGlobally) return;
@@ -442,6 +483,19 @@ export default function FactoryInvoiceDetail() {
                 >
                   <RefreshCw className={`h-4 w-4 ${repriceMutation.isPending ? "animate-spin" : ""}`} />
                   Apply Selling Prices
+                </DropdownMenuItem>
+              )}
+              {order.status !== "CANCELLED" && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setSelectedProformaId("");
+                    setShowProformaDialog(true);
+                  }}
+                  disabled={applyProformaMutation.isPending}
+                  data-testid="button-apply-proforma-prices"
+                >
+                  <DollarSign className="h-4 w-4" />
+                  Apply Proforma Prices
                 </DropdownMenuItem>
               )}
 
@@ -672,6 +726,63 @@ export default function FactoryInvoiceDetail() {
           </div>
         </div>
       </Card>
+
+      <Dialog open={showProformaDialog} onOpenChange={setShowProformaDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Apply Proforma Prices</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Select a proforma to apply its article prices to all matching bales in this order.
+            </p>
+            {proformas.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">No proformas found for this customer.</p>
+            ) : (
+              <Select value={selectedProformaId} onValueChange={setSelectedProformaId}>
+                <SelectTrigger data-testid="select-proforma">
+                  <SelectValue placeholder="Select a proforma..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {proformas.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)} data-testid={`option-proforma-${p.id}`}>
+                      {p.name} ({p.lines.length} line{p.lines.length !== 1 ? "s" : ""})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {selectedProformaId && (() => {
+              const pf = proformas.find(p => String(p.id) === selectedProformaId);
+              if (!pf || pf.lines.length === 0) return null;
+              return (
+                <div className="rounded-md border p-3 space-y-1 max-h-48 overflow-y-auto">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Price lines in this proforma:</p>
+                  {pf.lines.map((l, i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{l.articleCode}</span>
+                      <span className="font-medium">${parseFloat(l.pricePerBale).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowProformaDialog(false)} data-testid="button-cancel-proforma">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => { if (selectedProformaId) applyProformaMutation.mutate(parseInt(selectedProformaId)); }}
+                disabled={!selectedProformaId || applyProformaMutation.isPending}
+                data-testid="button-confirm-proforma"
+              >
+                <DollarSign className="mr-2 h-4 w-4" />
+                {applyProformaMutation.isPending ? "Applying…" : "Apply Prices"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
