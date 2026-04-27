@@ -1357,7 +1357,6 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
       if (order.status === "CANCELLED") return res.status(400).json({ message: "Cannot reprice a cancelled order" });
-      if (order.status === "FINALIZED") return res.status(400).json({ message: "Cannot reprice a finalized order — unfinalize it first" });
 
       // Validate proforma belongs to this company
       const [proforma] = await db.select().from(customerProformas)
