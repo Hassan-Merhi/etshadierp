@@ -50,6 +50,7 @@ interface NavItem {
   icon: any;
   adminOnly?: boolean;
   featureFlag?: string;
+  featureFlagDefaultOn?: boolean;
   requiresExplicitAccess?: boolean;
 }
 
@@ -66,6 +67,7 @@ const navSections: NavSection[] = [
     color: "#3b82f6",
     items: [
       { title: "Production Analytics", url: "/factory/production-report", icon: BarChart3 },
+      { title: "Factory Sheets",       url: "/factory/sheets",            icon: Table     },
     ],
   },
   {
@@ -125,9 +127,8 @@ const navSections: NavSection[] = [
     label: "Reports",
     color: "#06b6d4",
     items: [
-      { title: "Analytics",           url: "/factory/analytics",          icon: TrendingUp },
-      { title: "Financial Snapshot",  url: "/factory/financial-snapshot", icon: LayoutGrid  },
-      { title: "Factory Sheets",      url: "/factory/sheets",             icon: Table       },
+      { title: "Analytics",           url: "/factory/analytics",          icon: TrendingUp, featureFlag: "analyticsEnabled",         featureFlagDefaultOn: true },
+      { title: "Financial Snapshot",  url: "/factory/financial-snapshot", icon: LayoutGrid,  featureFlag: "financialSnapshotEnabled",  featureFlagDefaultOn: true },
     ],
   },
   {
@@ -210,7 +211,13 @@ export function FactorySidebar({ user }: { user?: any }) {
       ...s,
       items: s.items.filter(item => {
         if (item.adminOnly && !isAdmin) return false;
-        if (item.featureFlag) { if (!settings || settings[item.featureFlag] !== true) return false; }
+        if (item.featureFlag) {
+          if (item.featureFlagDefaultOn) {
+            if (settings && settings[item.featureFlag] === false) return false;
+          } else {
+            if (!settings || settings[item.featureFlag] !== true) return false;
+          }
+        }
         if (myAccess && !myAccess.fullAccess && myAccess.pageKeys.length > 0)
           if (!myAccess.pageKeys.includes(item.url.replace(/^\//, ""))) return false;
         if (item.requiresExplicitAccess && !isAdmin && myAccess) {

@@ -36,6 +36,8 @@ interface FactorySettingsData {
   supplierReportEnabled: boolean;
   supplierStatementEnabled: boolean;
   daybookEnabled: boolean;
+  analyticsEnabled: boolean;
+  financialSnapshotEnabled: boolean;
   workersTabPayrollEnabled: boolean;
   workersTabAttendanceEnabled: boolean;
   workersTabReportEnabled: boolean;
@@ -79,6 +81,8 @@ const defaultSettings: FactorySettingsData = {
   supplierReportEnabled: true,
   supplierStatementEnabled: true,
   daybookEnabled: true,
+  analyticsEnabled: true,
+  financialSnapshotEnabled: true,
   workersTabPayrollEnabled: true,
   workersTabAttendanceEnabled: true,
   workersTabReportEnabled: true,
@@ -543,6 +547,8 @@ export default function FactorySettings() {
           </CardHeader>
           <CardContent className="divide-y">
             {toggleItem("Daybook", "daybookEnabled")}
+            {toggleItem("Analytics", "analyticsEnabled")}
+            {toggleItem("Financial Snapshot", "financialSnapshotEnabled")}
           </CardContent>
         </Card>
 
