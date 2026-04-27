@@ -1134,6 +1134,7 @@ export const customers = pgTable("customers", {
   openingBalanceSide: varchar("opening_balance_side", { length: 2 }).default("Dr"),
   active: boolean("active").notNull().default(true),
   statementNote: text("statement_note"),
+  paymentTermsDays: integer("payment_terms_days"),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
@@ -1150,6 +1151,7 @@ export const insertCustomerSchema = createInsertSchema(customers).omit({
   openingBalance: z.string().optional(),
   openingBalanceSide: z.enum(["Dr", "Cr"]).optional().or(z.literal("")),
   ledgerAccountId: z.number().optional(),
+  paymentTermsDays: z.number().int().positive().optional().nullable(),
 });
 
 export type InsertCustomer = z.infer<typeof insertCustomerSchema>;

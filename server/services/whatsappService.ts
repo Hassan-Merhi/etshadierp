@@ -107,6 +107,77 @@ interface SendResult {
   error?:  string;
 }
 
+/** Send a plain text message to one specific chatId */
+export async function sendWhatsAppTextToChatId(
+  chatId:  string,
+  message: string,
+): Promise<{ success: boolean; error?: string }> {
+  const settings = await getWaSettings();
+  if (!settings?.instanceId || !settings?.apiToken) {
+    return { success: false, error: "WhatsApp credentials not configured" };
+  }
+  if (!settings.enabled) {
+    return { success: false, error: "WhatsApp sending is disabled" };
+  }
+
+  const url = baseUrl(settings.instanceId, settings.apiToken, "sendMessage");
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chatId, message }),
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    return { success: false, error: `Green API ${response.status}: ${body}` };
+  }
+  return { success: true };
+}
+
+/** Send a plain text message to ALL active recipients */
+export async function sendWhatsAppText(
+  message: string,
+): Promise<{ success: boolean; sent: number; failed: number; errors: string[] }> {
+  const settings = await getWaSettings();
+  if (!settings?.instanceId || !settings?.apiToken) {
+    return { success: false, sent: 0, failed: 0, errors: ["WhatsApp credentials not configured"] };
+  }
+  if (!settings.enabled) {
+    return { success: false, sent: 0, failed: 0, errors: ["WhatsApp sending is disabled"] };
+  }
+
+  const recipients = await getActiveRecipients();
+  if (!recipients.length) {
+    return { success: false, sent: 0, failed: 0, errors: ["No active WhatsApp recipients"] };
+  }
+
+  const url = baseUrl(settings.instanceId, settings.apiToken, "sendMessage");
+
+  let sent = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  for (const r of recipients) {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatId: r.chatId, message }),
+      });
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`Green API ${response.status}: ${body}`);
+      }
+      sent++;
+    } catch (e: any) {
+      failed++;
+      errors.push(e.message ?? "Unknown error");
+      console.error("[WhatsApp] Text send failed:", e);
+    }
+  }
+
+  return { success: sent > 0, sent, failed, errors };
+}
+
 /** Send a single file to one specific chatId (not all recipients) */
 export async function sendWhatsAppFileToChatId(
   chatId:   string,

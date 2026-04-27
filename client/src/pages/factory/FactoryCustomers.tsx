@@ -13,7 +13,7 @@ import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Search, Phone, User, Trash2, FileText, RotateCcw, History } from "lucide-react";
+import { Plus, Pencil, Search, Phone, User, Trash2, FileText, RotateCcw, History, Clock } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface Customer {
@@ -24,6 +24,7 @@ interface Customer {
   openingBalance: string | null;
   openingBalanceSide: string | null;
   active: boolean;
+  paymentTermsDays: number | null;
   balance?: number;
   balanceSide?: string;
 }
@@ -41,6 +42,7 @@ export default function FactoryCustomers() {
     phone: "",
     openingBalance: "",
     openingBalanceSide: "Dr",
+    paymentTermsDays: "" as string,
   });
 
   const { data: customers = [], isLoading, isError, error } = useQuery<Customer[]>({
@@ -119,7 +121,7 @@ export default function FactoryCustomers() {
   });
 
   const resetForm = () => {
-    setFormData({ legalName: "", phone: "", openingBalance: "", openingBalanceSide: "Dr" });
+    setFormData({ legalName: "", phone: "", openingBalance: "", openingBalanceSide: "Dr", paymentTermsDays: "" });
   };
 
   const openCreate = () => {
@@ -134,26 +136,31 @@ export default function FactoryCustomers() {
       phone: customer.phone || "",
       openingBalance: customer.openingBalance || "",
       openingBalanceSide: customer.openingBalanceSide || "Dr",
+      paymentTermsDays: customer.paymentTermsDays != null ? String(customer.paymentTermsDays) : "",
     });
   };
 
   const handleCreate = () => {
     if (!formData.legalName.trim()) return;
+    const days = formData.paymentTermsDays ? parseInt(formData.paymentTermsDays) : undefined;
     createMutation.mutate({
       legalName: formData.legalName.trim(),
       phone: formData.phone.trim() || undefined,
       openingBalance: formData.openingBalance || undefined,
       openingBalanceSide: formData.openingBalanceSide || undefined,
+      paymentTermsDays: days || undefined,
     });
   };
 
   const handleUpdate = () => {
     if (!editingCustomer || !formData.legalName.trim()) return;
+    const days = formData.paymentTermsDays ? parseInt(formData.paymentTermsDays) : null;
     updateMutation.mutate({
       id: editingCustomer.id,
       data: {
         legalName: formData.legalName.trim(),
         phone: formData.phone.trim() || null,
+        paymentTermsDays: days,
       },
     });
   };
@@ -228,6 +235,7 @@ export default function FactoryCustomers() {
                   <TableHead>Name</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead className="text-right">Balance</TableHead>
+                  <TableHead>Terms</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[90px]"></TableHead>
                 </TableRow>
@@ -235,7 +243,7 @@ export default function FactoryCustomers() {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       {search ? "No customers match your search" : "No customers yet"}
                     </TableCell>
                   </TableRow>
@@ -264,6 +272,16 @@ export default function FactoryCustomers() {
                           </span>
                         ) : (
                           "-"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {customer.paymentTermsDays != null ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground" data-testid={`text-payment-terms-${customer.id}`}>
+                            <Clock className="h-3 w-3" />
+                            Net {customer.paymentTermsDays}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -424,6 +442,39 @@ export default function FactoryCustomers() {
                 </Select>
               </div>
             </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block flex items-center gap-1">
+                <Clock className="h-3.5 w-3.5" />
+                Payment Terms
+              </label>
+              <Select
+                value={formData.paymentTermsDays || "none"}
+                onValueChange={(v) => setFormData({ ...formData, paymentTermsDays: v === "none" ? "" : v === "custom" ? "" : v })}
+              >
+                <SelectTrigger data-testid="select-payment-terms">
+                  <SelectValue placeholder="No payment terms" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No payment terms</SelectItem>
+                  <SelectItem value="30">Net 30 days</SelectItem>
+                  <SelectItem value="45">Net 45 days</SelectItem>
+                  <SelectItem value="60">Net 60 days</SelectItem>
+                  <SelectItem value="90">Net 90 days</SelectItem>
+                </SelectContent>
+              </Select>
+              {formData.paymentTermsDays && !["30","45","60","90"].includes(formData.paymentTermsDays) && (
+                <Input
+                  type="number"
+                  min={1}
+                  value={formData.paymentTermsDays}
+                  onChange={(e) => setFormData({ ...formData, paymentTermsDays: e.target.value })}
+                  placeholder="Days"
+                  className="mt-2"
+                  data-testid="input-custom-payment-terms"
+                />
+              )}
+              <p className="text-xs text-muted-foreground mt-1">A WhatsApp reminder will be sent when this customer has an outstanding balance past their due date.</p>
+            </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => { setIsCreateOpen(false); resetForm(); }} data-testid="button-cancel-create">
                 Cancel
@@ -469,6 +520,44 @@ export default function FactoryCustomers() {
                 placeholder="Phone number"
                 data-testid="input-edit-customer-phone"
               />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block flex items-center gap-1">
+                <Clock className="h-3.5 w-3.5" />
+                Payment Terms
+              </label>
+              <Select
+                value={formData.paymentTermsDays && ["30","45","60","90"].includes(formData.paymentTermsDays) ? formData.paymentTermsDays : formData.paymentTermsDays ? "custom" : "none"}
+                onValueChange={(v) => {
+                  if (v === "none") setFormData({ ...formData, paymentTermsDays: "" });
+                  else if (v === "custom") setFormData({ ...formData, paymentTermsDays: "" });
+                  else setFormData({ ...formData, paymentTermsDays: v });
+                }}
+              >
+                <SelectTrigger data-testid="select-edit-payment-terms">
+                  <SelectValue placeholder="No payment terms" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No payment terms</SelectItem>
+                  <SelectItem value="30">Net 30 days</SelectItem>
+                  <SelectItem value="45">Net 45 days</SelectItem>
+                  <SelectItem value="60">Net 60 days</SelectItem>
+                  <SelectItem value="90">Net 90 days</SelectItem>
+                  <SelectItem value="custom">Custom...</SelectItem>
+                </SelectContent>
+              </Select>
+              {formData.paymentTermsDays && !["30","45","60","90"].includes(formData.paymentTermsDays) && (
+                <Input
+                  type="number"
+                  min={1}
+                  value={formData.paymentTermsDays}
+                  onChange={(e) => setFormData({ ...formData, paymentTermsDays: e.target.value })}
+                  placeholder="Number of days"
+                  className="mt-2"
+                  data-testid="input-edit-custom-payment-terms"
+                />
+              )}
+              <p className="text-xs text-muted-foreground mt-1">A WhatsApp reminder is sent at 9 AM when this customer has an outstanding balance past their due date.</p>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => { setEditingCustomer(null); resetForm(); }} data-testid="button-cancel-edit">

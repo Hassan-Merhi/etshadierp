@@ -1254,6 +1254,8 @@ let migrationsDone = false;
     `ALTER TABLE customers ADD COLUMN IF NOT EXISTS statement_note TEXT`,
     // Per-row note on each transaction in the customer balance/statement
     `ALTER TABLE customer_balances ADD COLUMN IF NOT EXISTS row_note TEXT`,
+    // Payment terms (days) for factory customers — used for overdue reminders
+    `ALTER TABLE customers ADD COLUMN IF NOT EXISTS payment_terms_days integer`,
     // Destination field on incoming containers (where the goods are going/warehouse)
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS destination TEXT`,
     // ── Factory/ERP User Profile Tables (may not exist on older prod DBs) ─────

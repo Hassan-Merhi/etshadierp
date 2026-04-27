@@ -3,7 +3,7 @@ import archiver from "archiver";
 import { fetchAllCompanies } from "./exportDataService";
 import { sendExportEmail } from "./emailService";
 import { pool } from "../db";
-import { getWaSettings, getActiveRecipients, sendWhatsAppFile, sendWhatsAppFileToChatId } from "./whatsappService";
+import { getWaSettings, getActiveRecipients, sendWhatsAppFile, sendWhatsAppFileToChatId, sendWhatsAppText } from "./whatsappService";
 import { generateNetPositionExcel } from "../helpers/generateNetPositionExcel";
 import { generateStockPdf } from "../helpers/generateStockPdf";
 import { storage } from "../storage";
@@ -527,6 +527,109 @@ async function runMonthlyWhatsAppNetPosition() {
   }
 }
 
+/**
+ * Check all factory customers who have payment terms set and an outstanding debit balance
+ * whose oldest unpaid invoice has passed its due date (invoice_date + payment_terms_days).
+ * Sends a single consolidated WhatsApp text message listing all overdue customers.
+ */
+export async function checkOverdueCustomers(): Promise<void> {
+  console.log("[OverdueCheck] Running overdue customer payment check...");
+
+  const waSettings = await getWaSettings();
+  if (!waSettings?.enabled) {
+    console.log("[OverdueCheck] WhatsApp disabled — skipping.");
+    return;
+  }
+
+  try {
+    // Find customers with payment terms set, their net balance (debit = they owe us),
+    // and the earliest finalized invoice date per customer.
+    const result = await pool.query(`
+      SELECT
+        c.id,
+        c.legal_name,
+        c.payment_terms_days,
+        c.company_id,
+        COALESCE(SUM(
+          CASE
+            WHEN cb.entry_type = 'DEBIT'  THEN cb.amount::numeric
+            WHEN cb.entry_type = 'CREDIT' THEN -cb.amount::numeric
+            ELSE 0
+          END
+        ), 0) + COALESCE(
+          CASE WHEN c.opening_balance_side = 'Dr' THEN c.opening_balance::numeric
+               WHEN c.opening_balance_side = 'Cr' THEN -c.opening_balance::numeric
+               ELSE 0 END, 0
+        ) AS net_balance,
+        MIN(
+          CASE WHEN cb.entry_type = 'DEBIT' THEN cb.entry_date ELSE NULL END
+        ) AS earliest_invoice_date
+      FROM customers c
+      LEFT JOIN customer_balances cb ON cb.customer_id = c.id
+      WHERE c.payment_terms_days IS NOT NULL
+        AND c.deleted_at IS NULL
+        AND c.active = true
+      GROUP BY c.id, c.legal_name, c.payment_terms_days, c.company_id,
+               c.opening_balance, c.opening_balance_side
+      HAVING COALESCE(SUM(
+          CASE
+            WHEN cb.entry_type = 'DEBIT'  THEN cb.amount::numeric
+            WHEN cb.entry_type = 'CREDIT' THEN -cb.amount::numeric
+            ELSE 0
+          END
+        ), 0) + COALESCE(
+          CASE WHEN c.opening_balance_side = 'Dr' THEN c.opening_balance::numeric
+               WHEN c.opening_balance_side = 'Cr' THEN -c.opening_balance::numeric
+               ELSE 0 END, 0
+        ) > 0
+    `);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const overdue: { name: string; balance: number; dueDate: string; daysOverdue: number }[] = [];
+
+    for (const row of result.rows) {
+      const earliestInvoiceDate = row.earliest_invoice_date ? new Date(row.earliest_invoice_date) : null;
+      if (!earliestInvoiceDate) continue;
+
+      const dueDate = new Date(earliestInvoiceDate);
+      dueDate.setDate(dueDate.getDate() + Number(row.payment_terms_days));
+      dueDate.setHours(0, 0, 0, 0);
+
+      if (dueDate <= today) {
+        const daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+        overdue.push({
+          name: row.legal_name,
+          balance: parseFloat(row.net_balance),
+          dueDate: dueDate.toISOString().substring(0, 10),
+          daysOverdue,
+        });
+      }
+    }
+
+    if (overdue.length === 0) {
+      console.log("[OverdueCheck] No overdue customers today.");
+      return;
+    }
+
+    const lines = overdue.map((c) =>
+      `• ${c.name}: $${c.balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — due ${c.dueDate} (${c.daysOverdue === 0 ? "due today" : `${c.daysOverdue}d overdue`})`
+    );
+
+    const message = `*Payment Reminder*\n\nThe following customers have outstanding balances past their due date:\n\n${lines.join("\n")}\n\nPlease follow up.`;
+
+    const waRes = await sendWhatsAppText(message);
+    if (waRes.success) {
+      console.log(`[OverdueCheck] Reminder sent for ${overdue.length} overdue customer(s).`);
+    } else {
+      console.error("[OverdueCheck] Failed to send WhatsApp reminder:", waRes.errors);
+    }
+  } catch (err: any) {
+    console.error("[OverdueCheck] Error during overdue check:", err.message);
+  }
+}
+
 export function startScheduler() {
   if (schedulerStarted) return;
   schedulerStarted = true;
@@ -556,10 +659,19 @@ export function startScheduler() {
     timezone: "America/New_York",
   });
 
+  // Overdue customer payment reminder — runs every day at 9:00 AM EST
+  cron.schedule("0 9 * * *", async () => {
+    console.log("[OverdueCheck] 9 AM cron fired.");
+    await checkOverdueCustomers();
+  }, {
+    timezone: "America/New_York",
+  });
+
   console.log("[DailyExport] Scheduler started — will run daily at 6:00 PM EST.");
   console.log("[WhatsApp] Monthly net-position scheduler started — runs on the 1st of each month at 7:00 AM EST.");
   console.log("[StockReport] Independent scheduler started — checks every hour.");
   console.log("[NetPositionExport] Scheduled export checker started — checks every hour.");
+  console.log("[OverdueCheck] Payment reminder scheduler started — runs daily at 9:00 AM EST.");
 }
 
 /** Manually trigger the daily ZIP → WhatsApp send (bypasses the dailyAutoSend schedule toggle).
