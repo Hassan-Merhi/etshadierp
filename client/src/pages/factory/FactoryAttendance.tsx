@@ -288,8 +288,19 @@ export default function FactoryAttendance() {
 
   // All workers (active + inactive) — used only by the Excel export
   const allWorkers = data?.workers ?? [];
-  // UI only shows active workers in the attendance grid
-  const workers = allWorkers.filter((w) => w.active !== false);
+  // UI only shows active workers in the attendance grid, sorted by employee code (HMD001, HMD002…)
+  const workers = [...allWorkers.filter((w) => w.active !== false)].sort((a, b) => {
+    const codeA = a.employeeCode ?? "";
+    const codeB = b.employeeCode ?? "";
+    if (!codeA && !codeB) return a.fullName.localeCompare(b.fullName);
+    if (!codeA) return 1;
+    if (!codeB) return -1;
+    // Extract trailing numeric portion for natural sort (HMD001 < HMD002 < HMD010)
+    const numA = parseInt(codeA.replace(/\D/g, ""), 10) || 0;
+    const numB = parseInt(codeB.replace(/\D/g, ""), 10) || 0;
+    if (numA !== numB) return numA - numB;
+    return codeA.localeCompare(codeB);
+  });
 
   const counts = {
     total: workers.length,
@@ -537,6 +548,7 @@ export default function FactoryAttendance() {
                       <thead className="sticky top-0 z-10 bg-muted/50">
                         <tr className="border-b bg-muted/40">
                           <th className="text-left px-4 py-2 font-medium text-muted-foreground w-8">#</th>
+                          <th className="text-left px-4 py-2 font-medium text-muted-foreground w-24">Code</th>
                           <th className="text-left px-4 py-2 font-medium text-muted-foreground">Worker Name</th>
                           <th className="text-left px-4 py-2 font-medium text-muted-foreground w-44">Status</th>
                           <th className="text-left px-4 py-2 font-medium text-muted-foreground">Notes</th>
@@ -552,6 +564,9 @@ export default function FactoryAttendance() {
                               className="border-b last:border-0 hover-elevate"
                             >
                               <td className="px-4 py-2 text-muted-foreground">{idx + 1}</td>
+                              <td className="px-4 py-2 font-mono text-xs text-muted-foreground" data-testid={`text-worker-code-${worker.id}`}>
+                                {worker.employeeCode ?? "—"}
+                              </td>
                               <td
                                 className="px-4 py-2 font-medium"
                                 dir="auto"
@@ -607,13 +622,20 @@ export default function FactoryAttendance() {
                           className="border rounded-md p-3 space-y-2"
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <p
-                              className="font-medium text-sm"
-                              dir="auto"
-                              data-testid={`text-worker-name-mobile-${worker.id}`}
-                            >
-                              {worker.fullName}
-                            </p>
+                            <div>
+                              <p
+                                className="font-medium text-sm"
+                                dir="auto"
+                                data-testid={`text-worker-name-mobile-${worker.id}`}
+                              >
+                                {worker.fullName}
+                              </p>
+                              {worker.employeeCode && (
+                                <span className="text-xs font-mono text-muted-foreground" data-testid={`text-worker-code-mobile-${worker.id}`}>
+                                  {worker.employeeCode}
+                                </span>
+                              )}
+                            </div>
                             <span className="text-xs text-muted-foreground shrink-0">{idx + 1}</span>
                           </div>
                           <Select
