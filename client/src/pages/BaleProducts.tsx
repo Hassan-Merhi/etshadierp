@@ -1366,14 +1366,16 @@ export default function BaleProducts() {
                             )}
                             <TableCell></TableCell>
                             <TableCell>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={(e) => { e.stopPropagation(); setEditingProduct(product); }}
-                                data-testid={`button-edit-product-${product.id}`}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
+                              {isAdmin && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={(e) => { e.stopPropagation(); setEditingProduct(product); }}
+                                  data-testid={`button-edit-product-${product.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1463,14 +1465,16 @@ export default function BaleProducts() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setEditingProduct(product)}
-                        data-testid={`button-edit-product-${product.id}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      {isAdmin && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setEditingProduct(product)}
+                          data-testid={`button-edit-product-${product.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
