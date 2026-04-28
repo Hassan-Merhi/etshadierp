@@ -160,6 +160,18 @@ export default function TransactionJournal() {
   const [hideAmountsLocal, setHideAmountsLocal] = useState<boolean | null>(null);
   const hideAmounts = hideAmountsLocal !== null ? hideAmountsLocal : prefHidden;
 
+  // ── Hidden rows (per-row EyeOff, local state) ──
+  const [hiddenRowIds, setHiddenRowIds] = useState<Set<number>>(new Set());
+  const [showHidden, setShowHidden] = useState(false);
+
+  const toggleHideRow = (id: number) => {
+    setHiddenRowIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
+      return next;
+    });
+  };
+
   // ── Detail dialog ──
   const [detailId, setDetailId] = useState<number | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -285,6 +297,12 @@ export default function TransactionJournal() {
   };
 
   const availableCompanies: CompanyOption[] = data?.companies || [];
+
+  // ── Visible vouchers (filter hidden unless showHidden) ──
+  const allVouchers = data?.vouchers || [];
+  const visibleVouchers = showHidden
+    ? allVouchers
+    : allVouchers.filter((v) => !hiddenRowIds.has(v.id));
 
   // ── Keyboard date navigation: "-" = back 1 day, "Shift+=" = forward 1 day ──
   useEffect(() => {
@@ -605,7 +623,7 @@ export default function TransactionJournal() {
       {/* ── Table ── */}
       <Card>
         <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
             <CardTitle className="text-base">
               Vouchers
               {!isLoading && (
@@ -625,6 +643,31 @@ export default function TransactionJournal() {
               {hideAmounts ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
               {hideAmounts ? "Amounts hidden" : "Hide amounts"}
             </Button>
+            <Button
+              variant={showHidden ? "secondary" : "outline"}
+              size="sm"
+              className="gap-1.5 h-8 text-xs"
+              onClick={() => setShowHidden((v) => !v)}
+              disabled={hiddenRowIds.size === 0}
+              title={hiddenRowIds.size === 0 ? "No hidden rows" : showHidden ? "Hide hidden rows" : `Show ${hiddenRowIds.size} hidden row${hiddenRowIds.size !== 1 ? "s" : ""}`}
+              data-testid="button-toggle-show-hidden"
+            >
+              {showHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+              {showHidden ? "Showing hidden" : "Show hidden"}
+              {hiddenRowIds.size > 0 && <Badge className="ml-1 text-xs">{hiddenRowIds.size}</Badge>}
+            </Button>
+            {hiddenRowIds.size > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs text-muted-foreground"
+                onClick={() => { setHiddenRowIds(new Set()); setShowHidden(false); }}
+                data-testid="button-clear-hidden-rows"
+                title="Clear all hidden rows"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
           {totalPages > 1 && (
             <div className="flex items-center gap-2 text-sm">
@@ -650,7 +693,7 @@ export default function TransactionJournal() {
                   <TableHead className="w-[160px]">Type</TableHead>
                   <TableHead>Description</TableHead>
                   {!hideAmounts && <TableHead className="text-right w-[130px]">Amount</TableHead>}
-                  <TableHead className="w-[90px] text-center">Actions</TableHead>
+                  <TableHead className="w-[120px] text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -662,70 +705,85 @@ export default function TransactionJournal() {
                       ))}
                     </TableRow>
                   ))
-                ) : (data?.vouchers || []).length === 0 ? (
+                ) : visibleVouchers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={hideAmounts ? 5 : 6} className="text-center py-12 text-muted-foreground">
-                      No transactions found for the selected filters.
+                      {allVouchers.length > 0 && hiddenRowIds.size > 0
+                        ? "All rows on this page are hidden."
+                        : "No transactions found for the selected filters."}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  (data?.vouchers || []).map((v) => (
-                    <TableRow
-                      key={v.id}
-                      data-testid={`row-voucher-${v.id}`}
-                    >
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {fmtDate(v.voucherDate)}
-                      </TableCell>
-                      <TableCell>
-                        <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded truncate max-w-[140px] ${companyColor(v.companyId)}`}>
-                          {v.companyName}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <VoucherTypeBadge type={v.voucherType} />
-                          {v.optional && (
-                            <Badge variant="outline" className="text-xs">Optional</Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm max-w-xs text-muted-foreground">
-                        <div className="flex items-center gap-1 truncate">
-                          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-                          <span className="truncate">{v.description || v.narration || "—"}</span>
-                        </div>
-                      </TableCell>
-                      {!hideAmounts && (
-                        <TableCell className="text-right text-sm font-mono">
-                          <span className="text-xs text-muted-foreground mr-1">{v.currency}</span>
-                          {formatAmount(v.totalAmount)}
+                  visibleVouchers.map((v) => {
+                    const isHidden = hiddenRowIds.has(v.id);
+                    return (
+                      <TableRow
+                        key={v.id}
+                        data-testid={`row-voucher-${v.id}`}
+                        className={isHidden && showHidden ? "opacity-50" : ""}
+                      >
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                          {fmtDate(v.voucherDate)}
                         </TableCell>
-                      )}
-                      <TableCell>
-                        <div className="flex items-center justify-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openDetail(v.id)}
-                            data-testid={`button-preview-voucher-${v.id}`}
-                            title="Preview"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openInCompany(v.companyId, `/daybook?voucherId=${v.id}`)}
-                            data-testid={`button-edit-voucher-${v.id}`}
-                            title="Open in Daybook"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        <TableCell>
+                          <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded truncate max-w-[140px] ${companyColor(v.companyId)}`}>
+                            {v.companyName}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <VoucherTypeBadge type={v.voucherType} />
+                            {v.optional && (
+                              <Badge variant="outline" className="text-xs">Optional</Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm max-w-xs text-muted-foreground">
+                          <div className="flex items-center gap-1 truncate">
+                            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                            <span className="truncate">{v.description || v.narration || "—"}</span>
+                          </div>
+                        </TableCell>
+                        {!hideAmounts && (
+                          <TableCell className="text-right text-sm font-mono">
+                            <span className="text-xs text-muted-foreground mr-1">{v.currency}</span>
+                            {formatAmount(v.totalAmount)}
+                          </TableCell>
+                        )}
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openDetail(v.id)}
+                              data-testid={`button-preview-voucher-${v.id}`}
+                              title="Preview"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => toggleHideRow(v.id)}
+                              data-testid={`button-hide-voucher-${v.id}`}
+                              title={isHidden ? "Unhide row" : "Hide row"}
+                            >
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openInCompany(v.companyId, `/daybook?voucherId=${v.id}`)}
+                              data-testid={`button-edit-voucher-${v.id}`}
+                              title="Open in Daybook"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
