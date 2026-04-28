@@ -55,6 +55,7 @@ interface NetPositionAccount {
 
 interface NetPositionData {
   rawMaterialValue: number;
+  balanceOnTableValue: number;
   supplierLiabilities: number;
   forUs: { total: number; accounts: NetPositionAccount[] };
   onUs: { total: number; accounts: NetPositionAccount[] };
@@ -229,11 +230,10 @@ export default function FactoryFinancialSnapshot() {
     const signedValue = (a: { value: number; side: "forUs" | "onUs" }) =>
       a.side === "forUs" ? a.value : -a.value;
 
-    // ── Mix Batches on Tables (Balance on Table from net position) ──
-    const balanceOnTable = netPosition.forUs?.accounts?.find(a => a.code === "BALANCE_ON_TABLE");
-    const mixBatchValue = balanceOnTable?.value ?? 0;
+    // ── Mix Batches on Tables — from net position "Balance on Table" top-level field ──
+    const mixBatchValue = netPosition.balanceOnTableValue ?? 0;
 
-    // ── Raw Material Value from net position ──
+    // ── Raw Material Value — from net position "Factory Raw Material Stock" top-level field ──
     const rawMaterialValue = netPosition.rawMaterialValue ?? 0;
 
     // ── Supplier Balances (auto: all suppliers from net position) ──
@@ -542,7 +542,9 @@ export default function FactoryFinancialSnapshot() {
                           {usd(computed.customerNet)}
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {computed.customerCount} customer{computed.customerCount !== 1 ? "s" : ""} · Total owed by customers
+                          {computed.customerCount === 0
+                            ? "No customer balances"
+                            : `${computed.customerCount} customer${computed.customerCount !== 1 ? "s" : ""} · Total owed by customers`}
                         </p>
                       </div>
                       <div className="mt-1 text-muted-foreground shrink-0">
@@ -786,7 +788,7 @@ export default function FactoryFinancialSnapshot() {
         <div className="flex items-start gap-2 rounded-md border border-muted bg-muted/30 p-3 text-xs text-muted-foreground">
           <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
           <span>
-            Values are sourced from the Net Position. Raw material and mix batch values use USD cost per kg. Supplier and customer totals include all accounts. Cash &amp; Bank, Agent, and Freight accounts are manually configured using the + button.
+            Values are sourced from the Net Position. Raw material value uses the Factory Raw Material Stock figure. Mix batches on table uses the Balance on Table figure. Supplier balances is the sum of all suppliers in USD including brokers. Customer credit is the sum of all customer balances. Cash &amp; Bank and Freight / Embassy / Shipping accounts are manually configured using the + button.
           </span>
         </div>
 

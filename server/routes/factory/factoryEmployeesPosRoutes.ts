@@ -3218,6 +3218,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         supplierLiabilities: round2(totalSupplierLiabilities),
         inventoryValue: baleInventoryValue,
         rawMaterialValue: rawMaterialStockValue,
+        balanceOnTableValue: balanceOnTableValue,
         ledgerAssets: cleanLedgerForUsTotal,
         pendingOrders,
         verifiedOrders,
