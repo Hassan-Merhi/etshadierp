@@ -70,6 +70,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const [groupFilter, setGroupFilter] = useState<string>("all");
   const [editingItem, setEditingItem] = useState<{ stockItemId: number; locationId: number; value: string } | null>(null);
   const [showUnpriced, setShowUnpriced] = useState(false);
+  const [hiddenUnpricedGroups, setHiddenUnpricedGroups] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
@@ -169,6 +170,20 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
   const unpricedCount = useMemo(() => locationPricedList.filter(isItemUnpriced).length, [locationPricedList, isAllMode]);
 
+  // Groups that have at least one unpriced item, with their counts — used for the chip picker
+  const unpricedByGroup = useMemo<{ name: string; count: number }[]>(() => {
+    if (!showUnpriced) return [];
+    const map = new Map<string, number>();
+    for (const item of locationPricedList) {
+      if (!isItemUnpriced(item)) continue;
+      const g = item.stockGroupName || "(No Group)";
+      map.set(g, (map.get(g) || 0) + 1);
+    }
+    return Array.from(map.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [locationPricedList, showUnpriced, isAllMode]);
+
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
     return locationPricedList.filter((item: any) => {
@@ -177,12 +192,13 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
         item.name.toLowerCase().includes(q) ||
         (item.code && item.code.toLowerCase().includes(q)) ||
         (item.stockGroupName && item.stockGroupName.toLowerCase().includes(q));
-      const matchesGroup =
-        groupFilter === "all" || item.stockGroupName === groupFilter;
+      const matchesGroup = showUnpriced
+        ? !hiddenUnpricedGroups.has(item.stockGroupName || "(No Group)")
+        : groupFilter === "all" || item.stockGroupName === groupFilter;
       const matchesUnpriced = !showUnpriced || isItemUnpriced(item);
       return matchesSearch && matchesGroup && matchesUnpriced;
     });
-  }, [locationPricedList, search, groupFilter, showUnpriced, isAllMode]);
+  }, [locationPricedList, search, groupFilter, showUnpriced, hiddenUnpricedGroups, isAllMode]);
 
   const selectedLocation = locations.find((l) => l.id === selectedLocationId);
 
@@ -263,7 +279,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
               {!posUser && (
                 <button
                   data-testid="button-location-all"
-                  onClick={() => { setSelectedLocationId(ALL_LOCATIONS_ID); setSearch(""); setGroupFilter("all"); setEditingItem(null); setShowUnpriced(false); }}
+                  onClick={() => { setSelectedLocationId(ALL_LOCATIONS_ID); setSearch(""); setGroupFilter("all"); setEditingItem(null); setShowUnpriced(false); setHiddenUnpricedGroups(new Set()); }}
                   className={cn(
                     "w-full text-left px-3 py-2 rounded-md text-sm transition-colors hover-elevate flex items-center gap-1.5",
                     selectedLocationId === ALL_LOCATIONS_ID
@@ -279,7 +295,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 <button
                   key={loc.id}
                   data-testid={`button-location-${loc.id}`}
-                  onClick={() => { setSelectedLocationId(loc.id); setSearch(""); setGroupFilter("all"); setEditingItem(null); setShowUnpriced(false); }}
+                  onClick={() => { setSelectedLocationId(loc.id); setSearch(""); setGroupFilter("all"); setEditingItem(null); setShowUnpriced(false); setHiddenUnpricedGroups(new Set()); }}
                   className={cn(
                     "w-full text-left px-3 py-2 rounded-md text-sm transition-colors hover-elevate",
                     selectedLocationId === loc.id
@@ -325,7 +341,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            {stockGroups.length > 0 && (
+            {stockGroups.length > 0 && !showUnpriced && (
               <Select value={groupFilter} onValueChange={setGroupFilter}>
                 <SelectTrigger data-testid="select-group-filter" className="w-44">
                   <SelectValue placeholder="All groups" />
@@ -343,7 +359,11 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 variant={showUnpriced ? "default" : "outline"}
                 size="sm"
                 data-testid="button-show-unpriced"
-                onClick={() => setShowUnpriced((v) => !v)}
+                onClick={() => {
+                  setShowUnpriced((v) => !v);
+                  setHiddenUnpricedGroups(new Set());
+                  setGroupFilter("all");
+                }}
                 className="gap-1.5 shrink-0"
               >
                 <EyeOff className="w-3.5 h-3.5" />
@@ -354,6 +374,53 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                   </Badge>
                 )}
               </Button>
+            )}
+          </div>
+        )}
+
+        {/* ── Unpriced group chips ── */}
+        {selectedLocationId && showUnpriced && unpricedByGroup.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 px-4 py-2 border-b shrink-0 bg-muted/30">
+            <span className="text-xs text-muted-foreground shrink-0 mr-1">Groups:</span>
+            {unpricedByGroup.map(({ name, count }) => {
+              const isHidden = hiddenUnpricedGroups.has(name);
+              return (
+                <button
+                  key={name}
+                  data-testid={`chip-unpriced-group-${name}`}
+                  onClick={() => {
+                    setHiddenUnpricedGroups((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(name)) next.delete(name);
+                      else next.add(name);
+                      return next;
+                    });
+                  }}
+                  className={cn(
+                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-all",
+                    isHidden
+                      ? "bg-muted text-muted-foreground border-border line-through opacity-50"
+                      : "bg-background text-foreground border-border hover-elevate"
+                  )}
+                >
+                  {name}
+                  <span className={cn(
+                    "text-[10px] font-semibold px-1 py-0 rounded-full",
+                    isHidden ? "bg-muted-foreground/20 text-muted-foreground" : "bg-amber-500/20 text-amber-700 dark:text-amber-400"
+                  )}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+            {hiddenUnpricedGroups.size > 0 && (
+              <button
+                onClick={() => setHiddenUnpricedGroups(new Set())}
+                className="text-xs text-muted-foreground underline ml-1"
+                data-testid="button-show-all-unpriced-groups"
+              >
+                show all
+              </button>
             )}
           </div>
         )}
@@ -402,14 +469,16 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 <div className="flex flex-col items-center justify-center h-full text-center gap-2 text-muted-foreground py-16">
                   <Tag className="w-10 h-10 opacity-30" />
                   <p className="text-sm">
-                    {showUnpriced && !search && groupFilter === "all"
-                      ? "All items are priced."
-                      : search || groupFilter !== "all" || showUnpriced
-                        ? "No items match your filters."
-                        : "No items found."}
+                    {showUnpriced && !search && hiddenUnpricedGroups.size === unpricedByGroup.length
+                      ? "All groups hidden — click a group chip above to show items."
+                      : showUnpriced && !search
+                        ? "All items are priced."
+                        : search || groupFilter !== "all" || showUnpriced
+                          ? "No items match your filters."
+                          : "No items found."}
                   </p>
                   {(search || groupFilter !== "all" || showUnpriced) && (
-                    <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setGroupFilter("all"); setShowUnpriced(false); }}>
+                    <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setGroupFilter("all"); setShowUnpriced(false); setHiddenUnpricedGroups(new Set()); }}>
                       Clear filters
                     </Button>
                   )}
