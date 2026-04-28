@@ -149,6 +149,35 @@ export async function sendWhatsAppTextToChatId(
   return { success: true };
 }
 
+/** Send a file by URL via the POS instance (id=2 with fallback to id=1).
+ *  Uses Green API's sendFileByUrl — more reliable than multipart upload. */
+export async function sendWhatsAppFileByUrlToChatIdPos(
+  chatId:   string,
+  fileUrl:  string,
+  fileName: string,
+  caption:  string,
+): Promise<{ success: boolean; error?: string }> {
+  const settings = await getPosWaSettings();
+  if (!settings?.instanceId || !settings?.apiToken) {
+    return { success: false, error: "WhatsApp credentials not configured" };
+  }
+  if (!settings.enabled) {
+    return { success: false, error: "WhatsApp sending is disabled" };
+  }
+
+  const url = baseUrl(settings.instanceId, settings.apiToken, "sendFileByUrl");
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chatId, urlFile: fileUrl, fileName, caption }),
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    return { success: false, error: `Green API ${response.status}: ${body}` };
+  }
+  return { success: true };
+}
+
 /** Send a plain text message via the POS instance (id=2 with fallback to id=1) */
 export async function sendWhatsAppTextToChatIdPos(
   chatId:  string,

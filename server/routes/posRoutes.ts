@@ -39,11 +39,33 @@ import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
-import { sendWhatsAppTextToChatIdPos, sendWhatsAppFileToChatIdPos } from "../services/whatsappService";
+import { sendWhatsAppTextToChatIdPos, sendWhatsAppFileToChatIdPos, sendWhatsAppFileByUrlToChatIdPos } from "../services/whatsappService";
 import PDFDocument from "pdfkit";
+import { randomUUID } from "crypto";
+
+// ── Temporary PDF store for WhatsApp sendFileByUrl ────────────────────────────
+const tempPdfStore = new Map<string, { buffer: Buffer; expiresAt: number }>();
+function storeTempPdf(buffer: Buffer): string {
+  const id = randomUUID();
+  tempPdfStore.set(id, { buffer, expiresAt: Date.now() + 10 * 60 * 1000 });
+  // lazy cleanup
+  setTimeout(() => tempPdfStore.delete(id), 10 * 60 * 1000);
+  return id;
+}
 
 
 export function registerPosRoutes(app: Express) {
+  // ── Serve temporarily stored PDFs (used by WhatsApp sendFileByUrl) ──────────
+  app.get("/api/pos/temp-pdf/:id", (req, res) => {
+    const entry = tempPdfStore.get(req.params.id);
+    if (!entry || entry.expiresAt < Date.now()) {
+      return res.status(404).json({ message: "PDF not found or expired" });
+    }
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="stock_report.pdf"`);
+    res.send(entry.buffer);
+  });
+
   app.post("/api/pos/sales", requireAuth, canModifyDate("voucherDate"), async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
@@ -1573,18 +1595,24 @@ export function registerPosRoutes(app: Express) {
       const fileName = `Stock_${safeLocationName}_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`;
       const caption  = `📍 ${location.name} — Stock Report\n🕐 ${dateStr}`;
 
-      const result = await sendWhatsAppFileToChatIdPos(
+      // Store PDF temporarily and build a public URL for Green API to fetch
+      const pdfId  = storeTempPdf(pdfBuffer);
+      const proto  = req.headers["x-forwarded-proto"] ?? req.protocol;
+      const host   = req.headers["x-forwarded-host"] ?? req.get("host");
+      const pdfUrl = `${proto}://${host}/api/pos/temp-pdf/${pdfId}`;
+
+      const result = await sendWhatsAppFileByUrlToChatIdPos(
         location.whatsappGroupChatId,
-        pdfBuffer,
+        pdfUrl,
         fileName,
         caption,
-        "application/pdf",
       );
 
       if (!result.success) {
         console.error("[/api/pos/send-stock-pdf]", {
           locationId,
           chatId: location.whatsappGroupChatId,
+          pdfUrl,
           error: result.error,
         });
         return res.status(502).json({ message: result.error ?? "Failed to send WhatsApp PDF" });
