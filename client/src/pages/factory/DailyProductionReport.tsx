@@ -1144,20 +1144,6 @@ export default function DailyProductionReport() {
                   <span className="text-sm font-bold flex items-center gap-2">
                     <span className="font-bold">{data?.wipersGarbage.totalGarbageQty ?? 0}</span>
                     <span className="text-xs font-normal text-muted-foreground">{fmtKg(data?.wipersGarbage.totalGarbageKg ?? 0)}</span>
-                    {(() => {
-                      const garbageKg = data?.wipersGarbage.totalGarbageKg ?? 0;
-                      const rawKg = data?.rawMaterial.totalWeightKg ?? 0;
-                      const pct = rawKg > 0 ? (garbageKg / rawKg) * 100 : 0;
-                      return (
-                        <span
-                          className={`text-xs font-semibold px-1.5 py-0.5 rounded-sm tabular-nums ${pct > 10 ? "bg-red-200 text-red-800 dark:bg-red-900/50 dark:text-red-300" : pct > 5 ? "bg-amber-200 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300" : "bg-green-200 text-green-800 dark:bg-green-900/50 dark:text-green-300"}`}
-                          data-testid="text-garbage-pct"
-                          title="Garbage as % of original batch input"
-                        >
-                          {pct.toFixed(1)}%
-                        </span>
-                      );
-                    })()}
                   </span>
                 </div>
                 <StatRow label="Value" value={fmtMoney(data?.wipersGarbage.totalValue ?? 0)} />
@@ -1168,6 +1154,20 @@ export default function DailyProductionReport() {
                     <span className="text-xs font-normal text-muted-foreground ml-3">{fmtKg(data?.wipersGarbage.totalWeightKg ?? 0)}</span>
                   </span>
                 </div>
+                {(() => {
+                  const wgKg = data?.wipersGarbage.totalWeightKg ?? 0;
+                  const rawKg = data?.rawMaterial.totalWeightKg ?? 0;
+                  const pct = rawKg > 0 ? (wgKg / rawKg) * 100 : 0;
+                  const color = pct > 10 ? "text-red-600 dark:text-red-400" : pct > 5 ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400";
+                  return (
+                    <div className="flex flex-col items-center justify-center py-3 mt-1 border-t border-red-200 dark:border-red-800/40">
+                      <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">% of Input</span>
+                      <span className={`text-3xl font-extrabold tabular-nums ${color}`} data-testid="text-wg-pct">
+                        {pct.toFixed(1)}%
+                      </span>
+                    </div>
+                  );
+                })()}
               </>
             )}
           </CardContent>
