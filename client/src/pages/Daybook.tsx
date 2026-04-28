@@ -92,7 +92,6 @@ import {
   Edit,
   Trash2,
   Plus,
-  Minus,
   ChevronDown,
   ChevronRight,
   Check,
@@ -1830,39 +1829,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
           <div className="flex flex-wrap items-end gap-4">
             <div className="space-y-2">
               <Label>Period</Label>
-              <div className="flex items-center gap-1">
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => setPeriodFilter((prev) => ({
-                    fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), -1), "yyyy-MM-dd"),
-                    toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), -1), "yyyy-MM-dd"),
-                    preset: "custom",
-                  }))}
-                  title="Previous day"
-                  data-testid="button-prev-day"
-                >
-                  <Minus className="h-4 w-4" />
-                </Button>
-                <PeriodFilter
-                  value={periodFilter}
-                  onChange={setPeriodFilter}
-                  data-testid="period-filter"
-                />
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => setPeriodFilter((prev) => ({
-                    fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), 1), "yyyy-MM-dd"),
-                    toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), 1), "yyyy-MM-dd"),
-                    preset: "custom",
-                  }))}
-                  title="Next day"
-                  data-testid="button-next-day"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
+              <PeriodFilter
+                value={periodFilter}
+                onChange={setPeriodFilter}
+                data-testid="period-filter"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="voucher-type">Voucher Type</Label>

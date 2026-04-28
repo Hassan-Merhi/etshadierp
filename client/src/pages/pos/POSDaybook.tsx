@@ -32,7 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar, DollarSign, Package, Eye, EyeOff, Lock, Pencil, Save, X, Plus, Minus, Trash2, ArrowRight, Printer } from "lucide-react";
+import { Calendar, DollarSign, Package, Eye, EyeOff, Lock, Pencil, Save, X, Plus, Trash2, ArrowRight, Printer } from "lucide-react";
 import { useRef } from "react";
 import { useReactToPrint } from "react-to-print";
 import { format, startOfDay, endOfDay, isValid, parseISO, addDays } from "date-fns";
@@ -497,39 +497,11 @@ export default function POSDaybook() {
           title="POS Daybook" 
           subtitle={getSubtitle()}
         />
-        <div className="flex items-center gap-1">
-          <Button
-            size="icon"
-            variant="outline"
-            onClick={() => setPeriodFilter((prev) => ({
-              fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), -1), "yyyy-MM-dd"),
-              toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), -1), "yyyy-MM-dd"),
-              preset: "custom",
-            }))}
-            title="Previous day"
-            data-testid="button-prev-day"
-          >
-            <Minus className="h-4 w-4" />
-          </Button>
-          <PeriodFilter
-            value={periodFilter}
-            onChange={setPeriodFilter}
-            data-testid="pos-daybook-period-filter"
-          />
-          <Button
-            size="icon"
-            variant="outline"
-            onClick={() => setPeriodFilter((prev) => ({
-              fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), 1), "yyyy-MM-dd"),
-              toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), 1), "yyyy-MM-dd"),
-              preset: "custom",
-            }))}
-            title="Next day"
-            data-testid="button-next-day"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
+        <PeriodFilter
+          value={periodFilter}
+          onChange={setPeriodFilter}
+          data-testid="pos-daybook-period-filter"
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-4">

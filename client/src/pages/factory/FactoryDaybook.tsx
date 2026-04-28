@@ -6,7 +6,7 @@ import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   BookOpen, Eye, EyeOff, ExternalLink, List, AlignJustify, Package,
-  Trash2, ChevronDown, ChevronRight, Filter, X, FileDown, Plus, Minus,
+  Trash2, ChevronDown, ChevronRight, Filter, X, FileDown, Plus,
   LayoutList, Layers,
 } from "lucide-react";
 import {
@@ -993,35 +993,7 @@ export default function FactoryDaybook() {
           <div className="flex flex-wrap items-end gap-4">
             <div className="space-y-2">
               <Label>Period</Label>
-              <div className="flex items-center gap-1">
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => setPeriodFilter((prev) => ({
-                    fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), -1), "yyyy-MM-dd"),
-                    toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), -1), "yyyy-MM-dd"),
-                    preset: "custom",
-                  }))}
-                  title="Previous day"
-                  data-testid="button-prev-day"
-                >
-                  <Minus className="h-4 w-4" />
-                </Button>
-                <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => setPeriodFilter((prev) => ({
-                    fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), 1), "yyyy-MM-dd"),
-                    toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), 1), "yyyy-MM-dd"),
-                    preset: "custom",
-                  }))}
-                  title="Next day"
-                  data-testid="button-next-day"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
+              <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
             </div>
             <div className="space-y-2">
               <Label>Type</Label>
