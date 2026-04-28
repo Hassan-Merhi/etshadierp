@@ -6,7 +6,7 @@ import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   BookOpen, Eye, EyeOff, ExternalLink, List, AlignJustify, Package,
-  Trash2, ChevronDown, ChevronRight, Filter, X, FileDown, Plus,
+  Trash2, ChevronDown, ChevronRight, Filter, X, FileDown, Plus, Minus,
   LayoutList, Layers,
 } from "lucide-react";
 import {
@@ -993,7 +993,35 @@ export default function FactoryDaybook() {
           <div className="flex flex-wrap items-end gap-4">
             <div className="space-y-2">
               <Label>Period</Label>
-              <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
+              <div className="flex items-center gap-1">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setPeriodFilter((prev) => ({
+                    fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), -1), "yyyy-MM-dd"),
+                    toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), -1), "yyyy-MM-dd"),
+                    preset: "custom",
+                  }))}
+                  title="Previous day"
+                  data-testid="button-prev-day"
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setPeriodFilter((prev) => ({
+                    fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), 1), "yyyy-MM-dd"),
+                    toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), 1), "yyyy-MM-dd"),
+                    preset: "custom",
+                  }))}
+                  title="Next day"
+                  data-testid="button-next-day"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Type</Label>
@@ -1098,7 +1126,7 @@ export default function FactoryDaybook() {
               )}
             </CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
-              {isDetailed && hiddenRowIds.size > 0 && (
+              {isDetailed && (
                 <>
                   <Button
                     variant={showHidden ? "secondary" : "outline"}
@@ -1106,22 +1134,26 @@ export default function FactoryDaybook() {
                     onClick={() => setShowHidden((v) => !v)}
                     className="gap-1"
                     data-testid="button-toggle-show-hidden"
+                    disabled={hiddenRowIds.size === 0}
+                    title={hiddenRowIds.size === 0 ? "No hidden rows" : showHidden ? "Hide hidden rows" : `Show ${hiddenRowIds.size} hidden row${hiddenRowIds.size !== 1 ? "s" : ""}`}
                   >
-                    <EyeOff className="w-4 h-4" />
-                    {showHidden ? "Hide hidden rows" : "Show hidden"}
-                    <Badge className="ml-1">{hiddenRowIds.size}</Badge>
+                    {showHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                    {showHidden ? "Showing hidden" : "Show hidden"}
+                    {hiddenRowIds.size > 0 && <Badge className="ml-1">{hiddenRowIds.size}</Badge>}
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => { setHiddenRowIds(new Set()); setShowHidden(false); }}
-                    className="gap-1 text-muted-foreground"
-                    data-testid="button-clear-hidden-rows"
-                    title="Clear all hidden rows"
-                  >
-                    <X className="w-4 h-4" />
-                    Clear
-                  </Button>
+                  {hiddenRowIds.size > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setHiddenRowIds(new Set()); setShowHidden(false); }}
+                      className="gap-1 text-muted-foreground"
+                      data-testid="button-clear-hidden-rows"
+                      title="Clear all hidden rows"
+                    >
+                      <X className="w-4 h-4" />
+                      Clear
+                    </Button>
+                  )}
                 </>
               )}
               <div className="flex items-center border rounded-md overflow-hidden">

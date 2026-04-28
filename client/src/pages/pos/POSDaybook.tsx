@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,10 +32,10 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar, DollarSign, Package, Eye, EyeOff, Lock, Pencil, Save, X, Plus, Trash2, ArrowRight, Printer } from "lucide-react";
+import { Calendar, DollarSign, Package, Eye, EyeOff, Lock, Pencil, Save, X, Plus, Minus, Trash2, ArrowRight, Printer } from "lucide-react";
 import { useRef } from "react";
 import { useReactToPrint } from "react-to-print";
-import { format, startOfDay, endOfDay, isValid, parseISO } from "date-fns";
+import { format, startOfDay, endOfDay, isValid, parseISO, addDays } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -248,6 +249,36 @@ export default function POSDaybook() {
     const row = document.querySelector(`[data-dialog-row="${selectedDialogRow}"]`);
     if (row) row.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [selectedDialogRow]);
+
+  // Keyboard +/- date navigation (when no dialog is open)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (hasAnyOpenDialog()) return;
+      if (selectedVoucher) return;
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      const fmt = "yyyy-MM-dd";
+      const isBack = e.key === "-" || e.code === "Minus";
+      const isForward = (e.key === "+" && e.shiftKey) || (e.code === "Equal" && e.shiftKey) || e.key === "=";
+      if (isBack) {
+        e.preventDefault();
+        setPeriodFilter((prev) => ({
+          fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), -1), fmt),
+          toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), -1), fmt),
+          preset: "custom",
+        }));
+      } else if (isForward) {
+        e.preventDefault();
+        setPeriodFilter((prev) => ({
+          fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), 1), fmt),
+          toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), 1), fmt),
+          preset: "custom",
+        }));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedVoucher]);
 
   // Keyboard navigation for dialog item rows
   const getDialogItems = useCallback((): Array<{ stockItemId?: number; stockItemName?: string }> => {
@@ -466,11 +497,39 @@ export default function POSDaybook() {
           title="POS Daybook" 
           subtitle={getSubtitle()}
         />
-        <PeriodFilter
-          value={periodFilter}
-          onChange={setPeriodFilter}
-          data-testid="pos-daybook-period-filter"
-        />
+        <div className="flex items-center gap-1">
+          <Button
+            size="icon"
+            variant="outline"
+            onClick={() => setPeriodFilter((prev) => ({
+              fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), -1), "yyyy-MM-dd"),
+              toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), -1), "yyyy-MM-dd"),
+              preset: "custom",
+            }))}
+            title="Previous day"
+            data-testid="button-prev-day"
+          >
+            <Minus className="h-4 w-4" />
+          </Button>
+          <PeriodFilter
+            value={periodFilter}
+            onChange={setPeriodFilter}
+            data-testid="pos-daybook-period-filter"
+          />
+          <Button
+            size="icon"
+            variant="outline"
+            onClick={() => setPeriodFilter((prev) => ({
+              fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), 1), "yyyy-MM-dd"),
+              toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), 1), "yyyy-MM-dd"),
+              preset: "custom",
+            }))}
+            title="Next day"
+            data-testid="button-next-day"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-4">
@@ -557,19 +616,21 @@ export default function POSDaybook() {
               </span>
             )}
           </CardTitle>
-          {hiddenRowIds.size > 0 && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant={showHidden ? "secondary" : "outline"}
-                size="sm"
-                onClick={() => setShowHidden((prev) => !prev)}
-                data-testid="button-toggle-show-hidden"
-                className="gap-1"
-              >
-                <EyeOff className="w-4 h-4" />
-                {showHidden ? "Hide hidden rows" : "Show hidden"}
-                <Badge className="ml-1">{hiddenRowIds.size}</Badge>
-              </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={showHidden ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setShowHidden((prev) => !prev)}
+              data-testid="button-toggle-show-hidden"
+              className="gap-1"
+              disabled={hiddenRowIds.size === 0}
+              title={hiddenRowIds.size === 0 ? "No hidden rows" : showHidden ? "Hide hidden rows" : `Show ${hiddenRowIds.size} hidden row${hiddenRowIds.size !== 1 ? "s" : ""}`}
+            >
+              {showHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              {showHidden ? "Showing hidden" : "Show hidden"}
+              {hiddenRowIds.size > 0 && <Badge className="ml-1">{hiddenRowIds.size}</Badge>}
+            </Button>
+            {hiddenRowIds.size > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -581,8 +642,8 @@ export default function POSDaybook() {
                 <X className="w-4 h-4" />
                 Clear
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {isLoadingUser || isLoading ? (

@@ -92,6 +92,7 @@ import {
   Edit,
   Trash2,
   Plus,
+  Minus,
   ChevronDown,
   ChevronRight,
   Check,
@@ -1829,11 +1830,39 @@ export default function Daybook({ user }: { user?: any } = {}) {
           <div className="flex flex-wrap items-end gap-4">
             <div className="space-y-2">
               <Label>Period</Label>
-              <PeriodFilter
-                value={periodFilter}
-                onChange={setPeriodFilter}
-                data-testid="period-filter"
-              />
+              <div className="flex items-center gap-1">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setPeriodFilter((prev) => ({
+                    fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), -1), "yyyy-MM-dd"),
+                    toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), -1), "yyyy-MM-dd"),
+                    preset: "custom",
+                  }))}
+                  title="Previous day"
+                  data-testid="button-prev-day"
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <PeriodFilter
+                  value={periodFilter}
+                  onChange={setPeriodFilter}
+                  data-testid="period-filter"
+                />
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setPeriodFilter((prev) => ({
+                    fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), 1), "yyyy-MM-dd"),
+                    toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), 1), "yyyy-MM-dd"),
+                    preset: "custom",
+                  }))}
+                  title="Next day"
+                  data-testid="button-next-day"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="voucher-type">Voucher Type</Label>
@@ -1934,19 +1963,21 @@ export default function Daybook({ user }: { user?: any } = {}) {
               )}
             </CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
-              {hiddenRowIds.size > 0 && (
-                <>
-                  <Button
-                    variant={showHidden ? "secondary" : "outline"}
-                    size="sm"
-                    onClick={() => setShowHidden((v) => !v)}
-                    className="gap-1"
-                    data-testid="button-toggle-show-hidden"
-                  >
-                    <EyeOff className="w-4 h-4" />
-                    {showHidden ? "Hide hidden rows" : "Show hidden"}
-                    <Badge className="ml-1">{hiddenRowIds.size}</Badge>
-                  </Button>
+              <>
+                <Button
+                  variant={showHidden ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => setShowHidden((v) => !v)}
+                  className="gap-1"
+                  data-testid="button-toggle-show-hidden"
+                  disabled={hiddenRowIds.size === 0}
+                  title={hiddenRowIds.size === 0 ? "No hidden rows" : showHidden ? "Hide hidden rows" : `Show ${hiddenRowIds.size} hidden row${hiddenRowIds.size !== 1 ? "s" : ""}`}
+                >
+                  {showHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                  {showHidden ? "Showing hidden" : "Show hidden"}
+                  {hiddenRowIds.size > 0 && <Badge className="ml-1">{hiddenRowIds.size}</Badge>}
+                </Button>
+                {hiddenRowIds.size > 0 && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1958,8 +1989,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
                     <X className="w-4 h-4" />
                     Clear
                   </Button>
-                </>
-              )}
+                )}
+              </>
               <div className="flex items-center border rounded-md overflow-hidden">
                 <Button
                   variant="ghost"
