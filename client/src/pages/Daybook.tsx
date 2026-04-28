@@ -3433,39 +3433,10 @@ export default function Daybook({ user }: { user?: any } = {}) {
                             </TableRow>
                           ));
                         })()}
-                        {/* Totals Row */}
+                        {/* Totals Row — hidden for Mixed (shown below table instead) */}
+                        {selectedVoucher.voucherType !== "Mixed" && (
                         <TableRow className="font-bold bg-muted/50">
-                          {selectedVoucher.voucherType === "Mixed" ? (
-                            <>
-                              <TableCell>Total</TableCell>
-                              <TableCell></TableCell>
-                              <TableCell className="text-right font-mono">
-                                {viewVoucherEntries
-                                  .reduce(
-                                    (sum: number, e: ViewVoucherEntry) =>
-                                      sum + Math.abs(parseFloat(e.quantity || "0")),
-                                    0,
-                                  )
-                                  .toFixed(3).replace(/\.?0+$/, "")}
-                              </TableCell>
-                              {user && !user?.role?.startsWith("POS") && (
-                                <>
-                                  <TableCell></TableCell>
-                                  <TableCell className="text-right font-mono">
-                                    {(() => {
-                                      const prodTotal = viewVoucherEntries
-                                        .filter((e: ViewVoucherEntry) => e.adjustmentType === "Production" || (e.adjustmentType == null && parseFloat(e.quantity || "0") > 0))
-                                        .reduce((sum: number, e: ViewVoucherEntry) => sum + Math.abs(parseFloat(e.totalAmount || "0")), 0);
-                                      const consTotal = viewVoucherEntries
-                                        .filter((e: ViewVoucherEntry) => e.adjustmentType === "Consumption" || (e.adjustmentType == null && parseFloat(e.quantity || "0") < 0))
-                                        .reduce((sum: number, e: ViewVoucherEntry) => sum + Math.abs(parseFloat(e.totalAmount || "0")), 0);
-                                      return formatAmount(prodTotal - consTotal);
-                                    })()}
-                                  </TableCell>
-                                </>
-                              )}
-                            </>
-                          ) : selectedVoucher.voucherType === "Consumption" ||
+                          {selectedVoucher.voucherType === "Consumption" ||
                           selectedVoucher.voucherType === "Production" ||
                           selectedVoucher.voucherType === "Stock Transfer" ||
                           selectedVoucher.voucherType === "StockTransfer" ? (
@@ -3554,8 +3525,39 @@ export default function Daybook({ user }: { user?: any } = {}) {
                             </>
                           )}
                         </TableRow>
+                        )}
                       </TableBody>
                     </Table>
+                    {/* Mixed voucher totals — outside the table */}
+                    {selectedVoucher.voucherType === "Mixed" && (
+                      <div className="flex items-center justify-between px-4 py-3 border-t font-bold">
+                        <div className="flex items-center gap-4">
+                          <span>Total</span>
+                          <span className="font-mono text-sm text-muted-foreground">
+                            {viewVoucherEntries
+                              .reduce(
+                                (sum: number, e: ViewVoucherEntry) =>
+                                  sum + Math.abs(parseFloat(e.quantity || "0")),
+                                0,
+                              )
+                              .toFixed(3).replace(/\.?0+$/, "")} units
+                          </span>
+                        </div>
+                        {user && !user?.role?.startsWith("POS") && (
+                          <span className="font-mono">
+                            {(() => {
+                              const prodTotal = viewVoucherEntries
+                                .filter((e: ViewVoucherEntry) => e.adjustmentType === "Production" || (e.adjustmentType == null && parseFloat(e.quantity || "0") > 0))
+                                .reduce((sum: number, e: ViewVoucherEntry) => sum + Math.abs(parseFloat(e.totalAmount || "0")), 0);
+                              const consTotal = viewVoucherEntries
+                                .filter((e: ViewVoucherEntry) => e.adjustmentType === "Consumption" || (e.adjustmentType == null && parseFloat(e.quantity || "0") < 0))
+                                .reduce((sum: number, e: ViewVoucherEntry) => sum + Math.abs(parseFloat(e.totalAmount || "0")), 0);
+                              return formatAmount(prodTotal - consTotal);
+                            })()}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
