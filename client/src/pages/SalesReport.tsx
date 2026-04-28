@@ -110,9 +110,9 @@ const formatSmartNumber = (value: string | number) => {
 export default function SalesReport() {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("today"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
-  const [selectedLocation, setSelectedLocation] = useState<string>("");
-  const [selectedStockItem, setSelectedStockItem] = useState<string>("");
-  const [selectedStockGroup, setSelectedStockGroup] = useState<string>("");
+  const [selectedLocation, setSelectedLocation] = useState<string>("all");
+  const [selectedStockItem, setSelectedStockItem] = useState<string>("all");
+  const [selectedStockGroup, setSelectedStockGroup] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [grouping, setGrouping] = useState<GroupingType>("daily");
   const [profitFilter, setProfitFilter] = useState<ProfitFilter>("all");
@@ -322,9 +322,9 @@ export default function SalesReport() {
 
   const handleClearFilters = () => {
     setPeriodFilter(getDefaultPeriodValue("today"));
-    setSelectedLocation("");
-    setSelectedStockItem("");
-    setSelectedStockGroup("");
+    setSelectedLocation("all");
+    setSelectedStockItem("all");
+    setSelectedStockGroup("all");
     setSearchTerm("");
     setProfitFilter("all");
     setSelectedCompanies([]);
@@ -518,8 +518,8 @@ export default function SalesReport() {
               setSelectedCompanies([]);
               // Location and stock item IDs are company-specific — clear them when entering multi-company mode
               if (next) {
-                setSelectedLocation("");
-                setSelectedStockItem("");
+                setSelectedLocation("all");
+                setSelectedStockItem("all");
                 // If still on "this_month" default, switch to last 30 days so cross-company data is visible
                 if (periodFilter.preset === "this_month") {
                   setPeriodFilter(getDefaultPeriodValue("today"));
@@ -722,7 +722,7 @@ export default function SalesReport() {
                 value={selectedStockGroup}
                 onValueChange={(val) => {
                   setSelectedStockGroup(val);
-                  setSelectedStockItem(""); // reset item when group changes
+                  setSelectedStockItem("all"); // reset item when group changes
                 }}
               >
                 <SelectTrigger id="stockGroup" data-testid="select-stock-group">
