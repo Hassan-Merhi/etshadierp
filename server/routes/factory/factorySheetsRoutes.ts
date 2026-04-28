@@ -144,9 +144,13 @@ export function registerFactorySheetsRoutes(app: Express) {
           h == null ? "" : String(h)
         );
 
-        const rows: { label: string; cells: (number | null)[] }[] = [];
+        const rows: { label: string; cells: (number | string | null)[] }[] = [];
         for (let r = 1; r < rawData.length; r++) {
           const rawRow = rawData[r] ?? [];
+          // Skip entirely empty rows
+          const hasData = rawRow.some((v: any) => v !== null && v !== undefined && v !== "");
+          if (!hasData) continue;
+
           const rawLabel = rawRow[0];
           let label: string;
           if (rawLabel == null) {
@@ -157,15 +161,21 @@ export function registerFactorySheetsRoutes(app: Express) {
             const d = String(rawLabel.getDate()).padStart(2, "0");
             label = `${y}-${m}-${d}`;
           } else {
-            const s = String(rawLabel).trim();
-            // Try to detect serial date numbers xlsx sometimes emits
-            label = s;
+            label = String(rawLabel).trim();
           }
-          const cells: (number | null)[] = rawRow.slice(1).map((v: any) => {
+
+          const cells: (number | string | null)[] = rawRow.slice(1).map((v: any) => {
             if (v === null || v === undefined || v === "") return null;
-            if (v instanceof Date) return null; // skip date values in data cells
+            if (v instanceof Date) {
+              // Date in a data cell — format as ISO
+              const y = v.getFullYear();
+              const m = String(v.getMonth() + 1).padStart(2, "0");
+              const d = String(v.getDate()).padStart(2, "0");
+              return `${y}-${m}-${d}`;
+            }
             const n = Number(v);
-            return isNaN(n) ? null : n;
+            // If it parses as a clean number, store as number; otherwise keep as string
+            return isNaN(n) ? String(v).trim() : n;
           });
           // Pad or trim cells to match column count
           while (cells.length < columns.length) cells.push(null);
@@ -239,7 +249,7 @@ export function registerFactorySheetsRoutes(app: Express) {
 
       for (const sheet of sheets) {
         const columns = (sheet.columns as string[]) ?? [];
-        const rows = (sheet.rows as { label: string; cells: (number | null)[] }[]) ?? [];
+        const rows = (sheet.rows as { label: string; cells: (number | string | null)[] }[]) ?? [];
 
         // Build the 2D array: header row + data rows + difference row
         const headerRow = ["", ...columns];
