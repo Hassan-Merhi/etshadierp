@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, MapPin, Tag, AlertCircle, Check, X, Pencil, Layers } from "lucide-react";
+import { Search, MapPin, Tag, AlertCircle, Check, X, Pencil, Layers, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -69,6 +69,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const [search, setSearch] = useState("");
   const [groupFilter, setGroupFilter] = useState<string>("all");
   const [editingItem, setEditingItem] = useState<{ stockItemId: number; locationId: number; value: string } | null>(null);
+  const [showUnpriced, setShowUnpriced] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
@@ -157,6 +158,17 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     return Array.from(groups).sort();
   }, [locationPricedList]);
 
+  const isItemUnpriced = (item: any): boolean => {
+    if (isAllMode) {
+      const hasMasterPrice = item.masterPrices && Object.values(item.masterPrices).some((p: any) => p && parseFloat(p) > 0);
+      const hasBase = item.baseSellingPrice && parseFloat(item.baseSellingPrice) > 0;
+      return !hasMasterPrice && !hasBase;
+    }
+    return !item.sellingPrice || parseFloat(item.sellingPrice) === 0;
+  };
+
+  const unpricedCount = useMemo(() => locationPricedList.filter(isItemUnpriced).length, [locationPricedList, isAllMode]);
+
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
     return locationPricedList.filter((item: any) => {
@@ -167,9 +179,10 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
         (item.stockGroupName && item.stockGroupName.toLowerCase().includes(q));
       const matchesGroup =
         groupFilter === "all" || item.stockGroupName === groupFilter;
-      return matchesSearch && matchesGroup;
+      const matchesUnpriced = !showUnpriced || isItemUnpriced(item);
+      return matchesSearch && matchesGroup && matchesUnpriced;
     });
-  }, [locationPricedList, search, groupFilter]);
+  }, [locationPricedList, search, groupFilter, showUnpriced, isAllMode]);
 
   const selectedLocation = locations.find((l) => l.id === selectedLocationId);
 
@@ -250,7 +263,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
               {!posUser && (
                 <button
                   data-testid="button-location-all"
-                  onClick={() => { setSelectedLocationId(ALL_LOCATIONS_ID); setSearch(""); setGroupFilter("all"); setEditingItem(null); }}
+                  onClick={() => { setSelectedLocationId(ALL_LOCATIONS_ID); setSearch(""); setGroupFilter("all"); setEditingItem(null); setShowUnpriced(false); }}
                   className={cn(
                     "w-full text-left px-3 py-2 rounded-md text-sm transition-colors hover-elevate flex items-center gap-1.5",
                     selectedLocationId === ALL_LOCATIONS_ID
@@ -266,7 +279,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 <button
                   key={loc.id}
                   data-testid={`button-location-${loc.id}`}
-                  onClick={() => { setSelectedLocationId(loc.id); setSearch(""); setGroupFilter("all"); setEditingItem(null); }}
+                  onClick={() => { setSelectedLocationId(loc.id); setSearch(""); setGroupFilter("all"); setEditingItem(null); setShowUnpriced(false); }}
                   className={cn(
                     "w-full text-left px-3 py-2 rounded-md text-sm transition-colors hover-elevate",
                     selectedLocationId === loc.id
@@ -325,6 +338,23 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 </SelectContent>
               </Select>
             )}
+            {canEdit && (
+              <Button
+                variant={showUnpriced ? "default" : "outline"}
+                size="sm"
+                data-testid="button-show-unpriced"
+                onClick={() => setShowUnpriced((v) => !v)}
+                className="gap-1.5 shrink-0"
+              >
+                <EyeOff className="w-3.5 h-3.5" />
+                Unpriced
+                {unpricedCount > 0 && (
+                  <Badge variant={showUnpriced ? "secondary" : "destructive"} className="ml-0.5 px-1.5 py-0 text-xs">
+                    {unpricedCount}
+                  </Badge>
+                )}
+              </Button>
+            )}
           </div>
         )}
 
@@ -372,10 +402,14 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 <div className="flex flex-col items-center justify-center h-full text-center gap-2 text-muted-foreground py-16">
                   <Tag className="w-10 h-10 opacity-30" />
                   <p className="text-sm">
-                    {search || groupFilter !== "all" ? "No items match your search." : "No items found."}
+                    {showUnpriced && !search && groupFilter === "all"
+                      ? "All items are priced."
+                      : search || groupFilter !== "all" || showUnpriced
+                        ? "No items match your filters."
+                        : "No items found."}
                   </p>
-                  {(search || groupFilter !== "all") && (
-                    <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setGroupFilter("all"); }}>
+                  {(search || groupFilter !== "all" || showUnpriced) && (
+                    <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setGroupFilter("all"); setShowUnpriced(false); }}>
                       Clear filters
                     </Button>
                   )}
@@ -413,7 +447,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                       </TableHeader>
                       <TableBody>
                         {filteredItems.map((item: any) => (
-                          <TableRow key={item.stockItemId} data-testid={`row-price-${item.stockItemId}`} className={cn(canEdit && !isAllMode && "group")}>
+                          <TableRow key={item.stockItemId} data-testid={`row-price-${item.stockItemId}`} className={cn(canEdit && !isAllMode && "group", isItemUnpriced(item) && "bg-amber-50/50 dark:bg-amber-950/20")}>
                             <TableCell className="font-mono text-sm text-muted-foreground">{item.code || "—"}</TableCell>
                             <TableCell>
                               <div className="font-medium">{item.name}</div>
