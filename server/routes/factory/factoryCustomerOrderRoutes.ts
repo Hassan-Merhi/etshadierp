@@ -2914,6 +2914,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           baleArticleCode: factoryBales.articleCode,
           baleProductId: factoryBales.productId,
           baleProductName: factoryBales.productName,
+          baleReferenceNumber: factoryBales.referenceNumber,
+          baleCode: factoryBales.baleCode,
           productArticleCode: factoryBaleProducts.articleCode,
           productName: factoryBaleProducts.name,
         })
@@ -3147,6 +3149,51 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         lr.getCell(2).alignment = { horizontal: "left" };
         merge(lr.number, 2, COL);
       }
+
+      // ── Second sheet: individual Bale References ──
+      const refSheet = workbook.addWorksheet("Bale References");
+      refSheet.columns = [
+        { key: "num",  width: 6  },  // #
+        { key: "ref",  width: 22 },  // Reference Number
+        { key: "code", width: 16 },  // Article Code
+        { key: "prod", width: 32 },  // Product Name
+      ];
+
+      const refHdr = refSheet.addRow(["#", "Reference Number", "Article Code", "Product"]);
+      refHdr.height = 24;
+      refHdr.eachCell((cell: any) => {
+        cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
+        setFill(cell, DARK_BLUE);
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.border = { top: { style: "thin", color: { argb: WHITE } }, bottom: { style: "thin", color: { argb: WHITE } }, left: { style: "thin", color: { argb: WHITE } }, right: { style: "thin", color: { argb: WHITE } } };
+      });
+
+      // Build per-bale rows sorted by article code then reference number
+      const baleRefRows = baleLinks
+        .map((link) => {
+          const code = link.productArticleCode || link.baleArticleCode || link.orderBaleArticleCode || "";
+          const refNum = link.baleReferenceNumber || link.baleCode || `BALE-${link.baleId}`;
+          const prodName = productNameMap.get(code) || link.productName || link.baleProductName || link.baleName || code;
+          return { code, refNum, prodName };
+        })
+        .filter((r) => r.refNum)
+        .sort((a, b) => a.code.localeCompare(b.code) || a.refNum.localeCompare(b.refNum));
+
+      baleRefRows.forEach((r, idx) => {
+        const dr = refSheet.addRow([idx + 1, r.refNum, r.code, r.prodName]);
+        dr.height = 20;
+        dr.eachCell((cell: any) => { cell.font = { size: 11 }; });
+        if (idx % 2 === 1) dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
+        dr.getCell(1).alignment = { horizontal: "center" };
+        dr.eachCell((cell: any) => {
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFDDDDDD" } },
+            bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
+            left: { style: "thin", color: { argb: "FFDDDDDD" } },
+            right: { style: "thin", color: { argb: "FFDDDDDD" } },
+          };
+        });
+      });
 
       const fileDateStr = getClientDate(req);
       const fileName = `loading_status_${invoiceNum.replace(/[^a-zA-Z0-9]/g, "_")}_${fileDateStr}.xlsx`;

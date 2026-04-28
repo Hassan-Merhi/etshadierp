@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import { Eye, Trash2, RotateCcw, Download, FileSpreadsheet, FileText, Package } from "lucide-react";
+import { Eye, Trash2, RotateCcw, Download, FileSpreadsheet, FileText, Package, Container } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -329,6 +329,20 @@ export default function FactoryInvoices() {
                               <FileText className="h-4 w-4 mr-2" />
                               PDF
                             </DropdownMenuItem>
+                            {isAdmin && (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  const a = document.createElement("a");
+                                  a.href = `/api/factory/customer-orders/${order.id}/loading-status-export`;
+                                  a.download = "";
+                                  a.click();
+                                }}
+                                data-testid={`button-download-loading-status-${order.id}`}
+                              >
+                                <Container className="h-4 w-4 mr-2" />
+                                Loading Status + Bale Refs
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
 

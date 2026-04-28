@@ -7,7 +7,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import { ClipboardCheck, Eye, Package, Trash2, Download, FileText } from "lucide-react";
+import { ClipboardCheck, Eye, Package, Trash2, Download, FileText, FileSpreadsheet, Container } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -50,6 +50,9 @@ export default function FactoryPendingInvoices() {
   const modeApiRequest = getApiRequest(appMode);
   const [statusFilter, setStatusFilter] = useState<string>("PENDING_VERIFIED");
   const { toast } = useToast();
+
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const isAdmin = myAccess?.fullAccess === true;
 
   const { data: pendingOrders = [], isLoading: pendingLoading } = useQuery<CustomerOrder[]>({
     queryKey: ["/api/factory/customer-orders?status=PENDING_VERIFICATION"],
@@ -233,8 +236,24 @@ export default function FactoryPendingInvoices() {
                           }}
                           data-testid={`button-export-order-${order.id}`}
                         >
-                          <Download className="h-4 w-4" />
+                          <FileSpreadsheet className="h-4 w-4" />
                         </Button>
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Loading Status + Bale Refs (Excel)"
+                            onClick={() => {
+                              const a = document.createElement("a");
+                              a.href = `/api/factory/customer-orders/${order.id}/loading-status-export`;
+                              a.download = "";
+                              a.click();
+                            }}
+                            data-testid={`button-loading-status-${order.id}`}
+                          >
+                            <Container className="h-4 w-4" />
+                          </Button>
+                        )}
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button
