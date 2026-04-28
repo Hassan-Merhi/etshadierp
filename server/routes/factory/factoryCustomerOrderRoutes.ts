@@ -1,5 +1,6 @@
 import { getClientDate } from "../../lib/dateUtils";
 import { getExportPriceVisibility } from "../../helpers/exportVisibility";
+import { sendWhatsAppTextToChatIdPos } from "../../services/whatsappService";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -2148,6 +2149,37 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           amountUsd: verifyTotalValue,
         });
         res.json(updated);
+
+        // Fire-and-forget: WhatsApp verification notification to the location's group chat.
+        // This runs after the response is sent so it never delays or blocks the API call.
+        setImmediate(async () => {
+          try {
+            if (!order.locationId) return;
+            const [loc] = await db
+              .select({ whatsappGroupChatId: locations.whatsappGroupChatId })
+              .from(locations)
+              .where(eq(locations.id, order.locationId));
+            if (!loc?.whatsappGroupChatId) return;
+
+            const baleCount = verifyBales.length;
+            const lines: string[] = [
+              `*Container Verified* ✓`,
+              ``,
+              `Order #${orderId}`,
+              order.containerNumber ? `Container: ${order.containerNumber}` : null,
+              `Customer: ${verifyCustomer?.legalName || "—"}`,
+              `Bales loaded: ${baleCount}`,
+              order.destination ? `Destination: ${order.destination}` : null,
+              `Date: ${verifyToday}`,
+              notes ? `Notes: ${notes}` : null,
+            ].filter(Boolean) as string[];
+
+            await sendWhatsAppTextToChatIdPos(loc.whatsappGroupChatId, lines.join("\n"));
+            console.log(`[verify-whatsapp] Sent notification to ${loc.whatsappGroupChatId} for order #${orderId}`);
+          } catch (e: any) {
+            console.error("[verify-whatsapp] Failed to send notification:", e.message);
+          }
+        });
       } else {
         const [updated] = await db.update(customerOrders).set({
           containerNotes: notes || order.containerNotes,
