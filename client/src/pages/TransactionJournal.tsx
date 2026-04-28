@@ -999,7 +999,12 @@ export default function TransactionJournal() {
 
                 // ── PRODUCTION / CONSUMPTION / MIXED ────────────────────────────────
                 if ((vtype === "Production" || vtype === "Consumption" || vtype === "Mixed") && stockRows.length > 0) {
-                  const grandTotal = stockRows.reduce((s, r) => s + Math.abs(parseFloat(r.totalAmount || "0")), 0);
+                  const grandTotal = vtype === "Mixed"
+                    ? stockRows.reduce((s, r) => {
+                        const amt = Math.abs(parseFloat(r.totalAmount || "0"));
+                        return r.adjustmentType === "Production" ? s + amt : s - amt;
+                      }, 0)
+                    : stockRows.reduce((s, r) => s + Math.abs(parseFloat(r.totalAmount || "0")), 0);
                   const grandQty   = stockRows.reduce((s, r) => s + Math.abs(parseFloat(r.quantity    || "0")), 0);
                   return (
                     <div>

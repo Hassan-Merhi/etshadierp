@@ -2741,23 +2741,29 @@ export function registerVoucherRoutes(app: Express) {
         }
 
         // Calculate totals and prepare items data
-        let totalAmount = 0;
+        // For Mixed: net totalAmount = production (positive qty) - consumption (negative qty)
+        // For Production/Consumption only: use absolute value
+        let signedTotal = 0;
 
         const adjustmentItemsData = items.map((item: any) => {
           const quantity = parseFloat(item.quantity);
           const rate = parseFloat(item.rate);
-          const itemTotal = quantity * rate;
-
-          totalAmount += itemTotal;
+          const absItemTotal = Math.abs(quantity) * rate;  // always positive (consistent with createStockAdjustment)
+          signedTotal += quantity * rate;  // signed: negative for consumption items
 
           return {
             adjustmentId: adjustmentVoucher.id,
             stockItemId: item.stockItemId,
             quantity: item.quantity,
             rate: item.rate,
-            totalAmount: itemTotal.toFixed(2),
+            totalAmount: absItemTotal.toFixed(2),
           };
         });
+
+        // Voucher totalAmount: net for Mixed, absolute for Production/Consumption
+        const totalAmount = existingVoucher.voucherType === "Mixed"
+          ? signedTotal
+          : Math.abs(signedTotal);
 
         // Wrap all inventory mutations + related writes in a transaction
         const updated = await db.transaction(async (tx) => {

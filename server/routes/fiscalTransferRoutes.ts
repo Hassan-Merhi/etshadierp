@@ -1623,7 +1623,12 @@ export function registerFiscalTransferRoutes(app: Express) {
         const updated = await storage.updateStockAdjustment(id, locationId, adjustmentType, notes || "", itemsForStorage);
         
         // Recalculate voucher totalAmount based on updated items
-        const newTotalAmount = items.reduce((sum, item) => sum + (Math.abs(item.quantity) * item.rate), 0);
+        // For Mixed: net = production (positive qty) - consumption (negative qty)
+        // For Production/Consumption only: use absolute value sum
+        const { adjustmentType: updatedAdjType } = parseResult.data;
+        const newTotalAmount = updatedAdjType === "Mixed"
+          ? items.reduce((sum, item) => sum + (item.quantity * item.rate), 0)
+          : items.reduce((sum, item) => sum + (Math.abs(item.quantity) * item.rate), 0);
         await db.update(vouchers)
           .set({ totalAmount: newTotalAmount.toFixed(2) })
           .where(eq(vouchers.id, updated.adjustment.voucherId));

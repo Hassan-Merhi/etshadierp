@@ -2893,6 +2893,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const productionTotal = adjustmentEntries
     .filter(entry => entry.type === "PRODUCE")
     .reduce((sum, entry) => sum + (parseFloat(entry.quantity || "0") * parseFloat(entry.rate || "0")), 0);
+  const currentHasConsumption = adjustmentEntries.some((e: any) => e.type === "CONSUME");
+  const currentHasProduction = adjustmentEntries.some((e: any) => e.type === "PRODUCE");
+  const currentAdjustmentType = currentHasConsumption && currentHasProduction ? "Mixed" : currentHasProduction ? "Production" : "Consumption";
+  const displayAdjustmentTotal = currentAdjustmentType === "Mixed" ? productionTotal - consumptionTotal : consumptionTotal + productionTotal;
 
   // Fetch location inventory for auto-filling rates in adjustments
   const { data: locationInventory = [] } = useQuery<any[]>({
@@ -3016,7 +3020,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         rate: entry.rate,
       }));
 
-      const totalAmount = consumptionTotal + productionTotal;
+      const totalAmount = adjustmentType === "Mixed"
+        ? productionTotal - consumptionTotal
+        : consumptionTotal + productionTotal;
       
       if (isEditMode) {
         // UPDATE MODE: Use PATCH to update existing voucher and stock adjustment
@@ -6378,7 +6384,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             </div>
                             <div className="text-sm font-semibold">Total:</div>
                             <div className="text-sm font-bold font-mono" data-testid="text-adjustment-total">
-                              {formatAmount(consumptionTotal + productionTotal)}
+                              {formatAmount(displayAdjustmentTotal)}
                             </div>
                           </div>
                         </div>

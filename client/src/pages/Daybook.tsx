@@ -3431,7 +3431,37 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         })()}
                         {/* Totals Row */}
                         <TableRow className="font-bold bg-muted/50">
-                          {selectedVoucher.voucherType === "Consumption" ||
+                          {selectedVoucher.voucherType === "Mixed" ? (
+                            <>
+                              <TableCell>Total</TableCell>
+                              <TableCell></TableCell>
+                              <TableCell className="text-right font-mono">
+                                {viewVoucherEntries
+                                  .reduce(
+                                    (sum: number, e: ViewVoucherEntry) =>
+                                      sum + Math.abs(parseFloat(e.quantity || "0")),
+                                    0,
+                                  )
+                                  .toFixed(3).replace(/\.?0+$/, "")}
+                              </TableCell>
+                              {user && !user?.role?.startsWith("POS") && (
+                                <>
+                                  <TableCell></TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    {(() => {
+                                      const prodTotal = viewVoucherEntries
+                                        .filter((e: ViewVoucherEntry) => e.adjustmentType === "Production" || (e.adjustmentType == null && parseFloat(e.quantity || "0") > 0))
+                                        .reduce((sum: number, e: ViewVoucherEntry) => sum + Math.abs(parseFloat(e.totalAmount || "0")), 0);
+                                      const consTotal = viewVoucherEntries
+                                        .filter((e: ViewVoucherEntry) => e.adjustmentType === "Consumption" || (e.adjustmentType == null && parseFloat(e.quantity || "0") < 0))
+                                        .reduce((sum: number, e: ViewVoucherEntry) => sum + Math.abs(parseFloat(e.totalAmount || "0")), 0);
+                                      return formatAmount(prodTotal - consTotal);
+                                    })()}
+                                  </TableCell>
+                                </>
+                              )}
+                            </>
+                          ) : selectedVoucher.voucherType === "Consumption" ||
                           selectedVoucher.voucherType === "Production" ||
                           selectedVoucher.voucherType === "Stock Transfer" ||
                           selectedVoucher.voucherType === "StockTransfer" ? (
