@@ -2113,6 +2113,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         })),
         ...enrichedFxTransfers.map((t: any) => {
           const isOut = t.fromSupplierId === supplierId;
+          const isSelf = t.fromSupplierId === t.toSupplierId;
           const cc = isOut ? (t.fromCurrencyCode || "USD") : "USD";
           const amt = isOut ? t.fromAmount : t.toAmountUsd;
           const counterparty = isOut ? (t.toSupplierName || "Broker") : (t.fromSupplierName || "Linked");
@@ -2120,7 +2121,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
             key: `fx-${t.id}`,
             date: t.date,
             type: "fx",
-            ref: isOut ? `FX → ${counterparty}` : `FX ← ${counterparty}`,
+            ref: isSelf ? `FX Settlement` : (isOut ? `FX → ${counterparty}` : `FX ← ${counterparty}`),
             detail: isOut ? `${t.fromCurrencyCode} ${parseFloat(t.fromAmount || "0").toFixed(2)} → $${parseFloat(t.toAmountUsd || "0").toFixed(2)}${t.sourceType ? ` · ${t.sourceType}` : ""}` : `+$${parseFloat(t.toAmountUsd || "0").toFixed(2)} received`,
             amount: fmtAmt(amt, cc, isOut),
             amountIsNeg: isOut,

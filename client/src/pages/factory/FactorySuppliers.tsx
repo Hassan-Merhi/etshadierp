@@ -485,7 +485,8 @@ export default function FactorySuppliers() {
       if (fxConversionForm.toSupplierId && fxConversionForm.toSupplierId !== statementSupplierId) {
         queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", fxConversionForm.toSupplierId, "statement"] });
       }
-      toast({ title: "FX Transfer recorded", description: `${fxConversionForm.selectedCurrency} balance transferred to parent USD` });
+      const isSelfSettle = fxConversionForm.toSupplierId === fxConversionForm.fromSupplierId;
+      toast({ title: "FX Transfer recorded", description: isSelfSettle ? `${fxConversionForm.selectedCurrency} balance settled to USD` : `${fxConversionForm.selectedCurrency} balance transferred to parent USD` });
       setFxConversionOpen(false);
     },
     onError: (err: Error) => {
@@ -1304,22 +1305,23 @@ export default function FactorySuppliers() {
                       Currency Pools
                       <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("currencyPools") ? "" : "rotate-180"}`} />
                     </span>
-                    {statementData.supplier.parentId && statementData.currencyGroups.some(g => g.currencyCode !== "USD" && (parseFloat(g.netPayable) > 0 || parseFloat(g.totalCommission) > 0)) && (
+                    {statementData.currencyGroups.some(g => g.currencyCode !== "USD" && (parseFloat(g.netPayable) > 0 || parseFloat(g.totalCommission) > 0)) && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
                           const firstNonUsd = statementData.currencyGroups.find(g => g.currencyCode !== "USD" && (parseFloat(g.netPayable) > 0 || parseFloat(g.totalCommission) > 0));
-                          if (firstNonUsd && statementSupplierId && statementData.supplier.parentId) {
+                          if (firstNonUsd && statementSupplierId) {
                             const hasBalance = parseFloat(firstNonUsd.netPayable) > 0;
                             setFxSourceType(hasBalance ? "supplier" : "commission");
-                            openFxConversionDialog(statementSupplierId, statementData.supplier.parentId, firstNonUsd.currencyCode, hasBalance ? firstNonUsd.netPayable : "0", firstNonUsd.totalCommission);
+                            const toId = statementData.supplier.parentId || statementSupplierId;
+                            openFxConversionDialog(statementSupplierId, toId, firstNonUsd.currencyCode, hasBalance ? firstNonUsd.netPayable : "0", firstNonUsd.totalCommission);
                           }
                         }}
                         data-testid="button-fx-convert"
                       >
                         <ArrowRightLeft className="h-3.5 w-3.5 mr-1.5" />
-                        Settle FX to Broker
+                        {statementData.supplier.parentId ? "Settle FX to Broker" : "Settle FX to USD"}
                       </Button>
                     )}
                   </CardTitle>
@@ -1828,6 +1830,7 @@ export default function FactorySuppliers() {
                       }),
                     ...(statementData.fxTransfers || []).map((t: any) => {
                       const isOut = t.fromSupplierId === statementSupplierId;
+                      const isSelf = t.fromSupplierId === t.toSupplierId;
                       const counterparty = isOut ? (t.toSupplierName || "Broker") : (t.fromSupplierName || "Linked");
                       const fromAmt = parseFloat(t.fromAmount || "0");
                       const fromCc = t.fromCurrencyCode || "USD";
@@ -1836,7 +1839,7 @@ export default function FactorySuppliers() {
                         key: `f-${t.id}`,
                         date: t.date,
                         type: "fx" as RowType,
-                        ref: isOut ? `FX → ${counterparty}` : `FX ← ${counterparty}`,
+                        ref: isSelf ? `FX Settlement` : (isOut ? `FX → ${counterparty}` : `FX ← ${counterparty}`),
                         detail: isOut
                           ? `${fromCc !== "USD" ? `${fromCc} ` : "$"}${formatNum(String(fromAmt))} → $${formatNum(String(toUsd.toFixed(2)))}${t.sourceType ? ` · ${srcLabel[t.sourceType] || t.sourceType}` : ""}`
                           : `+$${formatNum(String(toUsd.toFixed(2)))}`,
@@ -1996,21 +1999,34 @@ export default function FactorySuppliers() {
         {/* FX Settlement Dialog — internal settlement: linked supplier foreign currency → broker USD bucket */}
         <Dialog open={fxConversionOpen} onOpenChange={(open) => { if (!open) setFxConversionOpen(false); }}>
           <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <ArrowRightLeft className="h-4 w-4" />
-                {fxConversionForm.selectedCurrency === "USD"
-                  ? (parseFloat(fxConversionForm.commissionBalance || "0") > 0 ? "Transfer Commission to Broker" : "Transfer Freight to Broker")
-                  : "FX Settlement to Broker (USD)"}
-              </DialogTitle>
-              <DialogDescription>
-                {fxConversionForm.selectedCurrency === "USD"
-                  ? parseFloat(fxConversionForm.commissionBalance || "0") > 0
-                    ? "Direct USD transfer: moves this commission from the linked supplier to the broker's USD pool at 1:1 rate. Not a voucher payment."
-                    : "Direct USD transfer: moves this freight obligation from the linked supplier to the broker's USD pool at 1:1 rate. Not a voucher payment."
-                  : "Internal settlement: converts this linked supplier's foreign currency balance into the broker's USD pool. Not a voucher payment."}
-              </DialogDescription>
-            </DialogHeader>
+            {(() => {
+              const isSelf = fxConversionForm.toSupplierId === fxConversionForm.fromSupplierId;
+              return (
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <ArrowRightLeft className="h-4 w-4" />
+                    {fxConversionForm.selectedCurrency === "USD"
+                      ? (parseFloat(fxConversionForm.commissionBalance || "0") > 0
+                          ? (isSelf ? "Settle Commission to USD" : "Transfer Commission to Broker")
+                          : (isSelf ? "Settle Freight to USD" : "Transfer Freight to Broker"))
+                      : (isSelf ? `FX Settlement to USD` : "FX Settlement to Broker (USD)")}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {fxConversionForm.selectedCurrency === "USD"
+                      ? parseFloat(fxConversionForm.commissionBalance || "0") > 0
+                        ? (isSelf
+                            ? "Direct USD settlement: records this commission as settled at 1:1. Not a voucher payment."
+                            : "Direct USD transfer: moves this commission from the linked supplier to the broker's USD pool at 1:1 rate. Not a voucher payment.")
+                        : (isSelf
+                            ? "Direct USD settlement: records this freight obligation as settled at 1:1. Not a voucher payment."
+                            : "Direct USD transfer: moves this freight obligation from the linked supplier to the broker's USD pool at 1:1 rate. Not a voucher payment.")
+                      : (isSelf
+                          ? "Internal settlement: converts this supplier's foreign currency balance to its USD equivalent. Not a voucher payment."
+                          : "Internal settlement: converts this linked supplier's foreign currency balance into the broker's USD pool. Not a voucher payment.")}
+                  </DialogDescription>
+                </DialogHeader>
+              );
+            })()}
             <div className="space-y-4">
               {/* Source type selector */}
               <div>
