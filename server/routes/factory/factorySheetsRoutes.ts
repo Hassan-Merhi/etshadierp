@@ -2,11 +2,147 @@ import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { factorySheets } from "@shared/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, ne } from "drizzle-orm";
 import multer from "multer";
 import { read as readExcel, utils as xlsxUtils, write as writeExcel, WorkBook } from "xlsx";
 
 const upload = multer({ storage: multer.memoryStorage() });
+
+// ── STATUS sheet helpers ───────────────────────────────────────────────────────
+type CellVal = number | string | null;
+type SRow = { label: string; cells: CellVal[] };
+type SSheet = { id?: number; name: string; columns: string[]; rows: SRow[]; orderIndex?: number };
+
+const STATUS_NAME = "STATUS";
+
+function toNumber(v: CellVal): number {
+  if (typeof v === "number") return isNaN(v) ? 0 : v;
+  if (typeof v === "string") {
+    const n = parseFloat(v.replace(/,/g, ""));
+    return isNaN(n) ? 0 : n;
+  }
+  return 0;
+}
+
+function findSheet(sheets: SSheet[], name: string): SSheet | undefined {
+  const n = name.trim().toLowerCase();
+  return sheets.find(s => s.name.trim().toLowerCase().includes(n));
+}
+
+function findColumnIndex(sheet: SSheet, names: string[]): number {
+  for (const name of names) {
+    const n = name.trim().toLowerCase();
+    const idx = sheet.columns.findIndex(c => c.trim().toLowerCase() === n);
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
+
+function sumColumn(sheet: SSheet | undefined, names: string[]): number {
+  if (!sheet) return 0;
+  const idx = findColumnIndex(sheet, names);
+  if (idx === -1) return 0;
+  return sheet.rows.reduce((sum, row) => sum + toNumber(row.cells[idx]), 0);
+}
+
+function buildStatusSheet(
+  sheets: SSheet[],
+  existingStatus?: SSheet,
+): { columns: string[]; rows: SRow[] } {
+  // Read persisted BEFORE values from the existing STATUS sheet (so edits survive recalc)
+  const getExistingBefore = (labelFragment: string, defaultVal: number): number => {
+    if (!existingStatus) return defaultVal;
+    const beforeIdx = findColumnIndex(existingStatus, ["BEFORE"]);
+    if (beforeIdx === -1) return defaultVal;
+    const row = existingStatus.rows.find(r =>
+      r.label.trim().toLowerCase().includes(labelFragment.toLowerCase()),
+    );
+    if (!row) return defaultVal;
+    const v = toNumber(row.cells[beforeIdx]);
+    return v !== 0 ? v : defaultVal;
+  };
+
+  // Source sheets
+  const prodSheet  = findSheet(sheets, "PRODUCTION");
+  const stockSheet = findSheet(sheets, "STOCK IN");
+  const ioSheet    = findSheet(sheets, "IO");
+
+  // DIFF values
+  const prodDiff  = -Math.abs(sumColumn(prodSheet,  ["DIFF", "Diff", "فرق"]));
+  const stockDiff = -Math.abs(sumColumn(stockSheet, ["فرق",  "DIFF", "Diff"]));
+  const ioDiff    =           sumColumn(ioSheet,    ["WEIGHT", "Weight"]);
+
+  // BEFORE values
+  const prodBefore  = getExistingBefore("PRODUCTION", -183221);
+  const stockBefore = getExistingBefore("STOCK IN",    -46020);
+  const ioBefore    = getExistingBefore("IO",          -69011);
+
+  // AFTER = BEFORE + DIFF
+  const prodAfter  = prodBefore  + prodDiff;
+  const stockAfter = stockBefore + stockDiff;
+  const ioAfter    = ioBefore    + ioDiff;
+
+  // DIFFERENCE totals row
+  const totalBefore = prodBefore  + stockBefore + ioBefore;
+  const totalDiff   = prodDiff    + stockDiff   + ioDiff;
+  const totalAfter  = prodAfter   + stockAfter  + ioAfter;
+
+  const columns = ["BEFORE", "DIFF", "AFTER"];
+  const rows: SRow[] = [
+    { label: "PRODUCTION اجراء اعمال", cells: [prodBefore,  prodDiff,  prodAfter] },
+    { label: "STOCK IN",               cells: [stockBefore, stockDiff, stockAfter] },
+    { label: "IO",                     cells: [ioBefore,    ioDiff,    ioAfter] },
+    { label: "DIFFERENCE",             cells: [totalBefore, totalDiff, totalAfter] },
+  ];
+
+  return { columns, rows };
+}
+
+// Upsert the STATUS sheet for a company, always at orderIndex 0.
+// Pass in already-fetched source sheets to avoid redundant DB calls.
+async function upsertStatusSheet(companyId: number, sourceSheets: SSheet[]): Promise<void> {
+  // Exclude STATUS itself from source data
+  const nonStatus = sourceSheets.filter(
+    s => s.name.trim().toUpperCase() !== STATUS_NAME,
+  );
+
+  // Find the existing STATUS record so we can preserve BEFORE values
+  const existingStatus = sourceSheets.find(
+    s => s.name.trim().toUpperCase() === STATUS_NAME,
+  );
+
+  const { columns, rows } = buildStatusSheet(nonStatus, existingStatus);
+
+  if (existingStatus?.id) {
+    // Update in place
+    await db
+      .update(factorySheets)
+      .set({ columns, rows, orderIndex: 0, updatedAt: new Date() })
+      .where(and(eq(factorySheets.id, existingStatus.id), eq(factorySheets.companyId, companyId)));
+  } else {
+    // Push all existing sheets up by 1 to make room
+    const allSheets = await db
+      .select({ id: factorySheets.id, orderIndex: factorySheets.orderIndex })
+      .from(factorySheets)
+      .where(eq(factorySheets.companyId, companyId));
+
+    for (const s of allSheets) {
+      await db
+        .update(factorySheets)
+        .set({ orderIndex: s.orderIndex + 1 })
+        .where(and(eq(factorySheets.id, s.id), eq(factorySheets.companyId, companyId)));
+    }
+
+    // Insert STATUS as first
+    await db.insert(factorySheets).values({
+      companyId,
+      name: STATUS_NAME,
+      orderIndex: 0,
+      columns,
+      rows,
+    });
+  }
+}
 
 export function registerFactorySheetsRoutes(app: Express) {
 
@@ -82,6 +218,27 @@ export function registerFactorySheetsRoutes(app: Express) {
         .returning();
 
       if (!updated) return res.status(404).json({ message: "Sheet not found" });
+
+      // If the saved sheet is a source sheet (not STATUS), recalculate STATUS
+      if (updated.name.trim().toUpperCase() !== STATUS_NAME) {
+        const allSheets = await db
+          .select()
+          .from(factorySheets)
+          .where(eq(factorySheets.companyId, companyId))
+          .orderBy(asc(factorySheets.orderIndex), asc(factorySheets.id));
+
+        await upsertStatusSheet(
+          companyId,
+          allSheets.map(s => ({
+            id: s.id,
+            name: s.name,
+            columns: (s.columns as string[]) ?? [],
+            rows: (s.rows as SRow[]) ?? [],
+            orderIndex: s.orderIndex,
+          })),
+        );
+      }
+
       res.json(updated);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -192,7 +349,32 @@ export function registerFactorySheetsRoutes(app: Express) {
         created.push(s);
       }
 
-      res.json(created);
+      // Build / rebuild STATUS sheet from the imported data
+      const allSheets = await db
+        .select()
+        .from(factorySheets)
+        .where(eq(factorySheets.companyId, companyId))
+        .orderBy(asc(factorySheets.orderIndex), asc(factorySheets.id));
+
+      await upsertStatusSheet(
+        companyId,
+        allSheets.map(s => ({
+          id: s.id,
+          name: s.name,
+          columns: (s.columns as string[]) ?? [],
+          rows: (s.rows as SRow[]) ?? [],
+          orderIndex: s.orderIndex,
+        })),
+      );
+
+      // Return the final list including STATUS
+      const finalSheets = await db
+        .select()
+        .from(factorySheets)
+        .where(eq(factorySheets.companyId, companyId))
+        .orderBy(asc(factorySheets.orderIndex), asc(factorySheets.id));
+
+      res.json(finalSheets);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

@@ -284,13 +284,31 @@ export default function FactorySheets() {
         })
       ));
     },
-    onSuccess: () => {
-      // Lock all rows after save
+    onSuccess: async () => {
+      // Lock all rows after save, then refresh STATUS from server
       setLocalSheets(prev => prev.map(s => ({
         ...s,
         dirty: false,
         rows: s.rows.map(r => ({ ...r, locked: true })),
       })));
+
+      // Pull the fresh STATUS sheet from the server and merge it into local state
+      try {
+        const fresh: FactorySheet[] = await fetch("/api/factory/sheets", { credentials: "include" }).then(r => r.json());
+        const freshStatus = fresh.find(s => s.name.trim().toUpperCase() === "STATUS");
+        if (freshStatus) {
+          setLocalSheets(prev => {
+            const hasStatus = prev.some(s => s.name.trim().toUpperCase() === "STATUS");
+            const converted = fromApiSheet(freshStatus);
+            if (hasStatus) {
+              return prev.map(s => s.name.trim().toUpperCase() === "STATUS" ? converted : s);
+            } else {
+              return [converted, ...prev];
+            }
+          });
+        }
+      } catch { /* non-critical — STATUS will refresh on next load */ }
+
       queryClient.invalidateQueries({ queryKey: ["/api/factory/sheets"] });
       const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       setSavedAt(now);
