@@ -648,7 +648,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   const sendStockReportToWhatsApp = async (locationId?: number | null) => {
     if (!locationId) throw new Error("No location selected");
-    const res = await apiRequest("POST", "/api/pos/send-shift-report", { locationId });
+    const res = await apiRequest("POST", "/api/pos/send-stock-pdf", { locationId });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.message || "WhatsApp stock report failed to send");
     return body;
@@ -2652,12 +2652,22 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                   handleSendWhatsAppReport();
                 }
               }}
-              disabled={stockInventoryLoading}
+              disabled={stockInventoryLoading || sendingWhatsApp}
               className="gap-2"
               data-testid="button-confirm-stock-print"
             >
-              <Printer className="h-4 w-4" />
-              {stockInventoryLoading ? "Loading…" : "Print Stock"}
+              {sendingWhatsApp ? (
+                <span className="animate-spin">↻</span>
+              ) : (
+                <Printer className="h-4 w-4" />
+              )}
+              {stockInventoryLoading
+                ? "Loading…"
+                : sendingWhatsApp
+                  ? "Sending…"
+                  : (activeLocation as any)?.whatsappGroupChatId
+                    ? "Print + Send to WhatsApp"
+                    : "Print Stock"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

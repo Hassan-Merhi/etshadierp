@@ -39,7 +39,8 @@ import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
-import { sendWhatsAppTextToChatIdPos } from "../services/whatsappService";
+import { sendWhatsAppTextToChatIdPos, sendWhatsAppFileToChatIdPos } from "../services/whatsappService";
+import PDFDocument from "pdfkit";
 
 
 export function registerPosRoutes(app: Express) {
@@ -1430,6 +1431,169 @@ export function registerPosRoutes(app: Express) {
       console.error("[/api/pos/send-shift-report]", {
         locationId: req.body.locationId,
         chatId: (error as any)?.chatId ?? undefined,
+        error: error?.message ?? error,
+      });
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── POS Stock PDF → WhatsApp ──────────────────────────────────────────────
+  app.post("/api/pos/send-stock-pdf", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const userId = req.session.userId!;
+
+      let locationId: number | null = null;
+      if (req.body.locationId) {
+        locationId = parseInt(req.body.locationId as string);
+      } else {
+        const ucr = await db
+          .select({ assignedLocationId: userCompanyRoles.assignedLocationId })
+          .from(userCompanyRoles)
+          .where(and(eq(userCompanyRoles.userId, userId), eq(userCompanyRoles.companyId, companyId)))
+          .limit(1);
+        locationId = ucr[0]?.assignedLocationId ?? null;
+      }
+
+      if (!locationId) return res.status(400).json({ message: "No location found for this user" });
+
+      const [location] = await db
+        .select()
+        .from(locations)
+        .where(and(eq(locations.id, locationId), eq(locations.companyId, companyId)))
+        .limit(1);
+
+      if (!location) return res.status(404).json({ message: "Location not found" });
+
+      if (!location.whatsappGroupChatId) {
+        return res.status(400).json({ message: "No WhatsApp group configured for this location" });
+      }
+
+      // Fetch stock inventory grouped
+      const stockRows = await db
+        .select({
+          name:      stockItems.name,
+          unit:      stockItems.uom,
+          quantity:  inventory.quantity,
+          groupName: stockGroups.name,
+          groupCode: stockGroups.code,
+        })
+        .from(inventory)
+        .innerJoin(stockItems, eq(inventory.stockItemId, stockItems.id))
+        .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+        .where(and(eq(inventory.locationId, locationId), eq(inventory.companyId, companyId)))
+        .orderBy(asc(stockGroups.name), asc(stockItems.name));
+
+      // Filter zero-qty rows and group
+      const nonZero = stockRows.filter(r => parseFloat(r.quantity ?? "0") !== 0);
+      const grouped: Record<string, { name: string; items: typeof nonZero }> = {};
+      for (const row of nonZero) {
+        const key = row.groupCode ?? row.groupName ?? "Unassigned";
+        if (!grouped[key]) grouped[key] = { name: row.groupName ?? "Unassigned", items: [] };
+        grouped[key].items.push(row);
+      }
+      const grandTotal = nonZero.reduce((s, r) => s + Math.floor(parseFloat(r.quantity ?? "0")), 0);
+      const dateStr = format(new Date(), "dd MMM yyyy, h:mm a");
+
+      // Build PDF with PDFKit
+      const doc = new PDFDocument({ size: "A4", margin: 40, autoFirstPage: true });
+      const chunks: Buffer[] = [];
+      doc.on("data", (c: Buffer) => chunks.push(c));
+
+      await new Promise<void>((resolve, reject) => {
+        doc.on("end", resolve);
+        doc.on("error", reject);
+
+        // ── Header ──────────────────────────────────────────────────────────
+        doc.fontSize(16).font("Helvetica-Bold")
+          .text(location.name, { align: "center" });
+        doc.fontSize(10).font("Helvetica")
+          .text("Godown Summary", { align: "center" });
+        doc.fontSize(9).fillColor("#555555")
+          .text(dateStr, { align: "center" });
+        doc.moveDown(0.5);
+        doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#333333").lineWidth(1.5).stroke();
+        doc.moveDown(0.4);
+
+        // ── Table header ────────────────────────────────────────────────────
+        const colItem = 40;
+        const colQty  = 510;
+        doc.fontSize(9).font("Helvetica-Bold").fillColor("#000000");
+        doc.text("Item", colItem, doc.y);
+        doc.moveUp();
+        doc.text("Qty (BL)", colQty - 60, doc.y, { width: 60, align: "right" });
+        doc.moveDown(0.3);
+        doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#333333").lineWidth(1).stroke();
+        doc.moveDown(0.3);
+
+        // ── Rows ─────────────────────────────────────────────────────────────
+        for (const [, { name, items }] of Object.entries(grouped)) {
+          const groupQty = items.reduce((s, i) => s + Math.floor(parseFloat(i.quantity ?? "0")), 0);
+
+          // Group row (bold, slightly shaded background)
+          const gy = doc.y;
+          doc.rect(40, gy - 2, 515, 14).fillColor("#e8e8e8").fill();
+          doc.font("Helvetica-Bold").fontSize(9).fillColor("#000000");
+          doc.text(name, colItem, gy, { lineBreak: false });
+          doc.text(groupQty.toLocaleString(), colQty - 60, gy, { width: 60, align: "right", lineBreak: false });
+          doc.moveDown(0.9);
+
+          // Item rows
+          for (const item of items) {
+            const qty = Math.floor(parseFloat(item.quantity ?? "0"));
+            const isNeg = qty < 0;
+            const iy = doc.y;
+            if (isNeg) {
+              doc.rect(40, iy - 2, 515, 13).fillColor("#ffe0e0").fill();
+            }
+            doc.font("Helvetica").fontSize(8.5).fillColor(isNeg ? "#cc0000" : "#000000");
+            doc.text(item.name, colItem + 12, iy, { lineBreak: false });
+            doc.text(qty.toLocaleString(), colQty - 60, iy, { width: 60, align: "right", lineBreak: false });
+            doc.moveDown(0.75);
+          }
+        }
+
+        // ── Grand total ──────────────────────────────────────────────────────
+        doc.moveDown(0.3);
+        doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#333333").lineWidth(1.5).stroke();
+        doc.moveDown(0.3);
+        const ty = doc.y;
+        doc.rect(40, ty - 2, 515, 15).fillColor("#f0f0f0").fill();
+        doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#000000");
+        doc.text("Grand Total", colItem, ty, { lineBreak: false });
+        doc.text(grandTotal.toLocaleString(), colQty - 60, ty, { width: 60, align: "right", lineBreak: false });
+
+        doc.end();
+      });
+
+      const pdfBuffer = Buffer.concat(chunks);
+      const safeLocationName = location.name.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_-]/g, "");
+      const fileName = `Stock_${safeLocationName}_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`;
+      const caption  = `📍 ${location.name} — Stock Report\n🕐 ${dateStr}`;
+
+      const result = await sendWhatsAppFileToChatIdPos(
+        location.whatsappGroupChatId,
+        pdfBuffer,
+        fileName,
+        caption,
+        "application/pdf",
+      );
+
+      if (!result.success) {
+        console.error("[/api/pos/send-stock-pdf]", {
+          locationId,
+          chatId: location.whatsappGroupChatId,
+          error: result.error,
+        });
+        return res.status(502).json({ message: result.error ?? "Failed to send WhatsApp PDF" });
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[/api/pos/send-stock-pdf]", {
+        locationId: req.body.locationId,
         error: error?.message ?? error,
       });
       res.status(500).json({ message: error.message });
