@@ -301,7 +301,8 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
   const totalCost = selectedSources.reduce((s, x) => s + x.totalCost, 0);
   const blendedCostPerKg = totalWeight > 0 ? totalCost / totalWeight : 0;
   const currentUsedKg = batch ? parseFloat((batch as any).usedKg || "0") : 0;
-  const belowUsed = totalWeight < currentUsedKg - 0.001;
+  // Warn if clearly below used (>1 kg gap). Backend enforces the strict check.
+  const belowUsed = totalWeight < currentUsedKg - 1;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -518,7 +519,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
               </Button>
               <Button
                 onClick={() => saveMutation.mutate()}
-                disabled={saveMutation.isPending || selectedSources.length === 0 || belowUsed}
+                disabled={saveMutation.isPending || selectedSources.length === 0}
                 data-testid="button-save-edit"
               >
                 {saveMutation.isPending ? "Saving…" : "Save Changes"}
