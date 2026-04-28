@@ -147,9 +147,23 @@ export function registerFactorySheetsRoutes(app: Express) {
         const rows: { label: string; cells: (number | null)[] }[] = [];
         for (let r = 1; r < rawData.length; r++) {
           const rawRow = rawData[r] ?? [];
-          const label = rawRow[0] == null ? "" : String(rawRow[0]);
+          const rawLabel = rawRow[0];
+          let label: string;
+          if (rawLabel == null) {
+            label = "";
+          } else if (rawLabel instanceof Date) {
+            const y = rawLabel.getFullYear();
+            const m = String(rawLabel.getMonth() + 1).padStart(2, "0");
+            const d = String(rawLabel.getDate()).padStart(2, "0");
+            label = `${y}-${m}-${d}`;
+          } else {
+            const s = String(rawLabel).trim();
+            // Try to detect serial date numbers xlsx sometimes emits
+            label = s;
+          }
           const cells: (number | null)[] = rawRow.slice(1).map((v: any) => {
             if (v === null || v === undefined || v === "") return null;
+            if (v instanceof Date) return null; // skip date values in data cells
             const n = Number(v);
             return isNaN(n) ? null : n;
           });

@@ -5,16 +5,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Plus, Trash2, Download, Upload, Save, X, Check, TableProperties, FileDown,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Plus, Trash2, Download, Upload, Save, X, TableProperties, FileDown, Lock,
 } from "lucide-react";
 import type { FactorySheet } from "@shared/schema";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type CellValue = number | string | null;
-type SheetRow = { label: string; cells: CellValue[] };
+type SheetRow = { label: string; cells: CellValue[]; locked?: boolean };
 
 interface LocalSheet {
-  id: number | null; // null = not yet saved
+  id: number | null;
   name: string;
   orderIndex: number;
   columns: string[];
@@ -23,12 +34,13 @@ interface LocalSheet {
 }
 
 function fromApiSheet(s: FactorySheet): LocalSheet {
+  const rows = ((s.rows as SheetRow[]) ?? []).map(r => ({ ...r, locked: true }));
   return {
     id: s.id,
     name: s.name,
     orderIndex: s.orderIndex,
     columns: (s.columns as string[]) ?? [],
-    rows: (s.rows as SheetRow[]) ?? [],
+    rows,
     dirty: false,
   };
 }
@@ -54,37 +66,23 @@ function fmt(v: CellValue): string {
   return v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 4 });
 }
 
-// Parse cell input: try to parse as number; if it looks like an in-progress
-// negative number (just "-") or is non-numeric text, store as a string so the
-// user can keep typing without losing their input.
 function parseCellValue(s: string): CellValue {
   if (s === "" || s === null || s === undefined) return null;
   const trimmed = s.trim();
   if (trimmed === "") return null;
-  // Intermediate negative sign — preserve it as a string so typing continues
   if (trimmed === "-") return "-";
   const cleaned = trimmed.replace(/,/g, "");
   const n = Number(cleaned);
   if (!isNaN(n)) return n;
-  // Non-numeric text — store as string
   return s;
 }
 
 // ── Tab name editor ────────────────────────────────────────────────────────────
 function TabLabel({
-  name,
-  active,
-  onActivate,
-  onRename,
-  onDelete,
-  canDelete,
+  name, active, onActivate, onRename, onDelete, canDelete,
 }: {
-  name: string;
-  active: boolean;
-  onActivate: () => void;
-  onRename: (v: string) => void;
-  onDelete: () => void;
-  canDelete: boolean;
+  name: string; active: boolean; onActivate: () => void;
+  onRename: (v: string) => void; onDelete: () => void; canDelete: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
@@ -97,9 +95,7 @@ function TabLabel({
     setEditing(false);
   };
 
-  useEffect(() => {
-    if (editing) inputRef.current?.select();
-  }, [editing]);
+  useEffect(() => { if (editing) inputRef.current?.select(); }, [editing]);
 
   return (
     <div
@@ -147,6 +143,7 @@ function TabLabel({
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function FactorySheets() {
   const { toast } = useToast();
+  const { formatDisplayDate } = useDateFormat();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const [localSheets, setLocalSheets] = useState<LocalSheet[]>([]);
@@ -155,7 +152,26 @@ export default function FactorySheets() {
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const silentSaveRef = useRef(false);
 
-  // ── Load from server ─────────────────────────────────────────────────────
+  // Admin unlock dialog state
+  const [unlockPending, setUnlockPending] = useState<{
+    rowIdx: number;
+    type: "label" | "cell";
+    colIdx?: number;
+  } | null>(null);
+
+  // ── Current user for admin check ───────────────────────────────────────────
+  const { data: me } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const isAdmin = me?.role === "Admin" || me?.role === "Owner" || me?.role === "Developer";
+
+  // ── ISO date label formatting ──────────────────────────────────────────────
+  const fmtLabel = useCallback((label: string): string => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(label)) {
+      return formatDisplayDate(label);
+    }
+    return label;
+  }, [formatDisplayDate]);
+
+  // ── Load from server ───────────────────────────────────────────────────────
   const { data: apiSheets, isLoading } = useQuery<FactorySheet[]>({
     queryKey: ["/api/factory/sheets"],
   });
@@ -179,13 +195,11 @@ export default function FactorySheets() {
       silentSaveRef.current = true;
       saveMutation.mutate(localSheets);
     }, 2000);
-    return () => {
-      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
-    };
+    return () => { if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localSheets]);
 
-  // ── Helpers ──────────────────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────
   const updateSheet = useCallback((fn: (s: LocalSheet) => LocalSheet) => {
     setLocalSheets(prev => {
       const next = [...prev];
@@ -194,13 +208,39 @@ export default function FactorySheets() {
     });
   }, [activeIdx]);
 
-  // ── Mutations ────────────────────────────────────────────────────────────
+  // Unlock a specific row so it's editable
+  const unlockRow = useCallback((rowIdx: number) => {
+    setLocalSheets(prev => {
+      const next = [...prev];
+      const sheet = { ...next[activeIdx] };
+      sheet.rows = sheet.rows.map((r, i) =>
+        i === rowIdx ? { ...r, locked: false } : r
+      );
+      next[activeIdx] = sheet;
+      return next;
+    });
+  }, [activeIdx]);
+
+  // Handle click on a locked cell — show dialog (admin) or toast (non-admin)
+  const handleLockedClick = useCallback((rowIdx: number, type: "label" | "cell", colIdx?: number) => {
+    if (isAdmin) {
+      setUnlockPending({ rowIdx, type, colIdx });
+    } else {
+      toast({
+        title: "Row locked",
+        description: "This row has been saved and is locked. Only an Admin can edit saved data.",
+        variant: "destructive",
+      });
+    }
+  }, [isAdmin, toast]);
+
+  // ── Mutations ─────────────────────────────────────────────────────────────
   const createMutation = useMutation({
     mutationFn: (name: string) =>
       apiRequest("POST", "/api/factory/sheets", { name }).then(r => r.json()),
     onSuccess: (created: FactorySheet) => {
       setLocalSheets(prev => [...prev, fromApiSheet(created)]);
-      setActiveIdx(prev => prev + 1); // will be last
+      setActiveIdx(prev => prev + 1);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/sheets"] });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -213,12 +253,17 @@ export default function FactorySheets() {
         apiRequest("PUT", `/api/factory/sheets/${s.id}`, {
           name: s.name,
           columns: s.columns,
-          rows: s.rows,
+          rows: s.rows.map(r => ({ label: r.label, cells: r.cells })), // strip locked from DB
         })
       ));
     },
     onSuccess: () => {
-      setLocalSheets(prev => prev.map(s => ({ ...s, dirty: false })));
+      // Lock all rows after save
+      setLocalSheets(prev => prev.map(s => ({
+        ...s,
+        dirty: false,
+        rows: s.rows.map(r => ({ ...r, locked: true })),
+      })));
       queryClient.invalidateQueries({ queryKey: ["/api/factory/sheets"] });
       const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       setSavedAt(now);
@@ -236,10 +281,7 @@ export default function FactorySheets() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/factory/sheets/${id}`),
     onSuccess: (_data, id) => {
-      setLocalSheets(prev => {
-        const next = prev.filter(s => s.id !== id);
-        return next;
-      });
+      setLocalSheets(prev => prev.filter(s => s.id !== id));
       setActiveIdx(prev => Math.max(0, prev - 1));
       queryClient.invalidateQueries({ queryKey: ["/api/factory/sheets"] });
       toast({ title: "Sheet deleted" });
@@ -264,7 +306,7 @@ export default function FactorySheets() {
       });
     },
     onSuccess: (sheets: FactorySheet[]) => {
-      setLocalSheets(sheets.map(fromApiSheet));
+      setLocalSheets(sheets.map(fromApiSheet)); // rows marked locked by fromApiSheet
       setActiveIdx(0);
       setInitialised(true);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/sheets"] });
@@ -274,15 +316,10 @@ export default function FactorySheets() {
   });
 
   // ── Export ────────────────────────────────────────────────────────────────
-  const handleExport = () => {
-    window.open("/api/factory/sheets/export", "_blank");
-  };
+  const handleExport = () => { window.open("/api/factory/sheets/export", "_blank"); };
 
   // ── Tab operations ────────────────────────────────────────────────────────
-  const addTab = () => {
-    const name = `Sheet ${localSheets.length + 1}`;
-    createMutation.mutate(name);
-  };
+  const addTab = () => { createMutation.mutate(`Sheet ${localSheets.length + 1}`); };
 
   const renameTab = (idx: number, newName: string) => {
     setLocalSheets(prev => {
@@ -295,9 +332,8 @@ export default function FactorySheets() {
   const deleteTab = (idx: number) => {
     const s = localSheets[idx];
     if (!s) return;
-    if (s.id) {
-      deleteMutation.mutate(s.id);
-    } else {
+    if (s.id) { deleteMutation.mutate(s.id); }
+    else {
       setLocalSheets(prev => prev.filter((_, i) => i !== idx));
       setActiveIdx(prev => Math.max(0, prev - 1));
     }
@@ -316,10 +352,7 @@ export default function FactorySheets() {
     updateSheet(s => ({
       ...s,
       columns: s.columns.filter((_, i) => i !== colIdx),
-      rows: s.rows.map(r => ({
-        ...r,
-        cells: r.cells.filter((_, i) => i !== colIdx),
-      })),
+      rows: s.rows.map(r => ({ ...r, cells: r.cells.filter((_, i) => i !== colIdx) })),
     }));
   };
 
@@ -337,16 +370,13 @@ export default function FactorySheets() {
       ...s,
       rows: [
         ...s.rows,
-        { label: `Row ${s.rows.length + 1}`, cells: Array(s.columns.length).fill(null) },
+        { label: "", cells: Array(s.columns.length).fill(null), locked: false },
       ],
     }));
   };
 
   const removeRow = (rowIdx: number) => {
-    updateSheet(s => ({
-      ...s,
-      rows: s.rows.filter((_, i) => i !== rowIdx),
-    }));
+    updateSheet(s => ({ ...s, rows: s.rows.filter((_, i) => i !== rowIdx) }));
   };
 
   const setRowLabel = (rowIdx: number, val: string) => {
@@ -386,10 +416,9 @@ export default function FactorySheets() {
       if (e.key === "Enter") {
         e.preventDefault();
         if (ri >= rowCount - 1) {
-          // Last row → create new row then focus it
           updateSheet(s => ({
             ...s,
-            rows: [...s.rows, { label: `Row ${s.rows.length + 1}`, cells: Array(s.columns.length).fill(null) }],
+            rows: [...s.rows, { label: "", cells: Array(s.columns.length).fill(null), locked: false }],
           }));
           setTimeout(() => focusCell(rowCount, ci), 30);
         } else {
@@ -413,14 +442,12 @@ export default function FactorySheets() {
       } else if (e.key === "ArrowLeft") {
         const input = e.currentTarget;
         if (input.selectionStart === 0 && input.selectionEnd === 0 && ci > 0) {
-          e.preventDefault();
-          focusCell(ri, ci - 1);
+          e.preventDefault(); focusCell(ri, ci - 1);
         }
       } else if (e.key === "ArrowRight") {
         const input = e.currentTarget;
         if (input.selectionStart === input.value.length && ci < colCount - 1) {
-          e.preventDefault();
-          focusCell(ri, ci + 1);
+          e.preventDefault(); focusCell(ri, ci + 1);
         }
       }
     },
@@ -430,10 +457,7 @@ export default function FactorySheets() {
   // Ctrl+I → add column
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === "i") {
-        e.preventDefault();
-        addColumn();
-      }
+      if (e.ctrlKey && e.key === "i") { e.preventDefault(); addColumn(); }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -453,6 +477,41 @@ export default function FactorySheets() {
 
   return (
     <div className="flex flex-col h-full bg-background">
+
+      {/* ── Admin unlock dialog ──────────────────────────────────────────── */}
+      <AlertDialog open={!!unlockPending} onOpenChange={open => { if (!open) setUnlockPending(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unlock saved row?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This row has already been saved and is locked. Editing saved data may affect
+              historical records. Are you sure you want to unlock it for editing?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (unlockPending) {
+                  unlockRow(unlockPending.rowIdx);
+                  // After unlocking, focus the appropriate input
+                  const { rowIdx, type, colIdx } = unlockPending;
+                  setTimeout(() => {
+                    const selector = type === "cell"
+                      ? `[data-testid="input-cell-${rowIdx}-${colIdx}"]`
+                      : `[data-testid="input-row-label-${rowIdx}"]`;
+                    const el = document.querySelector(selector) as HTMLInputElement | null;
+                    if (el) { el.focus(); el.select(); }
+                  }, 50);
+                }
+                setUnlockPending(null);
+              }}
+            >
+              Unlock & Edit
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Toolbar ─────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-4 py-2 border-b flex-wrap">
@@ -562,12 +621,10 @@ export default function FactorySheets() {
             <table className="border-collapse text-sm" data-testid="grid-table">
               <thead className="sticky top-0 z-10">
                 <tr>
-                  {/* Row-label header */}
                   <th className="border border-border bg-muted px-2 py-1.5 text-left font-medium text-muted-foreground min-w-[180px]">
                     Label
                   </th>
 
-                  {/* Column headers — editable */}
                   {activeSheet.columns.map((col, ci) => (
                     <th
                       key={ci}
@@ -592,7 +649,6 @@ export default function FactorySheets() {
                     </th>
                   ))}
 
-                  {/* Add column */}
                   <th className="border border-border bg-muted px-2 py-1.5 text-center">
                     <button
                       data-testid="button-add-column"
@@ -607,54 +663,82 @@ export default function FactorySheets() {
               </thead>
 
               <tbody>
-                {/* Data rows */}
-                {activeSheet.rows.map((row, ri) => (
-                  <tr key={ri} className="hover:bg-muted/30">
-                    {/* Row label */}
-                    <td className="border border-border px-1 py-0.5 bg-muted/20">
-                      <Input
-                        value={row.label}
-                        onChange={e => setRowLabel(ri, e.target.value)}
-                        className="h-7 text-xs border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-1"
-                        data-testid={`input-row-label-${ri}`}
-                        dir="auto"
-                      />
-                    </td>
-
-                    {/* Data cells */}
-                    {activeSheet.columns.map((_, ci) => {
-                      const val = row.cells[ci];
-                      const isNeg = typeof val === "number" && val < 0;
-                      const isText = typeof val === "string" && val !== "-";
-                      return (
-                        <td
-                          key={ci}
-                          className="border border-border px-1 py-0.5"
-                        >
+                {activeSheet.rows.map((row, ri) => {
+                  const isLocked = row.locked === true;
+                  return (
+                    <tr key={ri} className="hover:bg-muted/30">
+                      {/* Row label */}
+                      <td className="border border-border px-1 py-0.5 bg-muted/20">
+                        {isLocked ? (
+                          <div
+                            data-testid={`locked-row-label-${ri}`}
+                            onClick={() => handleLockedClick(ri, "label")}
+                            className="h-7 px-2 flex items-center gap-1.5 cursor-pointer text-xs text-foreground group"
+                            title={isAdmin ? "Click to unlock for editing" : "Row is locked"}
+                          >
+                            <Lock className="h-3 w-3 text-muted-foreground/50 shrink-0 group-hover:text-muted-foreground transition-colors" />
+                            <span className="truncate">{fmtLabel(row.label)}</span>
+                          </div>
+                        ) : (
                           <Input
-                            value={fmt(val)}
-                            onChange={e => setCell(ri, ci, e.target.value)}
-                            onKeyDown={e => handleCellKeyDown(e, ri, ci)}
-                            className={`h-7 text-xs border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-1 tabular-nums ${isNeg ? "text-red-500" : ""} ${isText ? "text-left" : "text-right"}`}
-                            data-testid={`input-cell-${ri}-${ci}`}
+                            value={row.label}
+                            onChange={e => setRowLabel(ri, e.target.value)}
+                            className="h-7 text-xs border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-1"
+                            data-testid={`input-row-label-${ri}`}
                             dir="auto"
                           />
-                        </td>
-                      );
-                    })}
+                        )}
+                      </td>
 
-                    {/* Remove row */}
-                    <td className="border border-border px-2 py-0.5 text-center">
-                      <button
-                        data-testid={`button-remove-row-${ri}`}
-                        onClick={() => removeRow(ri)}
-                        className="text-muted-foreground hover:text-destructive transition-colors"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      {/* Data cells */}
+                      {activeSheet.columns.map((_, ci) => {
+                        const val = row.cells[ci];
+                        const isNeg = typeof val === "number" && val < 0;
+                        const isText = typeof val === "string" && val !== "-";
+                        return (
+                          <td key={ci} className="border border-border px-1 py-0.5">
+                            {isLocked ? (
+                              <div
+                                data-testid={`locked-cell-${ri}-${ci}`}
+                                onClick={() => handleLockedClick(ri, "cell", ci)}
+                                className={`h-7 px-2 flex items-center cursor-pointer text-xs tabular-nums group
+                                  ${isText ? "justify-start" : "justify-end"}
+                                  ${isNeg ? "text-red-500" : "text-foreground"}`}
+                                title={isAdmin ? "Click to unlock for editing" : "Row is locked"}
+                              >
+                                {fmt(val)}
+                              </div>
+                            ) : (
+                              <Input
+                                value={fmt(val)}
+                                onChange={e => setCell(ri, ci, e.target.value)}
+                                onKeyDown={e => handleCellKeyDown(e, ri, ci)}
+                                className={`h-7 text-xs border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-1 tabular-nums
+                                  ${isNeg ? "text-red-500" : ""}
+                                  ${isText ? "text-left" : "text-right"}`}
+                                data-testid={`input-cell-${ri}-${ci}`}
+                                dir="auto"
+                              />
+                            )}
+                          </td>
+                        );
+                      })}
+
+                      {/* Remove row */}
+                      <td className="border border-border px-2 py-0.5 text-center">
+                        {!isLocked && (
+                          <button
+                            data-testid={`button-remove-row-${ri}`}
+                            onClick={() => removeRow(ri)}
+                            className="text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
 
                 {/* Difference row — auto-calculated */}
                 {activeSheet.columns.length > 0 && (
