@@ -5,7 +5,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
 import {
   Card, CardContent, CardHeader, CardTitle,
 } from "@/components/ui/card";
@@ -30,7 +30,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import {
   Search, Filter, ExternalLink, Building2,
-  RefreshCw, X, FileText, Receipt, Factory, Eye, Pencil, ChevronLeft, ChevronRight,
+  RefreshCw, X, FileText, Receipt, Factory, Eye, EyeOff, Pencil, ChevronLeft, ChevronRight,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -153,6 +153,12 @@ export default function TransactionJournal() {
   const [search,         setSearch]         = useState("");
   const [page,           setPage]           = useState(1);
   const LIMIT = 50;
+
+  // ── Hide amounts toggle (local + user preference) ──
+  const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
+  const prefHidden = (myErpPages?.hiddenErpCostFields ?? []).includes("daybook_amounts");
+  const [hideAmountsLocal, setHideAmountsLocal] = useState<boolean | null>(null);
+  const hideAmounts = hideAmountsLocal !== null ? hideAmountsLocal : prefHidden;
 
   // ── Detail dialog ──
   const [detailId, setDetailId] = useState<number | null>(null);
@@ -279,6 +285,44 @@ export default function TransactionJournal() {
   };
 
   const availableCompanies: CompanyOption[] = data?.companies || [];
+
+  // ── Keyboard date navigation: "-" = back 1 day, "Shift+=" = forward 1 day ──
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "textarea") return;
+      if (tag === "input") {
+        const inputType = (target as HTMLInputElement).type || "text";
+        if (["text", "number", "email", "password", "search", "tel", "url"].includes(inputType)) return;
+      }
+      if (tag === "select") return;
+
+      const dateFmt = "yyyy-MM-dd";
+      const isBack    = e.key === "-" || e.code === "Minus";
+      const isForward = (e.key === "+" && e.shiftKey) || (e.code === "Equal" && e.shiftKey);
+
+      if (isBack) {
+        e.preventDefault();
+        setPeriodFilter((prev) => ({
+          fromDate: prev.fromDate ? format(addDays(new Date(prev.fromDate), -1), dateFmt) : prev.fromDate,
+          toDate:   prev.toDate   ? format(addDays(new Date(prev.toDate),   -1), dateFmt) : prev.toDate,
+          preset: "custom",
+        }));
+        setPage(1);
+      } else if (isForward) {
+        e.preventDefault();
+        setPeriodFilter((prev) => ({
+          fromDate: prev.fromDate ? format(addDays(new Date(prev.fromDate), 1), dateFmt) : prev.fromDate,
+          toDate:   prev.toDate   ? format(addDays(new Date(prev.toDate),   1), dateFmt) : prev.toDate,
+          preset: "custom",
+        }));
+        setPage(1);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // ── Summary aggregation ──
   const summaryByCompany = (data?.summary || []).reduce<
@@ -561,14 +605,27 @@ export default function TransactionJournal() {
       {/* ── Table ── */}
       <Card>
         <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2 flex-wrap">
-          <CardTitle className="text-base">
-            Vouchers
-            {!isLoading && (
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                {totalVouchers.toLocaleString()} total
-              </span>
-            )}
-          </CardTitle>
+          <div className="flex items-center gap-3">
+            <CardTitle className="text-base">
+              Vouchers
+              {!isLoading && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  {totalVouchers.toLocaleString()} total
+                </span>
+              )}
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 h-8 text-xs"
+              onClick={() => setHideAmountsLocal((v) => !(v !== null ? v : prefHidden))}
+              title={hideAmounts ? "Show amounts" : "Hide amounts"}
+              data-testid="button-toggle-hide-amounts"
+            >
+              {hideAmounts ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              {hideAmounts ? "Amounts hidden" : "Hide amounts"}
+            </Button>
+          </div>
           {totalPages > 1 && (
             <div className="flex items-center gap-2 text-sm">
               <span className="text-muted-foreground">
@@ -592,7 +649,7 @@ export default function TransactionJournal() {
                   <TableHead className="w-[150px]">Company</TableHead>
                   <TableHead className="w-[160px]">Type</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead className="text-right w-[130px]">Amount</TableHead>
+                  {!hideAmounts && <TableHead className="text-right w-[130px]">Amount</TableHead>}
                   <TableHead className="w-[90px] text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -600,14 +657,14 @@ export default function TransactionJournal() {
                 {isLoading ? (
                   Array.from({ length: 10 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 6 }).map((__, j) => (
+                      {Array.from({ length: hideAmounts ? 5 : 6 }).map((__, j) => (
                         <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : (data?.vouchers || []).length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={hideAmounts ? 5 : 6} className="text-center py-12 text-muted-foreground">
                       No transactions found for the selected filters.
                     </TableCell>
                   </TableRow>
@@ -639,10 +696,12 @@ export default function TransactionJournal() {
                           <span className="truncate">{v.description || v.narration || "—"}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right text-sm font-mono">
-                        <span className="text-xs text-muted-foreground mr-1">{v.currency}</span>
-                        {formatAmount(v.totalAmount)}
-                      </TableCell>
+                      {!hideAmounts && (
+                        <TableCell className="text-right text-sm font-mono">
+                          <span className="text-xs text-muted-foreground mr-1">{v.currency}</span>
+                          {formatAmount(v.totalAmount)}
+                        </TableCell>
+                      )}
                       <TableCell>
                         <div className="flex items-center justify-center gap-1">
                           <Button
