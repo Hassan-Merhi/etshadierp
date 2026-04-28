@@ -1697,7 +1697,7 @@ let migrationsDone = false;
       truck_no         TEXT,
       driver_name      TEXT,
       notes            TEXT,
-      created_by       INTEGER,
+      created_by       VARCHAR(100),
       created_by_name  TEXT,
       started_at       TIMESTAMP NOT NULL DEFAULT now(),
       completed_at     TIMESTAMP,
@@ -1719,13 +1719,15 @@ let migrationsDone = false;
       product_name     TEXT,
       weight_kg        DECIMAL(15,3) NOT NULL DEFAULT 0,
       scanned_at       TIMESTAMP NOT NULL DEFAULT now(),
-      scanned_by       INTEGER,
+      scanned_by       VARCHAR(100),
       scanned_by_name  TEXT,
       created_at       TIMESTAMP NOT NULL DEFAULT now()
     )`,
     `CREATE INDEX IF NOT EXISTS factory_invoice_loading_bales_session_idx ON factory_invoice_loading_bales (session_id)`,
     `CREATE INDEX IF NOT EXISTS factory_invoice_loading_bales_invoice_idx ON factory_invoice_loading_bales (invoice_id)`,
     `CREATE INDEX IF NOT EXISTS factory_invoice_loading_bales_bale_idx    ON factory_invoice_loading_bales (bale_id)`,
+    `ALTER TABLE factory_invoice_loading_sessions ALTER COLUMN created_by TYPE VARCHAR(100) USING created_by::VARCHAR`,
+    `ALTER TABLE factory_invoice_loading_bales    ALTER COLUMN scanned_by TYPE VARCHAR(100) USING scanned_by::VARCHAR`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

@@ -4625,7 +4625,7 @@ export const factoryInvoiceLoadingSessions = pgTable("factory_invoice_loading_se
   truckNo: text("truck_no"),
   driverName: text("driver_name"),
   notes: text("notes"),
-  createdBy: integer("created_by"),
+  createdBy: varchar("created_by", { length: 100 }),
   createdByName: text("created_by_name"),
   startedAt: timestamp("started_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
@@ -4665,7 +4665,7 @@ export const factoryInvoiceLoadingBales = pgTable("factory_invoice_loading_bales
   productName: text("product_name"),
   weightKg: decimal("weight_kg", { precision: 15, scale: 3 }).notNull().default("0"),
   scannedAt: timestamp("scanned_at").notNull().defaultNow(),
-  scannedBy: integer("scanned_by"),
+  scannedBy: varchar("scanned_by", { length: 100 }),
   scannedByName: text("scanned_by_name"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({

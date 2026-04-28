@@ -123,9 +123,19 @@ export default function FactoryInvoiceLoadingScan() {
   // ── Active session state ──
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
   const [showStartForm, setShowStartForm] = useState(false);
-  const [truckNo, setTruckNo] = useState("");
-  const [driverName, setDriverName] = useState("");
-  const [notes, setNotes] = useState("");
+
+  const lsKey = `loading-scan-form-${invoiceId}`;
+  const savedForm = (() => { try { return JSON.parse(localStorage.getItem(lsKey) || "{}"); } catch { return {}; } })();
+  const [truckNo, setTruckNo] = useState<string>(savedForm.truckNo ?? "");
+  const [driverName, setDriverName] = useState<string>(savedForm.driverName ?? "");
+  const [notes, setNotes] = useState<string>(savedForm.notes ?? "");
+
+  const autosaveForm = useCallback((updates: { truckNo?: string; driverName?: string; notes?: string }) => {
+    try {
+      const current = (() => { try { return JSON.parse(localStorage.getItem(lsKey) || "{}"); } catch { return {}; } })();
+      localStorage.setItem(lsKey, JSON.stringify({ ...current, ...updates }));
+    } catch {}
+  }, [lsKey]);
 
   // ── Scanner state ──
   const [scanInput, setScanInput] = useState("");
@@ -439,7 +449,7 @@ export default function FactoryInvoiceLoadingScan() {
                     id="input-truck-no"
                     placeholder="e.g. ABC-1234"
                     value={truckNo}
-                    onChange={(e) => setTruckNo(e.target.value)}
+                    onChange={(e) => { setTruckNo(e.target.value); autosaveForm({ truckNo: e.target.value }); }}
                     data-testid="input-truck-no"
                   />
                 </div>
@@ -449,7 +459,7 @@ export default function FactoryInvoiceLoadingScan() {
                     id="input-driver-name"
                     placeholder="Driver's name"
                     value={driverName}
-                    onChange={(e) => setDriverName(e.target.value)}
+                    onChange={(e) => { setDriverName(e.target.value); autosaveForm({ driverName: e.target.value }); }}
                     data-testid="input-driver-name"
                   />
                 </div>
@@ -460,7 +470,7 @@ export default function FactoryInvoiceLoadingScan() {
                   id="input-notes"
                   placeholder="Optional notes..."
                   value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  onChange={(e) => { setNotes(e.target.value); autosaveForm({ notes: e.target.value }); }}
                   data-testid="input-notes"
                   className="resize-none"
                   rows={2}

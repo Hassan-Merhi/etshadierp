@@ -281,8 +281,8 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       }
 
       // Create session
-      const userId = (req.session as any).userId;
-      const username = (req.session as any).username || req.user?.username || "";
+      const userId = req.user?.id ?? null;
+      const username = req.user?.username ?? "";
       const { locationId, truckNo, driverName, notes } = req.body;
 
       const [session] = await db
@@ -419,8 +419,8 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       }
 
       // Insert
-      const userId = (req.session as any).userId;
-      const username = (req.session as any).username || "";
+      const userId = req.user?.id ?? null;
+      const username = req.user?.username ?? "";
 
       const [loadingBale] = await db
         .insert(factoryInvoiceLoadingBales)
