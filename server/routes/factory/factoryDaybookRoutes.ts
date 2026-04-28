@@ -309,10 +309,28 @@ export function registerFactoryDaybookRoutes(app: Express) {
         }
       }
 
+      // ── 2c. Deduplicate singleton event types ────────────────────────────────
+      // State-change events (INVOICE, INVOICE_REVERTED, ORDER_VERIFIED, ORDER_CANCELLED)
+      // can be written multiple times for the same referenceId when an order is
+      // approved → reverted → re-approved repeatedly. Keep only the latest entry
+      // (highest id) per (txType, referenceId). The array is already sorted
+      // desc by id so the first occurrence of each key is the most recent.
+      const SINGLETON_TX_TYPES = new Set([
+        "INVOICE", "INVOICE_REVERTED", "ORDER_VERIFIED", "ORDER_CANCELLED",
+      ]);
+      const _seenSingletonKeys = new Set<string>();
+      const deduplicatedRows = (filteredDaybookRows as any[]).filter((r: any) => {
+        if (!SINGLETON_TX_TYPES.has(r.txType) || r.referenceId == null) return true;
+        const key = `${r.txType}:${r.referenceId}`;
+        if (_seenSingletonKeys.has(key)) return false;
+        _seenSingletonKeys.add(key);
+        return true;
+      });
+
       // ── 3. Merge + sort ────────────────────────────────────────────────────
       // If ownOnly, exclude synthetic rows (voucher-derived rows with no createdBy)
       const effectiveSyntheticRows = ownOnly ? [] : syntheticRows;
-      const merged = [...filteredDaybookRows, ...effectiveSyntheticRows].sort((a: any, b: any) => {
+      const merged = [...deduplicatedRows, ...effectiveSyntheticRows].sort((a: any, b: any) => {
         if (b.txDate > a.txDate) return 1;
         if (b.txDate < a.txDate) return -1;
         return Math.abs(b.id) - Math.abs(a.id);

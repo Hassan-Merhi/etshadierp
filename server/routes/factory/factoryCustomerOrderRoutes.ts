@@ -1277,11 +1277,18 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       });
 
       const today = req.body.txDate || req.body.invoiceDate || getClientDate(req);
+      const invoiceRefId = result.orderId || orderId;
+      // Remove any previous INVOICE and INVOICE_REVERTED rows so only this approval shows
+      await db.delete(factoryDaybookEntries).where(and(
+        eq(factoryDaybookEntries.companyId, companyId),
+        sql`${factoryDaybookEntries.txType} IN ('INVOICE','INVOICE_REVERTED')`,
+        eq(factoryDaybookEntries.referenceId, invoiceRefId)
+      ));
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
         txType: "INVOICE",
-        referenceId: result.orderId || orderId,
+        referenceId: invoiceRefId,
         referenceTable: "customer_orders",
         description: `Invoice ${result.invoiceNumber} – ${result.customerName || "Customer"}`,
         amountCurrency: parseFloat(result.grandTotal || "0"),
@@ -2093,6 +2100,12 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         const [unfCustomer] = await tx.select({ legalName: customers.legalName })
           .from(customers).where(eq(customers.id, order.customerId));
         const unfToday = req.body.txDate || getClientDate(req);
+        // Remove any previous INVOICE and INVOICE_REVERTED rows so only this revert shows
+        await tx.delete(factoryDaybookEntries).where(and(
+          eq(factoryDaybookEntries.companyId, companyId),
+          sql`${factoryDaybookEntries.txType} IN ('INVOICE','INVOICE_REVERTED')`,
+          eq(factoryDaybookEntries.referenceId, orderId)
+        ));
         await writeDaybookEntry(tx, {
           companyId,
           txDate: unfToday,
@@ -2133,6 +2146,11 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const [cancelCustomer] = await db.select({ legalName: customers.legalName })
         .from(customers).where(eq(customers.id, order.customerId));
       const cancelToday = req.body.txDate || getClientDate(req);
+      await db.delete(factoryDaybookEntries).where(and(
+        eq(factoryDaybookEntries.companyId, companyId),
+        eq(factoryDaybookEntries.txType, "ORDER_CANCELLED"),
+        eq(factoryDaybookEntries.referenceId, orderId)
+      ));
       await writeDaybookEntry(db, {
         companyId,
         txDate: cancelToday,
@@ -2376,6 +2394,11 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         const verifyBales = await db.select({ priceUsed: customerOrderBales.priceUsed }).from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
         const verifyTotalValue = verifyBales.reduce((s: number, b: any) => s + parseFloat(b.priceUsed || "0"), 0);
         const verifyToday = getClientDate(req);
+        await db.delete(factoryDaybookEntries).where(and(
+          eq(factoryDaybookEntries.companyId, companyId),
+          eq(factoryDaybookEntries.txType, "ORDER_VERIFIED"),
+          eq(factoryDaybookEntries.referenceId, orderId)
+        ));
         await writeDaybookEntry(db, {
           companyId,
           txDate: verifyToday,
