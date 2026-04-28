@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation, useRoute } from "wouter";
 import { useEscapeBack } from "@/hooks/use-escape-back";
-import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw, Container, Pencil, RotateCcw, Hammer, ChevronDown, GitCompare, DollarSign } from "lucide-react";
+import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw, Container, Pencil, RotateCcw, Hammer, ChevronDown, GitCompare, DollarSign, ScanLine } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -452,6 +452,15 @@ export default function FactoryInvoiceDetail() {
               ) : (
                 <><ClipboardCheck className="mr-2 h-4 w-4" />View Loading</>
               )}
+            </Button>
+          )}
+          {isFinalized && (
+            <Button
+              onClick={() => navigate(`/factory/invoices/${order.id}/loading-scan`)}
+              data-testid="button-scan-loading"
+            >
+              <ScanLine className="mr-2 h-4 w-4" />
+              Scan Loading
             </Button>
           )}
 

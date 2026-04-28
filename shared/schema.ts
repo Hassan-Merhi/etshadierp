@@ -4608,3 +4608,76 @@ export const insertFactoryV3LoadBaleSchema = createInsertSchema(factoryV3LoadBal
 });
 export type FactoryV3LoadBale = typeof factoryV3LoadBales.$inferSelect;
 export type InsertFactoryV3LoadBale = z.infer<typeof insertFactoryV3LoadBaleSchema>;
+
+// ── Invoice Loading Sessions — track physical bale loading against FINALIZED invoices ──────────
+// These tables are completely separate from customer_orders / customer_order_bales.
+// They do NOT modify invoice totals, prices, customer balances, or accounting entries.
+// They are a logistics-only tracking layer on top of the finalized invoice.
+
+export const factoryInvoiceLoadingSessions = pgTable("factory_invoice_loading_sessions", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  invoiceId: integer("invoice_id").notNull(),
+  customerId: integer("customer_id").notNull(),
+  locationId: integer("location_id"),
+  // status: OPEN | COMPLETED | CANCELLED
+  status: text("status").notNull().default("OPEN"),
+  truckNo: text("truck_no"),
+  driverName: text("driver_name"),
+  notes: text("notes"),
+  createdBy: integer("created_by"),
+  createdByName: text("created_by_name"),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  invoiceIdx: index("factory_invoice_loading_sessions_invoice_idx").on(t.invoiceId),
+  companyIdx: index("factory_invoice_loading_sessions_company_idx").on(t.companyId),
+  statusIdx: index("factory_invoice_loading_sessions_status_idx").on(t.status),
+}));
+
+export const insertFactoryInvoiceLoadingSessionSchema = createInsertSchema(factoryInvoiceLoadingSessions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  startedAt: true,
+  completedAt: true,
+  cancelledAt: true,
+});
+export type FactoryInvoiceLoadingSession = typeof factoryInvoiceLoadingSessions.$inferSelect;
+export type InsertFactoryInvoiceLoadingSession = z.infer<typeof insertFactoryInvoiceLoadingSessionSchema>;
+
+// IMPORTANT: No unique(companyId, invoiceId, baleId) constraint here.
+// Cancelled sessions keep their bale rows for audit history.
+// Duplicate prevention is enforced in application code:
+//   - Only OPEN and COMPLETED sessions are checked when scanning a new bale.
+//   - A bale may be re-scanned for the same invoice after its prior session was CANCELLED.
+export const factoryInvoiceLoadingBales = pgTable("factory_invoice_loading_bales", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  sessionId: integer("session_id").notNull(),
+  invoiceId: integer("invoice_id").notNull(),
+  baleId: integer("bale_id").notNull(),
+  baleReference: varchar("bale_reference", { length: 100 }).notNull(),
+  articleCode: varchar("article_code", { length: 50 }),
+  productName: text("product_name"),
+  weightKg: decimal("weight_kg", { precision: 15, scale: 3 }).notNull().default("0"),
+  scannedAt: timestamp("scanned_at").notNull().defaultNow(),
+  scannedBy: integer("scanned_by"),
+  scannedByName: text("scanned_by_name"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  sessionIdx: index("factory_invoice_loading_bales_session_idx").on(t.sessionId),
+  invoiceIdx: index("factory_invoice_loading_bales_invoice_idx").on(t.invoiceId),
+  baleIdx: index("factory_invoice_loading_bales_bale_idx").on(t.baleId),
+}));
+
+export const insertFactoryInvoiceLoadingBaleSchema = createInsertSchema(factoryInvoiceLoadingBales).omit({
+  id: true,
+  scannedAt: true,
+  createdAt: true,
+});
+export type FactoryInvoiceLoadingBale = typeof factoryInvoiceLoadingBales.$inferSelect;
+export type InsertFactoryInvoiceLoadingBale = z.infer<typeof insertFactoryInvoiceLoadingBaleSchema>;

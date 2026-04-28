@@ -161,6 +161,7 @@ const FactoryPriceList = lazy(() => import("@/pages/factory/FactoryPriceList"));
 const FactoryPendingInvoiceVerify = lazy(() => import("@/pages/factory/FactoryPendingInvoiceVerify"));
 const FactoryPendingLoadings = lazy(() => import("@/pages/factory/FactoryPendingLoadings"));
 const FactoryContainerLoadingScan = lazy(() => import("@/pages/factory/FactoryContainerLoadingScan"));
+const FactoryInvoiceLoadingScan = lazy(() => import("@/pages/factory/FactoryInvoiceLoadingScan"));
 const FactoryTransporters = lazy(() => import("@/pages/factory/FactoryTransporters"));
 const FactoryDashboardIntel = lazy(() => import("@/pages/factory/FactoryDashboard"));
 const FactoryKpis = lazy(() => import("@/pages/factory/FactoryKpis"));
@@ -834,6 +835,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/sales/loading/new" component={FactoryContainerLoadingScan} />
                     <Route path="/factory/sales/loadings" component={FactoryLoadingsHub} />
                     <Route path="/factory/sales/pending-invoices/:id/verify" component={FactoryPendingInvoiceVerify} />
+                    <Route path="/factory/invoices/:id/loading-scan" component={FactoryInvoiceLoadingScan} />
                     <Route path="/factory/sales/invoices/:id" component={FactoryInvoiceDetail} />
                     <Route path="/factory/price-list" component={FactoryPriceList} />
                     <Route path="/factory/sales/proformas/:proformaId/add-line" component={ProformaAddLine} />
