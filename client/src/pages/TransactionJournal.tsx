@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -139,6 +140,7 @@ export default function TransactionJournal() {
   const [, setLocation] = useLocation();
   const { selectCompany, companies: contextCompanies } = useCompany();
   const { toast } = useToast();
+  const { formatCashAmount } = useCurrencyContext();
 
   // ── Filter state ──
   const [periodFilter,   setPeriodFilter]   = useState<PeriodFilterValue>(getDefaultPeriodValue("today"));
@@ -728,11 +730,10 @@ export default function TransactionJournal() {
                 </div>
               ) : (() => {
                 const vtype = detailData.voucher.voucherType;
-                const cur = detailData.voucher.currency;
                 const fmt = (v: any) => {
                   const n = typeof v === "number" ? v : parseFloat(v || "0");
-                  if (isNaN(n)) return `${cur} —`;
-                  return `${cur} ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                  if (isNaN(n)) return "—";
+                  return formatCashAmount(n);
                 };
                 const fmtNum = (v: any) => {
                   const n = typeof v === "number" ? v : parseFloat(v || "0");
@@ -1192,12 +1193,12 @@ export default function TransactionJournal() {
                                   <p className="text-sm font-medium">{e.accountName || `Account #${e.ledgerAccountId}`}</p>
                                   {bal !== undefined && (
                                     <p className="text-xs text-muted-foreground">
-                                      Balance: {cur} {parseFloat(bal).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                      Balance: {fmt(parseFloat(bal))}
                                     </p>
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right text-sm font-mono py-2">
-                                  {cur} {amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                  {fmt(amount)}
                                 </TableCell>
                               </TableRow>
                             );
@@ -1206,7 +1207,7 @@ export default function TransactionJournal() {
                             <TableRow className="border-t font-semibold bg-muted/20">
                               <TableCell className="py-2 text-sm">Total</TableCell>
                               <TableCell className="text-right text-sm font-mono py-2">
-                                {cur} {grandTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                {fmt(grandTotal)}
                               </TableCell>
                             </TableRow>
                           )}

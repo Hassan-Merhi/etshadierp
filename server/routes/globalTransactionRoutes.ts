@@ -16,6 +16,7 @@ import {
   poLineItems,
   suppliers,
   containers,
+  customers,
 } from "../../shared/schema";
 import {
   eq,
@@ -304,19 +305,27 @@ export function registerGlobalTransactionRoutes(
 
       if (!voucher) return res.status(404).json({ message: "Voucher not found" });
 
-      const entries = await db
+      const entriesRaw = await db
         .select({
           id:            voucherEntries.id,
           ledgerAccountId: voucherEntries.ledgerAccountId,
+          customerId:    voucherEntries.customerId,
           accountName:   ledgerAccounts.name,
+          customerName:  customers.legalName,
           debitAmount:   voucherEntries.debitAmount,
           creditAmount:  voucherEntries.creditAmount,
           narration:     voucherEntries.narration,
         })
         .from(voucherEntries)
         .leftJoin(ledgerAccounts, eq(ledgerAccounts.id, voucherEntries.ledgerAccountId))
+        .leftJoin(customers, eq(customers.id, voucherEntries.customerId))
         .where(eq(voucherEntries.voucherId, voucherId))
         .orderBy(voucherEntries.id);
+
+      const entries = entriesRaw.map(e => ({
+        ...e,
+        accountName: e.accountName || e.customerName || null,
+      }));
 
       return res.json({ voucher, entries });
     } catch (err) {
@@ -341,19 +350,27 @@ export function registerGlobalTransactionRoutes(
       const type = voucher.voucherType;
 
       // Always fetch base ledger entries
-      const entries = await db
+      const rawEntries = await db
         .select({
           id:              voucherEntries.id,
           ledgerAccountId: voucherEntries.ledgerAccountId,
+          customerId:      voucherEntries.customerId,
           accountName:     ledgerAccounts.name,
+          customerName:    customers.legalName,
           debitAmount:     voucherEntries.debitAmount,
           creditAmount:    voucherEntries.creditAmount,
           narration:       voucherEntries.narration,
         })
         .from(voucherEntries)
         .leftJoin(ledgerAccounts, eq(ledgerAccounts.id, voucherEntries.ledgerAccountId))
+        .leftJoin(customers, eq(customers.id, voucherEntries.customerId))
         .where(eq(voucherEntries.voucherId, voucherId))
         .orderBy(voucherEntries.id);
+
+      const entries = rawEntries.map(e => ({
+        ...e,
+        accountName: e.accountName || e.customerName || null,
+      }));
 
       // Sales: return ledger entries + sales item rows
       if (type === "Sales" || type === "POS") {

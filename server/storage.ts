@@ -3224,6 +3224,7 @@ export class DbStorage implements IStorage {
         employeeLastName: schema.employees.lastName,
         employeeCode: schema.employees.code,
         factorySupplierName: schema.factorySuppliers.name,
+        customerName: schema.customers.legalName,
       })
       .from(schema.voucherEntries)
       .leftJoin(schema.ledgerAccounts, eq(schema.voucherEntries.ledgerAccountId, schema.ledgerAccounts.id))
@@ -3232,6 +3233,7 @@ export class DbStorage implements IStorage {
       .leftJoin(schema.suppliers, eq(schema.voucherEntries.supplierId, schema.suppliers.id))
       .leftJoin(schema.employees, eq(schema.voucherEntries.employeeId, schema.employees.id))
       .leftJoin(schema.factorySuppliers, eq(schema.voucherEntries.factorySupplierId, schema.factorySuppliers.id))
+      .leftJoin(schema.customers, eq(schema.voucherEntries.customerId, schema.customers.id))
       .where(eq(schema.voucherEntries.voucherId, voucherId));
 
     return entries.map(entry => {
@@ -3241,7 +3243,7 @@ export class DbStorage implements IStorage {
       
       return {
         ...entry,
-        accountName: entry.accountName || entry.bankAccountName || entry.fixedAssetName || entry.supplierName || entry.factorySupplierName || employeeName || 'Unknown Account',
+        accountName: entry.accountName || entry.bankAccountName || entry.fixedAssetName || entry.supplierName || entry.factorySupplierName || employeeName || entry.customerName || 'Unknown Account',
         accountCode: entry.accountCode || entry.bankAccountCode || entry.fixedAssetCode || entry.supplierCode || entry.employeeCode || '-',
       };
     });
