@@ -34,7 +34,7 @@ interface LocalSheet {
 }
 
 function fromApiSheet(s: FactorySheet): LocalSheet {
-  const rows = ((s.rows as SheetRow[]) ?? []).map(r => ({ ...r, locked: true }));
+  const rows = ((s.rows as SheetRow[]) ?? []).map(r => ({ ...r, cells: r.cells ?? [], locked: true }));
   return {
     id: s.id,
     name: s.name,
@@ -389,7 +389,7 @@ export default function FactorySheets() {
     updateSheet(s => ({
       ...s,
       columns: [...s.columns, `Col ${s.columns.length + 1}`],
-      rows: s.rows.map(r => ({ ...r, cells: [...r.cells, null] })),
+      rows: s.rows.map(r => ({ ...r, cells: [...(r.cells ?? []), null] })),
     }));
   };
 
@@ -397,7 +397,7 @@ export default function FactorySheets() {
     updateSheet(s => ({
       ...s,
       columns: s.columns.filter((_, i) => i !== colIdx),
-      rows: s.rows.map(r => ({ ...r, cells: r.cells.filter((_, i) => i !== colIdx) })),
+      rows: s.rows.map(r => ({ ...r, cells: (r.cells ?? []).filter((_, i) => i !== colIdx) })),
     }));
   };
 
