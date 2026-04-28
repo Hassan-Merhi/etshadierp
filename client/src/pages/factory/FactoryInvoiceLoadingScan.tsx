@@ -289,6 +289,8 @@ export default function FactoryInvoiceLoadingScan() {
   const currentBales = summary?.currentSessionBales || [];
   const isFullyLoaded = (summary?.totals.remaining ?? 1) <= 0;
   const show50Warning = currentBales.length >= 50;
+  const pendingLines = summary?.lines.filter((l) => l.remaining > 0) ?? [];
+  const doneLineCount = (summary?.lines.length ?? 0) - pendingLines.length;
 
   if (isLoading) {
     return (
@@ -341,32 +343,33 @@ export default function FactoryInvoiceLoadingScan() {
         </div>
       </div>
 
-      {/* ── Invoice summary cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* ── Big counters ── */}
+      <div className="grid grid-cols-2 gap-3">
         <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-muted-foreground">Invoice Bales</p>
-            <p className="text-2xl font-bold" data-testid="text-total-bales">{summary.totals.invoiceBales}</p>
+          <CardContent className="pt-5 pb-4 text-center">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Scanned</p>
+            <p className="text-5xl font-bold text-green-600 dark:text-green-400 leading-none" data-testid="text-loaded-bales">
+              {summary.totals.alreadyLoaded}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">of {summary.totals.invoiceBales} bales</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-muted-foreground">Loaded</p>
-            <p className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-loaded-bales">{summary.totals.alreadyLoaded}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-muted-foreground">Remaining</p>
-            <p className={`text-2xl font-bold ${summary.totals.remaining === 0 ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}`} data-testid="text-remaining-bales">
+          <CardContent className="pt-5 pb-4 text-center">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Remaining</p>
+            <p
+              className={`text-5xl font-bold leading-none ${
+                summary.totals.remaining === 0
+                  ? "text-green-600 dark:text-green-400"
+                  : "text-amber-600 dark:text-amber-400"
+              }`}
+              data-testid="text-remaining-bales"
+            >
               {summary.totals.remaining}
             </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-muted-foreground">Sessions</p>
-            <p className="text-2xl font-bold" data-testid="text-session-count">{summary.sessions.length}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {summary.sessions.length} session{summary.sessions.length !== 1 ? "s" : ""}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -383,42 +386,57 @@ export default function FactoryInvoiceLoadingScan() {
         </Card>
       )}
 
-      {/* ── Per-line summary ── */}
+      {/* ── Per-line summary (only pending lines shown) ── */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Invoice Lines</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="text-sm font-medium">Remaining Lines</CardTitle>
+            {doneLineCount > 0 && (
+              <span className="flex items-center gap-1 text-xs text-green-700 dark:text-green-400 font-medium">
+                <CheckCircle className="h-3.5 w-3.5" />
+                {doneLineCount} line{doneLineCount !== 1 ? "s" : ""} fully loaded
+              </span>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Article Code</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead className="text-right">Invoice Qty</TableHead>
-                  <TableHead className="text-right">Loaded</TableHead>
-                  {activeSessionId && <TableHead className="text-right">This Session</TableHead>}
-                  <TableHead className="text-right">Remaining</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {summary.lines.map((line) => (
-                  <TableRow key={line.lineId} data-testid={`row-line-${line.lineId}`}>
-                    <TableCell className="font-mono text-xs">{line.articleCode}</TableCell>
-                    <TableCell className="text-sm">{line.productName}</TableCell>
-                    <TableCell className="text-right text-sm">{line.invoiceQty}</TableCell>
-                    <TableCell className="text-right text-sm text-green-700 dark:text-green-400">{line.alreadyLoaded}</TableCell>
-                    {activeSessionId && (
-                      <TableCell className="text-right text-sm text-blue-700 dark:text-blue-400">{line.currentSessionLoaded}</TableCell>
-                    )}
-                    <TableCell className={`text-right text-sm font-medium ${line.remaining === 0 ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400"}`}>
-                      {line.remaining}
-                    </TableCell>
+          {pendingLines.length === 0 ? (
+            <div className="flex items-center justify-center gap-2 py-6 text-green-700 dark:text-green-400">
+              <CheckCircle className="h-5 w-5" />
+              <span className="font-medium text-sm">All lines fully loaded</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Article Code</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead className="text-right">Invoice Qty</TableHead>
+                    <TableHead className="text-right">Loaded</TableHead>
+                    {activeSessionId && <TableHead className="text-right">This Session</TableHead>}
+                    <TableHead className="text-right">Remaining</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {pendingLines.map((line) => (
+                    <TableRow key={line.lineId} data-testid={`row-line-${line.lineId}`}>
+                      <TableCell className="font-mono text-xs">{line.articleCode}</TableCell>
+                      <TableCell className="text-sm">{line.productName}</TableCell>
+                      <TableCell className="text-right text-sm">{line.invoiceQty}</TableCell>
+                      <TableCell className="text-right text-sm text-green-700 dark:text-green-400">{line.alreadyLoaded}</TableCell>
+                      {activeSessionId && (
+                        <TableCell className="text-right text-sm text-blue-700 dark:text-blue-400">{line.currentSessionLoaded}</TableCell>
+                      )}
+                      <TableCell className="text-right text-sm font-bold text-amber-700 dark:text-amber-400">
+                        {line.remaining}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -565,10 +583,17 @@ export default function FactoryInvoiceLoadingScan() {
               </Button>
             </form>
 
-            <p className="text-xs text-muted-foreground">
-              <strong>{currentBales.length}</strong> bale{currentBales.length !== 1 ? "s" : ""} scanned in this session.
-              Press <kbd className="text-xs border rounded px-1">Enter</kbd> to submit.
-            </p>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span><strong className="text-foreground">{currentBales.length}</strong> scanned this session</span>
+              <span>·</span>
+              <span>
+                <strong className={summary.totals.remaining === 0 ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}>
+                  {summary.totals.remaining}
+                </strong> remaining overall
+              </span>
+              <span>·</span>
+              <span>Press <kbd className="text-xs border rounded px-1">Enter</kbd> to submit</span>
+            </div>
 
             {/* Current session bales table */}
             {currentBales.length > 0 && (
