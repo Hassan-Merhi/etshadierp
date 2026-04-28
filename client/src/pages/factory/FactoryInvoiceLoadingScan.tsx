@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   ScanLine, ArrowLeft, Play, CheckCircle, XCircle, Trash2,
-  FileDown, FileSpreadsheet, AlertTriangle, Package, Truck,
+  FileDown, FileSpreadsheet, AlertTriangle, Package, Truck, RotateCcw,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 
@@ -153,6 +153,15 @@ export default function FactoryInvoiceLoadingScan() {
     refetchInterval: 10_000,
     retry: 1,
   });
+
+  // Auto-resume the most recent OPEN session when the page loads (handles navigate-away + return)
+  useEffect(() => {
+    if (!summary || activeSessionId) return;
+    const openSession = summary.sessions.find((s) => s.status === "OPEN");
+    if (openSession) {
+      setActiveSessionId(openSession.id);
+    }
+  }, [summary?.sessions.length]);
 
   // Auto-focus scan input when session is active
   useEffect(() => {
@@ -696,6 +705,18 @@ export default function FactoryInvoiceLoadingScan() {
                       <TableCell className="text-right font-medium">{s.totalBales}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {s.status === "OPEN" && s.id !== activeSessionId && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setActiveSessionId(s.id)}
+                              data-testid={`button-resume-session-${s.id}`}
+                              title="Resume this session"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                              Resume
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
