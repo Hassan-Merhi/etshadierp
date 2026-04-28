@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, MapPin, Tag, AlertCircle, Check, X, Pencil, Layers, EyeOff } from "lucide-react";
+import { Search, MapPin, Tag, AlertCircle, Check, X, Pencil, Layers, EyeOff, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -258,6 +258,65 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const canEdit = !posUser;
   const showCostPrice = isPrivileged && !posUser;
 
+  const [exporting, setExporting] = useState(false);
+
+  const exportToExcel = async () => {
+    if (filteredItems.length === 0) return;
+    setExporting(true);
+    try {
+      const XLSX = await import("xlsx");
+
+      const rows = filteredItems.map((item: any) => {
+        const row: Record<string, any> = {
+          Code: item.code || "",
+          "Item Name": item.name,
+          Group: item.stockGroupName || "",
+        };
+
+        if (showCostPrice) {
+          row["Cost Price"] = item.costPrice && parseFloat(item.costPrice) > 0
+            ? parseFloat(item.costPrice)
+            : "";
+          const offloadTotal = parseFloat(item.costPrice ?? "0") + parseFloat(item.offloadingCost ?? "0");
+          row["Cost + Offloading"] = offloadTotal > 0 ? offloadTotal : "";
+        }
+
+        if (isAllMode) {
+          for (const m of masters) {
+            const price = item.masterPrices?.[m.id] ?? item.baseSellingPrice ?? null;
+            row[m.name] = price && parseFloat(price) > 0 ? parseFloat(price) : "";
+          }
+        } else {
+          row["Selling Price"] = item.sellingPrice && parseFloat(item.sellingPrice) > 0
+            ? parseFloat(item.sellingPrice)
+            : item.baseSellingPrice && parseFloat(item.baseSellingPrice) > 0
+              ? parseFloat(item.baseSellingPrice)
+              : "";
+          row["Qty in Stock"] = item.quantity && parseFloat(item.quantity) > 0
+            ? parseFloat(item.quantity)
+            : "";
+        }
+
+        return row;
+      });
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Price List");
+
+      const locationLabel = isAllMode
+        ? "All_Locations"
+        : selectedLocation?.name.replace(/\s+/g, "_") ?? "Unknown";
+      const dateStr = new Date().toLocaleDateString("en-CA");
+      const filterPart = showUnpriced ? "_unpriced" : groupFilter !== "all" ? `_${groupFilter.replace(/\s+/g, "_")}` : "";
+      const searchPart = search.trim() ? `_search-${search.trim().replace(/\s+/g, "_")}` : "";
+
+      XLSX.writeFile(wb, `price_list_${locationLabel}${filterPart}${searchPart}_${dateStr}.xlsx`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="flex h-full overflow-hidden">
@@ -375,6 +434,17 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 )}
               </Button>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="button-export-price-list"
+              onClick={exportToExcel}
+              disabled={exporting || filteredItems.length === 0}
+              className="gap-1.5 shrink-0"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {exporting ? "Exporting…" : "Export"}
+            </Button>
           </div>
         )}
 
