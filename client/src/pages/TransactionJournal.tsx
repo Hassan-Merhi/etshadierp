@@ -230,14 +230,21 @@ export default function TransactionJournal() {
   // Fetch per-entry account balances for ledger entries when detail opens
   useEffect(() => {
     if (!drawerOpen || !detailData) return;
-    const entries = detailData.entries.filter((e) => e.ledgerAccountId);
+    const entries = detailData.entries.filter((e) => e.ledgerAccountId || e.customerId);
     if (entries.length === 0) return;
     let cancelled = false;
     (async () => {
       const results: Record<number, string> = {};
       await Promise.all(entries.map(async (e) => {
         try {
-          const res = await fetch(`/api/accounts/ledger/${e.ledgerAccountId}/balance`, { credentials: "include" });
+          let url: string | null = null;
+          if (e.ledgerAccountId) {
+            url = `/api/accounts/ledger/${e.ledgerAccountId}/balance`;
+          } else if (e.customerId) {
+            url = `/api/customers/${e.customerId}/balance`;
+          }
+          if (!url) return;
+          const res = await fetch(url, { credentials: "include" });
           if (!res.ok) return;
           const data = await res.json();
           if (!cancelled) results[e.id] = data.balance?.toString() ?? "0";

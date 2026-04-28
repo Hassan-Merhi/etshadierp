@@ -278,6 +278,8 @@ interface ViewVoucherEntry {
   ledgerAccountId?: number;
   bankAccountId?: number;
   employeeId?: number;
+  supplierId?: number;
+  customerId?: number;
   factorySupplierId?: number;
   isPurchaseItem?: boolean;
   quantity?: string;
@@ -676,6 +678,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
               url = `/api/accounts/ledger/${entry.ledgerAccountId}/balance`;
             } else if (entry.bankAccountId) {
               url = `/api/accounts/ledger/${entry.bankAccountId}/balance`;
+            } else if (entry.customerId) {
+              url = `/api/customers/${entry.customerId}/balance`;
             } else if (entry.employeeId) {
               url = `/api/employees/${entry.employeeId}/balance`;
             } else if (entry.supplierId) {

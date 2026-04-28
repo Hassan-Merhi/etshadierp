@@ -3225,6 +3225,7 @@ export class DbStorage implements IStorage {
         employeeCode: schema.employees.code,
         factorySupplierName: schema.factorySuppliers.name,
         customerName: schema.customers.legalName,
+        customerId: schema.voucherEntries.customerId,
       })
       .from(schema.voucherEntries)
       .leftJoin(schema.ledgerAccounts, eq(schema.voucherEntries.ledgerAccountId, schema.ledgerAccounts.id))
