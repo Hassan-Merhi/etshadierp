@@ -261,11 +261,6 @@ export function registerFactoryMixBatchRoutes(app: Express) {
           sourceRecords.push({ sourceBatchId, weightKg: String(weight), costPerKg: String(cost), totalCost: String(weight * cost) });
         }
 
-        // ── 4. Validate new total >= already used in production ──
-        if (totalWeightKg < usedKg - 0.001) {
-          throw new Error(`New total (${totalWeightKg.toFixed(3)} kg) is less than already used in production (${usedKg.toFixed(3)} kg). Increase sources or reduce cannot proceed.`);
-        }
-
         const blendedCostPerKg = totalWeightKg > 0 ? totalCost / totalWeightKg : 0;
 
         // ── 5. Update batch totals ──
