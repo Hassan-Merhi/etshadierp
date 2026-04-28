@@ -21,10 +21,13 @@ process.on("uncaughtException", (err: Error) => {
   console.error("[UncaughtException]", err.message, err.stack);
 });
 
-// Build version for cache busting and deployment tracking
-const BUILD_VERSION = process.env.BUILD_VERSION || 
-                      process.env.RENDER_GIT_COMMIT?.substring(0, 8) || 
-                      Date.now().toString();
+// Build version for cache-busting and deployment tracking.
+// IMPORTANT: never use Date.now() as the fallback — it changes on every restart
+// and causes the browser to think the app was updated, triggering false reload prompts.
+const BUILD_VERSION =
+  process.env.BUILD_VERSION ||
+  process.env.RENDER_GIT_COMMIT?.substring(0, 8) ||
+  "dev";
 
 const app = express();
 

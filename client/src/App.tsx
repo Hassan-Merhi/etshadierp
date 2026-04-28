@@ -973,6 +973,70 @@ function AuthenticatedApp() {
   );
 }
 
+// ── Production-only update banner ─────────────────────────────────────────────
+// Polls /api/version every 5 minutes. When the build version changes it shows a
+// small non-blocking toast with a manual "Refresh" button. It NEVER auto-refreshes.
+// In development, Vite HMR handles reconnection — this component does nothing.
+function UpdateBanner() {
+  const { toast } = useToast();
+  const notifiedRef = useRef(false);
+  const initialVersionRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    // Only run in production — dev restarts are handled by Vite HMR
+    if (import.meta.env.DEV) return;
+
+    async function checkVersion() {
+      try {
+        const res = await fetch("/api/version", { credentials: "same-origin" });
+        if (!res.ok) return;
+        const data = await res.json();
+        const ver: string = data.version ?? "";
+        if (!ver || ver === "dev") return;
+
+        if (initialVersionRef.current === null) {
+          // Store the version that was live when the app first loaded
+          initialVersionRef.current = ver;
+          return;
+        }
+
+        if (ver !== initialVersionRef.current && !notifiedRef.current) {
+          notifiedRef.current = true;
+          toast({
+            title: "Update available",
+            description: "A new version of the app is ready.",
+            duration: 0, // stay until dismissed
+            action: (
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="button-update-refresh"
+                onClick={() => {
+                  // Clear chunk-reload guards so the reload is clean
+                  try {
+                    Object.keys(sessionStorage)
+                      .filter((k) => k.startsWith("chunkReload:") || k.startsWith("chunkRetry:"))
+                      .forEach((k) => sessionStorage.removeItem(k));
+                  } catch { /* ignore */ }
+                  window.location.reload();
+                }}
+              >
+                Refresh
+              </Button>
+            ) as any,
+          });
+        }
+      } catch { /* network error — ignore, will retry next interval */ }
+    }
+
+    checkVersion(); // initial check
+    const id = setInterval(checkVersion, 5 * 60 * 1000); // every 5 minutes
+    return () => clearInterval(id);
+  }, [toast]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -991,6 +1055,7 @@ export default function App() {
                         </Route>
                       </Switch>
                       <Toaster />
+                      <UpdateBanner />
                       <ChatWidget />
                       <DateJumpDialog />
                     </CursorNavProvider>

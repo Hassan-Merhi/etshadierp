@@ -125,12 +125,17 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error("[ErrorBoundary] Uncaught error:", error, info.componentStack);
 
     if (isChunkLoadError(error)) {
+      // In development, Vite HMR handles reconnection — never auto-reload here.
+      // Auto-reloading fights Vite's own recovery and creates a loop on every
+      // dev server restart.
+      if (import.meta.env.DEV) return;
+
       // If we're offline, the chunk simply isn't cached — reloading won't help.
       if (!navigator.onLine) return;
       const path = window.location.pathname;
       if (canAutoRetry(path)) {
         recordRetry(path);
-        // Small delay so Vite/server has time to finish restarting
+        // Small delay so the server has time to finish restarting
         setTimeout(() => hardNavigate(path), 800);
       }
     }
@@ -171,13 +176,20 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
           );
         }
+        // In development the server restarts often — don't alarm the user with
+        // "New version available". Just show a quiet reload prompt.
+        const isDev = import.meta.env.DEV;
         return (
           <div className="flex flex-col items-center justify-center h-full min-h-[40vh] gap-4 p-6 text-center">
             <RefreshCw className="h-10 w-10 text-muted-foreground" />
             <div>
-              <p className="font-semibold text-lg">New version available</p>
+              <p className="font-semibold text-lg">
+                {isDev ? "Page needs a reload" : "New version available"}
+              </p>
               <p className="text-sm text-muted-foreground mt-1">
-                The app was updated. Click below to reload and get the latest version.
+                {isDev
+                  ? "The dev server restarted. Click below to reload this page."
+                  : "The app was updated. Click below to reload and get the latest version."}
               </p>
             </div>
             <Button onClick={this.handleReload} data-testid="button-reload-chunk">

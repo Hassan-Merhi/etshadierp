@@ -33,6 +33,11 @@ window.addEventListener("unhandledrejection", (event) => {
   //       appear in ALL runtime error stacks and cause false positives → infinite reload loop.
 
   if (isChunk) {
+    // In development, Vite's HMR already handles reconnection and module reloading.
+    // Auto-reloading here would fight with Vite's own recovery mechanism and create
+    // a loop whenever the dev server restarts.
+    if (import.meta.env.DEV) return;
+
     const path = window.location.pathname;
     const key = "chunkReload:" + path;
     try {
