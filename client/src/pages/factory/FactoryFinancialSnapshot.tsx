@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,13 +21,10 @@ import {
   Scale,
   TrendingUp,
   TrendingDown,
-  Users,
   Wallet,
-  DollarSign,
   Truck,
   UserRound,
   RefreshCw,
-  Building2,
   HardHat,
   BarChart3,
   AlertCircle,
@@ -42,41 +39,25 @@ import { useEscapeBack } from "@/hooks/use-escape-back";
 import { useToast } from "@/hooks/use-toast";
 
 interface SnapshotData {
-  rawMaterialValue: number;
-  mixBatchValue: number;
   baleWeightTotal: number;
   baleCount: number;
   baleValueTotal: number;
-  outstandingAdvances: number;
-  advanceCount: number;
-  activeWorkerCount: number;
-  capitalTotal: number;
-  equityAccounts: { id: number; name: string; code: string; accountType: string }[];
+}
+
+interface NetPositionAccount {
+  name: string;
+  code: string;
+  value: number;
+  category: string;
+  id?: number;
+  breakdown?: { label: string; native: string; usd: number }[];
 }
 
 interface NetPositionData {
-  forUsTotal: number;
-  onUsTotal: number;
-  netPosition: number;
-  supplierLiabilities: number;
-  inventoryValue: number;
   rawMaterialValue: number;
-  forUs: { total: number; breakdown: { name: string; value: number }[]; accounts: { name: string; code: string; value: number; category: string }[] };
-  onUs: { total: number; breakdown: { name: string; value: number }[]; accounts: { name: string; code: string; value: number; category: string }[] };
-}
-
-interface Customer {
-  id: number;
-  legalName: string;
-  balance: number;
-  balanceSide: string;
-}
-
-interface AgentAccount {
-  id: number;
-  accountId: string;
-  accountType: string;
-  accountName: string;
+  supplierLiabilities: number;
+  forUs: { total: number; accounts: NetPositionAccount[] };
+  onUs: { total: number; accounts: NetPositionAccount[] };
 }
 
 const usd = (n: number) =>
@@ -154,19 +135,17 @@ function KpiCard({
   );
 }
 
-function SectionHeader({ title, count, color }: { title: string; count?: number; color: string }) {
+function SectionHeader({ title, color }: { title: string; color: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
       <div className="h-3.5 w-1 rounded-full shrink-0" style={{ backgroundColor: color }} />
       <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-      {count !== undefined && (
-        <Badge variant="outline" className="text-xs h-5">
-          {count} items
-        </Badge>
-      )}
     </div>
   );
 }
+
+type PinnedRow = { id: number; accountId: string; accountType: string; accountName: string };
+type CardKey = "agent" | "freight" | "advance" | "cashbank";
 
 export default function FactoryFinancialSnapshot() {
   useEscapeBack();
@@ -176,15 +155,12 @@ export default function FactoryFinancialSnapshot() {
   const [cashBankExpanded, setCashBankExpanded] = useState(false);
   const [agentExpanded, setAgentExpanded] = useState(false);
   const [freightExpanded, setFreightExpanded] = useState(false);
-
-  // picker state: which card is open, and the search term
-  type CardKey = "agent" | "freight" | "supplier" | "customer" | "advance";
-  const [pickerFor, setPickerFor] = useState<CardKey | null>(null);
-  const [pickerSearch, setPickerSearch] = useState("");
-
   const [supplierExpanded, setSupplierExpanded] = useState(false);
   const [customerExpanded, setCustomerExpanded] = useState(false);
   const [advanceExpanded, setAdvanceExpanded] = useState(false);
+
+  const [pickerFor, setPickerFor] = useState<CardKey | null>(null);
+  const [pickerSearch, setPickerSearch] = useState("");
 
   const { data: snapshot, isLoading: loadingSnapshot, refetch: refetchSnapshot, dataUpdatedAt: snapUpdated } =
     useQuery<SnapshotData>({ queryKey: ["/api/factory/financial-snapshot"] });
@@ -192,22 +168,14 @@ export default function FactoryFinancialSnapshot() {
   const { data: netPosition, isLoading: loadingNP, refetch: refetchNP } =
     useQuery<NetPositionData>({ queryKey: ["/api/factory/net-position"] });
 
-  const { data: customers, isLoading: loadingCustomers, refetch: refetchCustomers } =
-    useQuery<Customer[]>({ queryKey: ["/api/factory/customers"] });
-
   const { data: agentAccounts, isLoading: loadingAgents, refetch: refetchAgents } =
-    useQuery<AgentAccount[]>({ queryKey: ["/api/agent-accounts"] });
-
-  type PinnedRow = { id: number; accountId: string; accountType: string; accountName: string };
+    useQuery<PinnedRow[]>({ queryKey: ["/api/agent-accounts"] });
 
   const { data: freightAccountRows, isLoading: loadingFreight } =
     useQuery<PinnedRow[]>({ queryKey: ["/api/freight-accounts"] });
 
-  const { data: supplierPinned, isLoading: loadingSupplierPinned } =
-    useQuery<PinnedRow[]>({ queryKey: ["/api/snapshot-pinned-accounts/supplier"] });
-
-  const { data: customerPinned, isLoading: loadingCustomerPinned } =
-    useQuery<PinnedRow[]>({ queryKey: ["/api/snapshot-pinned-accounts/customer"] });
+  const { data: cashbankPinned, isLoading: loadingCashbank } =
+    useQuery<PinnedRow[]>({ queryKey: ["/api/snapshot-pinned-accounts/cashbank"] });
 
   const { data: advancePinned, isLoading: loadingAdvancePinned } =
     useQuery<PinnedRow[]>({ queryKey: ["/api/snapshot-pinned-accounts/advance"] });
@@ -240,20 +208,18 @@ export default function FactoryFinancialSnapshot() {
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
-  const isLoading = loadingSnapshot || loadingNP || loadingCustomers || loadingAgents || loadingFreight
-    || loadingSupplierPinned || loadingCustomerPinned || loadingAdvancePinned;
+  const isLoading = loadingSnapshot || loadingNP || loadingAgents || loadingFreight || loadingCashbank || loadingAdvancePinned;
 
   const handleRefresh = () => {
     refetchSnapshot();
     refetchNP();
-    refetchCustomers();
     refetchAgents();
   };
 
   const lastUpdated = snapUpdated ? new Date(snapUpdated).toLocaleTimeString() : null;
 
   const computed = useMemo(() => {
-    if (!netPosition || !customers || !agentAccounts) return null;
+    if (!netPosition || !agentAccounts) return null;
 
     const allAccounts = [
       ...((netPosition.forUs?.accounts || []).map(a => ({ ...a, side: "forUs" as const }))),
@@ -263,10 +229,28 @@ export default function FactoryFinancialSnapshot() {
     const signedValue = (a: { value: number; side: "forUs" | "onUs" }) =>
       a.side === "forUs" ? a.value : -a.value;
 
-    const nameMatch = (name: string, ...keywords: string[]) =>
-      keywords.some(k => name.toLowerCase().includes(k.toLowerCase()));
+    // ── Mix Batches on Tables (Balance on Table from net position) ──
+    const balanceOnTable = netPosition.forUs?.accounts?.find(a => a.code === "BALANCE_ON_TABLE");
+    const mixBatchValue = balanceOnTable?.value ?? 0;
 
-    // ── Agent accounts (ID-based from DB) ──
+    // ── Raw Material Value from net position ──
+    const rawMaterialValue = netPosition.rawMaterialValue ?? 0;
+
+    // ── Supplier Balances (auto: all suppliers from net position) ──
+    const supplierAccounts = (netPosition.onUs?.accounts || []).filter(a => a.category === "Supplier");
+    const supplierNet = netPosition.supplierLiabilities ?? 0;
+    const supplierList = supplierAccounts
+      .map(a => ({ name: a.name, value: a.value, breakdown: a.breakdown }))
+      .sort((x, y) => y.value - x.value);
+
+    // ── Customer Credit (auto: all Dr customers from net position) ──
+    const customerAccounts = (netPosition.forUs?.accounts || []).filter(a => a.category === "Customer");
+    const customerNet = customerAccounts.reduce((sum, a) => sum + a.value, 0);
+    const customerList = customerAccounts
+      .map(a => ({ name: a.name, value: a.value }))
+      .sort((x, y) => y.value - x.value);
+
+    // ── Agent Accounts ──
     const agentNames = new Set(agentAccounts.map(a => a.accountName.toLowerCase().trim()));
     const agentIds = new Set(
       agentAccounts.map(a => {
@@ -274,57 +258,10 @@ export default function FactoryFinancialSnapshot() {
         return parseInt(parts[parts.length - 1] || "0");
       }).filter(Boolean)
     );
-
-    // ── Freight accounts (ID-based from DB) ──
-    const freightIds = new Set(
-      (freightAccountRows || []).map(a => {
-        const parts = a.accountId.split("-");
-        return parseInt(parts[parts.length - 1] || "0");
-      }).filter(Boolean)
-    );
-    const freightNames = new Set((freightAccountRows || []).map(a => a.accountName.toLowerCase().trim()));
-
-    const cashBankAccounts = allAccounts.filter(a =>
-      a.category === "Cash" || a.category === "Bank"
-    );
-    // Use signed total: forUs = positive (asset), onUs = negative (overdraft)
-    const cashBankTotal = cashBankAccounts.reduce(
-      (sum, a) => sum + (a.side === "forUs" ? a.value : -a.value), 0
-    );
-
-    const freightAccountItems = freightAccountRows && freightAccountRows.length > 0
-      ? allAccounts.filter(a =>
-          freightNames.has(a.name.toLowerCase().trim()) || freightIds.has(Number((a as any).id))
-        )
-      : [];
-    const freightNet = freightAccountItems.reduce((sum, a) => sum + signedValue(a), 0);
-
     const agentAccountItems = allAccounts.filter(a =>
       agentNames.has(a.name.toLowerCase().trim()) || agentIds.has(Number((a as any).id))
     );
     const agentNet = agentAccountItems.reduce((sum, a) => sum + signedValue(a), 0);
-
-    const rentalAccounts = allAccounts.filter(a =>
-      nameMatch(a.name, "rent", "rental", "إيجار")
-    );
-    const rentalNet = rentalAccounts.reduce((sum, a) => sum + signedValue(a), 0);
-
-    const customerCredit = (customers as any[]).reduce((sum: number, c: any) => {
-      const bal = parseFloat(c.balance || "0");
-      if (c.balanceSide === "Dr" && bal > 0) return sum + bal;
-      return sum;
-    }, 0);
-
-    // Build sorted account list for expandable view with signed balances
-    const cashBankList = cashBankAccounts
-      .map(a => ({
-        id: (a as any).id as number,
-        name: a.name,
-        code: a.code,
-        signedBalance: a.side === "forUs" ? a.value : -a.value,
-      }))
-      .sort((x, y) => Math.abs(y.signedBalance) - Math.abs(x.signedBalance));
-
     const agentList = agentAccountItems
       .map(a => ({
         id: (a as any).id as number,
@@ -335,6 +272,20 @@ export default function FactoryFinancialSnapshot() {
       }))
       .sort((x, y) => Math.abs(y.signedBalance) - Math.abs(x.signedBalance));
 
+    // ── Freight Accounts ──
+    const freightIds = new Set(
+      (freightAccountRows || []).map(a => {
+        const parts = a.accountId.split("-");
+        return parseInt(parts[parts.length - 1] || "0");
+      }).filter(Boolean)
+    );
+    const freightNames = new Set((freightAccountRows || []).map(a => a.accountName.toLowerCase().trim()));
+    const freightAccountItems = (freightAccountRows && freightAccountRows.length > 0)
+      ? allAccounts.filter(a =>
+          freightNames.has(a.name.toLowerCase().trim()) || freightIds.has(Number((a as any).id))
+        )
+      : [];
+    const freightNet = freightAccountItems.reduce((sum, a) => sum + signedValue(a), 0);
     const freightList = freightAccountItems
       .map(a => ({
         id: (a as any).id as number,
@@ -345,9 +296,33 @@ export default function FactoryFinancialSnapshot() {
       }))
       .sort((x, y) => Math.abs(y.signedBalance) - Math.abs(x.signedBalance));
 
-    // ── Helper: build a pinned list from a pinned rows array ──
+    // ── Cash & Bank (manual pinned) ──
+    const cashbankIds = new Set(
+      (cashbankPinned || []).map(a => {
+        const parts = a.accountId.split("-");
+        return parseInt(parts[parts.length - 1] || "0");
+      }).filter(Boolean)
+    );
+    const cashbankNames = new Set((cashbankPinned || []).map(a => a.accountName.toLowerCase().trim()));
+    const cashBankItems = (cashbankPinned && cashbankPinned.length > 0)
+      ? allAccounts.filter(a =>
+          cashbankNames.has(a.name.toLowerCase().trim()) || cashbankIds.has(Number((a as any).id))
+        )
+      : [];
+    const cashBankTotal = cashBankItems.reduce((sum, a) => sum + signedValue(a), 0);
+    const cashBankList = cashBankItems
+      .map(a => ({
+        id: (a as any).id as number,
+        compositeId: `ledger-${(a as any).id}`,
+        name: a.name,
+        code: a.code,
+        signedBalance: signedValue(a),
+      }))
+      .sort((x, y) => Math.abs(y.signedBalance) - Math.abs(x.signedBalance));
+
+    // ── Worker Advances (pinned) ──
     const buildPinnedList = (pinned: PinnedRow[] | undefined) => {
-      if (!pinned || pinned.length === 0) return { items: [], net: 0 };
+      if (!pinned || pinned.length === 0) return { items: [], net: 0, list: [] };
       const pinnedIds = new Set(pinned.map(p => {
         const parts = p.accountId.split("-");
         return parseInt(parts[parts.length - 1] || "0");
@@ -366,14 +341,19 @@ export default function FactoryFinancialSnapshot() {
       })).sort((x, y) => Math.abs(y.signedBalance) - Math.abs(x.signedBalance));
       return { items, net, list };
     };
-
-    const supplierData = buildPinnedList(supplierPinned);
-    const customerData = buildPinnedList(customerPinned);
     const advanceData = buildPinnedList(advancePinned);
 
     return {
+      rawMaterialValue,
+      mixBatchValue,
+      supplierNet,
+      supplierCount: supplierList.length,
+      supplierList,
+      customerNet,
+      customerCount: customerList.length,
+      customerList,
       cashBankTotal,
-      cashBankCount: cashBankAccounts.length,
+      cashBankCount: cashBankItems.length,
       cashBankList,
       freightNet,
       freightCount: freightAccountItems.length,
@@ -381,23 +361,38 @@ export default function FactoryFinancialSnapshot() {
       agentNet,
       agentCount: agentAccountItems.length,
       agentList,
-      supplierNet: supplierData.net,
-      supplierCount: supplierData.items.length,
-      supplierList: supplierData.list ?? [],
-      customerNet: customerData.net,
-      customerCount: customerData.items.length,
-      customerList: customerData.list ?? [],
       advanceNet: advanceData.net,
       advanceCount: advanceData.items.length,
-      advanceList: advanceData.list ?? [],
-      rentalNet,
-      rentalCount: rentalAccounts.length,
-      customerCredit,
+      advanceList: advanceData.list,
       allAccounts,
     };
-  }, [netPosition, customers, agentAccounts, freightAccountRows, supplierPinned, customerPinned, advancePinned]);
+  }, [netPosition, agentAccounts, freightAccountRows, cashbankPinned, advancePinned]);
 
   const allLoading = isLoading || !computed;
+
+  // ── Account picker helpers ──
+  const pinnedRowsForCard: PinnedRow[] =
+    pickerFor === "agent" ? (agentAccounts || []) :
+    pickerFor === "freight" ? (freightAccountRows || []) :
+    pickerFor === "cashbank" ? (cashbankPinned || []) :
+    pickerFor === "advance" ? (advancePinned || []) : [];
+
+  const pickerSelectedIds = new Set(pinnedRowsForCard.map(a => a.accountId));
+  const pickerAccounts = (computed?.allAccounts || [])
+    .filter(a => {
+      const compositeId = `ledger-${(a as any).id}`;
+      if (pickerSelectedIds.has(compositeId)) return false;
+      if (!pickerSearch.trim()) return true;
+      return a.name.toLowerCase().includes(pickerSearch.toLowerCase()) ||
+             (a.code || "").toLowerCase().includes(pickerSearch.toLowerCase());
+    })
+    .slice(0, 80);
+
+  const cardLabel =
+    pickerFor === "agent" ? "Agent" :
+    pickerFor === "freight" ? "Freight / Embassy" :
+    pickerFor === "cashbank" ? "Cash & Bank" :
+    pickerFor === "advance" ? "Advance" : "";
 
   return (
     <>
@@ -430,25 +425,25 @@ export default function FactoryFinancialSnapshot() {
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
 
-        {/* ── Section 1: Factory Floor ───────────────────────────────────── */}
+        {/* ── Section 1: Factory Floor ─────────────────────────────────── */}
         <div>
           <SectionHeader title="Factory Floor" color="#10b981" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <KpiCard
               icon={Package}
               title="Raw Material Value"
-              value={snapshot ? usd(snapshot.rawMaterialValue) : "—"}
-              sub={snapshot ? `${snapshot.rawMaterialValue > 0 ? "Remaining stock" : "No stock in hand"}` : undefined}
+              value={computed ? usd(computed.rawMaterialValue) : "—"}
+              sub="Remaining stock"
               color="green"
-              loading={loadingSnapshot}
+              loading={allLoading}
             />
             <KpiCard
               icon={Layers}
               title="Mix Batches on Tables"
-              value={snapshot ? usd(snapshot.mixBatchValue) : "—"}
+              value={computed ? usd(computed.mixBatchValue) : "—"}
               sub="Active & open batches"
               color="blue"
-              loading={loadingSnapshot}
+              loading={allLoading}
             />
             <KpiCard
               icon={Scale}
@@ -463,96 +458,116 @@ export default function FactoryFinancialSnapshot() {
 
         <Separator />
 
-        {/* ── Section 2: Positions ──────────────────────────────────────── */}
+        {/* ── Section 2: Balances & Credit ─────────────────────────────── */}
         <div>
           <SectionHeader title="Balances & Credit" color="#f59e0b" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 
-            {/* ── Supplier Balances ── */}
+            {/* ── Supplier Balances (auto: all suppliers) ── */}
             {allLoading ? (
               <KpiCard icon={TrendingDown} title="Supplier Balances" value="—" color="red" loading />
             ) : (
               <Card data-testid="kpi-card-supplier">
                 <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <button className="flex-1 flex items-start gap-3 text-left min-w-0" onClick={() => setSupplierExpanded(v => !v)} data-testid="button-expand-supplier">
-                      <div className={`mt-0.5 p-2 rounded-md bg-muted shrink-0 text-red-500`}><TrendingDown className="h-4 w-4" /></div>
+                  <button
+                    className="w-full text-left"
+                    onClick={() => setSupplierExpanded(v => !v)}
+                    data-testid="button-expand-supplier"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 p-2 rounded-md bg-muted shrink-0 text-red-500">
+                        <TrendingDown className="h-4 w-4" />
+                      </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-muted-foreground font-medium">Supplier Balances</p>
                         <p className="text-lg font-semibold font-mono mt-0.5 text-red-600 dark:text-red-400" data-testid="value-supplier">
-                          {computed && computed.supplierCount === 0 ? <span className="text-sm font-normal text-muted-foreground">No accounts selected</span> : usd(Math.abs(computed?.supplierNet ?? 0))}
+                          {usd(computed.supplierNet)}
                         </p>
-                        {computed && computed.supplierCount > 0 && <p className="text-xs text-muted-foreground mt-0.5">{computed.supplierCount} account{computed.supplierCount !== 1 ? "s" : ""} · Total owed to suppliers</p>}
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {computed.supplierCount} supplier{computed.supplierCount !== 1 ? "s" : ""} · Total owed to suppliers
+                        </p>
                       </div>
-                      <div className="mt-1 text-muted-foreground shrink-0">{supplierExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</div>
-                    </button>
-                    <Button size="icon" variant="ghost" className="shrink-0 mt-0.5" onClick={() => { setPickerFor("supplier"); setPickerSearch(""); }} data-testid="button-add-supplier-account"><Plus className="h-4 w-4" /></Button>
-                  </div>
-                  {supplierExpanded && computed && computed.supplierList.length > 0 && (
+                      <div className="mt-1 text-muted-foreground shrink-0">
+                        {supplierExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </div>
+                    </div>
+                  </button>
+                  {supplierExpanded && computed.supplierList.length > 0 && (
                     <div className="mt-3 pt-3 border-t space-y-1">
-                      {computed.supplierList.map((acct, i) => (
-                        <div key={acct.id ?? i} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md group">
-                          <button className="flex items-center gap-1.5 min-w-0 text-left hover-elevate rounded flex-1 py-0.5 px-1" onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger`)} data-testid={`button-supplier-account-${acct.id}`}>
-                            <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <span className="text-sm text-foreground truncate">{acct.name}</span>
-                            {acct.code && <span className="text-xs text-muted-foreground shrink-0">{acct.code}</span>}
-                          </button>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <span className="text-sm font-mono font-medium text-red-600 dark:text-red-400">{usd(acct.signedBalance)}</span>
-                            <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeAccountMutation.mutate({ type: "supplier", accountId: acct.compositeId })} data-testid={`button-remove-supplier-${acct.id}`}><X className="h-3 w-3" /></Button>
+                      {computed.supplierList.map((s, i) => (
+                        <div key={i} className="py-1.5 px-2 rounded-md">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm text-foreground truncate">{s.name}</span>
+                            <span className="text-sm font-mono font-medium text-red-600 dark:text-red-400 shrink-0">{usd(s.value)}</span>
                           </div>
+                          {s.breakdown && s.breakdown.length > 0 && (
+                            <div className="mt-1 pl-2 space-y-0.5">
+                              {s.breakdown.map((b, bi) => (
+                                <div key={bi} className="flex items-center justify-between gap-2">
+                                  <span className="text-xs text-muted-foreground truncate">{b.label}</span>
+                                  <span className="text-xs text-muted-foreground shrink-0">{b.native} ≈ {usd(b.usd)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
                   )}
-                  {supplierExpanded && computed && computed.supplierList.length === 0 && <p className="mt-3 pt-3 border-t text-xs text-muted-foreground text-center">Click + to add supplier accounts</p>}
+                  {supplierExpanded && computed.supplierList.length === 0 && (
+                    <p className="mt-3 pt-3 border-t text-xs text-muted-foreground text-center">No supplier balances found</p>
+                  )}
                 </CardContent>
               </Card>
             )}
 
-            {/* ── Customer Credit ── */}
+            {/* ── Customer Credit (auto: all Dr customers) ── */}
             {allLoading ? (
               <KpiCard icon={TrendingUp} title="Customer Credit" value="—" color="green" loading />
             ) : (
               <Card data-testid="kpi-card-customer">
                 <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <button className="flex-1 flex items-start gap-3 text-left min-w-0" onClick={() => setCustomerExpanded(v => !v)} data-testid="button-expand-customer">
-                      <div className="mt-0.5 p-2 rounded-md bg-muted shrink-0 text-emerald-500"><TrendingUp className="h-4 w-4" /></div>
+                  <button
+                    className="w-full text-left"
+                    onClick={() => setCustomerExpanded(v => !v)}
+                    data-testid="button-expand-customer"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 p-2 rounded-md bg-muted shrink-0 text-emerald-500">
+                        <TrendingUp className="h-4 w-4" />
+                      </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-muted-foreground font-medium">Customer Credit</p>
                         <p className="text-lg font-semibold font-mono mt-0.5 text-emerald-600 dark:text-emerald-400" data-testid="value-customer">
-                          {computed && computed.customerCount === 0 ? <span className="text-sm font-normal text-muted-foreground">No accounts selected</span> : usd(Math.abs(computed?.customerNet ?? 0))}
+                          {usd(computed.customerNet)}
                         </p>
-                        {computed && computed.customerCount > 0 && <p className="text-xs text-muted-foreground mt-0.5">{computed.customerCount} account{computed.customerCount !== 1 ? "s" : ""} · Net customer receivable</p>}
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {computed.customerCount} customer{computed.customerCount !== 1 ? "s" : ""} · Total owed by customers
+                        </p>
                       </div>
-                      <div className="mt-1 text-muted-foreground shrink-0">{customerExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</div>
-                    </button>
-                    <Button size="icon" variant="ghost" className="shrink-0 mt-0.5" onClick={() => { setPickerFor("customer"); setPickerSearch(""); }} data-testid="button-add-customer-account"><Plus className="h-4 w-4" /></Button>
-                  </div>
-                  {customerExpanded && computed && computed.customerList.length > 0 && (
+                      <div className="mt-1 text-muted-foreground shrink-0">
+                        {customerExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </div>
+                    </div>
+                  </button>
+                  {customerExpanded && computed.customerList.length > 0 && (
                     <div className="mt-3 pt-3 border-t space-y-1">
-                      {computed.customerList.map((acct, i) => (
-                        <div key={acct.id ?? i} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md group">
-                          <button className="flex items-center gap-1.5 min-w-0 text-left hover-elevate rounded flex-1 py-0.5 px-1" onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger`)} data-testid={`button-customer-account-${acct.id}`}>
-                            <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <span className="text-sm text-foreground truncate">{acct.name}</span>
-                            {acct.code && <span className="text-xs text-muted-foreground shrink-0">{acct.code}</span>}
-                          </button>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <span className={`text-sm font-mono font-medium ${acct.signedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>{usd(acct.signedBalance)}</span>
-                            <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeAccountMutation.mutate({ type: "customer", accountId: acct.compositeId })} data-testid={`button-remove-customer-${acct.id}`}><X className="h-3 w-3" /></Button>
-                          </div>
+                      {computed.customerList.map((c, i) => (
+                        <div key={i} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md">
+                          <span className="text-sm text-foreground truncate">{c.name}</span>
+                          <span className="text-sm font-mono font-medium text-emerald-600 dark:text-emerald-400 shrink-0">{usd(c.value)}</span>
                         </div>
                       ))}
                     </div>
                   )}
-                  {customerExpanded && computed && computed.customerList.length === 0 && <p className="mt-3 pt-3 border-t text-xs text-muted-foreground text-center">Click + to add customer accounts</p>}
+                  {customerExpanded && computed.customerList.length === 0 && (
+                    <p className="mt-3 pt-3 border-t text-xs text-muted-foreground text-center">No customer balances found</p>
+                  )}
                 </CardContent>
               </Card>
             )}
 
-            {/* ── Worker Advances Outstanding ── */}
+            {/* ── Worker Advances Outstanding (pinned) ── */}
             {allLoading ? (
               <KpiCard icon={HardHat} title="Worker Advances Outstanding" value="—" color="amber" loading />
             ) : (
@@ -564,15 +579,17 @@ export default function FactoryFinancialSnapshot() {
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-muted-foreground font-medium">Worker Advances Outstanding</p>
                         <p className="text-lg font-semibold font-mono mt-0.5 text-amber-600 dark:text-amber-400" data-testid="value-advance">
-                          {computed && computed.advanceCount === 0 ? <span className="text-sm font-normal text-muted-foreground">No accounts selected</span> : usd(Math.abs(computed?.advanceNet ?? 0))}
+                          {computed.advanceCount === 0
+                            ? <span className="text-sm font-normal text-muted-foreground">No accounts selected</span>
+                            : usd(Math.abs(computed.advanceNet))}
                         </p>
-                        {computed && computed.advanceCount > 0 && <p className="text-xs text-muted-foreground mt-0.5">{computed.advanceCount} account{computed.advanceCount !== 1 ? "s" : ""} · Outstanding advances</p>}
+                        {computed.advanceCount > 0 && <p className="text-xs text-muted-foreground mt-0.5">{computed.advanceCount} account{computed.advanceCount !== 1 ? "s" : ""} · Outstanding advances</p>}
                       </div>
                       <div className="mt-1 text-muted-foreground shrink-0">{advanceExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</div>
                     </button>
                     <Button size="icon" variant="ghost" className="shrink-0 mt-0.5" onClick={() => { setPickerFor("advance"); setPickerSearch(""); }} data-testid="button-add-advance-account"><Plus className="h-4 w-4" /></Button>
                   </div>
-                  {advanceExpanded && computed && computed.advanceList.length > 0 && (
+                  {advanceExpanded && computed.advanceList.length > 0 && (
                     <div className="mt-3 pt-3 border-t space-y-1">
                       {computed.advanceList.map((acct, i) => (
                         <div key={acct.id ?? i} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md group">
@@ -589,100 +606,91 @@ export default function FactoryFinancialSnapshot() {
                       ))}
                     </div>
                   )}
-                  {advanceExpanded && computed && computed.advanceList.length === 0 && <p className="mt-3 pt-3 border-t text-xs text-muted-foreground text-center">Click + to add advance accounts</p>}
+                  {advanceExpanded && computed.advanceList.length === 0 && <p className="mt-3 pt-3 border-t text-xs text-muted-foreground text-center">Click + to add advance accounts</p>}
                 </CardContent>
               </Card>
             )}
-
           </div>
         </div>
 
         <Separator />
 
-        {/* ── Section 3: Accounts ───────────────────────────────────────── */}
+        {/* ── Section 3: Accounts & Finance ────────────────────────────── */}
         <div>
           <SectionHeader title="Accounts & Finance" color="#6366f1" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {/* ── Expandable Cash & Bank card ── */}
+
+            {/* ── Cash & Bank (manual pinned) ── */}
             {allLoading ? (
               <KpiCard icon={Wallet} title="Cash & Bank" value="—" color="green" loading />
             ) : (
               <Card data-testid="kpi-card-cash-bank">
                 <CardContent className="p-4">
-                  <button
-                    className="w-full text-left"
-                    onClick={() => setCashBankExpanded(v => !v)}
-                    data-testid="button-expand-cash-bank"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`mt-0.5 p-2 rounded-md bg-muted shrink-0 ${computed && computed.cashBankTotal >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                  <div className="flex items-start gap-3">
+                    <button className="flex-1 flex items-start gap-3 text-left min-w-0" onClick={() => setCashBankExpanded(v => !v)} data-testid="button-expand-cash-bank">
+                      <div className={`mt-0.5 p-2 rounded-md bg-muted shrink-0 ${computed.cashBankTotal >= 0 ? "text-emerald-500" : "text-red-500"}`}>
                         <Wallet className="h-4 w-4" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-muted-foreground font-medium">Cash & Bank</p>
-                        <p className={`text-lg font-semibold font-mono mt-0.5 ${computed && computed.cashBankTotal >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
-                          data-testid="value-cash-bank">
-                          {computed ? usd(computed.cashBankTotal) : "—"}
+                        <p className={`text-lg font-semibold font-mono mt-0.5 ${computed.cashBankTotal >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`} data-testid="value-cash-bank">
+                          {computed.cashBankCount === 0
+                            ? <span className="text-sm font-normal text-muted-foreground">No accounts selected</span>
+                            : usd(computed.cashBankTotal)}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {computed ? `${computed.cashBankCount} account${computed.cashBankCount !== 1 ? "s" : ""}` : ""}
-                        </p>
+                        {computed.cashBankCount > 0 && <p className="text-xs text-muted-foreground mt-0.5">{computed.cashBankCount} account{computed.cashBankCount !== 1 ? "s" : ""}</p>}
                       </div>
                       <div className="mt-1 text-muted-foreground shrink-0">
                         {cashBankExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </div>
-                    </div>
-                  </button>
-
-                  {cashBankExpanded && computed && computed.cashBankList.length > 0 && (
+                    </button>
+                    <Button size="icon" variant="ghost" className="shrink-0 mt-0.5" onClick={() => { setPickerFor("cashbank"); setPickerSearch(""); }} data-testid="button-add-cashbank-account">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {cashBankExpanded && computed.cashBankList.length > 0 && (
                     <div className="mt-3 pt-3 border-t space-y-1">
                       {computed.cashBankList.map((acct, i) => (
-                        <button
-                          key={acct.id ?? i}
-                          className="w-full flex items-center justify-between gap-2 py-1.5 px-2 rounded-md hover-elevate text-left group"
-                          onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger`)}
-                          data-testid={`button-cash-account-${acct.id}`}
-                        >
-                          <div className="flex items-center gap-1.5 min-w-0">
+                        <div key={acct.id ?? i} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md group">
+                          <button className="flex items-center gap-1.5 min-w-0 text-left hover-elevate rounded flex-1 py-0.5 px-1" onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger`)} data-testid={`button-cashbank-account-${acct.id}`}>
                             <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                             <span className="text-sm text-foreground truncate">{acct.name}</span>
                             {acct.code && <span className="text-xs text-muted-foreground shrink-0">{acct.code}</span>}
+                          </button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className={`text-sm font-mono font-medium ${acct.signedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>{usd(acct.signedBalance)}</span>
+                            <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeAccountMutation.mutate({ type: "cashbank", accountId: acct.compositeId })} data-testid={`button-remove-cashbank-${acct.id}`}><X className="h-3 w-3" /></Button>
                           </div>
-                          <span className={`text-sm font-mono font-medium shrink-0 ${acct.signedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                            {usd(acct.signedBalance)}
-                          </span>
-                        </button>
+                        </div>
                       ))}
                     </div>
                   )}
-
-                  {cashBankExpanded && computed && computed.cashBankList.length === 0 && (
-                    <p className="mt-3 pt-3 border-t text-xs text-muted-foreground text-center">No cash or bank accounts found</p>
+                  {cashBankExpanded && computed.cashBankList.length === 0 && (
+                    <p className="mt-3 pt-3 border-t text-xs text-muted-foreground text-center">Click + to add cash & bank accounts</p>
                   )}
                 </CardContent>
               </Card>
             )}
-            {/* ── Expandable Agent Accounts card ── */}
+
+            {/* ── Agent Accounts (manual) ── */}
             {allLoading ? (
               <KpiCard icon={UserRound} title="Agent Accounts" value="—" color="amber" loading />
             ) : (
               <Card data-testid="kpi-card-agents">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
-                    <button
-                      className="flex-1 flex items-start gap-3 text-left min-w-0"
-                      onClick={() => setAgentExpanded(v => !v)}
-                      data-testid="button-expand-agents"
-                    >
-                      <div className={`mt-0.5 p-2 rounded-md bg-muted shrink-0 ${computed && computed.agentNet >= 0 ? "text-emerald-500" : "text-amber-500"}`}>
+                    <button className="flex-1 flex items-start gap-3 text-left min-w-0" onClick={() => setAgentExpanded(v => !v)} data-testid="button-expand-agents">
+                      <div className={`mt-0.5 p-2 rounded-md bg-muted shrink-0 ${computed.agentNet >= 0 ? "text-emerald-500" : "text-amber-500"}`}>
                         <UserRound className="h-4 w-4" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-muted-foreground font-medium">Agent Accounts</p>
-                        <p className={`text-lg font-semibold font-mono mt-0.5 ${computed && computed.agentNet >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
-                          {computed && computed.agentCount === 0 ? <span className="text-sm font-normal text-muted-foreground">No accounts selected</span> : usd(Math.abs(computed?.agentNet ?? 0))}
+                        <p className={`text-lg font-semibold font-mono mt-0.5 ${computed.agentNet >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                          {computed.agentCount === 0
+                            ? <span className="text-sm font-normal text-muted-foreground">No accounts selected</span>
+                            : usd(Math.abs(computed.agentNet))}
                         </p>
-                        {computed && computed.agentCount > 0 && (
+                        {computed.agentCount > 0 && (
                           <p className="text-xs text-muted-foreground mt-0.5">{computed.agentCount} account{computed.agentCount !== 1 ? "s" : ""} · {computed.agentNet >= 0 ? "Net receivable" : "Net payable"}</p>
                         )}
                       </div>
@@ -690,77 +698,53 @@ export default function FactoryFinancialSnapshot() {
                         {agentExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </div>
                     </button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="shrink-0 mt-0.5"
-                      onClick={() => { setPickerFor("agent"); setPickerSearch(""); }}
-                      data-testid="button-add-agent-account"
-                    >
+                    <Button size="icon" variant="ghost" className="shrink-0 mt-0.5" onClick={() => { setPickerFor("agent"); setPickerSearch(""); }} data-testid="button-add-agent-account">
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
-
-                  {agentExpanded && computed && computed.agentList.length > 0 && (
+                  {agentExpanded && computed.agentList.length > 0 && (
                     <div className="mt-3 pt-3 border-t space-y-1">
                       {computed.agentList.map((acct, i) => (
                         <div key={acct.id ?? i} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md group">
-                          <button
-                            className="flex items-center gap-1.5 min-w-0 text-left hover-elevate rounded flex-1 py-0.5 px-1"
-                            onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger`)}
-                            data-testid={`button-agent-account-${acct.id}`}
-                          >
+                          <button className="flex items-center gap-1.5 min-w-0 text-left hover-elevate rounded flex-1 py-0.5 px-1" onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger`)} data-testid={`button-agent-account-${acct.id}`}>
                             <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                             <span className="text-sm text-foreground truncate">{acct.name}</span>
                             {acct.code && <span className="text-xs text-muted-foreground shrink-0">{acct.code}</span>}
                           </button>
                           <div className="flex items-center gap-1 shrink-0">
-                            <span className={`text-sm font-mono font-medium ${acct.signedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
-                              {usd(acct.signedBalance)}
-                            </span>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => removeAccountMutation.mutate({ type: "agent", accountId: acct.compositeId })}
-                              data-testid={`button-remove-agent-${acct.id}`}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
+                            <span className={`text-sm font-mono font-medium ${acct.signedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>{usd(acct.signedBalance)}</span>
+                            <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeAccountMutation.mutate({ type: "agent", accountId: acct.compositeId })} data-testid={`button-remove-agent-${acct.id}`}><X className="h-3 w-3" /></Button>
                           </div>
                         </div>
                       ))}
                     </div>
                   )}
-
-                  {agentExpanded && computed && computed.agentList.length === 0 && (
+                  {agentExpanded && computed.agentList.length === 0 && (
                     <p className="mt-3 pt-3 border-t text-xs text-muted-foreground text-center">Click + to add agent accounts</p>
                   )}
                 </CardContent>
               </Card>
             )}
 
-            {/* ── Expandable Freight card ── */}
+            {/* ── Freight / Embassy / Shipping (manual) ── */}
             {allLoading ? (
               <KpiCard icon={Truck} title="Freight / Embassy / Shipping" value="—" color="amber" loading />
             ) : (
               <Card data-testid="kpi-card-freight">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
-                    <button
-                      className="flex-1 flex items-start gap-3 text-left min-w-0"
-                      onClick={() => setFreightExpanded(v => !v)}
-                      data-testid="button-expand-freight"
-                    >
-                      <div className={`mt-0.5 p-2 rounded-md bg-muted shrink-0 ${computed && computed.freightNet >= 0 ? "text-emerald-500" : "text-amber-500"}`}>
+                    <button className="flex-1 flex items-start gap-3 text-left min-w-0" onClick={() => setFreightExpanded(v => !v)} data-testid="button-expand-freight">
+                      <div className={`mt-0.5 p-2 rounded-md bg-muted shrink-0 ${computed.freightNet >= 0 ? "text-emerald-500" : "text-amber-500"}`}>
                         <Truck className="h-4 w-4" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-muted-foreground font-medium">Freight / Embassy / Shipping</p>
-                        <p className={`text-lg font-semibold font-mono mt-0.5 ${computed && computed.freightNet >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
-                          {computed && computed.freightCount === 0 ? <span className="text-sm font-normal text-muted-foreground">No accounts selected</span> : usd(Math.abs(computed?.freightNet ?? 0))}
+                        <p className={`text-lg font-semibold font-mono mt-0.5 ${computed.freightNet >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                          {computed.freightCount === 0
+                            ? <span className="text-sm font-normal text-muted-foreground">No accounts selected</span>
+                            : usd(Math.abs(computed.freightNet))}
                         </p>
-                        {computed && computed.freightCount > 0 && (
+                        {computed.freightCount > 0 && (
                           <p className="text-xs text-muted-foreground mt-0.5">{computed.freightCount} account{computed.freightCount !== 1 ? "s" : ""} · {computed.freightNet >= 0 ? "Net asset" : "Net payable"}</p>
                         )}
                       </div>
@@ -768,84 +752,41 @@ export default function FactoryFinancialSnapshot() {
                         {freightExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </div>
                     </button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="shrink-0 mt-0.5"
-                      onClick={() => { setPickerFor("freight"); setPickerSearch(""); }}
-                      data-testid="button-add-freight-account"
-                    >
+                    <Button size="icon" variant="ghost" className="shrink-0 mt-0.5" onClick={() => { setPickerFor("freight"); setPickerSearch(""); }} data-testid="button-add-freight-account">
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
-
-                  {freightExpanded && computed && computed.freightList.length > 0 && (
+                  {freightExpanded && computed.freightList.length > 0 && (
                     <div className="mt-3 pt-3 border-t space-y-1">
                       {computed.freightList.map((acct, i) => (
                         <div key={acct.id ?? i} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md group">
-                          <button
-                            className="flex items-center gap-1.5 min-w-0 text-left hover-elevate rounded flex-1 py-0.5 px-1"
-                            onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger`)}
-                            data-testid={`button-freight-account-${acct.id}`}
-                          >
+                          <button className="flex items-center gap-1.5 min-w-0 text-left hover-elevate rounded flex-1 py-0.5 px-1" onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger`)} data-testid={`button-freight-account-${acct.id}`}>
                             <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                             <span className="text-sm text-foreground truncate">{acct.name}</span>
                             {acct.code && <span className="text-xs text-muted-foreground shrink-0">{acct.code}</span>}
                           </button>
                           <div className="flex items-center gap-1 shrink-0">
-                            <span className={`text-sm font-mono font-medium ${acct.signedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
-                              {usd(acct.signedBalance)}
-                            </span>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => removeAccountMutation.mutate({ type: "freight", accountId: acct.compositeId })}
-                              data-testid={`button-remove-freight-${acct.id}`}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
+                            <span className={`text-sm font-mono font-medium ${acct.signedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>{usd(acct.signedBalance)}</span>
+                            <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeAccountMutation.mutate({ type: "freight", accountId: acct.compositeId })} data-testid={`button-remove-freight-${acct.id}`}><X className="h-3 w-3" /></Button>
                           </div>
                         </div>
                       ))}
                     </div>
                   )}
-
-                  {freightExpanded && computed && computed.freightList.length === 0 && (
+                  {freightExpanded && computed.freightList.length === 0 && (
                     <p className="mt-3 pt-3 border-t text-xs text-muted-foreground text-center">Click + to add freight/embassy accounts</p>
                   )}
                 </CardContent>
               </Card>
             )}
-            {(!computed || computed.rentalNet < 0) && (
-              <KpiCard
-                icon={Building2}
-                title="Rentals"
-                value={computed ? usd(Math.abs(computed.rentalNet)) : "—"}
-                sub={computed && computed.rentalCount > 0 ? `${computed.rentalCount} account${computed.rentalCount !== 1 ? "s" : ""} · Outstanding rental payable` : "Accounts matching rent/rental"}
-                color="red"
-                loading={allLoading}
-              />
-            )}
           </div>
-          {computed && computed.rentalNet >= 0 && computed.rentalCount > 0 && (
-            <p className="text-xs text-muted-foreground mt-2 pl-1">
-              Rentals: {usd(computed.rentalNet)} — shown only when negative (payable)
-            </p>
-          )}
-          {computed && computed.rentalCount === 0 && (
-            <p className="text-xs text-muted-foreground mt-2 pl-1">
-              No rental accounts found (accounts named "rent" or "rental")
-            </p>
-          )}
         </div>
 
-        {/* ── Disclaimer ────────────────────────────────────────────────── */}
+        {/* ── Disclaimer ───────────────────────────────────────────────── */}
         <div className="flex items-start gap-2 rounded-md border border-muted bg-muted/30 p-3 text-xs text-muted-foreground">
           <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
           <span>
-            Values are computed from live data. Raw material value uses USD cost per kg where available.
-            Bale weight shows all-time production. Agent and Freight accounts are manually configured using the + button.
+            Values are sourced from the Net Position. Raw material and mix batch values use USD cost per kg. Supplier and customer totals include all accounts. Cash &amp; Bank, Agent, and Freight accounts are manually configured using the + button.
           </span>
         </div>
 
@@ -853,88 +794,62 @@ export default function FactoryFinancialSnapshot() {
     </div>
 
     {/* ── Account Picker Dialog ─────────────────────────────────────── */}
-    {(() => {
-      const pinnedRowsForCard =
-        pickerFor === "agent" ? (agentAccounts || []) :
-        pickerFor === "freight" ? (freightAccountRows || []) :
-        pickerFor === "supplier" ? (supplierPinned || []) :
-        pickerFor === "customer" ? (customerPinned || []) :
-        pickerFor === "advance" ? (advancePinned || []) : [];
-      const selectedIds = new Set(pinnedRowsForCard.map(a => a.accountId));
-      const pickerAccounts = (computed?.allAccounts || [])
-        .filter(a => {
-          const compositeId = `ledger-${(a as any).id}`;
-          if (selectedIds.has(compositeId)) return false;
-          if (!pickerSearch.trim()) return true;
-          return a.name.toLowerCase().includes(pickerSearch.toLowerCase()) ||
-                 (a.code || "").toLowerCase().includes(pickerSearch.toLowerCase());
-        })
-        .slice(0, 80);
-      const cardLabel =
-        pickerFor === "agent" ? "Agent" :
-        pickerFor === "freight" ? "Freight / Embassy" :
-        pickerFor === "supplier" ? "Supplier" :
-        pickerFor === "customer" ? "Customer" :
-        pickerFor === "advance" ? "Advance" : "";
-      return (
-        <Dialog open={pickerFor !== null} onOpenChange={(open) => { if (!open) setPickerFor(null); }}>
-          <DialogContent className="max-w-md max-h-[80vh] flex flex-col gap-0 p-0">
-            <DialogHeader className="p-4 pb-3 border-b shrink-0">
-              <DialogTitle>
-                Add {cardLabel} Account
-              </DialogTitle>
-            </DialogHeader>
-            <div className="p-3 border-b shrink-0">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  className="pl-8 h-8 text-sm"
-                  placeholder="Search accounts..."
-                  value={pickerSearch}
-                  onChange={e => setPickerSearch(e.target.value)}
-                  autoFocus
-                  data-testid="input-picker-search"
-                />
-              </div>
-            </div>
-            <div className="overflow-y-auto flex-1 p-2">
-              {pickerAccounts.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-6">
-                  {pickerSearch ? "No accounts match your search" : "All accounts already selected"}
-                </p>
-              )}
-              {pickerAccounts.map((acct, i) => {
-                const acctId = (acct as any).id as number;
-                const compositeId = `ledger-${acctId}`;
-                return (
-                  <button
-                    key={acctId ?? i}
-                    className="w-full flex items-center justify-between gap-3 py-2 px-3 rounded-md hover-elevate text-left"
-                    onClick={() => {
-                      if (!pickerFor) return;
-                      addAccountMutation.mutate({
-                        type: pickerFor,
-                        body: { accountId: compositeId, accountType: "ledger", accountName: acct.name },
-                      });
-                      setPickerFor(null);
-                    }}
-                    data-testid={`button-pick-account-${acctId}`}
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm text-foreground truncate">{acct.name}</p>
-                      {acct.code && <p className="text-xs text-muted-foreground">{acct.code}</p>}
-                    </div>
-                    <span className={`text-sm font-mono shrink-0 ${acct.side === "forUs" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
-                      {usd(acct.value)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </DialogContent>
-        </Dialog>
-      );
-    })()}
+    <Dialog open={pickerFor !== null} onOpenChange={(open) => { if (!open) setPickerFor(null); }}>
+      <DialogContent className="max-w-md max-h-[80vh] flex flex-col gap-0 p-0">
+        <DialogHeader className="p-4 pb-3 border-b shrink-0">
+          <DialogTitle>Add {cardLabel} Account</DialogTitle>
+        </DialogHeader>
+        <div className="p-3 border-b shrink-0">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              className="pl-8 h-8 text-sm"
+              placeholder="Search accounts..."
+              value={pickerSearch}
+              onChange={e => setPickerSearch(e.target.value)}
+              autoFocus
+              data-testid="input-picker-search"
+            />
+          </div>
+        </div>
+        <div className="overflow-y-auto flex-1 p-2">
+          {pickerAccounts.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-6">
+              {pickerSearch ? "No accounts match your search" : "All accounts already selected"}
+            </p>
+          )}
+          {pickerAccounts.map((acct, i) => {
+            const acctId = (acct as any).id as number;
+            const compositeId = `ledger-${acctId}`;
+            const side = (acct as any).side as "forUs" | "onUs";
+            const signedBal = side === "forUs" ? acct.value : -acct.value;
+            return (
+              <button
+                key={acctId ?? i}
+                className="w-full flex items-center justify-between gap-3 py-2 px-3 rounded-md hover-elevate text-left"
+                onClick={() => {
+                  if (!pickerFor) return;
+                  addAccountMutation.mutate({
+                    type: pickerFor,
+                    body: { accountId: compositeId, accountType: "ledger", accountName: acct.name },
+                  });
+                  setPickerFor(null);
+                }}
+                data-testid={`button-picker-account-${acctId}`}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-foreground truncate">{acct.name}</p>
+                  {acct.code && <p className="text-xs text-muted-foreground">{acct.code} · {acct.category}</p>}
+                </div>
+                <span className={`text-sm font-mono shrink-0 ${signedBal >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                  {usd(signedBal)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }
