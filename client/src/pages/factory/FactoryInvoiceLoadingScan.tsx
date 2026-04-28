@@ -139,7 +139,7 @@ export default function FactoryInvoiceLoadingScan() {
 
   // ── Data ──
   const summaryKey = [`/api/factory/invoices/${invoiceId}/loading-summary`, activeSessionId];
-  const { data: summary, isLoading } = useQuery<LoadingSummaryResponse>({
+  const { data: summary, isLoading, isError, error } = useQuery<LoadingSummaryResponse>({
     queryKey: summaryKey,
     queryFn: async () => {
       const url = activeSessionId
@@ -151,6 +151,7 @@ export default function FactoryInvoiceLoadingScan() {
     },
     enabled: !!invoiceId,
     refetchInterval: 10_000,
+    retry: 1,
   });
 
   // Auto-focus scan input when session is active
@@ -280,12 +281,13 @@ export default function FactoryInvoiceLoadingScan() {
     );
   }
 
-  if (!summary) {
+  if (isError || (!isLoading && !summary)) {
+    const msg = (error as any)?.message || "Invoice not found";
     return (
-      <div className="flex flex-col items-center justify-center h-full p-6">
-        <p className="text-muted-foreground">Invoice not found</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate("/factory/invoicing?tab=invoices")}>
-          <ArrowLeft className="h-4 w-4 mr-2" />Back to Invoices
+      <div className="flex flex-col items-center justify-center h-full p-6 gap-3">
+        <p className="text-destructive font-medium">{msg}</p>
+        <Button variant="outline" onClick={() => navigate(`/factory/sales/invoices/${invoiceId}`)}>
+          <ArrowLeft className="h-4 w-4 mr-2" />Back to Invoice
         </Button>
       </div>
     );
