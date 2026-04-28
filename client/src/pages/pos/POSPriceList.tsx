@@ -372,7 +372,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
       {/* ── Main content ── */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
+        <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0 flex-wrap">
           <Tag className="w-4 h-4 text-muted-foreground" />
           <h1 className="text-base font-semibold">Price List</h1>
           {isAllMode ? (
@@ -386,6 +386,21 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
               {selectedLocation.name}
             </Badge>
           ) : null}
+          {selectedLocationId && (
+            <div className="ml-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="button-export-price-list"
+                onClick={exportToExcel}
+                disabled={exporting || filteredItems.length === 0}
+                className="gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                {exporting ? "Exporting…" : "Export"}
+              </Button>
+            </div>
+          )}
         </div>
 
         {selectedLocationId && (
@@ -434,17 +449,6 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 )}
               </Button>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              data-testid="button-export-price-list"
-              onClick={exportToExcel}
-              disabled={exporting || filteredItems.length === 0}
-              className="gap-1.5 shrink-0"
-            >
-              <Download className="w-3.5 h-3.5" />
-              {exporting ? "Exporting…" : "Export"}
-            </Button>
           </div>
         )}
 
