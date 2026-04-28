@@ -163,23 +163,44 @@ export default function FactoryFinancialSnapshot() {
   const [pickerFor, setPickerFor] = useState<CardKey | null>(null);
   const [pickerSearch, setPickerSearch] = useState("");
 
-  const { data: snapshot, isLoading: loadingSnapshot, refetch: refetchSnapshot, dataUpdatedAt: snapUpdated } =
-    useQuery<SnapshotData>({ queryKey: ["/api/factory/financial-snapshot"] });
+  const { data: snapshot, isLoading: loadingSnapshot, isFetching: fetchingSnapshot, refetch: refetchSnapshot, dataUpdatedAt: snapUpdated } =
+    useQuery<SnapshotData>({
+      queryKey: ["/api/factory/financial-snapshot"],
+      placeholderData: (prev) => prev,
+      refetchInterval: 5 * 60 * 1000,
+    });
 
-  const { data: netPosition, isLoading: loadingNP, refetch: refetchNP } =
-    useQuery<NetPositionData>({ queryKey: ["/api/factory/net-position"] });
+  const { data: netPosition, isLoading: loadingNP, isFetching: fetchingNP, refetch: refetchNP } =
+    useQuery<NetPositionData>({
+      queryKey: ["/api/factory/net-position"],
+      placeholderData: (prev) => prev,
+      refetchInterval: 5 * 60 * 1000,
+    });
 
-  const { data: agentAccounts, isLoading: loadingAgents, refetch: refetchAgents } =
-    useQuery<PinnedRow[]>({ queryKey: ["/api/agent-accounts"] });
+  const { data: agentAccounts, isLoading: loadingAgents, isFetching: fetchingAgents, refetch: refetchAgents } =
+    useQuery<PinnedRow[]>({
+      queryKey: ["/api/agent-accounts"],
+      placeholderData: (prev) => prev,
+      refetchInterval: 5 * 60 * 1000,
+    });
 
   const { data: freightAccountRows, isLoading: loadingFreight } =
-    useQuery<PinnedRow[]>({ queryKey: ["/api/freight-accounts"] });
+    useQuery<PinnedRow[]>({
+      queryKey: ["/api/freight-accounts"],
+      placeholderData: (prev) => prev,
+    });
 
   const { data: cashbankPinned, isLoading: loadingCashbank } =
-    useQuery<PinnedRow[]>({ queryKey: ["/api/snapshot-pinned-accounts/cashbank"] });
+    useQuery<PinnedRow[]>({
+      queryKey: ["/api/snapshot-pinned-accounts/cashbank"],
+      placeholderData: (prev) => prev,
+    });
 
   const { data: advancePinned, isLoading: loadingAdvancePinned } =
-    useQuery<PinnedRow[]>({ queryKey: ["/api/snapshot-pinned-accounts/advance"] });
+    useQuery<PinnedRow[]>({
+      queryKey: ["/api/snapshot-pinned-accounts/advance"],
+      placeholderData: (prev) => prev,
+    });
 
   const addAccountMutation = useMutation({
     mutationFn: ({ type, body }: { type: CardKey; body: { accountId: string; accountType: string; accountName: string } }) => {
@@ -209,7 +230,10 @@ export default function FactoryFinancialSnapshot() {
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
+  // True only on first load (no cached data yet) — triggers full skeleton screen
   const isLoading = loadingSnapshot || loadingNP || loadingAgents || loadingFreight || loadingCashbank || loadingAdvancePinned;
+  // True whenever any background refetch is in flight — used only for the button spinner
+  const isFetching = fetchingSnapshot || fetchingNP || fetchingAgents;
 
   const handleRefresh = () => {
     refetchSnapshot();
@@ -416,7 +440,7 @@ export default function FactoryFinancialSnapshot() {
               disabled={isLoading}
               data-testid="button-refresh-snapshot"
             >
-              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isFetching ? "animate-spin" : ""}`} />
               Refresh
             </Button>
           </div>
