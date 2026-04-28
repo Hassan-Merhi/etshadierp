@@ -22,7 +22,7 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type CellValue = number | string | null;
-type SheetRow = { label: string; cells: CellValue[]; locked?: boolean };
+type SheetRow = { label: string; cells: CellValue[] };
 
 interface LocalSheet {
   id: number | null;
@@ -30,17 +30,20 @@ interface LocalSheet {
   orderIndex: number;
   columns: string[];
   rows: SheetRow[];
+  lockedColumns: number[]; // indices of columns locked after save
   dirty: boolean;
 }
 
 function fromApiSheet(s: FactorySheet): LocalSheet {
-  const rows = ((s.rows as SheetRow[]) ?? []).map(r => ({ ...r, cells: r.cells ?? [], locked: true }));
+  const columns = (s.columns as string[]) ?? [];
+  const rows = ((s.rows as SheetRow[]) ?? []).map(r => ({ label: r.label, cells: r.cells ?? [] }));
   return {
     id: s.id,
     name: s.name,
     orderIndex: s.orderIndex,
-    columns: (s.columns as string[]) ?? [],
+    columns,
     rows,
+    lockedColumns: columns.map((_, i) => i), // all saved columns locked on load
     dirty: false,
   };
 }
@@ -179,12 +182,8 @@ export default function FactorySheets() {
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const silentSaveRef = useRef(false);
 
-  // Admin unlock dialog state
-  const [unlockPending, setUnlockPending] = useState<{
-    rowIdx: number;
-    type: "label" | "cell";
-    colIdx?: number;
-  } | null>(null);
+  // Admin unlock dialog state — tracks which column to unlock
+  const [unlockPending, setUnlockPending] = useState<{ colIdx: number } | null>(null);
 
   // ── Current user for admin check ───────────────────────────────────────────
   const { data: me } = useQuery<any>({ queryKey: ["/api/auth/me"] });
@@ -235,27 +234,25 @@ export default function FactorySheets() {
     });
   }, [activeIdx]);
 
-  // Unlock a specific row so it's editable
-  const unlockRow = useCallback((rowIdx: number) => {
+  // Unlock a specific column so its cells become editable
+  const unlockColumn = useCallback((colIdx: number) => {
     setLocalSheets(prev => {
       const next = [...prev];
       const sheet = { ...next[activeIdx] };
-      sheet.rows = sheet.rows.map((r, i) =>
-        i === rowIdx ? { ...r, locked: false } : r
-      );
+      sheet.lockedColumns = sheet.lockedColumns.filter(i => i !== colIdx);
       next[activeIdx] = sheet;
       return next;
     });
   }, [activeIdx]);
 
   // Handle click on a locked cell — show dialog (admin) or toast (non-admin)
-  const handleLockedClick = useCallback((rowIdx: number, type: "label" | "cell", colIdx?: number) => {
+  const handleLockedClick = useCallback((colIdx: number) => {
     if (isAdmin) {
-      setUnlockPending({ rowIdx, type, colIdx });
+      setUnlockPending({ colIdx });
     } else {
       toast({
-        title: "Row locked",
-        description: "This row has been saved and is locked. Only an Admin can edit saved data.",
+        title: "Column locked",
+        description: "This column has been saved and is locked. Only an Admin can edit saved data.",
         variant: "destructive",
       });
     }
@@ -285,11 +282,11 @@ export default function FactorySheets() {
       ));
     },
     onSuccess: async () => {
-      // Lock all rows after save, then refresh STATUS from server
+      // Lock all columns after save, then refresh STATUS from server
       setLocalSheets(prev => prev.map(s => ({
         ...s,
         dirty: false,
-        rows: s.rows.map(r => ({ ...r, locked: true })),
+        lockedColumns: s.columns.map((_, i) => i),
       })));
 
       // Pull the fresh STATUS sheet from the server and merge it into local state
@@ -351,7 +348,7 @@ export default function FactorySheets() {
       });
     },
     onSuccess: (sheets: FactorySheet[]) => {
-      setLocalSheets(sheets.map(fromApiSheet)); // rows marked locked by fromApiSheet
+      setLocalSheets(sheets.map(fromApiSheet)); // columns marked locked by fromApiSheet
       setActiveIdx(0);
       setInitialised(true);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/sheets"] });
@@ -390,6 +387,7 @@ export default function FactorySheets() {
       ...s,
       columns: [...s.columns, `Col ${s.columns.length + 1}`],
       rows: s.rows.map(r => ({ ...r, cells: [...(r.cells ?? []), null] })),
+      // new columns start unlocked — lockedColumns unchanged
     }));
   };
 
@@ -398,6 +396,10 @@ export default function FactorySheets() {
       ...s,
       columns: s.columns.filter((_, i) => i !== colIdx),
       rows: s.rows.map(r => ({ ...r, cells: (r.cells ?? []).filter((_, i) => i !== colIdx) })),
+      // remove deleted index and shift all higher indices down by 1
+      lockedColumns: s.lockedColumns
+        .filter(i => i !== colIdx)
+        .map(i => (i > colIdx ? i - 1 : i)),
     }));
   };
 
@@ -415,7 +417,7 @@ export default function FactorySheets() {
       ...s,
       rows: [
         ...s.rows,
-        { label: "", cells: Array(s.columns.length).fill(null), locked: false },
+        { label: "", cells: Array(s.columns.length).fill(null) },
       ],
     }));
   };
@@ -463,7 +465,7 @@ export default function FactorySheets() {
         if (ri >= rowCount - 1) {
           updateSheet(s => ({
             ...s,
-            rows: [...s.rows, { label: "", cells: Array(s.columns.length).fill(null), locked: false }],
+            rows: [...s.rows, { label: "", cells: Array(s.columns.length).fill(null) }],
           }));
           setTimeout(() => focusCell(rowCount, ci), 30);
         } else {
@@ -527,9 +529,9 @@ export default function FactorySheets() {
       <AlertDialog open={!!unlockPending} onOpenChange={open => { if (!open) setUnlockPending(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Unlock saved row?</AlertDialogTitle>
+            <AlertDialogTitle>Unlock saved column?</AlertDialogTitle>
             <AlertDialogDescription>
-              This row has already been saved and is locked. Editing saved data may affect
+              This column has already been saved and is locked. Editing saved data may affect
               historical records. Are you sure you want to unlock it for editing?
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -538,18 +540,9 @@ export default function FactorySheets() {
             <AlertDialogAction
               onClick={() => {
                 if (unlockPending) {
-                  unlockRow(unlockPending.rowIdx);
-                  // After unlocking, focus the appropriate input
-                  const { rowIdx, type, colIdx } = unlockPending;
-                  setTimeout(() => {
-                    const selector = type === "cell"
-                      ? `[data-testid="input-cell-${rowIdx}-${colIdx}"]`
-                      : `[data-testid="input-row-label-${rowIdx}"]`;
-                    const el = document.querySelector(selector) as HTMLInputElement | null;
-                    if (el) { el.focus(); el.select(); }
-                  }, 50);
+                  unlockColumn(unlockPending.colIdx);
+                  setUnlockPending(null);
                 }
-                setUnlockPending(null);
               }}
             >
               Unlock & Edit
@@ -670,29 +663,44 @@ export default function FactorySheets() {
                     Label
                   </th>
 
-                  {activeSheet.columns.map((col, ci) => (
-                    <th
-                      key={ci}
-                      className="border border-border bg-muted px-1 py-1 text-center font-medium min-w-[130px]"
-                    >
-                      <div className="flex items-center gap-1">
-                        <Input
-                          value={col}
-                          onChange={e => setColumnHeader(ci, e.target.value)}
-                          className="h-7 text-xs text-center font-semibold border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-1"
-                          data-testid={`input-col-header-${ci}`}
-                        />
-                        <button
-                          data-testid={`button-remove-col-${ci}`}
-                          onClick={() => removeColumn(ci)}
-                          className="text-muted-foreground hover:text-destructive shrink-0 transition-colors"
-                          style={{ visibility: "visible" }}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </th>
-                  ))}
+                  {activeSheet.columns.map((col, ci) => {
+                    const isColLocked = activeSheet.lockedColumns.includes(ci);
+                    return (
+                      <th
+                        key={ci}
+                        className="border border-border bg-muted px-1 py-1 text-center font-medium min-w-[130px]"
+                      >
+                        {isColLocked ? (
+                          <div
+                            className="flex items-center justify-center gap-1.5 px-2 py-0.5 cursor-pointer group"
+                            onClick={() => handleLockedClick(ci)}
+                            title={isAdmin ? "Click to unlock column for editing" : "Column is locked"}
+                            data-testid={`locked-col-header-${ci}`}
+                          >
+                            <Lock className="h-3 w-3 text-muted-foreground/50 shrink-0 group-hover:text-muted-foreground transition-colors" />
+                            <span className="text-xs font-semibold truncate">{col}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              value={col}
+                              onChange={e => setColumnHeader(ci, e.target.value)}
+                              className="h-7 text-xs text-center font-semibold border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-1"
+                              data-testid={`input-col-header-${ci}`}
+                            />
+                            <button
+                              data-testid={`button-remove-col-${ci}`}
+                              onClick={() => removeColumn(ci)}
+                              className="text-muted-foreground hover:text-destructive shrink-0 transition-colors"
+                              style={{ visibility: "visible" }}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
+                      </th>
+                    );
+                  })}
 
                   <th className="border border-border bg-muted px-2 py-1.5 text-center">
                     <button
@@ -708,87 +716,71 @@ export default function FactorySheets() {
               </thead>
 
               <tbody>
-                {activeSheet.rows.map((row, ri) => {
-                  const isLocked = row.locked === true;
-                  return (
-                    <tr key={ri} className="hover:bg-muted/30">
-                      {/* Row label */}
-                      <td className="border border-border px-1 py-0.5 bg-muted/20">
-                        {isLocked ? (
-                          <div
-                            data-testid={`locked-row-label-${ri}`}
-                            onClick={() => handleLockedClick(ri, "label")}
-                            className="h-7 px-2 flex items-center gap-1.5 cursor-pointer text-xs text-foreground group"
-                            title={isAdmin ? "Click to unlock for editing" : "Row is locked"}
-                          >
-                            <Lock className="h-3 w-3 text-muted-foreground/50 shrink-0 group-hover:text-muted-foreground transition-colors" />
-                            <span className="truncate">{fmtLabel(row.label)}</span>
-                          </div>
-                        ) : (
-                          <Input
-                            value={row.label}
-                            onChange={e => setRowLabel(ri, e.target.value)}
-                            className="h-7 text-xs border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-1"
-                            data-testid={`input-row-label-${ri}`}
-                            dir="auto"
-                          />
-                        )}
-                      </td>
+                {activeSheet.rows.map((row, ri) => (
+                  <tr key={ri} className="hover:bg-muted/30">
+                    {/* Row label — always editable */}
+                    <td className="border border-border px-1 py-0.5 bg-muted/20">
+                      <Input
+                        value={row.label}
+                        onChange={e => setRowLabel(ri, e.target.value)}
+                        className="h-7 text-xs border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-1"
+                        data-testid={`input-row-label-${ri}`}
+                        dir="auto"
+                      />
+                    </td>
 
-                      {/* Data cells */}
-                      {activeSheet.columns.map((colName, ci) => {
-                        const isDiff = isDiffColumn(colName);
-                        const rawVal = row.cells[ci];
-                        const val = isDiff
-                          ? computeDiffValue(activeSheet.columns, row.cells, ci)
-                          : rawVal;
-                        const isNeg = typeof val === "number" && val < 0;
-                        const isText = !isDiff && typeof rawVal === "string" && rawVal !== "-";
-                        return (
-                          <td key={ci} className={`border border-border px-1 py-0.5 ${isDiff ? "bg-muted/20" : ""}`}>
-                            {isLocked || isDiff ? (
-                              <div
-                                data-testid={`locked-cell-${ri}-${ci}`}
-                                onClick={() => !isDiff && handleLockedClick(ri, "cell", ci)}
-                                className={`h-7 px-2 flex items-center text-xs tabular-nums
-                                  ${!isDiff ? "cursor-pointer group" : "cursor-default"}
-                                  ${isText ? "justify-start" : "justify-end"}
-                                  ${isNeg ? "text-red-500" : isDiff ? "text-foreground font-medium" : "text-foreground"}`}
-                                title={isDiff ? "Auto-calculated: left col − right col" : isAdmin ? "Click to unlock for editing" : "Row is locked"}
-                              >
-                                {fmt(val)}
-                              </div>
-                            ) : (
-                              <Input
-                                value={fmt(rawVal)}
-                                onChange={e => setCell(ri, ci, e.target.value)}
-                                onKeyDown={e => handleCellKeyDown(e, ri, ci)}
-                                className={`h-7 text-xs border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-1 tabular-nums
-                                  ${isNeg ? "text-red-500" : ""}
-                                  ${isText ? "text-left" : "text-right"}`}
-                                data-testid={`input-cell-${ri}-${ci}`}
-                                dir="auto"
-                              />
-                            )}
-                          </td>
-                        );
-                      })}
+                    {/* Data cells — locked per column */}
+                    {activeSheet.columns.map((colName, ci) => {
+                      const isColLocked = activeSheet.lockedColumns.includes(ci);
+                      const isDiff = isDiffColumn(colName);
+                      const rawVal = row.cells[ci];
+                      const val = isDiff
+                        ? computeDiffValue(activeSheet.columns, row.cells, ci)
+                        : rawVal;
+                      const isNeg = typeof val === "number" && val < 0;
+                      const isText = !isDiff && typeof rawVal === "string" && rawVal !== "-";
+                      return (
+                        <td key={ci} className={`border border-border px-1 py-0.5 ${isDiff ? "bg-muted/20" : ""}`}>
+                          {isColLocked || isDiff ? (
+                            <div
+                              data-testid={`locked-cell-${ri}-${ci}`}
+                              onClick={() => !isDiff && handleLockedClick(ci)}
+                              className={`h-7 px-2 flex items-center text-xs tabular-nums
+                                ${!isDiff ? "cursor-pointer group" : "cursor-default"}
+                                ${isText ? "justify-start" : "justify-end"}
+                                ${isNeg ? "text-red-500" : isDiff ? "text-foreground font-medium" : "text-foreground"}`}
+                              title={isDiff ? "Auto-calculated: left col − right col" : isAdmin ? "Click to unlock column for editing" : "Column is locked"}
+                            >
+                              {fmt(val)}
+                            </div>
+                          ) : (
+                            <Input
+                              value={fmt(rawVal)}
+                              onChange={e => setCell(ri, ci, e.target.value)}
+                              onKeyDown={e => handleCellKeyDown(e, ri, ci)}
+                              className={`h-7 text-xs border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-1 tabular-nums
+                                ${isNeg ? "text-red-500" : ""}
+                                ${isText ? "text-left" : "text-right"}`}
+                              data-testid={`input-cell-${ri}-${ci}`}
+                              dir="auto"
+                            />
+                          )}
+                        </td>
+                      );
+                    })}
 
-                      {/* Remove row */}
-                      <td className="border border-border px-2 py-0.5 text-center">
-                        {!isLocked && (
-                          <button
-                            data-testid={`button-remove-row-${ri}`}
-                            onClick={() => removeRow(ri)}
-                            className="text-muted-foreground hover:text-destructive transition-colors"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                    {/* Remove row — always available */}
+                    <td className="border border-border px-2 py-0.5 text-center">
+                      <button
+                        data-testid={`button-remove-row-${ri}`}
+                        onClick={() => removeRow(ri)}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
 
                 {/* Difference row — auto-calculated */}
                 {activeSheet.columns.length > 0 && (
