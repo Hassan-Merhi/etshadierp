@@ -1333,6 +1333,15 @@ export function registerStatsRoutes(app: Express) {
           costProfit: salesItems.profit, // Actual selling price - cost price
           isCreditSale: vouchers.isCreditSale,
           createdAt: salesItems.createdAt,
+          customerName: sql<string | null>`(
+            SELECT la.name
+            FROM voucher_entries ve
+            INNER JOIN ledger_accounts la ON ve.ledger_account_id = la.id
+            WHERE ve.voucher_id = ${vouchers.id}
+              AND cast(ve.debit_amount as numeric) > 0
+              AND ve.ledger_account_id IS NOT NULL
+            LIMIT 1
+          )`.as("customer_name"),
         })
         .from(salesItems)
         .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))

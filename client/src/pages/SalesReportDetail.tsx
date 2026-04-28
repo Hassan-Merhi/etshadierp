@@ -36,6 +36,7 @@ interface SalesReportItem {
   configuredProfit: number;
   configuredProfitPercentage: number;
   isCreditSale?: boolean;
+  customerName?: string | null;
   createdAt: string;
   companyId?: number;
   companyCode?: string;
@@ -243,6 +244,21 @@ export default function SalesReportDetail() {
     });
   };
 
+  // Compute unique customer name(s) for credit sale badge
+  const creditCustomerNames = isCreditSaleParam === "true"
+    ? [...new Set(
+        filteredItems
+          .map(item => item.customerName)
+          .filter((n): n is string => !!n)
+          .map(n => n.replace(/ - Customer Account$/i, "").trim())
+      )]
+    : [];
+  const creditCustomerLabel = creditCustomerNames.length === 1
+    ? creditCustomerNames[0]
+    : creditCustomerNames.length > 1
+      ? `${creditCustomerNames.length} customers`
+      : null;
+
   const totalQty = filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
   const totalSales = filteredItems.reduce((sum, item) => sum + parseFloat(item.totalSales || "0"), 0);
   const totalCost = filteredItems.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0);
@@ -260,7 +276,9 @@ export default function SalesReportDetail() {
           <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
             Sales Details — {displayDate}
             {isCreditSaleParam === "true" && (
-              <Badge variant="outline" className="text-sm text-amber-600 border-amber-400 dark:text-amber-400 dark:border-amber-600">Credit Sales</Badge>
+              <Badge variant="outline" className="text-sm text-amber-600 border-amber-400 dark:text-amber-400 dark:border-amber-600">
+                Credit Sales{creditCustomerLabel ? ` · ${creditCustomerLabel}` : ""}
+              </Badge>
             )}
           </h1>
           <p className="text-sm text-muted-foreground">
