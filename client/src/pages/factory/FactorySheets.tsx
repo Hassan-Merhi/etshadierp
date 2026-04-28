@@ -45,15 +45,42 @@ function fromApiSheet(s: FactorySheet): LocalSheet {
   };
 }
 
+// ── Diff column detection ──────────────────────────────────────────────────────
+function isDiffColumn(name: string): boolean {
+  const n = name.trim().toLowerCase();
+  return n === "diff" || n === "difference" || n === "فرق";
+}
+
+// For a diff column at index ci, subtract: (second-to-left non-diff col) - (nearest left non-diff col)
+function computeDiffValue(columns: string[], cells: CellValue[], ci: number): number | null {
+  const leftNonDiff: number[] = [];
+  for (let i = ci - 1; i >= 0 && leftNonDiff.length < 2; i--) {
+    if (!isDiffColumn(columns[i])) leftNonDiff.unshift(i);
+  }
+  if (leftNonDiff.length < 2) return null;
+  const a = cells[leftNonDiff[0]];
+  const b = cells[leftNonDiff[1]];
+  if (typeof a !== "number" || typeof b !== "number") return null;
+  return a - b;
+}
+
 // ── Difference row calculation ─────────────────────────────────────────────────
-function calcDiff(rows: SheetRow[], colCount: number): (number | null)[] {
+function calcDiff(rows: SheetRow[], columns: string[]): (number | null)[] {
+  const colCount = columns.length;
   const diff: (number | null)[] = Array(colCount).fill(null);
   for (const row of rows) {
     for (let c = 0; c < colCount; c++) {
+      if (isDiffColumn(columns[c])) continue; // computed separately below
       const v = row.cells[c];
       if (typeof v === "number") {
         diff[c] = (diff[c] ?? 0) + v;
       }
+    }
+  }
+  // Compute diff columns from totals
+  for (let c = 0; c < colCount; c++) {
+    if (isDiffColumn(columns[c])) {
+      diff[c] = computeDiffValue(columns, diff, c);
     }
   }
   return diff;
@@ -473,7 +500,7 @@ export default function FactorySheets() {
     );
   }
 
-  const diffRow = activeSheet ? calcDiff(activeSheet.rows, activeSheet.columns.length) : [];
+  const diffRow = activeSheet ? calcDiff(activeSheet.rows, activeSheet.columns) : [];
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -691,26 +718,31 @@ export default function FactorySheets() {
                       </td>
 
                       {/* Data cells */}
-                      {activeSheet.columns.map((_, ci) => {
-                        const val = row.cells[ci];
+                      {activeSheet.columns.map((colName, ci) => {
+                        const isDiff = isDiffColumn(colName);
+                        const rawVal = row.cells[ci];
+                        const val = isDiff
+                          ? computeDiffValue(activeSheet.columns, row.cells, ci)
+                          : rawVal;
                         const isNeg = typeof val === "number" && val < 0;
-                        const isText = typeof val === "string" && val !== "-";
+                        const isText = !isDiff && typeof rawVal === "string" && rawVal !== "-";
                         return (
-                          <td key={ci} className="border border-border px-1 py-0.5">
-                            {isLocked ? (
+                          <td key={ci} className={`border border-border px-1 py-0.5 ${isDiff ? "bg-muted/20" : ""}`}>
+                            {isLocked || isDiff ? (
                               <div
                                 data-testid={`locked-cell-${ri}-${ci}`}
-                                onClick={() => handleLockedClick(ri, "cell", ci)}
-                                className={`h-7 px-2 flex items-center cursor-pointer text-xs tabular-nums group
+                                onClick={() => !isDiff && handleLockedClick(ri, "cell", ci)}
+                                className={`h-7 px-2 flex items-center text-xs tabular-nums
+                                  ${!isDiff ? "cursor-pointer group" : "cursor-default"}
                                   ${isText ? "justify-start" : "justify-end"}
-                                  ${isNeg ? "text-red-500" : "text-foreground"}`}
-                                title={isAdmin ? "Click to unlock for editing" : "Row is locked"}
+                                  ${isNeg ? "text-red-500" : isDiff ? "text-foreground font-medium" : "text-foreground"}`}
+                                title={isDiff ? "Auto-calculated: left col − right col" : isAdmin ? "Click to unlock for editing" : "Row is locked"}
                               >
                                 {fmt(val)}
                               </div>
                             ) : (
                               <Input
-                                value={fmt(val)}
+                                value={fmt(rawVal)}
                                 onChange={e => setCell(ri, ci, e.target.value)}
                                 onKeyDown={e => handleCellKeyDown(e, ri, ci)}
                                 className={`h-7 text-xs border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-1 tabular-nums
