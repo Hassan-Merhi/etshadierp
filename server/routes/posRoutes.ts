@@ -1427,7 +1427,11 @@ export function registerPosRoutes(app: Express) {
 
       res.json({ success: true, message: "Stock report sent to WhatsApp" });
     } catch (error: any) {
-      console.error("[/api/pos/send-shift-report]", error);
+      console.error("[/api/pos/send-shift-report]", {
+        locationId: req.body.locationId,
+        chatId: (error as any)?.chatId ?? undefined,
+        error: error?.message ?? error,
+      });
       res.status(500).json({ message: error.message });
     }
   });

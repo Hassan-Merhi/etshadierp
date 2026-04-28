@@ -501,22 +501,15 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         return await res.json();
       }
     },
-    onSuccess: (data: any) => {
+    onSuccess: async (data: any) => {
       setSavedSale(data);
-      toast({
-        title: editVoucherId ? "Sale Updated" : "Sale Saved",
-        description: `Sale ${data.voucher?.voucherNumber} has been ${editVoucherId ? 'updated' : 'saved'} successfully.`,
-      });
-      
+
       if (!editVoucherId) {
         setSaleJustCompleted(true);
       }
-      
-      // Auto-show print dialog for both new and edit
-      setShowPrintDialog(true);
-      
-      // Invalidate inventory query to refresh stock levels
-      const locationId = activeLocation?.id || editVoucher?.locationId;
+
+      // Invalidate queries regardless of print/WhatsApp path
+      const locationId = activeLocation?.id || data.location?.id || editVoucher?.locationId;
       if (locationId) {
         queryClient.invalidateQueries({ queryKey: [`/api/locations/${locationId}/inventory`] });
       }
@@ -525,6 +518,42 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${editVoucherId}`] });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+
+      // If this is a new sale and the location has a WhatsApp group, send automatically
+      const hasWhatsApp =
+        !editVoucherId &&
+        !!(
+          (activeLocation as any)?.whatsappGroupChatId ||
+          (data.location as any)?.whatsappGroupChatId
+        );
+
+      if (hasWhatsApp) {
+        setShowPrintDialog(false);
+        setShowStockPrompt(false);
+        setSendingWhatsApp(true);
+        try {
+          await sendStockReportToWhatsApp(locationId);
+          toast({
+            title: "Sale saved",
+            description: `Sale ${data.voucher?.voucherNumber} saved and stock report sent to WhatsApp.`,
+          });
+        } catch (e: any) {
+          toast({
+            title: "Sale saved",
+            description: `Sale ${data.voucher?.voucherNumber} saved, but WhatsApp stock report failed: ${e.message}`,
+            variant: "destructive",
+          });
+        } finally {
+          setSendingWhatsApp(false);
+        }
+      } else {
+        // Existing behaviour — open print dialog
+        toast({
+          title: editVoucherId ? "Sale Updated" : "Sale Saved",
+          description: `Sale ${data.voucher?.voucherNumber} has been ${editVoucherId ? "updated" : "saved"} successfully.`,
+        });
+        setShowPrintDialog(true);
+      }
     },
     onError: (error: any) => {
       if (error.name === "OfflineQueued") {
@@ -617,20 +646,21 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     documentTitle: `STK_${(activeLocation?.name || "Location").replace(/\s+/g, "_")}_${new Date().toLocaleDateString('en-CA')}`,
   });
 
+  const sendStockReportToWhatsApp = async (locationId?: number | null) => {
+    if (!locationId) throw new Error("No location selected");
+    const res = await apiRequest("POST", "/api/pos/send-shift-report", { locationId });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.message || "WhatsApp stock report failed to send");
+    return body;
+  };
+
   const handleSendWhatsAppReport = async () => {
     setSendingWhatsApp(true);
     try {
-      const res = await apiRequest("POST", "/api/pos/send-shift-report", {
-        locationId: activeLocation?.id,
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        toast({ title: "Failed to send", description: body.message || "WhatsApp send failed.", variant: "destructive" });
-      } else {
-        toast({ title: "Sent", description: "Stock report sent to WhatsApp group." });
-      }
-    } catch {
-      toast({ title: "Error", description: "Could not reach the server.", variant: "destructive" });
+      await sendStockReportToWhatsApp(activeLocation?.id);
+      toast({ title: "Sent", description: "Stock report sent to WhatsApp group." });
+    } catch (e: any) {
+      toast({ title: "Failed to send", description: e.message || "WhatsApp send failed.", variant: "destructive" });
     } finally {
       setSendingWhatsApp(false);
     }
