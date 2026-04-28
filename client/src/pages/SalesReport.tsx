@@ -108,7 +108,7 @@ const formatSmartNumber = (value: string | number) => {
 };
 
 export default function SalesReport() {
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("last_1_month"));
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("today"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [selectedStockItem, setSelectedStockItem] = useState<string>("");
@@ -321,7 +321,7 @@ export default function SalesReport() {
   );
 
   const handleClearFilters = () => {
-    setPeriodFilter(getDefaultPeriodValue("last_1_month"));
+    setPeriodFilter(getDefaultPeriodValue("today"));
     setSelectedLocation("");
     setSelectedStockItem("");
     setSelectedStockGroup("");
@@ -522,7 +522,7 @@ export default function SalesReport() {
                 setSelectedStockItem("");
                 // If still on "this_month" default, switch to last 30 days so cross-company data is visible
                 if (periodFilter.preset === "this_month") {
-                  setPeriodFilter(getDefaultPeriodValue("last_1_month"));
+                  setPeriodFilter(getDefaultPeriodValue("today"));
                 }
               }
             }}

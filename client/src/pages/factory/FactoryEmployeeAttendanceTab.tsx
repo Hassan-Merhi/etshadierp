@@ -368,8 +368,8 @@ function PerEmployeeView() {
   const { toast } = useToast();
   const [selectedEmpId, setSelectedEmpId] = useState<string>("");
   const [empComboOpen, setEmpComboOpen] = useState(false);
-  const [startDate, setStartDate] = useState(currentMonthStart());
-  const [endDate, setEndDate] = useState(currentMonthEnd());
+  const [startDate, setStartDate] = useState(todayStr());
+  const [endDate, setEndDate] = useState(todayStr());
   const [checkedDates, setCheckedDates] = useState<Record<string, boolean>>({});
 
   const { data: empList } = useQuery<EmpRow[]>({

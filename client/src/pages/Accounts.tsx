@@ -186,7 +186,7 @@ export default function Accounts() {
     if (urlStartDate && urlEndDate) {
       return { fromDate: urlStartDate, toDate: urlEndDate, preset: "custom" as const };
     }
-    return getDefaultPeriodValue("this_month");
+    return getDefaultPeriodValue("today");
   });
   const [accountToEdit, setAccountToEdit] = useState<LedgerAccount | null>(
     null,
@@ -572,7 +572,7 @@ export default function Accounts() {
     setSelectedAccount(account || null);
     setSearchTerm("");
     // Reset period filter to this_month when switching accounts
-    const defaultPeriod = getDefaultPeriodValue("last_1_month");
+    const defaultPeriod = getDefaultPeriodValue("today");
     setPeriodFilter(defaultPeriod);
     // Save to URL
     if (account) {

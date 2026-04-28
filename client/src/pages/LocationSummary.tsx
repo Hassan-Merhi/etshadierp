@@ -81,7 +81,7 @@ export default function LocationSummary() {
     new Set(savedState?.expandedGroups || [])
   );
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => 
-    savedState?.periodFilter || getDefaultPeriodValue("last_1_month")
+    savedState?.periodFilter || getDefaultPeriodValue("today")
   );
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);

@@ -218,7 +218,7 @@ export default function FactoryWorkerAttendanceReport() {
   const qc = useQueryClient();
 
   /* Date mode state */
-  const [mode, setMode]               = useState<DateMode>("thisMonth");
+  const [mode, setMode]               = useState<DateMode>("today");
   /* customStart/customEnd are used for both "thisMonth" navigation and "custom" range */
   const [customStart, setCustomStart] = useState(isoMonthStart);
   const [customEnd,   setCustomEnd]   = useState(isoMonthEnd);

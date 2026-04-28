@@ -75,7 +75,7 @@ function getInitialPeriodValue(year: number | null, month: number | null): Perio
       preset: "custom",
     };
   }
-  return getDefaultPeriodValue("this_month");
+  return getDefaultPeriodValue("today");
 }
 
 export default function LedgerVouchers() {

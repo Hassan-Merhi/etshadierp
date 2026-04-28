@@ -210,7 +210,7 @@ export default function NetProfitReport() {
   const isAdminOrDev = user?.role === "Admin" || user?.role === "Developer";
 
   const now = new Date();
-  const [period, setPeriod] = useState<Period>("this_month");
+  const [period, setPeriod] = useState<Period>("today");
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("current");
   const [specificMonth, setSpecificMonth] = useState<number>(now.getMonth() + 1);
   const [specificYear, setSpecificYear] = useState<number>(now.getFullYear());

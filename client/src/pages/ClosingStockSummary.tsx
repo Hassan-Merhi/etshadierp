@@ -58,7 +58,7 @@ export default function ClosingStockSummary() {
   const [, navigate] = useLocation();
   const { selectedCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("last_1_month"));
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("today"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
 
   const { data, isLoading } = useQuery<ClosingStockData>({

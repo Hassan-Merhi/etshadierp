@@ -171,7 +171,7 @@ function AccountBreakdown({
 
 export default function FactoryNetProfitAnalytics() {
   const now = new Date();
-  const [period, setPeriod] = useState<Period>("all_time");
+  const [period, setPeriod] = useState<Period>("today");
   const [specificMonth, setSpecificMonth] = useState<number>(now.getMonth() + 1);
   const [specificYear, setSpecificYear] = useState<number>(now.getFullYear());
   const [customFromDate, setCustomFromDate] = useState<string>("");

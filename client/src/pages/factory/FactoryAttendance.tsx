@@ -146,8 +146,8 @@ export default function FactoryAttendance() {
   const [shift, setShift] = useState<string>("");
 
   // ── Range export state ────────────────────────────────────────
-  const [rangeStart, setRangeStart] = useState<string>(currentMonthStart());
-  const [rangeEnd, setRangeEnd] = useState<string>(currentMonthEnd());
+  const [rangeStart, setRangeStart] = useState<string>(todayStr());
+  const [rangeEnd, setRangeEnd] = useState<string>(todayStr());
   const [isExportingRange, setIsExportingRange] = useState(false);
   const [rangePrintDialog, setRangePrintDialog] = useState<"excel" | "print" | null>(null);
   const [attendanceMap, setAttendanceMap] = useState<Record<number, AttendanceStatus>>({});
@@ -738,8 +738,8 @@ function PerWorkerView() {
   const { toast } = useToast();
   const [selectedWorkerId, setSelectedWorkerId] = useState<string>("");
   const [workerComboOpen, setWorkerComboOpen] = useState(false);
-  const [startDate, setStartDate] = useState<string>(currentMonthStart());
-  const [endDate, setEndDate] = useState<string>(currentMonthEnd());
+  const [startDate, setStartDate] = useState<string>(todayStr());
+  const [endDate, setEndDate] = useState<string>(todayStr());
   const [checkedDates, setCheckedDates] = useState<Record<string, boolean>>({});
 
   const { data: workersList, isLoading: loadingWorkers } = useQuery<WorkerRow[]>({
