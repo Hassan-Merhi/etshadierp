@@ -10,10 +10,24 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // ── STATUS sheet helpers ───────────────────────────────────────────────────────
 type CellVal = number | string | null;
-type SRow = { label: string; cells: CellVal[] };
-type SSheet = { id?: number; name: string; columns: string[]; rows: SRow[]; orderIndex?: number };
+type SRow = { id?: string; label: string; cells: any[] };
+type SSheet = { id?: number; name: string; columns: any[]; rows: SRow[]; orderIndex?: number };
 
 const STATUS_NAME = "STATUS";
+
+// Support both old format (string) and new format ({ id, label })
+function getColLabel(col: any): string {
+  if (typeof col === "string") return col;
+  return col?.label ?? "";
+}
+
+// Support both old format (primitive) and new format ({ value, link? })
+function getCellRawValue(cell: any): CellVal {
+  if (cell === null || cell === undefined) return null;
+  if (typeof cell === "number" || typeof cell === "string") return cell;
+  if (typeof cell === "object" && "value" in cell) return cell.value ?? null;
+  return null;
+}
 
 function toNumber(v: CellVal): number {
   if (typeof v === "number") return isNaN(v) ? 0 : v;
@@ -32,7 +46,7 @@ function findSheet(sheets: SSheet[], name: string): SSheet | undefined {
 function findColumnIndex(sheet: SSheet, names: string[]): number {
   for (const name of names) {
     const n = name.trim().toLowerCase();
-    const idx = sheet.columns.findIndex(c => c.trim().toLowerCase() === n);
+    const idx = sheet.columns.findIndex(c => getColLabel(c).trim().toLowerCase() === n);
     if (idx !== -1) return idx;
   }
   return -1;
@@ -42,7 +56,7 @@ function sumColumn(sheet: SSheet | undefined, names: string[]): number {
   if (!sheet) return 0;
   const idx = findColumnIndex(sheet, names);
   if (idx === -1) return 0;
-  return sheet.rows.reduce((sum, row) => sum + toNumber(row.cells[idx]), 0);
+  return sheet.rows.reduce((sum, row) => sum + toNumber(getCellRawValue(row.cells[idx])), 0);
 }
 
 function buildStatusSheet(
@@ -58,7 +72,7 @@ function buildStatusSheet(
       r.label.trim().toLowerCase().includes(labelFragment.toLowerCase()),
     );
     if (!row) return defaultVal;
-    const v = toNumber(row.cells[beforeIdx]);
+    const v = toNumber(getCellRawValue(row.cells[beforeIdx]));
     return v !== 0 ? v : defaultVal;
   };
 
@@ -89,10 +103,10 @@ function buildStatusSheet(
 
   const columns = ["BEFORE", "DIFF", "AFTER"];
   const rows: SRow[] = [
-    { label: "PRODUCTION اجراء اعمال", cells: [prodBefore,  prodDiff,  prodAfter] },
-    { label: "STOCK IN",               cells: [stockBefore, stockDiff, stockAfter] },
-    { label: "IO",                     cells: [ioBefore,    ioDiff,    ioAfter] },
-    { label: "DIFFERENCE",             cells: [totalBefore, totalDiff, totalAfter] },
+    { id: "status_row_production", label: "PRODUCTION اجراء اعمال", cells: [prodBefore,  prodDiff,  prodAfter] },
+    { id: "status_row_stockin",    label: "STOCK IN",               cells: [stockBefore, stockDiff, stockAfter] },
+    { id: "status_row_io",         label: "IO",                     cells: [ioBefore,    ioDiff,    ioAfter] },
+    { id: "status_row_difference", label: "DIFFERENCE",             cells: [totalBefore, totalDiff, totalAfter] },
   ];
 
   return { columns, rows };
@@ -430,17 +444,18 @@ export function registerFactorySheetsRoutes(app: Express) {
       const wb = xlsxUtils.book_new();
 
       for (const sheet of sheets) {
-        const columns = (sheet.columns as string[]) ?? [];
-        const rows = (sheet.rows as { label: string; cells: (number | string | null)[] }[]) ?? [];
+        const rawColumns = (sheet.columns as any[]) ?? [];
+        const rows = (sheet.rows as SRow[]) ?? [];
+        const colLabels = rawColumns.map(getColLabel);
 
         // Build the 2D array: header row + data rows + difference row
-        const headerRow = ["", ...columns];
-        const dataRows = rows.map(r => [r.label, ...r.cells.map(c => c ?? "")]);
+        const headerRow = ["", ...colLabels];
+        const dataRows = rows.map(r => [r.label, ...r.cells.map((c: any) => getCellRawValue(c) ?? "")]);
 
-        // Difference row = sum of all cells per column
-        const diffCells = columns.map((_, colIdx) => {
+        // Difference row = sum of all cells per column (using raw values)
+        const diffCells = colLabels.map((_, colIdx) => {
           const sum = rows.reduce((acc, r) => {
-            const v = r.cells[colIdx];
+            const v = getCellRawValue(r.cells[colIdx]);
             return acc + (typeof v === "number" ? v : 0);
           }, 0);
           return sum;
