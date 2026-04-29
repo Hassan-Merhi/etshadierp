@@ -386,7 +386,7 @@ export function FactorySidebar({ user }: { user?: any }) {
               </Badge>
             </a>
           )}
-          {isAdmin && (
+          {(isAdmin || isDeveloper) && (
             <FlatLink href="/factory/settings" icon={Settings} label="Settings" color="#6b7280" testId="link-factory-settings" />
           )}
           {isDeveloper && (
