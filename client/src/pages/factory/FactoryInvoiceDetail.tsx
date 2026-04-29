@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation, useRoute } from "wouter";
 import { useEscapeBack } from "@/hooks/use-escape-back";
-import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw, Container, Pencil, RotateCcw, Hammer, ChevronDown, GitCompare, DollarSign, ScanLine } from "lucide-react";
+import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw, Container, Pencil, RotateCcw, Hammer, ChevronDown, GitCompare, DollarSign, ScanLine, ArrowLeftRight } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,6 +48,8 @@ interface OrderLine {
 }
 
 interface OrderBale {
+  id: number;
+  baleId: number;
   baleReference: string;
   locationId: number;
   weight: number;
@@ -96,6 +98,8 @@ export default function FactoryInvoiceDetail() {
   const [revertDialogOpen, setRevertDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [baleRefArticle, setBaleRefArticle] = useState<{ code: string; name: string } | null>(null);
+  const [exchangeBale, setExchangeBale] = useState<{ orderBaleId: number; reference: string } | null>(null);
+  const [newRefInput, setNewRefInput] = useState("");
   const [showProformaDialog, setShowProformaDialog] = useState(false);
   const [selectedProformaId, setSelectedProformaId] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -275,6 +279,27 @@ export default function FactoryInvoiceDetail() {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
       setShowProformaDialog(false);
       setSelectedProformaId("");
+    },
+    onError: (error: any) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const exchangeMutation = useMutation({
+    mutationFn: async ({ orderBaleId, newBaleReference }: { orderBaleId: number; newBaleReference: string }) => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales/exchange`, { orderBaleId, newBaleReference });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to exchange bale");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Bale exchanged", description: `Replaced successfully.` });
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
+      setExchangeBale(null);
+      setNewRefInput("");
     },
     onError: (error: any) => {
       if (error?._handledGlobally) return;
@@ -843,29 +868,89 @@ export default function FactoryInvoiceDetail() {
             </DialogTitle>
           </DialogHeader>
           {baleRefArticle && (() => {
-            const refs = (order?.bales ?? [])
+            const balesForArticle = (order?.bales ?? [])
               .filter((b) => b.articleCode === baleRefArticle.code)
-              .map((b) => b.baleReference)
-              .sort();
-            return refs.length === 0 ? (
+              .sort((a, b) => a.baleReference.localeCompare(b.baleReference));
+            const canExchange = isAdmin && isFinalized;
+            return balesForArticle.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">No bale references found for this item.</p>
             ) : (
               <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">{refs.length} bale{refs.length !== 1 ? "s" : ""} loaded</p>
+                <p className="text-xs text-muted-foreground">
+                  {balesForArticle.length} bale{balesForArticle.length !== 1 ? "s" : ""} loaded
+                  {canExchange && <span className="ml-1">— click <ArrowLeftRight className="inline h-3 w-3" /> to exchange</span>}
+                </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {refs.map((ref) => (
+                  {balesForArticle.map((b) => (
                     <div
-                      key={ref}
-                      className="rounded-md border bg-muted/30 px-2.5 py-1.5 font-mono text-sm text-center"
-                      data-testid={`bale-ref-${ref}`}
+                      key={b.id}
+                      className="group relative rounded-md border bg-muted/30 px-2.5 py-1.5 font-mono text-sm text-center"
+                      data-testid={`bale-ref-${b.baleReference}`}
                     >
-                      {ref}
+                      {b.baleReference}
+                      {canExchange && (
+                        <button
+                          className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 bg-background border rounded-full p-0.5 hover-elevate transition-opacity"
+                          onClick={() => { setExchangeBale({ orderBaleId: b.id, reference: b.baleReference }); setNewRefInput(""); }}
+                          data-testid={`button-exchange-bale-${b.id}`}
+                          title="Exchange this bale for another"
+                        >
+                          <ArrowLeftRight className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Exchange Bale Dialog */}
+      <Dialog open={exchangeBale !== null} onOpenChange={(open) => { if (!open) { setExchangeBale(null); setNewRefInput(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base flex items-center gap-2">
+              <ArrowLeftRight className="h-4 w-4" />
+              Exchange Bale
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+              <span className="text-muted-foreground">Removing: </span>
+              <span className="font-mono font-medium">{exchangeBale?.reference}</span>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Replacement bale reference</label>
+              <Input
+                placeholder="e.g. REF12345"
+                value={newRefInput}
+                onChange={(e) => setNewRefInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newRefInput.trim() && exchangeBale) {
+                    exchangeMutation.mutate({ orderBaleId: exchangeBale.orderBaleId, newBaleReference: newRefInput.trim() });
+                  }
+                }}
+                data-testid="input-exchange-bale-ref"
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">The replacement bale must be in stock. Price is preserved.</p>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => { setExchangeBale(null); setNewRefInput(""); }} data-testid="button-cancel-exchange">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => { if (exchangeBale && newRefInput.trim()) exchangeMutation.mutate({ orderBaleId: exchangeBale.orderBaleId, newBaleReference: newRefInput.trim() }); }}
+                disabled={!newRefInput.trim() || exchangeMutation.isPending}
+                data-testid="button-confirm-exchange"
+              >
+                <ArrowLeftRight className="mr-2 h-4 w-4" />
+                {exchangeMutation.isPending ? "Exchanging…" : "Exchange"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
