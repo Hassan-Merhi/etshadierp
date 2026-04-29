@@ -38,7 +38,8 @@ import { format } from "date-fns";
 import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
-import { generateStockPdf } from "../helpers/generateStockPdf";
+import { generateStockPdf }   from "../helpers/generateStockPdf";
+import { generateInvoicePdf } from "../helpers/generateInvoicePdf";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
 import { sendWhatsAppTextToChatIdPos, sendWhatsAppFileToChatIdPos, sendWhatsAppFileByUrlToChatIdPos, sendWhatsAppFileByUploadPos } from "../services/whatsappService";
 import PDFDocument from "pdfkit";
@@ -166,6 +167,53 @@ export function registerPosRoutes(app: Express) {
       res.json({ success: true });
     } catch (error: any) {
       console.error("[/api/pos/send-stock-pdf-backend]", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Server-side invoice PDF → WhatsApp ────────────────────────────────────
+  app.post("/api/pos/send-invoice-pdf-backend", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { voucherId, locationId } = req.body;
+      if (!voucherId)  return res.status(400).json({ message: "voucherId is required" });
+      if (!locationId) return res.status(400).json({ message: "locationId is required" });
+
+      const locId = parseInt(locationId);
+      if (isNaN(locId)) return res.status(400).json({ message: "Invalid locationId" });
+
+      const [location] = await db
+        .select()
+        .from(locations)
+        .where(and(eq(locations.id, locId), eq(locations.companyId, companyId)))
+        .limit(1);
+
+      if (!location)                     return res.status(404).json({ message: "Location not found" });
+      if (!location.whatsappGroupChatId) return res.status(400).json({ message: "No WhatsApp group configured for this location" });
+
+      const pdfBuffer = await generateInvoicePdf(parseInt(voucherId), companyId);
+
+      const locName  = location.name;
+      const dateStr  = new Date().toISOString().slice(0, 10);
+      const safeName = `${locName} Invoice ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
+      const caption  = `${locName} — ${dateStr}`;
+
+      console.log(`[WA invoice backend] chatId=${location.whatsappGroupChatId} file=${safeName}.pdf size=${pdfBuffer.length}`);
+
+      const result = await sendWhatsAppFileToChatIdPos(
+        location.whatsappGroupChatId,
+        pdfBuffer,
+        `${safeName}.pdf`,
+        caption,
+      );
+
+      if (!result.success) return res.status(502).json({ message: result.error ?? "WhatsApp send failed" });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[/api/pos/send-invoice-pdf-backend]", error);
       res.status(500).json({ message: error.message });
     }
   });

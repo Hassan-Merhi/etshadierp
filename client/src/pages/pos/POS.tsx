@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { captureElementToPdf } from "@/lib/captureElementToPdf";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation, Redirect, Link } from "wouter";
@@ -139,6 +138,38 @@ async function sendWaPdfWithRetry(
     }
   }
   return { ok: false, message: lastMessage, attempts: maxAttempts };
+}
+
+// Server-side invoice PDF send — generates PDF on the backend
+async function sendInvoicePdfWithRetry(
+  voucherId: number,
+  locationId: number,
+  opts: { maxAttempts?: number; delayMs?: number; onAttempt?: (n: number) => void } = {},
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const maxAttempts = opts.maxAttempts ?? 3;
+  const delayMs     = opts.delayMs     ?? 2000;
+  let lastMessage   = "WhatsApp send failed";
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    opts.onAttempt?.(attempt);
+    try {
+      const res = await apiRequest("POST", "/api/pos/send-invoice-pdf-backend", { voucherId, locationId });
+      const respBody = await res.json().catch(() => ({}));
+      if (res.ok) return { ok: true };
+
+      lastMessage = respBody.message || `WhatsApp send failed (HTTP ${res.status})`;
+      if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
+        return { ok: false, message: lastMessage };
+      }
+    } catch (e: any) {
+      lastMessage = e?.message || "Network error";
+    }
+
+    if (attempt < maxAttempts) {
+      await new Promise(r => setTimeout(r, delayMs * attempt));
+    }
+  }
+  return { ok: false, message: lastMessage };
 }
 
 // Server-side stock PDF send — generates PDF on the backend (multi-page safe)
@@ -338,21 +369,15 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const stockPrintRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Tracks when the invoice print template DOM node is actually mounted.
-  // The template lives inside the AlertDialog portal, so printRef.current can be null
-  // on the very first effect run after showPrintDialog becomes true.
-  // Using a callback ref notifies React when the node mounts/unmounts so the
-  // auto-send effect re-fires once the DOM is ready.
-  const [printRefMounted, setPrintRefMounted] = useState(false);
+  // Callback ref so react-to-print gets notified when the invoice template mounts/unmounts
   const printCallbackRef = useCallback((el: HTMLDivElement | null) => {
     printRef.current = el;
-    setPrintRefMounted(!!el);
   }, []);
 
-  // Deferred WhatsApp invoice send — fires after print dialog renders
+  // Deferred WhatsApp invoice send — fires after sale is saved
   const [pendingAutoSend, setPendingAutoSend] = useState<{
-    locationId: number; locationName: string; companyName: string;
-    voucherNumber: string; voucherDate: string;
+    voucherId: number; locationId: number; locationName: string;
+    companyName: string; voucherNumber: string; voucherDate: string;
   } | null>(null);
 
   // Stock WhatsApp auto-send state
@@ -528,62 +553,40 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }
   }, [highlightedIndex, activeRow]);
 
-  // Fire deferred WhatsApp auto-send once print dialog has rendered (printRef mounted).
-  // Double-rAF ensures the invoice print template DOM is fully committed before capture.
+  // Invoice WhatsApp auto-send — backend generates the PDF server-side.
   useEffect(() => {
-    if (!pendingAutoSend || !showPrintDialog || !printRefMounted || !printRef.current) return;
+    if (!pendingAutoSend) return;
     const data = pendingAutoSend;
+    setPendingAutoSend(null);
 
-    let raf1: number, raf2: number;
-    let cancelled = false;
-
-    raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => {
-        if (cancelled || !printRef.current) return;
-        setPendingAutoSend(null);
-
-        const doSend = async () => {
-          setSendingInvoiceWhatsApp(true);
-          try {
-            const safeName = `${data.locationName} ${data.companyName} ${data.voucherDate} Invoice`
-              .replace(/[^\w\s.()\-]/g, "_").trim();
-            const pdfBase64 = await captureElementToPdf(printRef.current!);
-            const result = await sendWaPdfWithRetry(
-              {
-                pdfBase64,
-                locationId: data.locationId,
-                filename: `${safeName}.pdf`,
-                caption: `${data.locationName} — ${data.voucherDate}`,
-              },
-              {
-                onAttempt: (n) => {
-                  if (n > 1) {
-                    toast({ title: "Retrying…", description: `WhatsApp invoice send attempt ${n}/3.` });
-                  }
-                },
-              },
-            );
-            if (!result.ok) {
-              toast({ title: "WhatsApp", description: result.message, variant: "destructive" });
-            } else {
-              toast({ title: "WhatsApp", description: "Invoice sent to WhatsApp group." });
-            }
-          } catch (e: any) {
-            toast({ title: "WhatsApp", description: e.message || "Could not send invoice.", variant: "destructive" });
-          } finally {
-            setSendingInvoiceWhatsApp(false);
-          }
-        };
-        doSend();
-      });
-    });
-
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
+    const doSend = async () => {
+      setSendingInvoiceWhatsApp(true);
+      try {
+        const result = await sendInvoicePdfWithRetry(
+          data.voucherId,
+          data.locationId,
+          {
+            onAttempt: (n) => {
+              if (n > 1) {
+                toast({ title: "Retrying…", description: `WhatsApp invoice send attempt ${n}/3.` });
+              }
+            },
+          },
+        );
+        if (!result.ok) {
+          toast({ title: "WhatsApp", description: result.message, variant: "destructive" });
+        } else {
+          toast({ title: "WhatsApp", description: "Invoice sent to WhatsApp group." });
+        }
+      } catch (e: any) {
+        toast({ title: "WhatsApp", description: e.message || "Could not send invoice.", variant: "destructive" });
+      } finally {
+        setSendingInvoiceWhatsApp(false);
+      }
     };
-  }, [pendingAutoSend, showPrintDialog, printRefMounted]);
+    doSend();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAutoSend]);
 
   // Warn user about unsaved changes when leaving the page
   useEffect(() => {
@@ -679,6 +682,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           (data.location as any)?.whatsappGroupChatId;
         if (waGroupId && data.voucher?.id) {
           setPendingAutoSend({
+            voucherId:     data.voucher.id,
             locationId:    activeLocation?.id || data.location?.id,
             locationName:  activeLocation?.name || data.location?.name || "Location",
             companyName:   (selectedCompany as any)?.name || "",
@@ -852,22 +856,17 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   };
 
   const handleSendInvoiceWhatsApp = async () => {
-    if (!printRef.current) return;
+    const vId  = savedSale?.voucher?.id;
+    const locId = activeLocation?.id;
+    if (!vId || !locId) {
+      toast({ title: "Not ready", description: "No saved invoice to send.", variant: "destructive" });
+      return;
+    }
     setSendingInvoiceWhatsApp(true);
     try {
-      const locName  = activeLocation?.name || "Location";
-      const compName = (selectedCompany as any)?.name || "";
-      const vDate    = savedSale?.saleDate || new Date().toISOString().slice(0, 10);
-      const vNum     = savedSale?.voucher?.voucherNumber || String(savedSale?.voucher?.id ?? "");
-      const safeName = `${locName} ${compName} ${vDate} Invoice`.replace(/[^\w\s.()\-]/g, "_").trim();
-      const pdfBase64 = await captureElementToPdf(printRef.current);
-      const result = await sendWaPdfWithRetry(
-        {
-          pdfBase64,
-          locationId: activeLocation?.id,
-          filename: `${safeName}.pdf`,
-          caption: `${locName} — ${vDate}`,
-        },
+      const result = await sendInvoicePdfWithRetry(
+        vId,
+        locId,
         {
           onAttempt: (n) => {
             if (n > 1) {
