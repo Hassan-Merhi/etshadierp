@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { captureElementToPdf } from "@/lib/captureElementToPdf";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
@@ -272,6 +272,17 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const stockPrintRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Tracks when the invoice print template DOM node is actually mounted.
+  // The template lives inside the AlertDialog portal, so printRef.current can be null
+  // on the very first effect run after showPrintDialog becomes true.
+  // Using a callback ref notifies React when the node mounts/unmounts so the
+  // auto-send effect re-fires once the DOM is ready.
+  const [printRefMounted, setPrintRefMounted] = useState(false);
+  const printCallbackRef = useCallback((el: HTMLDivElement | null) => {
+    printRef.current = el;
+    setPrintRefMounted(!!el);
+  }, []);
+
   // Deferred WhatsApp invoice send — fires after print dialog renders
   const [pendingAutoSend, setPendingAutoSend] = useState<{
     locationId: number; locationName: string; companyName: string;
@@ -454,7 +465,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   // Fire deferred WhatsApp auto-send once print dialog has rendered (printRef mounted).
   // Double-rAF ensures the invoice print template DOM is fully committed before capture.
   useEffect(() => {
-    if (!pendingAutoSend || !showPrintDialog || !printRef.current) return;
+    if (!pendingAutoSend || !showPrintDialog || !printRefMounted || !printRef.current) return;
     const data = pendingAutoSend;
 
     let raf1: number, raf2: number;
@@ -498,7 +509,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
     };
-  }, [pendingAutoSend, showPrintDialog]);
+  }, [pendingAutoSend, showPrintDialog, printRefMounted]);
 
   // Warn user about unsaved changes when leaving the page
   useEffect(() => {
@@ -2535,7 +2546,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           
           {/* Invoice print template — off-screen so html2canvas can capture it */}
           <div style={{ position: 'fixed', top: '-99999px', left: '-99999px', width: '680px', pointerEvents: 'none', zIndex: -1 }}>
-            <div ref={printRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '8pt', padding: '8px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: 'normal', fontVariantNumeric: 'tabular-nums' }}>
+            <div ref={printCallbackRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '8pt', padding: '8px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: 'normal', fontVariantNumeric: 'tabular-nums' }}>
               <style dangerouslySetInnerHTML={{ __html: `
                 @media print {
                   body { font-family: Arial, Helvetica, sans-serif !important; }
