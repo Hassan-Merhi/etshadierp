@@ -43,15 +43,16 @@ import { sendWhatsAppTextToChatIdPos, sendWhatsAppFileToChatIdPos, sendWhatsAppF
 import PDFDocument from "pdfkit";
 import { randomUUID } from "crypto";
 
-// ── Temporary PDF store for WhatsApp sendFileByUrl ────────────────────────────
-const tempPdfStore = new Map<string, { buffer: Buffer; expiresAt: number }>();
-function storeTempPdf(buffer: Buffer): string {
+// ── Temporary file store for WhatsApp sendFileByUrl ──────────────────────────
+const tempPdfStore = new Map<string, { buffer: Buffer; expiresAt: number; contentType?: string; filename?: string }>();
+function storeTempFile(buffer: Buffer, contentType?: string, filename?: string): string {
   const id = randomUUID();
-  tempPdfStore.set(id, { buffer, expiresAt: Date.now() + 10 * 60 * 1000 });
-  // lazy cleanup
+  tempPdfStore.set(id, { buffer, expiresAt: Date.now() + 10 * 60 * 1000, contentType, filename });
   setTimeout(() => tempPdfStore.delete(id), 10 * 60 * 1000);
   return id;
 }
+// keep old name as alias
+const storeTempPdf = storeTempFile;
 
 
 export function registerPosRoutes(app: Express) {
@@ -59,10 +60,12 @@ export function registerPosRoutes(app: Express) {
   app.get("/api/pos/temp-pdf/:id", (req, res) => {
     const entry = tempPdfStore.get(req.params.id);
     if (!entry || entry.expiresAt < Date.now()) {
-      return res.status(404).json({ message: "PDF not found or expired" });
+      return res.status(404).json({ message: "File not found or expired" });
     }
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `inline; filename="stock_report.pdf"`);
+    const ct = entry.contentType ?? "application/pdf";
+    const fn = entry.filename ?? "stock_report.pdf";
+    res.setHeader("Content-Type", ct);
+    res.setHeader("Content-Disposition", `inline; filename="${fn}"`);
     res.send(entry.buffer);
   });
 
