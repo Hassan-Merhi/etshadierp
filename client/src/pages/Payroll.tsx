@@ -658,7 +658,7 @@ export default function Payroll() {
         code: selectedWorkerForEdit.code,
         monthlySalary: selectedWorkerForEdit.monthlySalary,
         department: selectedWorkerForEdit.department || "",
-        active: selectedWorkerForEdit.active,
+        active: selectedWorkerForEdit.active !== false,
       });
     }
   }, [selectedWorkerForEdit, editWorkerDialogOpen, editWorkerForm]);
@@ -1282,7 +1282,7 @@ export default function Payroll() {
         monthlySalary: editingEmployee.monthlySalary || "0",
         department: editingEmployee.department || "",
         joinDate: editingEmployee.joinDate || new Date().toLocaleDateString('en-CA'),
-        active: editingEmployee.active,
+        active: editingEmployee.active !== false,
         employeeGroupId: (editingEmployee as any).employeeGroupId?.toString() || "",
         salesBonusPct: editingEmployee.salesBonusPct != null ? String(editingEmployee.salesBonusPct) : "",
         salesBonusPctSourceCompanyId: (editingEmployee as any).salesBonusPctSourceCompanyId != null ? String((editingEmployee as any).salesBonusPctSourceCompanyId) : "",
