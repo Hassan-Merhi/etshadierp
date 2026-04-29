@@ -39,6 +39,8 @@ const ALLOWED_SHARED_PREFIXES = [
   "/api/orphaned-records",
   "/api/stock-group-archives",
   "/api/admin",
+  "/api/whatsapp",
+  "/api/my-erp-pages",
 ];
 
 function isAllowedFactoryPath(url: string): boolean {

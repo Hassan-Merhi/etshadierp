@@ -4681,3 +4681,30 @@ export const insertFactoryInvoiceLoadingBaleSchema = createInsertSchema(factoryI
 });
 export type FactoryInvoiceLoadingBale = typeof factoryInvoiceLoadingBales.$inferSelect;
 export type InsertFactoryInvoiceLoadingBale = z.infer<typeof insertFactoryInvoiceLoadingBaleSchema>;
+
+// ─── Factory Account WhatsApp Auto-Statement Rules ────────────────────────────
+// Each row configures automatic monthly-statement delivery for one ledger account.
+// Unique constraint: one rule per (companyId, ledgerAccountId).
+export const factoryAccountWhatsappRules = pgTable("factory_account_whatsapp_rules", {
+  id:               serial("id").primaryKey(),
+  companyId:        integer("company_id").notNull(),
+  ledgerAccountId:  integer("ledger_account_id").notNull(),
+  enabled:          boolean("enabled").notNull().default(false),
+  whatsappChatId:   text("whatsapp_chat_id"),
+  sendOnPayment:    boolean("send_on_payment").notNull().default(true),
+  sendOnReceipt:    boolean("send_on_receipt").notNull().default(true),
+  sendOnJournal:    boolean("send_on_journal").notNull().default(true),
+  createdAt:        timestamp("created_at").notNull().defaultNow(),
+  updatedAt:        timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueAccountRule: uniqueIndex("factory_account_wa_rules_unique").on(t.companyId, t.ledgerAccountId),
+  accountIdx:        index("factory_account_wa_rules_account_idx").on(t.ledgerAccountId),
+}));
+
+export const insertFactoryAccountWhatsappRuleSchema = createInsertSchema(factoryAccountWhatsappRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type FactoryAccountWhatsappRule = typeof factoryAccountWhatsappRules.$inferSelect;
+export type InsertFactoryAccountWhatsappRule = z.infer<typeof insertFactoryAccountWhatsappRuleSchema>;

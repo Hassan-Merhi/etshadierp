@@ -1046,12 +1046,15 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         return await res.json();
       }
     },
-    onSuccess: async () => {
+    onSuccess: async (data: any) => {
       const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Success",
         description: `${activeTab === "payment" ? "Payment" : "Receipt"} voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
+      if (data?.whatsapp?.sent) {
+        toast({ title: "Statement sent to WhatsApp" });
+      }
       discardPaymentDraft();
       
       // Invalidate only essential queries for faster saves
@@ -1725,12 +1728,15 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         return await res.json();
       }
     },
-    onSuccess: async () => {
+    onSuccess: async (data: any) => {
       const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Success",
         description: `Journal voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
+      if (data?.whatsapp?.sent) {
+        toast({ title: "Statement sent to WhatsApp" });
+      }
       discardJournalDraft();
       
       // Invalidate only essential queries for faster saves

@@ -49,7 +49,12 @@ import {
   RotateCcw,
   History,
   ArrowUpRight,
+  MessageCircle,
+  Send,
+  Loader2,
+  CheckCircle2,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -295,6 +300,95 @@ export default function Accounts() {
     queryKey: ["/api/accounts/all", selectedCompany?.id],
     enabled: !!selectedCompany,
   });
+
+  // ── WhatsApp auto-statement rule ──────────────────────────────────────────
+  interface WaRule {
+    id?: number;
+    enabled: boolean;
+    whatsappChatId: string;
+    sendOnPayment: boolean;
+    sendOnReceipt: boolean;
+    sendOnJournal: boolean;
+  }
+  interface WaChat { id: string; name: string; type: string; }
+
+  const [waRuleDialogOpen, setWaRuleDialogOpen] = useState(false);
+  const [waChatSearch, setWaChatSearch]         = useState("");
+  const [waRuleDraft, setWaRuleDraft]           = useState<WaRule>({
+    enabled: false, whatsappChatId: "", sendOnPayment: true, sendOnReceipt: true, sendOnJournal: false,
+  });
+
+  const ledgerAccountId =
+    selectedAccount?.type === "ledger" ? selectedAccount.accountId : null;
+
+  const { data: waRule, refetch: refetchWaRule } = useQuery<WaRule>({
+    queryKey: ["/api/factory/accounts", ledgerAccountId, "whatsapp-rule"],
+    queryFn: async () => {
+      if (!ledgerAccountId) return null as any;
+      const r = await modeApiRequest("GET", `/api/factory/accounts/${ledgerAccountId}/whatsapp-rule`);
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    enabled: appMode === "factory" && !!ledgerAccountId,
+    staleTime: 30_000,
+  });
+
+  const { data: waChats = [], isLoading: waChatsLoading } = useQuery<WaChat[]>({
+    queryKey: ["/api/whatsapp/chats/pos"],
+    queryFn: async () => {
+      const r = await modeApiRequest("GET", "/api/whatsapp/chats/pos");
+      if (!r.ok) throw new Error("Failed to load chats");
+      return r.json();
+    },
+    enabled: waRuleDialogOpen,
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const saveWaRuleMutation = useMutation({
+    mutationFn: async (rule: WaRule) => {
+      const r = await modeApiRequest("PUT", `/api/factory/accounts/${ledgerAccountId}/whatsapp-rule`, rule);
+      if (!r.ok) throw new Error("Failed to save rule");
+      return r.json();
+    },
+    onSuccess: () => {
+      refetchWaRule();
+      setWaRuleDialogOpen(false);
+      toast({ title: "WhatsApp rule saved" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const sendWaStatementMutation = useMutation({
+    mutationFn: async () => {
+      const r = await modeApiRequest("POST", `/api/factory/accounts/${ledgerAccountId}/send-statement-whatsapp`, {
+        startDate: periodFilter.fromDate,
+        endDate: periodFilter.toDate,
+        lang: "en",
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || "Failed to send");
+      return data;
+    },
+    onSuccess: () => toast({ title: "Statement sent to WhatsApp" }),
+    onError: (e: Error) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
+  });
+
+  // Open WA rule dialog: seed draft from current rule
+  function openWaRuleDialog() {
+    setWaRuleDraft(
+      waRule
+        ? { ...waRule }
+        : { enabled: false, whatsappChatId: "", sendOnPayment: true, sendOnReceipt: true, sendOnJournal: false }
+    );
+    setWaChatSearch("");
+    setWaRuleDialogOpen(true);
+  }
+
+  const filteredWaChats = waChats.filter(
+    (c) => c.name.toLowerCase().includes(waChatSearch.toLowerCase())
+  );
+  // ─────────────────────────────────────────────────────────────────────────
 
   // Filter out inventory accounts - they have their own dedicated page
   // Filter out supplier accounts - they have their own dedicated Suppliers page
@@ -1993,6 +2087,36 @@ export default function Accounts() {
                         })()}
                       </div>
                       <div className="md:col-span-2 flex justify-end gap-2 flex-wrap">
+                        {/* WhatsApp buttons — factory mode + ledger accounts only */}
+                        {appMode === "factory" && selectedAccount?.type === "ledger" && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => sendWaStatementMutation.mutate()}
+                              disabled={sendWaStatementMutation.isPending || !waRule?.enabled || !waRule?.whatsappChatId}
+                              title={!waRule?.enabled || !waRule?.whatsappChatId ? "Configure WhatsApp first" : "Send statement to WhatsApp now"}
+                              data-testid="button-send-whatsapp-statement"
+                            >
+                              {sendWaStatementMutation.isPending
+                                ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                : <Send className="w-4 h-4 mr-2" />}
+                              Send to WhatsApp
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={openWaRuleDialog}
+                              data-testid="button-whatsapp-settings"
+                            >
+                              <MessageCircle className="w-4 h-4 mr-2" />
+                              WhatsApp
+                              {waRule?.enabled && waRule?.whatsappChatId && (
+                                <CheckCircle2 className="w-3.5 h-3.5 ml-1.5 text-green-600" />
+                              )}
+                            </Button>
+                          </>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -3574,6 +3698,114 @@ export default function Accounts() {
         onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
         onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
       />
+
+      {/* ── WhatsApp Auto-Statement Settings Dialog ── */}
+      <Dialog open={waRuleDialogOpen} onOpenChange={setWaRuleDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="w-5 h-5" />
+              WhatsApp Statement Settings
+            </DialogTitle>
+            <DialogDescription>
+              Automatically send a monthly PDF statement to a WhatsApp group whenever a voucher is saved for{" "}
+              <span className="font-medium">{selectedAccount?.name}</span>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 py-2">
+            {/* Enable toggle */}
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Enable auto-statement</Label>
+              <Switch
+                checked={waRuleDraft.enabled}
+                onCheckedChange={(v) => setWaRuleDraft((d) => ({ ...d, enabled: v }))}
+                data-testid="switch-wa-enabled"
+              />
+            </div>
+
+            {/* Target chat */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Target WhatsApp group / chat</Label>
+              <Input
+                placeholder="Search chats..."
+                value={waChatSearch}
+                onChange={(e) => setWaChatSearch(e.target.value)}
+                data-testid="input-wa-chat-search"
+              />
+              <div className="border rounded-md max-h-44 overflow-y-auto text-sm">
+                {waChatsLoading && (
+                  <p className="text-muted-foreground text-center py-4">Loading chats…</p>
+                )}
+                {!waChatsLoading && filteredWaChats.length === 0 && (
+                  <p className="text-muted-foreground text-center py-4">No chats found</p>
+                )}
+                {filteredWaChats.map((chat) => (
+                  <button
+                    key={chat.id}
+                    type="button"
+                    onClick={() => setWaRuleDraft((d) => ({ ...d, whatsappChatId: chat.id }))}
+                    className={`w-full text-left px-3 py-2 hover-elevate transition-colors ${
+                      waRuleDraft.whatsappChatId === chat.id
+                        ? "bg-primary/10 text-primary font-medium"
+                        : ""
+                    }`}
+                    data-testid={`option-wa-chat-${chat.id}`}
+                  >
+                    <div className="font-medium">{chat.name}</div>
+                    <div className="text-xs text-muted-foreground">{chat.type}</div>
+                  </button>
+                ))}
+              </div>
+              {waRuleDraft.whatsappChatId && (
+                <p className="text-xs text-muted-foreground">
+                  Selected: <span className="font-medium">{
+                    waChats.find((c) => c.id === waRuleDraft.whatsappChatId)?.name ?? waRuleDraft.whatsappChatId
+                  }</span>
+                </p>
+              )}
+            </div>
+
+            {/* Trigger toggles */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Send on voucher type</Label>
+              <div className="space-y-2">
+                {(
+                  [
+                    { key: "sendOnPayment", label: "Payment voucher" },
+                    { key: "sendOnReceipt", label: "Receipt voucher" },
+                    { key: "sendOnJournal", label: "Journal voucher" },
+                  ] as const
+                ).map(({ key, label }) => (
+                  <div key={key} className="flex items-center justify-between">
+                    <Label className="text-sm text-muted-foreground">{label}</Label>
+                    <Switch
+                      checked={waRuleDraft[key]}
+                      onCheckedChange={(v) => setWaRuleDraft((d) => ({ ...d, [key]: v }))}
+                      data-testid={`switch-${key}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setWaRuleDialogOpen(false)} data-testid="button-wa-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => saveWaRuleMutation.mutate(waRuleDraft)}
+              disabled={saveWaRuleMutation.isPending}
+              data-testid="button-wa-save"
+            >
+              {saveWaRuleMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
+              ) : "Save Rule"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
