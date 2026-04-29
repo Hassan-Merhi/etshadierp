@@ -49,6 +49,10 @@ import path from "path";
 import fs from "fs";
 
 import { registerVoucherEntryRoutes } from "./voucherEntryRoutes";
+import { recalculateOrderTotals } from "./factory/_helpers";
+import {
+  customerOrderCharges, customerOrders, customerOrderBales, customerOrderLines,
+} from "@shared/schema";
 
 export function registerVoucherRoutes(app: Express) {
   app.get("/api/vouchers", requireAuth, async (req, res) => {
@@ -3289,6 +3293,35 @@ export function registerVoucherRoutes(app: Express) {
           voucherType: { old: existingVoucher.voucherType, new: updatedVoucher.voucherType },
         },
       });
+
+      // ── CHARGE voucher sync ──────────────────────────────────────────────
+      // If this voucher was auto-created during invoice finalization (number
+      // format: CHARGE-{invoiceNumber}-{chargeId}-{timestamp}), sync the new
+      // amount back to customer_order_charges and recalculate the invoice totals.
+      const chargeMatch = existingVoucher.voucherNumber?.match(/^CHARGE-.+-(\d+)-\d+$/);
+      if (chargeMatch && existingVoucher.sourceModule === "FACTORY") {
+        const chargeId = parseInt(chargeMatch[1]);
+        const newAmount = Math.max(totalDebits, totalCredits);
+        const [charge] = await db.select({ orderId: customerOrderCharges.orderId })
+          .from(customerOrderCharges).where(eq(customerOrderCharges.id, chargeId));
+        if (charge) {
+          await db.update(customerOrderCharges)
+            .set({ amount: String(newAmount) })
+            .where(eq(customerOrderCharges.id, chargeId));
+          await recalculateOrderTotals(db, charge.orderId);
+          // Also update the customer balance ledger debit for this invoice
+          const [updatedOrd] = await db.select({ grandTotal: customerOrders.grandTotal, status: customerOrders.status })
+            .from(customerOrders).where(eq(customerOrders.id, charge.orderId));
+          if (updatedOrd?.status === "FINALIZED") {
+            await db.update(customerBalances)
+              .set({ debitAmount: String(updatedOrd.grandTotal), balance: String(updatedOrd.grandTotal) })
+              .where(and(
+                eq(customerBalances.referenceId, charge.orderId),
+                eq(customerBalances.referenceType, "INVOICE"),
+              ));
+          }
+        }
+      }
 
       const result = { voucher: updatedVoucher, entries: createdEntries };
 
