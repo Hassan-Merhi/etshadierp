@@ -20,6 +20,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ScanLine, ArrowLeft, Play, CheckCircle, XCircle, Trash2,
   FileDown, FileSpreadsheet, AlertTriangle, Package, Truck, RotateCcw,
 } from "lucide-react";
@@ -146,6 +149,9 @@ export default function FactoryInvoiceLoadingScan() {
   // ── Cancel dialog ──
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+
+  // ── Bale refs dialog ──
+  const [baleRefLine, setBaleRefLine] = useState<{ code: string; name: string } | null>(null);
 
   // ── Data ──
   const summaryKey = [`/api/factory/invoices/${invoiceId}/loading-summary`, activeSessionId];
@@ -422,7 +428,16 @@ export default function FactoryInvoiceLoadingScan() {
                   {pendingLines.map((line) => (
                     <TableRow key={line.lineId} data-testid={`row-line-${line.lineId}`}>
                       <TableCell className="font-mono text-xs">{line.articleCode}</TableCell>
-                      <TableCell className="text-sm">{line.productName}</TableCell>
+                      <TableCell className="text-sm">
+                        <button
+                          className="text-left hover-elevate rounded-md px-1 -mx-1 py-0.5 font-medium underline-offset-2 hover:underline"
+                          onClick={() => setBaleRefLine({ code: line.articleCode, name: line.productName })}
+                          data-testid={`button-scan-bale-refs-${line.lineId}`}
+                          title="Click to see all reference numbers"
+                        >
+                          {line.productName}
+                        </button>
+                      </TableCell>
                       <TableCell className="text-right text-sm">{line.invoiceQty}</TableCell>
                       <TableCell className="text-right text-sm text-green-700 dark:text-green-400">{line.alreadyLoaded}</TableCell>
                       {activeSessionId && (
@@ -842,6 +857,60 @@ export default function FactoryInvoiceLoadingScan() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bale References Dialog */}
+      <Dialog open={baleRefLine !== null} onOpenChange={(open) => { if (!open) setBaleRefLine(null); }}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base">
+              {baleRefLine?.name}
+              <span className="ml-2 font-mono text-sm text-muted-foreground">({baleRefLine?.code})</span>
+            </DialogTitle>
+          </DialogHeader>
+          {baleRefLine && (() => {
+            const bales = (summary?.invoiceBales ?? [])
+              .filter((b) => b.articleCode === baleRefLine.code)
+              .sort((a, b) => a.baleReference.localeCompare(b.baleReference));
+            if (bales.length === 0) {
+              return <p className="text-sm text-muted-foreground py-4 text-center">No bale references found for this item.</p>;
+            }
+            const loaded = bales.filter((b) => b.loaded);
+            const pending = bales.filter((b) => !b.loaded);
+            return (
+              <div className="space-y-4">
+                <p className="text-xs text-muted-foreground">
+                  {bales.length} total · <span className="text-green-700 dark:text-green-400">{loaded.length} loaded</span>
+                  {pending.length > 0 && <> · <span className="text-amber-700 dark:text-amber-400">{pending.length} pending</span></>}
+                </p>
+                {loaded.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Loaded</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {loaded.map((b) => (
+                        <div key={b.baleId} className="rounded-md border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 px-2.5 py-1.5 font-mono text-sm text-center text-green-800 dark:text-green-300">
+                          {b.baleReference}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {pending.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Not Yet Loaded</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {pending.map((b) => (
+                        <div key={b.baleId} className="rounded-md border bg-muted/30 px-2.5 py-1.5 font-mono text-sm text-center">
+                          {b.baleReference}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

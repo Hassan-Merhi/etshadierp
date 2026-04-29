@@ -95,6 +95,7 @@ export default function FactoryInvoiceDetail() {
   const [editValue, setEditValue] = useState("");
   const [revertDialogOpen, setRevertDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [baleRefArticle, setBaleRefArticle] = useState<{ code: string; name: string } | null>(null);
   const [showProformaDialog, setShowProformaDialog] = useState(false);
   const [selectedProformaId, setSelectedProformaId] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -654,7 +655,14 @@ export default function FactoryInvoiceDetail() {
                     {line.articleCode}
                   </TableCell>
                   <TableCell data-testid={`text-bale-name-${idx}`}>
-                    {line.baleName}
+                    <button
+                      className="text-left hover-elevate rounded-md px-1 -mx-1 py-0.5 font-medium underline-offset-2 hover:underline"
+                      onClick={() => setBaleRefArticle({ code: line.articleCode, name: line.baleName })}
+                      data-testid={`button-bale-refs-${idx}`}
+                      title="Click to see all reference numbers"
+                    >
+                      {line.baleName}
+                    </button>
                   </TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-qty-${idx}`}>
                     {line.qty}
@@ -822,6 +830,42 @@ export default function FactoryInvoiceDetail() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bale References Dialog */}
+      <Dialog open={baleRefArticle !== null} onOpenChange={(open) => { if (!open) setBaleRefArticle(null); }}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base">
+              {baleRefArticle?.name}
+              <span className="ml-2 font-mono text-sm text-muted-foreground">({baleRefArticle?.code})</span>
+            </DialogTitle>
+          </DialogHeader>
+          {baleRefArticle && (() => {
+            const refs = (order?.bales ?? [])
+              .filter((b) => b.articleCode === baleRefArticle.code)
+              .map((b) => b.baleReference)
+              .sort();
+            return refs.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No bale references found for this item.</p>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">{refs.length} bale{refs.length !== 1 ? "s" : ""} loaded</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {refs.map((ref) => (
+                    <div
+                      key={ref}
+                      className="rounded-md border bg-muted/30 px-2.5 py-1.5 font-mono text-sm text-center"
+                      data-testid={`bale-ref-${ref}`}
+                    >
+                      {ref}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>
