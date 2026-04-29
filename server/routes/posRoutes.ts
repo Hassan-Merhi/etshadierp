@@ -146,8 +146,7 @@ export function registerPosRoutes(app: Express) {
       const companyName = company?.name || "Company";
       const locName     = location.name;
 
-      const isPosUser = (req.user?.role ?? "").startsWith("POS");
-      const pdfBuffer = await generateStockPdf(companyId, companyName, locId, locName, isPosUser);
+      const pdfBuffer = await generateStockPdf(companyId, companyName, locId, locName);
 
       const dateStr  = new Date().toISOString().slice(0, 10);
       const safeName = `${locName} STK ${companyName} ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
