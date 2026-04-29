@@ -451,36 +451,53 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }
   }, [highlightedIndex, activeRow]);
 
-  // Fire deferred WhatsApp auto-send once print dialog has rendered (printRef mounted)
+  // Fire deferred WhatsApp auto-send once print dialog has rendered (printRef mounted).
+  // Double-rAF ensures the invoice print template DOM is fully committed before capture.
   useEffect(() => {
     if (!pendingAutoSend || !showPrintDialog || !printRef.current) return;
     const data = pendingAutoSend;
-    setPendingAutoSend(null);
-    const doSend = async () => {
-      setSendingInvoiceWhatsApp(true);
-      try {
-        const safeName = `${data.locationName} ${data.companyName} ${data.voucherDate} Invoice ${data.voucherNumber}`
-          .replace(/[^\w\s.()\-]/g, "_").trim();
-        const pdfBase64 = await captureElementToPdf(printRef.current!);
-        const res = await apiRequest("POST", "/api/pos/send-whatsapp-pdf-upload", {
-          pdfBase64,
-          locationId: data.locationId,
-          filename: `${safeName}.pdf`,
-          caption: `${data.locationName} — ${data.voucherNumber}`,
-        });
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          toast({ title: "WhatsApp", description: body.message || "Invoice send failed.", variant: "destructive" });
-        } else {
-          toast({ title: "WhatsApp", description: "Invoice sent to WhatsApp group." });
-        }
-      } catch (e: any) {
-        toast({ title: "WhatsApp", description: e.message || "Could not send invoice.", variant: "destructive" });
-      } finally {
-        setSendingInvoiceWhatsApp(false);
-      }
+
+    let raf1: number, raf2: number;
+    let cancelled = false;
+
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        if (cancelled || !printRef.current) return;
+        setPendingAutoSend(null);
+
+        const doSend = async () => {
+          setSendingInvoiceWhatsApp(true);
+          try {
+            const safeName = `${data.locationName} ${data.companyName} ${data.voucherDate} Invoice ${data.voucherNumber}`
+              .replace(/[^\w\s.()\-]/g, "_").trim();
+            const pdfBase64 = await captureElementToPdf(printRef.current!);
+            const res = await apiRequest("POST", "/api/pos/send-whatsapp-pdf-upload", {
+              pdfBase64,
+              locationId: data.locationId,
+              filename: `${safeName}.pdf`,
+              caption: `${data.locationName} — ${data.voucherNumber}`,
+            });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              toast({ title: "WhatsApp", description: body.message || "Invoice send failed.", variant: "destructive" });
+            } else {
+              toast({ title: "WhatsApp", description: "Invoice sent to WhatsApp group." });
+            }
+          } catch (e: any) {
+            toast({ title: "WhatsApp", description: e.message || "Could not send invoice.", variant: "destructive" });
+          } finally {
+            setSendingInvoiceWhatsApp(false);
+          }
+        };
+        doSend();
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
     };
-    doSend();
   }, [pendingAutoSend, showPrintDialog]);
 
   // Warn user about unsaved changes when leaving the page
@@ -674,40 +691,75 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   // Stock inventory query — prefetch when invoice dialog is open so it's ready for the stock prompt
   const printLocationId = activeLocation?.id ?? (editVoucher as any)?.locationId ?? null;
-  const { data: stockInventory = [], isLoading: stockInventoryLoading } = useQuery<any[]>({
+  const {
+    data: stockInventory = [],
+    isLoading: stockInventoryLoading,
+    isFetched: stockInventoryFetched,
+    isFetching: stockInventoryFetching,
+  } = useQuery<any[]>({
     queryKey: [`/api/locations/${printLocationId}/inventory`],
     enabled: (showPrintDialog || showStockPrompt) && !!printLocationId,
   });
 
-  // Deferred stock auto-send — fires after print dialog renders AND inventory query resolves
+  // Deferred stock auto-send — fires only after the inventory fetch fully completes AND
+  // the stock print DOM has been flushed with the new data (double-rAF guard).
   useEffect(() => {
-    if (!pendingStockSend || !showPrintDialog || stockInventoryLoading || !stockPrintRef.current) return;
-    setPendingStockSend(false);
-    const doSend = async () => {
-      setStockWaStatus("sending");
-      try {
+    // isFetching covers both initial load and background refetches (e.g. after invalidateQueries).
+    // isFetched ensures at least one fetch has completed before we attempt a capture.
+    if (
+      !pendingStockSend ||
+      !showPrintDialog ||
+      stockInventoryFetching ||
+      !stockInventoryFetched ||
+      !stockPrintRef.current
+    ) return;
+
+    let raf1: number, raf2: number;
+    let cancelled = false;
+
+    // Double requestAnimationFrame: lets React commit DOM updates with the fetched
+    // stockInventory data before html2canvas reads the DOM.
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        if (cancelled || !stockPrintRef.current) return;
+
+        setPendingStockSend(false);
+
         const locName  = activeLocation?.name || "Location";
         const compName = (selectedCompany as any)?.name || "";
         const dateStr  = new Date().toISOString().slice(0, 10);
         const safeName = `${locName} STK ${compName} ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
-        const pdfBase64 = await captureElementToPdf(stockPrintRef.current!);
-        const res = await apiRequest("POST", "/api/pos/send-whatsapp-pdf-upload", {
-          pdfBase64,
-          locationId: activeLocation?.id,
-          filename: `${safeName}.pdf`,
-          caption: `Stock Report — ${locName}`,
-        });
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(body.message || "Stock send failed");
-        setStockWaStatus("sent");
-        toast({ title: "Stock sent", description: "Stock report sent to WhatsApp group." });
-      } catch (e: any) {
-        setStockWaStatus("failed");
-        toast({ title: "Stock send failed", description: e.message || "Could not send stock report.", variant: "destructive" });
-      }
+
+        const doSend = async () => {
+          setStockWaStatus("sending");
+          try {
+            const pdfBase64 = await captureElementToPdf(stockPrintRef.current!);
+            const res = await apiRequest("POST", "/api/pos/send-whatsapp-pdf-upload", {
+              pdfBase64,
+              locationId: activeLocation?.id,
+              filename: `${safeName}.pdf`,
+              caption: `Stock Report — ${locName}`,
+            });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.message || "Stock send failed");
+            setStockWaStatus("sent");
+            toast({ title: "Stock sent", description: "Stock report sent to WhatsApp group." });
+          } catch (e: any) {
+            setStockWaStatus("failed");
+            toast({ title: "Stock send failed", description: e.message || "Could not send stock report.", variant: "destructive" });
+          }
+        };
+        doSend();
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
     };
-    doSend();
-  }, [pendingStockSend, showPrintDialog, stockInventoryLoading]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingStockSend, showPrintDialog, stockInventoryFetching, stockInventoryFetched]);
 
   const handleStockPrint = useReactToPrint({
     contentRef: stockPrintRef,
