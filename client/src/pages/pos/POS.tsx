@@ -479,14 +479,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         const doSend = async () => {
           setSendingInvoiceWhatsApp(true);
           try {
-            const safeName = `${data.locationName} ${data.companyName} ${data.voucherDate} Invoice ${data.voucherNumber}`
+            const safeName = `${data.locationName} ${data.companyName} ${data.voucherDate} Invoice`
               .replace(/[^\w\s.()\-]/g, "_").trim();
             const pdfBase64 = await captureElementToPdf(printRef.current!);
             const res = await apiRequest("POST", "/api/pos/send-whatsapp-pdf-upload", {
               pdfBase64,
               locationId: data.locationId,
               filename: `${safeName}.pdf`,
-              caption: `${data.locationName} — ${data.voucherNumber}`,
+              caption: `${data.locationName} — ${data.voucherDate}`,
             });
             const body = await res.json().catch(() => ({}));
             if (!res.ok) {
@@ -816,13 +816,13 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       const compName = (selectedCompany as any)?.name || "";
       const vDate    = savedSale?.saleDate || new Date().toISOString().slice(0, 10);
       const vNum     = savedSale?.voucher?.voucherNumber || String(savedSale?.voucher?.id ?? "");
-      const safeName = `${locName} ${compName} ${vDate} Invoice ${vNum}`.replace(/[^\w\s.()\-]/g, "_").trim();
+      const safeName = `${locName} ${compName} ${vDate} Invoice`.replace(/[^\w\s.()\-]/g, "_").trim();
       const pdfBase64 = await captureElementToPdf(printRef.current);
       const res = await apiRequest("POST", "/api/pos/send-whatsapp-pdf-upload", {
         pdfBase64,
         locationId: activeLocation?.id,
         filename: `${safeName}.pdf`,
-        caption: `${locName} — ${vNum}`,
+        caption: `${locName} — ${vDate}`,
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
