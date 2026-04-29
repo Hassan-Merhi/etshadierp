@@ -86,6 +86,7 @@ export default function FactoryInvoiceCreate() {
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [orderDate, setOrderDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [chargeLedgerAccountId, setChargeLedgerAccountId] = useState<string>("");
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [orderId, setOrderId] = useState<number | null>(null);
   const [scanCode, setScanCode] = useState("");
@@ -104,6 +105,10 @@ export default function FactoryInvoiceCreate() {
 
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
+  });
+
+  const { data: ledgerAccounts = [] } = useQuery<{ id: number; name: string; code: string }[]>({
+    queryKey: ["/api/ledger-accounts"],
   });
 
   const { data: proformas = [] } = useQuery<Proforma[]>({
@@ -172,13 +177,14 @@ export default function FactoryInvoiceCreate() {
   });
 
   const addChargeMutation = useMutation({
-    mutationFn: async (data: { name: string; amount: number; chargeType: string }) => {
+    mutationFn: async (data: { name: string; amount: number; chargeType: string; ledgerAccountId?: number }) => {
       await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/charges`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       setChargeName("");
       setChargeAmount("");
+      setChargeLedgerAccountId("");
       toast({ title: "Charge added" });
     },
     onError: (error: Error) => {
@@ -269,8 +275,9 @@ export default function FactoryInvoiceCreate() {
       name,
       amount: parseFloat(chargeAmount),
       chargeType,
+      ...(chargeLedgerAccountId ? { ledgerAccountId: parseInt(chargeLedgerAccountId) } : {}),
     });
-  }, [chargeAmount, chargeName, chargeType, orderId, addChargeMutation]);
+  }, [chargeAmount, chargeName, chargeType, chargeLedgerAccountId, orderId, addChargeMutation]);
 
   const bales = orderDetail?.bales || [];
   const charges = orderDetail?.charges || [];
@@ -524,6 +531,17 @@ export default function FactoryInvoiceCreate() {
                   data-testid="input-charge-name"
                 />
               )}
+
+              <Select value={chargeLedgerAccountId} onValueChange={setChargeLedgerAccountId}>
+                <SelectTrigger data-testid="select-charge-ledger-account">
+                  <SelectValue placeholder="Ledger account (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ledgerAccounts.map((acc) => (
+                    <SelectItem key={acc.id} value={String(acc.id)}>{acc.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               <div className="flex items-center gap-2">
                 <Input

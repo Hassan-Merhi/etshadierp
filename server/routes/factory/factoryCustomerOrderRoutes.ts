@@ -1147,6 +1147,42 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
     }
   });
 
+  app.patch("/api/factory/customer-orders/:id/charges/:chargeId", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const chargeId = parseInt(req.params.chargeId);
+
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+
+      const { ledgerAccountId, amount, name } = req.body;
+      const updateData: Record<string, unknown> = {};
+      if (ledgerAccountId !== undefined) updateData.ledgerAccountId = ledgerAccountId ? parseInt(ledgerAccountId) : null;
+      if (amount !== undefined) updateData.amount = parseFloat(amount).toFixed(2);
+      if (name !== undefined) updateData.name = name;
+
+      if (Object.keys(updateData).length === 0) return res.status(400).json({ message: "Nothing to update" });
+
+      await db.update(customerOrderCharges)
+        .set(updateData)
+        .where(and(eq(customerOrderCharges.orderId, orderId), eq(customerOrderCharges.id, chargeId)));
+
+      await recalculateOrderTotals(db, orderId);
+
+      const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
+      const updatedCharges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+
+      res.json({ ...updatedOrder, charges: updatedCharges });
+    } catch (error: any) {
+      console.error("[PATCH charge]", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/factory/customer-orders/:id/charges/:chargeId", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;

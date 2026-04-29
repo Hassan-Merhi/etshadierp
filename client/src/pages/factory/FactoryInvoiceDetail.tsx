@@ -94,6 +94,7 @@ export default function FactoryInvoiceDetail() {
   const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
   const [editingArticleCode, setEditingArticleCode] = useState<string | null>(null);
+  const [editingChargeLedger, setEditingChargeLedger] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
   const [revertDialogOpen, setRevertDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -114,6 +115,24 @@ export default function FactoryInvoiceDetail() {
   const { data: order, isLoading } = useQuery<OrderDetail>({
     queryKey: [`/api/factory/customer-orders/${orderId}`],
     enabled: !!orderId,
+  });
+
+  const { data: ledgerAccounts = [] } = useQuery<{ id: number; name: string; code: string }[]>({
+    queryKey: ["/api/ledger-accounts"],
+  });
+
+  const updateChargeLedgerMutation = useMutation({
+    mutationFn: async ({ chargeId, ledgerAccountId }: { chargeId: number; ledgerAccountId: number | null }) => {
+      const res = await modeApiRequest("PATCH", `/api/factory/customer-orders/${orderId}/charges/${chargeId}`, { ledgerAccountId });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to update charge");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
+      setEditingChargeLedger(null);
+      toast({ title: "Ledger account updated" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const { data: myAccess } = useQuery<{ hiddenCostFields: string[] }>({
@@ -770,23 +789,50 @@ export default function FactoryInvoiceDetail() {
       {isAdmin && (freightCharges.length > 0 || otherCharges.length > 0) && (
         <Card className={`p-4 mb-6${hideExportSelling ? " print:hidden" : ""}`}>
           <h3 className="font-semibold mb-3" data-testid="text-charges-header">Freight &amp; Charges</h3>
-          <div className="space-y-2">
-            {freightCharges.map((charge, idx) => (
-              <div key={`freight-${charge.name ?? idx}`} className="flex items-center justify-between gap-2" data-testid={`row-freight-charge-${idx}`}>
-                <span className="text-sm">{charge.name}</span>
-                <span className="font-mono text-sm" data-testid={`text-freight-amount-${idx}`}>
-                  {Number(charge.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-            ))}
-            {otherCharges.map((charge, idx) => (
-              <div key={`other-${charge.name ?? idx}`} className="flex items-center justify-between gap-2" data-testid={`row-other-charge-${idx}`}>
-                <span className="text-sm">{charge.name}</span>
-                <span className="font-mono text-sm" data-testid={`text-other-amount-${idx}`}>
-                  {Number(charge.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-            ))}
+          <div className="space-y-3">
+            {[...freightCharges, ...otherCharges].map((charge, idx) => {
+              const linkedAccount = ledgerAccounts.find(a => a.id === charge.ledgerAccountId);
+              const isEditing = editingChargeLedger === charge.id;
+              return (
+                <div key={charge.id} className="space-y-1" data-testid={`row-charge-${idx}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm">{charge.name}</span>
+                    <span className="font-mono text-sm">
+                      {Number(charge.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  {isEditing ? (
+                    <div className="flex items-center gap-2 print:hidden">
+                      <Select
+                        value={String(charge.ledgerAccountId ?? "")}
+                        onValueChange={(val) => updateChargeLedgerMutation.mutate({ chargeId: charge.id, ledgerAccountId: val ? parseInt(val) : null })}
+                      >
+                        <SelectTrigger className="h-8 text-xs flex-1" data-testid={`select-charge-ledger-${charge.id}`}>
+                          <SelectValue placeholder="Select ledger account..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ledgerAccounts.map(acc => (
+                            <SelectItem key={acc.id} value={String(acc.id)}>{acc.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button size="sm" variant="ghost" onClick={() => setEditingChargeLedger(null)} data-testid={`button-cancel-charge-ledger-${charge.id}`}>Cancel</Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 print:hidden">
+                      {linkedAccount ? (
+                        <Badge variant="secondary" className="text-xs">{linkedAccount.name}</Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No ledger account</span>
+                      )}
+                      <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => setEditingChargeLedger(charge.id)} data-testid={`button-edit-charge-ledger-${charge.id}`}>
+                        <Pencil className="h-3 w-3 mr-1" />Link
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}
