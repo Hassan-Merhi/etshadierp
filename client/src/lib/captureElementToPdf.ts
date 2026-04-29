@@ -2,17 +2,24 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
 /**
- * Captures a DOM element as a multi-page A4 PDF and returns the base64-encoded string.
+ * Captures a DOM element as a PDF and returns the base64-encoded string.
  *
- * - Content taller than one A4 page is automatically paginated.
- * - Works with off-screen elements (position:fixed at negative coords).
- * - Does NOT work with display:none or visibility:hidden elements.
+ * Two modes:
+ *  - Multi-page A4 (default): content taller than one A4 page is sliced into
+ *    multiple A4 pages. May cut rows at slice boundaries.
+ *  - Single-page (singlePage: true): creates ONE PDF page whose height exactly
+ *    matches the rendered content at A4 width. No slicing, no cut-off text.
+ *    Ideal for reports where content length is unknown (stock summaries etc.).
+ *
+ * Works with off-screen elements (position:fixed at negative coords).
+ * Does NOT work with display:none or visibility:hidden elements.
  */
 export async function captureElementToPdf(
   element: HTMLElement,
-  opts?: { scale?: number }
+  opts?: { scale?: number; singlePage?: boolean }
 ): Promise<string> {
   const scale = opts?.scale ?? 2;
+  const singlePage = opts?.singlePage ?? false;
 
   const canvas = await html2canvas(element, {
     scale,
@@ -23,7 +30,6 @@ export async function captureElementToPdf(
   });
 
   const A4_W = 595.28; // pts
-  const A4_H = 841.89; // pts
 
   // CSS-pixel dimensions of the captured content
   const imgW = canvas.width / scale;
@@ -31,12 +37,24 @@ export async function captureElementToPdf(
 
   // Ratio that maps content width to A4 width (never upscale beyond original)
   const ratio = Math.min(A4_W / imgW, 1);
+  const pdfH  = imgH * ratio;
 
-  // Total PDF height if the whole image were one tall strip
-  const totalPdfH = imgH * ratio;
+  if (singlePage) {
+    // One tall page sized to the content — no slicing, no cut-off rows
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "pt",
+      format: [A4_W, pdfH],
+    });
 
-  // Number of A4 pages needed
-  const numPages = Math.max(1, Math.ceil(totalPdfH / A4_H));
+    const imgData = canvas.toDataURL("image/jpeg", 0.92);
+    pdf.addImage(imgData, "JPEG", 0, 0, A4_W, pdfH);
+    return pdf.output("datauristring").split(",")[1];
+  }
+
+  // ── Multi-page A4 mode ────────────────────────────────────────────────────
+  const A4_H = 841.89; // pts
+  const numPages = Math.max(1, Math.ceil(pdfH / A4_H));
 
   const pdf = new jsPDF({
     orientation: "portrait",
@@ -47,14 +65,13 @@ export async function captureElementToPdf(
   for (let i = 0; i < numPages; i++) {
     if (i > 0) pdf.addPage("a4", "portrait");
 
-    // How many canvas pixels correspond to one A4 page in height
+    // Canvas pixels that correspond to one A4 page height
     const pxPerPage = (A4_H / ratio) * scale;
     const pxStart   = i * pxPerPage;
     const pxSliceH  = Math.min(pxPerPage, canvas.height - pxStart);
 
     if (pxSliceH <= 0) break;
 
-    // Extract just this page's vertical slice into a temporary canvas
     const sliceCanvas = document.createElement("canvas");
     sliceCanvas.width  = canvas.width;
     sliceCanvas.height = Math.ceil(pxSliceH);
@@ -62,12 +79,9 @@ export async function captureElementToPdf(
     const ctx = sliceCanvas.getContext("2d");
     if (!ctx) continue;
 
-    // Shift the source canvas upward so the desired slice sits at y = 0
     ctx.drawImage(canvas, 0, -Math.floor(pxStart));
 
     const sliceData = sliceCanvas.toDataURL("image/jpeg", 0.92);
-
-    // PDF height for this slice — may be shorter on the last page
     const pdfSliceH = (pxSliceH / scale) * ratio;
 
     pdf.addImage(sliceData, "JPEG", 0, 0, A4_W, pdfSliceH);
