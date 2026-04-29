@@ -1520,83 +1520,142 @@ export function registerPosRoutes(app: Express) {
         grouped[key].items.push(row);
       }
       const grandTotal = nonZero.reduce((s, r) => s + Math.floor(parseFloat(r.quantity ?? "0")), 0);
-      const dateStr = format(new Date(), "dd MMM yyyy, h:mm a");
+      const now = new Date();
+      const dateHeader  = format(now, "dd-MMM-yy");
+      const printedStr  = `Printed: ${format(now, "dd-MMM-yy HH:mm")}`;
+      const captionDate = format(now, "dd MMM yyyy, h:mm a");
 
-      // Build PDF with PDFKit
+      // Build PDF with PDFKit — mirroring the LocationInventory print template
       const doc = new PDFDocument({ size: "A4", margin: 40, autoFirstPage: true });
       const chunks: Buffer[] = [];
       doc.on("data", (c: Buffer) => chunks.push(c));
+      let pageNum = 1;
+
+      // helper: draw page footer (page number)
+      const drawFooter = () => {
+        const pageH = doc.page.height;
+        doc.fontSize(8).font("Helvetica").fillColor("#888888")
+          .text(`Page ${pageNum}`, 40, pageH - 28, { width: 515, align: "right" });
+      };
+
+      doc.on("pageAdded", () => {
+        pageNum++;
+      });
 
       await new Promise<void>((resolve, reject) => {
         doc.on("end", resolve);
         doc.on("error", reject);
 
         // ── Header ──────────────────────────────────────────────────────────
-        doc.fontSize(16).font("Helvetica-Bold")
-          .text(location.name, { align: "center" });
-        doc.fontSize(10).font("Helvetica")
+        // Location name — bold + underline
+        doc.fontSize(16).font("Helvetica-Bold").fillColor("#000000");
+        const nameText = location.name;
+        const nameW = doc.widthOfString(nameText);
+        const nameX = (515 - nameW) / 2 + 40;
+        const nameY = doc.y;
+        doc.text(nameText, { align: "center" });
+        doc.moveTo(nameX, nameY + 18).lineTo(nameX + nameW, nameY + 18)
+          .strokeColor("#000000").lineWidth(0.75).stroke();
+
+        // "Godown Summary"
+        doc.fontSize(12).font("Helvetica-Bold")
           .text("Godown Summary", { align: "center" });
-        doc.fontSize(9).fillColor("#555555")
-          .text(dateStr, { align: "center" });
-        doc.moveDown(0.5);
-        doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#333333").lineWidth(1.5).stroke();
+
+        // Date (dd-MMM-yy)
+        doc.fontSize(9).font("Helvetica").fillColor("#333333")
+          .text(dateHeader, { align: "center" });
+
         doc.moveDown(0.4);
 
-        // ── Table header ────────────────────────────────────────────────────
-        const colItem = 40;
-        const colQty  = 510;
-        doc.fontSize(9).font("Helvetica-Bold").fillColor("#000000");
-        doc.text("Item", colItem, doc.y);
-        doc.moveUp();
-        doc.text("Qty (BL)", colQty - 60, doc.y, { width: 60, align: "right" });
-        doc.moveDown(0.3);
-        doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#333333").lineWidth(1).stroke();
-        doc.moveDown(0.3);
+        // "Printed: …" left  /  "Page 1" right
+        const metaY = doc.y;
+        doc.fontSize(8).font("Helvetica").fillColor("#666666");
+        doc.text(printedStr, 40, metaY, { lineBreak: false });
+        doc.text("Page 1", 40, metaY, { width: 515, align: "right", lineBreak: false });
+        doc.moveDown(0.6);
+
+        // Separator
+        doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#cccccc").lineWidth(0.75).stroke();
+        doc.moveDown(0.5);
+
+        // ── Column header ────────────────────────────────────────────────────
+        const colParticulars = 40;
+        const colQtyRight    = 555;
+        const colQtyW        = 90;
+
+        const thY = doc.y;
+        doc.rect(40, thY - 2, 515, 16).fillColor("#f8f8f8").fill();
+        doc.fontSize(10).font("Helvetica-Bold").fillColor("#000000");
+        doc.text("Particulars", colParticulars, thY, { lineBreak: false });
+        doc.text("Closing Balance", colQtyRight - colQtyW, thY, { width: colQtyW, align: "right", lineBreak: false });
+        doc.moveDown(0.6);
+
+        // "Quantity" sub-header under Closing Balance
+        const subY = doc.y - 2;
+        doc.fontSize(8).font("Helvetica").fillColor("#444444");
+        doc.text("Quantity", colQtyRight - colQtyW, subY, { width: colQtyW, align: "right", lineBreak: false });
+        doc.moveDown(0.2);
+
+        doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#333333").lineWidth(1.5).stroke();
+        doc.moveDown(0.4);
 
         // ── Rows ─────────────────────────────────────────────────────────────
         for (const [, { name, items }] of Object.entries(grouped)) {
           const groupQty = items.reduce((s, i) => s + Math.floor(parseFloat(i.quantity ?? "0")), 0);
+          const groupUom = items[0]?.unit ?? "";
 
-          // Group row (bold, slightly shaded background)
+          // Group row
           const gy = doc.y;
-          doc.rect(40, gy - 2, 515, 14).fillColor("#e8e8e8").fill();
-          doc.font("Helvetica-Bold").fontSize(9).fillColor("#000000");
-          doc.text(name, colItem, gy, { lineBreak: false });
-          doc.text(groupQty.toLocaleString(), colQty - 60, gy, { width: 60, align: "right", lineBreak: false });
+          doc.rect(40, gy - 2, 515, 14).fillColor("#eaeaea").fill();
+          doc.moveTo(40, gy - 2).lineTo(555, gy - 2).strokeColor("#666666").lineWidth(0.5).stroke();
+          doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000");
+          doc.text(name, colParticulars, gy, { lineBreak: false });
+          doc.text(`${groupQty.toLocaleString()} ${groupUom}`.trim(), colQtyRight - colQtyW, gy, { width: colQtyW, align: "right", lineBreak: false });
           doc.moveDown(0.9);
+          const gyBottom = doc.y;
+          doc.moveTo(40, gyBottom).lineTo(555, gyBottom).strokeColor("#666666").lineWidth(0.5).stroke();
+          doc.moveDown(0.1);
 
           // Item rows
           for (const item of items) {
             const qty = Math.floor(parseFloat(item.quantity ?? "0"));
+            const uom = item.unit ?? "";
             const isNeg = qty < 0;
             const iy = doc.y;
             if (isNeg) {
-              doc.rect(40, iy - 2, 515, 13).fillColor("#ffe0e0").fill();
+              doc.rect(40, iy - 2, 515, 13).fillColor("rgba(255,200,200,0.5)").fill();
             }
-            doc.font("Helvetica").fontSize(8.5).fillColor(isNeg ? "#cc0000" : "#000000");
-            doc.text(item.name, colItem + 12, iy, { lineBreak: false });
-            doc.text(qty.toLocaleString(), colQty - 60, iy, { width: 60, align: "right", lineBreak: false });
+            doc.font("Helvetica").fontSize(9).fillColor(isNeg ? "#cc0000" : "#000000");
+            doc.text(item.name, colParticulars + 8, iy, { lineBreak: false });
+            const qtyLabel = `${qty.toLocaleString()} ${uom}`.trim();
+            doc.text(qtyLabel, colQtyRight - colQtyW, iy, { width: colQtyW, align: "right", lineBreak: false });
             doc.moveDown(0.75);
+            doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#999999").lineWidth(0.3).stroke();
+            doc.moveDown(0.05);
           }
         }
 
         // ── Grand total ──────────────────────────────────────────────────────
-        doc.moveDown(0.3);
+        doc.moveDown(0.2);
         doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#333333").lineWidth(1.5).stroke();
         doc.moveDown(0.3);
         const ty = doc.y;
-        doc.rect(40, ty - 2, 515, 15).fillColor("#f0f0f0").fill();
-        doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#000000");
-        doc.text("Grand Total", colItem, ty, { lineBreak: false });
-        doc.text(grandTotal.toLocaleString(), colQty - 60, ty, { width: 60, align: "right", lineBreak: false });
+        doc.rect(40, ty - 2, 515, 16).fillColor("#f0f0f0").fill();
+        doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000");
+        const gtUom = nonZero[0]?.unit ?? "";
+        doc.text("Grand Total", colParticulars, ty, { lineBreak: false });
+        doc.text(`${grandTotal.toLocaleString()} ${gtUom}`.trim(), colQtyRight - colQtyW, ty, { width: colQtyW, align: "right", lineBreak: false });
+        doc.moveDown(0.5);
+        doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#333333").lineWidth(1.5).stroke();
 
+        drawFooter();
         doc.end();
       });
 
       const pdfBuffer = Buffer.concat(chunks);
       const safeLocationName = location.name.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_-]/g, "");
-      const fileName = `Stock_${safeLocationName}_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`;
-      const caption  = `📍 ${location.name} — Stock Report\n🕐 ${dateStr}`;
+      const fileName = `Stock_${safeLocationName}_${format(now, "yyyyMMdd_HHmm")}.pdf`;
+      const caption  = `📍 ${location.name} — Stock Report\n🕐 ${captionDate}`;
 
       // Store PDF temporarily and build a public URL for Green API to fetch
       const pdfId  = storeTempPdf(pdfBuffer);
