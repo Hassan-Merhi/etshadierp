@@ -3305,8 +3305,12 @@ export function registerVoucherRoutes(app: Express) {
         const [charge] = await db.select({ orderId: customerOrderCharges.orderId })
           .from(customerOrderCharges).where(eq(customerOrderCharges.id, chargeId));
         if (charge) {
+          const chargeUpdate: { amount: string; name?: string } = { amount: String(newAmount) };
+          if (updatedVoucher.description?.trim()) {
+            chargeUpdate.name = updatedVoucher.description.trim();
+          }
           await db.update(customerOrderCharges)
-            .set({ amount: String(newAmount) })
+            .set(chargeUpdate)
             .where(eq(customerOrderCharges.id, chargeId));
           await recalculateOrderTotals(db, charge.orderId);
           // Also update the customer balance ledger debit for this invoice
