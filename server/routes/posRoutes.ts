@@ -38,6 +38,7 @@ import { format } from "date-fns";
 import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
+import { generateStockPdf } from "../helpers/generateStockPdf";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
 import { sendWhatsAppTextToChatIdPos, sendWhatsAppFileToChatIdPos, sendWhatsAppFileByUrlToChatIdPos, sendWhatsAppFileByUploadPos } from "../services/whatsappService";
 import PDFDocument from "pdfkit";
@@ -110,6 +111,61 @@ export function registerPosRoutes(app: Express) {
       res.json({ success: true });
     } catch (error: any) {
       console.error("[/api/pos/send-whatsapp-pdf-upload]", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Server-side stock PDF → WhatsApp (no browser capture needed) ──────────
+  app.post("/api/pos/send-stock-pdf-backend", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { locationId } = req.body;
+      if (!locationId) return res.status(400).json({ message: "locationId is required" });
+
+      const locId = parseInt(locationId);
+      if (isNaN(locId)) return res.status(400).json({ message: "Invalid locationId" });
+
+      const [location] = await db
+        .select()
+        .from(locations)
+        .where(and(eq(locations.id, locId), eq(locations.companyId, companyId)))
+        .limit(1);
+
+      if (!location)                     return res.status(404).json({ message: "Location not found" });
+      if (!location.whatsappGroupChatId) return res.status(400).json({ message: "No WhatsApp group configured for this location" });
+
+      const [company] = await db
+        .select({ name: companies.name })
+        .from(companies)
+        .where(eq(companies.id, companyId))
+        .limit(1);
+
+      const companyName = company?.name || "Company";
+      const locName     = location.name;
+
+      const pdfBuffer = await generateStockPdf(companyId, companyName, locId, locName);
+
+      const dateStr  = new Date().toISOString().slice(0, 10);
+      const safeName = `${locName} STK ${companyName} ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
+      const stampStr = new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+      const caption  = `Stock Report — ${locName}\n${stampStr}`;
+
+      console.log(`[WA stock backend] chatId=${location.whatsappGroupChatId} file=${safeName}.pdf size=${pdfBuffer.length}`);
+
+      const result = await sendWhatsAppFileToChatIdPos(
+        location.whatsappGroupChatId,
+        pdfBuffer,
+        `${safeName}.pdf`,
+        caption,
+      );
+
+      if (!result.success) return res.status(502).json({ message: result.error ?? "WhatsApp send failed" });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[/api/pos/send-stock-pdf-backend]", error);
       res.status(500).json({ message: error.message });
     }
   });

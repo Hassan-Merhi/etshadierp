@@ -141,6 +141,37 @@ async function sendWaPdfWithRetry(
   return { ok: false, message: lastMessage, attempts: maxAttempts };
 }
 
+// Server-side stock PDF send — generates PDF on the backend (multi-page safe)
+async function sendStockPdfWithRetry(
+  locationId: number,
+  opts: { maxAttempts?: number; delayMs?: number; onAttempt?: (n: number) => void } = {},
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const maxAttempts = opts.maxAttempts ?? 3;
+  const delayMs     = opts.delayMs     ?? 2000;
+  let lastMessage   = "WhatsApp send failed";
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    opts.onAttempt?.(attempt);
+    try {
+      const res = await apiRequest("POST", "/api/pos/send-stock-pdf-backend", { locationId });
+      const respBody = await res.json().catch(() => ({}));
+      if (res.ok) return { ok: true };
+
+      lastMessage = respBody.message || `WhatsApp send failed (HTTP ${res.status})`;
+      if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
+        return { ok: false, message: lastMessage };
+      }
+    } catch (e: any) {
+      lastMessage = e?.message || "Network error";
+    }
+
+    if (attempt < maxAttempts) {
+      await new Promise(r => setTimeout(r, delayMs * attempt));
+    }
+  }
+  return { ok: false, message: lastMessage };
+}
+
 export default function POS({ posUser, editVoucherId }: { posUser?: any; editVoucherId?: string } = {}) {
   const { selectedLocation, setSelectedLocation } = useLocationContext();
   const { selectedCompany } = useCompany();
@@ -750,81 +781,41 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const {
     data: stockInventory = [],
     isLoading: stockInventoryLoading,
-    isFetched: stockInventoryFetched,
-    isFetching: stockInventoryFetching,
   } = useQuery<any[]>({
     queryKey: [`/api/locations/${printLocationId}/inventory`],
     enabled: (showPrintDialog || showStockPrompt) && !!printLocationId,
   });
 
-  // Deferred stock auto-send — fires only after the inventory fetch fully completes AND
-  // the stock print DOM has been flushed with the new data (double-rAF guard).
+  // Deferred stock auto-send — backend generates the PDF server-side (multi-page safe).
   useEffect(() => {
-    // isFetching covers both initial load and background refetches (e.g. after invalidateQueries).
-    // isFetched ensures at least one fetch has completed before we attempt a capture.
-    if (
-      !pendingStockSend ||
-      !showPrintDialog ||
-      stockInventoryFetching ||
-      !stockInventoryFetched ||
-      !stockPrintRef.current
-    ) return;
+    if (!pendingStockSend || !activeLocation?.id) return;
 
-    let raf1: number, raf2: number;
-    let cancelled = false;
+    setPendingStockSend(false);
+    setStockWaStatus("sending");
 
-    // Double requestAnimationFrame: lets React commit DOM updates with the fetched
-    // stockInventory data before html2canvas reads the DOM.
-    raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => {
-        if (cancelled || !stockPrintRef.current) return;
-
-        setPendingStockSend(false);
-
-        const locName  = activeLocation?.name || "Location";
-        const compName = (selectedCompany as any)?.name || "";
-        const dateStr  = new Date().toISOString().slice(0, 10);
-        const safeName = `${locName} STK ${compName} ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
-
-        const doSend = async () => {
-          setStockWaStatus("sending");
-          try {
-            const pdfBase64 = await captureElementToPdf(stockPrintRef.current!);
-            const stampStr = new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-            const result = await sendWaPdfWithRetry(
-              {
-                pdfBase64,
-                locationId: activeLocation?.id,
-                filename: `${safeName}.pdf`,
-                caption: `Stock Report — ${locName}\n${stampStr}`,
-              },
-              {
-                onAttempt: (n) => {
-                  if (n > 1) {
-                    toast({ title: "Retrying…", description: `WhatsApp stock send attempt ${n}/3.` });
-                  }
-                },
-              },
-            );
-            if (!result.ok) throw new Error(result.message);
-            setStockWaStatus("sent");
-            toast({ title: "Stock sent", description: "Stock report sent to WhatsApp group." });
-          } catch (e: any) {
-            setStockWaStatus("failed");
-            toast({ title: "Stock send failed", description: e.message || "Could not send stock report.", variant: "destructive" });
-          }
-        };
-        doSend();
-      });
-    });
-
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
+    const doSend = async () => {
+      try {
+        const result = await sendStockPdfWithRetry(
+          activeLocation.id,
+          {
+            onAttempt: (n) => {
+              if (n > 1) {
+                toast({ title: "Retrying…", description: `WhatsApp stock send attempt ${n}/3.` });
+              }
+            },
+          },
+        );
+        if (!result.ok) throw new Error(result.message);
+        setStockWaStatus("sent");
+        toast({ title: "Stock sent", description: "Stock report sent to WhatsApp group." });
+      } catch (e: any) {
+        setStockWaStatus("failed");
+        toast({ title: "Stock send failed", description: e.message || "Could not send stock report.", variant: "destructive" });
+      }
     };
+    doSend();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingStockSend, showPrintDialog, stockInventoryFetching, stockInventoryFetched]);
+  }, [pendingStockSend]);
 
   const handleStockPrint = useReactToPrint({
     contentRef: stockPrintRef,
@@ -832,26 +823,15 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   });
 
   const handleSendWhatsAppReport = async () => {
-    if (!stockPrintRef.current) {
-      toast({ title: "Not ready", description: "Stock template not mounted yet.", variant: "destructive" });
+    if (!activeLocation?.id) {
+      toast({ title: "No location", description: "No active location selected.", variant: "destructive" });
       return;
     }
     setSendingWhatsApp(true);
     setStockWaStatus("sending");
     try {
-      const locName  = activeLocation?.name || "Location";
-      const compName = (selectedCompany as any)?.name || "";
-      const dateStr  = new Date().toISOString().slice(0, 10);
-      const safeName = `${locName} STK ${compName} ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
-      const pdfBase64 = await captureElementToPdf(stockPrintRef.current);
-      const stampStr = new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-      const result = await sendWaPdfWithRetry(
-        {
-          pdfBase64,
-          locationId: activeLocation?.id,
-          filename: `${safeName}.pdf`,
-          caption: `Stock Report — ${locName}\n${stampStr}`,
-        },
+      const result = await sendStockPdfWithRetry(
+        activeLocation.id,
         {
           onAttempt: (n) => {
             if (n > 1) {

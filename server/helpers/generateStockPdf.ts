@@ -49,11 +49,20 @@ interface StockRow {
 
 // ── Main export ───────────────────────────────────────────────────────────────
 export async function generateStockPdf(
-  companyId:   number,
-  companyName: string,
+  companyId:    number,
+  companyName:  string,
+  locationId?:  number,
+  locationName?: string,
 ): Promise<Buffer> {
 
   // ── Fetch inventory ─────────────────────────────────────────────────────────
+  const params: (number)[] = [companyId];
+  let locationFilter = "";
+  if (locationId) {
+    params.push(locationId);
+    locationFilter = `AND l.id = $${params.length}`;
+  }
+
   const result = await pool.query<{
     item_name: string; group_name: string | null; uom: string;
     quantity: string; average_rate: string; total_value: string;
@@ -70,8 +79,9 @@ export async function generateStockPdf(
      JOIN locations l ON l.id = i.location_id
      WHERE l.company_id = $1
        AND i.quantity::numeric > 0
+       ${locationFilter}
      ORDER BY LOWER(COALESCE(sg.name, 'zzzzz')), LOWER(si.name)`,
-    [companyId],
+    params,
   );
 
   const rows: StockRow[] = result.rows.map((r) => ({
@@ -123,9 +133,10 @@ export async function generateStockPdf(
     doc.text(companyName, X_PART, y, { width: USABLE_W, align: "center", underline: true, lineBreak: false });
     y += 22;
 
-    // "Godown Summary" — 12pt bold centered
+    // "Godown Summary" (or location-specific title) — 12pt bold centered
     doc.font("Helvetica-Bold").fontSize(12);
-    doc.text("Godown Summary", X_PART, y, { width: USABLE_W, align: "center", lineBreak: false });
+    const reportTitle = locationName ? `Stock Report — ${locationName}` : "Godown Summary";
+    doc.text(reportTitle, X_PART, y, { width: USABLE_W, align: "center", lineBreak: false });
     y += 17;
 
     // Date — 9pt centered #333
