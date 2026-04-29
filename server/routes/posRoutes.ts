@@ -1999,8 +1999,11 @@ export function registerPosRoutes(app: Express) {
       });
 
       const pdfBuffer = Buffer.concat(pchunks);
-      const safeVNum  = (voucher.voucherNumber ?? "invoice").replace(/[^a-zA-Z0-9_-]/g, "_");
-      const fileName  = `Invoice_${safeVNum}.pdf`;
+      const company   = await storage.getCompanyById(companyId);
+      const safeLoc   = (location.name ?? "").replace(/[^a-zA-Z0-9 \-]/g, "").trim();
+      const safeCo    = (company?.name ?? "").replace(/[^a-zA-Z0-9 \-]/g, "").trim();
+      const safeDate  = (voucher.voucherDate ?? format(new Date(), "yyyy-MM-dd")).replace(/[^0-9-]/g, "");
+      const fileName  = `${safeLoc} ${safeCo} ${safeDate}.pdf`.replace(/\s+/g, " ").trim();
       const caption   = `📍 ${location.name} — ${voucher.voucherNumber}`;
 
       console.log(`[WA invoice upload] chatId=${location.whatsappGroupChatId} file=${fileName} size=${pdfBuffer.length}`);
