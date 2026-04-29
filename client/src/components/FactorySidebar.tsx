@@ -158,7 +158,7 @@ const navSections: NavSection[] = [
       { title: "Production Summary",url: "/factory/production-summary",           icon: BarChart3,  featureFlag: "productionSummaryEnabled"   },
       { title: "Supplier Report",   url: "/factory/supplier-report",              icon: ClipboardCheck, featureFlag: "supplierReportEnabled"  },
       { title: "Supplier Statement",url: "/factory/supplier-statement",           icon: ClipboardCheck, featureFlag: "supplierStatementEnabled"},
-      { title: "Intel Settings",    url: "/factory/intelligence/settings",        icon: Settings,   adminOnly: true, developerOnly: false                     },
+      { title: "Intel Settings",    url: "/factory/intelligence/settings",        icon: Settings,   adminOnly: true                           },
     ],
   },
 ];
@@ -388,6 +388,9 @@ export function FactorySidebar({ user }: { user?: any }) {
           )}
           {isAdmin && (
             <FlatLink href="/factory/settings" icon={Settings} label="Settings" color="#6b7280" testId="link-factory-settings" />
+          )}
+          {isAdmin && (
+            <FlatLink href="/factory/intelligence/settings" icon={Settings} label="Intel Settings" color="#f43f5e" testId="link-factory-intel-settings" />
           )}
         </div>
       </SidebarContent>
