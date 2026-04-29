@@ -158,7 +158,7 @@ const navSections: NavSection[] = [
       { title: "Production Summary",url: "/factory/production-summary",           icon: BarChart3,  featureFlag: "productionSummaryEnabled"   },
       { title: "Supplier Report",   url: "/factory/supplier-report",              icon: ClipboardCheck, featureFlag: "supplierReportEnabled"  },
       { title: "Supplier Statement",url: "/factory/supplier-statement",           icon: ClipboardCheck, featureFlag: "supplierStatementEnabled"},
-      { title: "Intel Settings",    url: "/factory/intelligence/settings",        icon: Settings,   adminOnly: true                           },
+      { title: "Intel Settings",    url: "/factory/intelligence/settings",        icon: Settings,   adminOnly: true, developerOnly: false                     },
     ],
   },
 ];
