@@ -6363,16 +6363,16 @@ export class DbStorage implements IStorage {
 
   async getCustomerBalance(customerId: number, companyId: number): Promise<number> {
     const [result] = await db
-      .select({ balance: schema.customerBalances.balance })
+      .select({
+        net: sql<string>`COALESCE(SUM(CAST(${schema.customerBalances.debitAmount} AS numeric) - CAST(${schema.customerBalances.creditAmount} AS numeric)), 0)`,
+      })
       .from(schema.customerBalances)
       .where(and(
         eq(schema.customerBalances.customerId, customerId),
         eq(schema.customerBalances.companyId, companyId)
-      ))
-      .orderBy(desc(schema.customerBalances.createdAt))
-      .limit(1);
+      ));
 
-    return result ? parseFloat(result.balance) : 0;
+    return result ? parseFloat(result.net) : 0;
   }
 
   async getCustomerStatement(
