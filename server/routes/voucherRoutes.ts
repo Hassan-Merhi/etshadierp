@@ -67,7 +67,8 @@ async function syncJournalToOrderCharge(
     ledgerAccountId: number | null;
     debitAmount: string;
     creditAmount: string;
-  }>
+  }>,
+  voucherId?: number
 ) {
   const customerEntry = savedEntries.find(e => e.customerId !== null);
   if (!customerEntry) return;
@@ -81,31 +82,68 @@ async function syncJournalToOrderCharge(
     const newAmount = parseFloat(ledgerEntry.creditAmount || "0");
     if (newAmount <= 0) continue;
 
-    const matchingCharges = await db
-      .select({
-        id: customerOrderCharges.id,
-        orderId: customerOrderCharges.orderId,
-        amount: customerOrderCharges.amount,
-        chargeType: customerOrderCharges.chargeType,
-      })
-      .from(customerOrderCharges)
-      .innerJoin(customerOrders, and(
-        eq(customerOrderCharges.orderId, customerOrders.id),
-        eq(customerOrders.customerId, customerEntry.customerId!),
-        eq(customerOrders.companyId, companyId),
-      ))
-      .where(eq(customerOrderCharges.ledgerAccountId, ledgerEntry.ledgerAccountId!));
+    let matchingCharges: { id: number; orderId: number; amount: string; chargeType: string }[] = [];
 
-    if (matchingCharges.length !== 1) continue; // ambiguous — skip
+    // Priority 1: find by direct voucher link (exact match, no ambiguity)
+    if (voucherId) {
+      matchingCharges = await db
+        .select({
+          id: customerOrderCharges.id,
+          orderId: customerOrderCharges.orderId,
+          amount: customerOrderCharges.amount,
+          chargeType: customerOrderCharges.chargeType,
+        })
+        .from(customerOrderCharges)
+        .innerJoin(customerOrders, and(
+          eq(customerOrderCharges.orderId, customerOrders.id),
+          eq(customerOrders.companyId, companyId),
+        ))
+        .where(and(
+          eq(customerOrderCharges.voucherId, voucherId),
+          eq(customerOrderCharges.ledgerAccountId, ledgerEntry.ledgerAccountId!),
+        ));
+    }
+
+    // Priority 2: fall back to ledger account match (only if exactly one unlinked result)
+    if (matchingCharges.length === 0) {
+      const byLedger = await db
+        .select({
+          id: customerOrderCharges.id,
+          orderId: customerOrderCharges.orderId,
+          amount: customerOrderCharges.amount,
+          chargeType: customerOrderCharges.chargeType,
+        })
+        .from(customerOrderCharges)
+        .innerJoin(customerOrders, and(
+          eq(customerOrderCharges.orderId, customerOrders.id),
+          eq(customerOrders.customerId, customerEntry.customerId!),
+          eq(customerOrders.companyId, companyId),
+        ))
+        .where(and(
+          eq(customerOrderCharges.ledgerAccountId, ledgerEntry.ledgerAccountId!),
+          isNull(customerOrderCharges.voucherId),
+        ));
+
+      if (byLedger.length === 1) {
+        matchingCharges = byLedger;
+      }
+    }
+
+    if (matchingCharges.length === 0) continue;
 
     const charge = matchingCharges[0];
     const oldAmount = parseFloat(charge.amount || "0");
-    if (Math.abs(oldAmount - newAmount) < 0.01) continue; // no change
+    const amountChanged = Math.abs(oldAmount - newAmount) >= 0.01;
 
-    // Update the charge amount
+    // Update charge amount and stamp voucherId for direct future lookups
     await db.update(customerOrderCharges)
-      .set({ amount: newAmount.toFixed(2) })
+      .set({
+        amount: newAmount.toFixed(2),
+        ...(voucherId ? { voucherId } : {}),
+      })
       .where(eq(customerOrderCharges.id, charge.id));
+
+    if (!amountChanged) continue; // voucherId stamp done, but no recalc needed
 
     // Recalculate and save order totals
     await recalculateOrderTotals(db, charge.orderId);
@@ -1141,7 +1179,7 @@ export function registerVoucherRoutes(app: Express) {
         }
 
         // Sync order charges automatically (non-fatal)
-        await syncJournalToOrderCharge(req.session.currentCompanyId!, result.entries).catch(() => {});
+        await syncJournalToOrderCharge(req.session.currentCompanyId!, result.entries, result.voucher.id).catch(() => {});
 
         // Write to factory daybook if this company has factory settings
         try {
@@ -1362,7 +1400,7 @@ export function registerVoucherRoutes(app: Express) {
 
         // Sync order charges: if the journal has a customer entry + a CR ledger entry
         // that matches a charge on one of their orders, update that charge automatically
-        await syncJournalToOrderCharge(req.session.currentCompanyId!, result.entries).catch(() => {});
+        await syncJournalToOrderCharge(req.session.currentCompanyId!, result.entries, result.voucher.id).catch(() => {});
 
         // WhatsApp auto-statement trigger (non-fatal)
         let waJournalPatch: { sent: boolean; error?: string } = { sent: false };
