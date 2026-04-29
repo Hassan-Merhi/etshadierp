@@ -2325,23 +2325,49 @@ export default function Payroll() {
                                     </div>
                                   </TableCell>
                                   <TableCell>
-                                    <ConfirmationDialog
-                                      trigger={
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          className="text-destructive hover:text-destructive"
-                                          data-testid={`button-delete-worker-${worker.id}`}
+                                    <div className="flex items-center gap-1">
+                                      {workerGroups.length > 0 && (
+                                        <Select
+                                          onValueChange={(groupId) => {
+                                            addWorkerToWorkerGroupMutation.mutate({
+                                              groupId: parseInt(groupId),
+                                              workerId: worker.id,
+                                            });
+                                          }}
                                         >
-                                          <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                      }
-                                      title="Delete Worker"
-                                      description={`Are you sure you want to delete ${worker.firstName} ${worker.lastName}? This action cannot be undone.`}
-                                      confirmText="Delete"
-                                      variant="destructive"
-                                      onConfirm={() => handleDeleteWorker(worker)}
-                                    />
+                                          <SelectTrigger
+                                            className="h-8 w-32 text-xs"
+                                            data-testid={`select-move-group-${worker.id}`}
+                                          >
+                                            <SelectValue placeholder="Move to group" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {workerGroups.map(g => (
+                                              <SelectItem key={g.id} value={String(g.id)}>
+                                                {g.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      )}
+                                      <ConfirmationDialog
+                                        trigger={
+                                          <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="text-destructive hover:text-destructive"
+                                            data-testid={`button-delete-worker-${worker.id}`}
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        }
+                                        title="Delete Worker"
+                                        description={`Are you sure you want to delete ${worker.firstName} ${worker.lastName}? This action cannot be undone.`}
+                                        confirmText="Delete"
+                                        variant="destructive"
+                                        onConfirm={() => handleDeleteWorker(worker)}
+                                      />
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               );
