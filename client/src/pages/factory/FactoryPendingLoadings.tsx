@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
@@ -6,18 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
-import { Clock, Package, Play, Trash2, Download, Link, X } from "lucide-react";
+import { Clock, Package, Play, Trash2, Download, Link, X, Undo2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +17,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { apiRequest, keyStartsWith } from "@/lib/queryClient";
+
+const UNDO_TIMEOUT_MS = 8000;
 
 interface PendingLoad {
   id: number;
@@ -39,6 +31,13 @@ interface PendingLoad {
   locationId: number | null;
   loadingStartedAt: string | null;
   status: string;
+}
+
+interface UndoItem {
+  load: PendingLoad;
+  cancelledAt: number;
+  timerId: ReturnType<typeof setTimeout>;
+  elapsed: number;
 }
 
 interface Proforma {
@@ -55,9 +54,23 @@ export default function FactoryPendingLoadings() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [deleteTarget, setDeleteTarget] = useState<PendingLoad | null>(null);
   const [linkTarget, setLinkTarget] = useState<PendingLoad | null>(null);
   const [selectedProformaId, setSelectedProformaId] = useState<number | null>(null);
+  const [undoItems, setUndoItems] = useState<UndoItem[]>([]);
+  const [, forceRender] = useState(0);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Tick every 100ms to update progress bars
+  useEffect(() => {
+    tickRef.current = setInterval(() => {
+      setUndoItems((prev) => {
+        if (prev.length === 0) return prev;
+        forceRender((n) => n + 1);
+        return prev;
+      });
+    }, 100);
+    return () => { if (tickRef.current) clearInterval(tickRef.current); };
+  }, []);
 
   const { data: loads = [], isLoading } = useQuery<PendingLoad[]>({
     queryKey: ["/api/factory/customer-orders?status=LOADING"],
@@ -75,20 +88,53 @@ export default function FactoryPendingLoadings() {
     enabled: !!linkTarget,
   });
 
-  const deleteMutation = useMutation({
+  const cancelMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/factory/customer-orders/${id}`);
+      await apiRequest("POST", `/api/factory/customer-orders/${id}/cancel`);
     },
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
-      toast({ title: "Loading deleted", description: "Bales have been returned to stock." });
-      setDeleteTarget(null);
     },
     onError: (err: any) => {
       toast({ title: "Delete failed", description: err.message, variant: "destructive" });
-      setDeleteTarget(null);
     },
   });
+
+  const restoreMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("POST", `/api/factory/customer-orders/${id}/restore-loading`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+    },
+    onError: (err: any) => {
+      toast({ title: "Restore failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleDelete = (load: PendingLoad) => {
+    cancelMutation.mutate(load.id);
+
+    const timerId = setTimeout(() => {
+      setUndoItems((prev) => prev.filter((u) => u.load.id !== load.id));
+    }, UNDO_TIMEOUT_MS);
+
+    setUndoItems((prev) => [
+      ...prev.filter((u) => u.load.id !== load.id),
+      { load, cancelledAt: Date.now(), timerId, elapsed: 0 },
+    ]);
+  };
+
+  const handleUndo = (item: UndoItem) => {
+    clearTimeout(item.timerId);
+    setUndoItems((prev) => prev.filter((u) => u.load.id !== item.load.id));
+    restoreMutation.mutate(item.load.id);
+  };
+
+  const dismissUndo = (item: UndoItem) => {
+    clearTimeout(item.timerId);
+    setUndoItems((prev) => prev.filter((u) => u.load.id !== item.load.id));
+  };
 
   const linkProformaMutation = useMutation({
     mutationFn: async ({ orderId, proformaId }: { orderId: number; proformaId: number | null }) => {
@@ -137,13 +183,65 @@ export default function FactoryPendingLoadings() {
         <p className="text-muted-foreground text-sm">In-progress container loads saved for later</p>
       </div>
 
+      {/* Undo banners */}
+      {undoItems.length > 0 && (
+        <div className="space-y-2 mb-4">
+          {undoItems.map((item) => {
+            const elapsed = Date.now() - item.cancelledAt;
+            const remaining = Math.max(0, UNDO_TIMEOUT_MS - elapsed);
+            const pct = (remaining / UNDO_TIMEOUT_MS) * 100;
+            return (
+              <div
+                key={item.load.id}
+                className="relative overflow-hidden rounded-md border border-amber-400/60 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 flex items-center justify-between gap-3"
+                data-testid={`banner-undo-${item.load.id}`}
+              >
+                {/* Countdown bar */}
+                <div
+                  className="absolute bottom-0 left-0 h-0.5 bg-amber-400 transition-none"
+                  style={{ width: `${pct}%` }}
+                />
+                <div className="flex items-center gap-2 min-w-0">
+                  <Trash2 className="h-4 w-4 text-amber-600 shrink-0" />
+                  <span className="text-sm font-medium text-amber-900 dark:text-amber-100 truncate">
+                    Loading #{item.load.id} ({item.load.customerName}) deleted
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-amber-400 text-amber-800 dark:text-amber-200"
+                    onClick={() => handleUndo(item)}
+                    disabled={restoreMutation.isPending}
+                    data-testid={`button-undo-${item.load.id}`}
+                  >
+                    <Undo2 className="h-3.5 w-3.5 mr-1.5" />
+                    Undo
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="text-amber-700 dark:text-amber-300"
+                    onClick={() => dismissUndo(item)}
+                    data-testid={`button-dismiss-undo-${item.load.id}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-20 w-full" />
           ))}
         </div>
-      ) : loads.length === 0 ? (
+      ) : loads.length === 0 && undoItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground" data-testid="text-no-loads">
           <Clock className="h-16 w-16 mb-4 opacity-30" />
           <p className="text-lg font-medium">No pending loads</p>
@@ -211,7 +309,8 @@ export default function FactoryPendingLoadings() {
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() => setDeleteTarget(load)}
+                    onClick={() => handleDelete(load)}
+                    disabled={cancelMutation.isPending}
                     data-testid={`button-delete-${load.id}`}
                     title="Delete loading (returns bales to stock)"
                     className="text-destructive"
@@ -251,7 +350,6 @@ export default function FactoryPendingLoadings() {
               <p className="text-sm text-muted-foreground text-center py-6">No proformas found for this customer.</p>
             ) : (
               <>
-                {/* Option to unlink */}
                 <button
                   type="button"
                   onClick={() => setSelectedProformaId(null)}
@@ -319,29 +417,6 @@ export default function FactoryPendingLoadings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete pending loading?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will delete Loading #{deleteTarget?.id} for{" "}
-              <strong>{deleteTarget?.customerName}</strong> and return all{" "}
-              {deleteTarget?.totalQtyBales} scanned bales back to stock. This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-              className="bg-destructive text-destructive-foreground"
-              data-testid="button-confirm-delete"
-            >
-              {deleteMutation.isPending ? "Deleting…" : "Delete & Return to Stock"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
