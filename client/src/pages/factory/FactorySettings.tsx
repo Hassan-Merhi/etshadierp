@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download, WifiOff, ToggleRight, DollarSign, AlertTriangle, FileSpreadsheet, Images } from "lucide-react";
+import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download, WifiOff, ToggleRight, DollarSign, AlertTriangle, FileSpreadsheet, Images, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
 import { ImportBalesTab } from "./BaleStockEntry";
@@ -163,9 +163,15 @@ function MigrateVoucherDescriptionsCard() {
   );
 }
 
+interface WaChat { id: string; name: string; type: string; }
+
 export default function FactorySettings() {
   const { toast } = useToast();
   const [settings, setSettings] = useState<FactorySettingsData>(defaultSettings);
+
+  const [prodWaGroupId, setProdWaGroupId] = useState<string>("");
+  const [prodWaSearch, setProdWaSearch] = useState("");
+  const [prodWaPickerOpen, setProdWaPickerOpen] = useState(false);
 
   const [codePrefix, setCodePrefix] = useState("HMD13");
   const [findStr, setFindStr] = useState("-");
@@ -365,8 +371,44 @@ export default function FactorySettings() {
   useEffect(() => {
     if (data) {
       setSettings({ ...defaultSettings, ...data });
+      setProdWaGroupId((data as any).productionWorkerMatrixWhatsappGroupId ?? "");
     }
   }, [data]);
+
+  const { data: waChats = [], isLoading: waChatsLoading } = useQuery<WaChat[]>({
+    queryKey: ["/api/whatsapp/chats/pos"],
+    queryFn: async () => {
+      const r = await factoryApiRequest("GET", "/api/whatsapp/chats/pos");
+      if (!r.ok) throw new Error("Failed to load chats");
+      return r.json();
+    },
+    enabled: prodWaPickerOpen,
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const saveProdWaGroupMutation = useMutation({
+    mutationFn: async (chatId: string) => {
+      const res = await factoryApiRequest("PUT", "/api/factory/settings", {
+        productionWorkerMatrixWhatsappGroupId: chatId,
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Save failed"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/settings"] });
+      setProdWaPickerOpen(false);
+      toast({ title: "Saved", description: "Production WhatsApp group updated." });
+    },
+    onError: (err: any) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const filteredWaChats = waChats.filter(c =>
+    !prodWaSearch || c.name?.toLowerCase().includes(prodWaSearch.toLowerCase())
+  );
 
   const mutation = useMutation({
     mutationFn: async (updated: FactorySettingsData) => {
@@ -1084,6 +1126,109 @@ export default function FactorySettings() {
             Manage Product Images
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* ── Production WhatsApp Group ─────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageCircle className="h-5 w-5 text-muted-foreground" />
+            Production WhatsApp Group
+          </CardTitle>
+          <CardDescription>
+            Select the WhatsApp group that receives the Worker Matrix PDF when production is ended. This group is also used for manual sends from Stock Entry History.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {prodWaGroupId && !prodWaPickerOpen && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium" data-testid="text-prod-wa-group">
+                {waChats.find(c => c.id === prodWaGroupId)?.name ?? prodWaGroupId}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setProdWaPickerOpen(true)}
+                data-testid="button-change-prod-wa-group"
+              >
+                Change
+              </Button>
+            </div>
+          )}
+          {!prodWaGroupId && !prodWaPickerOpen && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setProdWaPickerOpen(true)}
+              data-testid="button-select-prod-wa-group"
+            >
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Select WhatsApp Group
+            </Button>
+          )}
+          {prodWaPickerOpen && (
+            <div className="space-y-2">
+              <Input
+                placeholder="Search chats…"
+                value={prodWaSearch}
+                onChange={e => setProdWaSearch(e.target.value)}
+                data-testid="input-prod-wa-search"
+              />
+              <div className="border rounded-md max-h-48 overflow-y-auto text-sm">
+                {waChatsLoading && (
+                  <p className="text-muted-foreground text-center py-4">
+                    <Loader2 className="h-4 w-4 inline mr-1 animate-spin" />Loading chats…
+                  </p>
+                )}
+                {!waChatsLoading && filteredWaChats.length === 0 && (
+                  <p className="text-muted-foreground text-center py-4">No chats found</p>
+                )}
+                {filteredWaChats.map(chat => (
+                  <button
+                    key={chat.id}
+                    type="button"
+                    onClick={() => setProdWaGroupId(chat.id)}
+                    className={`w-full text-left px-3 py-2 hover-elevate transition-colors ${
+                      prodWaGroupId === chat.id ? "bg-primary/10 text-primary font-medium" : ""
+                    }`}
+                    data-testid={`option-prod-wa-chat-${chat.id}`}
+                  >
+                    <div className="font-medium">{chat.name}</div>
+                    <div className="text-xs text-muted-foreground">{chat.type}</div>
+                  </button>
+                ))}
+              </div>
+              {prodWaGroupId && (
+                <p className="text-xs text-muted-foreground">
+                  Selected: <span className="font-medium">{
+                    waChats.find(c => c.id === prodWaGroupId)?.name ?? prodWaGroupId
+                  }</span>
+                </p>
+              )}
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => saveProdWaGroupMutation.mutate(prodWaGroupId)}
+                  disabled={!prodWaGroupId || saveProdWaGroupMutation.isPending}
+                  data-testid="button-save-prod-wa-group"
+                >
+                  {saveProdWaGroupMutation.isPending
+                    ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    : <CheckCircle className="h-3 w-3 mr-1" />}
+                  Save
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setProdWaPickerOpen(false); setProdWaSearch(""); }}
+                  data-testid="button-cancel-prod-wa-group"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

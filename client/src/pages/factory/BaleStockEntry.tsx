@@ -2,7 +2,7 @@
   import { useQuery, useMutation } from "@tanstack/react-query";
   import {
     Plus, Minus, Trash2, Printer, ScanLine, AlertCircle, Package, CheckCircle,
-    XCircle, ShieldAlert, Lock, Upload, FileSpreadsheet, CalendarDays, List, LayoutList, Download, Palette
+    XCircle, ShieldAlert, Lock, Upload, FileSpreadsheet, CalendarDays, List, LayoutList, Download, Palette, Square, Loader2, MessageCircle
   } from "lucide-react";
   import { Button } from "@/components/ui/button";
   import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +30,7 @@
   import { queryClient } from "@/lib/queryClient";
   import { useAppMode } from "@/contexts/AppModeContext";
   import { getApiRequest } from "@/lib/factoryApi";
+  import { apiRequest } from "@/lib/queryClient";
   import { useCompany } from "@/contexts/CompanyContext";
   import { useFormDraft } from "@/hooks/useFormDraft";
   import { DraftRestorePrompt } from "@/components/DraftRestorePrompt";
@@ -2182,6 +2183,7 @@
   export default function BaleStockEntry() {
     const todayStr = new Date().toLocaleDateString('en-CA');
     const [summaryDate, setSummaryDate] = useState<string>(todayStr);
+    const { toast } = useToast();
 
     const { data: settings } = useQuery<any>({
       queryKey: ["/api/factory/settings"],
@@ -2195,12 +2197,57 @@
     const showEntry   = settings?.stockEntryTabEntryEnabled   !== false && !hiddenTabs.includes("hide_tab_stockentry_entry");
     const showHistory = settings?.stockEntryTabHistoryEnabled !== false && !hiddenTabs.includes("hide_tab_stockentry_history");
 
+    const { data: productionSession, refetch: refetchSession } = useQuery<any>({
+      queryKey: ["/api/factory/stock-entry/production-session", todayStr],
+      queryFn: async () => {
+        const r = await fetch(`/api/factory/stock-entry/production-session?date=${todayStr}`);
+        return r.ok ? r.json() : null;
+      },
+      staleTime: 30000,
+    });
+    const productionAlreadyEnded = !!productionSession?.productionEndedAt;
+
+    const endProductionMutation = useMutation({
+      mutationFn: async () => {
+        const res = await apiRequest("POST", "/api/factory/stock-entry/end-production", { date: todayStr });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Failed to end production"); }
+        return res.json();
+      },
+      onSuccess: () => {
+        toast({ title: "Production ended", description: "Worker Matrix PDF sent to WhatsApp group." });
+        refetchSession();
+      },
+      onError: (err: any) => {
+        if (err?._handledGlobally) return;
+        toast({ title: "End Production failed", description: err.message, variant: "destructive" });
+      },
+    });
+
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">Bale Stock Entry</h1>
           <div className="flex items-center gap-2">
             <LabelPrintSettings />
+            {productionAlreadyEnded ? (
+              <Badge variant="secondary" className="gap-1" data-testid="badge-production-ended">
+                <CheckCircle className="h-3 w-3" />
+                Production Ended
+              </Badge>
+            ) : (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => endProductionMutation.mutate()}
+                disabled={endProductionMutation.isPending}
+                data-testid="button-end-production"
+              >
+                {endProductionMutation.isPending
+                  ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  : <Square className="h-3 w-3 mr-1" />}
+                End Production
+              </Button>
+            )}
             <Badge variant="secondary" data-testid="badge-stock-entry">STOCK ENTRY</Badge>
           </div>
         </div>

@@ -4708,3 +4708,29 @@ export const insertFactoryAccountWhatsappRuleSchema = createInsertSchema(factory
 });
 export type FactoryAccountWhatsappRule = typeof factoryAccountWhatsappRules.$inferSelect;
 export type InsertFactoryAccountWhatsappRule = z.infer<typeof insertFactoryAccountWhatsappRuleSchema>;
+
+// ─── Factory Production Sessions ─────────────────────────────────────────────
+// One row per (companyId, sessionDate) — tracks end-of-day production state
+// and WhatsApp Worker Matrix delivery metadata.
+export const factoryProductionSessions = pgTable("factory_production_sessions", {
+  id:                              serial("id").primaryKey(),
+  companyId:                       integer("company_id").notNull(),
+  sessionDate:                     varchar("session_date", { length: 10 }).notNull(), // YYYY-MM-DD
+  productionEndedAt:               timestamp("production_ended_at"),
+  productionEndedBy:               text("production_ended_by"),
+  workerMatrixWhatsappSentAt:      timestamp("worker_matrix_whatsapp_sent_at"),
+  workerMatrixWhatsappMessageId:   text("worker_matrix_whatsapp_message_id"),
+  createdAt:                       timestamp("created_at").notNull().defaultNow(),
+  updatedAt:                       timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueSession: uniqueIndex("factory_production_sessions_unique").on(t.companyId, t.sessionDate),
+  companyIdx:    index("factory_production_sessions_company_idx").on(t.companyId),
+}));
+
+export const insertFactoryProductionSessionSchema = createInsertSchema(factoryProductionSessions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type FactoryProductionSession = typeof factoryProductionSessions.$inferSelect;
+export type InsertFactoryProductionSession = z.infer<typeof insertFactoryProductionSessionSchema>;

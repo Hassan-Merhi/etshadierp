@@ -172,6 +172,18 @@ The app has a layered offline-first foundation:
 - **`routes/supplierProformaRoutes.ts`** — ERP supplier proforma verification
 - All other `routes/*.ts` files — ERP domain routes (auth, accounts, vouchers, pos, stock, etc.)
 
+## End Production (Factory Mode) — Apr 2026
+
+- **`server/routes/factory/endProductionRoutes.ts`** — Three routes:
+  - `GET /api/factory/stock-entry/production-session?date=` — returns today's production session (ended status)
+  - `POST /api/factory/stock-entry/end-production` — generates Worker Bales PDF (pdfkit), sends it to the configured production WhatsApp group via Green API POS instance, then marks session ended in `factory_production_sessions`. Returns error (and does NOT mark ended) if WhatsApp send fails.
+  - `POST /api/factory/bales/send-worker-pdf-whatsapp` — manual send of Worker PDF for a given date WITHOUT marking production ended
+- **`server/lib/workerBalesPdfGenerator.ts`** — Server-side pdfkit PDF replicating the browser "Worker PDF" (portrait, two sections: bale detail + worker summary)
+- **`factory_production_sessions` DB table** — tracks per-(companyId, sessionDate) production ended state and WhatsApp send timestamps
+- **`client/src/pages/factory/BaleStockEntry.tsx`** — "End Production" button (destructive) in header; turns into "Production Ended" badge once ended today
+- **`client/src/pages/StockEntryHistory.tsx`** — "Send Worker PDF to WhatsApp" option in Actions menu
+- **`client/src/pages/factory/FactorySettings.tsx`** — "Production WhatsApp Group" picker card using `/api/whatsapp/chats/pos`; stored in `factory_settings.extraSettings.productionWorkerMatrixWhatsappGroupId`
+
 ## External Dependencies
 
 -   **AI/ML**: Google Gemini API

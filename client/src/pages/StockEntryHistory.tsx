@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
-import { ChevronDown, ChevronRight, Download, Search, RotateCcw, List, AlignJustify, FileDown, MoreVertical, CalendarRange } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Search, RotateCcw, List, AlignJustify, FileDown, MoreVertical, CalendarRange, MessageCircle, Loader2 } from "lucide-react";
 import ProductionPlannerDialog from "./factory/ProductionPlannerDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -259,6 +259,23 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     },
     onError: (err: any) => {
       toast({ title: "Assignment failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const sendWorkerPdfWaMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/factory/bales/send-worker-pdf-whatsapp", {
+        date: useDateFilter ? fromDate : today,
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Send failed"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Sent", description: "Worker PDF sent to production WhatsApp group." });
+    },
+    onError: (err: any) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Send failed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -703,6 +720,16 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                 data-testid="button-export-worker-pdf"
               >
                 <FileDown className="w-3 h-3 mr-2" /> Worker PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => sendWorkerPdfWaMutation.mutate()}
+                disabled={filteredGroups.length === 0 || sendWorkerPdfWaMutation.isPending}
+                data-testid="button-send-worker-pdf-whatsapp"
+              >
+                {sendWorkerPdfWaMutation.isPending
+                  ? <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                  : <MessageCircle className="w-3 h-3 mr-2" />}
+                Send Worker PDF to WhatsApp
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={exportExcel}
