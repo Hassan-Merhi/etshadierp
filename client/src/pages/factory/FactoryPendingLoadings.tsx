@@ -9,6 +9,16 @@ import { useLocation } from "wouter";
 import { Clock, Package, Play, Trash2, Download, Link, X, Undo2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -54,6 +64,7 @@ export default function FactoryPendingLoadings() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [deleteTarget, setDeleteTarget] = useState<PendingLoad | null>(null);
   const [linkTarget, setLinkTarget] = useState<PendingLoad | null>(null);
   const [selectedProformaId, setSelectedProformaId] = useState<number | null>(null);
   const [undoItems, setUndoItems] = useState<UndoItem[]>([]);
@@ -113,6 +124,13 @@ export default function FactoryPendingLoadings() {
   });
 
   const handleDelete = (load: PendingLoad) => {
+    setDeleteTarget(load);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) return;
+    const load = deleteTarget;
+    setDeleteTarget(null);
     cancelMutation.mutate(load.id);
 
     const timerId = setTimeout(() => {
@@ -330,6 +348,30 @@ export default function FactoryPendingLoadings() {
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete pending loading?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete Loading #{deleteTarget?.id} for{" "}
+              <strong>{deleteTarget?.customerName}</strong> and return all{" "}
+              {deleteTarget?.totalQtyBales} scanned bales back to stock.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground"
+              data-testid="button-confirm-delete"
+            >
+              Delete & Return to Stock
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Link Proforma Dialog */}
       <Dialog open={!!linkTarget} onOpenChange={(open) => { if (!open) closeLinkDialog(); }}>
