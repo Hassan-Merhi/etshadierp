@@ -2252,6 +2252,46 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
     }
   });
 
+  // Restore a recently-cancelled LOADING order back to LOADING status
+  app.post("/api/factory/customer-orders/:id/restore-loading", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      if (order.status !== "CANCELLED") return res.status(400).json({ message: "Only CANCELLED orders can be restored" });
+      if (!order.loadingStartedAt) return res.status(400).json({ message: "This order was not a loading order" });
+
+      // Restore bales that belong to this order back to RESERVED_FOR_ORDER
+      const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+      for (const ob of orderBales) {
+        await db.update(factoryBales)
+          .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
+          .where(and(eq(factoryBales.id, ob.baleId), eq(factoryBales.status, "IN_STOCK")));
+      }
+
+      const [restored] = await db.update(customerOrders)
+        .set({ status: "LOADING", updatedAt: new Date() })
+        .where(eq(customerOrders.id, orderId))
+        .returning();
+
+      // Remove the ORDER_CANCELLED daybook entry
+      await db.delete(factoryDaybookEntries).where(and(
+        eq(factoryDaybookEntries.companyId, companyId),
+        eq(factoryDaybookEntries.txType, "ORDER_CANCELLED"),
+        eq(factoryDaybookEntries.referenceId, orderId)
+      ));
+
+      res.json(restored);
+    } catch (error: any) {
+      console.error("Error restoring loading order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ───────────────────────────────────────────────
   // CONTAINER LOADING WORKFLOW
   // ───────────────────────────────────────────────
