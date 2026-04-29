@@ -255,10 +255,11 @@ function parseCellValue(s: string): CellValue {
 
 // ── Tab name editor ────────────────────────────────────────────────────────────
 function TabLabel({
-  name, active, onActivate, onRename, onDelete, canDelete,
+  name, active, onActivate, onRename, onDelete, canDelete, isAdmin, onLockClick,
 }: {
   name: string; active: boolean; onActivate: () => void;
   onRename: (v: string) => void; onDelete: () => void; canDelete: boolean;
+  isAdmin: boolean; onLockClick?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
@@ -302,7 +303,7 @@ function TabLabel({
       ) : (
         <span className="text-sm">{name}</span>
       )}
-      {active && canDelete && (
+      {active && isAdmin && canDelete && (
         <button
           data-testid={`tab-delete-${name}`}
           onClick={e => { e.stopPropagation(); onDelete(); }}
@@ -310,6 +311,17 @@ function TabLabel({
           style={{ visibility: "visible" }}
         >
           <X className="h-3 w-3" />
+        </button>
+      )}
+      {active && !isAdmin && (
+        <button
+          data-testid={`tab-locked-${name}`}
+          onClick={e => { e.stopPropagation(); onLockClick?.(); }}
+          className="ml-1 rounded-sm opacity-40 hover:opacity-70 text-muted-foreground transition-opacity"
+          title="Only admins can delete sheets"
+          style={{ visibility: "visible" }}
+        >
+          <Lock className="h-3 w-3" />
         </button>
       )}
     </div>
@@ -956,6 +968,11 @@ export default function FactorySheets() {
             onRename={(v) => renameTab(idx, v)}
             onDelete={() => deleteTab(idx)}
             canDelete={localSheets.length > 1}
+            isAdmin={isAdmin}
+            onLockClick={() => toast({
+              title: "Sheets are locked",
+              description: "Only admins can delete sheets.",
+            })}
           />
         ))}
         <button
@@ -978,7 +995,7 @@ export default function FactorySheets() {
         </div>
       ) : (
         <div className="flex-1 overflow-auto p-4">
-          <div className="inline-block min-w-full">
+          <div className="w-fit mx-auto">
             <table className="border-collapse text-sm" data-testid="grid-table">
               <thead className="sticky top-0 z-10">
                 <tr>
@@ -1104,7 +1121,7 @@ export default function FactorySheets() {
                                 className={`h-7 px-2 flex items-center gap-1 text-xs tabular-nums select-none
                                   ${!isDiff && !isLinked ? "cursor-pointer" : "cursor-default"}
                                   ${isErrorVal ? "text-red-500 font-mono" : isNeg ? "text-red-500" : isDiff ? "text-foreground font-medium" : "text-foreground"}
-                                  ${isTextVal ? "justify-start" : "justify-end"}`}
+                                  ${isTextVal ? "justify-start" : "justify-center"}`}
                                 title={isDiff ? "Auto-calculated" : isAdmin && !isLinked ? "Click to unlock column for editing" : isLinked && linkInfo ? `Linked from: ${linkInfo}` : ""}
                               >
                                 {isLinked && !isBroken && !isCyclic && (
@@ -1113,7 +1130,7 @@ export default function FactorySheets() {
                                 {(isBroken || isCyclic) && (
                                   <Link2Off className="h-2.5 w-2.5 text-red-400 shrink-0" />
                                 )}
-                                <span className="flex-1 text-right tabular-nums">{fmt(displayValue)}</span>
+                                <span className="tabular-nums">{fmt(displayValue)}</span>
                               </div>
                             ) : (
                               <Input
@@ -1122,7 +1139,7 @@ export default function FactorySheets() {
                                 onKeyDown={(e) => handleCellKeyDown(e, ri, ci)}
                                 className={`h-7 text-xs border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-2 tabular-nums
                                   ${isNeg ? "text-red-500" : ""}
-                                  ${isTextVal ? "text-left" : "text-right"}`}
+                                  ${isTextVal ? "text-left" : "text-center"}`}
                                 data-testid={`input-cell-${ri}-${ci}`}
                                 dir="auto"
                               />
@@ -1198,7 +1215,7 @@ export default function FactorySheets() {
 
                     {/* STATUS: row Total column */}
                     {isStatusSheet && (
-                      <td className={`border border-border px-3 py-0.5 text-right text-xs tabular-nums font-bold bg-blue-50/30 dark:bg-blue-950/20 ${typeof statusRowTotals[ri] === "number" && statusRowTotals[ri]! < 0 ? "text-red-500" : "text-blue-700 dark:text-blue-300"}`} data-testid={`text-row-total-${ri}`}>
+                      <td className={`border border-border px-3 py-0.5 text-center text-xs tabular-nums font-bold bg-blue-50/30 dark:bg-blue-950/20 ${typeof statusRowTotals[ri] === "number" && statusRowTotals[ri]! < 0 ? "text-red-500" : "text-blue-700 dark:text-blue-300"}`} data-testid={`text-row-total-${ri}`}>
                         {fmt(statusRowTotals[ri])}
                       </td>
                     )}
@@ -1225,13 +1242,13 @@ export default function FactorySheets() {
                     {diffRow.map((val, ci) => {
                       const isNeg = typeof val === "number" && val < 0;
                       return (
-                        <td key={ci} className={`border border-border px-3 py-1.5 text-right text-xs tabular-nums font-bold ${isNeg ? "text-red-500" : "text-foreground"}`} data-testid={`text-diff-${ci}`}>
+                        <td key={ci} className={`border border-border px-3 py-1.5 text-center text-xs tabular-nums font-bold ${isNeg ? "text-red-500" : "text-foreground"}`} data-testid={`text-diff-${ci}`}>
                           {fmt(val)}
                         </td>
                       );
                     })}
                     {isStatusSheet && (
-                      <td className={`border border-border px-3 py-1.5 text-right text-xs tabular-nums font-bold bg-blue-50/60 dark:bg-blue-950/40 ${typeof statusGrandTotal === "number" && statusGrandTotal < 0 ? "text-red-500" : "text-blue-700 dark:text-blue-300"}`} data-testid="text-status-grand-total">
+                      <td className={`border border-border px-3 py-1.5 text-center text-xs tabular-nums font-bold bg-blue-50/60 dark:bg-blue-950/40 ${typeof statusGrandTotal === "number" && statusGrandTotal < 0 ? "text-red-500" : "text-blue-700 dark:text-blue-300"}`} data-testid="text-status-grand-total">
                         {fmt(statusGrandTotal)}
                       </td>
                     )}
