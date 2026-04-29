@@ -828,7 +828,12 @@ export function registerFactoryProductsRoutes(app: Express) {
         ))
         .orderBy(desc(factoryBales.createdAt));
 
-      res.json({ bales });
+      const [product] = await db
+        .select({ sellingPrice: factoryBaleProducts.sellingPrice })
+        .from(factoryBaleProducts)
+        .where(and(eq(factoryBaleProducts.id, productId), eq(factoryBaleProducts.companyId, companyId)));
+
+      res.json({ bales, sellingPrice: product?.sellingPrice || "0" });
     } catch (error: any) {
       console.error("Error fetching monthly bale details:", error);
       res.status(500).json({ message: error.message });
@@ -872,7 +877,12 @@ export function registerFactoryProductsRoutes(app: Express) {
         .where(and(...conditions))
         .orderBy(desc(factoryBales.createdAt));
 
-      res.json({ bales });
+      const [product] = await db
+        .select({ sellingPrice: factoryBaleProducts.sellingPrice })
+        .from(factoryBaleProducts)
+        .where(and(eq(factoryBaleProducts.id, productId), eq(factoryBaleProducts.companyId, companyId)));
+
+      res.json({ bales, sellingPrice: product?.sellingPrice || "0" });
     } catch (error: any) {
       console.error("Error fetching all bale details:", error);
       res.status(500).json({ message: error.message });
