@@ -1960,9 +1960,12 @@ export default function Accounts() {
                             }
                           }
 
-                          // Default: single balance display
-                          const bal = selectedAccount?.balance ?? 0;
-                          const side = selectedAccount?.balanceSide ?? "Dr";
+                          // Default: single balance display — use closingBalance so
+                          // the header always matches the bottom "Current Balance" row.
+                          const isSupplierType = selectedAccount?.type === "supplier";
+                          const side = isSupplierType
+                            ? (closingBalance > 0 ? "Cr" : "Dr")
+                            : (closingBalance >= 0 ? "Dr" : "Cr");
                           const isNegative = side === "Cr";
                           return (
                             <div className="flex items-center gap-2">
@@ -1975,7 +1978,7 @@ export default function Accounts() {
                                 className="font-mono font-semibold"
                                 data-testid="text-account-balance"
                               >
-                                {formatAmount(Math.abs(bal))} {side}
+                                {formatAmount(Math.abs(closingBalance))} {side}
                               </span>
                             </div>
                           );
