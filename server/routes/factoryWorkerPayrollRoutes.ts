@@ -504,6 +504,32 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
     }
   });
 
+  // GET /api/factory/payrolls/:id/detail - Full payroll detail with per-day attendance
+  app.get("/api/factory/payrolls/:id/detail", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+
+      const [payroll] = await db.select().from(factoryPayrolls)
+        .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)));
+      if (!payroll) return res.status(404).json({ message: "Payroll not found" });
+
+      const attendanceRows = await db.select().from(factoryAttendance)
+        .where(and(
+          eq(factoryAttendance.companyId, companyId),
+          eq(factoryAttendance.workerId, payroll.workerId),
+          gte(factoryAttendance.attendanceDate, payroll.periodStart),
+          lte(factoryAttendance.attendanceDate, payroll.periodEnd),
+        ))
+        .orderBy(factoryAttendance.attendanceDate);
+
+      res.json({ payroll, attendance: attendanceRows });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // PATCH /api/factory/payrolls/:id/mark-paid - Mark single payroll as paid
   app.patch("/api/factory/payrolls/:id/mark-paid", requireAuth, async (req: any, res: any) => {
     try {

@@ -256,6 +256,8 @@ export default function FactoryWorkerDetail() {
   const [fixAcctTargetId, setFixAcctTargetId] = useState<number | null>(null);
   const [fixAcctCashId, setFixAcctCashId] = useState("");
 
+  const [detailPayrollId, setDetailPayrollId] = useState<number | null>(null);
+
   const [editOpen, setEditOpen] = useState(false);
 
   const [advanceDate, setAdvanceDate] = useState(new Date().toLocaleDateString('en-CA'));
@@ -301,6 +303,16 @@ export default function FactoryWorkerDetail() {
       return res.json();
     },
     enabled: !!workerId,
+  });
+
+  const { data: payrollDetail, isLoading: payrollDetailLoading } = useQuery<{ payroll: PayrollRecord & { presentDays: string; absentDays: string; totalWorkingDays: number; balesCount: number; kgProcessed: string; overtimePay: string; overtimeHours: string; deductions: string; transport: string; notes: string | null }; attendance: { id: number; attendanceDate: string; status: string; shift: string | null; notes: string | null }[] }>({
+    queryKey: ["/api/factory/payrolls", detailPayrollId, "detail"],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/payrolls/${detailPayrollId}/detail`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch detail");
+      return res.json();
+    },
+    enabled: detailPayrollId !== null,
   });
 
   const baleQueryString = [startDate && `startDate=${startDate}`, endDate && `endDate=${endDate}`].filter(Boolean).join("&");
@@ -890,6 +902,15 @@ export default function FactoryWorkerDetail() {
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-1">
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => setDetailPayrollId(p.id)}
+                                      data-testid={`button-detail-payroll-${p.id}`}
+                                      title="View details"
+                                    >
+                                      <Eye className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
                                     {p.status !== "PAID" && (
                                       <Button
                                         size="sm"
@@ -1714,6 +1735,169 @@ export default function FactoryWorkerDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Payroll Detail Dialog */}
+      <Dialog open={detailPayrollId !== null} onOpenChange={(open) => { if (!open) setDetailPayrollId(null); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4" />
+              Payroll Detail
+              {payrollDetail && (
+                <span className="text-sm font-normal text-muted-foreground ml-1">
+                  {payrollDetail.payroll.periodStart?.slice(0, 10)} – {payrollDetail.payroll.periodEnd?.slice(0, 10)}
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          {payrollDetailLoading ? (
+            <div className="space-y-2 py-4">
+              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
+            </div>
+          ) : payrollDetail ? (
+            <div className="space-y-5">
+              {/* Pay Breakdown */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Pay Breakdown</p>
+                <div className="rounded-md border divide-y text-sm">
+                  {[
+                    { label: "Base Salary", value: payrollDetail.payroll.baseSalary, className: "" },
+                    { label: "Transport Allowance", value: (payrollDetail.payroll as any).transport || "0", className: "" },
+                    { label: "Bonuses", value: payrollDetail.payroll.bonuses, className: "text-green-700 dark:text-green-400" },
+                    { label: "Overtime Pay", value: (payrollDetail.payroll as any).overtimePay || "0", className: "" },
+                    { label: "Advances Deducted", value: payrollDetail.payroll.advances, className: "text-red-700 dark:text-red-400" },
+                    { label: "Other Deductions", value: (payrollDetail.payroll as any).deductions || "0", className: "text-red-700 dark:text-red-400" },
+                  ].map(({ label, value, className }) => (
+                    <div key={label} className="flex justify-between items-center px-3 py-2">
+                      <span className="text-muted-foreground">{label}</span>
+                      <span className={`font-mono font-medium ${className}`}>${fmtNum(value)}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between items-center px-3 py-2.5 bg-muted/40 font-semibold">
+                    <span>Net Salary</span>
+                    <span className="font-mono text-base">${fmtNum(payrollDetail.payroll.netSalary)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Attendance Summary */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Attendance Summary</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: "Present Days", value: parseFloat((payrollDetail.payroll as any).presentDays || "0"), color: "text-green-700 dark:text-green-400" },
+                    { label: "Absent Days", value: parseFloat((payrollDetail.payroll as any).absentDays || "0"), color: "text-red-700 dark:text-red-400" },
+                    { label: "Working Days", value: (payrollDetail.payroll as any).totalWorkingDays || 0, color: "" },
+                  ].map(({ label, value, color }) => (
+                    <Card key={label}>
+                      <CardContent className="p-3 text-center">
+                        <p className={`text-xl font-bold ${color}`}>{value}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              {/* Per-day Attendance */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Daily Attendance
+                  {payrollDetail.attendance.length > 0 && (
+                    <span className="ml-2 normal-case font-normal">({payrollDetail.attendance.length} records)</span>
+                  )}
+                </p>
+                {payrollDetail.attendance.length === 0 ? (
+                  <div className="rounded-md border px-4 py-6 text-center text-sm text-muted-foreground">
+                    No attendance records for this period. Salary was calculated by calendar days.
+                  </div>
+                ) : (
+                  <div className="rounded-md border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Day</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Shift</TableHead>
+                          <TableHead>Notes</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {payrollDetail.attendance.map((att) => {
+                          const d = new Date(att.attendanceDate + "T00:00:00");
+                          const dayName = d.toLocaleDateString("en-US", { weekday: "short" });
+                          const statusColors: Record<string, string> = {
+                            Present: "text-green-700 dark:text-green-400",
+                            Late: "text-amber-700 dark:text-amber-400",
+                            "Half Day": "text-blue-700 dark:text-blue-400",
+                            Absent: "text-red-700 dark:text-red-400",
+                          };
+                          return (
+                            <TableRow key={att.id} data-testid={`row-detail-att-${att.id}`}>
+                              <TableCell className="text-sm font-mono">{att.attendanceDate}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{dayName}</TableCell>
+                              <TableCell>
+                                <span className={`text-sm font-medium ${statusColors[att.status] || ""}`}>
+                                  {att.status}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{att.shift || "—"}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{att.notes || "—"}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+
+              {/* Extra stats (bales / kg / overtime) */}
+              {(parseFloat((payrollDetail.payroll as any).balesCount || "0") > 0 || parseFloat((payrollDetail.payroll as any).kgProcessed || "0") > 0 || parseFloat((payrollDetail.payroll as any).overtimeHours || "0") > 0) && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Production</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {parseFloat((payrollDetail.payroll as any).balesCount || "0") > 0 && (
+                      <Card><CardContent className="p-3 text-center">
+                        <p className="text-xl font-bold">{(payrollDetail.payroll as any).balesCount}</p>
+                        <p className="text-xs text-muted-foreground">Bales</p>
+                      </CardContent></Card>
+                    )}
+                    {parseFloat((payrollDetail.payroll as any).kgProcessed || "0") > 0 && (
+                      <Card><CardContent className="p-3 text-center">
+                        <p className="text-xl font-bold">{parseFloat((payrollDetail.payroll as any).kgProcessed || "0").toFixed(1)}</p>
+                        <p className="text-xs text-muted-foreground">KG</p>
+                      </CardContent></Card>
+                    )}
+                    {parseFloat((payrollDetail.payroll as any).overtimeHours || "0") > 0 && (
+                      <Card><CardContent className="p-3 text-center">
+                        <p className="text-xl font-bold">{parseFloat((payrollDetail.payroll as any).overtimeHours || "0").toFixed(1)}</p>
+                        <p className="text-xs text-muted-foreground">OT Hours</p>
+                      </CardContent></Card>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Notes */}
+              {payrollDetail.payroll.notes && (
+                <div className="rounded-md bg-muted/40 px-3 py-2 text-sm">
+                  <span className="text-muted-foreground text-xs font-medium">Notes: </span>
+                  {payrollDetail.payroll.notes}
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailPayrollId(null)} data-testid="button-close-payroll-detail">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {AdminDialog}
     </div>
   );
