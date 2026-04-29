@@ -1758,55 +1758,203 @@ export function registerPosRoutes(app: Express) {
         return res.status(400).json({ message: "WhatsApp group not configured for this location" });
       }
 
-      // Fetch sale items with stock item names
+      // Fetch sale items with all fields needed for the invoice PDF
       const items = await db
         .select({
-          name: stockItems.name,
-          quantity: salesItems.quantity,
-          sellingPrice: salesItems.sellingPrice,
-          totalSales: salesItems.totalSales,
+          name:            stockItems.name,
+          quantity:        salesItems.quantity,
+          sellingPrice:    salesItems.sellingPrice,
+          configuredPrice: salesItems.configuredPrice,
+          totalSales:      salesItems.totalSales,
         })
         .from(salesItems)
         .innerJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
         .where(eq(salesItems.voucherId, voucher.id));
 
-      const dateStr = voucher.voucherDate;
       const senderName = req.user?.username || "POS";
+      const totalAmount = parseFloat(voucher.totalAmount);
 
-      const itemLines = items.map((item) => {
-        const qty = parseFloat(item.quantity);
-        const rate = parseFloat(item.sellingPrice);
-        const total = parseFloat(item.totalSales);
-        const qtyStr = qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(3).replace(/\.?0+$/, "");
-        return `  • ${item.name} × ${qtyStr} @ $${rate.toFixed(2)} = $${total.toFixed(2)}`;
+      // ── Number formatting helpers ────────────────────────────────────────────
+      const fmtN = (n: number): string => {
+        if (n === 0) return "0";
+        const abs = Math.abs(n);
+        const s = abs % 1 === 0
+          ? abs.toLocaleString("en-US")
+          : abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return (n < 0 ? "-" : "") + s;
+      };
+      const fmtC = (n: number) => `$ ${fmtN(n)}`;
+
+      // ── Build PDF ────────────────────────────────────────────────────────────
+      // A4 width=595.28pt; left/right margin=30 → usable=535.28
+      const ML = 30, MR = 30;
+      const PW = 595.28;
+      const USE = PW - ML - MR; // 535.28
+
+      // Column x-positions and widths (proportions match the HTML template)
+      const cols = [
+        { label: "Description", w: Math.floor(USE * 0.30), align: "left"   as const },
+        { label: "Qty",         w: Math.floor(USE * 0.06), align: "center" as const },
+        { label: "Rate",        w: Math.floor(USE * 0.09), align: "center" as const },
+        { label: "Amt",         w: Math.floor(USE * 0.10), align: "center" as const },
+        { label: "Config",      w: Math.floor(USE * 0.10), align: "center" as const },
+        { label: "P/L Bale",   w: Math.floor(USE * 0.12), align: "center" as const },
+        { label: "Total P/L",  w: Math.floor(USE * 0.13), align: "center" as const },
+      ];
+      // build x starts
+      let cx = ML;
+      const colX: number[] = [];
+      for (const c of cols) { colX.push(cx); cx += c.w; }
+      const tableRight = cx;
+
+      const ROW_H   = 14;
+      const HDR_H   = 16;
+      const CELL_PAD = 3;
+      const FS_HDR  = 7;
+      const FS_ROW  = 7;
+
+      const pdoc = new PDFDocument({ size: "A4", margin: ML, autoFirstPage: true });
+      const pchunks: Buffer[] = [];
+      pdoc.on("data", (c: Buffer) => pchunks.push(c));
+
+      await new Promise<void>((resolve, reject) => {
+        pdoc.on("end", resolve);
+        pdoc.on("error", reject);
+
+        const drawCell = (
+          text: string,
+          x: number, y: number, w: number, h: number,
+          opts: { align?: "left"|"center"|"right"; bold?: boolean; color?: string; bg?: string; border?: string; fontSize?: number } = {}
+        ) => {
+          const bg     = opts.bg     ?? null;
+          const border = opts.border ?? "#999999";
+          if (bg) { pdoc.rect(x, y, w, h).fillColor(bg).fill(); }
+          pdoc.rect(x, y, w, h).strokeColor(border).lineWidth(0.4).stroke();
+          pdoc.font(opts.bold ? "Helvetica-Bold" : "Helvetica")
+              .fontSize(opts.fontSize ?? FS_ROW)
+              .fillColor(opts.color ?? "#000000");
+          pdoc.text(text, x + CELL_PAD, y + CELL_PAD + 1, {
+            width: w - CELL_PAD * 2,
+            align: opts.align ?? "left",
+            lineBreak: false,
+          });
+        };
+
+        // ── Title ──────────────────────────────────────────────────────────────
+        pdoc.font("Helvetica-Bold").fontSize(13).fillColor("#000000")
+          .text("POS INVOICE", ML, 30, { width: USE, align: "center" });
+
+        // ── Date / User row ────────────────────────────────────────────────────
+        const infoY = 50;
+        pdoc.moveTo(ML, infoY).lineTo(tableRight, infoY).strokeColor("#000000").lineWidth(1.5).stroke();
+        pdoc.font("Helvetica-Bold").fontSize(8).fillColor("#000000");
+        pdoc.text(`Date: ${voucher.voucherDate}`, ML, infoY + 3, { lineBreak: false });
+        pdoc.text(`User: ${senderName}`, ML, infoY + 3, { width: USE, align: "right", lineBreak: false });
+        pdoc.moveTo(ML, infoY + 14).lineTo(tableRight, infoY + 14).strokeColor("#000000").lineWidth(1.5).stroke();
+
+        // ── Credit sale label ──────────────────────────────────────────────────
+        let tableStartY = infoY + 22;
+        if (voucher.isCreditSale) {
+          pdoc.rect(ML, tableStartY, USE, 14).strokeColor("#000000").lineWidth(0.75).stroke();
+          pdoc.font("Helvetica-Bold").fontSize(8).fillColor("#000000")
+            .text("CREDIT SALE", ML + CELL_PAD, tableStartY + 3, { lineBreak: false });
+          tableStartY += 18;
+        }
+
+        // ── Table header ───────────────────────────────────────────────────────
+        let hy = tableStartY;
+        for (let i = 0; i < cols.length; i++) {
+          drawCell(cols[i].label, colX[i], hy, cols[i].w, HDR_H, {
+            align: cols[i].align, bold: true, bg: "#eeeeee",
+            border: "#999999", fontSize: FS_HDR,
+          });
+        }
+        let rowY = hy + HDR_H;
+
+        // ── Item rows ──────────────────────────────────────────────────────────
+        let totalQty = 0, totalAmt = 0, totalPL = 0;
+        items.forEach((item, idx) => {
+          const qty     = parseFloat(item.quantity);
+          const rate    = parseFloat(item.sellingPrice);
+          const amt     = qty * rate;
+          const config  = parseFloat(item.configuredPrice ?? "0");
+          const plBale  = rate - config;
+          const pl      = plBale * qty;
+          totalQty += qty; totalAmt += amt; totalPL += pl;
+
+          const bg = idx % 2 === 0 ? "#ffffff" : "#f5f5f5";
+          const plBaleColor  = plBale > 0 ? "#0a7e1f" : plBale < 0 ? "#c2272d" : "#000000";
+          const plTotalColor = pl     > 0 ? "#0a7e1f" : pl     < 0 ? "#c2272d" : "#000000";
+
+          drawCell(item.name,       colX[0], rowY, cols[0].w, ROW_H, { align: "left",   bg, border: "#c8c8c8" });
+          drawCell(fmtN(qty),       colX[1], rowY, cols[1].w, ROW_H, { align: "center", bg, border: "#c8c8c8" });
+          drawCell(fmtC(rate),      colX[2], rowY, cols[2].w, ROW_H, { align: "center", bg, border: "#c8c8c8" });
+          drawCell(fmtC(amt),       colX[3], rowY, cols[3].w, ROW_H, { align: "center", bg, border: "#c8c8c8" });
+          drawCell(fmtC(config),    colX[4], rowY, cols[4].w, ROW_H, { align: "center", bg, border: "#c8c8c8" });
+          drawCell(fmtC(plBale),    colX[5], rowY, cols[5].w, ROW_H, { align: "center", bg, border: "#c8c8c8", color: plBaleColor });
+          drawCell(fmtC(pl),        colX[6], rowY, cols[6].w, ROW_H, { align: "center", bg, border: "#c8c8c8", color: plTotalColor });
+          rowY += ROW_H;
+        });
+
+        // ── Totals row ─────────────────────────────────────────────────────────
+        const plTotColor = totalPL > 0 ? "#0a7e1f" : totalPL < 0 ? "#c2272d" : "#000000";
+        drawCell("TOTAL",         colX[0], rowY, cols[0].w, ROW_H, { bold: true, bg: "#eeeeee", border: "#999999" });
+        drawCell(fmtN(totalQty),  colX[1], rowY, cols[1].w, ROW_H, { align: "center", bold: true, bg: "#eeeeee", border: "#999999" });
+        drawCell("",              colX[2], rowY, cols[2].w, ROW_H, { bg: "#eeeeee", border: "#999999" });
+        drawCell(fmtC(totalAmt),  colX[3], rowY, cols[3].w, ROW_H, { align: "center", bold: true, bg: "#eeeeee", border: "#999999" });
+        drawCell("",              colX[4], rowY, cols[4].w, ROW_H, { bg: "#eeeeee", border: "#999999" });
+        drawCell("",              colX[5], rowY, cols[5].w, ROW_H, { bg: "#eeeeee", border: "#999999" });
+        drawCell(fmtC(totalPL),   colX[6], rowY, cols[6].w, ROW_H, { align: "center", bold: true, bg: "#eeeeee", border: "#999999", color: plTotColor });
+        rowY += ROW_H + 6;
+
+        // ── Total Paid ─────────────────────────────────────────────────────────
+        pdoc.moveTo(ML, rowY).lineTo(tableRight, rowY).strokeColor("#333333").lineWidth(1.5).stroke();
+        rowY += 5;
+        pdoc.font("Helvetica-Bold").fontSize(11).fillColor("#000000");
+        pdoc.text("TOTAL PAID:", ML, rowY, { lineBreak: false });
+        pdoc.text(fmtC(totalAmount), ML, rowY, { width: USE, align: "right", lineBreak: false });
+        rowY += 20;
+
+        // ── Note ───────────────────────────────────────────────────────────────
+        if (voucher.description) {
+          pdoc.rect(ML, rowY, USE, 18).strokeColor("#000000").lineWidth(1.5).stroke();
+          pdoc.font("Helvetica-Bold").fontSize(8).fillColor("#000000")
+            .text("Note: ", ML + CELL_PAD, rowY + 4, { continued: true, lineBreak: false });
+          pdoc.font("Helvetica").text(voucher.description, { lineBreak: false });
+          rowY += 24;
+        }
+
+        // ── Footer ─────────────────────────────────────────────────────────────
+        rowY += 6;
+        pdoc.moveTo(ML, rowY).lineTo(tableRight, rowY).strokeColor("#000000").lineWidth(1.5).stroke();
+        rowY += 5;
+        pdoc.font("Helvetica").fontSize(8).fillColor("#000000")
+          .text("Thank you for your business!", ML, rowY, { width: USE, align: "center" });
+
+        pdoc.end();
       });
 
-      const totalAmount = parseFloat(voucher.totalAmount);
-      const creditLine = voucher.isCreditSale ? "\n💳 *CREDIT SALE*" : "";
+      const pdfBuffer = Buffer.concat(pchunks);
+      const safeVNum  = (voucher.voucherNumber ?? "invoice").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const fileName  = `Invoice_${safeVNum}.pdf`;
+      const caption   = `📍 ${location.name} — ${voucher.voucherNumber}`;
 
-      const message = [
-        `🧾 *POS Invoice — ${voucher.voucherNumber}*`,
-        `📍 ${location.name}  |  📅 ${dateStr}`,
-        `👤 ${senderName}`,
-        creditLine,
-        ``,
-        `*Items:*`,
-        ...itemLines,
-        ``,
-        `━━━━━━━━━━━━━━━━`,
-        `💰 *Total: $${totalAmount.toFixed(2)}*`,
-        voucher.description ? `\n📝 ${voucher.description}` : "",
-      ]
-        .filter((l) => l !== undefined && l !== null)
-        .join("\n")
-        .trim();
+      const fileId  = storeTempFile(pdfBuffer, "application/pdf", fileName);
+      const proto   = req.headers["x-forwarded-proto"] ?? req.protocol;
+      const host    = req.headers["x-forwarded-host"] ?? req.get("host");
+      const fileUrl = `${proto}://${host}/api/pos/temp-pdf/${fileId}`;
 
-      const result = await sendWhatsAppTextToChatIdPos(location.whatsappGroupChatId, message);
+      const result = await sendWhatsAppFileByUrlToChatIdPos(
+        location.whatsappGroupChatId,
+        fileUrl,
+        fileName,
+        caption,
+      );
       if (!result.success) {
-        return res.status(502).json({ message: result.error ?? "Failed to send WhatsApp message" });
+        return res.status(502).json({ message: result.error ?? "Failed to send WhatsApp PDF" });
       }
 
-      res.json({ success: true, message: "Invoice sent to WhatsApp" });
+      res.json({ success: true, message: "Invoice PDF sent to WhatsApp" });
     } catch (error: any) {
       console.error("[/api/pos/send-invoice-whatsapp]", error);
       res.status(500).json({ message: error.message });
