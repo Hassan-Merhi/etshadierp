@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import { Plus, Trash2, Banknote, RotateCcw, Users, Loader2 } from "lucide-react";
+import { Plus, Trash2, Banknote, RotateCcw, Users, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -106,6 +106,7 @@ function AdvancesView() {
   const [addOpen, setAddOpen] = useState(false);
   const [filterWorker, setFilterWorker] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [showPaid, setShowPaid] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AdvanceRecord | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [reconcileOpen, setReconcileOpen] = useState(false);
@@ -361,80 +362,106 @@ function AdvancesView() {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="p-0 overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Worker</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right">Remaining</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead className="w-12"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                    No advances found
-                  </TableCell>
-                </TableRow>
-              ) : filtered.map((adv) => (
-                <TableRow key={adv.id} data-testid={`row-erp-advance-${adv.id}`}>
-                  <TableCell className="font-medium" data-testid={`text-erp-advance-worker-${adv.id}`}>
-                    {getWorkerName(adv.employeeId)}
-                  </TableCell>
-                  <TableCell>{fmtDate(adv.advanceDate)}</TableCell>
-                  <TableCell className="text-right font-mono">
-                    {fmt(adv.amount, formatAmount)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {fmt(adv.remainingBalance, formatAmount)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className="border-slate-400 text-slate-700 dark:text-slate-400"
-                    >
-                      Salary Ded.
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={adv.fullyPaid
-                        ? "border-green-500 text-green-700 dark:text-green-400"
-                        : "border-amber-400 text-amber-700 dark:text-amber-400"
-                      }
-                    >
-                      {adv.fullyPaid ? "Paid" : "Outstanding"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                    {adv.notes || "—"}
-                  </TableCell>
-                  <TableCell>
-                    {!adv.fullyPaid && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeleteTarget(adv)}
-                        data-testid={`button-delete-erp-advance-${adv.id}`}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {(() => {
+        const outstanding = filtered.filter(a => !a.fullyPaid);
+        const paid        = filtered.filter(a => a.fullyPaid);
+
+        const renderRow = (adv: AdvanceRecord) => (
+          <TableRow key={adv.id} data-testid={`row-erp-advance-${adv.id}`}
+            className={adv.fullyPaid ? "opacity-60" : ""}
+          >
+            <TableCell className="font-medium" data-testid={`text-erp-advance-worker-${adv.id}`}>
+              {getWorkerName(adv.employeeId)}
+            </TableCell>
+            <TableCell>{fmtDate(adv.advanceDate)}</TableCell>
+            <TableCell className="text-right font-mono">{fmt(adv.amount, formatAmount)}</TableCell>
+            <TableCell className="text-right font-mono">{fmt(adv.remainingBalance, formatAmount)}</TableCell>
+            <TableCell>
+              <Badge variant="outline" className="border-slate-400 text-slate-700 dark:text-slate-400">
+                Salary Ded.
+              </Badge>
+            </TableCell>
+            <TableCell>
+              <Badge variant="outline" className={adv.fullyPaid
+                ? "border-green-500 text-green-700 dark:text-green-400"
+                : "border-amber-400 text-amber-700 dark:text-amber-400"
+              }>
+                {adv.fullyPaid ? "Paid" : "Outstanding"}
+              </Badge>
+            </TableCell>
+            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+              {adv.notes || "—"}
+            </TableCell>
+            <TableCell>
+              {!adv.fullyPaid && (
+                <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(adv)}
+                  data-testid={`button-delete-erp-advance-${adv.id}`}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              )}
+            </TableCell>
+          </TableRow>
+        );
+
+        const colHeaders = (
+          <TableHeader>
+            <TableRow>
+              <TableHead>Worker</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead className="text-right">Amount</TableHead>
+              <TableHead className="text-right">Remaining</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Notes</TableHead>
+              <TableHead className="w-12"></TableHead>
+            </TableRow>
+          </TableHeader>
+        );
+
+        return (
+          <Card>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table>
+                {colHeaders}
+                <TableBody>
+                  {outstanding.length === 0 && paid.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                        No advances found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    <>
+                      {outstanding.map(renderRow)}
+
+                      {paid.length > 0 && (
+                        <>
+                          <TableRow
+                            className="cursor-pointer hover-elevate bg-muted/30"
+                            onClick={() => setShowPaid(p => !p)}
+                            data-testid="row-toggle-paid"
+                          >
+                            <TableCell colSpan={8} className="py-2">
+                              <span className="flex items-center gap-2 text-sm text-muted-foreground select-none">
+                                {showPaid
+                                  ? <ChevronDown className="h-4 w-4" />
+                                  : <ChevronRight className="h-4 w-4" />
+                                }
+                                {paid.length} paid advance{paid.length !== 1 ? "s" : ""}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                          {showPaid && paid.map(renderRow)}
+                        </>
+                      )}
+                    </>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Add Advance Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
