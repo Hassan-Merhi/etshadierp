@@ -278,6 +278,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     voucherNumber: string; voucherDate: string;
   } | null>(null);
 
+  // Stock WhatsApp auto-send state
+  type StockWaStatus = "idle" | "sending" | "sent" | "failed" | "not_configured";
+  const [stockWaStatus, setStockWaStatus]       = useState<StockWaStatus>("idle");
+  const [pendingStockSend, setPendingStockSend] = useState(false);
+
   // Mobile-specific state
   const [mobileItemSearchOpen, setMobileItemSearchOpen] = useState(false);
   const [mobileItemSearchTerm, setMobileItemSearchTerm] = useState("");
@@ -578,6 +583,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             voucherNumber: data.voucher?.voucherNumber || String(data.voucher.id),
             voucherDate:   data.voucher?.voucherDate   || new Date().toISOString().slice(0, 10),
           });
+          // Auto-send stock to WhatsApp in the background
+          setStockWaStatus("sending");
+          setPendingStockSend(true);
+        } else {
+          setStockWaStatus("not_configured");
         }
       }
     },
@@ -654,8 +664,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       if (editVoucherId) {
         navigate("/pos-daybook");
       } else {
-        // After printing the invoice, prompt to print stock
-        setShowStockPrompt(true);
+        // Only show stock prompt if WhatsApp didn't handle it (or failed)
+        if (stockWaStatus !== "sent" && stockWaStatus !== "sending") {
+          setShowStockPrompt(true);
+        }
       }
     },
   });
@@ -666,6 +678,36 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     queryKey: [`/api/locations/${printLocationId}/inventory`],
     enabled: (showPrintDialog || showStockPrompt) && !!printLocationId,
   });
+
+  // Deferred stock auto-send — fires after print dialog renders AND inventory query resolves
+  useEffect(() => {
+    if (!pendingStockSend || !showPrintDialog || stockInventoryLoading || !stockPrintRef.current) return;
+    setPendingStockSend(false);
+    const doSend = async () => {
+      setStockWaStatus("sending");
+      try {
+        const locName  = activeLocation?.name || "Location";
+        const compName = (selectedCompany as any)?.name || "";
+        const dateStr  = new Date().toISOString().slice(0, 10);
+        const safeName = `${locName} STK ${compName} ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
+        const pdfBase64 = await captureElementToPdf(stockPrintRef.current!);
+        const res = await apiRequest("POST", "/api/pos/send-whatsapp-pdf-upload", {
+          pdfBase64,
+          locationId: activeLocation?.id,
+          filename: `${safeName}.pdf`,
+          caption: `Stock Report — ${locName}`,
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.message || "Stock send failed");
+        setStockWaStatus("sent");
+        toast({ title: "Stock sent", description: "Stock report sent to WhatsApp group." });
+      } catch (e: any) {
+        setStockWaStatus("failed");
+        toast({ title: "Stock send failed", description: e.message || "Could not send stock report.", variant: "destructive" });
+      }
+    };
+    doSend();
+  }, [pendingStockSend, showPrintDialog, stockInventoryLoading]);
 
   const handleStockPrint = useReactToPrint({
     contentRef: stockPrintRef,
@@ -678,6 +720,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       return;
     }
     setSendingWhatsApp(true);
+    setStockWaStatus("sending");
     try {
       const locName  = activeLocation?.name || "Location";
       const compName = (selectedCompany as any)?.name || "";
@@ -692,8 +735,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.message || "WhatsApp stock report failed");
+      setStockWaStatus("sent");
       toast({ title: "Sent", description: "Stock report sent to WhatsApp group." });
     } catch (e: any) {
+      setStockWaStatus("failed");
       toast({ title: "Failed to send", description: e.message || "WhatsApp send failed.", variant: "destructive" });
     } finally {
       setSendingWhatsApp(false);
@@ -999,6 +1044,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     setSavedSale(null);
     setCurrentDraftId(null);
     setShowPrintDialog(false);
+    setStockWaStatus("idle");
+    setPendingStockSend(false);
   };
 
   const getStockWarning = (row: SaleRow): string | null => {
@@ -2580,18 +2627,40 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 {sendingInvoiceWhatsApp ? "Sending…" : "Resend Invoice"}
               </Button>
             )}
-            {!editVoucherId && (
-              <Button
-                variant="outline"
-                onClick={handleSendWhatsAppReport}
-                disabled={sendingWhatsApp}
-                className="gap-2"
-                data-testid="button-send-stock-whatsapp"
-              >
-                <Send className="h-4 w-4" />
-                {sendingWhatsApp ? "Sending…" : "Send Stock"}
-              </Button>
-            )}
+            {!editVoucherId && (() => {
+              const hasWa = !!(activeLocation as any)?.whatsappGroupChatId;
+              if (stockWaStatus === "sending") {
+                return (
+                  <Button variant="outline" disabled className="gap-2" data-testid="button-stock-wa-sending">
+                    <span className="animate-spin inline-block"><Send className="h-4 w-4" /></span>
+                    Sending Stock…
+                  </Button>
+                );
+              }
+              if (stockWaStatus === "sent") {
+                return (
+                  <Button variant="outline" disabled className="gap-2 opacity-60" data-testid="button-stock-wa-sent">
+                    <Send className="h-4 w-4" />
+                    Stock Sent
+                  </Button>
+                );
+              }
+              if (stockWaStatus === "failed" || !hasWa || stockWaStatus === "not_configured") {
+                return (
+                  <Button
+                    variant="outline"
+                    onClick={handleStockPrint}
+                    disabled={stockInventoryLoading}
+                    className="gap-2"
+                    data-testid="button-print-stock-fallback"
+                  >
+                    <Printer className="h-4 w-4" />
+                    {stockInventoryLoading ? "Loading…" : stockWaStatus === "failed" ? "Print Stock" : "Print Stock"}
+                  </Button>
+                );
+              }
+              return null;
+            })()}
             <Button onClick={handlePrint} className="gap-2" data-testid="button-print-invoice">
               <Printer className="h-4 w-4" />
               Print Invoice
