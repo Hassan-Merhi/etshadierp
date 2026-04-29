@@ -1626,19 +1626,17 @@ export function registerPosRoutes(app: Express) {
         const colQtyW        = 90;
 
         const thY = doc.y;
-        doc.rect(40, thY - 2, 515, 16).fillColor("#f8f8f8").fill();
-        doc.fontSize(10).font("Helvetica-Bold").fillColor("#000000");
-        doc.text("Particulars", colParticulars, thY, { lineBreak: false });
-        doc.text("Closing Balance", colQtyRight - colQtyW, thY, { width: colQtyW, align: "right", lineBreak: false });
-        doc.moveDown(0.6);
+        doc.rect(40, thY - 2, 515, 28).fillColor("#1a3a5c").fill();
+        doc.fontSize(10).font("Helvetica-Bold").fillColor("#ffffff");
+        doc.text("Particulars", colParticulars + 4, thY + 2, { lineBreak: false });
+        doc.text("Closing Balance", colQtyRight - colQtyW, thY + 2, { width: colQtyW, align: "right", lineBreak: false });
 
-        // "Quantity" sub-header under Closing Balance
-        const subY = doc.y - 2;
-        doc.fontSize(8).font("Helvetica").fillColor("#444444");
-        doc.text("Quantity", colQtyRight - colQtyW, subY, { width: colQtyW, align: "right", lineBreak: false });
-        doc.moveDown(0.2);
+        // "Quantity" sub-label
+        doc.fontSize(7.5).font("Helvetica").fillColor("#b0c4d8");
+        doc.text("Quantity", colQtyRight - colQtyW, thY + 15, { width: colQtyW, align: "right", lineBreak: false });
+        doc.moveDown(1.5);
 
-        doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#333333").lineWidth(1.5).stroke();
+        doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#1a3a5c").lineWidth(1).stroke();
         doc.moveDown(0.4);
 
         // ── Rows ─────────────────────────────────────────────────────────────
@@ -1646,49 +1644,57 @@ export function registerPosRoutes(app: Express) {
           const groupQty = items.reduce((s, i) => s + Math.floor(parseFloat(i.quantity ?? "0")), 0);
           const groupUom = items[0]?.unit ?? "";
 
-          // Group row
+          // Group header row — dark background, bold text
           const gy = doc.y;
-          doc.rect(40, gy - 2, 515, 14).fillColor("#eaeaea").fill();
-          doc.moveTo(40, gy - 2).lineTo(555, gy - 2).strokeColor("#666666").lineWidth(0.5).stroke();
-          doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000");
+          doc.rect(40, gy - 2, 515, 16).fillColor("#dde3ec").fill();
+          doc.moveTo(40, gy - 2).lineTo(555, gy - 2).strokeColor("#4a6080").lineWidth(0.75).stroke();
+          doc.font("Helvetica-Bold").fontSize(10).fillColor("#1a3a5c");
           doc.text(name, colParticulars, gy, { lineBreak: false });
           doc.text(`${groupQty.toLocaleString()} ${groupUom}`.trim(), colQtyRight - colQtyW, gy, { width: colQtyW, align: "right", lineBreak: false });
           doc.moveDown(0.9);
           const gyBottom = doc.y;
-          doc.moveTo(40, gyBottom).lineTo(555, gyBottom).strokeColor("#666666").lineWidth(0.5).stroke();
-          doc.moveDown(0.1);
+          doc.moveTo(40, gyBottom).lineTo(555, gyBottom).strokeColor("#4a6080").lineWidth(0.75).stroke();
+          doc.moveDown(0.2);
 
           // Item rows
-          for (const item of items) {
+          for (let ii = 0; ii < items.length; ii++) {
+            const item = items[ii];
             const qty = Math.floor(parseFloat(item.quantity ?? "0"));
             const uom = item.unit ?? "";
             const isNeg = qty < 0;
             const iy = doc.y;
-            if (isNeg) {
-              doc.rect(40, iy - 2, 515, 13).fillColor("rgba(255,200,200,0.5)").fill();
+            // Alternate row tint
+            if (ii % 2 === 1) {
+              doc.rect(40, iy - 2, 515, 15).fillColor("#f4f6f9").fill();
             }
-            doc.font("Helvetica").fontSize(9).fillColor(isNeg ? "#cc0000" : "#000000");
-            doc.text(item.name, colParticulars + 8, iy, { lineBreak: false });
+            if (isNeg) {
+              doc.rect(40, iy - 2, 515, 15).fillColor("#fff0f0").fill();
+            }
+            doc.font("Helvetica").fontSize(9.5).fillColor(isNeg ? "#c0392b" : "#111111");
+            doc.text(item.name, colParticulars + 10, iy, { lineBreak: false });
             const qtyLabel = `${qty.toLocaleString()} ${uom}`.trim();
-            doc.text(qtyLabel, colQtyRight - colQtyW, iy, { width: colQtyW, align: "right", lineBreak: false });
-            doc.moveDown(0.75);
-            doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#999999").lineWidth(0.3).stroke();
-            doc.moveDown(0.05);
+            doc.font(isNeg ? "Helvetica-Bold" : "Helvetica")
+               .text(qtyLabel, colQtyRight - colQtyW, iy, { width: colQtyW, align: "right", lineBreak: false });
+            doc.moveDown(0.85);
+            // Visible separator line between items
+            doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#c8d0da").lineWidth(0.5).stroke();
+            doc.moveDown(0.1);
           }
+          doc.moveDown(0.2);
         }
 
         // ── Grand total ──────────────────────────────────────────────────────
-        doc.moveDown(0.2);
-        doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#333333").lineWidth(1.5).stroke();
+        doc.moveDown(0.3);
+        doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#1a3a5c").lineWidth(1.25).stroke();
         doc.moveDown(0.3);
         const ty = doc.y;
-        doc.rect(40, ty - 2, 515, 16).fillColor("#f0f0f0").fill();
-        doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000");
+        doc.rect(40, ty - 2, 515, 20).fillColor("#1a3a5c").fill();
+        doc.font("Helvetica-Bold").fontSize(10.5).fillColor("#ffffff");
         const gtUom = nonZero[0]?.unit ?? "";
-        doc.text("Grand Total", colParticulars, ty, { lineBreak: false });
-        doc.text(`${grandTotal.toLocaleString()} ${gtUom}`.trim(), colQtyRight - colQtyW, ty, { width: colQtyW, align: "right", lineBreak: false });
-        doc.moveDown(0.5);
-        doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#333333").lineWidth(1.5).stroke();
+        doc.text("Grand Total", colParticulars + 4, ty + 3, { lineBreak: false });
+        doc.text(`${grandTotal.toLocaleString()} ${gtUom}`.trim(), colQtyRight - colQtyW, ty + 3, { width: colQtyW, align: "right", lineBreak: false });
+        doc.moveDown(1.2);
+        doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#1a3a5c").lineWidth(1.25).stroke();
 
         drawFooter();
         doc.end();
@@ -1823,32 +1829,39 @@ export function registerPosRoutes(app: Express) {
       const fmtC = (n: number) => `$ ${fmtN(n)}`;
 
       // ── Build PDF ────────────────────────────────────────────────────────────
-      // A4 width=595.28pt; left/right margin=30 → usable=535.28
-      const ML = 30, MR = 30;
+      // A4 width=595.28pt; left/right margin=36 → usable=523.28
+      const ML = 36, MR = 36;
       const PW = 595.28;
-      const USE = PW - ML - MR; // 535.28
+      const USE = PW - ML - MR; // 523.28
 
-      // Column x-positions and widths (proportions match the HTML template)
+      // Column proportions — Description wider for readability
       const cols = [
-        { label: "Description", w: Math.floor(USE * 0.30), align: "left"   as const },
-        { label: "Qty",         w: Math.floor(USE * 0.06), align: "center" as const },
-        { label: "Rate",        w: Math.floor(USE * 0.09), align: "center" as const },
-        { label: "Amt",         w: Math.floor(USE * 0.10), align: "center" as const },
-        { label: "Config",      w: Math.floor(USE * 0.10), align: "center" as const },
-        { label: "P/L Bale",   w: Math.floor(USE * 0.12), align: "center" as const },
-        { label: "Total P/L",  w: Math.floor(USE * 0.13), align: "center" as const },
+        { label: "Description", w: Math.floor(USE * 0.32), align: "left"   as const },
+        { label: "Qty",         w: Math.floor(USE * 0.07), align: "center" as const },
+        { label: "Rate",        w: Math.floor(USE * 0.10), align: "right"  as const },
+        { label: "Amount",      w: Math.floor(USE * 0.11), align: "right"  as const },
+        { label: "Config",      w: Math.floor(USE * 0.10), align: "right"  as const },
+        { label: "P/L Bale",   w: Math.floor(USE * 0.13), align: "right"  as const },
+        { label: "Total P/L",  w: Math.floor(USE * 0.13), align: "right"  as const },
       ];
-      // build x starts
+      // Pad last column to cover rounding gaps
+      const totalColW = cols.reduce((s, c) => s + c.w, 0);
+      cols[cols.length - 1].w += USE - totalColW;
+
       let cx = ML;
       const colX: number[] = [];
       for (const c of cols) { colX.push(cx); cx += c.w; }
-      const tableRight = cx;
+      const tableRight = ML + USE;
 
-      const ROW_H   = 14;
-      const HDR_H   = 16;
-      const CELL_PAD = 3;
-      const FS_HDR  = 7;
-      const FS_ROW  = 7;
+      const ROW_H    = 20;   // was 14 — more breathing room
+      const HDR_H    = 22;   // was 16
+      const CELL_PAD = 5;    // was 3
+      const FS_HDR   = 8.5;  // was 7
+      const FS_ROW   = 8.5;  // was 7
+
+      // Accent colour for header strip
+      const ACCENT   = "#1a3a5c";
+      const ACCENT_BG = "#eef2f7";
 
       const pdoc = new PDFDocument({ size: "A4", margin: ML, autoFirstPage: true });
       const pchunks: Buffer[] = [];
@@ -1863,47 +1876,58 @@ export function registerPosRoutes(app: Express) {
           x: number, y: number, w: number, h: number,
           opts: { align?: "left"|"center"|"right"; bold?: boolean; color?: string; bg?: string; border?: string; fontSize?: number } = {}
         ) => {
-          const bg     = opts.bg     ?? null;
-          const border = opts.border ?? "#999999";
+          const bg     = opts.bg ?? null;
+          const border = opts.border ?? "#bbbbbb";
           if (bg) { pdoc.rect(x, y, w, h).fillColor(bg).fill(); }
-          pdoc.rect(x, y, w, h).strokeColor(border).lineWidth(0.4).stroke();
+          pdoc.rect(x, y, w, h).strokeColor(border).lineWidth(0.5).stroke();
           pdoc.font(opts.bold ? "Helvetica-Bold" : "Helvetica")
               .fontSize(opts.fontSize ?? FS_ROW)
               .fillColor(opts.color ?? "#000000");
-          pdoc.text(text, x + CELL_PAD, y + CELL_PAD + 1, {
+          const textY = y + (h - (opts.fontSize ?? FS_ROW)) / 2 - 0.5;
+          pdoc.text(text, x + CELL_PAD, textY, {
             width: w - CELL_PAD * 2,
             align: opts.align ?? "left",
             lineBreak: false,
           });
         };
 
-        // ── Title ──────────────────────────────────────────────────────────────
-        pdoc.font("Helvetica-Bold").fontSize(13).fillColor("#000000")
-          .text("POS INVOICE", ML, 30, { width: USE, align: "center" });
+        // ── Title block ────────────────────────────────────────────────────────
+        // Thin top accent bar
+        pdoc.rect(ML, 28, USE, 3).fillColor(ACCENT).fill();
+        pdoc.font("Helvetica-Bold").fontSize(15).fillColor(ACCENT)
+          .text("POS INVOICE", ML, 38, { width: USE, align: "center", lineBreak: false });
+        // Location name (sub-title)
+        pdoc.font("Helvetica").fontSize(9).fillColor("#555555")
+          .text(location.name, ML, 57, { width: USE, align: "center", lineBreak: false });
+        // Bottom rule under title
+        pdoc.moveTo(ML, 70).lineTo(tableRight, 70).strokeColor(ACCENT).lineWidth(1).stroke();
 
         // ── Date / User row ────────────────────────────────────────────────────
-        const infoY = 50;
-        pdoc.moveTo(ML, infoY).lineTo(tableRight, infoY).strokeColor("#000000").lineWidth(1.5).stroke();
-        pdoc.font("Helvetica-Bold").fontSize(8).fillColor("#000000");
-        pdoc.text(`Date: ${voucher.voucherDate}`, ML, infoY + 3, { lineBreak: false });
-        pdoc.text(`User: ${senderName}`, ML, infoY + 3, { width: USE, align: "right", lineBreak: false });
-        pdoc.moveTo(ML, infoY + 14).lineTo(tableRight, infoY + 14).strokeColor("#000000").lineWidth(1.5).stroke();
+        const infoY = 75;
+        pdoc.font("Helvetica-Bold").fontSize(9).fillColor("#222222");
+        pdoc.text(`Date:  ${voucher.voucherDate}`, ML, infoY, { lineBreak: false });
+        pdoc.text(`User:  ${senderName}`, ML, infoY, { width: USE, align: "right", lineBreak: false });
+        pdoc.moveTo(ML, infoY + 14).lineTo(tableRight, infoY + 14).strokeColor("#cccccc").lineWidth(0.75).stroke();
 
         // ── Credit sale label ──────────────────────────────────────────────────
         let tableStartY = infoY + 22;
         if (voucher.isCreditSale) {
-          pdoc.rect(ML, tableStartY, USE, 14).strokeColor("#000000").lineWidth(0.75).stroke();
-          pdoc.font("Helvetica-Bold").fontSize(8).fillColor("#000000")
-            .text("CREDIT SALE", ML + CELL_PAD, tableStartY + 3, { lineBreak: false });
-          tableStartY += 18;
+          pdoc.rect(ML, tableStartY, USE, 16)
+            .fillColor("#fff3cd").fill();
+          pdoc.rect(ML, tableStartY, USE, 16)
+            .strokeColor("#e0a800").lineWidth(0.75).stroke();
+          pdoc.font("Helvetica-Bold").fontSize(8.5).fillColor("#856404")
+            .text("CREDIT SALE", ML + CELL_PAD, tableStartY + 4, { lineBreak: false });
+          tableStartY += 20;
         }
 
         // ── Table header ───────────────────────────────────────────────────────
         let hy = tableStartY;
         for (let i = 0; i < cols.length; i++) {
           drawCell(cols[i].label, colX[i], hy, cols[i].w, HDR_H, {
-            align: cols[i].align, bold: true, bg: "#eeeeee",
-            border: "#999999", fontSize: FS_HDR,
+            align: cols[i].align, bold: true,
+            bg: ACCENT_BG, border: "#8fa8c8", fontSize: FS_HDR,
+            color: ACCENT,
           });
         }
         let rowY = hy + HDR_H;
@@ -1919,53 +1943,56 @@ export function registerPosRoutes(app: Express) {
           const pl      = plBale * qty;
           totalQty += qty; totalAmt += amt; totalPL += pl;
 
-          const bg = idx % 2 === 0 ? "#ffffff" : "#f5f5f5";
-          const plBaleColor  = plBale > 0 ? "#0a7e1f" : plBale < 0 ? "#c2272d" : "#000000";
-          const plTotalColor = pl     > 0 ? "#0a7e1f" : pl     < 0 ? "#c2272d" : "#000000";
+          const bg = idx % 2 === 0 ? "#ffffff" : "#f8fafc";
+          const plBaleColor  = plBale > 0 ? "#15803d" : plBale < 0 ? "#b91c1c" : "#000000";
+          const plTotalColor = pl     > 0 ? "#15803d" : pl     < 0 ? "#b91c1c" : "#000000";
 
-          drawCell(item.name,       colX[0], rowY, cols[0].w, ROW_H, { align: "left",   bg, border: "#c8c8c8" });
-          drawCell(fmtN(qty),       colX[1], rowY, cols[1].w, ROW_H, { align: "center", bg, border: "#c8c8c8" });
-          drawCell(fmtC(rate),      colX[2], rowY, cols[2].w, ROW_H, { align: "center", bg, border: "#c8c8c8" });
-          drawCell(fmtC(amt),       colX[3], rowY, cols[3].w, ROW_H, { align: "center", bg, border: "#c8c8c8" });
-          drawCell(fmtC(config),    colX[4], rowY, cols[4].w, ROW_H, { align: "center", bg, border: "#c8c8c8" });
-          drawCell(fmtC(plBale),    colX[5], rowY, cols[5].w, ROW_H, { align: "center", bg, border: "#c8c8c8", color: plBaleColor });
-          drawCell(fmtC(pl),        colX[6], rowY, cols[6].w, ROW_H, { align: "center", bg, border: "#c8c8c8", color: plTotalColor });
+          drawCell(item.name,    colX[0], rowY, cols[0].w, ROW_H, { align: "left",   bg, border: "#d8e0ea" });
+          drawCell(fmtN(qty),    colX[1], rowY, cols[1].w, ROW_H, { align: "center", bg, border: "#d8e0ea" });
+          drawCell(fmtC(rate),   colX[2], rowY, cols[2].w, ROW_H, { align: "right",  bg, border: "#d8e0ea" });
+          drawCell(fmtC(amt),    colX[3], rowY, cols[3].w, ROW_H, { align: "right",  bg, border: "#d8e0ea" });
+          drawCell(fmtC(config), colX[4], rowY, cols[4].w, ROW_H, { align: "right",  bg, border: "#d8e0ea" });
+          drawCell(fmtC(plBale), colX[5], rowY, cols[5].w, ROW_H, { align: "right",  bg, border: "#d8e0ea", color: plBaleColor });
+          drawCell(fmtC(pl),     colX[6], rowY, cols[6].w, ROW_H, { align: "right",  bg, border: "#d8e0ea", color: plTotalColor });
           rowY += ROW_H;
         });
 
         // ── Totals row ─────────────────────────────────────────────────────────
-        const plTotColor = totalPL > 0 ? "#0a7e1f" : totalPL < 0 ? "#c2272d" : "#000000";
-        drawCell("TOTAL",         colX[0], rowY, cols[0].w, ROW_H, { bold: true, bg: "#eeeeee", border: "#999999" });
-        drawCell(fmtN(totalQty),  colX[1], rowY, cols[1].w, ROW_H, { align: "center", bold: true, bg: "#eeeeee", border: "#999999" });
-        drawCell("",              colX[2], rowY, cols[2].w, ROW_H, { bg: "#eeeeee", border: "#999999" });
-        drawCell(fmtC(totalAmt),  colX[3], rowY, cols[3].w, ROW_H, { align: "center", bold: true, bg: "#eeeeee", border: "#999999" });
-        drawCell("",              colX[4], rowY, cols[4].w, ROW_H, { bg: "#eeeeee", border: "#999999" });
-        drawCell("",              colX[5], rowY, cols[5].w, ROW_H, { bg: "#eeeeee", border: "#999999" });
-        drawCell(fmtC(totalPL),   colX[6], rowY, cols[6].w, ROW_H, { align: "center", bold: true, bg: "#eeeeee", border: "#999999", color: plTotColor });
-        rowY += ROW_H + 6;
+        const plTotColor = totalPL > 0 ? "#15803d" : totalPL < 0 ? "#b91c1c" : "#000000";
+        const TOT_H = ROW_H + 2;
+        drawCell("TOTAL",        colX[0], rowY, cols[0].w, TOT_H, { bold: true, bg: ACCENT_BG, border: "#8fa8c8", color: ACCENT });
+        drawCell(fmtN(totalQty), colX[1], rowY, cols[1].w, TOT_H, { align: "center", bold: true, bg: ACCENT_BG, border: "#8fa8c8", color: ACCENT });
+        drawCell("",             colX[2], rowY, cols[2].w, TOT_H, { bg: ACCENT_BG, border: "#8fa8c8" });
+        drawCell(fmtC(totalAmt), colX[3], rowY, cols[3].w, TOT_H, { align: "right",  bold: true, bg: ACCENT_BG, border: "#8fa8c8", color: ACCENT });
+        drawCell("",             colX[4], rowY, cols[4].w, TOT_H, { bg: ACCENT_BG, border: "#8fa8c8" });
+        drawCell("",             colX[5], rowY, cols[5].w, TOT_H, { bg: ACCENT_BG, border: "#8fa8c8" });
+        drawCell(fmtC(totalPL),  colX[6], rowY, cols[6].w, TOT_H, { align: "right",  bold: true, bg: ACCENT_BG, border: "#8fa8c8", color: plTotColor });
+        rowY += TOT_H + 10;
 
         // ── Total Paid ─────────────────────────────────────────────────────────
-        pdoc.moveTo(ML, rowY).lineTo(tableRight, rowY).strokeColor("#333333").lineWidth(1.5).stroke();
-        rowY += 5;
-        pdoc.font("Helvetica-Bold").fontSize(11).fillColor("#000000");
+        pdoc.moveTo(ML, rowY).lineTo(tableRight, rowY).strokeColor(ACCENT).lineWidth(1).stroke();
+        rowY += 7;
+        pdoc.font("Helvetica-Bold").fontSize(12).fillColor(ACCENT);
         pdoc.text("TOTAL PAID:", ML, rowY, { lineBreak: false });
         pdoc.text(fmtC(totalAmount), ML, rowY, { width: USE, align: "right", lineBreak: false });
-        rowY += 20;
+        rowY += 22;
 
         // ── Note ───────────────────────────────────────────────────────────────
         if (voucher.description) {
-          pdoc.rect(ML, rowY, USE, 18).strokeColor("#000000").lineWidth(1.5).stroke();
-          pdoc.font("Helvetica-Bold").fontSize(8).fillColor("#000000")
-            .text("Note: ", ML + CELL_PAD, rowY + 4, { continued: true, lineBreak: false });
-          pdoc.font("Helvetica").text(voucher.description, { lineBreak: false });
-          rowY += 24;
+          pdoc.rect(ML, rowY, USE, 20).fillColor("#f8f9fa").fill();
+          pdoc.rect(ML, rowY, USE, 20).strokeColor("#cccccc").lineWidth(0.75).stroke();
+          pdoc.font("Helvetica-Bold").fontSize(9).fillColor("#555555")
+            .text("Note: ", ML + CELL_PAD, rowY + 5, { continued: true, lineBreak: false });
+          pdoc.font("Helvetica").fillColor("#111111")
+            .text(voucher.description, { lineBreak: false });
+          rowY += 28;
         }
 
         // ── Footer ─────────────────────────────────────────────────────────────
-        rowY += 6;
-        pdoc.moveTo(ML, rowY).lineTo(tableRight, rowY).strokeColor("#000000").lineWidth(1.5).stroke();
-        rowY += 5;
-        pdoc.font("Helvetica").fontSize(8).fillColor("#000000")
+        rowY += 8;
+        pdoc.moveTo(ML, rowY).lineTo(tableRight, rowY).strokeColor("#cccccc").lineWidth(0.75).stroke();
+        rowY += 7;
+        pdoc.font("Helvetica").fontSize(8.5).fillColor("#888888")
           .text("Thank you for your business!", ML, rowY, { width: USE, align: "center" });
 
         pdoc.end();
