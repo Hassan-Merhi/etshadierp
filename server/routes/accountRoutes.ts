@@ -474,6 +474,7 @@ export function registerAccountRoutes(app: Express) {
             isNull(vouchers.deletedAt),
             or(
               ilike(vouchers.voucherNumber, `%${q}%`),
+              ilike(vouchers.description, `%${q}%`),
               isNumericSearch
                 ? sql`CAST(${vouchers.totalAmount} AS TEXT) LIKE ${"%" + amountQ + "%"}`
                 : sql`false`,

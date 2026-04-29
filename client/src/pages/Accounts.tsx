@@ -3439,13 +3439,13 @@ export default function Accounts() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Find Voucher</CardTitle>
-              <p className="text-sm text-muted-foreground">Search by voucher number or payment amount to quickly open and edit any transaction</p>
+              <p className="text-sm text-muted-foreground">Search by voucher number, description, or amount to quickly open and edit any transaction</p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
-                  placeholder="Search by voucher number or amount (e.g. REC-001, 3967)"
+                  placeholder="Search by voucher number, description, or amount (e.g. REC-001, duties, 3967)"
                   value={voucherSearchTerm}
                   onChange={(e) => setVoucherSearchTerm(e.target.value)}
                   className="pl-9"
