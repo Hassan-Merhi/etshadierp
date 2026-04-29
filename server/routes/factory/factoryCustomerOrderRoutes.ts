@@ -2261,7 +2261,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { customerId, proformaIdUsed, locationId, orderDate } = req.body;
+      const { customerId, proformaIdUsed, locationId, orderDate, containerNotes } = req.body;
       if (!customerId) return res.status(400).json({ message: "Customer is required" });
       if (!locationId) return res.status(400).json({ message: "Location is required" });
 
@@ -2273,6 +2273,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         orderDate: orderDate || getClientDate(req),
         status: "LOADING",
         loadingStartedAt: new Date(),
+        containerNotes: containerNotes || null,
       }).returning();
 
       const [loadingCustomer] = await db.select({ legalName: customers.legalName }).from(customers).where(eq(customers.id, parseInt(customerId)));

@@ -2,6 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
@@ -11,7 +12,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
-import { ScanLine, Trash2, Package, MapPin, Play, CheckCircle, Clock, Save, AlertTriangle, Rows3, AlignJustify } from "lucide-react";
+import { ScanLine, Trash2, Package, MapPin, Play, CheckCircle, Clock, Save, AlertTriangle, Rows3, AlignJustify, StickyNote } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Customer {
@@ -61,6 +62,7 @@ interface OrderDetail {
   status: string;
   proformaIdUsed: number | null;
   totalQtyBales: number;
+  containerNotes: string | null;
   bales: OrderBale[];
 }
 
@@ -75,6 +77,7 @@ export default function ContainerLoadingScan() {
   const [orderDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [orderId, setOrderId] = useState<number | null>(null);
   const [isResuming, setIsResuming] = useState(false);
+  const [loadingNote, setLoadingNote] = useState<string>("");
   const [scanCode, setScanCode] = useState("");
   const [scanFlash, setScanFlash] = useState<"success" | "error" | null>(null);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
@@ -132,11 +135,19 @@ export default function ContainerLoadingScan() {
     refetchInterval: 5000,
   });
 
-  // When resuming: restore customer/location and show last scanned popup
+  // Auto-select location when there is only one option
+  useEffect(() => {
+    if (!orderId && locations.length === 1 && !selectedLocationId) {
+      setSelectedLocationId(String(locations[0].id));
+    }
+  }, [locations, orderId, selectedLocationId]);
+
+  // When resuming: restore customer/location/note and show last scanned popup
   useEffect(() => {
     if (isResuming && orderDetail && !selectedCustomerId) {
       setSelectedCustomerId(String(orderDetail.customerId));
       setSelectedLocationId(String(orderDetail.locationId || ""));
+      setLoadingNote(orderDetail.containerNotes || "");
       const stored = localStorage.getItem(`lastScannedBale_${orderDetail.id}`);
       if (stored) {
         try { setLastScannedRef(JSON.parse(stored)); } catch { setLastScannedRef({ baleReference: stored, baleName: "", articleCode: "" }); }
@@ -147,7 +158,7 @@ export default function ContainerLoadingScan() {
   }, [isResuming, orderDetail, selectedCustomerId]);
 
   const createOrderMutation = useMutation({
-    mutationFn: async (data: { customerId: number; proformaIdUsed: number | null; locationId: number; orderDate: string }) => {
+    mutationFn: async (data: { customerId: number; proformaIdUsed: number | null; locationId: number; orderDate: string; containerNotes?: string }) => {
       const res = await modeApiRequest("POST", "/api/factory/customer-orders-loading", data);
       return await res.json();
     },
@@ -294,6 +305,22 @@ export default function ContainerLoadingScan() {
     },
   });
 
+  const saveNoteMutation = useMutation({
+    mutationFn: async (note: string) => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/assign-container`, { containerNotes: note });
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Note saved" });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders?status=LOADING") });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error saving note", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleStartLoading = useCallback(() => {
     if (!customerId || !selectedLocationId) return;
     const activeProforma = proformas.find((p) => p.isActive) || null;
@@ -302,8 +329,9 @@ export default function ContainerLoadingScan() {
       proformaIdUsed: activeProforma?.id || null,
       locationId: parseInt(selectedLocationId),
       orderDate,
+      containerNotes: loadingNote.trim() || undefined,
     });
-  }, [customerId, selectedLocationId, proformas, orderDate, createOrderMutation]);
+  }, [customerId, selectedLocationId, proformas, orderDate, loadingNote, createOrderMutation]);
 
   const handleScan = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== "Enter" || !scanCode.trim() || !orderId || !selectedLocationId) return;
@@ -603,6 +631,44 @@ export default function ContainerLoadingScan() {
                 No active proforma found. Loading will proceed without price references.
               </p>
             )}
+
+            <div>
+              <label className="text-sm font-medium mb-1 block">
+                <StickyNote className="inline h-3 w-3 mr-1" />
+                Note
+              </label>
+              {!orderId ? (
+                <Textarea
+                  placeholder="Optional note for this loading..."
+                  value={loadingNote}
+                  onChange={(e) => setLoadingNote(e.target.value)}
+                  className="resize-none text-sm"
+                  rows={2}
+                  data-testid="textarea-loading-note"
+                />
+              ) : (
+                <div className="flex gap-2 items-start">
+                  <Textarea
+                    placeholder="Add a note..."
+                    value={loadingNote}
+                    onChange={(e) => setLoadingNote(e.target.value)}
+                    className="resize-none text-sm flex-1"
+                    rows={2}
+                    data-testid="textarea-loading-note"
+                  />
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => saveNoteMutation.mutate(loadingNote)}
+                    disabled={saveNoteMutation.isPending}
+                    title="Save note"
+                    data-testid="button-save-note"
+                  >
+                    <Save className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
 
             {!orderId && (
               <Button

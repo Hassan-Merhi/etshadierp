@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
-import { Clock, Package, Play } from "lucide-react";
+import { Clock, Package, Play, StickyNote } from "lucide-react";
 
 interface PendingLoad {
   id: number;
@@ -15,6 +15,7 @@ interface PendingLoad {
   proformaIdUsed: number | null;
   locationId: number | null;
   loadingStartedAt: string | null;
+  containerNotes: string | null;
   status: string;
 }
 
@@ -83,6 +84,12 @@ export default function PendingLoadings() {
                       {load.totalQtyBales} bales scanned
                     </span>
                   </div>
+                  {load.containerNotes && (
+                    <div className="flex items-start gap-1.5 text-sm text-muted-foreground mt-0.5" data-testid={`text-note-${load.id}`}>
+                      <StickyNote className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                      <span className="italic">{load.containerNotes}</span>
+                    </div>
+                  )}
                 </div>
                 <Button
                   onClick={() => navigate(`/factory/sales/loading/new?orderId=${load.id}`)}
