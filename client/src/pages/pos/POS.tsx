@@ -106,6 +106,41 @@ interface Location {
   country: string | null;
 }
 
+// Retries the WhatsApp PDF upload up to `maxAttempts` times.
+// - Retries on network failures and 5xx/502 (transient WhatsApp/Green API hiccups).
+// - Does NOT retry on 4xx (e.g. missing config, invalid location) — those are permanent.
+// - Calls onAttempt(n) before each attempt so the UI can show "Retrying… (2/3)".
+async function sendWaPdfWithRetry(
+  body: { pdfBase64: string; locationId?: number; filename: string; caption: string },
+  opts: { maxAttempts?: number; delayMs?: number; onAttempt?: (n: number) => void } = {},
+): Promise<{ ok: true } | { ok: false; message: string; attempts: number }> {
+  const maxAttempts = opts.maxAttempts ?? 3;
+  const delayMs     = opts.delayMs     ?? 2000;
+  let lastMessage   = "WhatsApp send failed";
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    opts.onAttempt?.(attempt);
+    try {
+      const res = await apiRequest("POST", "/api/pos/send-whatsapp-pdf-upload", body);
+      const respBody = await res.json().catch(() => ({}));
+      if (res.ok) return { ok: true };
+
+      lastMessage = respBody.message || `WhatsApp send failed (HTTP ${res.status})`;
+      // Permanent client error — no point retrying.
+      if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
+        return { ok: false, message: lastMessage, attempts: attempt };
+      }
+    } catch (e: any) {
+      lastMessage = e?.message || "Network error";
+    }
+
+    if (attempt < maxAttempts) {
+      await new Promise(r => setTimeout(r, delayMs * attempt));
+    }
+  }
+  return { ok: false, message: lastMessage, attempts: maxAttempts };
+}
+
 export default function POS({ posUser, editVoucherId }: { posUser?: any; editVoucherId?: string } = {}) {
   const { selectedLocation, setSelectedLocation } = useLocationContext();
   const { selectedCompany } = useCompany();
@@ -482,15 +517,23 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             const safeName = `${data.locationName} ${data.companyName} ${data.voucherDate} Invoice`
               .replace(/[^\w\s.()\-]/g, "_").trim();
             const pdfBase64 = await captureElementToPdf(printRef.current!);
-            const res = await apiRequest("POST", "/api/pos/send-whatsapp-pdf-upload", {
-              pdfBase64,
-              locationId: data.locationId,
-              filename: `${safeName}.pdf`,
-              caption: `${data.locationName} — ${data.voucherDate}`,
-            });
-            const body = await res.json().catch(() => ({}));
-            if (!res.ok) {
-              toast({ title: "WhatsApp", description: body.message || "Invoice send failed.", variant: "destructive" });
+            const result = await sendWaPdfWithRetry(
+              {
+                pdfBase64,
+                locationId: data.locationId,
+                filename: `${safeName}.pdf`,
+                caption: `${data.locationName} — ${data.voucherDate}`,
+              },
+              {
+                onAttempt: (n) => {
+                  if (n > 1) {
+                    toast({ title: "Retrying…", description: `WhatsApp invoice send attempt ${n}/3.` });
+                  }
+                },
+              },
+            );
+            if (!result.ok) {
+              toast({ title: "WhatsApp", description: result.message, variant: "destructive" });
             } else {
               toast({ title: "WhatsApp", description: "Invoice sent to WhatsApp group." });
             }
@@ -745,14 +788,22 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           setStockWaStatus("sending");
           try {
             const pdfBase64 = await captureElementToPdf(stockPrintRef.current!, { singlePage: true });
-            const res = await apiRequest("POST", "/api/pos/send-whatsapp-pdf-upload", {
-              pdfBase64,
-              locationId: activeLocation?.id,
-              filename: `${safeName}.pdf`,
-              caption: `Stock Report — ${locName}`,
-            });
-            const body = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(body.message || "Stock send failed");
+            const result = await sendWaPdfWithRetry(
+              {
+                pdfBase64,
+                locationId: activeLocation?.id,
+                filename: `${safeName}.pdf`,
+                caption: `Stock Report — ${locName}`,
+              },
+              {
+                onAttempt: (n) => {
+                  if (n > 1) {
+                    toast({ title: "Retrying…", description: `WhatsApp stock send attempt ${n}/3.` });
+                  }
+                },
+              },
+            );
+            if (!result.ok) throw new Error(result.message);
             setStockWaStatus("sent");
             toast({ title: "Stock sent", description: "Stock report sent to WhatsApp group." });
           } catch (e: any) {
@@ -790,14 +841,22 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       const dateStr  = new Date().toISOString().slice(0, 10);
       const safeName = `${locName} STK ${compName} ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
       const pdfBase64 = await captureElementToPdf(stockPrintRef.current, { singlePage: true });
-      const res = await apiRequest("POST", "/api/pos/send-whatsapp-pdf-upload", {
-        pdfBase64,
-        locationId: activeLocation?.id,
-        filename: `${safeName}.pdf`,
-        caption: `Stock Report — ${locName}`,
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.message || "WhatsApp stock report failed");
+      const result = await sendWaPdfWithRetry(
+        {
+          pdfBase64,
+          locationId: activeLocation?.id,
+          filename: `${safeName}.pdf`,
+          caption: `Stock Report — ${locName}`,
+        },
+        {
+          onAttempt: (n) => {
+            if (n > 1) {
+              toast({ title: "Retrying…", description: `WhatsApp stock send attempt ${n}/3.` });
+            }
+          },
+        },
+      );
+      if (!result.ok) throw new Error(result.message);
       setStockWaStatus("sent");
       toast({ title: "Sent", description: "Stock report sent to WhatsApp group." });
     } catch (e: any) {
@@ -818,15 +877,23 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       const vNum     = savedSale?.voucher?.voucherNumber || String(savedSale?.voucher?.id ?? "");
       const safeName = `${locName} ${compName} ${vDate} Invoice`.replace(/[^\w\s.()\-]/g, "_").trim();
       const pdfBase64 = await captureElementToPdf(printRef.current);
-      const res = await apiRequest("POST", "/api/pos/send-whatsapp-pdf-upload", {
-        pdfBase64,
-        locationId: activeLocation?.id,
-        filename: `${safeName}.pdf`,
-        caption: `${locName} — ${vDate}`,
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast({ title: "Failed to send", description: body.message || "WhatsApp send failed.", variant: "destructive" });
+      const result = await sendWaPdfWithRetry(
+        {
+          pdfBase64,
+          locationId: activeLocation?.id,
+          filename: `${safeName}.pdf`,
+          caption: `${locName} — ${vDate}`,
+        },
+        {
+          onAttempt: (n) => {
+            if (n > 1) {
+              toast({ title: "Retrying…", description: `WhatsApp invoice send attempt ${n}/3.` });
+            }
+          },
+        },
+      );
+      if (!result.ok) {
+        toast({ title: "Failed to send", description: result.message, variant: "destructive" });
       } else {
         toast({ title: "Sent", description: "Invoice sent to WhatsApp group." });
       }
