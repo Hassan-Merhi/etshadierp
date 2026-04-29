@@ -3547,6 +3547,9 @@ export const factoryWorkerDocuments = pgTable("factory_worker_documents", {
   fileUrl: text("file_url").notNull(),
   fileType: text("file_type"),
   fileSize: integer("file_size"),
+  // Base64-encoded file contents. Stored in the DB so files survive
+  // server redeploys/restarts (Render & Replit have ephemeral disks).
+  fileData: text("file_data"),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
 });
 

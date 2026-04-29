@@ -779,6 +779,18 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const workerId = parseInt(req.params.id);
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
       const fileUrl = `/api/factory/uploads/workers/docs/${req.file.filename}`;
+
+      // Read the uploaded file from disk and store its content in the DB so
+      // it survives server redeploys/restarts (Render and Replit have
+      // ephemeral disks). The disk copy is kept as a hot cache.
+      let fileData: string | null = null;
+      try {
+        const buf = fs.readFileSync(req.file.path);
+        fileData = buf.toString("base64");
+      } catch (readErr) {
+        console.error("Failed to read uploaded worker doc into DB:", readErr);
+      }
+
       const [doc] = await db.insert(factoryWorkerDocuments).values({
         companyId,
         workerId,
@@ -787,6 +799,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         fileUrl,
         fileType: req.file.mimetype,
         fileSize: req.file.size,
+        fileData,
       }).returning();
       res.json(doc);
     } catch (error: any) {
@@ -796,12 +809,25 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
   });
 
   // GET /api/factory/workers/:id/documents - List documents
+  // Note: file_data is intentionally excluded — it's a (potentially large)
+  // base64 blob and the listing UI only needs metadata. The actual bytes
+  // are streamed from /api/factory/uploads/workers/docs/:filename.
   app.get("/api/factory/workers/:id/documents", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const workerId = parseInt(req.params.id);
-      const docs = await db.select().from(factoryWorkerDocuments)
+      const docs = await db.select({
+        id:           factoryWorkerDocuments.id,
+        companyId:    factoryWorkerDocuments.companyId,
+        workerId:     factoryWorkerDocuments.workerId,
+        fileName:     factoryWorkerDocuments.fileName,
+        originalName: factoryWorkerDocuments.originalName,
+        fileUrl:      factoryWorkerDocuments.fileUrl,
+        fileType:     factoryWorkerDocuments.fileType,
+        fileSize:     factoryWorkerDocuments.fileSize,
+        uploadedAt:   factoryWorkerDocuments.uploadedAt,
+      }).from(factoryWorkerDocuments)
         .where(and(eq(factoryWorkerDocuments.workerId, workerId), eq(factoryWorkerDocuments.companyId, companyId)))
         .orderBy(desc(factoryWorkerDocuments.uploadedAt));
       res.json(docs);
@@ -830,13 +856,50 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
   });
 
   // GET /api/factory/uploads/workers/docs/:filename - Serve worker documents
-  app.get("/api/factory/uploads/workers/docs/:filename", requireAuth, (req: any, res: any) => {
+  // Resolution order:
+  //   1. Local disk cache (fast, used right after upload).
+  //   2. Database fallback (file_data column) — needed because Render and
+  //      Replit have ephemeral disks that get wiped on every redeploy.
+  app.get("/api/factory/uploads/workers/docs/:filename", requireAuth, async (req: any, res: any) => {
     try {
       const filename = req.params.filename;
       const filePath = path.join(process.cwd(), "uploads", "workers", "docs", filename);
-      if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
-      res.sendFile(filePath);
+
+      if (fs.existsSync(filePath)) {
+        return res.sendFile(filePath);
+      }
+
+      // Disk miss — fall back to the DB copy.
+      const [doc] = await db.select({
+        fileData:     factoryWorkerDocuments.fileData,
+        fileType:     factoryWorkerDocuments.fileType,
+        originalName: factoryWorkerDocuments.originalName,
+      }).from(factoryWorkerDocuments)
+        .where(eq(factoryWorkerDocuments.fileName, filename))
+        .limit(1);
+
+      if (!doc?.fileData) {
+        return res.status(404).json({ message: "File not found" });
+      }
+
+      const buf = Buffer.from(doc.fileData, "base64");
+
+      // Re-hydrate the disk cache so subsequent requests are fast.
+      try {
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(filePath, buf);
+      } catch (cacheErr) {
+        console.error("Failed to re-hydrate worker doc disk cache:", cacheErr);
+      }
+
+      res.setHeader("Content-Type", doc.fileType || "application/octet-stream");
+      if (doc.originalName) {
+        res.setHeader("Content-Disposition", `inline; filename="${doc.originalName.replace(/"/g, "")}"`);
+      }
+      res.send(buf);
     } catch (error: any) {
+      console.error("Error serving worker document:", error);
       res.status(500).json({ message: error.message });
     }
   });

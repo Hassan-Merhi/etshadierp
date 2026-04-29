@@ -1219,6 +1219,9 @@ let migrationsDone = false;
 
     // factory_worker_advances — voucher_id column (Drizzle migration 0101)
     `ALTER TABLE factory_worker_advances ADD COLUMN IF NOT EXISTS voucher_id INTEGER`,
+    // factory_worker_documents — store file contents in DB so docs survive
+    // server redeploys/restarts (Render and Replit both have ephemeral disks).
+    `ALTER TABLE factory_worker_documents ADD COLUMN IF NOT EXISTS file_data text`,
 
     // ── Rental Auto-Transfer Config (Apr 2026) ────────────────────────────────
     `CREATE TABLE IF NOT EXISTS rental_auto_transfer_configs (
