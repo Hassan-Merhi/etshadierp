@@ -154,6 +154,12 @@ function resolveCellValue(
   const colIdx = sheet.columns.findIndex((c) => c.id === colId);
   if (colIdx === -1) return { value: "#REF!", broken: true, circular: false };
 
+  // Special sentinel: link to the auto-calculated Difference row
+  if (rowId === "__diff__") {
+    const diffValues = calcDiff(sheets, sheet);
+    return { value: diffValues[colIdx] ?? null, broken: false, circular: false };
+  }
+
   const row = sheet.rows.find((r) => r.id === rowId);
   if (!row) return { value: "#REF!", broken: true, circular: false };
 
@@ -345,9 +351,13 @@ function LinkDialog({
     else if (res.circular) { previewVal = "#CYCLE!"; previewLabel = "Circular reference"; }
     else if (res.value !== null) previewVal = fmt(res.value);
 
-    const sRow = srcSheet?.rows.find((r) => r.id === selRowId);
     const sCol = srcSheet?.columns.find((c) => c.id === selColId);
-    if (sRow && sCol) previewLabel = `${srcSheet?.name} → ${sRow.label} → ${sCol.label}`;
+    if (selRowId === "__diff__") {
+      previewLabel = `${srcSheet?.name} → Difference (auto) → ${sCol?.label || "(col)"}`;
+    } else {
+      const sRow = srcSheet?.rows.find((r) => r.id === selRowId);
+      if (sRow && sCol) previewLabel = `${srcSheet?.name} → ${sRow.label || "(row)"} → ${sCol.label || "(col)"}`;
+    }
   }
 
   const canSave = !!selSheetId && !!selRowId && !!selColId;
@@ -395,6 +405,9 @@ function LinkDialog({
                 <SelectValue placeholder={srcSheet ? "Select row…" : "Select sheet first"} />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="__diff__">
+                  Difference (auto-calculated)
+                </SelectItem>
                 {srcSheet?.rows.map((r) => (
                   <SelectItem key={r.id} value={r.id}>
                     {r.label || `(row)`}
@@ -839,6 +852,22 @@ export default function FactorySheets() {
 
   const diffRow = activeSheet ? calcDiff(localSheets, activeSheet) : [];
 
+  // STATUS sheet: auto-compute per-row totals (sum across all non-diff columns)
+  const isStatusSheet = !!activeSheet && activeSheet.name.trim().toUpperCase() === "STATUS";
+  const statusRowTotals: (number | null)[] = isStatusSheet
+    ? (activeSheet?.rows ?? []).map((row) =>
+        (activeSheet?.columns ?? []).reduce<number | null>((sum, col, ci) => {
+          if (isDiffColumn(col.label)) return sum;
+          const cell = row.cells[ci] ?? { value: null };
+          const eff = getEffectiveValue(localSheets, cell);
+          return typeof eff === "number" ? (sum ?? 0) + eff : sum;
+        }, null)
+      )
+    : [];
+  const statusGrandTotal: number | null = isStatusSheet
+    ? statusRowTotals.reduce<number | null>((sum, v) => (typeof v === "number" ? (sum ?? 0) + v : sum), null)
+    : null;
+
   return (
     <div className="flex flex-col h-full bg-background">
 
@@ -990,6 +1019,11 @@ export default function FactorySheets() {
                       </th>
                     );
                   })}
+                  {isStatusSheet && (
+                    <th className="border border-border bg-blue-50/60 dark:bg-blue-950/40 px-3 py-1.5 text-center font-bold text-xs min-w-[110px] text-blue-700 dark:text-blue-300">
+                      Total
+                    </th>
+                  )}
                   <th className="border border-border bg-muted px-2 py-1.5 text-center">
                     <button data-testid="button-add-column" onClick={addColumn} className="text-muted-foreground hover:text-foreground transition-colors" title="Add column">
                       <Plus className="h-4 w-4" />
@@ -1162,6 +1196,13 @@ export default function FactorySheets() {
                       );
                     })}
 
+                    {/* STATUS: row Total column */}
+                    {isStatusSheet && (
+                      <td className={`border border-border px-3 py-0.5 text-right text-xs tabular-nums font-bold bg-blue-50/30 dark:bg-blue-950/20 ${typeof statusRowTotals[ri] === "number" && statusRowTotals[ri]! < 0 ? "text-red-500" : "text-blue-700 dark:text-blue-300"}`} data-testid={`text-row-total-${ri}`}>
+                        {fmt(statusRowTotals[ri])}
+                      </td>
+                    )}
+
                     {/* Remove row */}
                     <td className="border border-border px-2 py-0.5 text-center">
                       <button
@@ -1179,7 +1220,7 @@ export default function FactorySheets() {
                 {activeSheet.columns.length > 0 && (
                   <tr className="bg-muted/40 font-semibold">
                     <td className="border border-border px-3 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wide">
-                      Difference
+                      {isStatusSheet ? "Total" : "Difference"}
                     </td>
                     {diffRow.map((val, ci) => {
                       const isNeg = typeof val === "number" && val < 0;
@@ -1189,6 +1230,11 @@ export default function FactorySheets() {
                         </td>
                       );
                     })}
+                    {isStatusSheet && (
+                      <td className={`border border-border px-3 py-1.5 text-right text-xs tabular-nums font-bold bg-blue-50/60 dark:bg-blue-950/40 ${typeof statusGrandTotal === "number" && statusGrandTotal < 0 ? "text-red-500" : "text-blue-700 dark:text-blue-300"}`} data-testid="text-status-grand-total">
+                        {fmt(statusGrandTotal)}
+                      </td>
+                    )}
                     <td className="border border-border" />
                   </tr>
                 )}
