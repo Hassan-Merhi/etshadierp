@@ -114,7 +114,7 @@ const navSections: NavSection[] = [
     items: [
       { title: "Payroll",           url: "/factory/payroll-hub",               icon: HardHat        },
       { title: "Suppliers",        url: "/factory/suppliers",                 icon: UserRound      },
-      { title: "Broker Statement", url: "/factory/broker-visual-statement",   icon: Scale          },
+      ...(import.meta.env.DEV ? [{ title: "Broker Statement", url: "/factory/broker-visual-statement", icon: Scale }] : []),
     ],
   },
   {

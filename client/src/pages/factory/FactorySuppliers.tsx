@@ -908,7 +908,7 @@ export default function FactorySuppliers() {
               {children.length} linked supplier{children.length !== 1 ? "s" : ""}
             </p>
           </div>
-          {parentSup && (
+          {parentSup && import.meta.env.DEV && (
             <Button
               variant="outline"
               size="sm"
