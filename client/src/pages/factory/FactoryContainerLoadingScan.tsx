@@ -2,6 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
@@ -43,6 +44,7 @@ import {
   History,
   ChevronDown,
   ChevronUp,
+  Pencil,
 } from "lucide-react";
 import {
   Dialog,
@@ -136,6 +138,7 @@ export default function FactoryContainerLoadingScan() {
   const [orderDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [orderId, setOrderId] = useState<number | null>(null);
   const [isResuming, setIsResuming] = useState(false);
+  const [loadingNote, setLoadingNote] = useState<string>("");
   const [scanCode, setScanCode] = useState("");
   const [scanFlash, setScanFlash] = useState<"success" | "error" | null>(null);
   const [showScanSuccessPopup, setShowScanSuccessPopup] = useState(false);
@@ -226,6 +229,7 @@ export default function FactoryContainerLoadingScan() {
     if (isResuming && orderDetail && !selectedCustomerId) {
       setSelectedCustomerId(String(orderDetail.customerId));
       setSelectedLocationId(String(orderDetail.locationId || ""));
+      setLoadingNote(orderDetail.containerNotes || "");
       const stored = localStorage.getItem(`lastScannedBale_${orderDetail.id}`);
       if (stored) {
         try { setLastScannedRef(JSON.parse(stored)); } catch { setLastScannedRef({ baleReference: stored, baleName: "", articleCode: "" }); }
@@ -241,6 +245,7 @@ export default function FactoryContainerLoadingScan() {
       proformaIdUsed: number | null;
       locationId: number;
       orderDate: string;
+      containerNotes?: string;
     }) => {
       const res = await modeApiRequest(
         "POST",
@@ -479,6 +484,20 @@ export default function FactoryContainerLoadingScan() {
     },
   });
 
+  const saveNoteMutation = useMutation({
+    mutationFn: async (note: string) => {
+      await modeApiRequest("PATCH", `/api/factory/customer-orders/${orderId}/loading-note`, { note });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+      toast({ title: "Note saved" });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Failed to save note", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleStartLoading = useCallback(async () => {
     if (!customerId || !selectedLocationId) return;
     const activeProforma = proformas.find((p) => p.isActive) || null;
@@ -511,12 +530,14 @@ export default function FactoryContainerLoadingScan() {
       proformaIdUsed: activeProforma?.id || null,
       locationId: parseInt(selectedLocationId),
       orderDate,
+      containerNotes: loadingNote.trim() || undefined,
     });
   }, [
     customerId,
     selectedLocationId,
     proformas,
     orderDate,
+    loadingNote,
     createOrderMutation,
   ]);
 
@@ -1102,6 +1123,42 @@ export default function FactoryContainerLoadingScan() {
                   references.
                 </p>
               )}
+
+            {/* Note field — editable before and after loading starts */}
+            <div>
+              <label className="text-sm font-medium mb-1 block">Note</label>
+              {orderId ? (
+                <div className="flex gap-2 items-start">
+                  <Textarea
+                    value={loadingNote}
+                    onChange={(e) => setLoadingNote(e.target.value)}
+                    placeholder="Add a note for this loading..."
+                    className="resize-none text-sm"
+                    rows={2}
+                    data-testid="input-loading-note"
+                  />
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => saveNoteMutation.mutate(loadingNote)}
+                    disabled={saveNoteMutation.isPending}
+                    data-testid="button-save-note"
+                    title="Save note"
+                  >
+                    <Save className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Textarea
+                  value={loadingNote}
+                  onChange={(e) => setLoadingNote(e.target.value)}
+                  placeholder="Optional note (e.g. Rush order, Handle with care)"
+                  className="resize-none text-sm"
+                  rows={2}
+                  data-testid="input-loading-note"
+                />
+              )}
+            </div>
 
             {!orderId && (
               <Button

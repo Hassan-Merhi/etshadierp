@@ -1282,6 +1282,33 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
     }
   });
 
+  // PATCH /api/factory/customer-orders/:id/loading-note — update the free-text
+  // note on a loading order (works on any non-cancelled status so floor staff
+  // can add or edit notes at any point during the loading lifecycle).
+  app.patch("/api/factory/customer-orders/:id/loading-note", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const { note } = req.body;
+
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Loading not found" });
+
+      const [updated] = await db.update(customerOrders)
+        .set({ containerNotes: note?.trim() || null, updatedAt: new Date() })
+        .where(eq(customerOrders.id, orderId))
+        .returning();
+
+      res.json({ success: true, order: updated });
+    } catch (error: any) {
+      console.error("Error updating loading note:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/factory/customer-orders/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;

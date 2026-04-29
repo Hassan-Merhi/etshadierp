@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
-import { Clock, Package, Play, Trash2, Download, Link, X, Undo2 } from "lucide-react";
+import { Clock, Package, Play, Trash2, Download, Link, X, Undo2, Pencil, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -27,6 +27,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { apiRequest, keyStartsWith } from "@/lib/queryClient";
+import { Textarea } from "@/components/ui/textarea";
 
 const UNDO_TIMEOUT_MS = 8000;
 
@@ -41,6 +42,7 @@ interface PendingLoad {
   locationId: number | null;
   loadingStartedAt: string | null;
   status: string;
+  containerNotes: string | null;
 }
 
 interface UndoItem {
@@ -70,6 +72,26 @@ export default function FactoryPendingLoadings() {
   const [undoItems, setUndoItems] = useState<UndoItem[]>([]);
   const [, forceRender] = useState(0);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Note editing state
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+  const [editingNoteText, setEditingNoteText] = useState<string>("");
+
+  const saveNoteMutation = useMutation({
+    mutationFn: async ({ id, note }: { id: number; note: string }) => {
+      const res = await apiRequest("PATCH", `/api/factory/customer-orders/${id}/loading-note`, { note });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+      setEditingNoteId(null);
+      toast({ title: "Note saved" });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Failed to save note", description: error.message, variant: "destructive" });
+    },
+  });
 
   // Tick every 100ms to update progress bars
   useEffect(() => {
@@ -303,6 +325,57 @@ export default function FactoryPendingLoadings() {
                       {load.totalQtyBales} bales scanned
                     </span>
                   </div>
+
+                  {/* Loading note row */}
+                  {editingNoteId === load.id ? (
+                    <div className="flex gap-2 items-start mt-1">
+                      <Textarea
+                        value={editingNoteText}
+                        onChange={(e) => setEditingNoteText(e.target.value)}
+                        className="resize-none text-sm"
+                        rows={2}
+                        autoFocus
+                        data-testid={`input-note-${load.id}`}
+                      />
+                      <div className="flex flex-col gap-1">
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          onClick={() => saveNoteMutation.mutate({ id: load.id, note: editingNoteText })}
+                          disabled={saveNoteMutation.isPending}
+                          data-testid={`button-save-note-${load.id}`}
+                          title="Save note"
+                        >
+                          <Save className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setEditingNoteId(null)}
+                          data-testid={`button-cancel-note-${load.id}`}
+                          title="Cancel"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2 mt-1">
+                      <span className="text-sm text-muted-foreground italic flex-1" data-testid={`text-note-${load.id}`}>
+                        {load.containerNotes ? load.containerNotes : "No note"}
+                      </span>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="shrink-0"
+                        onClick={() => { setEditingNoteId(load.id); setEditingNoteText(load.containerNotes || ""); }}
+                        data-testid={`button-edit-note-${load.id}`}
+                        title="Edit note"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button
