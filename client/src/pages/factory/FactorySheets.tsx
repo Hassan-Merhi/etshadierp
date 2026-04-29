@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Trash2, Download, Upload, Save, X, TableProperties, FileDown,
-  Lock, Link2, LinkOff, Copy, ExternalLink,
+  Lock, Link2, Link2Off, Copy, ExternalLink,
 } from "lucide-react";
 import type { FactorySheet } from "@shared/schema";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -1077,7 +1077,7 @@ export default function FactorySheets() {
                                   <Link2 className="h-2.5 w-2.5 text-blue-400 shrink-0" />
                                 )}
                                 {(isBroken || isCyclic) && (
-                                  <LinkOff className="h-2.5 w-2.5 text-red-400 shrink-0" />
+                                  <Link2Off className="h-2.5 w-2.5 text-red-400 shrink-0" />
                                 )}
                                 <span className="flex-1 text-right tabular-nums">{fmt(displayValue)}</span>
                               </div>
@@ -1106,7 +1106,7 @@ export default function FactorySheets() {
                                       title={isLinked ? `Linked from: ${linkInfo ?? "…"}` : "Link this cell"}
                                     >
                                       {isBroken || isCyclic ? (
-                                        <LinkOff className="h-2.5 w-2.5 text-red-400" />
+                                        <Link2Off className="h-2.5 w-2.5 text-red-400" />
                                       ) : isLinked ? (
                                         <Link2 className="h-2.5 w-2.5 text-blue-400" />
                                       ) : (
@@ -1135,7 +1135,7 @@ export default function FactorySheets() {
                                           Change link
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => unlinkCell(ri, ci)} className="text-xs gap-2">
-                                          <LinkOff className="h-3 w-3" />
+                                          <Link2Off className="h-3 w-3" />
                                           Unlink
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => copyLinkValueAsManual(ri, ci)} className="text-xs gap-2">

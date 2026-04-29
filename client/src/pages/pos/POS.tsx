@@ -519,40 +519,35 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       }
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
 
-      // If this is a new sale and the location has a WhatsApp group, send automatically
-      const hasWhatsApp =
-        !editVoucherId &&
-        !!(
-          (activeLocation as any)?.whatsappGroupChatId ||
-          (data.location as any)?.whatsappGroupChatId
-        );
+      // Always open the print dialog
+      toast({
+        title: editVoucherId ? "Sale Updated" : "Sale Saved",
+        description: `Sale ${data.voucher?.voucherNumber} has been ${editVoucherId ? "updated" : "saved"} successfully.`,
+      });
+      setShowPrintDialog(true);
 
-      if (hasWhatsApp) {
-        setShowPrintDialog(false);
-        setShowStockPrompt(false);
-        setSendingWhatsApp(true);
-        try {
-          await sendStockReportToWhatsApp(locationId);
-          toast({
-            title: "Sale saved",
-            description: `Sale ${data.voucher?.voucherNumber} saved and stock report sent to WhatsApp.`,
-          });
-        } catch (e: any) {
-          toast({
-            title: "Sale saved",
-            description: `Sale ${data.voucher?.voucherNumber} saved, but WhatsApp stock report failed: ${e.message}`,
-            variant: "destructive",
-          });
-        } finally {
-          setSendingWhatsApp(false);
+      // Fire-and-forget: auto-send invoice to WhatsApp if group is configured
+      if (!editVoucherId) {
+        const waGroupId =
+          (activeLocation as any)?.whatsappGroupChatId ||
+          (data.location as any)?.whatsappGroupChatId;
+        const voucherId = data.voucher?.id;
+        if (waGroupId && voucherId) {
+          setSendingInvoiceWhatsApp(true);
+          apiRequest("POST", "/api/pos/send-invoice-whatsapp", { voucherId })
+            .then(async (r) => {
+              const body = await r.json().catch(() => ({}));
+              if (!r.ok) {
+                toast({ title: "WhatsApp", description: body.message || "Invoice send failed.", variant: "destructive" });
+              } else {
+                toast({ title: "WhatsApp", description: "Invoice sent to WhatsApp group." });
+              }
+            })
+            .catch(() => {
+              toast({ title: "WhatsApp", description: "Could not reach WhatsApp service.", variant: "destructive" });
+            })
+            .finally(() => setSendingInvoiceWhatsApp(false));
         }
-      } else {
-        // Existing behaviour — open print dialog
-        toast({
-          title: editVoucherId ? "Sale Updated" : "Sale Saved",
-          description: `Sale ${data.voucher?.voucherNumber} has been ${editVoucherId ? "updated" : "saved"} successfully.`,
-        });
-        setShowPrintDialog(true);
       }
     },
     onError: (error: any) => {
@@ -2533,7 +2528,19 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 data-testid="button-send-whatsapp-invoice"
               >
                 <Send className="h-4 w-4" />
-                {sendingInvoiceWhatsApp ? "Sending…" : "Send to WhatsApp"}
+                {sendingInvoiceWhatsApp ? "Sending…" : "Resend Invoice"}
+              </Button>
+            )}
+            {!editVoucherId && (
+              <Button
+                variant="outline"
+                onClick={handleSendWhatsAppReport}
+                disabled={sendingWhatsApp}
+                className="gap-2"
+                data-testid="button-send-stock-whatsapp"
+              >
+                <Send className="h-4 w-4" />
+                {sendingWhatsApp ? "Sending…" : "Send Stock"}
               </Button>
             )}
             <Button onClick={handlePrint} className="gap-2" data-testid="button-print-invoice">
