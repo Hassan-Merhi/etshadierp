@@ -55,6 +55,79 @@ import {
   customerOrderCharges, customerOrders, customerOrderBales, customerOrderLines,
 } from "@shared/schema";
 
+/**
+ * After saving a journal voucher, if it has a customer entry + a ledger account entry,
+ * look for order charges linked to that ledger account for that customer.
+ * If exactly one charge is found, update its amount and recalculate the order totals.
+ */
+async function syncJournalToOrderCharge(
+  companyId: number,
+  savedEntries: Array<{
+    customerId: number | null;
+    ledgerAccountId: number | null;
+    debitAmount: string;
+    creditAmount: string;
+  }>
+) {
+  const customerEntry = savedEntries.find(e => e.customerId !== null);
+  if (!customerEntry) return;
+
+  const ledgerCrEntries = savedEntries.filter(
+    e => e.ledgerAccountId !== null && e.customerId === null && parseFloat(e.creditAmount || "0") > 0
+  );
+  if (ledgerCrEntries.length === 0) return;
+
+  for (const ledgerEntry of ledgerCrEntries) {
+    const newAmount = parseFloat(ledgerEntry.creditAmount || "0");
+    if (newAmount <= 0) continue;
+
+    const matchingCharges = await db
+      .select({
+        id: customerOrderCharges.id,
+        orderId: customerOrderCharges.orderId,
+        amount: customerOrderCharges.amount,
+        chargeType: customerOrderCharges.chargeType,
+      })
+      .from(customerOrderCharges)
+      .innerJoin(customerOrders, and(
+        eq(customerOrderCharges.orderId, customerOrders.id),
+        eq(customerOrders.customerId, customerEntry.customerId!),
+        eq(customerOrders.companyId, companyId),
+      ))
+      .where(eq(customerOrderCharges.ledgerAccountId, ledgerEntry.ledgerAccountId!));
+
+    if (matchingCharges.length !== 1) continue; // ambiguous — skip
+
+    const charge = matchingCharges[0];
+    const oldAmount = parseFloat(charge.amount || "0");
+    if (Math.abs(oldAmount - newAmount) < 0.01) continue; // no change
+
+    // Update the charge amount
+    await db.update(customerOrderCharges)
+      .set({ amount: newAmount.toFixed(2) })
+      .where(eq(customerOrderCharges.id, charge.id));
+
+    // Recalculate and save order totals
+    await recalculateOrderTotals(db, charge.orderId);
+
+    // Also sync the invoice debit in customerBalances
+    const [updatedOrder] = await db
+      .select({ grandTotal: customerOrders.grandTotal })
+      .from(customerOrders)
+      .where(eq(customerOrders.id, charge.orderId));
+
+    if (updatedOrder) {
+      await db.update(customerBalances)
+        .set({ debitAmount: updatedOrder.grandTotal, balance: updatedOrder.grandTotal })
+        .where(and(
+          eq(customerBalances.companyId, companyId),
+          eq(customerBalances.referenceId, charge.orderId),
+          eq(customerBalances.referenceType, "INVOICE"),
+        ));
+    }
+  }
+}
+
 export function registerVoucherRoutes(app: Express) {
   app.get("/api/vouchers", requireAuth, async (req, res) => {
     try {
@@ -997,7 +1070,7 @@ export function registerVoucherRoutes(app: Express) {
 
         // Use database transaction for atomic operation
         const result = await db.transaction(async (tx) => {
-          // Create voucher
+          // Create journal voucher
           const [createdVoucher] = await tx
             .insert(vouchers)
             .values({
@@ -1066,6 +1139,9 @@ export function registerVoucherRoutes(app: Express) {
             req.session.currentCompanyId!
           );
         }
+
+        // Sync order charges automatically (non-fatal)
+        await syncJournalToOrderCharge(req.session.currentCompanyId!, result.entries).catch(() => {});
 
         // Write to factory daybook if this company has factory settings
         try {
@@ -1283,6 +1359,10 @@ export function registerVoucherRoutes(app: Express) {
             req.session.currentCompanyId!
           );
         }
+
+        // Sync order charges: if the journal has a customer entry + a CR ledger entry
+        // that matches a charge on one of their orders, update that charge automatically
+        await syncJournalToOrderCharge(req.session.currentCompanyId!, result.entries).catch(() => {});
 
         // WhatsApp auto-statement trigger (non-fatal)
         let waJournalPatch: { sent: boolean; error?: string } = { sent: false };
