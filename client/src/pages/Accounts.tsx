@@ -804,6 +804,16 @@ export default function Accounts() {
   // Closing balance = final USD running balance (includes opening balance + all USD-currency vouchers)
   const closingBalance = finalRunningBalances.get("USD") ?? openingBalance;
 
+  // Actual account balance — the real current balance regardless of period filter.
+  // Uses the same sign convention as closingBalance (positive = Dr for non-suppliers, positive = Cr for suppliers).
+  const actualBalance = (() => {
+    const raw = selectedAccount?.balance ?? 0;
+    const side = selectedAccount?.balanceSide ?? "Dr";
+    const isSupp = selectedAccount?.type === "supplier";
+    if (isSupp) return side === "Cr" ? raw : -raw;
+    return side === "Dr" ? raw : -raw;
+  })();
+
   const handleExportStatementToExcel = async () => {
     if (!selectedAccount || vouchersWithBalance.length === 0) {
       toast({
@@ -1960,12 +1970,10 @@ export default function Accounts() {
                             }
                           }
 
-                          // Default: single balance display — use closingBalance so
-                          // the header always matches the bottom "Current Balance" row.
-                          const isSupplierType = selectedAccount?.type === "supplier";
-                          const side = isSupplierType
-                            ? (closingBalance > 0 ? "Cr" : "Dr")
-                            : (closingBalance >= 0 ? "Dr" : "Cr");
+                          // Default: single balance display — always the real
+                          // account balance, independent of any period filter.
+                          const bal = selectedAccount?.balance ?? 0;
+                          const side = selectedAccount?.balanceSide ?? "Dr";
                           const isNegative = side === "Cr";
                           return (
                             <div className="flex items-center gap-2">
@@ -1978,7 +1986,7 @@ export default function Accounts() {
                                 className="font-mono font-semibold"
                                 data-testid="text-account-balance"
                               >
-                                {formatAmount(Math.abs(closingBalance))} {side}
+                                {formatAmount(Math.abs(bal))} {side}
                               </span>
                             </div>
                           );
@@ -2723,29 +2731,29 @@ export default function Accounts() {
                               </TableCell>
                               <TableCell className="text-right font-mono font-bold w-[120px] py-2">
                                 {selectedAccount?.type === "supplier"
-                                  ? closingBalance < 0
-                                    ? formatAmount(Math.abs(closingBalance))
+                                  ? actualBalance < 0
+                                    ? formatAmount(Math.abs(actualBalance))
                                     : "-"
-                                  : closingBalance > 0
-                                    ? formatAmount(closingBalance)
+                                  : actualBalance > 0
+                                    ? formatAmount(actualBalance)
                                     : "-"}
                               </TableCell>
                               <TableCell className="text-right font-mono font-bold w-[120px] py-2">
                                 {selectedAccount?.type === "supplier"
-                                  ? closingBalance > 0
-                                    ? formatAmount(closingBalance)
+                                  ? actualBalance > 0
+                                    ? formatAmount(actualBalance)
                                     : "-"
-                                  : closingBalance < 0
-                                    ? formatAmount(Math.abs(closingBalance))
+                                  : actualBalance < 0
+                                    ? formatAmount(Math.abs(actualBalance))
                                     : "-"}
                               </TableCell>
                               <TableCell className="text-right font-mono font-bold w-[130px] py-2">
-                                {formatAmount(Math.abs(closingBalance))}{" "}
+                                {formatAmount(Math.abs(actualBalance))}{" "}
                                 {selectedAccount?.type === "supplier"
-                                  ? closingBalance > 0
+                                  ? actualBalance > 0
                                     ? "Cr"
                                     : "Dr"
-                                  : closingBalance >= 0
+                                  : actualBalance >= 0
                                     ? "Dr"
                                     : "Cr"}
                               </TableCell>
@@ -2776,10 +2784,10 @@ export default function Accounts() {
                           <div className="flex justify-between bg-accent/50 p-2 rounded border-t-2">
                             <span className="font-bold">Current Balance:</span>
                             <span className="font-mono font-bold">
-                              {formatAmount(Math.abs(closingBalance))}{" "}
+                              {formatAmount(Math.abs(actualBalance))}{" "}
                               {selectedAccount?.type === "supplier"
-                                ? closingBalance > 0 ? "Cr" : "Dr"
-                                : closingBalance >= 0 ? "Dr" : "Cr"}
+                                ? actualBalance > 0 ? "Cr" : "Dr"
+                                : actualBalance >= 0 ? "Dr" : "Cr"}
                             </span>
                           </div>
                         </div>
