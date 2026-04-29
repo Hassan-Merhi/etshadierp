@@ -2824,14 +2824,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             const grandTotal = sorted.reduce((s, i) => s + Math.floor(parseFloat(i.quantity || '0')), 0);
             const uom = sorted[0]?.stockItemUom || sorted[0]?.uom || 'BL';
             return (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt', lineHeight: '1.55', fontFamily: 'Arial, Helvetica, sans-serif', marginTop: '6px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt', lineHeight: '1.6', fontFamily: 'Arial, Helvetica, sans-serif', marginTop: '6px' }}>
                 <thead>
                   <tr>
-                    <th style={{ fontWeight: 'bold', fontSize: '9pt', padding: '5px 4px 5px 0', borderTop: '2px solid #333', borderBottom: '2px solid #333', textAlign: 'left', verticalAlign: 'bottom', backgroundColor: 'white' }}>
+                    <th style={{ fontWeight: 'bold', fontSize: '9pt', padding: '6px 8px 6px 4px', borderTop: '2.5px solid #111', borderBottom: '2.5px solid #111', textAlign: 'left', verticalAlign: 'bottom', backgroundColor: 'white' }}>
                       Particulars
                     </th>
-                    <th style={{ fontWeight: 'bold', fontSize: '9pt', padding: '5px 0 5px 4px', borderTop: '2px solid #333', borderBottom: '2px solid #333', textAlign: 'right', width: '140px', verticalAlign: 'bottom', backgroundColor: 'white' }}>
-                      Closing Balance<br /><span style={{ fontWeight: 'normal', fontSize: '7.5pt' }}>Quantity</span>
+                    <th style={{ fontWeight: 'bold', fontSize: '9pt', padding: '6px 4px 6px 8px', borderTop: '2.5px solid #111', borderBottom: '2.5px solid #111', textAlign: 'right', width: '140px', verticalAlign: 'bottom', backgroundColor: 'white' }}>
+                      Closing<br />Balance<br /><span style={{ fontWeight: 'normal', fontSize: '7.5pt' }}>Quantity</span>
                     </th>
                   </tr>
                 </thead>
@@ -2841,12 +2841,13 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                     const firstUom = (items as any[])[0]?.stockItemUom || (items as any[])[0]?.uom || 'BL';
                     const isGroupNeg = groupTotal < 0;
                     return [
-                      <tr key={`g-${groupCode}`}>
-                        <td style={{ fontWeight: 'bold', fontSize: '10pt', padding: '6px 4px 6px 0', borderTop: '1.5px solid #555', borderBottom: '1.5px solid #555', color: isGroupNeg ? '#c2272d' : 'inherit', verticalAlign: 'middle', backgroundColor: 'white' }}>
+                      /* Group header row — light gray background like the reference */
+                      <tr key={`g-${groupCode}`} style={{ backgroundColor: '#e8e8e8' }}>
+                        <td style={{ fontWeight: 'bold', fontSize: '9.5pt', padding: '5px 8px 5px 4px', borderTop: '1px solid #aaa', borderBottom: '1px solid #aaa', color: isGroupNeg ? '#c2272d' : '#000', verticalAlign: 'middle', backgroundColor: '#e8e8e8' }}>
                           {name}
                         </td>
-                        <td style={{ fontWeight: 'bold', fontSize: '10pt', padding: '6px 0 6px 4px', borderTop: '1.5px solid #555', borderBottom: '1.5px solid #555', textAlign: 'right', color: isGroupNeg ? '#c2272d' : 'inherit', verticalAlign: 'middle', backgroundColor: 'white' }}>
-                          {Math.floor(groupTotal).toLocaleString()}<span style={{ marginLeft: '0.4em' }}>{firstUom}</span>
+                        <td style={{ fontWeight: 'bold', fontSize: '9.5pt', padding: '5px 4px 5px 8px', borderTop: '1px solid #aaa', borderBottom: '1px solid #aaa', textAlign: 'right', color: isGroupNeg ? '#c2272d' : '#000', verticalAlign: 'middle', backgroundColor: '#e8e8e8', whiteSpace: 'nowrap' }}>
+                          {Math.floor(groupTotal).toLocaleString()}&nbsp;&nbsp;<span style={{ fontWeight: 'normal', fontSize: '8pt' }}>{firstUom}</span>
                         </td>
                       </tr>,
                       ...(items as any[]).map((item) => {
@@ -2855,11 +2856,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                         const itemUom = item.stockItemUom || item.uom || 'BL';
                         return (
                           <tr key={`i-${item.inventoryId || item.stockItemId}`} style={{ backgroundColor: isNeg ? '#fff0f0' : 'white' }}>
-                            <td style={{ padding: '3px 4px 3px 16px', borderBottom: '0.5px solid #ddd', fontSize: '9pt', color: isNeg ? '#c2272d' : 'inherit', fontWeight: isNeg ? 600 : 'normal', verticalAlign: 'middle' }}>
+                            <td style={{ padding: '3.5px 8px 3.5px 16px', borderBottom: '0.75px solid #ccc', fontSize: '9pt', color: isNeg ? '#c2272d' : '#222', fontWeight: isNeg ? 600 : 'normal', verticalAlign: 'middle' }}>
                               {item.stockItemName}
                             </td>
-                            <td style={{ padding: '3px 0 3px 4px', borderBottom: '0.5px solid #ddd', textAlign: 'right', fontSize: '9pt', fontWeight: isNeg ? 600 : 'normal', whiteSpace: 'nowrap', color: isNeg ? '#c2272d' : 'inherit', verticalAlign: 'middle' }}>
-                              {qty.toLocaleString()}<span style={{ marginLeft: '0.4em' }}>{itemUom}</span>
+                            <td style={{ padding: '3.5px 4px 3.5px 8px', borderBottom: '0.75px solid #ccc', textAlign: 'right', fontSize: '9pt', fontWeight: isNeg ? 600 : 'normal', whiteSpace: 'nowrap', color: isNeg ? '#c2272d' : '#222', verticalAlign: 'middle' }}>
+                              {qty.toLocaleString()}&nbsp;&nbsp;<span style={{ fontWeight: 'normal', fontSize: '8pt' }}>{itemUom}</span>
                             </td>
                           </tr>
                         );
@@ -2868,10 +2869,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                   })}
                 </tbody>
                 <tfoot>
-                  <tr>
-                    <td style={{ fontWeight: 'bold', fontSize: '11pt', borderTop: '2px solid #333', borderBottom: '2px solid #333', padding: '6px 4px 6px 0', backgroundColor: 'white', verticalAlign: 'middle' }}>Grand Total</td>
-                    <td style={{ fontWeight: 'bold', fontSize: '11pt', borderTop: '2px solid #333', borderBottom: '2px solid #333', padding: '6px 0 6px 4px', backgroundColor: 'white', textAlign: 'right', verticalAlign: 'middle' }}>
-                      {grandTotal.toLocaleString()}<span style={{ marginLeft: '0.4em' }}>{uom}</span>
+                  <tr style={{ backgroundColor: '#e8e8e8' }}>
+                    <td style={{ fontWeight: 'bold', fontSize: '10pt', borderTop: '2.5px solid #111', borderBottom: '2.5px solid #111', padding: '6px 8px 6px 4px', backgroundColor: '#e8e8e8', verticalAlign: 'middle' }}>Grand Total</td>
+                    <td style={{ fontWeight: 'bold', fontSize: '10pt', borderTop: '2.5px solid #111', borderBottom: '2.5px solid #111', padding: '6px 4px 6px 8px', backgroundColor: '#e8e8e8', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                      {grandTotal.toLocaleString()}&nbsp;&nbsp;<span style={{ fontWeight: 'normal', fontSize: '8pt' }}>{uom}</span>
                     </td>
                   </tr>
                 </tfoot>
