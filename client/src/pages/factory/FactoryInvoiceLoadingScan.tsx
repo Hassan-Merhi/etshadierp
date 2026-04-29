@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   ScanLine, ArrowLeft, Play, CheckCircle, XCircle, Trash2,
-  FileDown, FileSpreadsheet, AlertTriangle, Package, Truck, RotateCcw,
+  FileDown, FileSpreadsheet, AlertTriangle, Package, Truck, RotateCcw, List,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 
@@ -153,6 +153,9 @@ export default function FactoryInvoiceLoadingScan() {
   // ── Bale refs dialog ──
   const [baleRefLine, setBaleRefLine] = useState<{ code: string; name: string } | null>(null);
 
+  // ── View session bales dialog ──
+  const [viewSessionId, setViewSessionId] = useState<number | null>(null);
+
   // ── Data ──
   const summaryKey = [`/api/factory/invoices/${invoiceId}/loading-summary`, activeSessionId];
   const { data: summary, isLoading, isError, error } = useQuery<LoadingSummaryResponse>({
@@ -238,14 +241,14 @@ export default function FactoryInvoiceLoadingScan() {
   });
 
   const removeBaleFromSessionMutation = useMutation({
-    mutationFn: async (baleId: number) => {
-      const res = await apiRequest("DELETE", `/api/factory/invoice-loading-sessions/${activeSessionId}/bales/${baleId}`);
+    mutationFn: async ({ sessionId, baleId }: { sessionId: number; baleId: number }) => {
+      const res = await apiRequest("DELETE", `/api/factory/invoice-loading-sessions/${sessionId}/bales/${baleId}`);
       if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/invoices/${invoiceId}/loading-summary`] });
-      toast({ title: "Removed", description: "Bale removed from session." });
+      toast({ title: "Removed", description: "Bale removed and returned to unloaded." });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -636,7 +639,7 @@ export default function FactoryInvoiceLoadingScan() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => removeBaleFromSessionMutation.mutate(b.baleId)}
+                            onClick={() => activeSessionId && removeBaleFromSessionMutation.mutate({ sessionId: activeSessionId, baleId: b.baleId })}
                             disabled={removeBaleFromSessionMutation.isPending}
                             data-testid={`button-remove-bale-${b.baleId}`}
                             title="Remove from session"
@@ -755,6 +758,17 @@ export default function FactoryInvoiceLoadingScan() {
                       <TableCell className="text-right font-medium">{s.totalBales}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {s.status !== "CANCELLED" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setViewSessionId(s.id)}
+                              data-testid={`button-view-session-bales-${s.id}`}
+                              title="View & manage bales"
+                            >
+                              <List className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                           {s.status === "OPEN" && s.id !== activeSessionId && (
                             <Button
                               variant="outline"
@@ -857,6 +871,72 @@ export default function FactoryInvoiceLoadingScan() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* View / Delete session bales dialog */}
+      <Dialog open={viewSessionId !== null} onOpenChange={(open) => { if (!open) setViewSessionId(null); }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          {(() => {
+            const session = summary?.sessions.find((s) => s.id === viewSessionId);
+            const sessionBales = (summary?.invoiceBales ?? []).filter((b) => b.loadedSessionId === viewSessionId);
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-base flex flex-wrap items-center gap-2">
+                    Session #{viewSessionId}
+                    {session && <StatusBadge status={session.status} />}
+                    {session?.truckNo && <span className="font-mono text-sm text-muted-foreground">{session.truckNo}</span>}
+                    {session?.driverName && <span className="text-sm text-muted-foreground">/ {session.driverName}</span>}
+                  </DialogTitle>
+                </DialogHeader>
+                {sessionBales.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-6 text-center">No bales found in this session.</p>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">{sessionBales.length} bale{sessionBales.length !== 1 ? "s" : ""}. Click the trash icon to remove a bale and return it to unloaded.</p>
+                    <div className="overflow-x-auto rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Reference</TableHead>
+                            <TableHead>Article</TableHead>
+                            <TableHead>Product</TableHead>
+                            <TableHead className="text-right">Weight (kg)</TableHead>
+                            <TableHead className="w-8"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {sessionBales
+                            .sort((a, b) => a.baleReference.localeCompare(b.baleReference))
+                            .map((b) => (
+                              <TableRow key={b.baleId} data-testid={`row-view-session-bale-${b.baleId}`}>
+                                <TableCell className="font-mono text-sm">{b.baleReference}</TableCell>
+                                <TableCell className="text-xs">{b.articleCode || "—"}</TableCell>
+                                <TableCell className="text-xs text-muted-foreground">{b.productName || "—"}</TableCell>
+                                <TableCell className="text-right text-sm font-mono">{parseFloat(b.weightKg || "0").toFixed(3)}</TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    disabled={removeBaleFromSessionMutation.isPending}
+                                    onClick={() => viewSessionId && removeBaleFromSessionMutation.mutate({ sessionId: viewSessionId, baleId: b.baleId })}
+                                    data-testid={`button-delete-session-bale-${b.baleId}`}
+                                    title="Remove bale and return to unloaded"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       {/* Bale References Dialog */}
       <Dialog open={baleRefLine !== null} onOpenChange={(open) => { if (!open) setBaleRefLine(null); }}>

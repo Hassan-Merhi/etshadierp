@@ -465,7 +465,7 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
         ));
 
       if (!session) return res.status(404).json({ message: "Session not found" });
-      if (session.status !== "OPEN") return res.status(400).json({ message: "Can only remove bales from OPEN sessions" });
+      if (session.status === "CANCELLED") return res.status(400).json({ message: "Cannot remove bales from a cancelled session" });
 
       const deleted = await db
         .delete(factoryInvoiceLoadingBales)
