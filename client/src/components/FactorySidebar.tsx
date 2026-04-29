@@ -370,7 +370,7 @@ export function FactorySidebar({ user }: { user?: any }) {
 
         {/* Bottom utility strip */}
         <div className="mt-4 pt-3 border-t border-sidebar-border/60 space-y-0.5">
-          <FlatLink href="/spreadsheet" icon={TableProperties} label="Spreadsheet" color="#6b7280" testId="link-factory-spreadsheet" />
+          <FlatLink href="/factory/spreadsheet" icon={TableProperties} label="Spreadsheet" color="#6b7280" testId="link-factory-spreadsheet" />
           <FlatLink href="/factory/chat" icon={MessageCircle} label="Chat" color="#3b82f6" badge={chatUnread?.count} testId="link-factory-chat" />
           {conflictCount > 0 && (
             <a
