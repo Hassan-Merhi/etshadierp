@@ -1,26 +1,20 @@
 /**
- * Stock PDF — mirrors the POS stock print template exactly:
- *   - Title    : location name (underlined, 16pt bold) — or "Godown Summary" if no location
- *   - Subtitle : "Godown Summary" (12pt bold)
- *   - 2 columns: Particulars | Closing Balance (Qty)
- *   - Negative quantities → red text + red row background (like the HTML template)
+ * Stock PDF — mirrors the POS stock print template.
+ *
+ * Uses pdfkit's standard auto-flow mode (margin: 40) with pageAdded event
+ * to reliably handle multi-page output without blank-page artifacts.
+ *
+ * Layout : A4, 2 columns — Particulars | Closing Balance (Qty)
+ * Negatives: red text + red background row
  */
 
 import { pool } from "../db";
 
-// ── Page geometry ─────────────────────────────────────────────────────────────
-const PAGE_W   = 595;
-const PAGE_H   = 842;
-const MARGIN_X = 40;
-const MARGIN_Y = 34;
-const USABLE_W = PAGE_W - MARGIN_X * 2;   // 515 pt
-
-// ── Columns (match HTML: qty column ≈ 140px out of 794px usable ≈ 17.6 %) ───
-const COL_QTY_W  = Math.round(USABLE_W * 0.27);   // 139 pt
-const COL_PART_W = USABLE_W - COL_QTY_W;           // 376 pt
-
-const X_PART = MARGIN_X;
-const X_QTY  = X_PART + COL_PART_W;
+// ── Geometry (margin: 40 gives 515pt usable width, x: 40–555) ────────────────
+const X_LEFT    = 40;
+const X_RIGHT   = 555;
+const CONTENT_W = X_RIGHT - X_LEFT;   // 515 pt
+const COL_QTY_W = 95;                 // qty column width (≈18% matching HTML template)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtQty(n: number): string {
@@ -78,9 +72,8 @@ export async function generateStockPdf(
       uom:       r.uom || "BL",
       qty:       parseFloat(r.quantity || "0"),
     }))
-    .filter(r => r.qty !== 0);   // matches HTML template filter
+    .filter(r => r.qty !== 0);
 
-  // Group by stock group (SQL sort order preserved)
   const grouped: { groupName: string; items: StockRow[] }[] = [];
   for (const row of rows) {
     const last = grouped[grouped.length - 1];
@@ -94,10 +87,11 @@ export async function generateStockPdf(
   const now        = new Date();
   const dateStr    = fmtDate(now);
   const printedStr = `${dateStr} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
+  const mainTitle  = locationName ?? "Godown Summary";
 
-  // ── Build PDF ───────────────────────────────────────────────────────────────
+  // ── Build PDF (margin: 40 — reliable auto-flow mode) ─────────────────────
   const PDFDocument = (await import("pdfkit")).default;
-  const doc = new PDFDocument({ margin: 0, size: "A4", autoFirstPage: true });
+  const doc = new PDFDocument({ size: "A4", margin: 40, autoFirstPage: true });
 
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
@@ -108,145 +102,130 @@ export async function generateStockPdf(
 
   let pageNum = 1;
 
-  // Title = location name when we have one; otherwise just "Godown Summary"
-  const mainTitle = locationName ?? "Godown Summary";
-
-  // ── Page header ─────────────────────────────────────────────────────────────
-  function drawPageHeader(): number {
-    let y = MARGIN_Y;
-
-    // Big title — underlined, 16pt bold centered
+  // ── Page header + table header (drawn on every page) ─────────────────────
+  function drawPageHeader(): void {
+    // Title — location name, underlined, 16pt bold centered
     doc.font("Helvetica-Bold").fontSize(16).fillColor("#000000");
-    doc.text(mainTitle, X_PART, y, { width: USABLE_W, align: "center", underline: true, lineBreak: false });
-    y += 22;
+    doc.text(mainTitle, X_LEFT, doc.y, { width: CONTENT_W, align: "center", underline: true, lineBreak: false });
+    doc.y += 22;
 
-    // Subtitle "Godown Summary" — only if we have a specific location (matches HTML which always shows both)
+    // Subtitle "Godown Summary" — only shown if a specific location was given
     if (locationName) {
       doc.font("Helvetica-Bold").fontSize(12).fillColor("#000000");
-      doc.text("Godown Summary", X_PART, y, { width: USABLE_W, align: "center", lineBreak: false });
-      y += 17;
+      doc.text("Godown Summary", X_LEFT, doc.y, { width: CONTENT_W, align: "center", lineBreak: false });
+      doc.y += 17;
     }
 
     // Date — 9pt gray centered
     doc.font("Helvetica").fontSize(9).fillColor("#333333");
-    doc.text(dateStr, X_PART, y, { width: USABLE_W, align: "center", lineBreak: false });
-    y += 13;
+    doc.text(dateStr, X_LEFT, doc.y, { width: CONTENT_W, align: "center", lineBreak: false });
+    doc.y += 13;
 
-    // Meta bar — thin separator then "Printed …" left, "Page N" right
+    // Meta separator line
     doc.save();
-    doc.moveTo(X_PART, y).lineTo(X_PART + USABLE_W, y).strokeColor("#cccccc").lineWidth(0.5).stroke();
+    doc.moveTo(X_LEFT, doc.y).lineTo(X_RIGHT, doc.y).strokeColor("#cccccc").lineWidth(0.5).stroke();
     doc.restore();
-    y += 4;
+    doc.y += 4;
+
+    // "Printed: …" left  /  "Page N" right
+    const metaY = doc.y;
     doc.font("Helvetica").fontSize(8).fillColor("#666666");
-    doc.text(`Printed: ${printedStr}`, X_PART, y, { lineBreak: false });
-    doc.text(`Page ${pageNum}`, X_PART, y, { width: USABLE_W, align: "right", lineBreak: false });
-    y += 13;
+    doc.text(`Printed: ${printedStr}`, X_LEFT, metaY, { lineBreak: false });
+    doc.text(`Page ${pageNum}`,        X_LEFT, metaY, { width: CONTENT_W, align: "right", lineBreak: false });
+    doc.y = metaY + 13;
 
-    doc.fillColor("#000000");
-    return y;
-  }
-
-  // ── Table header ─────────────────────────────────────────────────────────────
-  function drawTableHeader(y: number): number {
-    const H = 22;
-
+    // Table header row
+    const thY = doc.y;
+    const thH = 22;
     doc.save();
-    doc.rect(X_PART, y, USABLE_W, H).fill("#ffffff");
-    // Thick top + bottom borders (matches HTML 2.5px solid #111)
-    doc.moveTo(X_PART, y).lineTo(X_PART + USABLE_W, y).strokeColor("#111111").lineWidth(2.5).stroke();
-    doc.moveTo(X_PART, y + H).lineTo(X_PART + USABLE_W, y + H).strokeColor("#111111").lineWidth(2.5).stroke();
+    doc.rect(X_LEFT, thY, CONTENT_W, thH).fill("#f8f8f8");
+    doc.moveTo(X_LEFT, thY)       .lineTo(X_RIGHT, thY)       .strokeColor("#111111").lineWidth(2.5).stroke();
+    doc.moveTo(X_LEFT, thY + thH).lineTo(X_RIGHT, thY + thH).strokeColor("#111111").lineWidth(2.5).stroke();
     doc.restore();
 
     doc.font("Helvetica-Bold").fontSize(9).fillColor("#000000");
-    doc.text("Particulars", X_PART + 4, y + 7, { width: COL_PART_W - 8, align: "left", lineBreak: false });
-
-    // "Closing Balance" stacked — bold 9pt then lighter 7.5pt "Quantity"
-    doc.font("Helvetica-Bold").fontSize(9).fillColor("#000000");
-    doc.text("Closing", X_QTY, y + 1, { width: COL_QTY_W - 4, align: "right", lineBreak: false });
-    doc.text("Balance", X_QTY, y + 8, { width: COL_QTY_W - 4, align: "right", lineBreak: false });
+    doc.text("Particulars",  X_LEFT + 4,            thY + 6,  { lineBreak: false });
+    doc.text("Closing",      X_RIGHT - COL_QTY_W,   thY + 2,  { width: COL_QTY_W, align: "right", lineBreak: false });
+    doc.text("Balance",      X_RIGHT - COL_QTY_W,   thY + 9,  { width: COL_QTY_W, align: "right", lineBreak: false });
     doc.font("Helvetica").fontSize(7.5).fillColor("#000000");
-    doc.text("Quantity", X_QTY, y + 14, { width: COL_QTY_W - 4, align: "right", lineBreak: false });
+    doc.text("Quantity",     X_RIGHT - COL_QTY_W,   thY + 14, { width: COL_QTY_W, align: "right", lineBreak: false });
 
-    return y + H + 1;
+    // Advance cursor past the table header
+    doc.y = thY + thH + 2;
+    doc.fillColor("#000000");
   }
 
-  // ── Page overflow ─────────────────────────────────────────────────────────
-  function checkPage(y: number, need: number): number {
-    if (y + need > PAGE_H - MARGIN_Y) {
-      doc.addPage({ size: "A4" });
-      pageNum++;
-      let ny = drawPageHeader();
-      ny = drawTableHeader(ny);
-      return ny;
+  // Draw first page header
+  drawPageHeader();
+
+  // Draw header automatically on every new page pdfkit adds
+  doc.on("pageAdded", () => {
+    pageNum++;
+    drawPageHeader();
+  });
+
+  // ── Helper: ensure at least `need` pt is available; add page if not ───────
+  function ensureSpace(need: number): void {
+    if (doc.y + need > (doc.page.maxY ?? 802)) {
+      doc.addPage();   // fires pageAdded → drawPageHeader()
     }
-    return y;
   }
 
-  // ── First page ─────────────────────────────────────────────────────────────
-  let y = drawPageHeader();
-  y += 2;
-  y = drawTableHeader(y);
-
-  // ── Rows ─────────────────────────────────────────────────────────────────
+  // ── Group + item rows ─────────────────────────────────────────────────────
   for (const { groupName, items } of grouped) {
-    const groupQty  = items.reduce((s, r) => s + r.qty, 0);
-    const firstUom  = items[0]?.uom || "BL";
+    const groupQty   = items.reduce((s, r) => s + r.qty, 0);
+    const firstUom   = items[0]?.uom || "BL";
     const isGroupNeg = groupQty < 0;
 
-    // Group header row — 17pt matches CSS padding + font-size of the print template
-    y = checkPage(y, 17);
+    // Keep group header + at least one item together
+    ensureSpace(17 + 20);
+
+    // Group header row
+    const gY = doc.y;
     const gH = 17;
     doc.save();
-    doc.rect(X_PART, y, USABLE_W, gH).fill("#e8e8e8");
-    doc.moveTo(X_PART, y).lineTo(X_PART + USABLE_W, y).strokeColor("#aaaaaa").lineWidth(0.75).stroke();
-    doc.moveTo(X_PART, y + gH).lineTo(X_PART + USABLE_W, y + gH).strokeColor("#aaaaaa").lineWidth(0.75).stroke();
+    doc.rect(X_LEFT, gY, CONTENT_W, gH).fill("#e8e8e8");
+    doc.moveTo(X_LEFT, gY)      .lineTo(X_RIGHT, gY)      .strokeColor("#aaaaaa").lineWidth(0.75).stroke();
+    doc.moveTo(X_LEFT, gY + gH).lineTo(X_RIGHT, gY + gH).strokeColor("#aaaaaa").lineWidth(0.75).stroke();
     doc.restore();
     doc.font("Helvetica-Bold").fontSize(9.5).fillColor(isGroupNeg ? "#c2272d" : "#000000");
-    doc.text(groupName, X_PART + 4, y + 4, { width: COL_PART_W - 8, align: "left",  lineBreak: false });
-    doc.text(
-      `${fmtQty(groupQty)}  ${firstUom}`,
-      X_QTY, y + 4, { width: COL_QTY_W - 4, align: "right", lineBreak: false },
-    );
-    y += gH;
+    doc.text(groupName, X_LEFT + 4, gY + 4, { lineBreak: false });
+    doc.text(`${fmtQty(groupQty)}  ${firstUom}`, X_RIGHT - COL_QTY_W, gY + 4, { width: COL_QTY_W, align: "right", lineBreak: false });
+    doc.y = gY + gH;
 
-    // Item rows — 20pt matches CSS (9pt font × 1.6 lineHeight + 3.5px top+bottom padding)
+    // Item rows
     for (const item of items) {
-      y = checkPage(y, 20);
+      ensureSpace(20);
+
+      const iY   = doc.y;
       const iH   = 20;
       const isNeg = item.qty < 0;
 
       doc.save();
-      if (isNeg) doc.rect(X_PART, y, USABLE_W, iH).fill("#fff0f0");
-      doc.moveTo(X_PART, y + iH).lineTo(X_PART + USABLE_W, y + iH)
-         .strokeColor("#cccccc").lineWidth(0.75).stroke();
+      if (isNeg) doc.rect(X_LEFT, iY, CONTENT_W, iH).fill("#fff0f0");
+      doc.moveTo(X_LEFT, iY + iH).lineTo(X_RIGHT, iY + iH).strokeColor("#cccccc").lineWidth(0.75).stroke();
       doc.restore();
 
-      const itemFont = isNeg ? "Helvetica-Bold" : "Helvetica";
-      doc.font(itemFont).fontSize(9).fillColor(isNeg ? "#c2272d" : "#222222");
-      doc.text(item.itemName, X_PART + 16, y + 6, { width: COL_PART_W - 20, align: "left",  lineBreak: false });
-      doc.text(
-        `${fmtQty(item.qty)}  ${item.uom}`,
-        X_QTY, y + 6, { width: COL_QTY_W - 4, align: "right", lineBreak: false },
-      );
-      y += iH;
+      doc.font(isNeg ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(isNeg ? "#c2272d" : "#222222");
+      doc.text(item.itemName,                    X_LEFT + 16,          iY + 6, { lineBreak: false });
+      doc.text(`${fmtQty(item.qty)}  ${item.uom}`, X_RIGHT - COL_QTY_W, iY + 6, { width: COL_QTY_W, align: "right", lineBreak: false });
+      doc.y = iY + iH;
     }
   }
 
-  // ── Grand Total ───────────────────────────────────────────────────────────
-  y = checkPage(y, 22);
-  y += 2;
+  // ── Grand Total row ───────────────────────────────────────────────────────
+  ensureSpace(22);
+  doc.y += 2;
+  const tY = doc.y;
   const tH = 18;
   doc.save();
-  doc.rect(X_PART, y, USABLE_W, tH).fill("#e8e8e8");
-  doc.moveTo(X_PART, y).lineTo(X_PART + USABLE_W, y).strokeColor("#111111").lineWidth(2.5).stroke();
-  doc.moveTo(X_PART, y + tH).lineTo(X_PART + USABLE_W, y + tH).strokeColor("#111111").lineWidth(2.5).stroke();
+  doc.rect(X_LEFT, tY, CONTENT_W, tH).fill("#e8e8e8");
+  doc.moveTo(X_LEFT, tY)      .lineTo(X_RIGHT, tY)      .strokeColor("#111111").lineWidth(2.5).stroke();
+  doc.moveTo(X_LEFT, tY + tH).lineTo(X_RIGHT, tY + tH).strokeColor("#111111").lineWidth(2.5).stroke();
   doc.restore();
   doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000");
-  doc.text("Grand Total", X_PART + 4, y + 5, { width: COL_PART_W - 8, align: "left",  lineBreak: false });
-  doc.text(
-    `${fmtQty(grandTotalQty)}  ${uomFirst}`,
-    X_QTY, y + 5, { width: COL_QTY_W - 4, align: "right", lineBreak: false },
-  );
+  doc.text("Grand Total",                        X_LEFT + 4,           tY + 5, { lineBreak: false });
+  doc.text(`${fmtQty(grandTotalQty)}  ${uomFirst}`, X_RIGHT - COL_QTY_W, tY + 5, { width: COL_QTY_W, align: "right", lineBreak: false });
 
   doc.end();
   return pdfReady;
