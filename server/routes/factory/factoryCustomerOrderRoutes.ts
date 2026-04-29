@@ -864,7 +864,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
-      if (!["DRAFT", "LOADING", "PENDING_VERIFICATION"].includes(order.status)) return res.status(400).json({ message: "Can only remove bales from DRAFT, LOADING, or PENDING_VERIFICATION orders" });
+      if (!["DRAFT", "LOADING", "PENDING_VERIFICATION", "VERIFIED", "FINALIZED"].includes(order.status)) return res.status(400).json({ message: "Can only remove bales from orders that are not yet cancelled" });
 
       const [orderBale] = await db.select().from(customerOrderBales)
         .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.id, baleId)));

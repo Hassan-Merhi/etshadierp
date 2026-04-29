@@ -100,6 +100,7 @@ export default function FactoryInvoiceDetail() {
   const [baleRefArticle, setBaleRefArticle] = useState<{ code: string; name: string } | null>(null);
   const [exchangeBale, setExchangeBale] = useState<{ orderBaleId: number; reference: string } | null>(null);
   const [newRefInput, setNewRefInput] = useState("");
+  const [removeBaleState, setRemoveBaleState] = useState<{ orderBaleId: number; reference: string } | null>(null);
   const [showProformaDialog, setShowProformaDialog] = useState(false);
   const [selectedProformaId, setSelectedProformaId] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -300,6 +301,26 @@ export default function FactoryInvoiceDetail() {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
       setExchangeBale(null);
       setNewRefInput("");
+    },
+    onError: (error: any) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const removeBaleMutation = useMutation({
+    mutationFn: async (orderBaleId: number) => {
+      const res = await modeApiRequest("DELETE", `/api/factory/customer-orders/${orderId}/bales/${orderBaleId}`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to remove bale");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Bale removed", description: "Bale returned to stock." });
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
+      setRemoveBaleState(null);
     },
     onError: (error: any) => {
       if (error?._handledGlobally) return;
@@ -878,7 +899,7 @@ export default function FactoryInvoiceDetail() {
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground">
                   {balesForArticle.length} bale{balesForArticle.length !== 1 ? "s" : ""} loaded
-                  {canExchange && <span className="ml-1">— click <ArrowLeftRight className="inline h-3 w-3" /> to exchange</span>}
+                  {canExchange && <span className="ml-1">— hover a chip to remove <Trash2 className="inline h-3 w-3" /> or exchange <ArrowLeftRight className="inline h-3 w-3" /></span>}
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {balesForArticle.map((b) => (
@@ -889,14 +910,24 @@ export default function FactoryInvoiceDetail() {
                     >
                       {b.baleReference}
                       {canExchange && (
-                        <button
-                          className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 bg-background border rounded-full p-0.5 hover-elevate transition-opacity"
-                          onClick={() => { setExchangeBale({ orderBaleId: b.id, reference: b.baleReference }); setNewRefInput(""); }}
-                          data-testid={`button-exchange-bale-${b.id}`}
-                          title="Exchange this bale for another"
-                        >
-                          <ArrowLeftRight className="h-3 w-3" />
-                        </button>
+                        <>
+                          <button
+                            className="absolute -top-1.5 -left-1.5 opacity-0 group-hover:opacity-100 bg-background border rounded-full p-0.5 hover-elevate transition-opacity"
+                            onClick={() => setRemoveBaleState({ orderBaleId: b.id, reference: b.baleReference })}
+                            data-testid={`button-remove-bale-${b.id}`}
+                            title="Remove this bale and return to stock"
+                          >
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </button>
+                          <button
+                            className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 bg-background border rounded-full p-0.5 hover-elevate transition-opacity"
+                            onClick={() => { setExchangeBale({ orderBaleId: b.id, reference: b.baleReference }); setNewRefInput(""); }}
+                            data-testid={`button-exchange-bale-${b.id}`}
+                            title="Exchange this bale for another"
+                          >
+                            <ArrowLeftRight className="h-3 w-3" />
+                          </button>
+                        </>
                       )}
                     </div>
                   ))}
@@ -906,6 +937,29 @@ export default function FactoryInvoiceDetail() {
           })()}
         </DialogContent>
       </Dialog>
+
+      {/* Remove Bale Confirm Dialog */}
+      <AlertDialog open={removeBaleState !== null} onOpenChange={(open) => { if (!open) setRemoveBaleState(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove bale from invoice?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bale <span className="font-mono font-medium">{removeBaleState?.reference}</span> will be removed from this invoice and returned to stock. The invoice totals will update automatically.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-remove-bale">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => removeBaleState && removeBaleMutation.mutate(removeBaleState.orderBaleId)}
+              disabled={removeBaleMutation.isPending}
+              data-testid="button-confirm-remove-bale"
+              className="bg-destructive text-destructive-foreground"
+            >
+              {removeBaleMutation.isPending ? "Removing…" : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Exchange Bale Dialog */}
       <Dialog open={exchangeBale !== null} onOpenChange={(open) => { if (!open) { setExchangeBale(null); setNewRefInput(""); } }}>
