@@ -1043,6 +1043,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
       const updatedCharges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
 
+      const resolvedLedgerAccountId = newCharge?.ledgerAccountId;
+      const chargeAmt = parseFloat(String(amount) || "0");
+
       // Sync customerBalances ledger entry if the order is already finalized
       if (updatedOrder.status === "FINALIZED") {
         const newGrandTotal = parseFloat(updatedOrder.grandTotal || "0");
@@ -1059,9 +1062,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
             .where(eq(customerBalances.id, existingLedgerEntry.id));
         }
 
-        // Create charge voucher if the charge has a ledger account (mirrors finalization logic)
-        const resolvedLedgerAccountId = newCharge?.ledgerAccountId;
-        const chargeAmt = parseFloat(String(amount) || "0");
+        // Create charge voucher (FINALIZED path — uses invoice number)
         if (newCharge && resolvedLedgerAccountId && chargeAmt > 0 && updatedOrder.invoiceNumber) {
           const [customer] = await db.select({ ledgerAccountId: customers.ledgerAccountId })
             .from(customers).where(eq(customers.id, order.customerId));
@@ -1098,6 +1099,47 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         }
       }
 
+      // Create PRE-voucher when order is PENDING or VERIFIED (before finalization)
+      // Uses naming CHARGE-PRE-{orderId}-{chargeId} — finalization will rename it to the
+      // invoice-based name, so it is never double-counted.
+      if (
+        ["PENDING_VERIFICATION", "VERIFIED"].includes(updatedOrder.status) &&
+        newCharge && resolvedLedgerAccountId && chargeAmt > 0
+      ) {
+        const [customer] = await db.select({ ledgerAccountId: customers.ledgerAccountId })
+          .from(customers).where(eq(customers.id, order.customerId));
+        if (customer?.ledgerAccountId) {
+          const preVoucherNumber = `CHARGE-PRE-${orderId}-${newCharge.id}`;
+          const chargeDesc = order.containerNumber
+            ? `${name} for container - ${order.containerNumber}`
+            : `${name} - Order #${orderId}`;
+          const [chargeVoucher] = await db.insert(vouchers).values({
+            companyId,
+            voucherType: "Journal",
+            voucherNumber: preVoucherNumber,
+            voucherDate: order.orderDate || getClientDate(req),
+            description: chargeDesc,
+            totalAmount: String(chargeAmt),
+            sourceModule: "FACTORY",
+          }).returning();
+          await db.insert(voucherEntries).values({
+            voucherId: chargeVoucher.id,
+            ledgerAccountId: customer.ledgerAccountId,
+            customerId: order.customerId,
+            debitAmount: String(chargeAmt),
+            creditAmount: "0",
+            narration: chargeDesc,
+          });
+          await db.insert(voucherEntries).values({
+            voucherId: chargeVoucher.id,
+            ledgerAccountId: resolvedLedgerAccountId,
+            debitAmount: "0",
+            creditAmount: String(chargeAmt),
+            narration: chargeDesc,
+          });
+        }
+      }
+
       res.json({ ...updatedOrder, charges: updatedCharges });
     } catch (error: any) {
       console.error("Error adding charge to order:", error);
@@ -1125,6 +1167,18 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
       const updatedCharges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
 
+      // Always clean up the PRE-voucher if one exists (covers PENDING/VERIFIED deletions,
+      // or edge cases where an order was never finalized but had a PRE voucher).
+      const preVoucherNum = `CHARGE-PRE-${orderId}-${chargeId}`;
+      const preVouchersToDelete = await db.select({ id: vouchers.id })
+        .from(vouchers)
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.voucherNumber, preVoucherNum)));
+      if (preVouchersToDelete.length > 0) {
+        const vIds = preVouchersToDelete.map((v: any) => v.id);
+        await db.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
+        await db.delete(vouchers).where(inArray(vouchers.id, vIds));
+      }
+
       // Sync customerBalances ledger entry if the order is already finalized
       if (updatedOrder.status === "FINALIZED") {
         const newGrandTotal = parseFloat(updatedOrder.grandTotal || "0");
@@ -1141,7 +1195,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
             .where(eq(customerBalances.id, existingLedgerEntry.id));
         }
 
-        // Delete the charge voucher that was created during finalization (prevents orphaned entries)
+        // Delete the finalized charge voucher (invoice-number-based naming)
         if (order.invoiceNumber) {
           const chargeVoucherPattern = `CHARGE-${order.invoiceNumber}-${chargeId}-%`;
           const chargeVouchersToDelete = await db.select({ id: vouchers.id })
@@ -1288,7 +1342,10 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           currency: "USD",
         });
 
-        // Create journal entries for charges that have a ledgerAccountId
+        // Create journal entries for charges that have a ledgerAccountId.
+        // If a PRE-voucher was already created when the charge was added in PENDING/VERIFIED
+        // state, rename it to the invoice-based number and update its description.
+        // Otherwise create a new voucher. This prevents double-counting.
         const chargesForJournal = await tx.select().from(customerOrderCharges)
           .where(and(eq(customerOrderCharges.orderId, orderId), sql`${customerOrderCharges.ledgerAccountId} IS NOT NULL`));
 
@@ -1298,37 +1355,55 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
             for (const charge of chargesForJournal) {
               const chargeAmount = parseFloat(charge.amount || "0");
               if (chargeAmount <= 0) continue;
-              // Create a voucher for each charge
-              const chargeVoucherNumber = `CHARGE-${invoiceNumber}-${charge.id}-${Date.now()}`;
+
+              const invoiceVoucherNumber = `CHARGE-${invoiceNumber}-${charge.id}-${Date.now()}`;
               const chargeDesc = order.containerNumber
                 ? `${charge.name} for offloaded container - ${order.containerNumber}`
                 : `${charge.name} - ${invoiceNumber}`;
-              const [chargeVoucher] = await tx.insert(vouchers).values({
-                companyId,
-                voucherType: "Journal",
-                voucherNumber: chargeVoucherNumber,
-                voucherDate: today,
-                description: chargeDesc,
-                totalAmount: String(chargeAmount),
-                sourceModule: "FACTORY",
-              }).returning();
-              // Dr Customer Account (charge billed to customer)
-              await tx.insert(voucherEntries).values({
-                voucherId: chargeVoucher.id,
-                ledgerAccountId: customer.ledgerAccountId,
-                customerId: order.customerId,
-                debitAmount: String(chargeAmount),
-                creditAmount: "0",
-                narration: chargeDesc,
-              });
-              // Cr Charge Account (freight/other charges income account)
-              await tx.insert(voucherEntries).values({
-                voucherId: chargeVoucher.id,
-                ledgerAccountId: charge.ledgerAccountId!,
-                debitAmount: "0",
-                creditAmount: String(chargeAmount),
-                narration: chargeDesc,
-              });
+
+              // Check for a PRE-voucher created when the charge was saved in pending/verified state
+              const preVoucherNumber = `CHARGE-PRE-${orderId}-${charge.id}`;
+              const [preVoucher] = await tx.select({ id: vouchers.id })
+                .from(vouchers)
+                .where(and(eq(vouchers.companyId, companyId), eq(vouchers.voucherNumber, preVoucherNumber)));
+
+              if (preVoucher) {
+                // Rename the PRE-voucher — same entries already exist, just update the reference
+                await tx.update(vouchers)
+                  .set({ voucherNumber: invoiceVoucherNumber, voucherDate: today, description: chargeDesc })
+                  .where(eq(vouchers.id, preVoucher.id));
+                await tx.update(voucherEntries)
+                  .set({ narration: chargeDesc })
+                  .where(eq(voucherEntries.voucherId, preVoucher.id));
+              } else {
+                // No PRE-voucher — charge was added before this feature or on a DRAFT order
+                const [chargeVoucher] = await tx.insert(vouchers).values({
+                  companyId,
+                  voucherType: "Journal",
+                  voucherNumber: invoiceVoucherNumber,
+                  voucherDate: today,
+                  description: chargeDesc,
+                  totalAmount: String(chargeAmount),
+                  sourceModule: "FACTORY",
+                }).returning();
+                // Dr Customer Account (charge billed to customer)
+                await tx.insert(voucherEntries).values({
+                  voucherId: chargeVoucher.id,
+                  ledgerAccountId: customer.ledgerAccountId,
+                  customerId: order.customerId,
+                  debitAmount: String(chargeAmount),
+                  creditAmount: "0",
+                  narration: chargeDesc,
+                });
+                // Cr Charge Account (freight/other charges income account)
+                await tx.insert(voucherEntries).values({
+                  voucherId: chargeVoucher.id,
+                  ledgerAccountId: charge.ledgerAccountId!,
+                  debitAmount: "0",
+                  creditAmount: String(chargeAmount),
+                  narration: chargeDesc,
+                });
+              }
             }
           }
         }
