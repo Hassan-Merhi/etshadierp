@@ -2662,11 +2662,31 @@ export default function Payroll() {
                           {worker.code && (
                             <p className="text-xs text-muted-foreground mt-0.5 font-mono" data-testid={`text-worker-code-${worker.id}`}>{worker.code}</p>
                           )}
-                          {workerGroupMap[worker.id] && (
+                          {workerGroupMap[worker.id] ? (
                             <Badge variant="secondary" className="mt-2 text-xs">
                               {workerGroupMap[worker.id]}
                             </Badge>
-                          )}
+                          ) : workerGroups.length > 0 ? (
+                            <div className="mt-2 w-full" onClick={(e) => e.stopPropagation()}>
+                              <Select
+                                onValueChange={(groupId) => {
+                                  addWorkerToWorkerGroupMutation.mutate({
+                                    groupId: parseInt(groupId),
+                                    workerId: worker.id,
+                                  });
+                                }}
+                              >
+                                <SelectTrigger className="h-7 text-xs w-full" data-testid={`select-card-move-group-${worker.id}`}>
+                                  <SelectValue placeholder="Add to group…" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {workerGroups.map(g => (
+                                    <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ) : null}
                           <p className="font-mono text-sm font-medium mt-2" data-testid={`text-worker-salary-${worker.id}`}>
                             {formatAmount(parseFloat(worker.monthlySalary || "0"))}
                           </p>
