@@ -654,9 +654,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             voucherNumber: data.voucher?.voucherNumber || String(data.voucher.id),
             voucherDate:   data.voucher?.voucherDate   || new Date().toISOString().slice(0, 10),
           });
-          // Auto-send stock to WhatsApp in the background
+          // Auto-send stock to WhatsApp — delayed 3 s so the invoice send
+          // always finishes before the stock send starts, avoiding back-to-back
+          // file uploads that can trip WhatsApp rate limits.
           setStockWaStatus("sending");
-          setPendingStockSend(true);
+          setTimeout(() => setPendingStockSend(true), 3000);
         } else {
           setStockWaStatus("not_configured");
         }
@@ -787,13 +789,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         const doSend = async () => {
           setStockWaStatus("sending");
           try {
-            const pdfBase64 = await captureElementToPdf(stockPrintRef.current!, { singlePage: true });
+            const pdfBase64 = await captureElementToPdf(stockPrintRef.current!);
+            const stampStr = new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
             const result = await sendWaPdfWithRetry(
               {
                 pdfBase64,
                 locationId: activeLocation?.id,
                 filename: `${safeName}.pdf`,
-                caption: `Stock Report — ${locName}`,
+                caption: `Stock Report — ${locName}\n${stampStr}`,
               },
               {
                 onAttempt: (n) => {
@@ -840,13 +843,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       const compName = (selectedCompany as any)?.name || "";
       const dateStr  = new Date().toISOString().slice(0, 10);
       const safeName = `${locName} STK ${compName} ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
-      const pdfBase64 = await captureElementToPdf(stockPrintRef.current, { singlePage: true });
+      const pdfBase64 = await captureElementToPdf(stockPrintRef.current);
+      const stampStr = new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
       const result = await sendWaPdfWithRetry(
         {
           pdfBase64,
           locationId: activeLocation?.id,
           filename: `${safeName}.pdf`,
-          caption: `Stock Report — ${locName}`,
+          caption: `Stock Report — ${locName}\n${stampStr}`,
         },
         {
           onAttempt: (n) => {
