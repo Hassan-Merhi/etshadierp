@@ -1,5 +1,5 @@
 import { getClientDate } from "../lib/dateUtils";
-import type { Express } from "express";
+import express, { type Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation, canModifyDate } from "../auth";
@@ -71,7 +71,10 @@ export function registerPosRoutes(app: Express) {
 
   // ── Receive a frontend-generated PDF and forward to WhatsApp ──────────────
   // Body: { pdfBase64: string, locationId: number, filename: string, caption?: string }
-  app.post("/api/pos/send-whatsapp-pdf-upload", requireAuth, async (req, res) => {
+  // NOTE: PDFs sent as base64 in JSON can easily exceed the global 2 MB body
+  // limit (a 1.5 MB PDF becomes ~2 MB base64), so we apply a route-specific
+  // 25 MB limit here. WhatsApp itself caps attachments around 15 MB.
+  app.post("/api/pos/send-whatsapp-pdf-upload", requireAuth, express.json({ limit: "25mb" }), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
