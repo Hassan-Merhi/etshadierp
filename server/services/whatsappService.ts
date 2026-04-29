@@ -178,6 +178,52 @@ export async function sendWhatsAppFileByUrlToChatIdPos(
   return { success: true };
 }
 
+/**
+ * Send a file directly to a WhatsApp chat via Green API's sendFileByUpload.
+ * Sends the raw bytes as multipart/form-data — does NOT require a publicly
+ * accessible download URL, so it works in dev and prod without config.
+ */
+export async function sendWhatsAppFileByUploadPos(
+  chatId:      string,
+  fileBuffer:  Buffer,
+  fileName:    string,
+  caption:     string,
+  mimeType:    string = "application/pdf",
+): Promise<{ success: boolean; error?: string }> {
+  const settings = await getPosWaSettings();
+  if (!settings?.instanceId || !settings?.apiToken) {
+    return { success: false, error: "WhatsApp credentials not configured" };
+  }
+  if (!settings.enabled) {
+    return { success: false, error: "WhatsApp sending is disabled" };
+  }
+
+  const url = baseUrl(settings.instanceId, settings.apiToken, "sendFileByUpload");
+
+  // Build multipart form data
+  const FormData = (await import("form-data")).default;
+  const form = new FormData();
+  form.append("chatId",  chatId);
+  form.append("caption", caption);
+  form.append("file", fileBuffer, { filename: fileName, contentType: mimeType });
+
+  const response = await fetch(url, {
+    method:  "POST",
+    headers: form.getHeaders(),
+    body:    form.getBuffer(),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    console.error("[WA upload] Green API error", response.status, body);
+    return { success: false, error: `Green API ${response.status}: ${body}` };
+  }
+
+  const json = await response.json().catch(() => ({})) as any;
+  console.log("[WA upload] Green API response", json);
+  return { success: true };
+}
+
 /** Send a plain text message via the POS instance (id=2 with fallback to id=1) */
 export async function sendWhatsAppTextToChatIdPos(
   chatId:  string,

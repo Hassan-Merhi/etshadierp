@@ -39,7 +39,7 @@ import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
-import { sendWhatsAppTextToChatIdPos, sendWhatsAppFileToChatIdPos, sendWhatsAppFileByUrlToChatIdPos } from "../services/whatsappService";
+import { sendWhatsAppTextToChatIdPos, sendWhatsAppFileToChatIdPos, sendWhatsAppFileByUrlToChatIdPos, sendWhatsAppFileByUploadPos } from "../services/whatsappService";
 import PDFDocument from "pdfkit";
 import { randomUUID } from "crypto";
 
@@ -91,14 +91,11 @@ export function registerPosRoutes(app: Express) {
 
       const pdfBuffer  = Buffer.from(pdfBase64, "base64");
       const safeFile   = (filename || "report.pdf").replace(/[^\w\s.()\-]/g, "_");
-      const fileId     = storeTempFile(pdfBuffer, "application/pdf", safeFile);
-      const proto      = req.headers["x-forwarded-proto"] ?? req.protocol;
-      const host       = req.headers["x-forwarded-host"]  ?? req.get("host");
-      const fileUrl    = `${proto}://${host}/api/pos/temp-pdf/${fileId}`;
 
-      const result = await sendWhatsAppFileByUrlToChatIdPos(
+      console.log(`[WA PDF upload] chatId=${location.whatsappGroupChatId} file=${safeFile} size=${pdfBuffer.length}`);
+      const result = await sendWhatsAppFileByUploadPos(
         location.whatsappGroupChatId,
-        fileUrl,
+        pdfBuffer,
         safeFile,
         caption ?? safeFile,
       );
@@ -1702,15 +1699,10 @@ export function registerPosRoutes(app: Express) {
       const fileName = `Stock_${safeLocationName}_${format(now, "yyyyMMdd_HHmm")}.pdf`;
       const caption  = `📍 ${location.name} — Stock Report\n🕐 ${captionDate}`;
 
-      // Store PDF temporarily and build a public URL for Green API to fetch
-      const pdfId  = storeTempPdf(pdfBuffer);
-      const proto  = req.headers["x-forwarded-proto"] ?? req.protocol;
-      const host   = req.headers["x-forwarded-host"] ?? req.get("host");
-      const pdfUrl = `${proto}://${host}/api/pos/temp-pdf/${pdfId}`;
-
-      const result = await sendWhatsAppFileByUrlToChatIdPos(
+      console.log(`[WA stock upload] chatId=${location.whatsappGroupChatId} file=${fileName} size=${pdfBuffer.length}`);
+      const result = await sendWhatsAppFileByUploadPos(
         location.whatsappGroupChatId,
-        pdfUrl,
+        pdfBuffer,
         fileName,
         caption,
       );
@@ -1984,14 +1976,10 @@ export function registerPosRoutes(app: Express) {
       const fileName  = `Invoice_${safeVNum}.pdf`;
       const caption   = `📍 ${location.name} — ${voucher.voucherNumber}`;
 
-      const fileId  = storeTempFile(pdfBuffer, "application/pdf", fileName);
-      const proto   = req.headers["x-forwarded-proto"] ?? req.protocol;
-      const host    = req.headers["x-forwarded-host"] ?? req.get("host");
-      const fileUrl = `${proto}://${host}/api/pos/temp-pdf/${fileId}`;
-
-      const result = await sendWhatsAppFileByUrlToChatIdPos(
+      console.log(`[WA invoice upload] chatId=${location.whatsappGroupChatId} file=${fileName} size=${pdfBuffer.length}`);
+      const result = await sendWhatsAppFileByUploadPos(
         location.whatsappGroupChatId,
-        fileUrl,
+        pdfBuffer,
         fileName,
         caption,
       );
