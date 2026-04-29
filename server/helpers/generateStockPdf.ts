@@ -193,26 +193,26 @@ export async function generateStockPdf(
     const firstUom  = items[0]?.uom || "BL";
     const isGroupNeg = groupQty < 0;
 
-    // Group header row
-    y = checkPage(y, 15);
-    const gH = 15;
+    // Group header row — 17pt matches CSS padding + font-size of the print template
+    y = checkPage(y, 17);
+    const gH = 17;
     doc.save();
     doc.rect(X_PART, y, USABLE_W, gH).fill("#e8e8e8");
     doc.moveTo(X_PART, y).lineTo(X_PART + USABLE_W, y).strokeColor("#aaaaaa").lineWidth(0.75).stroke();
     doc.moveTo(X_PART, y + gH).lineTo(X_PART + USABLE_W, y + gH).strokeColor("#aaaaaa").lineWidth(0.75).stroke();
     doc.restore();
     doc.font("Helvetica-Bold").fontSize(9.5).fillColor(isGroupNeg ? "#c2272d" : "#000000");
-    doc.text(groupName, X_PART + 4, y + 3, { width: COL_PART_W - 8, align: "left",  lineBreak: false });
+    doc.text(groupName, X_PART + 4, y + 4, { width: COL_PART_W - 8, align: "left",  lineBreak: false });
     doc.text(
       `${fmtQty(groupQty)}  ${firstUom}`,
-      X_QTY, y + 3, { width: COL_QTY_W - 4, align: "right", lineBreak: false },
+      X_QTY, y + 4, { width: COL_QTY_W - 4, align: "right", lineBreak: false },
     );
     y += gH;
 
-    // Item rows
+    // Item rows — 20pt matches CSS (9pt font × 1.6 lineHeight + 3.5px top+bottom padding)
     for (const item of items) {
-      y = checkPage(y, 13);
-      const iH   = 13;
+      y = checkPage(y, 20);
+      const iH   = 20;
       const isNeg = item.qty < 0;
 
       doc.save();
@@ -223,29 +223,29 @@ export async function generateStockPdf(
 
       const itemFont = isNeg ? "Helvetica-Bold" : "Helvetica";
       doc.font(itemFont).fontSize(9).fillColor(isNeg ? "#c2272d" : "#222222");
-      doc.text(item.itemName, X_PART + 16, y + 2, { width: COL_PART_W - 20, align: "left",  lineBreak: false });
+      doc.text(item.itemName, X_PART + 16, y + 6, { width: COL_PART_W - 20, align: "left",  lineBreak: false });
       doc.text(
         `${fmtQty(item.qty)}  ${item.uom}`,
-        X_QTY, y + 2, { width: COL_QTY_W - 4, align: "right", lineBreak: false },
+        X_QTY, y + 6, { width: COL_QTY_W - 4, align: "right", lineBreak: false },
       );
       y += iH;
     }
   }
 
   // ── Grand Total ───────────────────────────────────────────────────────────
-  y = checkPage(y, 20);
+  y = checkPage(y, 22);
   y += 2;
-  const tH = 17;
+  const tH = 18;
   doc.save();
   doc.rect(X_PART, y, USABLE_W, tH).fill("#e8e8e8");
   doc.moveTo(X_PART, y).lineTo(X_PART + USABLE_W, y).strokeColor("#111111").lineWidth(2.5).stroke();
   doc.moveTo(X_PART, y + tH).lineTo(X_PART + USABLE_W, y + tH).strokeColor("#111111").lineWidth(2.5).stroke();
   doc.restore();
   doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000");
-  doc.text("Grand Total", X_PART + 4, y + 4, { width: COL_PART_W - 8, align: "left",  lineBreak: false });
+  doc.text("Grand Total", X_PART + 4, y + 5, { width: COL_PART_W - 8, align: "left",  lineBreak: false });
   doc.text(
     `${fmtQty(grandTotalQty)}  ${uomFirst}`,
-    X_QTY, y + 4, { width: COL_QTY_W - 4, align: "right", lineBreak: false },
+    X_QTY, y + 5, { width: COL_QTY_W - 4, align: "right", lineBreak: false },
   );
 
   doc.end();
