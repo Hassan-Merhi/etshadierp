@@ -69,6 +69,51 @@ export function registerPosRoutes(app: Express) {
     res.send(entry.buffer);
   });
 
+  // ── Receive a frontend-generated PDF and forward to WhatsApp ──────────────
+  // Body: { pdfBase64: string, locationId: number, filename: string, caption?: string }
+  app.post("/api/pos/send-whatsapp-pdf-upload", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { pdfBase64, locationId, filename, caption } = req.body;
+      if (!pdfBase64)   return res.status(400).json({ message: "pdfBase64 is required" });
+      if (!locationId)  return res.status(400).json({ message: "locationId is required" });
+
+      const [location] = await db
+        .select()
+        .from(locations)
+        .where(and(eq(locations.id, parseInt(locationId)), eq(locations.companyId, companyId)))
+        .limit(1);
+
+      if (!location)                     return res.status(404).json({ message: "Location not found" });
+      if (!location.whatsappGroupChatId) return res.status(400).json({ message: "No WhatsApp group configured for this location" });
+
+      const pdfBuffer  = Buffer.from(pdfBase64, "base64");
+      const safeFile   = (filename || "report.pdf").replace(/[^\w\s.()\-]/g, "_");
+      const fileId     = storeTempFile(pdfBuffer, "application/pdf", safeFile);
+      const proto      = req.headers["x-forwarded-proto"] ?? req.protocol;
+      const host       = req.headers["x-forwarded-host"]  ?? req.get("host");
+      const fileUrl    = `${proto}://${host}/api/pos/temp-pdf/${fileId}`;
+
+      const result = await sendWhatsAppFileByUrlToChatIdPos(
+        location.whatsappGroupChatId,
+        fileUrl,
+        safeFile,
+        caption ?? safeFile,
+      );
+
+      if (!result.success) {
+        return res.status(502).json({ message: result.error ?? "WhatsApp send failed" });
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[/api/pos/send-whatsapp-pdf-upload]", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/pos/sales", requireAuth, canModifyDate("voucherDate"), async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {

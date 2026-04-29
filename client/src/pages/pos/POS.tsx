@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { captureElementToPdf } from "@/lib/captureElementToPdf";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation, Redirect, Link } from "wouter";
@@ -271,6 +272,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const stockPrintRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Deferred WhatsApp invoice send — fires after print dialog renders
+  const [pendingAutoSend, setPendingAutoSend] = useState<{
+    locationId: number; locationName: string; companyName: string;
+    voucherNumber: string; voucherDate: string;
+  } | null>(null);
+
   // Mobile-specific state
   const [mobileItemSearchOpen, setMobileItemSearchOpen] = useState(false);
   const [mobileItemSearchTerm, setMobileItemSearchTerm] = useState("");
@@ -439,6 +446,38 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }
   }, [highlightedIndex, activeRow]);
 
+  // Fire deferred WhatsApp auto-send once print dialog has rendered (printRef mounted)
+  useEffect(() => {
+    if (!pendingAutoSend || !showPrintDialog || !printRef.current) return;
+    const data = pendingAutoSend;
+    setPendingAutoSend(null);
+    const doSend = async () => {
+      setSendingInvoiceWhatsApp(true);
+      try {
+        const safeName = `${data.locationName} ${data.companyName} ${data.voucherDate} Invoice ${data.voucherNumber}`
+          .replace(/[^\w\s.()\-]/g, "_").trim();
+        const pdfBase64 = await captureElementToPdf(printRef.current!);
+        const res = await apiRequest("POST", "/api/pos/send-whatsapp-pdf-upload", {
+          pdfBase64,
+          locationId: data.locationId,
+          filename: `${safeName}.pdf`,
+          caption: `${data.locationName} — ${data.voucherNumber}`,
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast({ title: "WhatsApp", description: body.message || "Invoice send failed.", variant: "destructive" });
+        } else {
+          toast({ title: "WhatsApp", description: "Invoice sent to WhatsApp group." });
+        }
+      } catch (e: any) {
+        toast({ title: "WhatsApp", description: e.message || "Could not send invoice.", variant: "destructive" });
+      } finally {
+        setSendingInvoiceWhatsApp(false);
+      }
+    };
+    doSend();
+  }, [pendingAutoSend, showPrintDialog]);
+
   // Warn user about unsaved changes when leaving the page
   useEffect(() => {
     const hasUnsavedChanges = rows.some(row => row.itemName && row.quantity > 0);
@@ -526,27 +565,19 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       });
       setShowPrintDialog(true);
 
-      // Fire-and-forget: auto-send invoice to WhatsApp if group is configured
+      // Deferred auto-send: waits for print dialog to render, then captures printRef
       if (!editVoucherId) {
         const waGroupId =
           (activeLocation as any)?.whatsappGroupChatId ||
           (data.location as any)?.whatsappGroupChatId;
-        const voucherId = data.voucher?.id;
-        if (waGroupId && voucherId) {
-          setSendingInvoiceWhatsApp(true);
-          apiRequest("POST", "/api/pos/send-invoice-whatsapp", { voucherId })
-            .then(async (r) => {
-              const body = await r.json().catch(() => ({}));
-              if (!r.ok) {
-                toast({ title: "WhatsApp", description: body.message || "Invoice send failed.", variant: "destructive" });
-              } else {
-                toast({ title: "WhatsApp", description: "Invoice sent to WhatsApp group." });
-              }
-            })
-            .catch(() => {
-              toast({ title: "WhatsApp", description: "Could not reach WhatsApp service.", variant: "destructive" });
-            })
-            .finally(() => setSendingInvoiceWhatsApp(false));
+        if (waGroupId && data.voucher?.id) {
+          setPendingAutoSend({
+            locationId:    activeLocation?.id || data.location?.id,
+            locationName:  activeLocation?.name || data.location?.name || "Location",
+            companyName:   (selectedCompany as any)?.name || "",
+            voucherNumber: data.voucher?.voucherNumber || String(data.voucher.id),
+            voucherDate:   data.voucher?.voucherDate   || new Date().toISOString().slice(0, 10),
+          });
         }
       }
     },
@@ -641,18 +672,26 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     documentTitle: `STK_${(activeLocation?.name || "Location").replace(/\s+/g, "_")}_${new Date().toLocaleDateString('en-CA')}`,
   });
 
-  const sendStockReportToWhatsApp = async (locationId?: number | null) => {
-    if (!locationId) throw new Error("No location selected");
-    const res = await apiRequest("POST", "/api/pos/send-stock-pdf", { locationId });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.message || "WhatsApp stock report failed to send");
-    return body;
-  };
-
   const handleSendWhatsAppReport = async () => {
+    if (!stockPrintRef.current) {
+      toast({ title: "Not ready", description: "Stock template not mounted yet.", variant: "destructive" });
+      return;
+    }
     setSendingWhatsApp(true);
     try {
-      await sendStockReportToWhatsApp(activeLocation?.id);
+      const locName  = activeLocation?.name || "Location";
+      const compName = (selectedCompany as any)?.name || "";
+      const dateStr  = new Date().toISOString().slice(0, 10);
+      const safeName = `${locName} STK ${compName} ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
+      const pdfBase64 = await captureElementToPdf(stockPrintRef.current);
+      const res = await apiRequest("POST", "/api/pos/send-whatsapp-pdf-upload", {
+        pdfBase64,
+        locationId: activeLocation?.id,
+        filename: `${safeName}.pdf`,
+        caption: `Stock Report — ${locName}`,
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.message || "WhatsApp stock report failed");
       toast({ title: "Sent", description: "Stock report sent to WhatsApp group." });
     } catch (e: any) {
       toast({ title: "Failed to send", description: e.message || "WhatsApp send failed.", variant: "destructive" });
@@ -662,19 +701,29 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   };
 
   const handleSendInvoiceWhatsApp = async () => {
-    const voucherId = savedSale?.voucher?.id;
-    if (!voucherId) return;
+    if (!printRef.current) return;
     setSendingInvoiceWhatsApp(true);
     try {
-      const res = await apiRequest("POST", "/api/pos/send-invoice-whatsapp", { voucherId });
+      const locName  = activeLocation?.name || "Location";
+      const compName = (selectedCompany as any)?.name || "";
+      const vDate    = savedSale?.saleDate || new Date().toISOString().slice(0, 10);
+      const vNum     = savedSale?.voucher?.voucherNumber || String(savedSale?.voucher?.id ?? "");
+      const safeName = `${locName} ${compName} ${vDate} Invoice ${vNum}`.replace(/[^\w\s.()\-]/g, "_").trim();
+      const pdfBase64 = await captureElementToPdf(printRef.current);
+      const res = await apiRequest("POST", "/api/pos/send-whatsapp-pdf-upload", {
+        pdfBase64,
+        locationId: activeLocation?.id,
+        filename: `${safeName}.pdf`,
+        caption: `${locName} — ${vNum}`,
+      });
+      const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
         toast({ title: "Failed to send", description: body.message || "WhatsApp send failed.", variant: "destructive" });
       } else {
         toast({ title: "Sent", description: "Invoice sent to WhatsApp group." });
       }
-    } catch {
-      toast({ title: "Error", description: "Could not reach the server.", variant: "destructive" });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message || "Could not reach the server.", variant: "destructive" });
     } finally {
       setSendingInvoiceWhatsApp(false);
     }
@@ -2385,8 +2434,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             </AlertDialogDescription>
           </AlertDialogHeader>
           
-          {/* Hidden Print Template - POS/Thermal Style */}
-          <div className="hidden">
+          {/* Invoice print template — off-screen so html2canvas can capture it */}
+          <div style={{ position: 'fixed', top: '-99999px', left: '-99999px', width: '680px', pointerEvents: 'none', zIndex: -1 }}>
             <div ref={printRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '8pt', padding: '8px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: 'normal', fontVariantNumeric: 'tabular-nums' }}>
               <style dangerouslySetInnerHTML={{ __html: `
                 @media print {
@@ -2551,38 +2600,28 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Hidden Stock Print Template — lives outside all dialogs so ref stays mounted */}
-      <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', visibility: 'hidden', pointerEvents: 'none' }}>
-        <div ref={stockPrintRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', backgroundColor: 'white', color: 'black' }}>
-          <style dangerouslySetInnerHTML={{ __html: `
-            @page { size: A4; margin: 12mm 14mm; }
-            @media print {
-              body { margin: 0; font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-              .stock-header { text-align: center; margin-bottom: 10px; }
-              .stock-header h1 { font-size: 16pt; font-weight: bold; margin: 0 0 4px 0; text-decoration: underline; }
-              .stock-header p { font-size: 9pt; margin: 0; color: #333; }
-              .stock-meta { display: flex; justify-content: space-between; font-size: 8pt; color: #666; margin-top: 6px; padding-top: 4px; border-top: 1px solid #ccc; }
-              .stock-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 8px; }
-              .stock-table th { font-size: 9pt; font-weight: bold; padding: 4px 8px; border-bottom: 2px solid #333; text-align: left; background-color: #f0f0f0; }
-              .stock-table th.qty-col { text-align: right; }
-              .stock-table td { padding: 3px 8px; border-bottom: 1px solid #ccc; vertical-align: middle; }
-              .stock-table td.qty-col { text-align: right; font-weight: 500; white-space: nowrap; }
-              .stock-table tr.group-row td { font-weight: bold; font-size: 10pt; background-color: #e8e8e8; padding: 4px 8px; border-bottom: 1px solid #666; border-top: 1px solid #666; }
-              .stock-table tr.item-row td { padding-left: 16px; }
-              .stock-table tr.negative-row td { background-color: rgba(255,200,200,0.5); }
-              .stock-table tr.total-row td { font-weight: bold; font-size: 10pt; border-top: 2px solid #333; border-bottom: 2px solid #333; padding: 5px 8px; background-color: #f0f0f0; }
-            }
-          `}} />
-          <div className="stock-header">
-            <h1>{activeLocation?.name ?? "Stock Report"}</h1>
-            <p>Godown Summary</p>
-            <p>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}</p>
-            <div className="stock-meta">
+      {/* Stock print template — off-screen, inline styles for html2canvas + react-to-print */}
+      <div style={{ position: 'fixed', top: '-99999px', left: '-99999px', width: '794px', pointerEvents: 'none', zIndex: -1 }}>
+        <div ref={stockPrintRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', backgroundColor: 'white', color: 'black', padding: '12mm 14mm', boxSizing: 'border-box', width: '794px' }}>
+          {/* Header — matches LocationInventory print template */}
+          <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+            <h1 style={{ fontSize: '16pt', fontWeight: 'bold', margin: '0 0 4px 0', textDecoration: 'underline', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+              {activeLocation?.name ?? "Stock Report"}
+            </h1>
+            <h2 style={{ fontSize: '12pt', fontWeight: 'bold', margin: '0 0 2px 0', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+              Godown Summary
+            </h2>
+            <p style={{ fontSize: '9pt', margin: '0', color: '#333', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+              {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8pt', color: '#666', marginTop: '8px', paddingTop: '4px', borderTop: '1px solid #ccc' }}>
               <span>Printed: {new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+              <span>Page 1</span>
             </div>
           </div>
+
           {stockInventory.length === 0 ? (
-            <p style={{ textAlign: 'center', color: '#666', marginTop: '20px' }}>No inventory found at this location.</p>
+            <p style={{ textAlign: 'center', color: '#666', marginTop: '20px', fontFamily: 'Arial' }}>No inventory found at this location.</p>
           ) : (() => {
             const sorted = [...stockInventory]
               .filter(item => parseFloat(item.quantity || '0') !== 0)
@@ -2594,29 +2633,43 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               return acc;
             }, {});
             const grandTotal = sorted.reduce((s, i) => s + Math.floor(parseFloat(i.quantity || '0')), 0);
+            const uom = sorted[0]?.stockItemUom || sorted[0]?.uom || 'BL';
             return (
-              <table className="stock-table">
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt', lineHeight: '1.15', marginTop: '8px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
                 <thead>
                   <tr>
-                    <th>Item</th>
-                    <th className="qty-col">Qty (BL)</th>
+                    <th style={{ fontSize: '10pt', fontWeight: 'bold', padding: '4px 8px', borderBottom: '2px solid #333', textAlign: 'left', backgroundColor: '#f8f8f8' }}>Particulars</th>
+                    <th style={{ fontSize: '10pt', fontWeight: 'bold', padding: '4px 8px', borderBottom: '2px solid #333', textAlign: 'right', width: '120px', backgroundColor: '#f8f8f8' }}>
+                      Closing Balance<br /><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Quantity</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {Object.entries(grouped).map(([groupCode, { name, items }]) => {
-                    const groupQty = (items as any[]).reduce((s, i) => s + Math.floor(parseFloat(i.quantity || '0')), 0);
+                    const groupTotal = (items as any[]).reduce((s, i) => s + parseFloat(i.quantity || '0'), 0);
+                    const firstUom = (items as any[])[0]?.stockItemUom || (items as any[])[0]?.uom || 'BL';
+                    const isGroupNeg = groupTotal < 0;
                     return [
-                      <tr key={`g-${groupCode}`} className="group-row">
-                        <td>{name}</td>
-                        <td className="qty-col">{groupQty.toLocaleString()}</td>
+                      <tr key={`g-${groupCode}`} style={{ backgroundColor: '#eaeaea' }}>
+                        <td style={{ fontWeight: 'bold', fontSize: '10pt', padding: '4px 8px', borderBottom: '1px solid #666', borderTop: '1px solid #666', color: isGroupNeg ? '#c2272d' : 'inherit' }}>
+                          {name}
+                        </td>
+                        <td style={{ fontWeight: 'bold', fontSize: '10pt', padding: '4px 8px', borderBottom: '1px solid #666', borderTop: '1px solid #666', textAlign: 'right', color: isGroupNeg ? '#c2272d' : 'inherit' }}>
+                          {Math.floor(groupTotal).toLocaleString()}<span style={{ marginLeft: '0.5em' }}>{firstUom}</span>
+                        </td>
                       </tr>,
                       ...(items as any[]).map((item) => {
                         const qty = Math.floor(parseFloat(item.quantity || '0'));
                         const isNeg = qty < 0;
+                        const itemUom = item.stockItemUom || item.uom || 'BL';
                         return (
-                          <tr key={`i-${item.inventoryId || item.stockItemId}`} className={`item-row${isNeg ? ' negative-row' : ''}`}>
-                            <td>{item.stockItemName}</td>
-                            <td className="qty-col">{qty.toLocaleString()}</td>
+                          <tr key={`i-${item.inventoryId || item.stockItemId}`} style={{ backgroundColor: isNeg ? 'rgba(255,200,200,0.5)' : 'transparent' }}>
+                            <td style={{ padding: '3px 8px 3px 16px', borderBottom: '1px solid #999', fontSize: '9pt', color: isNeg ? '#c2272d' : 'inherit', fontWeight: isNeg ? 600 : 'normal' }}>
+                              {item.stockItemName}
+                            </td>
+                            <td style={{ padding: '3px 8px', borderBottom: '1px solid #999', textAlign: 'right', fontSize: '9pt', fontWeight: isNeg ? 600 : 500, whiteSpace: 'nowrap', color: isNeg ? '#c2272d' : 'inherit' }}>
+                              {qty.toLocaleString()}<span style={{ marginLeft: '0.5em' }}>{itemUom}</span>
+                            </td>
                           </tr>
                         );
                       }),
@@ -2624,9 +2677,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                   })}
                 </tbody>
                 <tfoot>
-                  <tr className="total-row">
-                    <td>Grand Total</td>
-                    <td className="qty-col">{grandTotal.toLocaleString()}</td>
+                  <tr>
+                    <td style={{ fontWeight: 'bold', fontSize: '10pt', borderTop: '2px solid #333', borderBottom: '2px solid #333', padding: '5px 8px', backgroundColor: '#f0f0f0' }}>Grand Total</td>
+                    <td style={{ fontWeight: 'bold', fontSize: '10pt', borderTop: '2px solid #333', borderBottom: '2px solid #333', padding: '5px 8px', backgroundColor: '#f0f0f0', textAlign: 'right' }}>
+                      {grandTotal.toLocaleString()}<span style={{ marginLeft: '0.5em' }}>{uom}</span>
+                    </td>
                   </tr>
                 </tfoot>
               </table>
