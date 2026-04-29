@@ -78,7 +78,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useFormDraft } from "@/hooks/useFormDraft";
@@ -1746,6 +1746,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts", paymentAccountType, paymentAccountId, "balance"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      // Invalidate customer statements and factory customer orders so journal entries
+      // linked to a customer account are reflected immediately
+      queryClient.invalidateQueries({ predicate: keyStartsWith('/api/factory/customers/') });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
+      queryClient.invalidateQueries({ predicate: keyStartsWith('/api/factory/customer-orders') });
       
       // Clear edit mode and navigate back to daybook or reset form
       if (isEditMode) {

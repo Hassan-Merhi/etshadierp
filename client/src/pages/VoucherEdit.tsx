@@ -1052,6 +1052,10 @@ export default function VoucherEdit() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       // Invalidate ledger transaction queries so balances refresh in Accounts page
       queryClient.invalidateQueries({ predicate: keyStartsWith('/api/accounts/') });
+      // Invalidate customer statements so journal entries linked to a customer are reflected
+      queryClient.invalidateQueries({ predicate: keyStartsWith('/api/factory/customers/') });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
+      queryClient.invalidateQueries({ predicate: keyStartsWith('/api/factory/customer-orders') });
       toast({
         title: "Success",
         description: "Voucher updated successfully",
