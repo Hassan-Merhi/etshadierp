@@ -2757,7 +2757,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             const grandTotal = sorted.reduce((s, i) => s + Math.floor(parseFloat(i.quantity || '0')), 0);
             const uom = sorted[0]?.stockItemUom || sorted[0]?.uom || 'BL';
             return (
-              {/* NO cell borders — only horizontal dividers, matching the target layout */}
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt', lineHeight: '1.55', fontFamily: 'Arial, Helvetica, sans-serif', marginTop: '6px' }}>
                 <thead>
                   <tr>
