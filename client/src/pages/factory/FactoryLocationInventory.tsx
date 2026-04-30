@@ -1395,7 +1395,7 @@ export default function FactoryLocationInventory() {
               type="button"
             >
               <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-mono">V5</Badge>
-              <span className="text-sm font-medium">Stock Allocation Summary</span>
+              <span className="text-sm font-medium">V5 Stock Allocation Summary</span>
               {v5Summary.shortageCount > 0 && (
                 <Badge variant="destructive" className="gap-1 text-xs">
                   <AlertTriangle className="h-3 w-3" />
@@ -1406,13 +1406,18 @@ export default function FactoryLocationInventory() {
             </button>
 
             {showV5Summary && (
-              <div className="overflow-auto rounded-md border text-sm" data-testid="table-v5-summary">
+              <>
+                <p className="text-xs text-muted-foreground mb-2">
+                  In Stock and Loading are filtered to this location.{" "}
+                  <span className="font-medium">Co.-Wide Reserved</span> is company-wide — V5 draft containers are not location-specific until loading begins.
+                </p>
+                <div className="overflow-auto rounded-md border text-sm" data-testid="table-v5-summary">
                 <table className="w-full text-left">
                   <thead>
                     <tr className="border-b bg-muted/50">
                       <th className="px-3 py-2 font-medium text-muted-foreground">Article</th>
                       <th className="px-3 py-2 text-right font-medium text-muted-foreground">In Stock</th>
-                      <th className="px-3 py-2 text-right font-medium text-muted-foreground">Reserved</th>
+                      <th className="px-3 py-2 text-right font-medium text-muted-foreground" title="Company-wide: V5 draft containers are not yet location-specific">Co.-Wide Reserved</th>
                       <th className="px-3 py-2 text-right font-medium text-muted-foreground">Loading</th>
                       <th className="px-3 py-2 text-right font-medium">Available</th>
                     </tr>
@@ -1441,6 +1446,7 @@ export default function FactoryLocationInventory() {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </div>
         )}
