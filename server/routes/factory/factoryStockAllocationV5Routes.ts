@@ -168,25 +168,54 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       }
 
       // 7. ALL active factory_bale_products — so users can allocate to zero-stock items
+      //    Using both code and article_code columns to build a full code→name map
       const allProductsRaw = await db.execute(
-        sql`SELECT COALESCE(article_code, code) AS "articleCode", name
+        sql`SELECT code, COALESCE(article_code, code) AS "articleCode", name
             FROM factory_bale_products
             WHERE company_id = ${companyId} AND active = true
             ORDER BY name`,
       );
-      const allProductsMap = new Map<string, string>(
-        ((allProductsRaw as any).rows ?? (allProductsRaw as any[])).map((r: any) => [r.articleCode, r.name]),
-      );
+      const allProductsMap = new Map<string, string>();
+      ((allProductsRaw as any).rows ?? (allProductsRaw as any[])).forEach((r: any) => {
+        if (r.name) {
+          // Map both the code and the article_code so bales stored under either key get a name
+          if (r.code)        allProductsMap.set(r.code, r.name);
+          if (r.articleCode) allProductsMap.set(r.articleCode, r.name);
+        }
+      });
 
-      // 8. Product names — prefer bale_products, fall back to proforma line names
+      // 8. Build allCodes union (stock bales + loading bales + proforma lines + all active products)
       const allCodes = new Set([
         ...inStockMap.keys(),
         ...inLoadingMap.keys(),
         ...allLines.map(l => l.articleCode),
         ...allProductsMap.keys(),
       ]);
+
+      // 9a. Bidirectional name lookup — same technique as V2 — for any code that appears in the data
+      //     Matches factory_bale_products by BOTH code and article_code columns
       const productNamesMap: Record<string, string> = {};
-      allProductsMap.forEach((name, code) => { productNamesMap[code] = name; });
+      if (allCodes.size > 0) {
+        const codeArr = sql.raw(`ARRAY[${Array.from(allCodes).map(c => `'${c.replace(/'/g, "''")}'`).join(",")}]`);
+        const prodRaw = await db.execute(
+          sql`SELECT DISTINCT ON (matched_code) matched_code AS "articleCode", name FROM (
+                SELECT name,
+                  CASE WHEN code        = ANY(${codeArr}) THEN code
+                       WHEN article_code = ANY(${codeArr}) THEN article_code
+                  END AS matched_code
+                FROM factory_bale_products
+                WHERE company_id = ${companyId}
+                  AND (code = ANY(${codeArr}) OR article_code = ANY(${codeArr}))
+              ) sub
+              WHERE matched_code IS NOT NULL
+              ORDER BY matched_code`,
+        );
+        ((prodRaw as any).rows ?? (prodRaw as any[])).forEach((r: any) => {
+          if (r.name) productNamesMap[r.articleCode] = r.name;
+        });
+      }
+
+      // 9b. Fill remaining codes from proforma line names (last resort)
       allLines.forEach(l => { if (!productNamesMap[l.articleCode]) productNamesMap[l.articleCode] = l.productName; });
 
       // 9. Build per-article aggregates
