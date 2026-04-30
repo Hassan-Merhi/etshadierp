@@ -510,6 +510,13 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (!order) return res.status(404).json({ message: "Order not found" });
       if (!["DRAFT", "LOADING", "PENDING_VERIFICATION"].includes(order.status)) return res.status(400).json({ message: "Can only add bales to DRAFT, LOADING, or PENDING_VERIFICATION orders" });
 
+      // V5 guard: proformaIdUsed IS NOT NULL
+      // V5 bales are SOLD once the order reaches PENDING_VERIFICATION — no further scanning allowed.
+      // Legacy V2/V3 behavior (PENDING_VERIFICATION scan allowed) is unchanged.
+      if (order.proformaIdUsed && order.status === "PENDING_VERIFICATION") {
+        return res.status(400).json({ message: "Cannot add bales to a V5 order that is already in PENDING_VERIFICATION" });
+      }
+
       // Check if this scan code matches a bale already reserved (status = RESERVED_FOR_ORDER).
       // Only match by unique bale identifiers (referenceNumber, baleCode) — NOT by articleCode or
       // productName, which are shared across many bales and would falsely block scanning the next
@@ -699,6 +706,13 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         return res.status(400).json({ message: "Can only add bales to DRAFT, LOADING, or PENDING_VERIFICATION orders" });
       }
 
+      // V5 guard: proformaIdUsed IS NOT NULL
+      // V5 bales are SOLD once the order reaches PENDING_VERIFICATION — no further bulk scanning allowed.
+      // Legacy V2/V3 behavior (PENDING_VERIFICATION scan allowed) is unchanged.
+      if (order.proformaIdUsed && order.status === "PENDING_VERIFICATION") {
+        return res.status(400).json({ message: "Cannot add bales to a V5 order that is already in PENDING_VERIFICATION" });
+      }
+
       const parsedLocationId = parseInt(locationId);
 
       // Get all products for this company for matching
@@ -741,6 +755,22 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
           if (!bale) { notFoundRefs.push(refNum); continue; }
           if (alreadyAddedBaleIds.has(bale.id)) continue;
+
+          // V5 guard: proformaIdUsed IS NOT NULL
+          // V5 bales stay IN_STOCK, so the same bale could appear as available in multiple orders.
+          // Reject if this bale is already linked to any other active (non-CANCELLED) order.
+          if (order.proformaIdUsed) {
+            const v5DupCheck = await db.execute(
+              sql`SELECT cob.order_id FROM customer_order_bales cob
+                  JOIN customer_orders co ON co.id = cob.order_id
+                  WHERE cob.bale_id = ${bale.id}
+                    AND co.status != 'CANCELLED'
+                    AND cob.order_id != ${orderId}
+                  LIMIT 1`,
+            );
+            const v5DupRow = (v5DupCheck as any).rows?.[0];
+            if (v5DupRow) { notFoundRefs.push(refNum); continue; }
+          }
 
           let priceUsed = "0";
           if (order.proformaIdUsed) {
@@ -787,6 +817,24 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         return res.json({ added: totalAdded, notFound: [], notFoundRefs, order: updatedOrder, bales: updatedBales });
       }
 
+      // ── V5 cross-order block set (ARTICLE mode) ─────────────────────────────
+      // V5 guard: proformaIdUsed IS NOT NULL
+      // V5 bales remain IN_STOCK while loaded in other orders. Build a set of bale IDs already
+      // claimed by other active (non-CANCELLED) V5 orders so they can be excluded during
+      // auto-selection. One query covers all articles. Legacy orders skip this block entirely.
+      const v5BlockedBaleIds = new Set<number>();
+      if (order.proformaIdUsed) {
+        const blockedRows = await db.execute(
+          sql`SELECT cob.bale_id FROM customer_order_bales cob
+              JOIN customer_orders co ON co.id = cob.order_id
+              WHERE co.status != 'CANCELLED'
+                AND cob.order_id != ${orderId}`,
+        );
+        for (const row of (blockedRows as any).rows ?? []) {
+          v5BlockedBaleIds.add(row.bale_id);
+        }
+      }
+
       // ── ARTICLE-CODE MODE (existing) ────────────────────────────────────────
       for (const item of items) {
         const articleCode = String(item.articleCode || "").trim();
@@ -822,8 +870,10 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           .orderBy(factoryBales.createdAt)
           .limit(qty * 5);
 
-        // Filter out bales already in this order or reserved for another order
-        const candidateBales = availableBales.filter((b: any) => !alreadyAddedBaleIds.has(b.id));
+        // Filter out bales already in this order, or (V5 only) linked to another active order.
+        const candidateBales = availableBales.filter((b: any) =>
+          !alreadyAddedBaleIds.has(b.id) && !v5BlockedBaleIds.has(b.id)
+        );
         const balesToAdd = candidateBales.slice(0, qty);
 
         if (balesToAdd.length < qty) {
