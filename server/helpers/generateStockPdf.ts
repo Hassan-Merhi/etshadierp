@@ -167,13 +167,16 @@ export async function generateStockPdf(
   }
 
   // ── Page-bottom helper — PDFKit ≥0.17 exposes maxY as a function ──────────
-  // In PDFKit <0.17 it may be a number or undefined. This handles all cases.
+  // IMPORTANT: Call maxY as a method (page.maxY()) not as a detached function.
+  // Detaching it via `const raw = page.maxY` and then calling `raw()` loses the
+  // `this` binding, so inside maxY(), `this.height` throws because `this` is
+  // undefined in strict mode (PDFKit 0.17.2 confirmed).
   function pageBottom(): number {
-    const raw = (doc.page as any).maxY;
-    if (typeof raw === "function") return raw() as number;
-    if (typeof raw === "number")   return raw;
+    const page = doc.page as any;
+    if (typeof page.maxY === "function") return page.maxY() as number;
+    if (typeof page.maxY === "number")   return page.maxY;
     // Fallback: height minus the bottom margin
-    return doc.page.height - ((doc.page as any).margins?.bottom ?? 40);
+    return page.height - (page.margins?.bottom ?? 40);
   }
 
   // ── Helper: ensure at least `need` pt is available; add page if not ───────
