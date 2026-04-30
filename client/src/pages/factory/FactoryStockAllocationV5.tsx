@@ -1,7 +1,7 @@
 import { useState, useMemo, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -146,6 +146,67 @@ export default function FactoryStockAllocationV5() {
       toast({ title: "Error closing proforma", description: err.message ?? "Unknown error", variant: "destructive" });
     },
   });
+
+  /* ── Edit-Draft-Quantities dialog state ─────────────────────────────────── */
+  interface EditDraftArticle {
+    articleCode: string;
+    productName: string;
+    currentExpectedQty: number;
+    eligibleCount: number; // DRAFT containers with 0 loadedQty for this article
+  }
+  const [editDraftDialog, setEditDraftDialog] = useState<{
+    proformaId: number;
+    proformaName: string;
+    articles: EditDraftArticle[];
+  } | null>(null);
+  const [editDraftQtys, setEditDraftQtys] = useState<Record<string, number>>({});
+
+  function openEditDraft(proformaId: number, proformaName: string, currentRows: V5Row[]) {
+    const articles: EditDraftArticle[] = [];
+    for (const row of currentRows) {
+      const pd = row.proformaDetails.find(p => p.proformaId === proformaId);
+      if (!pd) continue;
+      const eligible = pd.containers.filter(c => c.status === "DRAFT" && c.loadedQty === 0);
+      if (eligible.length === 0) continue;
+      articles.push({
+        articleCode: row.articleCode,
+        productName: row.productName,
+        currentExpectedQty: eligible[0].expectedQty,
+        eligibleCount: eligible.length,
+      });
+    }
+    setEditDraftDialog({ proformaId, proformaName, articles });
+    const initQtys: Record<string, number> = {};
+    articles.forEach(a => { initQtys[a.articleCode] = a.currentExpectedQty; });
+    setEditDraftQtys(initQtys);
+  }
+
+  const editDraftMut = useMutation({
+    mutationFn: ({ proformaId, updates }: { proformaId: number; updates: { articleCode: string; expectedQty: number }[] }) =>
+      apiRequest("PATCH", `/api/factory/v5/proforma/${proformaId}/draft-expected-lines`, { updates }),
+    onSuccess: (data: any) => {
+      toast({ title: `Draft quantities updated (${data?.updated ?? 0} lines changed).` });
+      setEditDraftDialog(null);
+      query.refetch();
+    },
+    onError: (err: any) => {
+      toast({ title: "Error updating quantities", description: err.message ?? "Unknown error", variant: "destructive" });
+    },
+  });
+
+  function submitEditDraft() {
+    if (!editDraftDialog) return;
+    const updates = editDraftDialog.articles.map(a => ({
+      articleCode: a.articleCode,
+      expectedQty: editDraftQtys[a.articleCode] ?? a.currentExpectedQty,
+    }));
+    const invalid = updates.find(u => !Number.isInteger(u.expectedQty) || u.expectedQty < 0);
+    if (invalid) {
+      toast({ title: "Validation error", description: "Quantities must be non-negative integers.", variant: "destructive" });
+      return;
+    }
+    editDraftMut.mutate({ proformaId: editDraftDialog.proformaId, updates });
+  }
 
   /* ── Query ──────────────────────────────────────────────────────────────── */
   const query = useQuery<V5Data>({
@@ -372,6 +433,18 @@ export default function FactoryStockAllocationV5() {
                                   <Plus className="h-2.5 w-2.5 mr-1" />Add Containers
                                 </Button>
                               )}
+                              {/* Edit Draft Quantities — only when at least one DRAFT container has 0 loaded bales */}
+                              {!isReadyToClose && proforma.containers.some(c => c.status === "DRAFT" && c.loadedQty === 0) && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-5 px-2 text-[10px]"
+                                  data-testid={`button-v5-edit-draft-${proforma.proformaId}`}
+                                  onClick={() => openEditDraft(proforma.proformaId, proforma.proformaName, rows)}
+                                >
+                                  <Pencil className="h-2.5 w-2.5 mr-1" />Edit Draft Qty
+                                </Button>
+                              )}
                               {isReadyToClose && (
                                 <Button
                                   size="sm"
@@ -527,6 +600,82 @@ export default function FactoryStockAllocationV5() {
               {addContainersMut.isPending
                 ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Adding…</>
                 : `Add ${ctCount} Container${ctCount !== 1 ? "s" : ""}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Draft Quantities dialog */}
+      <Dialog open={!!editDraftDialog} onOpenChange={open => { if (!open) setEditDraftDialog(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-4 w-4 text-muted-foreground" />
+              Edit Draft Quantities
+            </DialogTitle>
+          </DialogHeader>
+
+          {editDraftDialog && (
+            <div className="flex flex-col gap-4 py-1">
+              <p className="text-sm text-muted-foreground">
+                Editing expected quantities for <span className="font-semibold text-foreground">{editDraftDialog.proformaName}</span>.
+              </p>
+
+              {editDraftDialog.articles.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">No eligible draft containers found.</p>
+              ) : (
+                <div className="rounded-md border text-xs overflow-hidden">
+                  <div className="grid grid-cols-[1fr_60px_80px_64px] bg-muted px-3 py-2 gap-3 font-medium text-muted-foreground border-b">
+                    <span>Article</span>
+                    <span className="text-right">Current</span>
+                    <span className="text-right">New Qty</span>
+                    <span className="text-right">Ctrs</span>
+                  </div>
+                  {editDraftDialog.articles.map(a => (
+                    <div
+                      key={a.articleCode}
+                      className="grid grid-cols-[1fr_60px_80px_64px] px-3 py-2 gap-3 items-center border-b last:border-0"
+                    >
+                      <div>
+                        <div className="font-medium truncate max-w-[180px]" title={a.productName}>{a.productName}</div>
+                        <div className="text-[10px] text-muted-foreground font-mono">{a.articleCode}</div>
+                      </div>
+                      <span className="text-right font-mono tabular-nums text-muted-foreground">{a.currentExpectedQty}</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        className="w-full h-7 text-xs text-right"
+                        value={editDraftQtys[a.articleCode] ?? a.currentExpectedQty}
+                        onChange={e => setEditDraftQtys(prev => ({
+                          ...prev,
+                          [a.articleCode]: Math.max(0, parseInt(e.target.value) || 0),
+                        }))}
+                        data-testid={`input-v5-edit-draft-qty-${a.articleCode}`}
+                      />
+                      <span className="text-right text-muted-foreground tabular-nums font-mono">{a.eligibleCount}×</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2">
+                Only draft containers that have not started loading will be updated. Existing loaded containers will not change.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditDraftDialog(null)} data-testid="button-v5-edit-draft-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={submitEditDraft}
+              disabled={editDraftMut.isPending || !editDraftDialog || editDraftDialog.articles.length === 0}
+              data-testid="button-v5-edit-draft-submit"
+            >
+              {editDraftMut.isPending
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</>
+                : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
