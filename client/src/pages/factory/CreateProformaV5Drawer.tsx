@@ -245,17 +245,18 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
       }));
 
     const n = containerNames.length;
-    // Warning: check shortages
+    // Warning: check shortages using corrected formula
+    // balance = stockAvailable - totalLoaded - newRequest; negative = shortage
     const shortages = lines.filter(l => {
       const row = articleRows.find(r => r.articleCode === l.articleCode);
       if (!row) return false;
-      const expected = l.quantity * n;
-      return expected > row.stockAvailable + row.totalLoaded;
+      const balance = row.stockAvailable - row.totalLoaded - l.quantity * n;
+      return balance < 0;
     });
     if (shortages.length > 0 && sendToLoading) {
       const msgs = shortages.map(l => {
         const row = articleRows.find(r => r.articleCode === l.articleCode)!;
-        const shortBy = l.quantity * n - (row.stockAvailable + row.totalLoaded);
+        const shortBy = Math.abs(row.stockAvailable - row.totalLoaded - l.quantity * n);
         return `${l.productName} short by ${shortBy}`;
       });
       toast({
@@ -289,8 +290,8 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
   const warningCount = articleRows.filter(r => {
     const qty = parseInt(quantities[r.articleCode] || "0");
     if (isNaN(qty) || qty <= 0) return false;
-    const expected = sendToLoading && n > 0 ? qty * n : qty;
-    return expected > r.stockAvailable + r.totalLoaded;
+    const request = sendToLoading && n > 0 ? qty * n : qty;
+    return (r.stockAvailable - r.totalLoaded - request) < 0;
   }).length;
 
   const zeroItemCount = articleRows.filter(r => r.stockAvailable === 0).length;
@@ -463,7 +464,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
             <thead>
               <tr className="bg-muted sticky top-0 z-10">
                 <th className="text-left px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[200px] sticky left-0 bg-muted z-20">Product</th>
-                <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[120px]">Free to Promise</th>
+                <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[130px]">Available Balance</th>
                 <th className="text-center px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[110px]">Qty / Container</th>
                 {sendToLoading && n > 0 && (
                   <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[110px] text-amber-600 dark:text-amber-400">
@@ -478,10 +479,10 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
                 const rawVal  = quantities[row.articleCode] ?? "";
                 const parsed  = parseInt(rawVal);
                 const qty     = isNaN(parsed) ? 0 : parsed;
-                const expected = sendToLoading && n > 0 ? qty * n : qty;
-                const onHand  = row.stockAvailable + row.totalLoaded;
-                const shortage = expected > 0 && expected > onHand;
-                const shortBy  = expected - onHand;
+                const request  = sendToLoading && n > 0 ? qty * n : qty;
+                const balance  = row.stockAvailable - row.totalLoaded - request;
+                const shortage = request > 0 && balance < 0;
+                const shortBy  = Math.abs(balance);
                 const hasError = !!errors[`qty_${row.articleCode}`];
 
                 return (
@@ -501,14 +502,14 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
 
                     <td className={cn(
                       "px-3 py-1.5 border-r text-right font-mono tabular-nums text-xs font-semibold",
-                      row.freeToPromise > 0
+                      row.freeToPromise < 0
                         ? "text-destructive"
                         : row.freeToPromise === 0
                         ? "text-muted-foreground"
                         : "text-green-700 dark:text-green-400",
                     )}>
-                      {row.freeToPromise > 0 && <AlertTriangle className="inline h-3 w-3 mr-0.5 mb-0.5" />}
-                      {row.freeToPromise}
+                      {row.freeToPromise < 0 && <AlertTriangle className="inline h-3 w-3 mr-0.5 mb-0.5" />}
+                      {row.freeToPromise > 0 ? `+${row.freeToPromise}` : row.freeToPromise}
                     </td>
 
                     <td className="px-2 py-1 border-r">

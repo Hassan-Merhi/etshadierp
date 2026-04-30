@@ -150,10 +150,7 @@ export default function FactoryStockAllocationV5() {
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[130px] text-amber-600 dark:text-amber-400">Expected to Load</th>
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[110px] text-blue-600 dark:text-blue-400">Total Loaded</th>
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[140px]">
-                  <span className="flex items-center justify-end gap-1">
-                    Free to Promise
-                    <span className="text-[10px] font-normal text-muted-foreground">(+shortage)</span>
-                  </span>
+                  Available Balance
                 </th>
                 <th className="text-center px-3 py-2.5 font-medium border-b whitespace-nowrap min-w-[70px]">Detail</th>
               </tr>
@@ -161,7 +158,7 @@ export default function FactoryStockAllocationV5() {
             <tbody>
               {rows.map((row, idx) => {
                 const isExpanded = expandedRows.has(row.articleCode);
-                const isShortage = row.freeToPromise > 0;
+                const isShortage = row.freeToPromise < 0;
 
                 return (
                   // Issue 7 fix: key on Fragment to avoid React warning
@@ -212,7 +209,7 @@ export default function FactoryStockAllocationV5() {
 
                       <td className={cn(
                         "px-3 py-2 border-r text-right font-mono tabular-nums text-xs font-semibold",
-                        row.freeToPromise > 0
+                        row.freeToPromise < 0
                           ? "text-destructive"
                           : row.freeToPromise === 0
                           ? "text-muted-foreground"
@@ -220,11 +217,11 @@ export default function FactoryStockAllocationV5() {
                       )}>
                         <span className="flex items-center justify-end gap-1">
                           {isShortage && <AlertTriangle className="h-3 w-3" />}
-                          {row.freeToPromise}
+                          {row.freeToPromise > 0 ? `+${row.freeToPromise}` : row.freeToPromise}
                         </span>
                         {isShortage && (
                           <div className="text-[10px] text-destructive/80 font-normal text-right">
-                            short by {row.freeToPromise}
+                            need {Math.abs(row.freeToPromise)} more
                           </div>
                         )}
                       </td>
@@ -316,9 +313,13 @@ export default function FactoryStockAllocationV5() {
                   </td>
                   <td className={cn(
                     "px-3 py-2 border-r text-right font-mono tabular-nums",
-                    totals.freeToPromise > 0 ? "text-destructive" : "text-green-700 dark:text-green-400",
+                    totals.freeToPromise < 0
+                      ? "text-destructive"
+                      : totals.freeToPromise === 0
+                      ? "text-muted-foreground"
+                      : "text-green-700 dark:text-green-400",
                   )}>
-                    {totals.freeToPromise}
+                    {totals.freeToPromise > 0 ? `+${totals.freeToPromise}` : totals.freeToPromise}
                   </td>
                   <td />
                 </tr>

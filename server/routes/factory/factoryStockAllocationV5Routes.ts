@@ -247,7 +247,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         const stockAvailable = inStockMap.get(articleCode) ?? 0;
         const totalLoaded    = inLoadingMap.get(articleCode) ?? 0;
         const expectedToLoad = expectedMap.get(articleCode) ?? 0;
-        const freeToPromise  = expectedToLoad - (stockAvailable + totalLoaded);
+        const freeToPromise  = stockAvailable - expectedToLoad - totalLoaded;
 
         // Per-proforma/per-container expandable detail
         const proformaDetails = activeProformasRaw
@@ -318,7 +318,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         expectedToLoad: filtered.reduce((s, r) => s + r.expectedToLoad, 0),
         freeToPromise:  filtered.reduce((s, r) => s + r.freeToPromise, 0),
         totalKg:        filtered.reduce((s, r) => s + r.totalKg, 0),
-        shortageCount:  filtered.filter(r => r.freeToPromise > 0).length,
+        shortageCount:  filtered.filter(r => r.freeToPromise < 0).length,
       };
 
       res.json({ rows: filtered, totals, productNames: productNamesMap });
