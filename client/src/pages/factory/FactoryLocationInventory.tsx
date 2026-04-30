@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft, ChevronRight, MapPin, Layers, Package, Search, Printer, ArrowUpDown,
   FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2, Pencil, Tag, Zap, Eye,
-  AlertTriangle, ChevronDown
+  AlertTriangle
 } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { useEscapeBack } from "@/hooks/use-escape-back";
@@ -154,7 +154,6 @@ export default function FactoryLocationInventory() {
   const [proformaMode, setProformaMode] = useState(false);
   const [showZeroStock, setShowZeroStock] = useState(false);
   const [hideZeroAvailable, setHideZeroAvailable] = useState(true);
-  const [showV5Summary, setShowV5Summary] = useState(true);
   const [selections, setSelections] = useState<Map<number, ProformaSelection>>(new Map());
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   const [proformaAutoSave, setProformaAutoSave] = useState<boolean>(() => {
@@ -1377,6 +1376,23 @@ export default function FactoryLocationInventory() {
                 <span className="font-mono font-semibold">{formatAmount(totalSellValue)}</span>
               </div>
             )}
+            {!proformaMode && v5Summary && v5Summary.rows.length > 0 && (() => {
+              const netAvail = v5Summary.rows.reduce((s, r) => s + r.availableBalance, 0);
+              return (
+                <div
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold border ${
+                    netAvail < 0
+                      ? "bg-destructive/10 border-destructive/30 text-destructive"
+                      : "bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-400"
+                  }`}
+                  title="V5 allocation: SUM(In Stock − Co.-Wide Reserved − Loading) across all articles"
+                  data-testid="chip-v5-net-available"
+                >
+                  <span className="text-xs font-normal opacity-70">V5 Net Available:</span>
+                  <span className="font-mono">{netAvail.toLocaleString()}</span>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -1389,12 +1405,7 @@ export default function FactoryLocationInventory() {
             availableBalance = inStock − reservedExpected − loading         */}
         {!proformaMode && v5Summary && v5Summary.rows.length > 0 && (
           <div className="mb-4">
-            <button
-              className="flex items-center gap-2 w-full text-left mb-2"
-              onClick={() => setShowV5Summary(v => !v)}
-              data-testid="button-toggle-v5-summary"
-              type="button"
-            >
+            <div className="flex items-center gap-2 mb-2">
               <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-mono">V5</Badge>
               <span className="text-sm font-medium">V5 Stock Allocation Summary</span>
               {v5Summary.shortageCount > 0 && (
@@ -1403,58 +1414,56 @@ export default function FactoryLocationInventory() {
                   {v5Summary.shortageCount} shortage{v5Summary.shortageCount !== 1 ? "s" : ""}
                 </Badge>
               )}
-              <ChevronDown className={`ml-auto h-4 w-4 text-muted-foreground transition-transform ${showV5Summary ? "rotate-180" : ""}`} />
-            </button>
-
-            {showV5Summary && (
-              <>
-                <p className="text-xs text-muted-foreground mb-2">
-                  In Stock and Loading are filtered to this location.{" "}
-                  <span className="font-medium">Co.-Wide Reserved</span> is company-wide — V5 draft containers are not location-specific until loading begins.
-                </p>
-                <div className="overflow-auto rounded-md border text-sm" data-testid="table-v5-summary">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="px-3 py-2 font-medium text-muted-foreground">Article</th>
-                      <th className="px-3 py-2 text-right font-medium text-muted-foreground">In Stock</th>
-                      <th className="px-3 py-2 text-right font-medium text-muted-foreground" title="Company-wide: V5 draft containers are not yet location-specific">Co.-Wide Reserved</th>
-                      <th className="px-3 py-2 text-right font-medium text-muted-foreground">Loading</th>
-                      <th className="px-3 py-2 text-right font-medium text-muted-foreground">Wt/Bale (KG)</th>
-                      <th className="px-3 py-2 text-right font-medium">Available</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {v5Summary.rows.map((row) => (
-                      <tr
-                        key={row.articleCode}
-                        className="border-b last:border-0 hover-elevate"
-                        data-testid={`row-v5-summary-${row.articleCode}`}
+            </div>
+            <p className="text-xs text-muted-foreground mb-2">
+              In Stock and Loading are filtered to this location.{" "}
+              <span className="font-medium">Co.-Wide Reserved</span> is company-wide — V5 draft containers are not location-specific until loading begins.
+            </p>
+            <div className="overflow-auto rounded-md border text-sm" data-testid="table-v5-summary">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-3 py-2 font-medium text-muted-foreground">Article</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">In Stock</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground" title="Company-wide: V5 draft containers are not yet location-specific">Co.-Wide Reserved</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Loading</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Wt/Bale (KG)</th>
+                    <th className="px-3 py-2 text-right font-medium">Available</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {v5Summary.rows.map((row) => (
+                    <tr
+                      key={row.articleCode}
+                      className="border-b last:border-0 hover-elevate"
+                      data-testid={`row-v5-summary-${row.articleCode}`}
+                    >
+                      <td className="px-3 py-2">
+                        <div className="font-medium">{row.productName}</div>
+                        <div className="text-xs text-muted-foreground font-mono">{row.articleCode}</div>
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono">{row.inStock.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right font-mono text-muted-foreground">{row.reservedExpected.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right font-mono text-muted-foreground">{row.loading.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right font-mono text-muted-foreground">{row.weightPerBaleKg > 0 ? row.weightPerBaleKg.toLocaleString() : "0"}</td>
+                      <td className={`px-3 py-2 text-right font-mono font-semibold ${row.availableBalance < 0 ? "text-destructive" : "text-green-600 dark:text-green-400"}`}
+                        data-testid={`text-v5-available-${row.articleCode}`}
                       >
-                        <td className="px-3 py-2">
-                          <div className="font-medium">{row.productName}</div>
-                          <div className="text-xs text-muted-foreground font-mono">{row.articleCode}</div>
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono">{row.inStock.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right font-mono text-muted-foreground">{row.reservedExpected.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right font-mono text-muted-foreground">{row.loading.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right font-mono text-muted-foreground">{row.weightPerBaleKg > 0 ? row.weightPerBaleKg.toLocaleString() : "0"}</td>
-                        <td className={`px-3 py-2 text-right font-mono font-semibold ${row.availableBalance < 0 ? "text-destructive" : "text-green-600 dark:text-green-400"}`}
-                          data-testid={`text-v5-available-${row.articleCode}`}
-                        >
-                          {row.availableBalance.toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              </>
-            )}
+                        {row.availableBalance.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
         <Card className="p-4 w-full" ref={printRef}>
+          <div className="flex items-center gap-2 mb-3">
+            <Badge variant="outline" className="text-xs font-medium">Physical Inventory</Badge>
+            <span className="text-xs text-muted-foreground">Bale count · weight · cost / sell value by category</span>
+          </div>
           <div className="flex flex-col gap-2 mb-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1883,6 +1892,19 @@ export default function FactoryLocationInventory() {
               <span className="font-mono font-semibold">{formatAmount(totalSellValue)}</span>
             </div>
           )}
+        </div>
+      )}
+
+      {proformaMode && (
+        <div className="mb-3 flex items-start gap-2 px-3 py-2.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-sm text-amber-800 dark:text-amber-300"
+          data-testid="note-proforma-v5-advisory"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+          <span>
+            Available quantities shown below do not subtract V5 reserved allocations.
+            Check the <span className="font-medium">V5 Stock Allocation Summary</span> on the Locations view or the{" "}
+            <span className="font-medium">Stock Allocation V5</span> page for net availability before committing.
+          </span>
         </div>
       )}
 
