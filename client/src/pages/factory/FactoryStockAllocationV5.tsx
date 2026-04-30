@@ -1,10 +1,11 @@
 import { useState, useMemo, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock, Pencil } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -207,6 +208,36 @@ export default function FactoryStockAllocationV5() {
     }
     editDraftMut.mutate({ proformaId: editDraftDialog.proformaId, updates });
   }
+
+  /* ── Cancel-Container dialog state ──────────────────────────────────────── */
+  const [cancelDialog, setCancelDialog] = useState<{
+    orderId: number;
+    containerName: string;
+    status: "DRAFT" | "LOADING";
+  } | null>(null);
+  const [cancelSuperUser, setCancelSuperUser] = useState("");
+  const [cancelSuperPass, setCancelSuperPass] = useState("");
+
+  const cancelContainerMut = useMutation({
+    mutationFn: ({ orderId, supervisorUsername, supervisorPassword }: {
+      orderId: number;
+      supervisorUsername?: string;
+      supervisorPassword?: string;
+    }) =>
+      apiRequest("POST", `/api/factory/customer-orders/${orderId}/cancel`, {
+        ...(supervisorUsername ? { supervisorUsername, supervisorPassword } : {}),
+      }),
+    onSuccess: () => {
+      toast({ title: "Container cancelled." });
+      setCancelDialog(null);
+      setCancelSuperUser("");
+      setCancelSuperPass("");
+      query.refetch();
+    },
+    onError: (err: any) => {
+      toast({ title: "Cancel failed", description: err.message ?? "Unknown error", variant: "destructive" });
+    },
+  });
 
   /* ── Query ──────────────────────────────────────────────────────────────── */
   const query = useQuery<V5Data>({
@@ -477,6 +508,25 @@ export default function FactoryStockAllocationV5() {
                                         <span className="text-amber-500 ml-1">-{c.expectedQty - c.loadedQty}</span>
                                       )}
                                     </span>
+                                    {(c.status === "DRAFT" || c.status === "LOADING") && (
+                                      <button
+                                        type="button"
+                                        title={`Cancel ${c.containerName}`}
+                                        data-testid={`button-v5-cancel-container-${c.orderId}`}
+                                        onClick={() => {
+                                          setCancelSuperUser("");
+                                          setCancelSuperPass("");
+                                          setCancelDialog({
+                                            orderId: c.orderId,
+                                            containerName: c.containerName,
+                                            status: c.status as "DRAFT" | "LOADING",
+                                          });
+                                        }}
+                                        className="ml-0.5 text-muted-foreground hover:text-destructive transition-colors"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    )}
                                   </div>
                                 ))}
                               </div>
@@ -719,6 +769,112 @@ export default function FactoryStockAllocationV5() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Cancel Container — DRAFT (simple confirmation, no supervisor required) */}
+      {cancelDialog?.status === "DRAFT" && (
+        <Dialog open onOpenChange={open => { if (!open) setCancelDialog(null); }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive">
+                <X className="h-4 w-4" />
+                Cancel Container
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col gap-3 py-1">
+              <p className="text-sm text-muted-foreground">
+                Cancel <span className="font-semibold text-foreground">{cancelDialog.containerName}</span>?
+              </p>
+              <p className="text-sm text-muted-foreground">
+                This draft container will be marked as cancelled and removed from the expected load count. This cannot be undone.
+              </p>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setCancelDialog(null)} data-testid="button-v5-cancel-ct-dismiss">
+                Back
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => cancelContainerMut.mutate({ orderId: cancelDialog.orderId })}
+                disabled={cancelContainerMut.isPending}
+                data-testid="button-v5-cancel-ct-confirm"
+              >
+                {cancelContainerMut.isPending
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Cancelling…</>
+                  : "Cancel Container"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Cancel Container — LOADING (supervisor credentials required) */}
+      {cancelDialog?.status === "LOADING" && (
+        <Dialog open onOpenChange={open => {
+          if (!open) { setCancelDialog(null); setCancelSuperUser(""); setCancelSuperPass(""); }
+        }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive">
+                <X className="h-4 w-4" />
+                Cancel Loading Container
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col gap-4 py-1">
+              <p className="text-sm text-muted-foreground">
+                Cancel <span className="font-semibold text-foreground">{cancelDialog.containerName}</span>?
+                This container is actively loading. Admin approval is required.
+              </p>
+              <p className="text-xs text-muted-foreground bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2">
+                All scanned bale links will be removed. Bales will remain in stock. This action cannot be undone.
+              </p>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-sm">Supervisor Username</Label>
+                  <Input
+                    autoComplete="off"
+                    value={cancelSuperUser}
+                    onChange={e => setCancelSuperUser(e.target.value)}
+                    data-testid="input-v5-cancel-super-user"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-sm">Supervisor Password</Label>
+                  <Input
+                    type="password"
+                    autoComplete="current-password"
+                    value={cancelSuperPass}
+                    onChange={e => setCancelSuperPass(e.target.value)}
+                    data-testid="input-v5-cancel-super-pass"
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => { setCancelDialog(null); setCancelSuperUser(""); setCancelSuperPass(""); }}
+                data-testid="button-v5-cancel-ct-dismiss"
+              >
+                Back
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => cancelContainerMut.mutate({
+                  orderId: cancelDialog.orderId,
+                  supervisorUsername: cancelSuperUser,
+                  supervisorPassword: cancelSuperPass,
+                })}
+                disabled={cancelContainerMut.isPending || !cancelSuperUser.trim() || !cancelSuperPass}
+                data-testid="button-v5-cancel-ct-confirm"
+              >
+                {cancelContainerMut.isPending
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Cancelling…</>
+                  : "Cancel Container"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
