@@ -580,6 +580,25 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.baleId, bale.id)));
       if (alreadyAdded) return res.status(400).json({ message: "Bale already added to this order" });
 
+      // V5 guard: proformaIdUsed IS NOT NULL
+      // V5 bales remain IN_STOCK during loading so the RESERVED_FOR_ORDER check above cannot
+      // catch cross-order duplicates. Explicitly verify this bale is not already linked to
+      // any other active (non-CANCELLED) order.
+      if (order.proformaIdUsed) {
+        const v5DupCheck = await db.execute(
+          sql`SELECT cob.order_id FROM customer_order_bales cob
+              JOIN customer_orders co ON co.id = cob.order_id
+              WHERE cob.bale_id = ${bale.id}
+                AND co.status != 'CANCELLED'
+                AND cob.order_id != ${orderId}
+              LIMIT 1`,
+        );
+        const v5DupRow = (v5DupCheck as any).rows?.[0];
+        if (v5DupRow) {
+          return res.status(400).json({ message: `Bale ${bale.referenceNumber || scanCode} is already loaded in another active order` });
+        }
+      }
+
       let priceUsed = "0";
       let proformaLine: any = null;
       if (order.proformaIdUsed) {
@@ -640,7 +659,11 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         priceUsed,
       });
 
-      await db.update(factoryBales).set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() }).where(eq(factoryBales.id, bale.id));
+      // V5 guard: proformaIdUsed IS NOT NULL
+      // V5 bales remain IN_STOCK during loading — only legacy V2/V3 orders set RESERVED_FOR_ORDER.
+      if (!order.proformaIdUsed) {
+        await db.update(factoryBales).set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() }).where(eq(factoryBales.id, bale.id));
+      }
 
       await recalculateOrderTotals(db, orderId);
 
@@ -746,9 +769,13 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
             priceUsed,
           });
 
-          await db.update(factoryBales)
-            .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
-            .where(eq(factoryBales.id, bale.id));
+          // V5 guard: proformaIdUsed IS NOT NULL
+          // V5 bales remain IN_STOCK during loading — only legacy V2/V3 orders set RESERVED_FOR_ORDER.
+          if (!order.proformaIdUsed) {
+            await db.update(factoryBales)
+              .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
+              .where(eq(factoryBales.id, bale.id));
+          }
 
           alreadyAddedBaleIds.add(bale.id);
           totalAdded++;
@@ -832,9 +859,13 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
             priceUsed,
           });
 
-          await db.update(factoryBales)
-            .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
-            .where(eq(factoryBales.id, bale.id));
+          // V5 guard: proformaIdUsed IS NOT NULL
+          // V5 bales remain IN_STOCK during loading — only legacy V2/V3 orders set RESERVED_FOR_ORDER.
+          if (!order.proformaIdUsed) {
+            await db.update(factoryBales)
+              .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
+              .where(eq(factoryBales.id, bale.id));
+          }
 
           alreadyAddedBaleIds.add(bale.id);
           totalAdded++;
@@ -1360,9 +1391,20 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         if (bales.length === 0) throw new Error("Order has no bales");
 
         for (const b of bales) {
-          const [factoryBale] = await tx.select().from(factoryBales)
-            .where(and(eq(factoryBales.id, b.baleId), eq(factoryBales.status, "RESERVED_FOR_ORDER"), eq(factoryBales.erpLocationId, b.locationId)));
-          if (!factoryBale) throw new Error(`Bale ${b.baleReference} is no longer available`);
+          // V5 guard: proformaIdUsed IS NOT NULL
+          // V5 bales are already SOLD (set when order moved to PENDING_VERIFICATION).
+          // Accept SOLD or RESERVED_FOR_ORDER for V5; require RESERVED_FOR_ORDER only for legacy.
+          if (order.proformaIdUsed) {
+            const [factoryBale] = await tx.select().from(factoryBales)
+              .where(eq(factoryBales.id, b.baleId));
+            if (!factoryBale || !["RESERVED_FOR_ORDER", "SOLD"].includes(factoryBale.status)) {
+              throw new Error(`Bale ${b.baleReference} is no longer available`);
+            }
+          } else {
+            const [factoryBale] = await tx.select().from(factoryBales)
+              .where(and(eq(factoryBales.id, b.baleId), eq(factoryBales.status, "RESERVED_FOR_ORDER"), eq(factoryBales.erpLocationId, b.locationId)));
+            if (!factoryBale) throw new Error(`Bale ${b.baleReference} is no longer available`);
+          }
         }
 
         let seqRows = await tx.execute(sql`SELECT * FROM customer_invoice_sequences WHERE company_id = ${companyId} FOR UPDATE`);
@@ -2403,12 +2445,16 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (order.status !== "CANCELLED") return res.status(400).json({ message: "Only CANCELLED orders can be restored" });
       if (!order.loadingStartedAt) return res.status(400).json({ message: "This order was not a loading order" });
 
-      // Restore bales that belong to this order back to RESERVED_FOR_ORDER
+      // Restore bales that belong to this order back to RESERVED_FOR_ORDER.
+      // V5 guard: proformaIdUsed IS NOT NULL
+      // V5 bales remain IN_STOCK during loading — skip RESERVED_FOR_ORDER restore for V5 orders.
       const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
-      for (const ob of orderBales) {
-        await db.update(factoryBales)
-          .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
-          .where(and(eq(factoryBales.id, ob.baleId), eq(factoryBales.status, "IN_STOCK")));
+      if (!order.proformaIdUsed) {
+        for (const ob of orderBales) {
+          await db.update(factoryBales)
+            .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
+            .where(and(eq(factoryBales.id, ob.baleId), eq(factoryBales.status, "IN_STOCK")));
+        }
       }
 
       const [restored] = await db.update(customerOrders)
@@ -2490,6 +2536,18 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         loadingFinalizedAt: new Date(),
         updatedAt: new Date(),
       }).where(eq(customerOrders.id, orderId)).returning();
+
+      // V5 guard: proformaIdUsed IS NOT NULL
+      // Move all linked bales to SOLD when a V5 order reaches PENDING_VERIFICATION.
+      // This is idempotent — bales already SOLD are unaffected by the update.
+      // Legacy V2/V3 orders keep bales in RESERVED_FOR_ORDER until FINALIZED.
+      if (order.proformaIdUsed) {
+        for (const b of bales) {
+          await db.update(factoryBales)
+            .set({ status: "SOLD", updatedAt: new Date() })
+            .where(eq(factoryBales.id, b.baleId));
+        }
+      }
 
       const [lsCustomer] = await db.select({ legalName: customers.legalName }).from(customers).where(eq(customers.id, order.customerId));
       const lsToday = req.body?.txDate || getClientDate(req);
@@ -2735,6 +2793,13 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
       if (order.status !== "PENDING_VERIFICATION") return res.status(400).json({ message: "Only PENDING_VERIFICATION orders can be returned to loading" });
+
+      // V5 guard: proformaIdUsed IS NOT NULL
+      // V5 bales are already SOLD at PENDING_VERIFICATION — reversal is not safe without admin
+      // tooling that reverts bale statuses. Block until admin reversal flow is implemented.
+      if (order.proformaIdUsed) {
+        return res.status(400).json({ message: "Reversal from PENDING_VERIFICATION is not supported for V5 orders. Contact admin." });
+      }
 
       const [updated] = await db.update(customerOrders).set({
         status: "LOADING",
