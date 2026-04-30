@@ -9,9 +9,20 @@ import {
 } from "@shared/schema";
 import { eq, inArray, sql, and, gte, lte } from "drizzle-orm";
 
+// ─── V5 Guard Convention ─────────────────────────────────────────────────────
+// V5 orders are identified by: customer_orders.proforma_id_used IS NOT NULL
+// V2/V3 orders have proforma_id_used = null and must follow legacy bale lifecycle.
+// Do NOT add a dedicated isV5Order column unless proforma_id_used proves unreliable.
+// Every place this guard is applied, add the comment: "// V5 guard: proformaIdUsed IS NOT NULL"
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ─── Status constants ────────────────────────────────────────────────────────
 // Active order statuses from schema enum:
 //   DRAFT | LOADING | PENDING_VERIFICATION | VERIFIED | FINALIZED | CANCELLED
+//
+// NOTE: These constants will be restructured in Phase B when the formula switches
+// to customer_order_expected_lines (DRAFT only) and customer_order_bales (LOADING only).
+// They are kept here temporarily for reference.
 //
 // expectedToLoad  — orders that represent real loading intent (excludes CANCELLED)
 const ACTIVE_ORDER_STATUSES = ["DRAFT", "LOADING", "PENDING_VERIFICATION", "VERIFIED", "FINALIZED"];
@@ -20,13 +31,14 @@ const ACTIVE_ORDER_STATUSES = ["DRAFT", "LOADING", "PENDING_VERIFICATION", "VERI
 //                   (all statuses where bales were actually scanned in)
 const TOTAL_LOADED_STATUSES = ["LOADING", "PENDING_VERIFICATION", "VERIFIED", "FINALIZED"];
 
-// V5 formula:
-//   stockAvailable  = IN_STOCK bales not yet assigned to any order
-//   totalLoaded     = bales scanned into any TOTAL_LOADED_STATUSES order
+// V5 formula (Phase A — interim, to be corrected in Phase B/C):
+//   stockAvailable  = IN_STOCK bales
+//   totalLoaded     = bales scanned into TOTAL_LOADED_STATUSES orders
 //   expectedToLoad  = sum per article of (line.qty × linked active order count)
-//   freeToPromise   = expectedToLoad − (stockAvailable + totalLoaded)
-//     > 0 → shortage (need more bales)   → red
-//     ≤ 0 → sufficient                   → green
+//   freeToPromise   = stockAvailable − expectedToLoad − totalLoaded
+//     < 0 → shortage (need more bales)   → red
+//     = 0 → exactly covered              → neutral
+//     > 0 → surplus available            → green
 
 export function registerFactoryStockAllocationV5Routes(app: Express) {
 
