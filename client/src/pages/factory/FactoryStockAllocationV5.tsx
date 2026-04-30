@@ -1,7 +1,7 @@
 import { useState, useMemo, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -127,6 +127,25 @@ export default function FactoryStockAllocationV5() {
     }
     addContainersMut.mutate({ proformaId: addCtDialog.proformaId, names: trimmed });
   }
+
+  /* ── Close-Proforma dialog state ─────────────────────────────────────────── */
+  const [closeDialog, setCloseDialog] = useState<{
+    proformaId: number;
+    proformaName: string;
+  } | null>(null);
+
+  const closeProformaMut = useMutation({
+    mutationFn: (proformaId: number) =>
+      apiRequest("PATCH", `/api/factory/v5/proforma/${proformaId}/close`, {}),
+    onSuccess: () => {
+      toast({ title: "Proforma closed." });
+      setCloseDialog(null);
+      query.refetch();
+    },
+    onError: (err: any) => {
+      toast({ title: "Error closing proforma", description: err.message ?? "Unknown error", variant: "destructive" });
+    },
+  });
 
   /* ── Query ──────────────────────────────────────────────────────────────── */
   const query = useQuery<V5Data>({
@@ -311,7 +330,14 @@ export default function FactoryStockAllocationV5() {
                     </tr>
 
                     {/* Expandable proforma/container detail */}
-                    {isExpanded && row.proformaDetails.map(proforma => (
+                    {isExpanded && row.proformaDetails.map(proforma => {
+                      // Ready to close: has containers and all are FINALIZED or CANCELLED
+                      const isReadyToClose =
+                        proforma.containerCount > 0 &&
+                        proforma.containers.length > 0 &&
+                        proforma.containers.every(c => c.status === "FINALIZED" || c.status === "CANCELLED");
+
+                      return (
                       <tr key={`${row.articleCode}-p${proforma.proformaId}`} className="border-b bg-muted/30">
                         <td colSpan={6} className="px-0 py-0">
                           <div className="px-8 py-2">
@@ -326,15 +352,37 @@ export default function FactoryStockAllocationV5() {
                                 {proforma.lineQty} × {proforma.containerCount} =
                                 <span className="font-semibold text-amber-600 dark:text-amber-400 ml-1">{proforma.totalExpected} expected</span>
                               </span>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-5 px-2 text-[10px]"
-                                data-testid={`button-v5-add-containers-${proforma.proformaId}`}
-                                onClick={() => openAddContainers(proforma.proformaId, proforma.proformaName, proforma.containerCount)}
-                              >
-                                <Plus className="h-2.5 w-2.5 mr-1" />Add Containers
-                              </Button>
+                              {isReadyToClose && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] h-4 px-1.5 gap-0.5 text-green-700 dark:text-green-400 border-green-600/40"
+                                  data-testid={`badge-v5-ready-to-close-${proforma.proformaId}`}
+                                >
+                                  <CheckCircle2 className="h-2.5 w-2.5" />Ready to Close
+                                </Badge>
+                              )}
+                              {!isReadyToClose && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-5 px-2 text-[10px]"
+                                  data-testid={`button-v5-add-containers-${proforma.proformaId}`}
+                                  onClick={() => openAddContainers(proforma.proformaId, proforma.proformaName, proforma.containerCount)}
+                                >
+                                  <Plus className="h-2.5 w-2.5 mr-1" />Add Containers
+                                </Button>
+                              )}
+                              {isReadyToClose && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-5 px-2 text-[10px]"
+                                  data-testid={`button-v5-close-proforma-${proforma.proformaId}`}
+                                  onClick={() => setCloseDialog({ proformaId: proforma.proformaId, proformaName: proforma.proformaName })}
+                                >
+                                  <Lock className="h-2.5 w-2.5 mr-1" />Close Proforma
+                                </Button>
+                              )}
                             </div>
 
                             {proforma.containers.length > 0 ? (
@@ -365,7 +413,8 @@ export default function FactoryStockAllocationV5() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </Fragment>
                 );
               })}
@@ -478,6 +527,45 @@ export default function FactoryStockAllocationV5() {
               {addContainersMut.isPending
                 ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Adding…</>
                 : `Add ${ctCount} Container${ctCount !== 1 ? "s" : ""}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Close Proforma confirmation dialog */}
+      <Dialog open={!!closeDialog} onOpenChange={open => { if (!open) setCloseDialog(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-4 w-4 text-muted-foreground" />
+              Close Proforma
+            </DialogTitle>
+          </DialogHeader>
+
+          {closeDialog && (
+            <div className="flex flex-col gap-3 py-1">
+              <p className="text-sm text-muted-foreground">
+                Close <span className="font-semibold text-foreground">{closeDialog.proformaName}</span>?
+              </p>
+              <p className="text-sm text-muted-foreground">
+                It will stop counting in Expected to Load. Existing containers and history will remain.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setCloseDialog(null)} data-testid="button-v5-close-pf-cancel">
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              onClick={() => closeDialog && closeProformaMut.mutate(closeDialog.proformaId)}
+              disabled={closeProformaMut.isPending}
+              data-testid="button-v5-close-pf-confirm"
+            >
+              {closeProformaMut.isPending
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Closing…</>
+                : "Close Proforma"}
             </Button>
           </DialogFooter>
         </DialogContent>

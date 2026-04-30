@@ -608,4 +608,57 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       res.status(400).json({ message: err.message });
     }
   });
+
+  // ── PATCH /api/factory/v5/proforma/:proformaId/close ─────────────────────
+  // Manually closes an active proforma by setting isActive = false.
+  // Validates all linked containers are FINALIZED or CANCELLED before closing.
+  // After close the proforma no longer appears in the V5 GET (which filters isActive=true),
+  // so it stops contributing to expectedToLoad automatically.
+  // Does NOT delete proformas, containers, expected lines, or bales.
+  // V5 guard: proformaIdUsed IS NOT NULL (proforma.isActive is V5-specific concept)
+  app.patch("/api/factory/v5/proforma/:proformaId/close", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const proformaId = parseInt(req.params.proformaId);
+      if (!proformaId || isNaN(proformaId)) return res.status(400).json({ message: "Invalid proformaId" });
+
+      // Confirm proforma exists for this company
+      const [proforma] = await db
+        .select()
+        .from(customerProformas)
+        .where(and(eq(customerProformas.id, proformaId), eq(customerProformas.companyId, companyId)));
+      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+      if (!proforma.isActive) return res.status(400).json({ message: "Proforma is already closed" });
+
+      // Confirm it has linked customer_orders
+      const linkedOrdersRaw = await db.execute(
+        sql`SELECT id, status FROM customer_orders WHERE proforma_id_used = ${proformaId}`,
+      );
+      const linkedOrders = ((linkedOrdersRaw as any).rows ?? []) as { id: number; status: string }[];
+      if (linkedOrders.length === 0) {
+        return res.status(400).json({ message: "Cannot close a proforma with no linked containers" });
+      }
+
+      // Confirm all linked orders are FINALIZED or CANCELLED
+      const CLOSEABLE_STATUSES = ["FINALIZED", "CANCELLED"];
+      const openOrders = linkedOrders.filter(o => !CLOSEABLE_STATUSES.includes(o.status));
+      if (openOrders.length > 0) {
+        return res.status(400).json({ message: "Cannot close proforma while containers are still open." });
+      }
+
+      // Set isActive = false — proforma disappears from the V5 GET active filter automatically
+      const [updated] = await db
+        .update(customerProformas)
+        .set({ isActive: false })
+        .where(eq(customerProformas.id, proformaId))
+        .returning();
+
+      res.json({ proforma: updated });
+    } catch (err: any) {
+      console.error("[V5] close-proforma error:", err);
+      res.status(400).json({ message: err.message });
+    }
+  });
 }
