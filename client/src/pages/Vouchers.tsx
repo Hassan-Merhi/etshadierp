@@ -379,6 +379,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const [selectedAccountType, setSelectedAccountType] = useState<string | null>(null);
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
+  const [waPendingPrompt, setWaPendingPrompt] = useState<{ accountId: number; month: string } | null>(null);
 
   // Fetch data - include selectedCompany?.id in query keys for proper cache invalidation on company switch
   const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
@@ -1052,8 +1053,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         title: "Success",
         description: `${activeTab === "payment" ? "Payment" : "Receipt"} voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
-      if (data?.whatsapp?.sent) {
-        toast({ title: "Statement sent to WhatsApp" });
+      if (data?.whatsapp?.prompt && data.whatsapp.accountId && data.whatsapp.month) {
+        setWaPendingPrompt({ accountId: data.whatsapp.accountId, month: data.whatsapp.month });
       }
       discardPaymentDraft();
       
@@ -1129,6 +1130,24 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         description: error.message || `Failed to ${isEditMode ? "update" : "create"} voucher`,
         variant: "destructive",
       });
+    },
+  });
+
+  const sendWaStatementMutation = useMutation({
+    mutationFn: async ({ accountId, month }: { accountId: number; month: string }) => {
+      const res = await modeApiRequest("POST", `/api/factory/accounts/${accountId}/send-statement-whatsapp`, { month });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Failed to send WhatsApp");
+      return json;
+    },
+    onSuccess: () => {
+      toast({ title: "Statement sent to WhatsApp" });
+      setWaPendingPrompt(null);
+    },
+    onError: (error: any) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "WhatsApp send failed", description: error.message, variant: "destructive" });
+      setWaPendingPrompt(null);
     },
   });
 
@@ -1734,8 +1753,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         title: "Success",
         description: `Journal voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
-      if (data?.whatsapp?.sent) {
-        toast({ title: "Statement sent to WhatsApp" });
+      if (data?.whatsapp?.prompt && data.whatsapp.accountId && data.whatsapp.month) {
+        setWaPendingPrompt({ accountId: data.whatsapp.accountId, month: data.whatsapp.month });
       }
       discardJournalDraft();
       
@@ -6959,6 +6978,34 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         onAccountCreated={handleAccountCreated}
         apiRequestFn={modeApiRequest}
       />
+
+      {/* WhatsApp Statement Prompt */}
+      <AlertDialog open={!!waPendingPrompt} onOpenChange={(open) => { if (!open) setWaPendingPrompt(null); }}>
+        <AlertDialogContent data-testid="dialog-whatsapp-prompt">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send Statement via WhatsApp?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A WhatsApp statement is configured for this account. Would you like to send the{" "}
+              <strong>{waPendingPrompt?.month}</strong> statement now, or skip and send it manually later?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              data-testid="button-whatsapp-skip"
+              onClick={() => setWaPendingPrompt(null)}
+            >
+              Skip for Now
+            </AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="button-whatsapp-send"
+              disabled={sendWaStatementMutation.isPending}
+              onClick={() => waPendingPrompt && sendWaStatementMutation.mutate(waPendingPrompt)}
+            >
+              {sendWaStatementMutation.isPending ? "Sending..." : "Send Now"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -171,7 +171,42 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
   });
 }
 
-// ─── Internal helper ──────────────────────────────────────────────────────────
+// ─── Internal helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Checks whether a WhatsApp statement would be triggered for this voucher,
+ * WITHOUT actually sending. Used so the frontend can prompt the user.
+ *
+ * Returns { prompt: true, accountId, voucherDate, month } when a rule applies,
+ * or { prompt: false } when no rule is configured / applicable.
+ */
+export async function checkAccountWhatsAppRule(opts: {
+  companyId:    number;
+  accountId:    number;
+  accountType:  string;
+  voucherType:  "Payment" | "Receipt" | "Journal";
+  voucherDate:  string;
+}): Promise<{ prompt: boolean; accountId?: number; voucherDate?: string; month?: string }> {
+  const { companyId, accountId, accountType, voucherType, voucherDate } = opts;
+  if (accountType !== "ledger") return { prompt: false };
+  try {
+    const [rule] = await db.select()
+      .from(factoryAccountWhatsappRules)
+      .where(and(
+        eq(factoryAccountWhatsappRules.companyId, companyId),
+        eq(factoryAccountWhatsappRules.ledgerAccountId, accountId),
+      ));
+    if (!rule || !rule.enabled || !rule.whatsappChatId) return { prompt: false };
+    if (voucherType === "Payment" && !rule.sendOnPayment) return { prompt: false };
+    if (voucherType === "Receipt" && !rule.sendOnReceipt) return { prompt: false };
+    if (voucherType === "Journal" && !rule.sendOnJournal) return { prompt: false };
+    const month = voucherDate.substring(0, 7); // "yyyy-MM"
+    return { prompt: true, accountId, voucherDate, month };
+  } catch {
+    return { prompt: false };
+  }
+}
+
 /**
  * Called after a voucher save (Payment/Receipt/Journal).
  * Fires-and-forgets — never throws, so voucher save is unaffected.

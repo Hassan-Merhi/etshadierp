@@ -43,7 +43,7 @@ import { format } from "date-fns";
 import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
-import { triggerAccountWhatsAppStatement } from "./factoryWhatsappRoutes";
+import { checkAccountWhatsAppRule } from "./factoryWhatsappRoutes";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
 import { generatePDF } from "../pdfHelper";
 import path from "path";
@@ -786,10 +786,10 @@ export function registerVoucherRoutes(app: Express) {
           console.error("Factory daybook write failed (non-fatal):", dbErr);
         }
 
-        // WhatsApp auto-statement trigger (non-fatal)
-        let waResult: { sent: boolean; error?: string } = { sent: false };
+        // WhatsApp rule check — prompt the frontend instead of auto-sending
+        let waResult: { prompt: boolean; accountId?: number; voucherDate?: string; month?: string } = { prompt: false };
         try {
-          waResult = await triggerAccountWhatsAppStatement({
+          waResult = await checkAccountWhatsAppRule({
             companyId:   req.session.currentCompanyId!,
             accountId:   paymentAccountId,
             accountType: paymentAccountType,
@@ -797,7 +797,7 @@ export function registerVoucherRoutes(app: Express) {
             voucherDate: voucherDate,
           });
         } catch (waErr: any) {
-          console.error("WhatsApp trigger error (non-fatal):", waErr);
+          console.error("WhatsApp rule check error (non-fatal):", waErr);
         }
 
         res.json({ ...result, whatsapp: waResult });
@@ -1037,10 +1037,10 @@ export function registerVoucherRoutes(app: Express) {
           );
         }
 
-        // WhatsApp auto-statement trigger (non-fatal)
-        let waResultPatch: { sent: boolean; error?: string } = { sent: false };
+        // WhatsApp rule check — prompt the frontend instead of auto-sending
+        let waResultPatch: { prompt: boolean; accountId?: number; voucherDate?: string; month?: string } = { prompt: false };
         try {
-          waResultPatch = await triggerAccountWhatsAppStatement({
+          waResultPatch = await checkAccountWhatsAppRule({
             companyId:   req.session.currentCompanyId!,
             accountId:   paymentAccountId,
             accountType: paymentAccountType,
@@ -1048,7 +1048,7 @@ export function registerVoucherRoutes(app: Express) {
             voucherDate: voucherDate,
           });
         } catch (waErr: any) {
-          console.error("WhatsApp trigger error (non-fatal):", waErr);
+          console.error("WhatsApp rule check error (non-fatal):", waErr);
         }
 
         res.json({ voucher: result.voucher, entries: result.entries, whatsapp: waResultPatch });
@@ -1208,10 +1208,10 @@ export function registerVoucherRoutes(app: Express) {
           console.error("Factory daybook write failed (non-fatal):", dbErr);
         }
 
-        // WhatsApp auto-statement trigger (non-fatal)
+        // WhatsApp rule check — prompt the frontend instead of auto-sending
         // Resolve main account: prefer explicitly passed mainAccountId,
         // fallback to first ledger-type DR entry in entries array.
-        let waJournalResult: { sent: boolean; error?: string } = { sent: false };
+        let waJournalResult: { prompt: boolean; accountId?: number; voucherDate?: string; month?: string } = { prompt: false };
         try {
           let waAccountId   = mainAccountId   ? Number(mainAccountId)  : null;
           let waAccountType = mainAccountType ? String(mainAccountType) : "ledger";
@@ -1222,7 +1222,7 @@ export function registerVoucherRoutes(app: Express) {
             if (firstLedgerDr) { waAccountId = Number(firstLedgerDr.accountId); waAccountType = "ledger"; }
           }
           if (waAccountId) {
-            waJournalResult = await triggerAccountWhatsAppStatement({
+            waJournalResult = await checkAccountWhatsAppRule({
               companyId:   req.session.currentCompanyId!,
               accountId:   waAccountId,
               accountType: waAccountType,
@@ -1231,7 +1231,7 @@ export function registerVoucherRoutes(app: Express) {
             });
           }
         } catch (waErr: any) {
-          console.error("WhatsApp trigger error (non-fatal):", waErr);
+          console.error("WhatsApp rule check error (non-fatal):", waErr);
         }
 
         res.json({ ...result, whatsapp: waJournalResult });
@@ -1402,8 +1402,8 @@ export function registerVoucherRoutes(app: Express) {
         // that matches a charge on one of their orders, update that charge automatically
         await syncJournalToOrderCharge(req.session.currentCompanyId!, result.entries, result.voucher.id).catch(() => {});
 
-        // WhatsApp auto-statement trigger (non-fatal)
-        let waJournalPatch: { sent: boolean; error?: string } = { sent: false };
+        // WhatsApp rule check — prompt the frontend instead of auto-sending
+        let waJournalPatch: { prompt: boolean; accountId?: number; voucherDate?: string; month?: string } = { prompt: false };
         try {
           let waAccountId   = mainAccountIdPatch   ? Number(mainAccountIdPatch)   : null;
           let waAccountType = mainAccountTypePatch ? String(mainAccountTypePatch) : "ledger";
@@ -1414,7 +1414,7 @@ export function registerVoucherRoutes(app: Express) {
             if (firstLedgerDr) { waAccountId = Number(firstLedgerDr.accountId); waAccountType = "ledger"; }
           }
           if (waAccountId) {
-            waJournalPatch = await triggerAccountWhatsAppStatement({
+            waJournalPatch = await checkAccountWhatsAppRule({
               companyId:   req.session.currentCompanyId!,
               accountId:   waAccountId,
               accountType: waAccountType,
@@ -1423,7 +1423,7 @@ export function registerVoucherRoutes(app: Express) {
             });
           }
         } catch (waErr: any) {
-          console.error("WhatsApp trigger error (non-fatal):", waErr);
+          console.error("WhatsApp rule check error (non-fatal):", waErr);
         }
 
         res.json({ voucher: result.voucher, entries: result.entries, whatsapp: waJournalPatch });
