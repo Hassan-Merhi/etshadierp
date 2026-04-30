@@ -1734,6 +1734,22 @@ let migrationsDone = false;
     `CREATE INDEX IF NOT EXISTS factory_invoice_loading_bales_bale_idx    ON factory_invoice_loading_bales (bale_id)`,
     `ALTER TABLE factory_invoice_loading_sessions ALTER COLUMN created_by TYPE VARCHAR(100) USING created_by::VARCHAR`,
     `ALTER TABLE factory_invoice_loading_bales    ALTER COLUMN scanned_by TYPE VARCHAR(100) USING scanned_by::VARCHAR`,
+    // V5 Stock Allocation — per-container locked expected quantities (Phase B, Apr 2026)
+    // One row per (order_id × article_code). Created on POST proforma-with-loading; backfilled on first GET.
+    `CREATE TABLE IF NOT EXISTS customer_order_expected_lines (
+      id               SERIAL PRIMARY KEY,
+      company_id       INTEGER NOT NULL,
+      order_id         INTEGER NOT NULL,
+      proforma_id      INTEGER,
+      proforma_line_id INTEGER,
+      article_code     VARCHAR(50) NOT NULL,
+      product_name     TEXT,
+      expected_qty     INTEGER NOT NULL,
+      created_at       TIMESTAMP NOT NULL DEFAULT now(),
+      updated_at       TIMESTAMP NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS coel_order_idx   ON customer_order_expected_lines (order_id)`,
+    `CREATE INDEX IF NOT EXISTS coel_company_idx ON customer_order_expected_lines (company_id)`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

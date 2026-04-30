@@ -5,6 +5,7 @@ import {
   customerProformas,
   customerProformaLines,
   customerOrders,
+  customerOrderExpectedLines,
   customers,
 } from "@shared/schema";
 import { eq, inArray, sql, and, gte, lte } from "drizzle-orm";
@@ -61,14 +62,18 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         ((inStockRaw as any).rows ?? (inStockRaw as any[])).map((r: any) => [r.articleCode, Number(r.count)]),
       );
 
-      // 2. totalLoaded — bales physically scanned into loading/verified/finalized orders
+      // 2. totalLoaded — bales physically scanned into LOADING orders ONLY.
+      // Phase B change: Restricted to status='LOADING' so that PENDING_VERIFICATION/VERIFIED/FINALIZED
+      // orders do not double-count bales that are already SOLD (post Phase C).
+      // V5 guard: proformaIdUsed IS NOT NULL — only count V5 container orders.
       const inLoadingRaw = await db.execute(
         sql`SELECT fb.article_code AS "articleCode", COUNT(*)::int AS count
             FROM customer_order_bales cob
             JOIN factory_bales fb   ON fb.id  = cob.bale_id
             JOIN customer_orders co ON co.id  = cob.order_id
             WHERE co.company_id = ${companyId}
-              AND co.status = ANY(${sql.raw(`ARRAY['${TOTAL_LOADED_STATUSES.join("','")}']`)})
+              AND co.status = 'LOADING'
+              AND co.proforma_id_used IS NOT NULL
             GROUP BY fb.article_code`,
       );
       const inLoadingMap = new Map<string, number>(
@@ -146,7 +151,6 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       }
 
       // 5. Loaded bales per order — for expandable container detail
-      //    Count bales in ALL non-cancelled statuses to reflect actual loaded progress
       type BalesByOrder = { orderId: number; articleCode: string; count: number };
       let loadedBalesByOrder: BalesByOrder[] = [];
       const allOrderIds = ordersByProforma.map(o => o.id);
@@ -164,6 +168,58 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
           count: Number(r.count),
         }));
       }
+
+      // 5b. Backfill: Insert expected lines for any V5 DRAFT containers that were created before
+      //     Phase B. Idempotent — NOT EXISTS guard prevents duplicates.
+      //     V5 guard: proformaIdUsed IS NOT NULL
+      if (proformaIds.length > 0) {
+        try {
+          await db.execute(
+            sql`INSERT INTO customer_order_expected_lines
+                  (company_id, order_id, proforma_id, proforma_line_id, article_code, product_name, expected_qty)
+                SELECT co.company_id, co.id, co.proforma_id_used, cpl.id,
+                       cpl.article_code, cpl.product_name, cpl.quantity
+                FROM customer_orders co
+                JOIN customer_proforma_lines cpl ON cpl.proforma_id = co.proforma_id_used
+                WHERE co.company_id = ${companyId}
+                  AND co.status = 'DRAFT'
+                  AND co.proforma_id_used IS NOT NULL
+                  AND co.proforma_id_used = ANY(${sql.raw(`ARRAY[${proformaIds.join(",")}]`)})
+                  AND NOT EXISTS (
+                    SELECT 1 FROM customer_order_expected_lines cel
+                    WHERE cel.order_id = co.id AND cel.article_code = cpl.article_code
+                  )`,
+          );
+        } catch (_backfillErr) {
+          // Non-fatal: backfill failure must never block the GET response
+        }
+      }
+
+      // 5c. Per-container expected quantities from customer_order_expected_lines.
+      //     Covers all active (non-cancelled) orders so the expandable detail always shows
+      //     the locked-in expected qty per container.
+      //     V5 guard: proformaIdUsed IS NOT NULL (all allOrderIds are already V5 orders)
+      type ExpectedLine = { orderId: number; articleCode: string; expectedQty: number };
+      let allExpectedLines: ExpectedLine[] = [];
+      if (allOrderIds.length > 0) {
+        const expRaw = await db.execute(
+          sql`SELECT order_id AS "orderId", article_code AS "articleCode",
+                     expected_qty AS "expectedQty"
+              FROM customer_order_expected_lines
+              WHERE order_id = ANY(${sql.raw(`ARRAY[${allOrderIds.join(",")}]`)})`,
+        );
+        allExpectedLines = ((expRaw as any).rows ?? (expRaw as any[])).map((r: any) => ({
+          orderId: Number(r.orderId),
+          articleCode: r.articleCode,
+          expectedQty: Number(r.expectedQty),
+        }));
+      }
+
+      // Key: `${orderId}__${articleCode}` → expectedQty for per-container expandable detail
+      const perContainerExpectedMap = new Map<string, number>();
+      allExpectedLines.forEach(el => {
+        perContainerExpectedMap.set(`${el.orderId}__${el.articleCode}`, el.expectedQty);
+      });
 
       // 6. Customer names
       const customerIds = [...new Set([
@@ -246,13 +302,16 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         ordersByProformaId.get(o.proformaId)!.push(o);
       }
 
-      // expectedToLoad: only proformas with ≥1 active container order contribute
+      // expectedToLoad: sum of expected_qty from customer_order_expected_lines for DRAFT orders ONLY.
+      // Phase B change: replaces old (line.qty × containerCount) formula.
+      // Only DRAFT orders contribute — LOADING/PENDING/VERIFIED/FINALIZED do NOT inflate Expected to Load.
+      // V5 guard: proformaIdUsed IS NOT NULL (allExpectedLines already filtered to active V5 orders)
+      const draftOrderIds = new Set(ordersByProforma.filter(o => o.status === "DRAFT").map(o => o.id));
       const expectedMap = new Map<string, number>();
-      for (const line of allLines) {
-        const cnt = orderCountByProforma.get(line.proformaId) ?? 0;
-        if (cnt === 0) continue;
-        expectedMap.set(line.articleCode, (expectedMap.get(line.articleCode) ?? 0) + line.quantity * cnt);
-      }
+      allExpectedLines.forEach(el => {
+        if (!draftOrderIds.has(el.orderId)) return;
+        expectedMap.set(el.articleCode, (expectedMap.get(el.articleCode) ?? 0) + el.expectedQty);
+      });
 
       // 10. Build rows — union of all known codes (including zero-stock active products)
       const rows = Array.from(allCodes).sort().map(articleCode => {
@@ -272,14 +331,22 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               const loadedBales = loadedBalesByOrder.find(
                 b => b.orderId === o.id && b.articleCode === articleCode,
               )?.count ?? 0;
+              // Phase B: use locked-in per-container expected qty from customer_order_expected_lines.
+              // Falls back to lineQty if no expected line exists (e.g. order pre-dates Phase B backfill).
+              const containerExpectedQty = perContainerExpectedMap.get(`${o.id}__${articleCode}`) ?? lineQty;
               return {
                 orderId: o.id,
                 containerName: o.containerNumber ?? `Container #${o.id}`,
                 status: o.status,
-                expectedQty: lineQty,
+                expectedQty: containerExpectedQty,
                 loadedQty: loadedBales,
               };
             });
+            // totalExpected: sum of locked-in per-container expected qty for this article
+            const totalExpected = linkedOrders.reduce(
+              (sum, o) => sum + (perContainerExpectedMap.get(`${o.id}__${articleCode}`) ?? lineQty),
+              0,
+            );
             return {
               proformaId: p.id,
               proformaName: p.name,
@@ -287,7 +354,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               customerName: customerMap.get(p.customerId!) ?? `Customer #${p.customerId}`,
               lineQty,
               containerCount: linkedOrders.length,
-              totalExpected: lineQty * linkedOrders.length,
+              totalExpected,
               containers,
             };
           });
@@ -392,6 +459,27 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
             totalQtyBales: 0,
           }));
           createdOrders = await tx.insert(customerOrders).values(orderValues).returning();
+
+          // Phase B: Insert one expected line per (container × proforma line).
+          // These lock in the expected quantity at order creation time.
+          // V5 guard: proformaIdUsed IS NOT NULL (all createdOrders are V5 by construction)
+          const expectedLineValues: any[] = [];
+          for (const order of createdOrders) {
+            for (const line of insertedLines) {
+              expectedLineValues.push({
+                companyId,
+                orderId: order.id,
+                proformaId: proforma.id,
+                proformaLineId: line.id,
+                articleCode: line.articleCode,
+                productName: line.productName,
+                expectedQty: line.quantity,
+              });
+            }
+          }
+          if (expectedLineValues.length > 0) {
+            await tx.insert(customerOrderExpectedLines).values(expectedLineValues);
+          }
         }
 
         return { proforma, lines: insertedLines, orders: createdOrders };

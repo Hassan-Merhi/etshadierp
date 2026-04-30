@@ -3047,6 +3047,34 @@ export const customerOrderBales = pgTable("customer_order_bales", {
 
 export type CustomerOrderBale = typeof customerOrderBales.$inferSelect;
 
+// ─── V5: Per-container expected quantities ────────────────────────────────────
+// Created when a V5 proforma + containers are submitted via POST /api/factory/v5/proforma-with-loading.
+// One row per (order_id × article_code). Stores the expected quantity for that container at creation time
+// so that future proforma edits do not retroactively change containers that have already started loading.
+export const customerOrderExpectedLines = pgTable("customer_order_expected_lines", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  orderId: integer("order_id").notNull(),
+  proformaId: integer("proforma_id"),
+  proformaLineId: integer("proforma_line_id"),
+  articleCode: varchar("article_code", { length: 50 }).notNull(),
+  productName: text("product_name"),
+  expectedQty: integer("expected_qty").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  orderIdx: index("coel_order_idx").on(t.orderId),
+  companyIdx: index("coel_company_idx").on(t.companyId),
+}));
+
+export const insertCustomerOrderExpectedLineSchema = createInsertSchema(customerOrderExpectedLines).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCustomerOrderExpectedLine = z.infer<typeof insertCustomerOrderExpectedLineSchema>;
+export type CustomerOrderExpectedLine = typeof customerOrderExpectedLines.$inferSelect;
+
 export const customerOrderCharges = pgTable("customer_order_charges", {
   id: serial("id").primaryKey(),
   orderId: integer("order_id").notNull(),
