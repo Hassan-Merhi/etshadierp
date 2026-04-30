@@ -563,7 +563,7 @@ export default function Payroll() {
       payments[worker.id] = {
         workerId: worker.id,
         amount: netPayment.toString(),
-        selected: true,
+        selected: worker.active !== false,
         manuallyEdited: false,
       };
     });
@@ -1143,7 +1143,7 @@ export default function Payroll() {
 
   const updateWorkerMutation = useMutation({
     mutationFn: async (data: WorkerFormData & { id: number }) => {
-      return await modeApiRequest("PUT", `/api/employees/${data.id}`, {
+      return await modeApiRequest("PATCH", `/api/employees/${data.id}`, {
         ...data,
         employeeType: "Worker",
       });
