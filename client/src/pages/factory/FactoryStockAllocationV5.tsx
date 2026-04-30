@@ -1,10 +1,14 @@
 import { useState, useMemo, Fragment } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import CreateProformaV5Drawer from "./CreateProformaV5Drawer";
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
@@ -56,9 +60,73 @@ const STATUS_LABELS: Record<string, string> = {
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
 export default function FactoryStockAllocationV5() {
+  const { toast } = useToast();
+
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
   const [expandedRows, setExpandedRows]         = useState<Set<string>>(new Set());
   const [hideZero, setHideZero]                 = useState(true);
+
+  /* ── Add-Containers dialog state ────────────────────────────────────────── */
+  const [addCtDialog, setAddCtDialog] = useState<{
+    proformaId: number;
+    proformaName: string;
+    existingCount: number;
+  } | null>(null);
+  const [ctCount, setCtCount]   = useState(1);
+  const [ctNames, setCtNames]   = useState<string[]>([]);
+
+  function openAddContainers(proformaId: number, proformaName: string, existingCount: number) {
+    setAddCtDialog({ proformaId, proformaName, existingCount });
+    setCtCount(1);
+    setCtNames([`Container ${existingCount + 1}`]);
+  }
+
+  function handleCtCountChange(val: number) {
+    const n = Math.max(1, Math.min(50, val || 1));
+    setCtCount(n);
+    setCtNames(prev => {
+      const base = addCtDialog?.existingCount ?? 0;
+      if (n > prev.length) {
+        const extra = Array.from({ length: n - prev.length }, (_, i) =>
+          `Container ${base + prev.length + i + 1}`
+        );
+        return [...prev, ...extra];
+      }
+      return prev.slice(0, n);
+    });
+  }
+
+  function handleCtNameChange(idx: number, val: string) {
+    setCtNames(prev => prev.map((n, i) => (i === idx ? val : n)));
+  }
+
+  const addContainersMut = useMutation({
+    mutationFn: ({ proformaId, names }: { proformaId: number; names: string[] }) =>
+      apiRequest("POST", `/api/factory/v5/proforma/${proformaId}/add-containers`, { containerNames: names }),
+    onSuccess: (_data, { names }) => {
+      toast({ title: `Added ${names.length} container${names.length !== 1 ? "s" : ""}.` });
+      setAddCtDialog(null);
+      query.refetch();
+    },
+    onError: (err: any) => {
+      toast({ title: "Error adding containers", description: err.message ?? "Unknown error", variant: "destructive" });
+    },
+  });
+
+  function submitAddContainers() {
+    if (!addCtDialog) return;
+    const trimmed = ctNames.map(n => n.trim());
+    if (trimmed.some(n => !n)) {
+      toast({ title: "Validation error", description: "Container names must not be empty.", variant: "destructive" });
+      return;
+    }
+    const uniq = new Set(trimmed);
+    if (uniq.size !== trimmed.length) {
+      toast({ title: "Validation error", description: "Container names must be unique.", variant: "destructive" });
+      return;
+    }
+    addContainersMut.mutate({ proformaId: addCtDialog.proformaId, names: trimmed });
+  }
 
   /* ── Query ──────────────────────────────────────────────────────────────── */
   const query = useQuery<V5Data>({
@@ -258,6 +326,15 @@ export default function FactoryStockAllocationV5() {
                                 {proforma.lineQty} × {proforma.containerCount} =
                                 <span className="font-semibold text-amber-600 dark:text-amber-400 ml-1">{proforma.totalExpected} expected</span>
                               </span>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-5 px-2 text-[10px]"
+                                data-testid={`button-v5-add-containers-${proforma.proformaId}`}
+                                onClick={() => openAddContainers(proforma.proformaId, proforma.proformaName, proforma.containerCount)}
+                              >
+                                <Plus className="h-2.5 w-2.5 mr-1" />Add Containers
+                              </Button>
                             </div>
 
                             {proforma.containers.length > 0 ? (
@@ -336,6 +413,75 @@ export default function FactoryStockAllocationV5() {
         articleRows={drawerRows}
         onSuccess={() => query.refetch()}
       />
+
+      {/* Add Containers dialog */}
+      <Dialog open={!!addCtDialog} onOpenChange={open => { if (!open) setAddCtDialog(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Containers</DialogTitle>
+          </DialogHeader>
+
+          {addCtDialog && (
+            <div className="flex flex-col gap-4 py-1">
+              <p className="text-sm text-muted-foreground">
+                Adding to <span className="font-semibold text-foreground">{addCtDialog.proformaName}</span>
+                {" "}({addCtDialog.existingCount} existing container{addCtDialog.existingCount !== 1 ? "s" : ""})
+              </p>
+
+              {/* Number of containers */}
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium w-36 shrink-0">Number to add</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={ctCount}
+                  onChange={e => handleCtCountChange(parseInt(e.target.value) || 1)}
+                  className="w-24"
+                  data-testid="input-v5-ct-count"
+                />
+              </div>
+
+              {/* Editable name list */}
+              <div className="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1">
+                {ctNames.map((name, idx) => {
+                  const isDupe = ctNames.filter(n => n.trim() === name.trim() && name.trim()).length > 1;
+                  return (
+                    <div key={idx} className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-6 text-right shrink-0">{idx + 1}.</span>
+                      <Input
+                        value={name}
+                        onChange={e => handleCtNameChange(idx, e.target.value)}
+                        placeholder={`Container ${addCtDialog.existingCount + idx + 1}`}
+                        className={cn("flex-1", isDupe && "border-destructive focus-visible:ring-destructive")}
+                        data-testid={`input-v5-ct-name-${idx}`}
+                      />
+                      {isDupe && (
+                        <span className="text-[10px] text-destructive shrink-0">duplicate</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setAddCtDialog(null)} data-testid="button-v5-ct-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={submitAddContainers}
+              disabled={addContainersMut.isPending}
+              data-testid="button-v5-ct-submit"
+            >
+              {addContainersMut.isPending
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Adding…</>
+                : `Add ${ctCount} Container${ctCount !== 1 ? "s" : ""}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

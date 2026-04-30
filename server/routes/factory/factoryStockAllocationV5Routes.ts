@@ -496,4 +496,116 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       res.status(400).json({ message: err.message });
     }
   });
+
+  // ── POST /api/factory/v5/proforma/:proformaId/add-containers ─────────────
+  // Adds new DRAFT containers to an existing active proforma.
+  // Creates customer_orders + customer_order_expected_lines for each new container.
+  // Does NOT touch existing containers or their expected lines.
+  // V5 guard: proformaIdUsed IS NOT NULL (all created orders are V5 by construction)
+  app.post("/api/factory/v5/proforma/:proformaId/add-containers", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const proformaId = parseInt(req.params.proformaId);
+      if (!proformaId || isNaN(proformaId)) return res.status(400).json({ message: "Invalid proformaId" });
+
+      let { containerNames } = req.body;
+      if (!Array.isArray(containerNames) || containerNames.length === 0) {
+        return res.status(400).json({ message: "containerNames must be a non-empty array" });
+      }
+
+      // Trim names
+      containerNames = (containerNames as any[]).map((n: any) => String(n ?? "").trim());
+
+      // Reject empty names
+      if (containerNames.some((n: string) => !n)) {
+        return res.status(400).json({ message: "Container names must not be empty" });
+      }
+
+      // Reject duplicates within the request
+      const uniqueInReq = new Set(containerNames);
+      if (uniqueInReq.size !== containerNames.length) {
+        const seen = new Set<string>();
+        const dupes = containerNames.filter((n: string) => seen.size === seen.add(n).size);
+        return res.status(400).json({ message: `Duplicate container names in request: ${Array.from(new Set(dupes)).join(", ")}` });
+      }
+
+      // Confirm proforma exists for this company and is active
+      const [proforma] = await db
+        .select()
+        .from(customerProformas)
+        .where(and(eq(customerProformas.id, proformaId), eq(customerProformas.companyId, companyId)));
+      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+      if (!proforma.isActive) return res.status(400).json({ message: "Proforma is not active" });
+
+      // Reject names that already exist in customer_orders for this proforma (any status,
+      // including CANCELLED — prefer strict rejection to avoid confusion)
+      const existingOrdersRaw = await db.execute(
+        sql`SELECT container_number FROM customer_orders
+            WHERE proforma_id_used = ${proformaId}
+              AND container_number IS NOT NULL`,
+      );
+      const existingNames = new Set(
+        ((existingOrdersRaw as any).rows ?? []).map((r: any) => String(r.container_number ?? "").trim()),
+      );
+      const conflicting = containerNames.filter((n: string) => existingNames.has(n));
+      if (conflicting.length > 0) {
+        return res.status(400).json({ message: `Container name(s) already exist under this proforma: ${conflicting.join(", ")}` });
+      }
+
+      // Fetch current proforma lines — used to create expected_lines for each new container
+      const proformaLines = await db
+        .select()
+        .from(customerProformaLines)
+        .where(eq(customerProformaLines.proformaId, proformaId));
+
+      const result = await db.transaction(async (tx: any) => {
+        const today = new Date().toISOString().slice(0, 10);
+        const orderValues = containerNames.map((containerName: string) => ({
+          companyId,
+          customerId: proforma.customerId,
+          orderDate: today,
+          proformaIdUsed: proformaId,
+          containerNumber: containerName,
+          status: "DRAFT",
+          subtotalBales: "0",
+          freightAmount: "0",
+          otherChargesTotal: "0",
+          grandTotal: "0",
+          totalQtyBales: 0,
+        }));
+        const createdOrders = await tx.insert(customerOrders).values(orderValues).returning();
+
+        // Phase B: Insert one expected line per (container × proforma line).
+        // This locks in the expected qty at order creation time.
+        // Existing containers and their expected lines are not touched.
+        // V5 guard: proformaIdUsed IS NOT NULL (all createdOrders are V5 by construction)
+        const expectedLineValues: any[] = [];
+        for (const order of createdOrders) {
+          for (const line of proformaLines) {
+            expectedLineValues.push({
+              companyId,
+              orderId: order.id,
+              proformaId: proformaId,
+              proformaLineId: line.id,
+              articleCode: line.articleCode,
+              productName: line.productName,
+              expectedQty: Number(line.quantity),
+            });
+          }
+        }
+        if (expectedLineValues.length > 0) {
+          await tx.insert(customerOrderExpectedLines).values(expectedLineValues);
+        }
+
+        return { orders: createdOrders, expectedLinesCreated: expectedLineValues.length };
+      });
+
+      res.json({ added: containerNames.length, orders: result.orders, expectedLinesCreated: result.expectedLinesCreated });
+    } catch (err: any) {
+      console.error("[V5] add-containers error:", err);
+      res.status(400).json({ message: err.message });
+    }
+  });
 }
