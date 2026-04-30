@@ -298,9 +298,7 @@ export default function FactoryStockAllocationV5() {
                           {isShortage && <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />}
                           <div>
                             <div className="font-medium text-xs leading-tight truncate max-w-[200px]" title={row.productName}>{row.productName}</div>
-                            {row.productName !== row.articleCode && (
-                              <div className="text-[10px] text-muted-foreground font-mono">{row.articleCode}</div>
-                            )}
+                            <div className="text-[10px] text-muted-foreground font-mono">{row.articleCode}</div>
                           </div>
                         </div>
                       </td>
@@ -439,15 +437,6 @@ export default function FactoryStockAllocationV5() {
           </table>
         </div>
       )}
-
-      {/* Formula legend */}
-      <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground pt-1">
-        <span className="font-mono bg-muted px-2 py-0.5 rounded">
-          Free to Promise = Expected to Load − (Stock Available + Total Loaded)
-        </span>
-        <span className="text-destructive font-medium">Positive = shortage</span>
-        <span className="text-green-700 dark:text-green-400 font-medium">Negative = enough stock</span>
-      </div>
 
       {/* Create drawer */}
       <CreateProformaV5Drawer
