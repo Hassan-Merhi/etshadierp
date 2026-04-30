@@ -133,6 +133,7 @@ async function sendGreenApiFileUpload({
   const form = new FormData();
   form.append("chatId", chatId);
   if (caption) form.append("caption", caption);
+  form.append("fileName", fileName);
   form.append("file", buffer, { filename: fileName, contentType: mimeType });
 
   const response = await fetch(url, {
