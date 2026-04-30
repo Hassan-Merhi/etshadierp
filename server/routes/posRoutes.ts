@@ -146,7 +146,24 @@ export function registerPosRoutes(app: Express) {
       const companyName = company?.name || "Company";
       const locName     = location.name;
 
-      const pdfBuffer = await generateStockPdf(companyId, companyName, locId, locName);
+      const { buffer: pdfBuffer, pageCount, rowCount } = await generateStockPdf(companyId, companyName, locId, locName);
+
+      // ── Safety guard: reject absurdly over-paginated PDFs before sending ──
+      // Root cause was PDFKit ≥0.17 exposing page.maxY as a function instead of
+      // a number, making the ensureSpace comparison always false. This guard
+      // catches any future regression before a broken PDF reaches WhatsApp.
+      const maxAllowedPages = Math.ceil(rowCount / 20) + 5;
+      if (pageCount > maxAllowedPages) {
+        console.error(
+          `[WA stock backend] SAFETY GUARD: PDF has ${pageCount} pages for ${rowCount} rows ` +
+          `(max allowed: ${maxAllowedPages}). location="${locName}". Refusing to send.`,
+        );
+        return res.status(500).json({
+          message:
+            `PDF pagination error detected: ${pageCount} pages generated for ${rowCount} stock items ` +
+            `(expected ≤${maxAllowedPages}). Report not sent to WhatsApp.`,
+        });
+      }
 
       const dateStr  = new Date().toISOString().slice(0, 10);
       const safeName = `${locName} STK ${companyName} ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();

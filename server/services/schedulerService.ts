@@ -374,7 +374,21 @@ export async function checkAndRunStockReport(): Promise<void> {
     console.log(`[StockReport] Sending to ${company.name} → ${chatId} (${cfg.frequency})…`);
 
     // 1. Stock PDF
-    const pdfBuf  = await generateStockPdf(row.company_id, company.name);
+    const { buffer: pdfBuf, pageCount: pdfPageCount, rowCount: pdfRowCount } =
+      await generateStockPdf(row.company_id, company.name);
+
+    // Safety guard: if PDF is absurdly over-paginated, skip send rather than
+    // delivering a broken 100+ page file. Root cause: PDFKit ≥0.17 exposes
+    // page.maxY as a function; ensureSpace must call it, not compare to it.
+    const maxAllowedPages = Math.ceil(pdfRowCount / 20) + 5;
+    if (pdfPageCount > maxAllowedPages) {
+      console.error(
+        `[StockReport] SAFETY GUARD: PDF has ${pdfPageCount} pages for ${pdfRowCount} rows ` +
+        `(max allowed: ${maxAllowedPages}). company="${company.name}". Skipping WhatsApp send.`,
+      );
+      return;
+    }
+
     const pdfName = `Stock_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.pdf`;
     const pdfCap  = `Stock Inventory with Cost — ${company.name}\nAs of ${today}`;
     const pdfRes  = await sendWhatsAppFileToChatId(chatId, pdfBuf, pdfName, pdfCap, "application/pdf");

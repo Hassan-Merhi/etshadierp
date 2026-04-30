@@ -6,6 +6,11 @@
  *
  * Layout : A4, 2 columns — Particulars | Closing Balance (Qty)
  * Negatives: red text + red background row
+ *
+ * IMPORTANT: In PDFKit ≥0.17, doc.page.maxY is a FUNCTION, not a number.
+ * ensureSpace() always calls it as a function to avoid the bug where the
+ * nullish-coalescing fallback never fires (because a function is truthy),
+ * making every comparison evaluate to false and silently skipping page breaks.
  */
 
 import { pool } from "../db";
@@ -32,13 +37,19 @@ interface StockRow {
   qty:       number;
 }
 
+export interface StockPdfResult {
+  buffer:    Buffer;
+  pageCount: number;
+  rowCount:  number;
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 export async function generateStockPdf(
   companyId:     number,
   companyName:   string,
   locationId?:   number,
   locationName?: string,
-): Promise<Buffer> {
+): Promise<StockPdfResult> {
 
   // ── Fetch inventory ─────────────────────────────────────────────────────────
   const params: number[] = [companyId];
@@ -155,6 +166,23 @@ export async function generateStockPdf(
     doc.fillColor("#000000");
   }
 
+  // ── Page-bottom helper — PDFKit ≥0.17 exposes maxY as a function ──────────
+  // In PDFKit <0.17 it may be a number or undefined. This handles all cases.
+  function pageBottom(): number {
+    const raw = (doc.page as any).maxY;
+    if (typeof raw === "function") return raw() as number;
+    if (typeof raw === "number")   return raw;
+    // Fallback: height minus the bottom margin
+    return doc.page.height - ((doc.page as any).margins?.bottom ?? 40);
+  }
+
+  // ── Helper: ensure at least `need` pt is available; add page if not ───────
+  function ensureSpace(need: number): void {
+    if (doc.y + need > pageBottom()) {
+      doc.addPage();   // fires pageAdded → drawPageHeader()
+    }
+  }
+
   // Draw first page header
   drawPageHeader();
 
@@ -163,13 +191,6 @@ export async function generateStockPdf(
     pageNum++;
     drawPageHeader();
   });
-
-  // ── Helper: ensure at least `need` pt is available; add page if not ───────
-  function ensureSpace(need: number): void {
-    if (doc.y + need > (doc.page.maxY ?? 802)) {
-      doc.addPage();   // fires pageAdded → drawPageHeader()
-    }
-  }
 
   // ── Group + item rows ─────────────────────────────────────────────────────
   for (const { groupName, items } of grouped) {
@@ -228,5 +249,7 @@ export async function generateStockPdf(
   doc.text(`${fmtQty(grandTotalQty)}  ${uomFirst}`, X_RIGHT - COL_QTY_W, tY + 5, { width: COL_QTY_W, align: "right", lineBreak: false });
 
   doc.end();
-  return pdfReady;
+  const buffer = await pdfReady;
+
+  return { buffer, pageCount: pageNum, rowCount: rows.length };
 }
