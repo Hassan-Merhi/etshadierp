@@ -325,7 +325,6 @@ export default function FactoryStockAllocationV5() {
               <tr className="bg-muted sticky top-0 z-10">
                 <th className="text-left px-3 py-2.5 font-medium border-b border-r whitespace-nowrap sticky left-0 bg-muted z-20 min-w-[200px]">Product</th>
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[120px]">Stock Available</th>
-                <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[110px] text-muted-foreground">Total KG</th>
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[130px] text-amber-600 dark:text-amber-400">Expected to Load</th>
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[110px] text-blue-600 dark:text-blue-400">Total Loaded</th>
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[140px]">
@@ -364,12 +363,6 @@ export default function FactoryStockAllocationV5() {
                         {row.stockAvailable > 0
                           ? <span className="text-green-700 dark:text-green-400 font-medium">{row.stockAvailable}</span>
                           : <span className="text-muted-foreground/40">0</span>}
-                      </td>
-
-                      <td className="px-3 py-2 border-r text-right font-mono tabular-nums text-xs text-muted-foreground">
-                        {row.totalKg > 0
-                          ? <span>{row.totalKg.toLocaleString()} kg</span>
-                          : <span className="text-muted-foreground/40">—</span>}
                       </td>
 
                       <td className={cn(
@@ -431,7 +424,7 @@ export default function FactoryStockAllocationV5() {
 
                       return (
                       <tr key={`${row.articleCode}-p${proforma.proformaId}`} className="border-b bg-muted/30">
-                        <td colSpan={6} className="px-0 py-0">
+                        <td colSpan={5} className="px-0 py-0">
                           <div className="px-8 py-2">
                             <div className="flex items-center gap-2 mb-1.5 text-xs flex-wrap">
                               <span className="font-semibold">{proforma.proformaName}</span>
@@ -550,9 +543,6 @@ export default function FactoryStockAllocationV5() {
                   </td>
                   <td className="px-3 py-2 border-r text-right font-mono tabular-nums">
                     <span className="text-green-700 dark:text-green-400">{totals.stockAvailable}</span>
-                  </td>
-                  <td className="px-3 py-2 border-r text-right font-mono tabular-nums text-muted-foreground">
-                    {totals.totalKg > 0 ? `${totals.totalKg.toLocaleString()} kg` : "—"}
                   </td>
                   <td className="px-3 py-2 border-r text-right font-mono tabular-nums text-amber-600 dark:text-amber-400">
                     {totals.expectedToLoad}

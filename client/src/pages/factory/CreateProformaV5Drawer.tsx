@@ -284,6 +284,13 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
     return s + (isNaN(v) || v < 0 ? 0 : v);
   }, 0);
   const totalExpected = sendToLoading && n > 0 ? totalQty * n : totalQty;
+  const totalKg = articleRows.reduce((s, r) => {
+    const qty = parseInt(quantities[r.articleCode] || "0");
+    if (isNaN(qty) || qty <= 0) return s;
+    const p = map.get(r.articleCode);
+    const w = parseFloat(p?.weightPerBaleKg || "0");
+    return s + qty * w;
+  }, 0);
 
   const filledLines = articleRows.filter(r => { const v = quantities[r.articleCode]; return v && parseInt(v) > 0; }).length;
 
@@ -466,6 +473,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
                 <th className="text-left px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[200px] sticky left-0 bg-muted z-20">Product</th>
                 <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[130px]">Available Balance</th>
                 <th className="text-center px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[110px]">Qty / Container</th>
+                <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[90px] text-muted-foreground">Total KG</th>
                 {sendToLoading && n > 0 && (
                   <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[110px] text-amber-600 dark:text-amber-400">
                     Expected Total ({n}×)
@@ -539,6 +547,20 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
                       </div>
                     </td>
 
+                    {/* Total KG */}
+                    {(() => {
+                      const product = map.get(row.articleCode);
+                      const weightPerBale = parseFloat(product?.weightPerBaleKg || "0");
+                      const rowKg = qty > 0 && weightPerBale > 0 ? qty * weightPerBale : null;
+                      return (
+                        <td className="px-3 py-1.5 border-r text-right font-mono tabular-nums text-xs text-muted-foreground">
+                          {rowKg != null
+                            ? <span className="text-foreground font-medium">{rowKg.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg</span>
+                            : <span className="text-muted-foreground/40">—</span>}
+                        </td>
+                      );
+                    })()}
+
                     {sendToLoading && n > 0 && (
                       <td className={cn(
                         "px-3 py-1.5 border-r text-right font-mono tabular-nums text-xs font-semibold",
@@ -576,6 +598,9 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
           <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
             <span><span className="font-semibold text-foreground">{filledLines}</span> line{filledLines !== 1 ? "s" : ""}</span>
             <span><span className="font-semibold text-foreground">{totalQty}</span> bales/container</span>
+            {totalKg > 0 && (
+              <span><span className="font-semibold text-foreground">{totalKg.toLocaleString(undefined, { maximumFractionDigits: 1 })}</span> kg</span>
+            )}
             {sendToLoading && n > 0 && (
               <span className="text-amber-600 dark:text-amber-400">
                 <span className="font-semibold">{totalExpected}</span> total expected ({n} container{n !== 1 ? "s" : ""})
