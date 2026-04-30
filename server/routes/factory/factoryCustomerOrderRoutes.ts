@@ -320,6 +320,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           totalWeightKg: sql<string>`COALESCE((SELECT SUM(cob.weight) FROM customer_order_bales cob WHERE cob.order_id = ${customerOrders.id}), 0)`,
           containerNumber: customerOrders.containerNumber,
           shippingCompany: customerOrders.shippingCompany,
+          containerNotes: customerOrders.containerNotes,
           destination: customerOrders.destination,
           locationId: customerOrders.locationId,
           loadingStartedAt: customerOrders.loadingStartedAt,
