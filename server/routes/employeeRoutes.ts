@@ -5,6 +5,7 @@ import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } 
 import {
   upload, logAudit, getCurrentExchangeRate, syncEmployeeBalancesFromEntries,
 } from "./_helpers";
+import { triggerAccountWhatsAppStatement } from "./factoryWhatsappRoutes";
 import {
   locations, inventory, stockItems, stockGroups, ledgerAccounts, employees,
   employeeGroups, employeeGroupMembers, workerGroups,
@@ -1813,7 +1814,22 @@ export function registerEmployeeRoutes(app: Express) {
           }
         }
 
-        return res.json({ ...updated, voucher });
+        // WhatsApp auto-statement trigger (non-fatal) — uses the same per-account
+        // rule configured in Accounts → WhatsApp settings
+        let waResult: { sent: boolean; error?: string } = { sent: false };
+        try {
+          waResult = await triggerAccountWhatsAppStatement({
+            companyId,
+            accountId:   parseInt(paymentAccountId),
+            accountType: "ledger",
+            voucherType: "Payment",
+            voucherDate: payDate,
+          });
+        } catch (waErr: any) {
+          console.error("[payroll-wa] WhatsApp trigger error (non-fatal):", waErr);
+        }
+
+        return res.json({ ...updated, voucher, whatsapp: waResult });
       }
 
       if (action === "update" || !action) {

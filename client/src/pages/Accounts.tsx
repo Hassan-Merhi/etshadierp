@@ -329,7 +329,7 @@ export default function Accounts() {
       if (!r.ok) throw new Error("Failed");
       return r.json();
     },
-    enabled: appMode === "factory" && !!ledgerAccountId,
+    enabled: (appMode === "factory" || appMode === "erp") && !!ledgerAccountId,
     staleTime: 30_000,
   });
 
@@ -2087,8 +2087,8 @@ export default function Accounts() {
                         })()}
                       </div>
                       <div className="md:col-span-2 flex justify-end gap-2 flex-wrap">
-                        {/* WhatsApp buttons — factory mode + ledger accounts only */}
-                        {appMode === "factory" && selectedAccount?.type === "ledger" && (
+                        {/* WhatsApp buttons — factory/ERP mode + ledger accounts only */}
+                        {(appMode === "factory" || appMode === "erp") && selectedAccount?.type === "ledger" && (
                           <>
                             <Button
                               variant="outline"
