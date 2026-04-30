@@ -1,3 +1,4 @@
+// LEGACY — Stock Allocation V2. Superseded by FactoryStockAllocationV5. Kept as fallback only. Route: /factory/stock-allocation (not in sidebar).
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
