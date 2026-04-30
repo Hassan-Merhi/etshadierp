@@ -391,8 +391,20 @@ export async function checkAndRunStockReport(): Promise<void> {
 
     const pdfName = `Stock_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.pdf`;
     const pdfCap  = `Stock Inventory with Cost — ${company.name}\nAs of ${today}`;
+    console.log(
+      `[StockReport] Uploading stock PDF — chatId=${chatId} file=${pdfName} ` +
+      `size=${pdfBuf.length} pageCount=${pdfPageCount} rowCount=${pdfRowCount}`,
+    );
     const pdfRes  = await sendWhatsAppFileToChatId(chatId, pdfBuf, pdfName, pdfCap, "application/pdf");
-    console.log(`[StockReport] PDF: ${pdfRes.success ? "sent" : pdfRes.error}`);
+    if (pdfRes.success) {
+      console.log(`[StockReport] PDF sent — chatId=${chatId} file=${pdfName}`);
+    } else {
+      console.error(
+        `[StockReport] PDF upload failed — chatId=${chatId} file=${pdfName} ` +
+        `size=${pdfBuf.length} pageCount=${pdfPageCount} rowCount=${pdfRowCount} ` +
+        `greenApiError="${pdfRes.error}"`,
+      );
+    }
 
     // 2. Net Position Excel (Jan 1 → today)
     const xlsBuf  = await generateNetPositionExcel(row.company_id, company.name, yearStart, today);

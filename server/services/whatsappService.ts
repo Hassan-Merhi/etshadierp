@@ -104,6 +104,59 @@ export async function fetchGreenApiChats(
     }));
 }
 
+// ─── Shared upload helper (form-data package — the only reliable method) ──────
+
+/**
+ * Single shared implementation for Green API sendFileByUpload.
+ * Uses the `form-data` npm package (not native Web FormData / Blob).
+ * form.getBuffer() + form.getHeaders() is the correct pattern for node-fetch
+ * and produces well-formed multipart/form-data that Green API accepts.
+ */
+async function sendGreenApiFileUpload({
+  settings,
+  chatId,
+  buffer,
+  fileName,
+  caption,
+  mimeType,
+}: {
+  settings: WaSettings;
+  chatId:   string;
+  buffer:   Buffer;
+  fileName: string;
+  caption:  string;
+  mimeType: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const url = baseUrl(settings.instanceId, settings.apiToken, "sendFileByUpload");
+
+  const FormData = (await import("form-data")).default;
+  const form = new FormData();
+  form.append("chatId", chatId);
+  if (caption) form.append("caption", caption);
+  form.append("file", buffer, { filename: fileName, contentType: mimeType });
+
+  const response = await fetch(url, {
+    method:  "POST",
+    headers: form.getHeaders(),
+    body:    form.getBuffer(),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    console.error(
+      "[WA upload] Green API error",
+      response.status,
+      body,
+      { chatId, fileName, size: buffer.length },
+    );
+    return { success: false, error: `Green API ${response.status}: ${body}` };
+  }
+
+  const json = await response.json().catch(() => ({})) as any;
+  console.log("[WA upload] Green API response", json, { chatId, fileName, size: buffer.length });
+  return { success: true };
+}
+
 // ─── Send file ────────────────────────────────────────────────────────────────
 
 interface SendResult {
@@ -180,8 +233,8 @@ export async function sendWhatsAppFileByUrlToChatIdPos(
 
 /**
  * Send a file directly to a WhatsApp chat via Green API's sendFileByUpload.
- * Sends the raw bytes as multipart/form-data — does NOT require a publicly
- * accessible download URL, so it works in dev and prod without config.
+ * POS instance (id=2 with fallback to id=1).
+ * Uses the shared sendGreenApiFileUpload helper (form-data package).
  */
 export async function sendWhatsAppFileByUploadPos(
   chatId:      string,
@@ -197,31 +250,7 @@ export async function sendWhatsAppFileByUploadPos(
   if (!settings.enabled) {
     return { success: false, error: "WhatsApp sending is disabled" };
   }
-
-  const url = baseUrl(settings.instanceId, settings.apiToken, "sendFileByUpload");
-
-  // Build multipart form data
-  const FormData = (await import("form-data")).default;
-  const form = new FormData();
-  form.append("chatId",  chatId);
-  form.append("caption", caption);
-  form.append("file", fileBuffer, { filename: fileName, contentType: mimeType });
-
-  const response = await fetch(url, {
-    method:  "POST",
-    headers: form.getHeaders(),
-    body:    form.getBuffer(),
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    console.error("[WA upload] Green API error", response.status, body);
-    return { success: false, error: `Green API ${response.status}: ${body}` };
-  }
-
-  const json = await response.json().catch(() => ({})) as any;
-  console.log("[WA upload] Green API response", json);
-  return { success: true };
+  return sendGreenApiFileUpload({ settings, chatId, buffer: fileBuffer, fileName, caption, mimeType });
 }
 
 /** Send a plain text message via the POS instance (id=2 with fallback to id=1) */
@@ -295,7 +324,10 @@ export async function sendWhatsAppText(
   return { success: sent > 0, sent, failed, errors };
 }
 
-/** Send a file via the POS WhatsApp instance (id=2 with fallback to id=1) */
+/**
+ * Send a file via the POS WhatsApp instance (id=2 with fallback to id=1).
+ * Uses the shared sendGreenApiFileUpload helper (form-data package).
+ */
 export async function sendWhatsAppFileToChatIdPos(
   chatId:   string,
   buffer:   Buffer,
@@ -310,23 +342,13 @@ export async function sendWhatsAppFileToChatIdPos(
   if (!settings.enabled) {
     return { success: false, error: "WhatsApp sending is disabled" };
   }
-
-  const url  = baseUrl(settings.instanceId, settings.apiToken, "sendFileByUpload");
-  const form = new FormData();
-  const blob = new Blob([buffer], { type: mimeType });
-  form.append("chatId",   chatId);
-  form.append("file",     blob, fileName);
-  form.append("fileName", fileName);
-  if (caption) form.append("caption", caption);
-
-  const response = await fetch(url, { method: "POST", body: form });
-  if (!response.ok) {
-    const body = await response.text();
-    return { success: false, error: `Green API ${response.status}: ${body}` };
-  }
-  return { success: true };
+  return sendGreenApiFileUpload({ settings, chatId, buffer, fileName, caption, mimeType });
 }
 
+/**
+ * Send a file to a specific chatId via the main WhatsApp instance (id=1).
+ * Uses the shared sendGreenApiFileUpload helper (form-data package).
+ */
 export async function sendWhatsAppFileToChatId(
   chatId:   string,
   buffer:   Buffer,
@@ -341,23 +363,13 @@ export async function sendWhatsAppFileToChatId(
   if (!settings.enabled) {
     return { success: false, error: "WhatsApp sending is disabled" };
   }
-
-  const url  = baseUrl(settings.instanceId, settings.apiToken, "sendFileByUpload");
-  const form = new FormData();
-  const blob = new Blob([buffer], { type: mimeType });
-  form.append("chatId",   chatId);
-  form.append("file",     blob, fileName);
-  form.append("fileName", fileName);
-  if (caption) form.append("caption", caption);
-
-  const response = await fetch(url, { method: "POST", body: form });
-  if (!response.ok) {
-    const body = await response.text();
-    return { success: false, error: `Green API ${response.status}: ${body}` };
-  }
-  return { success: true };
+  return sendGreenApiFileUpload({ settings, chatId, buffer, fileName, caption, mimeType });
 }
 
+/**
+ * Send a file to ALL active recipients via the main WhatsApp instance (id=1).
+ * Uses the shared sendGreenApiFileUpload helper (form-data package).
+ */
 export async function sendWhatsAppFile(
   buffer:   Buffer,
   fileName: string,
@@ -376,24 +388,17 @@ export async function sendWhatsAppFile(
     return { success: false, sent: 0, failed: 0, errors: ["No active WhatsApp recipients"] };
   }
 
-  const url = baseUrl(settings.instanceId, settings.apiToken, "sendFileByUpload");
-
   const results = await Promise.allSettled(
     recipients.map(async (r): Promise<SendResult> => {
-      const form = new FormData();
-      const blob = new Blob([buffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      const res = await sendGreenApiFileUpload({
+        settings,
+        chatId:   r.chatId,
+        buffer,
+        fileName,
+        caption,
+        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
-      form.append("chatId",   r.chatId);
-      form.append("file",     blob, fileName);
-      form.append("fileName", fileName);
-      if (caption) form.append("caption", caption);
-
-      const response = await fetch(url, { method: "POST", body: form });
-      if (!response.ok) {
-        const body = await response.text();
-        throw new Error(`Green API ${response.status}: ${body}`);
-      }
+      if (!res.success) throw new Error(res.error ?? "Upload failed");
       return { chatId: r.chatId, success: true };
     }),
   );

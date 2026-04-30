@@ -170,7 +170,10 @@ export function registerPosRoutes(app: Express) {
       const stampStr = new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
       const caption  = `Stock Report — ${locName}\n${stampStr}`;
 
-      console.log(`[WA stock backend] chatId=${location.whatsappGroupChatId} file=${safeName}.pdf size=${pdfBuffer.length}`);
+      console.log(
+        `[WA stock backend] chatId=${location.whatsappGroupChatId} file=${safeName}.pdf ` +
+        `size=${pdfBuffer.length} pageCount=${pageCount} rowCount=${rowCount}`,
+      );
 
       const result = await sendWhatsAppFileToChatIdPos(
         location.whatsappGroupChatId,
@@ -179,7 +182,14 @@ export function registerPosRoutes(app: Express) {
         caption,
       );
 
-      if (!result.success) return res.status(502).json({ message: result.error ?? "WhatsApp send failed" });
+      if (!result.success) {
+        console.error(
+          `[WA stock backend] Upload failed — chatId=${location.whatsappGroupChatId} ` +
+          `file=${safeName}.pdf size=${pdfBuffer.length} pageCount=${pageCount} rowCount=${rowCount} ` +
+          `greenApiError="${result.error}"`,
+        );
+        return res.status(502).json({ message: result.error ?? "WhatsApp send failed" });
+      }
 
       res.json({ success: true });
     } catch (error: any) {

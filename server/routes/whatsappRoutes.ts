@@ -535,8 +535,13 @@ export function registerWhatsAppRoutes(app: Express) {
 
       const pdfName  = `Stock_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.pdf`;
       const pdfCap   = `Stock Inventory with Cost — ${company.name}\nAs of ${today}`;
+      console.log(`[WhatsApp] Uploading stock PDF — chatId=${chatId} file=${pdfName} size=${pdfBuf.length}`);
       const pdfRes   = await sendWhatsAppFileToChatId(chatId, pdfBuf, pdfName, pdfCap, "application/pdf");
       if (!pdfRes.success) {
+        console.error(
+          `[WhatsApp] send-stock-report: PDF upload failed — chatId=${chatId} file=${pdfName} ` +
+          `size=${pdfBuf.length} pageCount=${pageCount} rowCount=${rowCount} greenApiError="${pdfRes.error}"`,
+        );
         return res.status(502).json({ message: pdfRes.error || "Failed to send stock PDF" });
       }
 
