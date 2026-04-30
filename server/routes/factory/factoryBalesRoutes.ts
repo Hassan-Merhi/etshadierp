@@ -1974,6 +1974,9 @@ export function registerFactoryBalesRoutes(app: Express) {
       if (batchId) {
         baseConditions.push(eq(factoryBales.pressingBatchId, batchId));
         baseConditions.push(eq(factoryBales.status, "PENDING_PRESSING"));
+      } else {
+        // General scan lookup — never surface deleted or removed bales
+        baseConditions.push(not(inArray(factoryBales.status, ["DELETED", "REMOVED"])));
       }
       results = await db.select().from(factoryBales)
         .where(and(...baseConditions))

@@ -427,6 +427,8 @@ export default function FactoryLocationInventory() {
     onSuccess: (result: any) => {
       toast({ title: "Removed", description: `${result.removed} bale(s) removed from stock.` });
       queryClient.invalidateQueries({ queryKey: [`/api/factory/location-inventory/${selectedLocation?.id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       setDeleteDialogOpen(false);
       setDeleteProduct(null);
       setDeleteQty(1);

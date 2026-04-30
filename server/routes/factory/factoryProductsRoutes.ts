@@ -744,6 +744,7 @@ export function registerFactoryProductsRoutes(app: Express) {
           eq(factoryBales.erpLocationId, locationId),
           sql`${factoryBales.createdAt} >= ${startDate}`,
           sql`${factoryBales.createdAt} < ${endDate}`,
+          not(inArray(factoryBales.status, ["DELETED", "REMOVED"])),
         ))
         .groupBy(sql`EXTRACT(MONTH FROM ${factoryBales.createdAt})`)
         .orderBy(sql`EXTRACT(MONTH FROM ${factoryBales.createdAt})`);
@@ -825,6 +826,7 @@ export function registerFactoryProductsRoutes(app: Express) {
           eq(factoryBales.erpLocationId, locationId),
           sql`${factoryBales.createdAt} >= ${startDate}`,
           sql`${factoryBales.createdAt} < ${endDate}`,
+          not(inArray(factoryBales.status, ["DELETED", "REMOVED"])),
         ))
         .orderBy(desc(factoryBales.createdAt));
 
@@ -853,6 +855,7 @@ export function registerFactoryProductsRoutes(app: Express) {
         eq(factoryBales.companyId, companyId),
         eq(factoryBales.productId, productId),
         eq(factoryBales.erpLocationId, locationId),
+        not(inArray(factoryBales.status, ["DELETED", "REMOVED"])),
       ];
 
       if (year) {

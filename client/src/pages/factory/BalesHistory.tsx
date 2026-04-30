@@ -122,6 +122,8 @@ export default function BalesHistory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/location-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       toast({ title: "Bale deleted" });
       setDeleteConfirm(null);
     },

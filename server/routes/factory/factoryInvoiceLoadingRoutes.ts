@@ -11,7 +11,7 @@ import {
   factoryInvoiceLoadingBales,
   locations,
 } from "@shared/schema";
-import { eq, and, or, inArray, sql, ne } from "drizzle-orm";
+import { eq, and, or, inArray, not, sql, ne } from "drizzle-orm";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -363,6 +363,7 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
         .from(factoryBales)
         .where(and(
           eq(factoryBales.companyId, companyId),
+          not(inArray(factoryBales.status, ["DELETED", "REMOVED"])),
           or(
             sql`LOWER(${factoryBales.referenceNumber}) = ${scanLower}`,
             sql`LOWER(${factoryBales.baleCode}) = ${scanLower}`,
