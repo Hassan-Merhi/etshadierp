@@ -564,12 +564,12 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
                     {sendToLoading && n > 0 && (
                       <td className={cn(
                         "px-3 py-1.5 border-r text-right font-mono tabular-nums text-xs font-semibold",
-                        shortage ? "text-destructive" : expected > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground/40",
+                        shortage ? "text-destructive" : request > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground/40",
                       )}>
-                        {expected > 0 ? (
+                        {request > 0 ? (
                           <span className="flex items-center justify-end gap-1">
                             {shortage && <AlertTriangle className="h-3 w-3" />}
-                            {expected}
+                            {request}
                           </span>
                         ) : "—"}
                       </td>
