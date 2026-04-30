@@ -30,6 +30,7 @@ import {
   Building2,
   Store,
   ClipboardList,
+  KeyRound,
 } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
@@ -454,6 +455,7 @@ export function AppSidebar({ user }: { user?: any }) {
               </Badge>
             </a>
           )}
+          <FlatLink href="/my-settings" icon={KeyRound} label="My Settings" color="#6b7280" testId="link-my-settings" />
           {isItemVisible({ title: "Settings", url: "/settings", icon: Settings }) && (
             <FlatLink href="/settings" icon={Settings} label="Settings" color="#6b7280" testId="link-settings" />
           )}

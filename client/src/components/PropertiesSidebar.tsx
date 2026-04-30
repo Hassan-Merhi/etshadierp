@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ClipboardList,
   ArrowLeftRight,
+  KeyRound,
 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
 import { useLocation, Link } from "wouter";
@@ -173,6 +174,7 @@ export function PropertiesSidebar({ user }: { user?: any }) {
         </div>
 
         <div className="mt-4 pt-3 border-t border-sidebar-border/60 space-y-0.5">
+          <FlatLink href="/my-settings" icon={KeyRound} label="My Settings" color="#6b7280" testId="link-properties-my-settings" />
           {isAdmin && (
             <FlatLink href="/properties/settings" icon={Settings} label="Settings" color="#6b7280" testId="link-properties-settings" />
           )}

@@ -35,6 +35,7 @@ import {
   Store,
   Table,
   TableProperties,
+  KeyRound,
 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
 import { useLocation, Link } from "wouter";
@@ -386,6 +387,7 @@ export function FactorySidebar({ user }: { user?: any }) {
               </Badge>
             </a>
           )}
+          <FlatLink href="/my-settings" icon={KeyRound} label="My Settings" color="#6b7280" testId="link-factory-my-settings" />
           {(isAdmin || isDeveloper) && (
             <FlatLink href="/factory/settings" icon={Settings} label="Settings" color="#6b7280" testId="link-factory-settings" />
           )}

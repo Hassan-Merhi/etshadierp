@@ -4,6 +4,16 @@ import { userLocations } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { getClientDate } from "./lib/dateUtils";
 
+// Light authentication middleware — only requires a valid user session.
+// Does NOT require a company to be selected. Use for personal-account actions
+// such as changing one's own password.
+export function requireLogin(req: Request, res: Response, next: NextFunction) {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  next();
+}
+
 // Authentication middleware - checks if user is logged in.
 // Uses ONLY session data — zero database calls — to avoid pool exhaustion
 // under burst traffic. Role, location, and permission flags are written to

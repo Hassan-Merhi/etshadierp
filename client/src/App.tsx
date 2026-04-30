@@ -21,7 +21,7 @@ import { CursorNavProvider } from "@/contexts/CursorNavContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search, Tag, Building2, ClipboardList } from "lucide-react";
+import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search, Tag, Building2, ClipboardList, KeyRound } from "lucide-react";
 import { FactorySidebar } from "@/components/FactorySidebar";
 import { PropertiesSidebar } from "@/components/PropertiesSidebar";
 import { OfflineBanner } from "@/components/OfflineBanner";
@@ -201,6 +201,7 @@ const FactoryRentalWarehouses = lazy(() => import("@/pages/factory/FactoryRental
 const FactoryRentalShops = lazy(() => import("@/pages/factory/FactoryRentalShops"));
 const FactoryRentalPayments = lazy(() => import("@/pages/factory/FactoryRentalPayments"));
 const PropertiesRentalPayments = lazy(() => import("@/pages/properties/PropertiesRentalPayments"));
+const MySettings = lazy(() => import("@/pages/MySettings"));
 import { CommandPalette } from "@/components/CommandPalette";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowLeft } from "lucide-react";
@@ -251,6 +252,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
         <Route path="/pos-settings" component={POSSettings} />
         <Route path="/pos-price-list">{() => <POSPriceList posUser={user} />}</Route>
         <Route path="/pos-transfer-orders">{() => <PosTransferOrders posUser={user} />}</Route>
+        <Route path="/my-settings" component={MySettings} />
         <Route>{() => <POS posUser={user} />}</Route>
       </Switch>
     );
@@ -339,6 +341,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/inventory-repair" component={InventoryRepair} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/net-position-details" component={NetProfitDetails} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/company-data-reset" component={CompanyDataReset} />}
+      <Route path="/my-settings" component={MySettings} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -537,6 +540,7 @@ function AuthenticatedApp() {
     const isOnSettings = currentLocation === "/pos-settings";
     const isOnPriceList = currentLocation === "/pos-price-list";
     const isOnTransferOrders = currentLocation === "/pos-transfer-orders";
+    const isOnMySettings = currentLocation === "/my-settings";
 
     const posNavItems = [
       { label: "Point of Sale", icon: ShoppingCart, active: isOnPOS, testId: "button-pos-tab", onClick: () => setLocation("/") },
@@ -549,6 +553,7 @@ function AuthenticatedApp() {
       ...(posImportEnabled ? [{ label: "Import", icon: Upload, active: isOnImport, testId: "button-pos-import-tab", onClick: () => setLocation("/pos-import") }] : []),
       { label: "Chat", icon: MessageSquare, active: isOnChat, testId: "button-chat-tab", onClick: () => setLocation("/pos-chat"), badge: chatUnread?.count || 0 },
       { label: "Settings", icon: Cog, active: isOnSettings, testId: "button-settings-tab", onClick: () => setLocation("/pos-settings") },
+      { label: "My Settings", icon: KeyRound, active: isOnMySettings, testId: "button-my-settings-tab", onClick: () => setLocation("/my-settings") },
     ];
 
     const posStyle = { "--sidebar-width": "11rem", "--sidebar-width-icon": "3rem" };
@@ -649,7 +654,7 @@ function AuthenticatedApp() {
   const isPropertiesCompany = selectedCompany?.companyType === "properties";
   const isPropertiesRoute = currentLocation.startsWith("/properties/");
 
-  if (isPropertiesCompany && !isPropertiesRoute) {
+  if (isPropertiesCompany && !isPropertiesRoute && currentLocation !== "/my-settings") {
     return <Redirect to="/properties/daybook" />;
   }
 
@@ -711,6 +716,7 @@ function AuthenticatedApp() {
                         <Route path="/properties/ledger-monthly/:accountId" component={PropertiesLedgerMonthly} />
                         <Route path="/properties/ledger-vouchers/:accountId/:year/:month" component={PropertiesLedgerVouchers} />
                         {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/settings" component={PropertiesSettings} />}
+                        <Route path="/my-settings" component={MySettings} />
                         <Route><Redirect to="/properties/daybook" /></Route>
                       </Switch>
                     </Suspense>
@@ -730,7 +736,7 @@ function AuthenticatedApp() {
 
   const factoryDefaultPage = hasDashboardAccess ? "/factory/dashboard" : "/factory/stock-entry";
 
-  if (isFactoryCompany && !isFactoryRoute) {
+  if (isFactoryCompany && !isFactoryRoute && currentLocation !== "/my-settings") {
     return <Redirect to={factoryDefaultPage} />;
   }
 
@@ -738,7 +744,7 @@ function AuthenticatedApp() {
     return <Redirect to="/" />;
   }
 
-  if (!isFactoryCompany && !hasErpAccess && hasFactoryAccess && !isFactoryRoute) {
+  if (!isFactoryCompany && !hasErpAccess && hasFactoryAccess && !isFactoryRoute && currentLocation !== "/my-settings") {
     return <Redirect to={factoryDefaultPage} />;
   }
 
@@ -882,6 +888,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/chat" component={Chat} />
                     <Route path="/factory/conflicts" component={ConflictCenter} />
                     {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/settings" component={Settings} />}
+                    <Route path="/my-settings" component={MySettings} />
                     {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/deleted-items" component={DeletedItems} />}
                     {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/orphaned-records" component={OrphanedRecords} />}
                     {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/chatbot-settings" component={ChatbotSettings} />}

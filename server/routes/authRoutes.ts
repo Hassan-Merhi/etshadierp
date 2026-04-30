@@ -2,7 +2,7 @@ import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
-import { requireAuth, requireRole, requireNonPOS, canDelete, checkPOSLocation } from "../auth";
+import { requireAuth, requireLogin, requireRole, requireNonPOS, canDelete, checkPOSLocation } from "../auth";
 import { hashPassword, verifyPassword, logAudit } from "./_helpers";
 import {
   auditLog,
@@ -1416,6 +1416,44 @@ export function registerAuthRoutes(app: Express) {
         res.json({ message: "Company set successfully", companyId });
       });
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PATCH /api/me/password — any authenticated user can change their own password.
+  // Uses requireLogin (not requireAuth) so it works even without a company selected.
+  // Never accepts userId from the request body — always reads from the session.
+  app.patch("/api/me/password", requireLogin, async (req: any, res: any) => {
+    try {
+      const userId: string = req.session.userId;
+      const { currentPassword, newPassword, confirmPassword } = req.body;
+
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        return res.status(400).json({ message: "All password fields are required." });
+      }
+      if (newPassword.trim().length < 6) {
+        return res.status(400).json({ message: "New password must be at least 6 characters." });
+      }
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({ message: "New password and confirmation do not match." });
+      }
+
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      if (!user) {
+        return res.status(404).json({ message: "User not found." });
+      }
+
+      const { valid } = await verifyPassword(currentPassword, user.password);
+      if (!valid) {
+        return res.status(400).json({ message: "Current password is incorrect." });
+      }
+
+      const hashed = await hashPassword(newPassword);
+      await db.update(users).set({ password: hashed }).where(eq(users.id, userId));
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      console.error("Error changing password:", error);
       res.status(500).json({ message: error.message });
     }
   });
