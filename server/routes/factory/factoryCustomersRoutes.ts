@@ -702,10 +702,10 @@ export function registerFactoryCustomersRoutes(app: Express) {
           return r;
         } catch { return t; }
       };
-      const custRender = (text: string, x: number, yPos: number, w: number, align: "left"|"right" = "left") => {
+      const custRender = (text: string, x: number, yPos: number, w: number, align: "left"|"right" = "left", allowWrap = false) => {
         const ar = custHasArabicFont && custHasAr(text);
         doc.font(ar ? "Arabic" : "Helvetica").fontSize(8)
-          .text(ar ? custShape(text) : text, x, yPos, { width: w, align: ar ? "right" : align });
+          .text(ar ? custShape(text) : text, x, yPos, { width: w, align: ar ? "right" : align, lineBreak: allowWrap });
       };
 
       // ── Logo centred, taller ──
@@ -753,13 +753,13 @@ export function registerFactoryCustomersRoutes(app: Express) {
         if (y > 760) { doc.addPage(); y = 40; }
         if (idx % 2 === 1) { doc.rect(40, y, 515, rowH).fill("#F8F8F8"); doc.fillColor("#000000"); }
         doc.font("Helvetica").fontSize(8);
-        doc.text(fmtDate(row.transactionDate), colX[0] + 2, y + 3, { width: colW[0] - 4 });
-        doc.text(txLabel(row.transactionType), colX[1] + 2, y + 3, { width: colW[1] - 4 });
-        custRender(row.desc || "—", colX[2] + 2, y + 3, colW[2] - 4, "left");
-        if (row.destination) custRender(row.destination, colX[3] + 2, y + 3, colW[3] - 4, "left");
+        doc.text(fmtDate(row.transactionDate), colX[0] + 2, y + 3, { width: colW[0] - 4, lineBreak: false });
+        doc.text(txLabel(row.transactionType), colX[1] + 2, y + 3, { width: colW[1] - 4, lineBreak: false });
+        custRender(row.desc || "—", colX[2] + 2, y + 3, colW[2] - 4, "left", false);
+        if (row.destination) custRender(row.destination, colX[3] + 2, y + 3, colW[3] - 4, "left", false);
         doc.font("Helvetica").fontSize(8);
-        if (row.debit > 0) doc.text(fmtAmt(row.debit), colX[4] + 2, y + 3, { width: colW[4] - 4, align: "right" });
-        if (row.credit > 0) doc.text(fmtAmt(row.credit), colX[5] + 2, y + 3, { width: colW[5] - 4, align: "right" });
+        if (row.debit > 0) doc.text(fmtAmt(row.debit), colX[4] + 2, y + 3, { width: colW[4] - 4, align: "right", lineBreak: false });
+        if (row.credit > 0) doc.text(fmtAmt(row.credit), colX[5] + 2, y + 3, { width: colW[5] - 4, align: "right", lineBreak: false });
         if (row.rowNote) {
           doc.fillColor("#555555").font("Helvetica-Oblique").fontSize(6.5)
             .text(`↳ ${row.rowNote}`, colX[2] + 4, y + 13, { width: colW[2] + colW[3] + colW[4] + colW[5] - 8 });
