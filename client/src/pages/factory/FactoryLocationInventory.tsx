@@ -18,7 +18,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft, ChevronRight, MapPin, Layers, Package, Search, Printer, ArrowUpDown,
-  FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2, Pencil, Tag, Zap, Eye
+  FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2, Pencil, Tag, Zap, Eye,
+  AlertTriangle, ChevronDown
 } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { useEscapeBack } from "@/hooks/use-escape-back";
@@ -87,6 +88,19 @@ interface Customer {
   balanceSide: string;
 }
 
+interface V5LocationRow {
+  articleCode: string;
+  productName: string;
+  inStock: number;
+  reservedExpected: number;
+  loading: number;
+  availableBalance: number;
+}
+interface V5LocationSummary {
+  rows: V5LocationRow[];
+  shortageCount: number;
+}
+
 function applySortProducts(items: FactoryBaleProduct[], field: SortField, dir: SortDir) {
   return [...items].sort((a, b) => {
     let cmp = 0;
@@ -139,6 +153,7 @@ export default function FactoryLocationInventory() {
   const [proformaMode, setProformaMode] = useState(false);
   const [showZeroStock, setShowZeroStock] = useState(false);
   const [hideZeroAvailable, setHideZeroAvailable] = useState(true);
+  const [showV5Summary, setShowV5Summary] = useState(true);
   const [selections, setSelections] = useState<Map<number, ProformaSelection>>(new Map());
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   const [proformaAutoSave, setProformaAutoSave] = useState<boolean>(() => {
@@ -326,6 +341,21 @@ export default function FactoryLocationInventory() {
       return response.json();
     },
     enabled: !!selectedLocation && proformaMode,
+  });
+
+  // V5 stock summary — per-article allocation data using V5 source of truth.
+  // Shows: inStock (at this location), reservedExpected (company-wide DRAFT V5), loading (at this location).
+  // Disabled in proforma mode to avoid UI clutter.
+  const { data: v5Summary } = useQuery<V5LocationSummary>({
+    queryKey: selectedLocation
+      ? [`/api/factory/v5/location-summary`, selectedLocation.id]
+      : [],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/v5/location-summary?locationId=${selectedLocation!.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch V5 summary");
+      return res.json();
+    },
+    enabled: !!selectedLocation && !proformaMode,
   });
 
   // Catalog of all bale products — fetched in proforma mode OR when showZeroStock is on
@@ -1344,6 +1374,72 @@ export default function FactoryLocationInventory() {
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
                 <span className="text-muted-foreground">Sell Value:</span>
                 <span className="font-mono font-semibold">{formatAmount(totalSellValue)}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── V5 Stock Summary ─────────────────────────────────────────────────
+            Shows per-article balance using V5 source of truth. Not shown in
+            proforma-builder mode. Hidden when query returns no rows.
+            inStock        = IN_STOCK bales at this location
+            reservedExpected = DRAFT V5 expected lines (company-wide)
+            loading        = bales at this location in LOADING V5 containers
+            availableBalance = inStock − reservedExpected − loading         */}
+        {!proformaMode && v5Summary && v5Summary.rows.length > 0 && (
+          <div className="mb-4">
+            <button
+              className="flex items-center gap-2 w-full text-left mb-2"
+              onClick={() => setShowV5Summary(v => !v)}
+              data-testid="button-toggle-v5-summary"
+              type="button"
+            >
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-mono">V5</Badge>
+              <span className="text-sm font-medium">Stock Allocation Summary</span>
+              {v5Summary.shortageCount > 0 && (
+                <Badge variant="destructive" className="gap-1 text-xs">
+                  <AlertTriangle className="h-3 w-3" />
+                  {v5Summary.shortageCount} shortage{v5Summary.shortageCount !== 1 ? "s" : ""}
+                </Badge>
+              )}
+              <ChevronDown className={`ml-auto h-4 w-4 text-muted-foreground transition-transform ${showV5Summary ? "rotate-180" : ""}`} />
+            </button>
+
+            {showV5Summary && (
+              <div className="overflow-auto rounded-md border text-sm" data-testid="table-v5-summary">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="px-3 py-2 font-medium text-muted-foreground">Article</th>
+                      <th className="px-3 py-2 text-right font-medium text-muted-foreground">In Stock</th>
+                      <th className="px-3 py-2 text-right font-medium text-muted-foreground">Reserved</th>
+                      <th className="px-3 py-2 text-right font-medium text-muted-foreground">Loading</th>
+                      <th className="px-3 py-2 text-right font-medium">Available</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {v5Summary.rows.map((row) => (
+                      <tr
+                        key={row.articleCode}
+                        className="border-b last:border-0 hover-elevate"
+                        data-testid={`row-v5-summary-${row.articleCode}`}
+                      >
+                        <td className="px-3 py-2">
+                          <div className="font-medium">{row.productName}</div>
+                          <div className="text-xs text-muted-foreground font-mono">{row.articleCode}</div>
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono">{row.inStock.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right font-mono text-muted-foreground">{row.reservedExpected.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right font-mono text-muted-foreground">{row.loading.toLocaleString()}</td>
+                        <td className={`px-3 py-2 text-right font-mono font-semibold ${row.availableBalance < 0 ? "text-destructive" : "text-green-600 dark:text-green-400"}`}
+                          data-testid={`text-v5-available-${row.articleCode}`}
+                        >
+                          {row.availableBalance.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

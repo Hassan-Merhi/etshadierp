@@ -749,4 +749,121 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       res.status(400).json({ message: err.message });
     }
   });
+
+  // ── GET /api/factory/v5/location-summary ──────────────────────────────────
+  // Returns per-article V5 stock balance for a specific warehouse location:
+  //   inStock          — factory_bales.status = IN_STOCK at this location
+  //   reservedExpected — SUM(expected_qty) from DRAFT V5 orders on active proformas (company-wide)
+  //   loading          — bales at this location in LOADING V5 containers
+  //   availableBalance — inStock − reservedExpected − loading
+  //
+  // V5 guard: proforma_id_used IS NOT NULL (applied to both reservedExpected and loading queries)
+  // Does NOT read proforma_stock_reservations or any V2/V3 table.
+  app.get("/api/factory/v5/location-summary", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const locationId = parseInt(String(req.query.locationId));
+      if (!locationId || isNaN(locationId)) return res.status(400).json({ message: "locationId query param is required" });
+
+      // 1. inStock — IN_STOCK bales at this location, grouped by article
+      const inStockRaw = await db.execute(
+        sql`SELECT article_code AS "articleCode", COUNT(*)::int AS count
+            FROM factory_bales
+            WHERE company_id = ${companyId}
+              AND erp_location_id = ${locationId}
+              AND status = 'IN_STOCK'
+            GROUP BY article_code`,
+      );
+      const inStockMap = new Map<string, number>(
+        ((inStockRaw as any).rows ?? []).map((r: any) => [r.articleCode, Number(r.count)]),
+      );
+
+      // 2. reservedExpected — SUM(expected_qty) for DRAFT V5 orders on active proformas (company-wide)
+      //    V5 guard: proforma_id_used IS NOT NULL
+      //    Does NOT filter by location: DRAFT containers are reservations not yet physically loaded.
+      const reservedRaw = await db.execute(
+        sql`SELECT cel.article_code AS "articleCode", SUM(cel.expected_qty)::int AS total
+            FROM customer_order_expected_lines cel
+            JOIN customer_orders co ON co.id = cel.order_id
+            JOIN customer_proformas cp ON cp.id = co.proforma_id_used
+            WHERE cel.company_id = ${companyId}
+              AND co.status = 'DRAFT'
+              AND co.proforma_id_used IS NOT NULL
+              AND cp.is_active = true
+            GROUP BY cel.article_code`,
+      );
+      const reservedMap = new Map<string, number>(
+        ((reservedRaw as any).rows ?? []).map((r: any) => [r.articleCode, Number(r.total)]),
+      );
+
+      // 3. loading — bales at this location that have been scanned into LOADING V5 containers
+      //    V5 guard: proforma_id_used IS NOT NULL
+      //    Location-filtered because bales are physically at the location when loaded.
+      const loadingRaw = await db.execute(
+        sql`SELECT fb.article_code AS "articleCode", COUNT(*)::int AS count
+            FROM customer_order_bales cob
+            JOIN factory_bales fb ON fb.id = cob.bale_id
+            JOIN customer_orders co ON co.id = cob.order_id
+            WHERE co.company_id = ${companyId}
+              AND co.status = 'LOADING'
+              AND co.proforma_id_used IS NOT NULL
+              AND fb.erp_location_id = ${locationId}
+            GROUP BY fb.article_code`,
+      );
+      const loadingMap = new Map<string, number>(
+        ((loadingRaw as any).rows ?? []).map((r: any) => [r.articleCode, Number(r.count)]),
+      );
+
+      // 4. Resolve product names (bidirectional code/articleCode lookup — same pattern as V5 GET)
+      const allCodes = new Set([...inStockMap.keys(), ...reservedMap.keys(), ...loadingMap.keys()]);
+      const productNameMap = new Map<string, string>();
+      if (allCodes.size > 0) {
+        const codeArr = sql.raw(
+          `ARRAY[${Array.from(allCodes).map(c => `'${c.replace(/'/g, "''")}'`).join(",")}]`,
+        );
+        const nameRaw = await db.execute(
+          sql`SELECT DISTINCT ON (matched_code) matched_code AS "articleCode", name FROM (
+                SELECT name,
+                  CASE WHEN code        = ANY(${codeArr}) THEN code
+                       WHEN article_code = ANY(${codeArr}) THEN article_code
+                  END AS matched_code
+                FROM factory_bale_products
+                WHERE company_id = ${companyId}
+                  AND (code = ANY(${codeArr}) OR article_code = ANY(${codeArr}))
+              ) sub
+              WHERE matched_code IS NOT NULL
+              ORDER BY matched_code`,
+        );
+        ((nameRaw as any).rows ?? []).forEach((r: any) => {
+          if (r.name) productNameMap.set(r.articleCode, r.name);
+        });
+      }
+
+      // 5. Build per-article rows; exclude rows with all zeros
+      const rows = Array.from(allCodes).sort().map(articleCode => {
+        const inStock         = inStockMap.get(articleCode) ?? 0;
+        const reservedExpected = reservedMap.get(articleCode) ?? 0;
+        const loading          = loadingMap.get(articleCode) ?? 0;
+        const availableBalance = inStock - reservedExpected - loading;
+        return {
+          articleCode,
+          productName: productNameMap.get(articleCode) ?? articleCode,
+          inStock,
+          reservedExpected,
+          loading,
+          availableBalance,
+        };
+      }).filter(r => r.inStock > 0 || r.reservedExpected > 0 || r.loading > 0);
+
+      res.json({
+        rows,
+        shortageCount: rows.filter(r => r.availableBalance < 0).length,
+      });
+    } catch (err: any) {
+      console.error("[V5] location-summary error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
 }
