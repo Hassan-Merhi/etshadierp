@@ -168,19 +168,26 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       }
 
       // 7. ALL active factory_bale_products — so users can allocate to zero-stock items
-      //    Using both code and article_code columns to build a full code→name map
+      //    Using both code and article_code columns to build a full code→name map + weight map
       const allProductsRaw = await db.execute(
-        sql`SELECT code, COALESCE(article_code, code) AS "articleCode", name
+        sql`SELECT code, COALESCE(article_code, code) AS "articleCode", name,
+                   weight_per_bale_kg AS "weightKg"
             FROM factory_bale_products
             WHERE company_id = ${companyId} AND active = true
             ORDER BY name`,
       );
       const allProductsMap = new Map<string, string>();
+      const weightMap = new Map<string, number>();
       ((allProductsRaw as any).rows ?? (allProductsRaw as any[])).forEach((r: any) => {
         if (r.name) {
           // Map both the code and the article_code so bales stored under either key get a name
           if (r.code)        allProductsMap.set(r.code, r.name);
           if (r.articleCode) allProductsMap.set(r.articleCode, r.name);
+        }
+        const w = r.weightKg ? parseFloat(r.weightKg) : 0;
+        if (w > 0) {
+          if (r.code)        weightMap.set(r.code, w);
+          if (r.articleCode) weightMap.set(r.articleCode, w);
         }
       });
 
@@ -274,7 +281,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
           });
 
         const productName = productNamesMap[articleCode] || articleCode;
-        return { articleCode, productName, stockAvailable, totalLoaded, expectedToLoad, freeToPromise, proformaDetails };
+        const weightKg    = weightMap.get(articleCode) ?? 0;
+        const totalKg     = Math.round(stockAvailable * weightKg);
+        return { articleCode, productName, stockAvailable, totalLoaded, expectedToLoad, freeToPromise, totalKg, proformaDetails };
       });
 
       // 11. Apply frontend filters
@@ -308,6 +317,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         totalLoaded:    filtered.reduce((s, r) => s + r.totalLoaded, 0),
         expectedToLoad: filtered.reduce((s, r) => s + r.expectedToLoad, 0),
         freeToPromise:  filtered.reduce((s, r) => s + r.freeToPromise, 0),
+        totalKg:        filtered.reduce((s, r) => s + r.totalKg, 0),
         shortageCount:  filtered.filter(r => r.freeToPromise > 0).length,
       };
 

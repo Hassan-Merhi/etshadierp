@@ -1,12 +1,9 @@
 import { useState, useMemo, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import CreateProformaV5Drawer from "./CreateProformaV5Drawer";
 
@@ -35,6 +32,7 @@ interface V5Row {
   totalLoaded: number;
   expectedToLoad: number;
   freeToPromise: number;
+  totalKg: number;
   proformaDetails: ProformaDetail[];
 }
 interface V5Totals {
@@ -42,6 +40,7 @@ interface V5Totals {
   totalLoaded: number;
   expectedToLoad: number;
   freeToPromise: number;
+  totalKg: number;
   shortageCount: number;
 }
 interface V5Data {
@@ -49,16 +48,6 @@ interface V5Data {
   totals: V5Totals;
   productNames: Record<string, string>;
 }
-
-const STATUS_OPTIONS = [
-  { value: "ALL",                  label: "All statuses" },
-  { value: "DRAFT",                label: "Draft" },
-  { value: "LOADING",              label: "Loading" },
-  { value: "PENDING_VERIFICATION", label: "Pending Verification" },
-  { value: "VERIFIED",             label: "Verified" },
-  { value: "FINALIZED",            label: "Finalized" },
-  { value: "CANCELLED",            label: "Cancelled" },
-];
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Draft", LOADING: "Loading", PENDING_VERIFICATION: "Pending",
@@ -70,25 +59,13 @@ export default function FactoryStockAllocationV5() {
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
   const [expandedRows, setExpandedRows]         = useState<Set<string>>(new Set());
   const [hideZero, setHideZero]                 = useState(true);
-  const [filters, setFilters] = useState({
-    product: "", customer: "", proforma: "", container: "", status: "ALL",
-    fromDate: "", toDate: "",
-  });
 
-  /* ── Build query params ─────────────────────────────────────────────────── */
-  const params = new URLSearchParams();
-  if (filters.product)   params.set("productFilter",   filters.product);
-  if (filters.customer)  params.set("customerFilter",  filters.customer);
-  if (filters.proforma)  params.set("proformaFilter",  filters.proforma);
-  if (filters.container) params.set("containerFilter", filters.container);
-  if (filters.status && filters.status !== "ALL") params.set("statusFilter", filters.status);
-  if (filters.fromDate)  params.set("fromDate",        filters.fromDate);
-  if (filters.toDate)    params.set("toDate",          filters.toDate);
-  if (hideZero)          params.set("hideZero",        "true");
-
+  /* ── Query ──────────────────────────────────────────────────────────────── */
   const query = useQuery<V5Data>({
-    queryKey: ["/api/factory/v5/stock-allocation", filters, hideZero],
+    queryKey: ["/api/factory/v5/stock-allocation", hideZero],
     queryFn: async () => {
+      const params = new URLSearchParams();
+      if (hideZero) params.set("hideZero", "true");
       const res = await fetch(`/api/factory/v5/stock-allocation?${params}`, { credentials: "include" });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Failed"); }
       return res.json();
@@ -106,14 +83,6 @@ export default function FactoryStockAllocationV5() {
       return next;
     });
   }
-
-  function clearFilters() {
-    setFilters({ product: "", customer: "", proforma: "", container: "", status: "ALL", fromDate: "", toDate: "" });
-  }
-
-  const hasFilters = filters.product !== "" || filters.customer !== "" || filters.proforma !== ""
-    || filters.container !== "" || (filters.status !== "" && filters.status !== "ALL")
-    || filters.fromDate !== "" || filters.toDate !== "";
 
   /* ── Article rows for the drawer ──────────────────────────────────────── */
   const drawerRows = useMemo(() => rows.map(r => ({
@@ -158,95 +127,6 @@ export default function FactoryStockAllocationV5() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 items-end">
-        <div className="flex flex-col gap-1">
-          <Label className="text-[10px] text-muted-foreground">Product</Label>
-          <Input
-            placeholder="Search product…"
-            value={filters.product}
-            onChange={e => setFilters(f => ({ ...f, product: e.target.value }))}
-            className="h-8 text-xs w-40"
-            data-testid="input-v5-filter-product"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <Label className="text-[10px] text-muted-foreground">Customer</Label>
-          <Input
-            placeholder="Customer…"
-            value={filters.customer}
-            onChange={e => setFilters(f => ({ ...f, customer: e.target.value }))}
-            className="h-8 text-xs w-36"
-            data-testid="input-v5-filter-customer"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <Label className="text-[10px] text-muted-foreground">Proforma</Label>
-          <Input
-            placeholder="Proforma…"
-            value={filters.proforma}
-            onChange={e => setFilters(f => ({ ...f, proforma: e.target.value }))}
-            className="h-8 text-xs w-36"
-            data-testid="input-v5-filter-proforma"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <Label className="text-[10px] text-muted-foreground">Container</Label>
-          <Input
-            placeholder="Container…"
-            value={filters.container}
-            onChange={e => setFilters(f => ({ ...f, container: e.target.value }))}
-            className="h-8 text-xs w-36"
-            data-testid="input-v5-filter-container"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <Label className="text-[10px] text-muted-foreground">Status</Label>
-          <Select value={filters.status} onValueChange={v => setFilters(f => ({ ...f, status: v }))}>
-            <SelectTrigger className="h-8 text-xs w-44" data-testid="select-v5-filter-status">
-              <SelectValue placeholder="All statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_OPTIONS.map(o => (
-                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <Label className="text-[10px] text-muted-foreground">Proforma from</Label>
-          <Input
-            type="date"
-            value={filters.fromDate}
-            onChange={e => setFilters(f => ({ ...f, fromDate: e.target.value }))}
-            className="h-8 text-xs w-36"
-            data-testid="input-v5-filter-from-date"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <Label className="text-[10px] text-muted-foreground">Proforma to</Label>
-          <Input
-            type="date"
-            value={filters.toDate}
-            onChange={e => setFilters(f => ({ ...f, toDate: e.target.value }))}
-            className="h-8 text-xs w-36"
-            data-testid="input-v5-filter-to-date"
-          />
-        </div>
-
-        {hasFilters && (
-          <Button size="sm" variant="ghost" onClick={clearFilters} data-testid="button-v5-clear-filters">
-            Clear
-          </Button>
-        )}
-      </div>
-
       {/* Content */}
       {query.isLoading ? (
         <div className="flex items-center justify-center h-48">
@@ -260,12 +140,13 @@ export default function FactoryStockAllocationV5() {
       ) : rows.length === 0 ? (
         <Card><CardContent className="p-8 text-center text-muted-foreground">No data found. Create a proforma with containers to use V5 stock allocation.</CardContent></Card>
       ) : (
-        <div className="overflow-auto rounded-md border max-h-[calc(100vh-320px)]">
+        <div className="overflow-auto rounded-md border max-h-[calc(100vh-180px)]">
           <table className="w-full text-sm border-collapse min-w-max">
             <thead>
               <tr className="bg-muted sticky top-0 z-10">
                 <th className="text-left px-3 py-2.5 font-medium border-b border-r whitespace-nowrap sticky left-0 bg-muted z-20 min-w-[200px]">Product</th>
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[120px]">Stock Available</th>
+                <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[110px] text-muted-foreground">Total KG</th>
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[130px] text-amber-600 dark:text-amber-400">Expected to Load</th>
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[110px] text-blue-600 dark:text-blue-400">Total Loaded</th>
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[140px]">
@@ -307,6 +188,12 @@ export default function FactoryStockAllocationV5() {
                         {row.stockAvailable > 0
                           ? <span className="text-green-700 dark:text-green-400 font-medium">{row.stockAvailable}</span>
                           : <span className="text-muted-foreground/40">0</span>}
+                      </td>
+
+                      <td className="px-3 py-2 border-r text-right font-mono tabular-nums text-xs text-muted-foreground">
+                        {row.totalKg > 0
+                          ? <span>{row.totalKg.toLocaleString()} kg</span>
+                          : <span className="text-muted-foreground/40">—</span>}
                       </td>
 
                       <td className={cn(
@@ -417,6 +304,9 @@ export default function FactoryStockAllocationV5() {
                   </td>
                   <td className="px-3 py-2 border-r text-right font-mono tabular-nums">
                     <span className="text-green-700 dark:text-green-400">{totals.stockAvailable}</span>
+                  </td>
+                  <td className="px-3 py-2 border-r text-right font-mono tabular-nums text-muted-foreground">
+                    {totals.totalKg > 0 ? `${totals.totalKg.toLocaleString()} kg` : "—"}
                   </td>
                   <td className="px-3 py-2 border-r text-right font-mono tabular-nums text-amber-600 dark:text-amber-400">
                     {totals.expectedToLoad}

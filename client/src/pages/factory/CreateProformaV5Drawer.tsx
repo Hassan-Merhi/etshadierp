@@ -181,6 +181,26 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
     } else if (e.key === "Escape") { e.currentTarget.blur(); }
   }
 
+  function applyCatalogSellingPrice() {
+    const m = productMap();
+    const next: Record<string, string> = {};
+    for (const row of articleRows) {
+      const p = m.get(row.articleCode);
+      if (p?.sellingPrice && parseFloat(p.sellingPrice) > 0) next[row.articleCode] = p.sellingPrice;
+    }
+    setSellingPrices(prev => ({ ...prev, ...next }));
+  }
+
+  function applyCatalogProductionPrice() {
+    const m = productMap();
+    const next: Record<string, string> = {};
+    for (const row of articleRows) {
+      const p = m.get(row.articleCode);
+      if (p?.productionPrice && parseFloat(p.productionPrice) > 0) next[row.articleCode] = p.productionPrice;
+    }
+    setSellingPrices(prev => ({ ...prev, ...next }));
+  }
+
   function updateContainerName(idx: number, val: string) {
     setContainerNames(prev => { const next = [...prev]; next[idx] = val; return next; });
   }
@@ -371,8 +391,28 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
             </div>
           )}
 
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground h-9 ml-auto">
-            {draftStatus === "saved" && <><CheckCircle className="h-3 w-3 text-green-500" />Draft autosaved</>}
+          <div className="flex items-center gap-2 ml-auto flex-wrap">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={applyCatalogSellingPrice}
+              disabled={!productsQuery.data}
+              data-testid="button-v5-apply-sell-price"
+            >
+              Apply Sell Price
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={applyCatalogProductionPrice}
+              disabled={!productsQuery.data}
+              data-testid="button-v5-apply-prod-price"
+            >
+              Apply Prod Price
+            </Button>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground h-9">
+              {draftStatus === "saved" && <><CheckCircle className="h-3 w-3 text-green-500" />Draft autosaved</>}
+            </div>
           </div>
         </div>
 
