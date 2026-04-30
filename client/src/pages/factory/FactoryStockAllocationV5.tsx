@@ -51,7 +51,7 @@ interface V5Data {
 }
 
 const STATUS_OPTIONS = [
-  { value: "", label: "All statuses" },
+  { value: "ALL",                  label: "All statuses" },
   { value: "DRAFT",                label: "Draft" },
   { value: "LOADING",              label: "Loading" },
   { value: "PENDING_VERIFICATION", label: "Pending Verification" },
@@ -71,7 +71,7 @@ export default function FactoryStockAllocationV5() {
   const [expandedRows, setExpandedRows]         = useState<Set<string>>(new Set());
   const [hideZero, setHideZero]                 = useState(true);
   const [filters, setFilters] = useState({
-    product: "", customer: "", proforma: "", container: "", status: "",
+    product: "", customer: "", proforma: "", container: "", status: "ALL",
     fromDate: "", toDate: "",
   });
 
@@ -81,7 +81,7 @@ export default function FactoryStockAllocationV5() {
   if (filters.customer)  params.set("customerFilter",  filters.customer);
   if (filters.proforma)  params.set("proformaFilter",  filters.proforma);
   if (filters.container) params.set("containerFilter", filters.container);
-  if (filters.status)    params.set("statusFilter",    filters.status);
+  if (filters.status && filters.status !== "ALL") params.set("statusFilter", filters.status);
   if (filters.fromDate)  params.set("fromDate",        filters.fromDate);
   if (filters.toDate)    params.set("toDate",          filters.toDate);
   if (hideZero)          params.set("hideZero",        "true");
@@ -108,10 +108,12 @@ export default function FactoryStockAllocationV5() {
   }
 
   function clearFilters() {
-    setFilters({ product: "", customer: "", proforma: "", container: "", status: "", fromDate: "", toDate: "" });
+    setFilters({ product: "", customer: "", proforma: "", container: "", status: "ALL", fromDate: "", toDate: "" });
   }
 
-  const hasFilters = Object.values(filters).some(v => v !== "");
+  const hasFilters = filters.product !== "" || filters.customer !== "" || filters.proforma !== ""
+    || filters.container !== "" || (filters.status !== "" && filters.status !== "ALL")
+    || filters.fromDate !== "" || filters.toDate !== "";
 
   /* ── Article rows for the drawer ──────────────────────────────────────── */
   const drawerRows = useMemo(() => rows.map(r => ({
@@ -210,7 +212,7 @@ export default function FactoryStockAllocationV5() {
             </SelectTrigger>
             <SelectContent>
               {STATUS_OPTIONS.map(o => (
-                <SelectItem key={o.value || "__all"} value={o.value}>{o.label}</SelectItem>
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>

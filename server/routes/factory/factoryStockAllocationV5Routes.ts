@@ -64,7 +64,26 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       );
 
       // 3. Active proformas + lines (with optional date range filter on createdAt)
-      let proformaQuery = db
+      const proformaConditions: any[] = [
+        eq(customerProformas.companyId, companyId),
+        eq(customerProformas.isActive, true),
+      ];
+
+      if (fromDate) {
+        const from = new Date(String(fromDate));
+        if (!isNaN(from.getTime())) {
+          proformaConditions.push(gte(customerProformas.createdAt, from));
+        }
+      }
+      if (toDate) {
+        const to = new Date(String(toDate));
+        if (!isNaN(to.getTime())) {
+          to.setHours(23, 59, 59, 999);
+          proformaConditions.push(lte(customerProformas.createdAt, to));
+        }
+      }
+
+      const activeProformasRaw = await db
         .select({
           id: customerProformas.id,
           customerId: customerProformas.customerId,
@@ -73,24 +92,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
           createdAt: customerProformas.createdAt,
         })
         .from(customerProformas)
-        .where(and(eq(customerProformas.companyId, companyId), eq(customerProformas.isActive, true)));
-
-      // Apply date range filter
-      if (fromDate) {
-        const from = new Date(String(fromDate));
-        if (!isNaN(from.getTime())) {
-          proformaQuery = proformaQuery.where(gte(customerProformas.createdAt, from)) as any;
-        }
-      }
-      if (toDate) {
-        const to = new Date(String(toDate));
-        if (!isNaN(to.getTime())) {
-          to.setHours(23, 59, 59, 999);
-          proformaQuery = proformaQuery.where(lte(customerProformas.createdAt, to)) as any;
-        }
-      }
-
-      const activeProformasRaw = await proformaQuery;
+        .where(and(...proformaConditions));
 
       const proformaIds = activeProformasRaw.map(p => p.id);
 
