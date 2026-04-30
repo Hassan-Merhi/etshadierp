@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
+import { apiRequest } from "@/lib/queryClient";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
-  ChevronLeft, ChevronRight, MapPin, Layers, Package, Search, Printer, ArrowUpDown,
+  MapPin, Layers, Package, Search, Printer, ArrowUpDown,
   FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2, Pencil, Tag, Zap, Eye,
   AlertTriangle
 } from "lucide-react";
@@ -25,7 +26,7 @@ import { useReactToPrint } from "react-to-print";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
 import { buildZplBatch } from "@/lib/zplBuilder";
-import { LabelPrintSettings, getPaperFormat } from "@/components/LabelPrintSettings";
+import { getPaperFormat } from "@/components/LabelPrintSettings";
 import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, A4_DESIGN_OPTIONS, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
 
 type SortField = "name" | "bales" | "kg" | "value";
@@ -52,11 +53,9 @@ interface FactoryBaleProduct {
   baleCount: number;
   sellingPrice: string;
   productionPrice: number;
-  // Populated only in proforma mode (from /available endpoint)
   reservedQty?: number;
   availableQty?: number;
   reservations?: Array<{ proformaId: number; proformaName: string; customerId: number; qty: number }>;
-  // True for zero-stock catalog items whose underlying bale product is marked inactive
   isInactive?: boolean;
 }
 
@@ -88,20 +87,6 @@ interface Customer {
   balanceSide: string;
 }
 
-interface V5LocationRow {
-  articleCode: string;
-  productName: string;
-  inStock: number;
-  reservedExpected: number;
-  loading: number;
-  availableBalance: number;
-  weightPerBaleKg: number;
-}
-interface V5LocationSummary {
-  rows: V5LocationRow[];
-  shortageCount: number;
-}
-
 function applySortProducts(items: FactoryBaleProduct[], field: SortField, dir: SortDir) {
   return [...items].sort((a, b) => {
     let cmp = 0;
@@ -120,28 +105,11 @@ function isSpecialFactoryCategory(name: string) {
   return SPECIAL_FACTORY_CATS.some((s) => s.toLowerCase() === name.trim().toLowerCase());
 }
 
-function applySortCategories(items: CategoryGroup[], field: SortField, dir: SortDir) {
-  return [...items].sort((a, b) => {
-    let cmp = 0;
-    switch (field) {
-      case "name": cmp = a.categoryName.localeCompare(b.categoryName); break;
-      case "bales": cmp = a.baleCount - b.baleCount; break;
-      case "kg": cmp = a.totalWeight - b.totalWeight; break;
-      case "value": cmp = a.totalSellValue - b.totalSellValue; break;
-    }
-    return dir === "desc" ? -cmp : cmp;
-  });
-}
-
 export default function FactoryLocationInventory() {
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<CategoryGroup | null>(null);
   const [locationSearch, setLocationSearch] = useState("");
-  const [categorySearch, setCategorySearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("__all__");
   const [productSearch, setProductSearch] = useState("");
-  const [catSortField, setCatSortField] = useState<SortField>("name");
-  const [catSortDir, setCatSortDir] = useState<SortDir>("asc");
   const [prodSortField, setProdSortField] = useState<SortField>("name");
   const [prodSortDir, setProdSortDir] = useState<SortDir>("asc");
   const [_loc, navigate] = useLocation();
@@ -169,12 +137,10 @@ export default function FactoryLocationInventory() {
   const [newCustomerName, setNewCustomerName] = useState("");
   const [savedProformaId, setSavedProformaId] = useState<number | null>(null);
 
-  // Rename location dialog state
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renamingLocation, setRenamingLocation] = useState<Location | null>(null);
   const [renameInput, setRenameInput] = useState("");
 
-  // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteProduct, setDeleteProduct] = useState<FactoryBaleProduct | null>(null);
   const [deleteQty, setDeleteQty] = useState(1);
@@ -182,7 +148,6 @@ export default function FactoryLocationInventory() {
   const [deleteSupervisorPass, setDeleteSupervisorPass] = useState("");
   const [deleteReason, setDeleteReason] = useState("");
 
-  // Barcode reprint state
   const [reprintDialogOpen, setReprintDialogOpen] = useState(false);
   const [reprintProduct, setReprintProduct] = useState<FactoryBaleProduct | null>(null);
   const [reprintBales, setReprintBales] = useState<any[]>([]);
@@ -190,12 +155,10 @@ export default function FactoryLocationInventory() {
   const [reprintDesignPickerOpen, setReprintDesignPickerOpen] = useState(false);
   const [reprintPendingLabels, setReprintPendingLabels] = useState<LabelData[]>([]);
 
-  // Edit-mode state (deep-link from CustomerProformas "Edit in Inventory")
   const [editingProformaId, setEditingProformaId] = useState<number | null>(null);
   const [editProformaLines, setEditProformaLines] = useState<Array<{ articleCode: string; quantity: number; pricePerBale: string }>>([]);
   const [editModeInitialized, setEditModeInitialized] = useState(false);
 
-  // Overload warning dialog state
   const [overloadWarning, setOverloadWarning] = useState<{
     open: boolean;
     items: Array<{ articleCode: string; productName: string; requested: number; available: number }>;
@@ -343,22 +306,6 @@ export default function FactoryLocationInventory() {
     enabled: !!selectedLocation && proformaMode,
   });
 
-  // V5 stock summary — per-article allocation data using V5 source of truth.
-  // Shows: inStock (at this location), reservedExpected (company-wide DRAFT V5), loading (at this location).
-  // Disabled in proforma mode to avoid UI clutter.
-  const { data: v5Summary } = useQuery<V5LocationSummary>({
-    queryKey: selectedLocation
-      ? [`/api/factory/v5/location-summary`, selectedLocation.id]
-      : [],
-    queryFn: async () => {
-      const res = await fetch(`/api/factory/v5/location-summary?locationId=${selectedLocation!.id}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch V5 summary");
-      return res.json();
-    },
-    enabled: !!selectedLocation && !proformaMode,
-  });
-
-  // Catalog of all bale products — fetched in proforma mode OR when showZeroStock is on
   const { data: catalogBaleProducts = [] } = useQuery<Array<{ id: number; articleCode: string | null; name: string; sellingPrice: string | null; productionPrice: string | null; categoryId: number | null; active: boolean }>>({
     queryKey: ["/api/factory/bale-products"],
     queryFn: async () => {
@@ -379,8 +326,6 @@ export default function FactoryLocationInventory() {
     enabled: proformaMode || showZeroStock,
   });
 
-  // In proforma mode use the reservations-aware data; otherwise use the plain inventory.
-  // In proforma mode always merge all catalog products (even those with 0 stock) so every product is visible for selection.
   const activeInventoryData: FactoryBaleProduct[] = useMemo(() => {
     const base = proformaMode && availableInventoryData.length > 0 ? availableInventoryData : inventoryData;
     const catNameMap = new Map(catalogCategories.map((c) => [c.id, c.name]));
@@ -389,7 +334,6 @@ export default function FactoryLocationInventory() {
     if (!shouldMergeZero) return base;
 
     const inStockIds = new Set(base.map((p) => p.productId));
-    // Only include active catalog products not already in stock
     const zeroItems: FactoryBaleProduct[] = catalogBaleProducts
       .filter((p) => !inStockIds.has(p.id) && p.active !== false)
       .map((p) => ({
@@ -496,7 +440,6 @@ export default function FactoryLocationInventory() {
     },
   });
 
-  // Rename location mutation
   const renameLocationMutation = useMutation({
     mutationFn: async ({ id, name }: { id: number; name: string }) => {
       const res = await apiRequest("PATCH", `/api/locations/${id}`, { name });
@@ -523,7 +466,6 @@ export default function FactoryLocationInventory() {
     setRenameDialogOpen(true);
   };
 
-  // On mount: read URL params for edit-mode deep-link
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const editId = params.get("editProformaId");
@@ -535,7 +477,6 @@ export default function FactoryLocationInventory() {
       setProformaName(decodeURIComponent(editName));
       setSelectedCustomerId(editCustId);
       setProformaMode(true);
-      // Fetch existing proforma lines to pre-populate inventory selections
       fetch(`/api/factory/customer-proformas?customerId=${editCustId}`, { credentials: "include" })
         .then((r) => r.json())
         .then((proformas: any[]) => {
@@ -552,18 +493,13 @@ export default function FactoryLocationInventory() {
     }
   }, []);
 
-  // When inventory loads in edit mode, pre-populate selections from existing proforma lines
   useEffect(() => {
-    // Wait until: proforma ID set, lines fetched, a location chosen (so inventory query fires), inventory done loading
     if (!editingProformaId || editProformaLines.length === 0 || !selectedLocation || inventoryLoading || editModeInitialized) return;
-    // Build a lookup map from inventory data by articleCode
     const productByArticleCode = new Map<string, any>();
     (inventoryData as any[]).forEach((prod: any) => {
       productByArticleCode.set((prod.articleCode || "").toLowerCase(), prod);
     });
     const newSelections = new Map<number, ProformaSelection>();
-    // Loop through proforma lines (source of truth) instead of inventory.
-    // This ensures lines whose bales are fully reserved (RESERVED_FOR_ORDER) are not dropped.
     editProformaLines.forEach((line: any, index: number) => {
       const prod = productByArticleCode.get((line.articleCode || "").toLowerCase());
       if (prod) {
@@ -577,8 +513,6 @@ export default function FactoryLocationInventory() {
           pricePerBale: line.pricePerBale,
         });
       } else {
-        // Product not visible in current inventory — all bales may be reserved for an active loading.
-        // Still include this line so it is preserved when the proforma is saved.
         const syntheticId = -(index + 1);
         newSelections.set(syntheticId, {
           productId: syntheticId,
@@ -625,106 +559,41 @@ export default function FactoryLocationInventory() {
     l.name.toLowerCase().includes(locationSearch.toLowerCase())
   );
 
-  const globalSearchResults = useMemo(() => {
-    if (!categorySearch.trim() || !activeInventoryData.length) return null;
-    const q = categorySearch.toLowerCase();
-    const matched = activeInventoryData.filter(
-      (p) => p.productName.toLowerCase().includes(q) || p.articleCode.toLowerCase().includes(q)
+  const filteredProducts = useMemo(() => {
+    const q = productSearch.toLowerCase();
+    return applySortProducts(
+      activeInventoryData.filter((p) => {
+        const matchesSearch = !q || p.productName.toLowerCase().includes(q) || p.articleCode.toLowerCase().includes(q);
+        const matchesCat = categoryFilter === "__all__" || p.category === categoryFilter;
+        const hideZero = proformaMode ? hideZeroAvailable : !showZeroStock;
+        if (hideZero && p.baleCount === 0) return false;
+        if (proformaMode && showSelectedOnly) return matchesSearch && matchesCat && selections.has(p.productId);
+        return matchesSearch && matchesCat;
+      }),
+      prodSortField,
+      prodSortDir
     );
-    if (matched.length === 0) return null;
-    return matched;
-  }, [categorySearch, activeInventoryData]);
+  }, [activeInventoryData, productSearch, categoryFilter, prodSortField, prodSortDir, proformaMode, hideZeroAvailable, showZeroStock, showSelectedOnly, selections]);
 
-  const filteredCategories = applySortCategories(
-    categoryGroups.filter((c) =>
-      c.categoryName.toLowerCase().includes(categorySearch.toLowerCase()) &&
-      (categoryFilter === "__all__" || c.categoryName === categoryFilter)
-    ),
-    catSortField,
-    catSortDir
-  );
-  const regularCategories = filteredCategories.filter((c) => !isSpecialFactoryCategory(c.categoryName));
-  const specialCategories = filteredCategories.filter((c) => isSpecialFactoryCategory(c.categoryName));
-
-  // Derive products dynamically from activeInventoryData (never from the stale snapshot in selectedCategory.products)
-  const selectedCategoryProducts: FactoryBaleProduct[] = useMemo(() => {
-    if (!selectedCategory) return [];
-    if (selectedCategory.categoryId === -1) return activeInventoryData.slice().sort((a, b) => a.productName.localeCompare(b.productName));
-    const catId = selectedCategory.categoryId || 0;
-    return activeInventoryData.filter((p) => (p.categoryId || 0) === catId);
-  }, [selectedCategory, activeInventoryData]);
-
-  const filteredProducts = selectedCategory
-    ? applySortProducts(
-        selectedCategoryProducts.filter(
-          (p) => {
-            const matchesSearch = p.productName.toLowerCase().includes(productSearch.toLowerCase()) || p.articleCode.toLowerCase().includes(productSearch.toLowerCase());
-            const matchesCatFilter = selectedCategory.categoryId === -1
-              ? (categoryFilter === "__all__" || p.category === categoryFilter)
-              : true;
-            const hideZero = proformaMode ? hideZeroAvailable : !showZeroStock;
-            if (hideZero && p.baleCount === 0) return false;
-            if (proformaMode && showSelectedOnly) return matchesSearch && matchesCatFilter && selections.has(p.productId);
-            return matchesSearch && matchesCatFilter;
-          }
-        ),
-        prodSortField,
-        prodSortDir
-      )
-    : [];
+  const regularProducts = filteredProducts.filter((p) => !isSpecialFactoryCategory(p.category || ""));
+  const specialProducts = filteredProducts.filter((p) => isSpecialFactoryCategory(p.category || ""));
 
   const handleLocationClick = (location: Location) => {
     setSelectedLocation(location);
-    setSelectedCategory(null);
-    setCategorySearch("");
+    setProductSearch("");
     setCategoryFilter("__all__");
-    setProductSearch("");
-  };
-
-  const handleCategoryClick = (category: CategoryGroup) => {
-    setSelectedCategory(category);
-    setProductSearch("");
-  };
-
-  const handleViewAll = () => {
-    const allProducts = activeInventoryData.slice().sort((a, b) => a.productName.localeCompare(b.productName));
-    const totalBales = allProducts.reduce((s, p) => s + p.baleCount, 0);
-    const totalWeight = allProducts.reduce((s, p) => s + p.totalWeight, 0);
-    const totalCost = allProducts.reduce((s, p) => s + p.totalCost, 0);
-    setSelectedCategory({
-      categoryId: -1,
-      categoryName: "All Items",
-      baleCount: totalBales,
-      totalWeight,
-      totalCost,
-      productCount: allProducts.length,
-      products: allProducts,
-    });
-    setProductSearch("");
   };
 
   const handleBackToLocations = () => {
     setSelectedLocation(null);
-    setSelectedCategory(null);
     setLocationSearch("");
-    setCategorySearch("");
+    setProductSearch("");
     setCategoryFilter("__all__");
     setProformaMode(false);
     setSelections(new Map());
   };
 
-  const handleBackToCategories = () => {
-    setSelectedCategory(null);
-    setProductSearch("");
-    setCategoryFilter("__all__");
-  };
-
-  const escapeBackHandler = selectedCategory
-    ? handleBackToCategories
-    : selectedLocation
-      ? handleBackToLocations
-      : null;
-  useEscapeBack(escapeBackHandler);
+  useEscapeBack(selectedLocation ? handleBackToLocations : null);
 
   const toggleProformaMode = useCallback(() => {
     if (proformaMode) {
@@ -736,34 +605,18 @@ export default function FactoryLocationInventory() {
     }
   }, [proformaMode]);
 
-  // In proforma mode, auto-jump to "All Items" table as soon as a location is selected and inventory is ready
-  useEffect(() => {
-    if (proformaMode && selectedLocation && !inventoryLoading && !selectedCategory) {
-      setSelectedCategory({
-        categoryId: -1,
-        categoryName: "All Items",
-        baleCount: 0,
-        totalWeight: 0,
-        totalCost: 0,
-        productCount: 0,
-        products: [],
-      });
-    }
-  }, [proformaMode, selectedLocation, inventoryLoading, selectedCategory]);
-
   const selectAllVisible = useCallback(() => {
     setSelections((prev) => {
       const next = new Map(prev);
       filteredProducts.forEach((prod) => {
         if (!next.has(prod.productId)) {
-          const available = prod.baleCount;
           next.set(prod.productId, {
             productId: prod.productId,
             articleCode: prod.articleCode,
             productName: prod.productName,
-            availableBales: available,
+            availableBales: prod.baleCount,
             totalWeight: prod.totalWeight,
-            selectedQty: available,
+            selectedQty: prod.baleCount,
             pricePerBale: prod.sellingPrice || "0",
           });
         }
@@ -787,14 +640,13 @@ export default function FactoryLocationInventory() {
       if (next.has(prod.productId)) {
         next.delete(prod.productId);
       } else {
-        const available = prod.baleCount;
         next.set(prod.productId, {
           productId: prod.productId,
           articleCode: prod.articleCode,
           productName: prod.productName,
-          availableBales: available,
+          availableBales: prod.baleCount,
           totalWeight: prod.totalWeight,
-          selectedQty: available,
+          selectedQty: prod.baleCount,
           pricePerBale: prod.sellingPrice || "0",
         });
       }
@@ -851,9 +703,7 @@ export default function FactoryLocationInventory() {
     setSelections((prev) => {
       const next = new Map(prev);
       const existing = next.get(productId);
-      if (existing) {
-        next.set(productId, { ...existing, pricePerBale: price });
-      }
+      if (existing) next.set(productId, { ...existing, pricePerBale: price });
       return next;
     });
   }, []);
@@ -951,9 +801,6 @@ export default function FactoryLocationInventory() {
     }
   };
 
-  // Autosave: when editing a proforma, debounce-save 2s after any selection change.
-  // IMPORTANT: guard with editModeInitialized — if the existing proforma lines have not yet been
-  // loaded and mapped into selections, firing replace-lines would wipe all previous lines.
   useEffect(() => {
     if (!proformaAutoSave || !proformaMode || !editingProformaId || selections.size === 0 || !editModeInitialized) return;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
@@ -1201,15 +1048,25 @@ export default function FactoryLocationInventory() {
     </Dialog>
   );
 
+  // ─── View 1: Location list ────────────────────────────────────────────────
   if (!selectedLocation) {
     return (
       <div className="p-4 md:p-6 max-w-4xl mx-auto">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6 flex-wrap">
-          <h1 className="text-xl md:text-3xl font-bold" data-testid="text-page-title">Factory Location Inventory</h1>
+          <div>
+            <h1 className="text-xl md:text-3xl font-bold" data-testid="text-page-title">Location Inventory</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Physical bales on ground by location</p>
+          </div>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => { const p = new URLSearchParams(); if (hideAvgCost) p.set("includeCost","0"); if (hideSellingPrice) p.set("includeSellPrice","0"); const qs = p.toString(); window.open(`/api/factory/location-inventory/export/all${qs ? "?"+qs : ""}`, "_blank"); }}
+            onClick={() => {
+              const p = new URLSearchParams();
+              if (hideAvgCost) p.set("includeCost", "0");
+              if (hideSellingPrice) p.set("includeSellPrice", "0");
+              const qs = p.toString();
+              window.open(`/api/factory/location-inventory/export/all${qs ? "?" + qs : ""}`, "_blank");
+            }}
             data-testid="button-export-all-locations"
           >
             <FileSpreadsheet className="h-4 w-4 mr-1" /> Export All (Excel)
@@ -1287,567 +1144,227 @@ export default function FactoryLocationInventory() {
             </div>
           )}
         </Card>
-      </div>
-    );
-  }
 
-  if (!selectedCategory) {
-    const totalBales = regularCategories.reduce((s, c) => s + c.baleCount, 0);
-    const totalKg = regularCategories.reduce((s, c) => s + c.totalWeight, 0);
-    const totalValue = regularCategories.reduce((s, c) => s + c.totalCost, 0);
-    const totalSellValue = regularCategories.reduce((s, c) => s + c.totalSellValue, 0);
-    const totalCostValue = regularCategories.reduce((s, c) => s + c.products.reduce((ps, p) => ps + p.baleCount * p.productionPrice, 0), 0);
-    const totalProducts = regularCategories.reduce((s, c) => s + c.productCount, 0);
-    const spTotalBales = specialCategories.reduce((s, c) => s + c.baleCount, 0);
-    const spTotalKg = specialCategories.reduce((s, c) => s + c.totalWeight, 0);
-    const spTotalValue = specialCategories.reduce((s, c) => s + c.totalCost, 0);
-    const spTotalSellValue = specialCategories.reduce((s, c) => s + c.totalSellValue, 0);
-    const spTotalProducts = specialCategories.reduce((s, c) => s + c.productCount, 0);
-    const allCategoryNames = [...categoryGroups].sort((a, b) => a.categoryName.localeCompare(b.categoryName));
-
-    return (
-      <div className="p-4 md:p-6 max-w-5xl mx-auto">
-        <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-3" aria-label="Breadcrumb">
-          <button onClick={handleBackToLocations} className="hover:text-foreground transition-colors" data-testid="breadcrumb-locations">
-            Locations
-          </button>
-          <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
-          <span className="font-medium text-foreground truncate">{selectedLocation.name}</span>
-          <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
-          <span>Categories</span>
-        </nav>
-
-        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">{selectedLocation.name}</h1>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={(e) => openRenameDialog(selectedLocation, e)}
-              data-testid="button-rename-selected-location"
-              title="Rename location"
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="default" size="sm" onClick={handleViewAll} data-testid="button-view-all">
-              <Package className="h-4 w-4 mr-1" /> View All Items
-            </Button>
-            <Button variant="outline" size="icon" onClick={() => handlePrint()} data-testid="button-print" title="Print">
-              <Printer className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => { const p = new URLSearchParams(); if (hideAvgCost) p.set("includeCost","0"); if (hideSellingPrice) p.set("includeSellPrice","0"); const qs = p.toString(); window.open(`/api/factory/location-inventory/${selectedLocation.id}/export/excel${qs ? "?"+qs : ""}`, "_blank"); }}
-              data-testid="button-export-location-excel"
-              title="Export Excel"
-            >
-              <FileSpreadsheet className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        {!inventoryLoading && (
-          <div className="flex flex-wrap gap-2 mb-4">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
-              <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground">Categories:</span>
-              <span className="font-mono font-semibold">{regularCategories.length}</span>
-            </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
-              <span className="text-muted-foreground">Bales:</span>
-              <span className="font-mono font-semibold">{totalBales.toLocaleString()}</span>
-            </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
-              <span className="text-muted-foreground">Total KG:</span>
-              <span className="font-mono font-semibold">{fmt(totalKg)}</span>
-            </div>
-            {!hideSellingPrice && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
-                <span className="text-muted-foreground">Cost Value:</span>
-                <span className="font-mono font-semibold">{formatAmount(totalCostValue)}</span>
-              </div>
-            )}
-            {!hideSellingPrice && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
-                <span className="text-muted-foreground">Sell Value:</span>
-                <span className="font-mono font-semibold">{formatAmount(totalSellValue)}</span>
-              </div>
-            )}
-            {!proformaMode && v5Summary && v5Summary.rows.length > 0 && (() => {
-              const netAvail = v5Summary.rows.reduce((s, r) => s + r.availableBalance, 0);
-              return (
-                <div
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold border ${
-                    netAvail < 0
-                      ? "bg-destructive/10 border-destructive/30 text-destructive"
-                      : "bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-400"
-                  }`}
-                  title="V5 allocation: SUM(In Stock − Co.-Wide Reserved − Loading) across all articles"
-                  data-testid="chip-v5-net-available"
-                >
-                  <span className="text-xs font-normal opacity-70">V5 Net Available:</span>
-                  <span className="font-mono">{netAvail.toLocaleString()}</span>
-                </div>
-              );
-            })()}
-          </div>
-        )}
-
-        {/* ── V5 Stock Summary ─────────────────────────────────────────────────
-            Shows per-article balance using V5 source of truth. Not shown in
-            proforma-builder mode. Hidden when query returns no rows.
-            inStock        = IN_STOCK bales at this location
-            reservedExpected = DRAFT V5 expected lines (company-wide)
-            loading        = bales at this location in LOADING V5 containers
-            availableBalance = inStock − reservedExpected − loading         */}
-        {!proformaMode && v5Summary && v5Summary.rows.length > 0 && (
-          <div className="mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-mono">V5</Badge>
-              <span className="text-sm font-medium">V5 Stock Allocation Summary</span>
-              {v5Summary.shortageCount > 0 && (
-                <Badge variant="destructive" className="gap-1 text-xs">
-                  <AlertTriangle className="h-3 w-3" />
-                  {v5Summary.shortageCount} shortage{v5Summary.shortageCount !== 1 ? "s" : ""}
-                </Badge>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground mb-2">
-              In Stock and Loading are filtered to this location.{" "}
-              <span className="font-medium">Co.-Wide Reserved</span> is company-wide — V5 draft containers are not location-specific until loading begins.
-            </p>
-            <div className="overflow-auto rounded-md border text-sm" data-testid="table-v5-summary">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="px-3 py-2 font-medium text-muted-foreground">Article</th>
-                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">In Stock</th>
-                    <th className="px-3 py-2 text-right font-medium text-muted-foreground" title="Company-wide: V5 draft containers are not yet location-specific">Co.-Wide Reserved</th>
-                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Loading</th>
-                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Wt/Bale (KG)</th>
-                    <th className="px-3 py-2 text-right font-medium">Available</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {v5Summary.rows.map((row) => (
-                    <tr
-                      key={row.articleCode}
-                      className="border-b last:border-0 hover-elevate"
-                      data-testid={`row-v5-summary-${row.articleCode}`}
-                    >
-                      <td className="px-3 py-2">
-                        <div className="font-medium">{row.productName}</div>
-                        <div className="text-xs text-muted-foreground font-mono">{row.articleCode}</div>
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono">{row.inStock.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right font-mono text-muted-foreground">{row.reservedExpected.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right font-mono text-muted-foreground">{row.loading.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right font-mono text-muted-foreground">{row.weightPerBaleKg > 0 ? row.weightPerBaleKg.toLocaleString() : "0"}</td>
-                      <td className={`px-3 py-2 text-right font-mono font-semibold ${row.availableBalance < 0 ? "text-destructive" : "text-green-600 dark:text-green-400"}`}
-                        data-testid={`text-v5-available-${row.articleCode}`}
-                      >
-                        {row.availableBalance.toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        <Card className="p-4 w-full" ref={printRef}>
-          <div className="flex items-center gap-2 mb-3">
-            <Badge variant="outline" className="text-xs font-medium">Physical Inventory</Badge>
-            <span className="text-xs text-muted-foreground">Bale count · weight · cost / sell value by category</span>
-          </div>
-          <div className="flex flex-col gap-2 mb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Dialog open={renameDialogOpen} onOpenChange={(open) => { if (!open) setRenameDialogOpen(false); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Rename Location</DialogTitle>
+              <DialogDescription>
+                Enter a new name for <strong>{renamingLocation?.name}</strong>.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-2">
               <Input
-                placeholder="Search categories or items..."
-                value={categorySearch}
-                onChange={(e) => setCategorySearch(e.target.value)}
-                className="pl-9"
-                data-testid="input-search-categories"
+                value={renameInput}
+                onChange={(e) => setRenameInput(e.target.value)}
+                placeholder="Location name"
+                data-testid="input-rename-location"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && renameInput.trim() && renamingLocation) {
+                    renameLocationMutation.mutate({ id: renamingLocation.id, name: renameInput.trim() });
+                  }
+                }}
+                autoFocus
               />
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Select value={categoryFilter} onValueChange={setCategoryFilter} data-testid="select-category-filter">
-                <SelectTrigger className="w-[140px]" data-testid="select-category-filter-trigger">
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">All Categories</SelectItem>
-                  {allCategoryNames.map((c) => (
-                    <SelectItem key={c.categoryId || 0} value={c.categoryName}>{c.categoryName}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={catSortField} onValueChange={(v) => setCatSortField(v as SortField)} data-testid="select-cat-sort-field">
-                <SelectTrigger className="w-[120px]" data-testid="select-cat-sort-trigger">
-                  <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">Name</SelectItem>
-                  <SelectItem value="bales">Bales</SelectItem>
-                  <SelectItem value="kg">KG</SelectItem>
-                  <SelectItem value="value">Value</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setCatSortDir((d) => d === "asc" ? "desc" : "asc")}
-                data-testid="button-cat-sort-dir"
-              >
-                {catSortDir === "asc" ? "\u2191" : "\u2193"}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRenameDialogOpen(false)} data-testid="button-rename-cancel">
+                Cancel
               </Button>
-              {!proformaMode && (
-                <Button
-                  variant={showZeroStock ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setShowZeroStock(v => !v)}
-                  data-testid="button-show-zero-stock-categories"
-                  className="gap-1.5"
-                >
-                  <Eye className="h-4 w-4" />
-                  {showZeroStock ? "Hide zero" : "Show zero"}
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {(inventoryLoading || (proformaMode && availableLoading)) ? (
-            <div className="space-y-2">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : globalSearchResults ? (() => {
-            const sorted = applySortProducts(globalSearchResults, catSortField, catSortDir);
-            const gTotalBales = sorted.reduce((s, p) => s + p.baleCount, 0);
-            const gTotalKg = sorted.reduce((s, p) => s + p.totalWeight, 0);
-            const gTotalCost = sorted.reduce((s, p) => s + p.totalCost, 0);
-            const gTotalSellCost = sorted.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
-            return (
-              <>
-                <div className="mb-3 text-sm text-muted-foreground">
-                  Found {sorted.length} items matching "{categorySearch}" across all categories
-                </div>
-
-                <div className="md:hidden space-y-3">
-                  {sorted.map((prod) => (
-                    <Card key={prod.productId} className="p-3" data-testid={`row-search-result-${prod.productId}`}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{prod.productName}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                        <span>{prod.articleCode}</span>
-                        <span>| {prod.category || "Uncategorized"}</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div><span className="text-muted-foreground">Bales: </span><span className="font-mono">{prod.baleCount.toLocaleString()}</span></div>
-                        <div className="text-right"><span className="text-muted-foreground">KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
-                        {!hideSellingPrice && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>}
-                      </div>
-                    </Card>
-                  ))}
-                  <Card className="p-3 bg-muted/50" data-testid="text-search-totals">
-                    <div className="flex items-center justify-between gap-2 font-bold text-sm">
-                      <span>Total ({sorted.length} items, {gTotalBales.toLocaleString()} bales)</span>
-                      <span className="font-mono">{fmt(gTotalKg)} KG</span>
-                    </div>
-                    {!hideSellingPrice && <div className="text-right text-sm font-mono font-bold">{formatAmount(gTotalSellCost)} sell</div>}
-                  </Card>
-                </div>
-
-                <div className="hidden md:block rounded-md border overflow-hidden w-full">
-                  <table className="w-full table-fixed text-sm">
-                    <colgroup>
-                      <col style={{ width: "110px" }} />
-                      <col style={{ width: "100px" }} />
-                      <col />
-                      <col style={{ width: "70px" }} />
-                      <col style={{ width: "100px" }} />
-                      {!hideSellingPrice && <col style={{ width: "120px" }} />}
-                    </colgroup>
-                    <thead className="bg-muted/50 sticky top-0 z-10">
-                      <tr className="h-12">
-                        <th className="text-left px-3 font-medium">Category</th>
-                        <th className="text-left px-3 font-medium">Article Code</th>
-                        <th className="text-left px-3 font-medium">Bale Name</th>
-                        <th className="text-right px-3 font-medium">Bales</th>
-                        <th className="text-right px-3 font-medium">Total KG</th>
-                        {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Value</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sorted.map((prod) => (
-                        <tr key={prod.productId} className="border-t h-12" data-testid={`row-search-result-${prod.productId}`}>
-                          <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>
-                          <td className="px-3 text-muted-foreground font-mono text-xs">{prod.articleCode}</td>
-                          <td className="px-3 font-medium">{prod.productName}</td>
-                          <td className="text-right px-3 font-mono">{prod.baleCount.toLocaleString()}</td>
-                          <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
-                        </tr>
-                      ))}
-                      <tr className="border-t bg-muted/50 h-12 font-bold">
-                        <td className="px-3" colSpan={3}>Total ({sorted.length} items)</td>
-                        <td className="text-right px-3 font-mono">{gTotalBales.toLocaleString()}</td>
-                        <td className="text-right px-3 font-mono">{fmt(gTotalKg)}</td>
-                        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(gTotalSellCost)}</td>}
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            );
-          })() : categoryGroups.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No bales found at this location.</div>
-          ) : (
-            <>
-              {/* ── Regular categories ── */}
-              {(regularCategories.length > 0 || specialCategories.length === 0) && (
-                <>
-                  <div className="md:hidden space-y-3">
-                    {regularCategories.length === 0 ? (
-                      <div className="text-center py-4 text-muted-foreground text-sm">No categories found matching your search</div>
-                    ) : (
-                      <>
-                        {regularCategories.map((cat) => (
-                          <Card
-                            key={cat.categoryId || 0}
-                            className="p-3 cursor-pointer hover-elevate"
-                            onClick={() => handleCategoryClick(cat)}
-                            data-testid={`row-category-${cat.categoryId || "uncategorized"}`}
-                          >
-                            <div className="flex items-center gap-2 mb-2">
-                              <Layers className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-medium">{cat.categoryName}</span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                              <div><span className="text-muted-foreground">Products: </span><span>{cat.productCount}</span></div>
-                              <div className="text-right"><span className="text-muted-foreground">Bales: </span><span className="font-mono">{cat.baleCount.toLocaleString()}</span></div>
-                              <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(cat.totalWeight)}</span></div>
-                              {!hideSellingPrice && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium">{formatAmount(cat.totalSellValue)}</span></div>}
-                            </div>
-                          </Card>
-                        ))}
-                        <Card className="p-3 bg-muted/50" data-testid="text-category-totals">
-                          <div className="flex items-center justify-between gap-2 font-bold text-sm">
-                            <span>Total ({totalProducts} products, {totalBales.toLocaleString()} bales)</span>
-                            <span className="font-mono">{fmt(totalKg)} KG</span>
-                          </div>
-                          {!hideSellingPrice && <div className="text-right text-sm font-mono font-bold">{formatAmount(totalSellValue)} sell</div>}
-                        </Card>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="hidden md:block rounded-md border overflow-hidden w-full">
-                    <table className="w-full table-fixed text-sm">
-                      <colgroup>
-                        <col />
-                        <col style={{ width: "100px" }} />
-                        <col style={{ width: "110px" }} />
-                        <col style={{ width: "130px" }} />
-                        {!hideSellingPrice && <col style={{ width: "140px" }} />}
-                      </colgroup>
-                      <thead className="bg-muted/50 sticky top-0 z-10">
-                        <tr className="h-12">
-                          <th className="text-left px-3 font-medium">Category</th>
-                          <th className="text-right px-3 font-medium">Products</th>
-                          <th className="text-right px-3 font-medium">Bales</th>
-                          <th className="text-right px-3 font-medium">Total KG</th>
-                          {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Value</th>}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {regularCategories.length === 0 ? (
-                          <tr>
-                            <td colSpan={hideSellingPrice ? 4 : 5} className="text-center py-8 text-muted-foreground">No categories found matching your search</td>
-                          </tr>
-                        ) : (
-                          <>
-                            {regularCategories.map((cat) => (
-                              <tr
-                                key={cat.categoryId || 0}
-                                className="border-t hover-elevate cursor-pointer h-12"
-                                onClick={() => handleCategoryClick(cat)}
-                                data-testid={`row-category-${cat.categoryId || "uncategorized"}`}
-                              >
-                                <td className="px-3 font-medium">
-                                  <div className="flex items-center gap-2">
-                                    <Layers className="h-4 w-4 text-muted-foreground" />
-                                    {cat.categoryName}
-                                  </div>
-                                </td>
-                                <td className="text-right px-3 font-mono">{cat.productCount}</td>
-                                <td className="text-right px-3 font-mono">{cat.baleCount.toLocaleString()}</td>
-                                <td className="text-right px-3 font-mono">{fmt(cat.totalWeight)}</td>
-                                {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(cat.totalSellValue)}</td>}
-                              </tr>
-                            ))}
-                            <tr className="border-t bg-muted/50 h-12 font-bold">
-                              <td className="px-3">Total</td>
-                              <td className="text-right px-3 font-mono">{totalProducts}</td>
-                              <td className="text-right px-3 font-mono">{totalBales.toLocaleString()}</td>
-                              <td className="text-right px-3 font-mono">{fmt(totalKg)}</td>
-                              {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(totalSellValue)}</td>}
-                            </tr>
-                          </>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
-
-              {/* ── Special categories (Wipers / Garbage) ── */}
-              {specialCategories.length > 0 && (
-                <div className="mt-6">
-                  <p className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Wipers &amp; Garbage</p>
-                  <div className="md:hidden space-y-3">
-                    {specialCategories.map((cat) => (
-                      <Card
-                        key={cat.categoryId || 0}
-                        className="p-3 cursor-pointer hover-elevate"
-                        onClick={() => handleCategoryClick(cat)}
-                        data-testid={`row-category-${cat.categoryId || "uncategorized"}`}
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <Layers className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{cat.categoryName}</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div><span className="text-muted-foreground">Products: </span><span>{cat.productCount}</span></div>
-                          <div className="text-right"><span className="text-muted-foreground">Bales: </span><span className="font-mono">{cat.baleCount.toLocaleString()}</span></div>
-                          <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(cat.totalWeight)}</span></div>
-                          {!hideSellingPrice && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium">{formatAmount(cat.totalSellValue)}</span></div>}
-                        </div>
-                      </Card>
-                    ))}
-                    <Card className="p-3 bg-muted/50" data-testid="text-special-category-totals">
-                      <div className="flex items-center justify-between gap-2 font-bold text-sm">
-                        <span>Total ({spTotalProducts} products, {spTotalBales.toLocaleString()} bales)</span>
-                        <span className="font-mono">{fmt(spTotalKg)} KG</span>
-                      </div>
-                      {!hideSellingPrice && <div className="text-right text-sm font-mono font-bold">{formatAmount(spTotalSellValue)} sell</div>}
-                    </Card>
-                  </div>
-
-                  <div className="hidden md:block rounded-md border overflow-hidden w-full">
-                    <table className="w-full table-fixed text-sm">
-                      <colgroup>
-                        <col />
-                        <col style={{ width: "100px" }} />
-                        <col style={{ width: "110px" }} />
-                        <col style={{ width: "130px" }} />
-                        {!hideSellingPrice && <col style={{ width: "140px" }} />}
-                      </colgroup>
-                      <thead className="bg-muted/50 sticky top-0 z-10">
-                        <tr className="h-12">
-                          <th className="text-left px-3 font-medium">Category</th>
-                          <th className="text-right px-3 font-medium">Products</th>
-                          <th className="text-right px-3 font-medium">Bales</th>
-                          <th className="text-right px-3 font-medium">Total KG</th>
-                          {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Value</th>}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {specialCategories.map((cat) => (
-                          <tr
-                            key={cat.categoryId || 0}
-                            className="border-t hover-elevate cursor-pointer h-12"
-                            onClick={() => handleCategoryClick(cat)}
-                            data-testid={`row-category-special-${cat.categoryId || "uncategorized"}`}
-                          >
-                            <td className="px-3 font-medium">
-                              <div className="flex items-center gap-2">
-                                <Layers className="h-4 w-4 text-muted-foreground" />
-                                {cat.categoryName}
-                              </div>
-                            </td>
-                            <td className="text-right px-3 font-mono">{cat.productCount}</td>
-                            <td className="text-right px-3 font-mono">{cat.baleCount.toLocaleString()}</td>
-                            <td className="text-right px-3 font-mono">{fmt(cat.totalWeight)}</td>
-                            {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(cat.totalSellValue)}</td>}
-                          </tr>
-                        ))}
-                        <tr className="border-t bg-muted/50 h-12 font-bold">
-                          <td className="px-3">Total</td>
-                          <td className="text-right px-3 font-mono">{spTotalProducts}</td>
-                          <td className="text-right px-3 font-mono">{spTotalBales.toLocaleString()}</td>
-                          <td className="text-right px-3 font-mono">{fmt(spTotalKg)}</td>
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(spTotalSellValue)}</td>}
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-          {!inventoryLoading && !globalSearchResults && filteredCategories.length > 0 && (
-            <div className="mt-4 text-sm text-muted-foreground">
-              Showing {filteredCategories.length} of {categoryGroups.length} categories
-            </div>
-          )}
-        </Card>
+              <Button
+                onClick={() => {
+                  if (renameInput.trim() && renamingLocation) {
+                    renameLocationMutation.mutate({ id: renamingLocation.id, name: renameInput.trim() });
+                  }
+                }}
+                disabled={!renameInput.trim() || renameLocationMutation.isPending}
+                data-testid="button-rename-confirm"
+              >
+                {renameLocationMutation.isPending ? "Saving..." : "Rename"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
 
-  const isAllItems = selectedCategory.categoryId === -1;
-  const regularProducts = isAllItems ? filteredProducts.filter((p) => !isSpecialFactoryCategory(p.category || "")) : filteredProducts;
-  const specialProducts = isAllItems ? filteredProducts.filter((p) => isSpecialFactoryCategory(p.category || "")) : [];
+  // ─── View 2: Product table ────────────────────────────────────────────────
+  const allCategoryNames = [...categoryGroups]
+    .sort((a, b) => a.categoryName.localeCompare(b.categoryName))
+    .map((g) => g.categoryName);
+
+  const statsBales = activeInventoryData.reduce((s, p) => s + p.baleCount, 0);
+  const statsKg = activeInventoryData.reduce((s, p) => s + p.totalWeight, 0);
+  const statsCostValue = activeInventoryData.reduce((s, p) => s + p.baleCount * p.productionPrice, 0);
+  const statsSellValue = activeInventoryData.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
+
   const totalBales = regularProducts.reduce((s, p) => s + p.baleCount, 0);
   const totalKg = regularProducts.reduce((s, p) => s + p.totalWeight, 0);
-  const totalCost = regularProducts.reduce((s, p) => s + p.totalCost, 0);
   const totalSellValue = regularProducts.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
-  const totalProductionCostValue = regularProducts.reduce((s, p) => s + p.baleCount * p.productionPrice, 0);
-  const spProdTotalBales = specialProducts.reduce((s, p) => s + p.baleCount, 0);
-  const spProdTotalKg = specialProducts.reduce((s, p) => s + p.totalWeight, 0);
-  const spProdTotalCost = specialProducts.reduce((s, p) => s + p.totalCost, 0);
-  const spProdTotalSellValue = specialProducts.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
-  const allCategoryNamesForProducts = isAllItems
-    ? [...new Set(activeInventoryData.map((p) => p.category || ""))].filter(Boolean).sort()
-    : [];
-  const colSpanAll = (isAllItems ? 10 : 9) + (proformaMode ? 2 : 0) - (hideSellingPrice ? 4 : 0);
-  const colSpanLabel = isAllItems ? 2 : 1;
+  const totalProdValue = regularProducts.reduce((s, p) => s + p.baleCount * p.productionPrice, 0);
+  const spTotalBales = specialProducts.reduce((s, p) => s + p.baleCount, 0);
+  const spTotalKg = specialProducts.reduce((s, p) => s + p.totalWeight, 0);
+  const spTotalSellValue = specialProducts.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
+  const spTotalProdValue = specialProducts.reduce((s, p) => s + p.baleCount * p.productionPrice, 0);
+
+  const colSpan = 2 + (proformaMode ? 2 : 0) + (hideSellingPrice ? 0 : 4) + (proformaMode ? 0 : 1);
+
+  const renderProductRow = (prod: FactoryBaleProduct, testIdSuffix = "") => {
+    const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
+    const isSelected = selections.has(prod.productId);
+    const selection = selections.get(prod.productId);
+    return (
+      <tr
+        key={prod.productId}
+        className={`border-t h-12 ${proformaMode && isSelected ? "bg-primary/5" : ""}`}
+        data-testid={`row-product${testIdSuffix}-${prod.productId}`}
+      >
+        {proformaMode && (
+          <td className="px-2 text-center">
+            <Checkbox checked={isSelected} onCheckedChange={() => toggleSelection(prod)} data-testid={`checkbox-product${testIdSuffix}-${prod.productId}`} />
+          </td>
+        )}
+        <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>
+        <td className="px-3">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation.id}`)}
+              className={`text-left font-medium ${proformaMode ? "" : "hover:underline cursor-pointer"}`}
+              data-testid={`link-product${testIdSuffix}-${prod.productId}`}
+            >
+              {prod.productName}
+            </button>
+            {prod.isInactive && <Badge variant="outline" className="text-xs text-muted-foreground no-default-active-elevate">Inactive</Badge>}
+          </div>
+          {prod.articleCode && <div className="text-xs text-muted-foreground font-mono mt-0.5">{prod.articleCode}</div>}
+        </td>
+        <td className="text-right px-3 font-mono whitespace-nowrap">{prod.baleCount}</td>
+        {proformaMode && (
+          <td className="text-right px-3">
+            {isSelected && selection ? (
+              <Input type="number" value={selection.selectedQty} onChange={(e) => updateSelectionQty(prod.productId, e.target.value)} className="w-[70px] text-right ml-auto" min={1} data-testid={`input-qty${testIdSuffix}-${prod.productId}`} />
+            ) : <span className="text-muted-foreground">-</span>}
+          </td>
+        )}
+        {proformaMode && (
+          <td className="text-right px-3">
+            {isSelected && selection ? (
+              <Input type="number" value={selection.pricePerBale} onChange={(e) => updateSelectionPrice(prod.productId, e.target.value)} className="w-[90px] text-right ml-auto" step="0.01" data-testid={`input-price${testIdSuffix}-${prod.productId}`} />
+            ) : <span className="text-muted-foreground">-</span>}
+          </td>
+        )}
+        <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
+        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
+        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
+        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.productionPrice)}</td>}
+        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.baleCount * prod.productionPrice)}</td>}
+        <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
+        {!proformaMode && (
+          <td className="px-1 text-center">
+            <div className="flex items-center justify-center gap-0.5">
+              <Button size="icon" variant="ghost" className="h-7 w-7" title="View details" onClick={() => navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation.id}`)} data-testid={`button-view-details${testIdSuffix}-${prod.productId}`}>
+                <Package className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="icon" variant="ghost" className="h-7 w-7" title="Print barcodes" onClick={() => handleReprintProduct(prod)} data-testid={`button-print-barcodes${testIdSuffix}-${prod.productId}`}>
+                <Tag className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" title="Remove bales" onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }} data-testid={`button-delete-product${testIdSuffix}-${prod.productId}`}>
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </td>
+        )}
+      </tr>
+    );
+  };
+
+  const renderMobileCard = (prod: FactoryBaleProduct, testIdSuffix = "") => {
+    const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
+    const isSelected = selections.has(prod.productId);
+    const selection = selections.get(prod.productId);
+    return (
+      <Card key={prod.productId} className={`p-3 ${proformaMode && isSelected ? "ring-2 ring-primary" : ""}`} data-testid={`card-product${testIdSuffix}-${prod.productId}`}>
+        <div className="flex items-center gap-2 mb-2">
+          {proformaMode && (
+            <Checkbox checked={isSelected} onCheckedChange={() => toggleSelection(prod)} data-testid={`checkbox-mobile${testIdSuffix}-${prod.productId}`} />
+          )}
+          <Package className="h-4 w-4 text-muted-foreground" />
+          <button
+            onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation.id}`)}
+            className={`text-left font-medium flex-1 ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`}
+            data-testid={`link-mobile${testIdSuffix}-${prod.productId}`}
+          >
+            {prod.productName}
+          </button>
+          {prod.isInactive && <Badge variant="outline" className="text-xs text-muted-foreground no-default-active-elevate shrink-0">Inactive</Badge>}
+          {!proformaMode && (
+            <div className="flex items-center gap-0.5 ml-auto">
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleReprintProduct(prod)} data-testid={`button-reprint-mobile${testIdSuffix}-${prod.productId}`}>
+                <Tag className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }} data-testid={`button-delete-mobile${testIdSuffix}-${prod.productId}`}>
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+          <span>{prod.articleCode}</span>
+          {prod.category && <span>| {prod.category}</span>}
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div><span className="text-muted-foreground">Bales: </span><span className="font-mono">{prod.baleCount}</span></div>
+          <div className="text-right"><span className="text-muted-foreground">Wt/Bale: </span><span className="font-mono">{fmt(weightPerBale)} KG</span></div>
+          <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
+          {!hideSellingPrice && <div className="text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>}
+        </div>
+        {proformaMode && isSelected && selection && (
+          <div className="mt-2 pt-2 border-t flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground">Qty:</span>
+            <Input type="number" value={selection.selectedQty} onChange={(e) => updateSelectionQty(prod.productId, e.target.value)} className="w-20 text-right" min={1} data-testid={`input-qty-mobile${testIdSuffix}-${prod.productId}`} />
+            <span className="text-xs text-muted-foreground">/ {prod.baleCount}</span>
+            <span className="text-xs text-muted-foreground ml-2">Price:</span>
+            <Input type="number" value={selection.pricePerBale} onChange={(e) => updateSelectionPrice(prod.productId, e.target.value)} className="w-24 text-right" step="0.01" data-testid={`input-price-mobile${testIdSuffix}-${prod.productId}`} />
+          </div>
+        )}
+      </Card>
+    );
+  };
 
   return (
     <div className={`p-4 md:p-6 max-w-6xl mx-auto ${proformaMode && selections.size > 0 ? "pb-24" : ""}`}>
-      <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-3" aria-label="Breadcrumb">
-        <button onClick={handleBackToLocations} className="hover:text-foreground transition-colors" data-testid="breadcrumb-locations">
-          Locations
-        </button>
-        <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
-        <button onClick={handleBackToCategories} className="hover:text-foreground transition-colors" data-testid="breadcrumb-categories">
-          {selectedLocation.name}
-        </button>
-        <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
-        <span className="text-foreground">{selectedCategory.categoryName}</span>
-      </nav>
-
+      {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-        <h1 className="text-2xl font-bold" data-testid="text-page-title">{selectedCategory.categoryName}</h1>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleBackToLocations}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            data-testid="breadcrumb-locations"
+          >
+            Locations
+          </button>
+          <span className="text-muted-foreground text-sm">/</span>
+          <h1 className="text-xl md:text-2xl font-bold" data-testid="text-page-title">{selectedLocation.name}</h1>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => openRenameDialog(selectedLocation, e)}
+            data-testid="button-rename-selected-location"
+            title="Rename location"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+        </div>
         <div className="flex items-center gap-2">
           <Button
-            variant={proformaMode ? "destructive" : "default"}
+            variant={proformaMode ? "destructive" : "outline"}
             size="sm"
             onClick={toggleProformaMode}
             data-testid="button-toggle-proforma-mode"
           >
             <ClipboardList className="h-4 w-4 mr-1" />
-            {proformaMode ? "Exit Proforma Mode" : "Enter Proforma Mode"}
+            {proformaMode ? "Exit Proforma" : "Proforma Mode"}
           </Button>
           <Button variant="outline" size="icon" onClick={() => handlePrint()} data-testid="button-print" title="Print">
             <Printer className="h-4 w-4" />
@@ -1856,9 +1373,13 @@ export default function FactoryLocationInventory() {
             variant="outline"
             size="icon"
             onClick={() => {
-              const p = new URLSearchParams(); if (hideAvgCost) p.set("includeCost","0"); if (hideSellingPrice) p.set("includeSellPrice","0"); const qs = p.toString(); window.open(`/api/factory/location-inventory/${selectedLocation!.id}/export/excel${qs ? "?"+qs : ""}`, "_blank");
+              const p = new URLSearchParams();
+              if (hideAvgCost) p.set("includeCost", "0");
+              if (hideSellingPrice) p.set("includeSellPrice", "0");
+              const qs = p.toString();
+              window.open(`/api/factory/location-inventory/${selectedLocation.id}/export/excel${qs ? "?" + qs : ""}`, "_blank");
             }}
-            data-testid="button-export-inventory-excel"
+            data-testid="button-export-location-excel"
             title="Export Excel"
           >
             <FileSpreadsheet className="h-4 w-4" />
@@ -1866,48 +1387,54 @@ export default function FactoryLocationInventory() {
         </div>
       </div>
 
+      <p className="text-sm text-muted-foreground mb-4" data-testid="text-subtitle">
+        Physical bales on ground · IN_STOCK
+      </p>
+
+      {/* Stat chips */}
       {!inventoryLoading && (
         <div className="flex flex-wrap gap-2 mb-4">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
-            <span className="text-muted-foreground">Products:</span>
-            <span className="font-mono font-semibold">{regularProducts.length}</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
+            <Package className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-muted-foreground">Bales:</span>
-            <span className="font-mono font-semibold">{totalBales.toLocaleString()}</span>
+            <span className="font-mono font-semibold" data-testid="stat-total-bales">{statsBales.toLocaleString()}</span>
           </div>
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
             <span className="text-muted-foreground">Total KG:</span>
-            <span className="font-mono font-semibold">{fmt(totalKg)}</span>
+            <span className="font-mono font-semibold" data-testid="stat-total-kg">{fmt(statsKg)}</span>
           </div>
-          {!hideSellingPrice && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
+            <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-muted-foreground">Categories:</span>
+            <span className="font-mono font-semibold" data-testid="stat-categories">{categoryGroups.length}</span>
+          </div>
+          {!hideAvgCost && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
               <span className="text-muted-foreground">Cost Value:</span>
-              <span className="font-mono font-semibold">{formatAmount(totalProductionCostValue)}</span>
+              <span className="font-mono font-semibold" data-testid="stat-cost-value">{formatAmount(statsCostValue)}</span>
             </div>
           )}
           {!hideSellingPrice && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
               <span className="text-muted-foreground">Sell Value:</span>
-              <span className="font-mono font-semibold">{formatAmount(totalSellValue)}</span>
+              <span className="font-mono font-semibold" data-testid="stat-sell-value">{formatAmount(statsSellValue)}</span>
             </div>
           )}
         </div>
       )}
 
+      {/* Proforma advisory — only visible inside proforma mode */}
       {proformaMode && (
-        <div className="mb-3 flex items-start gap-2 px-3 py-2.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-sm text-amber-800 dark:text-amber-300"
-          data-testid="note-proforma-v5-advisory"
-        >
+        <div className="mb-3 flex items-start gap-2 px-3 py-2.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-sm text-amber-800 dark:text-amber-300" data-testid="note-proforma-advisory">
           <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
           <span>
-            Available quantities shown below do not subtract V5 reserved allocations.
-            Check the <span className="font-medium">V5 Stock Allocation Summary</span> on the Locations view or the{" "}
+            Available quantities shown do not subtract V5 reserved allocations. Check the{" "}
             <span className="font-medium">Stock Allocation V5</span> page for net availability before committing.
           </span>
         </div>
       )}
 
+      {/* Proforma controls */}
       {proformaMode && (
         <div className="mb-4 flex items-center gap-2 flex-wrap">
           {editingProformaId && (
@@ -1915,9 +1442,8 @@ export default function FactoryLocationInventory() {
               <FileText className="h-4 w-4 text-primary shrink-0" />
               <span className="text-sm font-medium text-primary">Editing proforma: <span className="font-bold">{proformaName}</span></span>
               <span className="text-xs text-muted-foreground ml-1 flex-1">
-                {proformaAutoSave ? "— Changes auto-save 2 s after you stop editing" : "— Select items from inventory and click Update Proforma to save changes"}
+                {proformaAutoSave ? "— Changes auto-save 2 s after you stop editing" : "— Select items and click Update Proforma to save changes"}
               </span>
-              {/* Autosave toggle */}
               <button
                 onClick={toggleProformaAutoSave}
                 className={`flex items-center gap-1.5 px-2.5 h-7 rounded border text-xs font-medium transition-colors shrink-0 ${
@@ -1926,7 +1452,6 @@ export default function FactoryLocationInventory() {
                     : "bg-background border-border text-muted-foreground"
                 }`}
                 data-testid="button-proforma-autosave-toggle"
-                title={proformaAutoSave ? "Autosave ON" : "Autosave OFF"}
               >
                 <Zap className={`h-3.5 w-3.5 ${proformaAutoSave ? "fill-green-500 text-green-500" : ""}`} />
                 Autosave
@@ -1944,24 +1469,13 @@ export default function FactoryLocationInventory() {
           </Button>
           {selections.size > 0 && (
             <>
-              <Button variant="outline" size="sm" onClick={applySellingPrices} data-testid="button-apply-selling-price">
-                Apply Sell Price
-              </Button>
-              <Button variant="outline" size="sm" onClick={applyProductionPrices} data-testid="button-apply-production-price">
-                Apply Prod Price
-              </Button>
+              <Button variant="outline" size="sm" onClick={applySellingPrices} data-testid="button-apply-selling-price">Apply Sell Price</Button>
+              <Button variant="outline" size="sm" onClick={applyProductionPrices} data-testid="button-apply-production-price">Apply Prod Price</Button>
             </>
           )}
           <div className="flex items-center gap-1.5 ml-2">
-            <Checkbox
-              checked={showSelectedOnly}
-              onCheckedChange={(v) => setShowSelectedOnly(!!v)}
-              id="show-selected-only"
-              data-testid="checkbox-show-selected-only"
-            />
-            <label htmlFor="show-selected-only" className="text-sm cursor-pointer select-none">
-              Selected only
-            </label>
+            <Checkbox checked={showSelectedOnly} onCheckedChange={(v) => setShowSelectedOnly(!!v)} id="show-selected-only" data-testid="checkbox-show-selected-only" />
+            <label htmlFor="show-selected-only" className="text-sm cursor-pointer select-none">Selected only</label>
           </div>
           <Button
             variant={hideZeroAvailable ? "outline" : "secondary"}
@@ -1979,12 +1493,14 @@ export default function FactoryLocationInventory() {
         </div>
       )}
 
+      {/* Main card — toolbar + table */}
       <Card className="p-4 w-full" ref={printRef}>
+        {/* Toolbar */}
         <div className="flex flex-col gap-2 mb-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by bale name or article code..."
+              placeholder="Search product or article code..."
               value={productSearch}
               onChange={(e) => setProductSearch(e.target.value)}
               className="pl-9"
@@ -1992,21 +1508,19 @@ export default function FactoryLocationInventory() {
             />
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {isAllItems && (
-              <Select value={categoryFilter} onValueChange={setCategoryFilter} data-testid="select-category-filter-products">
-                <SelectTrigger className="w-[140px]" data-testid="select-category-filter-products-trigger">
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">All Categories</SelectItem>
-                  {allCategoryNamesForProducts.map((name) => (
-                    <SelectItem key={name} value={name}>{name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <Select value={prodSortField} onValueChange={(v) => setProdSortField(v as SortField)} data-testid="select-prod-sort-field">
-              <SelectTrigger className="w-[120px]" data-testid="select-prod-sort-trigger">
+            <Select value={categoryFilter} onValueChange={setCategoryFilter} data-testid="select-category-filter">
+              <SelectTrigger className="w-[160px]" data-testid="select-category-filter-trigger">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Categories</SelectItem>
+                {allCategoryNames.map((name) => (
+                  <SelectItem key={name} value={name}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={prodSortField} onValueChange={(v) => setProdSortField(v as SortField)} data-testid="select-sort-field">
+              <SelectTrigger className="w-[120px]" data-testid="select-sort-trigger">
                 <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                 <SelectValue />
               </SelectTrigger>
@@ -2017,20 +1531,15 @@ export default function FactoryLocationInventory() {
                 <SelectItem value="value">Value</SelectItem>
               </SelectContent>
             </Select>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setProdSortDir((d) => d === "asc" ? "desc" : "asc")}
-              data-testid="button-prod-sort-dir"
-            >
-              {prodSortDir === "asc" ? "\u2191" : "\u2193"}
+            <Button variant="outline" size="icon" onClick={() => setProdSortDir((d) => d === "asc" ? "desc" : "asc")} data-testid="button-sort-dir">
+              {prodSortDir === "asc" ? "↑" : "↓"}
             </Button>
             {!proformaMode && (
               <Button
                 variant={showZeroStock ? "default" : "outline"}
                 size="sm"
                 onClick={() => setShowZeroStock(v => !v)}
-                data-testid="button-show-zero-stock-products"
+                data-testid="button-show-zero-stock"
                 className="gap-1.5"
               >
                 <Eye className="h-4 w-4" />
@@ -2040,493 +1549,203 @@ export default function FactoryLocationInventory() {
           </div>
         </div>
 
-        <div className="md:hidden space-y-3">
-          {regularProducts.length === 0 && specialProducts.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No products found matching your search</div>
-          ) : (
-            <>
-              {regularProducts.map((prod) => {
-                const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
-                const isSelected = selections.has(prod.productId);
-                const selection = selections.get(prod.productId);
-                return (
-                  <Card key={prod.productId} className={`p-3 ${proformaMode && isSelected ? "ring-2 ring-primary" : ""}`} data-testid={`row-product-${prod.productId}`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      {proformaMode && (
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleSelection(prod)}
-                          data-testid={`checkbox-product-mobile-${prod.productId}`}
-                        />
-                      )}
-                      <Package className="h-4 w-4 text-muted-foreground" />
-                      <button
-                        onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)}
-                        className={`text-left font-medium flex-1 ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`}
-                        data-testid={`link-product-mobile-${prod.productId}`}
-                      >
-                        {prod.productName}
-                      </button>
-                      {prod.isInactive && <Badge variant="outline" className="text-xs text-muted-foreground no-default-active-elevate shrink-0">Inactive</Badge>}
-                      {!proformaMode && (
-                        <div className="flex items-center gap-0.5 ml-auto">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            onClick={() => handleReprintProduct(prod)}
-                            data-testid={`button-print-barcodes-mobile-${prod.productId}`}
-                          >
-                            <Tag className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-destructive"
-                            onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }}
-                            data-testid={`button-delete-product-mobile-${prod.productId}`}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      )}
+        {/* Loading skeleton */}
+        {(inventoryLoading || (proformaMode && availableLoading)) && (
+          <div className="space-y-2">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        )}
+
+        {/* Mobile cards */}
+        {!inventoryLoading && !(proformaMode && availableLoading) && (
+          <div className="md:hidden space-y-3">
+            {regularProducts.length === 0 && specialProducts.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground" data-testid="text-no-products">
+                No products found{productSearch || categoryFilter !== "__all__" ? " matching your filters" : " at this location"}
+              </div>
+            ) : (
+              <>
+                {regularProducts.map((prod) => renderMobileCard(prod))}
+                {regularProducts.length > 0 && (
+                  <Card className="p-3 bg-muted/50" data-testid="text-product-totals">
+                    <div className="flex items-center justify-between gap-2 font-bold text-sm">
+                      <span>Total ({regularProducts.length} products, {totalBales.toLocaleString()} bales)</span>
+                      <span className="font-mono">{fmt(totalKg)} KG</span>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                      <span>{prod.articleCode}</span>
-                      {isAllItems && prod.category && (
-                        <span className="text-xs text-muted-foreground">| {prod.category}</span>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Bales: </span>
-                        <span className="font-mono">{prod.baleCount}</span>
-                      </div>
-                      <div className="text-right"><span className="text-muted-foreground">Wt/Bale: </span><span className="font-mono">{fmt(weightPerBale)} KG</span></div>
-                      <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
-                      {!hideSellingPrice && <div className="text-right"><span className="text-muted-foreground">Sell Price: </span><span className="font-mono">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</span></div>}
-                      {!hideSellingPrice && <div><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>}
-                      {!hideSellingPrice && <div className="text-right"><span className="text-muted-foreground">Prod Price: </span><span className="font-mono">{formatAmount(prod.productionPrice)}</span></div>}
-                      {!hideSellingPrice && <div><span className="text-muted-foreground">Prod Value: </span><span className="font-mono font-medium">{formatAmount(prod.baleCount * prod.productionPrice)}</span></div>}
-                    </div>
-                    {proformaMode && isSelected && selection && (
-                      <div className="mt-2 pt-2 border-t flex items-center gap-2 flex-wrap">
-                        <span className="text-xs text-muted-foreground">Qty:</span>
-                        <Input
-                          type="number"
-                          value={selection.selectedQty}
-                          onChange={(e) => updateSelectionQty(prod.productId, e.target.value)}
-                          className="w-20 text-right"
-                          min={1}
-                          data-testid={`input-qty-mobile-${prod.productId}`}
-                        />
-                        <span className="text-xs text-muted-foreground">/ {prod.baleCount}</span>
-                        <span className="text-xs text-muted-foreground ml-2">Price:</span>
-                        <Input
-                          type="number"
-                          value={selection.pricePerBale}
-                          onChange={(e) => updateSelectionPrice(prod.productId, e.target.value)}
-                          className="w-24 text-right"
-                          step="0.01"
-                          data-testid={`input-price-mobile-${prod.productId}`}
-                        />
+                    {!hideSellingPrice && (
+                      <div className="flex justify-between text-sm font-mono font-bold">
+                        <span>{formatAmount(totalSellValue)} sell</span>
+                        <span>{formatAmount(totalProdValue)} prod</span>
                       </div>
                     )}
                   </Card>
-                );
-              })}
-              {regularProducts.length > 0 && (
-                <Card className="p-3 bg-muted/50" data-testid="text-product-totals">
-                  <div className="flex items-center justify-between gap-2 font-bold text-sm">
-                    <span>Total ({regularProducts.length} products, {totalBales.toLocaleString()} bales)</span>
-                    <span className="font-mono">{fmt(totalKg)} KG</span>
-                  </div>
-                  {!hideSellingPrice && <div className="flex justify-between text-sm font-mono font-bold">
-                    <span>{formatAmount(totalSellValue)} sell</span>
-                    <span>{formatAmount(regularProducts.reduce((s, p) => s + p.baleCount * p.productionPrice, 0))} prod</span>
-                  </div>}
-                </Card>
-              )}
-              {isAllItems && specialProducts.length > 0 && (
-                <>
-                  <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide pt-2">Wipers &amp; Garbage</p>
-                  {specialProducts.map((prod) => {
-                    const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
-                    const isSelected = selections.has(prod.productId);
-                    const selection = selections.get(prod.productId);
-                    return (
-                      <Card key={prod.productId} className={`p-3 ${proformaMode && isSelected ? "ring-2 ring-primary" : ""}`} data-testid={`row-product-special-${prod.productId}`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          {proformaMode && (
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => toggleSelection(prod)}
-                              data-testid={`checkbox-product-mobile-${prod.productId}`}
-                            />
-                          )}
-                          <Package className="h-4 w-4 text-muted-foreground" />
-                          <button
-                            onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)}
-                            className={`text-left font-medium flex-1 ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`}
-                            data-testid={`link-product-mobile-sp-${prod.productId}`}
-                          >
-                            {prod.productName}
-                          </button>
-                          {prod.isInactive && <Badge variant="outline" className="text-xs text-muted-foreground no-default-active-elevate shrink-0">Inactive</Badge>}
-                          {!proformaMode && (
-                            <div className="flex items-center gap-0.5 ml-auto">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7"
-                                onClick={() => handleReprintProduct(prod)}
-                                data-testid={`button-print-barcodes-mobile-sp-${prod.productId}`}
-                              >
-                                <Tag className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 text-destructive"
-                                onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }}
-                                data-testid={`button-delete-product-mobile-sp-${prod.productId}`}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                          <span>{prod.articleCode}</span>
-                          <span className="text-xs text-muted-foreground">| {prod.category}</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">Bales: </span>
-                            <span className="font-mono">{prod.baleCount}</span>
-                          </div>
-                          <div className="text-right"><span className="text-muted-foreground">Wt/Bale: </span><span className="font-mono">{fmt(weightPerBale)} KG</span></div>
-                          <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
-                          {!hideSellingPrice && <div className="text-right"><span className="text-muted-foreground">Sell Price: </span><span className="font-mono">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</span></div>}
-                          {!hideSellingPrice && <div><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>}
-                          {!hideSellingPrice && <div className="text-right"><span className="text-muted-foreground">Prod Price: </span><span className="font-mono">{formatAmount(prod.productionPrice)}</span></div>}
-                          {!hideSellingPrice && <div><span className="text-muted-foreground">Prod Value: </span><span className="font-mono font-medium">{formatAmount(prod.baleCount * prod.productionPrice)}</span></div>}
-                        </div>
-                        {proformaMode && isSelected && selection && (
-                          <div className="mt-2 pt-2 border-t flex items-center gap-2 flex-wrap">
-                            <span className="text-xs text-muted-foreground">Qty:</span>
-                            <Input type="number" value={selection.selectedQty} onChange={(e) => updateSelectionQty(prod.productId, e.target.value)} className="w-20 text-right" min={1} data-testid={`input-qty-mobile-sp-${prod.productId}`} />
-                            <span className="text-xs text-muted-foreground">/ {prod.baleCount}</span>
-                            <span className="text-xs text-muted-foreground ml-2">Price:</span>
-                            <Input type="number" value={selection.pricePerBale} onChange={(e) => updateSelectionPrice(prod.productId, e.target.value)} className="w-24 text-right" step="0.01" data-testid={`input-price-mobile-sp-${prod.productId}`} />
-                          </div>
-                        )}
-                      </Card>
-                    );
-                  })}
-                  <Card className="p-3 bg-muted/50" data-testid="text-special-product-totals">
-                    <div className="flex items-center justify-between gap-2 font-bold text-sm">
-                      <span>Total ({specialProducts.length} products, {spProdTotalBales.toLocaleString()} bales)</span>
-                      <span className="font-mono">{fmt(spProdTotalKg)} KG</span>
-                    </div>
-                    {!hideSellingPrice && <div className="text-right text-sm font-mono font-bold">{formatAmount(spProdTotalSellValue)} sell</div>}
-                  </Card>
-                </>
-              )}
-            </>
-          )}
-        </div>
-
-        <div className="hidden md:block space-y-0 w-full">
-          <div className="rounded-md border overflow-x-auto w-full">
-            <table className="table-fixed text-sm" style={{ minWidth: "780px", width: "100%" }}>
-              <colgroup>
-                {proformaMode && <col style={{ width: "36px" }} />}
-                {isAllItems && <col style={{ width: "110px" }} />}
-                <col style={{ minWidth: "200px" }} />
-                <col style={{ width: "70px" }} />
-                {proformaMode && <col style={{ width: "80px" }} />}
-                {proformaMode && <col style={{ width: "110px" }} />}
-                <col style={{ width: "110px" }} />
-                {!hideSellingPrice && <col style={{ width: "110px" }} />}
-                {!hideSellingPrice && <col style={{ width: "130px" }} />}
-                {!hideSellingPrice && <col style={{ width: "110px" }} />}
-                {!hideSellingPrice && <col style={{ width: "130px" }} />}
-                <col style={{ width: "100px" }} />
-                {!proformaMode && <col style={{ width: "80px" }} />}
-              </colgroup>
-              <thead className="bg-muted/50 sticky top-0 z-10">
-                <tr className="h-12">
-                  {proformaMode && <th className="px-2"></th>}
-                  {isAllItems && <th className="text-left px-3 font-medium">Category</th>}
-                  <th className="text-left px-3 font-medium whitespace-nowrap">Bale Name</th>
-                  <th className="text-right px-3 font-medium whitespace-nowrap">{proformaMode ? "Available" : "Bales"}</th>
-                  {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
-                  {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
-                  <th className="text-right px-3 font-medium">Wt/Bale (KG)</th>
-                  {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Price</th>}
-                  {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Value</th>}
-                  {!hideSellingPrice && <th className="text-right px-3 font-medium">Prod Price</th>}
-                  {!hideSellingPrice && <th className="text-right px-3 font-medium">Prod Value</th>}
-                  <th className="text-right px-3 font-medium">Total KG</th>
-                  {!proformaMode && <th></th>}
-                </tr>
-              </thead>
-              <tbody>
-                {regularProducts.length === 0 ? (
-                  <tr>
-                    <td colSpan={colSpanAll} className="text-center py-8 text-muted-foreground">
-                      {specialProducts.length > 0 ? "No regular products found" : "No products found matching your search"}
-                    </td>
-                  </tr>
-                ) : (
+                )}
+                {specialProducts.length > 0 && (
                   <>
-                    {regularProducts.map((prod) => {
-                      const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
-                      const isSelected = selections.has(prod.productId);
-                      const selection = selections.get(prod.productId);
-                      return (
-                        <tr key={prod.productId} className={`border-t h-12 ${proformaMode && isSelected ? "bg-primary/5" : ""}`} data-testid={`row-product-${prod.productId}`}>
-                          {proformaMode && (
-                            <td className="px-2 text-center">
-                              <Checkbox checked={isSelected} onCheckedChange={() => toggleSelection(prod)} data-testid={`checkbox-product-${prod.productId}`} />
-                            </td>
-                          )}
-                          {isAllItems && <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>}
-                          <td className="px-3">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <button onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)} className={`text-left font-medium ${proformaMode ? "" : "hover:underline cursor-pointer"}`} data-testid={`link-product-desktop-${prod.productId}`}>
-                                {prod.productName}
-                              </button>
-                              {prod.isInactive && <Badge variant="outline" className="text-xs text-muted-foreground no-default-active-elevate">Inactive</Badge>}
-                            </div>
-                            {prod.articleCode && <div className="text-xs text-muted-foreground font-mono mt-0.5">{prod.articleCode}</div>}
-                          </td>
-                          <td className="text-right px-3 font-mono whitespace-nowrap">
-                            {prod.baleCount}
-                          </td>
-                          {proformaMode && (
-                            <td className="text-right px-3">
-                              {isSelected && selection ? (
-                                <Input type="number" value={selection.selectedQty} onChange={(e) => updateSelectionQty(prod.productId, e.target.value)} className="w-[70px] text-right ml-auto" min={1} data-testid={`input-qty-${prod.productId}`} />
-                              ) : (<span className="text-muted-foreground">-</span>)}
-                            </td>
-                          )}
-                          {proformaMode && (
-                            <td className="text-right px-3">
-                              {isSelected && selection ? (
-                                <Input type="number" value={selection.pricePerBale} onChange={(e) => updateSelectionPrice(prod.productId, e.target.value)} className="w-[90px] text-right ml-auto" step="0.01" data-testid={`input-price-${prod.productId}`} />
-                              ) : (<span className="text-muted-foreground">-</span>)}
-                            </td>
-                          )}
-                          <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.productionPrice)}</td>}
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.baleCount * prod.productionPrice)}</td>}
-                          <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
-                          {!proformaMode && (
-                            <td className="px-1 text-center">
-                              <div className="flex items-center justify-center gap-0.5">
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7"
-                                  title="Print barcodes"
-                                  onClick={() => handleReprintProduct(prod)}
-                                  data-testid={`button-print-barcodes-${prod.productId}`}
-                                >
-                                  <Tag className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7 text-destructive"
-                                  title="Remove bales"
-                                  onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }}
-                                  data-testid={`button-delete-product-${prod.productId}`}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            </td>
-                          )}
-                        </tr>
-                      );
-                    })}
-                    <tr className="border-t bg-muted/50 h-12 font-bold">
-                      {proformaMode && <td></td>}
-                      <td className="px-3" colSpan={colSpanLabel}>Total ({regularProducts.length} products)</td>
-                      <td className="text-right px-3 font-mono">{totalBales.toLocaleString()}</td>
-                      {proformaMode && <td></td>}
-                      {proformaMode && <td></td>}
-                      <td className="text-right px-3 font-mono">{proformaMode ? fmt(totalKg) : ""}</td>
-                      {!hideSellingPrice && <td className="text-right px-3 font-mono"></td>}
-                      {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(totalSellValue)}</td>}
-                      {!hideSellingPrice && <td className="text-right px-3 font-mono"></td>}
-                      {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(regularProducts.reduce((s, p) => s + p.baleCount * p.productionPrice, 0))}</td>}
-                      <td className="text-right px-3 font-mono">{fmt(totalKg)}</td>
-                      {!proformaMode && <td></td>}
-                    </tr>
+                    <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide pt-2">Wipers &amp; Garbage</p>
+                    {specialProducts.map((prod) => renderMobileCard(prod, "-sp"))}
+                    <Card className="p-3 bg-muted/50" data-testid="text-special-product-totals">
+                      <div className="flex items-center justify-between gap-2 font-bold text-sm">
+                        <span>Total ({specialProducts.length} products, {spTotalBales.toLocaleString()} bales)</span>
+                        <span className="font-mono">{fmt(spTotalKg)} KG</span>
+                      </div>
+                      {!hideSellingPrice && <div className="text-right text-sm font-mono font-bold">{formatAmount(spTotalSellValue)} sell</div>}
+                    </Card>
                   </>
                 )}
-              </tbody>
-            </table>
+              </>
+            )}
           </div>
+        )}
 
-          {isAllItems && specialProducts.length > 0 && (
-            <div className="mt-6">
-              <p className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Wipers &amp; Garbage</p>
-              <div className="rounded-md border overflow-x-auto w-full">
-                <table className="table-fixed text-sm" style={{ minWidth: "780px", width: "100%" }}>
-                  <colgroup>
-                    {proformaMode && <col style={{ width: "36px" }} />}
-                    <col style={{ width: "110px" }} />
-                    <col style={{ minWidth: "200px" }} />
-                    <col style={{ width: "70px" }} />
-                    {proformaMode && <col style={{ width: "80px" }} />}
-                    {proformaMode && <col style={{ width: "110px" }} />}
-                    <col style={{ width: "110px" }} />
-                    <col style={{ width: "110px" }} />
-                    <col style={{ width: "130px" }} />
-                    <col style={{ width: "100px" }} />
-                    {!proformaMode && <col style={{ width: "80px" }} />}
-                  </colgroup>
-                  <thead className="bg-muted/50 sticky top-0 z-10">
-                    <tr className="h-12">
-                      {proformaMode && <th className="px-2"></th>}
-                      <th className="text-left px-3 font-medium">Category</th>
-                      <th className="text-left px-3 font-medium whitespace-nowrap">Bale Name</th>
-                      <th className="text-right px-3 font-medium whitespace-nowrap">{proformaMode ? "Available" : "Bales"}</th>
-                      {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
-                      {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
-                      <th className="text-right px-3 font-medium">Wt/Bale (KG)</th>
-                      {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Price</th>}
-                      {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Value</th>}
-                      {!hideSellingPrice && <th className="text-right px-3 font-medium">Prod Price</th>}
-                      {!hideSellingPrice && <th className="text-right px-3 font-medium">Prod Value</th>}
-                      <th className="text-right px-3 font-medium">Total KG</th>
-                      {!proformaMode && <th></th>}
+        {/* Desktop table */}
+        {!inventoryLoading && !(proformaMode && availableLoading) && (
+          <div className="hidden md:block space-y-0 w-full">
+            <div className="rounded-md border overflow-x-auto w-full">
+              <table className="table-fixed text-sm" style={{ minWidth: "820px", width: "100%" }}>
+                <colgroup>
+                  {proformaMode && <col style={{ width: "36px" }} />}
+                  <col style={{ width: "110px" }} />
+                  <col style={{ minWidth: "200px" }} />
+                  <col style={{ width: "70px" }} />
+                  {proformaMode && <col style={{ width: "80px" }} />}
+                  {proformaMode && <col style={{ width: "110px" }} />}
+                  <col style={{ width: "110px" }} />
+                  {!hideSellingPrice && <col style={{ width: "110px" }} />}
+                  {!hideSellingPrice && <col style={{ width: "130px" }} />}
+                  {!hideSellingPrice && <col style={{ width: "110px" }} />}
+                  {!hideSellingPrice && <col style={{ width: "130px" }} />}
+                  <col style={{ width: "100px" }} />
+                  {!proformaMode && <col style={{ width: "100px" }} />}
+                </colgroup>
+                <thead className="bg-muted/50 sticky top-0 z-10">
+                  <tr className="h-12">
+                    {proformaMode && <th className="px-2"></th>}
+                    <th className="text-left px-3 font-medium">Category</th>
+                    <th className="text-left px-3 font-medium whitespace-nowrap">Product</th>
+                    <th className="text-right px-3 font-medium whitespace-nowrap">{proformaMode ? "Available" : "Bales"}</th>
+                    {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
+                    {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
+                    <th className="text-right px-3 font-medium">Avg KG/Bale</th>
+                    {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Price</th>}
+                    {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Value</th>}
+                    {!hideSellingPrice && <th className="text-right px-3 font-medium">Cost Price</th>}
+                    {!hideSellingPrice && <th className="text-right px-3 font-medium">Cost Value</th>}
+                    <th className="text-right px-3 font-medium">Total KG</th>
+                    {!proformaMode && <th className="text-center px-3 font-medium">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {regularProducts.length === 0 && specialProducts.length === 0 ? (
+                    <tr>
+                      <td colSpan={colSpan} className="text-center py-8 text-muted-foreground" data-testid="text-no-products-desktop">
+                        No products found{productSearch || categoryFilter !== "__all__" ? " matching your filters" : " at this location"}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {specialProducts.map((prod) => {
-                      const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
-                      const isSelected = selections.has(prod.productId);
-                      const selection = selections.get(prod.productId);
-                      return (
-                        <tr key={prod.productId} className={`border-t h-12 ${proformaMode && isSelected ? "bg-primary/5" : ""}`} data-testid={`row-product-special-${prod.productId}`}>
-                          {proformaMode && (
-                            <td className="px-2 text-center">
-                              <Checkbox checked={isSelected} onCheckedChange={() => toggleSelection(prod)} data-testid={`checkbox-product-sp-${prod.productId}`} />
-                            </td>
-                          )}
-                          <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>
-                          <td className="px-3">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <button onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)} className={`text-left font-medium ${proformaMode ? "" : "hover:underline cursor-pointer"}`} data-testid={`link-product-desktop-sp-${prod.productId}`}>
-                                {prod.productName}
-                              </button>
-                              {prod.isInactive && <Badge variant="outline" className="text-xs text-muted-foreground no-default-active-elevate">Inactive</Badge>}
-                            </div>
-                            {prod.articleCode && <div className="text-xs text-muted-foreground font-mono mt-0.5">{prod.articleCode}</div>}
-                          </td>
-                          <td className="text-right px-3 font-mono whitespace-nowrap">
-                            {prod.baleCount}
-                          </td>
-                          {proformaMode && (
-                            <td className="text-right px-3">
-                              {isSelected && selection ? (
-                                <Input type="number" value={selection.selectedQty} onChange={(e) => updateSelectionQty(prod.productId, e.target.value)} className="w-[70px] text-right ml-auto" min={1} data-testid={`input-qty-sp-${prod.productId}`} />
-                              ) : (<span className="text-muted-foreground">-</span>)}
-                            </td>
-                          )}
-                          {proformaMode && (
-                            <td className="text-right px-3">
-                              {isSelected && selection ? (
-                                <Input type="number" value={selection.pricePerBale} onChange={(e) => updateSelectionPrice(prod.productId, e.target.value)} className="w-[90px] text-right ml-auto" step="0.01" data-testid={`input-price-sp-${prod.productId}`} />
-                              ) : (<span className="text-muted-foreground">-</span>)}
-                            </td>
-                          )}
-                          <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.productionPrice)}</td>}
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.baleCount * prod.productionPrice)}</td>}
-                          <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
-                          {!proformaMode && (
-                            <td className="px-1 text-center">
-                              <div className="flex items-center justify-center gap-0.5">
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7"
-                                  title="Print barcodes"
-                                  onClick={() => handleReprintProduct(prod)}
-                                  data-testid={`button-print-barcodes-sp-${prod.productId}`}
-                                >
-                                  <Tag className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7 text-destructive"
-                                  title="Remove bales"
-                                  onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }}
-                                  data-testid={`button-delete-product-sp-${prod.productId}`}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            </td>
-                          )}
+                  ) : (
+                    <>
+                      {regularProducts.map((prod) => renderProductRow(prod))}
+                      {regularProducts.length > 0 && (
+                        <tr className="border-t bg-muted/50 h-12 font-bold">
+                          {proformaMode && <td></td>}
+                          <td className="px-3" colSpan={2}>Total ({regularProducts.length} products)</td>
+                          <td className="text-right px-3 font-mono">{totalBales.toLocaleString()}</td>
+                          {proformaMode && <td></td>}
+                          {proformaMode && <td></td>}
+                          <td className="text-right px-3 font-mono">{proformaMode ? fmt(totalKg) : ""}</td>
+                          {!hideSellingPrice && <td></td>}
+                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(totalSellValue)}</td>}
+                          {!hideSellingPrice && <td></td>}
+                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(totalProdValue)}</td>}
+                          <td className="text-right px-3 font-mono">{fmt(totalKg)}</td>
+                          {!proformaMode && <td></td>}
                         </tr>
-                      );
-                    })}
-                    <tr className="border-t bg-muted/50 h-12 font-bold">
-                      {proformaMode && <td></td>}
-                      <td className="px-3" colSpan={colSpanLabel}>Total ({specialProducts.length} products)</td>
-                      <td className="text-right px-3 font-mono">{spProdTotalBales.toLocaleString()}</td>
-                      {proformaMode && <td></td>}
-                      {proformaMode && <td></td>}
-                      <td className="text-right px-3 font-mono">{proformaMode ? fmt(spProdTotalKg) : ""}</td>
-                      {!hideSellingPrice && <td className="text-right px-3 font-mono"></td>}
-                      {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(spProdTotalSellValue)}</td>}
-                      {!hideSellingPrice && <td className="text-right px-3 font-mono"></td>}
-                      {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(specialProducts.reduce((s, p) => s + p.baleCount * p.productionPrice, 0))}</td>}
-                      <td className="text-right px-3 font-mono">{fmt(spProdTotalKg)}</td>
-                      {!proformaMode && <td></td>}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+                      )}
+                    </>
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
-        </div>
 
-        {filteredProducts.length > 0 && (
+            {specialProducts.length > 0 && (
+              <div className="mt-6">
+                <p className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Wipers &amp; Garbage</p>
+                <div className="rounded-md border overflow-x-auto w-full">
+                  <table className="table-fixed text-sm" style={{ minWidth: "820px", width: "100%" }}>
+                    <colgroup>
+                      {proformaMode && <col style={{ width: "36px" }} />}
+                      <col style={{ width: "110px" }} />
+                      <col style={{ minWidth: "200px" }} />
+                      <col style={{ width: "70px" }} />
+                      {proformaMode && <col style={{ width: "80px" }} />}
+                      {proformaMode && <col style={{ width: "110px" }} />}
+                      <col style={{ width: "110px" }} />
+                      {!hideSellingPrice && <col style={{ width: "110px" }} />}
+                      {!hideSellingPrice && <col style={{ width: "130px" }} />}
+                      {!hideSellingPrice && <col style={{ width: "110px" }} />}
+                      {!hideSellingPrice && <col style={{ width: "130px" }} />}
+                      <col style={{ width: "100px" }} />
+                      {!proformaMode && <col style={{ width: "100px" }} />}
+                    </colgroup>
+                    <thead className="bg-muted/50 sticky top-0 z-10">
+                      <tr className="h-12">
+                        {proformaMode && <th className="px-2"></th>}
+                        <th className="text-left px-3 font-medium">Category</th>
+                        <th className="text-left px-3 font-medium whitespace-nowrap">Product</th>
+                        <th className="text-right px-3 font-medium whitespace-nowrap">{proformaMode ? "Available" : "Bales"}</th>
+                        {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
+                        {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
+                        <th className="text-right px-3 font-medium">Avg KG/Bale</th>
+                        {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Price</th>}
+                        {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Value</th>}
+                        {!hideSellingPrice && <th className="text-right px-3 font-medium">Cost Price</th>}
+                        {!hideSellingPrice && <th className="text-right px-3 font-medium">Cost Value</th>}
+                        <th className="text-right px-3 font-medium">Total KG</th>
+                        {!proformaMode && <th className="text-center px-3 font-medium">Actions</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {specialProducts.map((prod) => renderProductRow(prod, "-sp"))}
+                      <tr className="border-t bg-muted/50 h-12 font-bold">
+                        {proformaMode && <td></td>}
+                        <td className="px-3" colSpan={2}>Total ({specialProducts.length} products)</td>
+                        <td className="text-right px-3 font-mono">{spTotalBales.toLocaleString()}</td>
+                        {proformaMode && <td></td>}
+                        {proformaMode && <td></td>}
+                        <td className="text-right px-3 font-mono">{proformaMode ? fmt(spTotalKg) : ""}</td>
+                        {!hideSellingPrice && <td></td>}
+                        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(spTotalSellValue)}</td>}
+                        {!hideSellingPrice && <td></td>}
+                        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(spTotalProdValue)}</td>}
+                        <td className="text-right px-3 font-mono">{fmt(spTotalKg)}</td>
+                        {!proformaMode && <td></td>}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!inventoryLoading && filteredProducts.length > 0 && (
           <div className="mt-4 text-sm text-muted-foreground">
-            Showing {filteredProducts.length} of {selectedCategory.products.length} products
+            Showing {filteredProducts.length} of {activeInventoryData.length} products
           </div>
         )}
       </Card>
 
+      {/* Proforma sticky footer */}
       {proformaMode && selections.size > 0 && (
         <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-3 shadow-lg">
           <div className="max-w-6xl mx-auto flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 flex-wrap">
-              <Badge variant="secondary" className="text-sm">
-                {selections.size} items
-              </Badge>
-              <span className="text-sm font-mono font-medium">
-                {totalSelectedBales} bales
-              </span>
-              <span className="text-sm font-mono text-muted-foreground">
-                {fmt(totalSelectedKg)} KG
-              </span>
-              <span className="text-sm font-mono text-muted-foreground">
-                {formatAmount(grandTotal)} total
-              </span>
+              <Badge variant="secondary" className="text-sm">{selections.size} items</Badge>
+              <span className="text-sm font-mono font-medium">{totalSelectedBales} bales</span>
+              <span className="text-sm font-mono text-muted-foreground">{fmt(totalSelectedKg)} KG</span>
+              <span className="text-sm font-mono text-muted-foreground">{formatAmount(grandTotal)} total</span>
             </div>
             <div className="flex items-center gap-2">
               {editingProformaId && proformaAutoSave && (
@@ -2550,10 +1769,7 @@ export default function FactoryLocationInventory() {
 
       {renderFinalizeDialog()}
 
-      <Dialog
-        open={overloadWarning.open}
-        onOpenChange={(open) => { if (!open) setOverloadWarning({ open: false, items: [], pendingFn: null }); }}
-      >
+      <Dialog open={overloadWarning.open} onOpenChange={(open) => { if (!open) setOverloadWarning({ open: false, items: [], pendingFn: null }); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle data-testid="text-overload-warning-title">Stock Overload Warning</DialogTitle>
@@ -2584,11 +1800,7 @@ export default function FactoryLocationInventory() {
             </Table>
           </div>
           <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setOverloadWarning({ open: false, items: [], pendingFn: null })}
-              data-testid="button-overload-cancel"
-            >
+            <Button variant="outline" onClick={() => setOverloadWarning({ open: false, items: [], pendingFn: null })} data-testid="button-overload-cancel">
               Cancel
             </Button>
             <Button
@@ -2612,13 +1824,13 @@ export default function FactoryLocationInventory() {
             <DialogTitle>Remove Bales from Stock</DialogTitle>
             <DialogDescription>
               {deleteProduct && (
-                <>Remove bales of <strong>{deleteProduct.productName}</strong> from <strong>{selectedLocation?.name}</strong>. Current stock: <strong>{deleteProduct.baleCount}</strong> bale(s).</>
+                <>Remove bales of <strong>{deleteProduct.productName}</strong> from <strong>{selectedLocation.name}</strong>. Current stock: <strong>{deleteProduct.baleCount}</strong> bale(s).</>
               )}
             </DialogDescription>
           </DialogHeader>
           {!navigator.onLine && (
             <div className="rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
-              You are offline. This removal will be queued and processed when back online. Ensure the supervisor password will not change before reconnecting.
+              You are offline. This removal will be queued and processed when back online.
             </div>
           )}
           <div className="space-y-4 py-2">
@@ -2636,34 +1848,15 @@ export default function FactoryLocationInventory() {
             </div>
             <div className="space-y-1">
               <Label htmlFor="delete-reason">Reason</Label>
-              <Input
-                id="delete-reason"
-                placeholder="e.g. damaged, lost, correction"
-                value={deleteReason}
-                onChange={(e) => setDeleteReason(e.target.value)}
-                data-testid="input-delete-reason"
-              />
+              <Input id="delete-reason" placeholder="e.g. damaged, lost, correction" value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} data-testid="input-delete-reason" />
             </div>
             <div className="space-y-1">
               <Label htmlFor="delete-supervisor-user">Supervisor Username</Label>
-              <Input
-                id="delete-supervisor-user"
-                placeholder="Admin/Owner/Manager username"
-                value={deleteSupervisorUser}
-                onChange={(e) => setDeleteSupervisorUser(e.target.value)}
-                data-testid="input-delete-supervisor-user"
-              />
+              <Input id="delete-supervisor-user" placeholder="Admin/Owner/Manager username" value={deleteSupervisorUser} onChange={(e) => setDeleteSupervisorUser(e.target.value)} data-testid="input-delete-supervisor-user" />
             </div>
             <div className="space-y-1">
               <Label htmlFor="delete-supervisor-pass">Supervisor Password</Label>
-              <Input
-                id="delete-supervisor-pass"
-                type="password"
-                placeholder="Password"
-                value={deleteSupervisorPass}
-                onChange={(e) => setDeleteSupervisorPass(e.target.value)}
-                data-testid="input-delete-supervisor-pass"
-              />
+              <Input id="delete-supervisor-pass" type="password" placeholder="Password" value={deleteSupervisorPass} onChange={(e) => setDeleteSupervisorPass(e.target.value)} data-testid="input-delete-supervisor-pass" />
             </div>
           </div>
           <DialogFooter>
@@ -2692,7 +1885,6 @@ export default function FactoryLocationInventory() {
         </DialogContent>
       </Dialog>
 
-      {/* Barcode Reprint Dialog */}
       <Dialog open={reprintDialogOpen} onOpenChange={(open) => { if (!open) { setReprintDialogOpen(false); setReprintBales([]); setReprintProduct(null); } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -2702,7 +1894,7 @@ export default function FactoryLocationInventory() {
             <DialogDescription>
               {reprintLoading
                 ? "Loading bales…"
-                : `${reprintBales.length} bale(s) in stock at ${selectedLocation?.name}. Click Print to generate labels for all of them.`}
+                : `${reprintBales.length} bale(s) in stock at ${selectedLocation.name}. Click Print to generate labels for all of them.`}
             </DialogDescription>
           </DialogHeader>
           {reprintLoading ? (
@@ -2747,7 +1939,6 @@ export default function FactoryLocationInventory() {
         </DialogContent>
       </Dialog>
 
-      {/* A4 Design Picker for reprint from inventory */}
       <Dialog open={reprintDesignPickerOpen} onOpenChange={setReprintDesignPickerOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -2777,7 +1968,6 @@ export default function FactoryLocationInventory() {
         </DialogContent>
       </Dialog>
 
-      {/* Rename Location Dialog */}
       <Dialog open={renameDialogOpen} onOpenChange={(open) => { if (!open) setRenameDialogOpen(false); }}>
         <DialogContent>
           <DialogHeader>
