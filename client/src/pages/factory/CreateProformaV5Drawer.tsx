@@ -58,9 +58,6 @@ function clearDraft() {
   try { localStorage.removeItem(DRAFT_KEY); } catch {}
 }
 
-function generateContainerNames(count: number): string[] {
-  return Array.from({ length: count }, (_, i) => `Container ${i + 1}`);
-}
 
 export default function CreateProformaV5Drawer({ open, onClose, articleRows, onSuccess }: Props) {
   const { toast } = useToast();
@@ -173,7 +170,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
 
   function handleQtyChange(code: string, val: string) {
     setQuantities(prev => ({ ...prev, [code]: val }));
-    setErrors(prev => { const n = { ...n, ...prev }; delete n[`qty_${code}`]; return n; });
+    setErrors(prev => { const n = { ...prev }; delete n[`qty_${code}`]; return n; });
   }
 
   function handleQtyKeyDown(e: React.KeyboardEvent<HTMLInputElement>, rowIdx: number) {

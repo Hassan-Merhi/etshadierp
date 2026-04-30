@@ -7,26 +7,30 @@ import {
   customerOrders,
   customers,
 } from "@shared/schema";
-import { eq, inArray, sql, and, notInArray } from "drizzle-orm";
+import { eq, inArray, sql, and, gte, lte } from "drizzle-orm";
 
-// ─── Active order statuses for V5 ───────────────────────────────────────────
-// Orders in these statuses represent real loading intent and count toward
-// the expectedToLoad calculation.
-const ACTIVE_ORDER_STATUSES = ["DRAFT", "LOADING", "PENDING_VERIFICATION", "VERIFIED"];
-// Bale-level loading: bales physically scanned into these orders are "in loading"
-const LOADING_BALE_STATUSES = ["LOADING", "PENDING_VERIFICATION"];
+// ─── Status constants ────────────────────────────────────────────────────────
+// Active order statuses from schema enum:
+//   DRAFT | LOADING | PENDING_VERIFICATION | VERIFIED | FINALIZED | CANCELLED
+//
+// expectedToLoad  — orders that represent real loading intent (excludes CANCELLED)
+const ACTIVE_ORDER_STATUSES = ["DRAFT", "LOADING", "PENDING_VERIFICATION", "VERIFIED", "FINALIZED"];
 
-// ─── V5 stock truth ──────────────────────────────────────────────────────────
-// stockAvailable   = IN_STOCK bales (free, not assigned to any order)
-// totalLoaded      = bales scanned into active loading orders
-// expectedToLoad   = sum per article of (line.quantity × linked active order count)
-// freeToPromise    = expectedToLoad - (stockAvailable + totalLoaded)
-//   > 0 → shortage (need more bales)  → show red
-//   ≤ 0 → enough or extra             → normal / green
+// totalLoaded     — bales that have been physically committed to a container
+//                   (all statuses where bales were actually scanned in)
+const TOTAL_LOADED_STATUSES = ["LOADING", "PENDING_VERIFICATION", "VERIFIED", "FINALIZED"];
+
+// V5 formula:
+//   stockAvailable  = IN_STOCK bales not yet assigned to any order
+//   totalLoaded     = bales scanned into any TOTAL_LOADED_STATUSES order
+//   expectedToLoad  = sum per article of (line.qty × linked active order count)
+//   freeToPromise   = expectedToLoad − (stockAvailable + totalLoaded)
+//     > 0 → shortage (need more bales)   → red
+//     ≤ 0 → sufficient                   → green
 
 export function registerFactoryStockAllocationV5Routes(app: Express) {
 
-  // ── Main allocation data ─────────────────────────────────────────────────
+  // ── GET /api/factory/v5/stock-allocation ────────────────────────────────
   app.get("/api/factory/v5/stock-allocation", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -45,22 +49,22 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         ((inStockRaw as any).rows ?? (inStockRaw as any[])).map((r: any) => [r.articleCode, Number(r.count)]),
       );
 
-      // 2. totalLoaded — bales actually scanned into loading orders
+      // 2. totalLoaded — bales physically scanned into loading/verified/finalized orders
       const inLoadingRaw = await db.execute(
         sql`SELECT fb.article_code AS "articleCode", COUNT(*)::int AS count
             FROM customer_order_bales cob
             JOIN factory_bales fb   ON fb.id  = cob.bale_id
             JOIN customer_orders co ON co.id  = cob.order_id
             WHERE co.company_id = ${companyId}
-              AND co.status IN ('LOADING', 'PENDING_VERIFICATION')
+              AND co.status = ANY(${sql.raw(`ARRAY['${TOTAL_LOADED_STATUSES.join("','")}']`)})
             GROUP BY fb.article_code`,
       );
       const inLoadingMap = new Map<string, number>(
         ((inLoadingRaw as any).rows ?? (inLoadingRaw as any[])).map((r: any) => [r.articleCode, Number(r.count)]),
       );
 
-      // 3. Active proformas + lines
-      const activeProformasRaw = await db
+      // 3. Active proformas + lines (with optional date range filter on createdAt)
+      let proformaQuery = db
         .select({
           id: customerProformas.id,
           customerId: customerProformas.customerId,
@@ -70,6 +74,23 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         })
         .from(customerProformas)
         .where(and(eq(customerProformas.companyId, companyId), eq(customerProformas.isActive, true)));
+
+      // Apply date range filter
+      if (fromDate) {
+        const from = new Date(String(fromDate));
+        if (!isNaN(from.getTime())) {
+          proformaQuery = proformaQuery.where(gte(customerProformas.createdAt, from)) as any;
+        }
+      }
+      if (toDate) {
+        const to = new Date(String(toDate));
+        if (!isNaN(to.getTime())) {
+          to.setHours(23, 59, 59, 999);
+          proformaQuery = proformaQuery.where(lte(customerProformas.createdAt, to)) as any;
+        }
+      }
+
+      const activeProformasRaw = await proformaQuery;
 
       const proformaIds = activeProformasRaw.map(p => p.id);
 
@@ -88,7 +109,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         ).map(l => ({ ...l, quantity: Number(l.quantity) }));
       }
 
-      // 4. Count active orders per proforma (for expectedToLoad multiplier)
+      // 4. Active orders per proforma (ACTIVE_ORDER_STATUSES, excludes CANCELLED)
       type OrderRow = { id: number; proformaId: number; containerNumber: string | null; status: string; customerId: number };
       let ordersByProforma: OrderRow[] = [];
       if (proformaIds.length > 0) {
@@ -110,7 +131,8 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         }));
       }
 
-      // 5. Loaded bales per order (for expandable container detail)
+      // 5. Loaded bales per order — for expandable container detail
+      //    Count bales in ALL non-cancelled statuses to reflect actual loaded progress
       type BalesByOrder = { orderId: number; articleCode: string; count: number };
       let loadedBalesByOrder: BalesByOrder[] = [];
       const allOrderIds = ordersByProforma.map(o => o.id);
@@ -143,28 +165,29 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         rows.forEach((c: any) => customerMap.set(c.id, c.legalName));
       }
 
-      // 7. Product names from factory_bale_products
-      const allCodes = [...new Set([...inStockMap.keys(), ...inLoadingMap.keys(), ...allLines.map(l => l.articleCode)])];
-      const productNamesMap: Record<string, string> = {};
-      if (allCodes.length > 0) {
-        const codeArr = sql.raw(`ARRAY[${allCodes.map(c => `'${c.replace(/'/g, "''")}'`).join(",")}]`);
-        const prodRaw = await db.execute(
-          sql`SELECT DISTINCT ON (matched_code) matched_code AS "articleCode", name FROM (
-                SELECT name,
-                  CASE WHEN code = ANY(${codeArr}) THEN code
-                       WHEN article_code = ANY(${codeArr}) THEN article_code
-                  END AS matched_code
-                FROM factory_bale_products
-                WHERE company_id = ${companyId}
-                  AND (code = ANY(${codeArr}) OR article_code = ANY(${codeArr}))
-              ) sub WHERE matched_code IS NOT NULL ORDER BY matched_code`,
-        );
-        ((prodRaw as any).rows ?? (prodRaw as any[])).forEach((r: any) => {
-          if (r.name) productNamesMap[r.articleCode] = r.name;
-        });
-      }
+      // 7. ALL active factory_bale_products — so users can allocate to zero-stock items
+      const allProductsRaw = await db.execute(
+        sql`SELECT COALESCE(article_code, code) AS "articleCode", name
+            FROM factory_bale_products
+            WHERE company_id = ${companyId} AND active = true
+            ORDER BY name`,
+      );
+      const allProductsMap = new Map<string, string>(
+        ((allProductsRaw as any).rows ?? (allProductsRaw as any[])).map((r: any) => [r.articleCode, r.name]),
+      );
 
-      // 8. Build per-article aggregates
+      // 8. Product names — prefer bale_products, fall back to proforma line names
+      const allCodes = new Set([
+        ...inStockMap.keys(),
+        ...inLoadingMap.keys(),
+        ...allLines.map(l => l.articleCode),
+        ...allProductsMap.keys(),
+      ]);
+      const productNamesMap: Record<string, string> = {};
+      allProductsMap.forEach((name, code) => { productNamesMap[code] = name; });
+      allLines.forEach(l => { if (!productNamesMap[l.articleCode]) productNamesMap[l.articleCode] = l.productName; });
+
+      // 9. Build per-article aggregates
       const orderCountByProforma = new Map<number, number>();
       const ordersByProformaId = new Map<number, OrderRow[]>();
       for (const o of ordersByProforma) {
@@ -173,30 +196,22 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         ordersByProformaId.get(o.proformaId)!.push(o);
       }
 
-      // per-article expectedToLoad: sum of line.qty * linked_order_count across all active proformas
+      // expectedToLoad: only proformas with ≥1 active container order contribute
       const expectedMap = new Map<string, number>();
       for (const line of allLines) {
         const cnt = orderCountByProforma.get(line.proformaId) ?? 0;
-        // Even proformas with 0 orders have lines — they don't contribute to expected yet
         if (cnt === 0) continue;
         expectedMap.set(line.articleCode, (expectedMap.get(line.articleCode) ?? 0) + line.quantity * cnt);
       }
 
-      // Union all codes
-      const allArticleCodes = new Set([
-        ...inStockMap.keys(),
-        ...inLoadingMap.keys(),
-        ...expectedMap.keys(),
-      ]);
-
-      // 9. Build product-level rows + expandable proforma/container detail
-      const rows = Array.from(allArticleCodes).sort().map(articleCode => {
+      // 10. Build rows — union of all known codes (including zero-stock active products)
+      const rows = Array.from(allCodes).sort().map(articleCode => {
         const stockAvailable = inStockMap.get(articleCode) ?? 0;
         const totalLoaded    = inLoadingMap.get(articleCode) ?? 0;
         const expectedToLoad = expectedMap.get(articleCode) ?? 0;
         const freeToPromise  = expectedToLoad - (stockAvailable + totalLoaded);
 
-        // Expandable: per-proforma-per-container detail
+        // Per-proforma/per-container expandable detail
         const proformaDetails = activeProformasRaw
           .filter(p => allLines.some(l => l.proformaId === p.id && l.articleCode === articleCode))
           .map(p => {
@@ -227,60 +242,36 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
             };
           });
 
-        const productName = productNamesMap[articleCode]
-          || allLines.find(l => l.articleCode === articleCode)?.productName
-          || articleCode;
-
-        return {
-          articleCode,
-          productName,
-          stockAvailable,
-          totalLoaded,
-          expectedToLoad,
-          freeToPromise,
-          proformaDetails,
-        };
+        const productName = productNamesMap[articleCode] || articleCode;
+        return { articleCode, productName, stockAvailable, totalLoaded, expectedToLoad, freeToPromise, proformaDetails };
       });
 
-      // 10. Apply filters
+      // 11. Apply frontend filters
       let filtered = rows;
       if (productFilter) {
         const q = String(productFilter).toLowerCase();
-        filtered = filtered.filter(r =>
-          r.articleCode.toLowerCase().includes(q) || r.productName.toLowerCase().includes(q),
-        );
+        filtered = filtered.filter(r => r.articleCode.toLowerCase().includes(q) || r.productName.toLowerCase().includes(q));
       }
       if (customerFilter) {
         const q = String(customerFilter).toLowerCase();
-        filtered = filtered.filter(r =>
-          r.proformaDetails.some(d => d.customerName.toLowerCase().includes(q)),
-        );
+        filtered = filtered.filter(r => r.proformaDetails.some(d => d.customerName.toLowerCase().includes(q)));
       }
       if (proformaFilter) {
         const q = String(proformaFilter).toLowerCase();
-        filtered = filtered.filter(r =>
-          r.proformaDetails.some(d => d.proformaName.toLowerCase().includes(q)),
-        );
+        filtered = filtered.filter(r => r.proformaDetails.some(d => d.proformaName.toLowerCase().includes(q)));
       }
       if (containerFilter) {
         const q = String(containerFilter).toLowerCase();
-        filtered = filtered.filter(r =>
-          r.proformaDetails.some(d =>
-            d.containers.some(c => c.containerName.toLowerCase().includes(q)),
-          ),
-        );
+        filtered = filtered.filter(r => r.proformaDetails.some(d => d.containers.some(c => c.containerName.toLowerCase().includes(q))));
       }
       if (statusFilter) {
         const q = String(statusFilter).toUpperCase();
-        filtered = filtered.filter(r =>
-          r.proformaDetails.some(d => d.containers.some(c => c.status === q)),
-        );
+        filtered = filtered.filter(r => r.proformaDetails.some(d => d.containers.some(c => c.status === q)));
       }
       if (hideZero === "true") {
         filtered = filtered.filter(r => r.expectedToLoad > 0 || r.stockAvailable > 0 || r.totalLoaded > 0);
       }
 
-      // Totals row
       const totals = {
         stockAvailable: filtered.reduce((s, r) => s + r.stockAvailable, 0),
         totalLoaded:    filtered.reduce((s, r) => s + r.totalLoaded, 0),
@@ -296,9 +287,8 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
     }
   });
 
-  // ── Create proforma + optional loading containers ────────────────────────
-  // POST /api/factory/v5/proforma-with-loading
-  // Body: { customerId, name, isActive, lines[], sendToLoading, containerCount, containerNames[] }
+  // ── POST /api/factory/v5/proforma-with-loading ──────────────────────────
+  // Body: { customerId, name, isActive, lines[], sendToLoading, containerNames[] }
   app.post("/api/factory/v5/proforma-with-loading", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -317,13 +307,11 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       const names: string[] = Array.isArray(containerNames) ? containerNames.filter(Boolean) : [];
 
       const result = await db.transaction(async (tx: any) => {
-        // Create the proforma
         const [proforma] = await tx
           .insert(customerProformas)
           .values({ companyId, customerId: Number(customerId), name, isActive: isActive ?? false })
           .returning();
 
-        // Create proforma lines
         const lineValues = validLines.map((l: any) => ({
           proformaId: proforma.id,
           articleCode: l.articleCode,
@@ -334,7 +322,6 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         }));
         const insertedLines = await tx.insert(customerProformaLines).values(lineValues).returning();
 
-        // Optionally create loading containers (customer_orders)
         let createdOrders: any[] = [];
         if (sendToLoading && names.length > 0) {
           const today = new Date().toISOString().slice(0, 10);
