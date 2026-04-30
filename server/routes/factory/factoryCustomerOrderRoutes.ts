@@ -3260,16 +3260,19 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       };
       const fmtM = (val: any) => `$${fmtN(val)}`;
 
-      // ── Logo ─────────────────────────────────────────────────────────────────
+      // ── Logo (centred, fixed height so title lands below it) ─────────────────
       const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+      const LOGO_W = 200;
+      const LOGO_H = 87;   // ≈ 200 × (96/220) — matches actual HMD logo aspect ratio
+      const LOGO_TOP = 30;
       if (fs.existsSync(logoPath)) {
-        try { doc.image(logoPath, (PAGE_W - 200) / 2, 40, { width: 200 }); } catch {}
+        try { doc.image(logoPath, (PAGE_W - LOGO_W) / 2, LOGO_TOP, { width: LOGO_W, height: LOGO_H, fit: [LOGO_W, LOGO_H] }); } catch {}
       }
-      const afterLogo = Math.max(doc.y, 80) + 8;
+      const afterLogo = LOGO_TOP + LOGO_H + 10;
 
       // ── Title ─────────────────────────────────────────────────────────────────
-      doc.fontSize(11).font("Helvetica").fillColor("#555555")
-        .text("COMMERCIAL INVOICE", L, afterLogo, { width: USABLE, align: "center" });
+      doc.fontSize(14).font("Helvetica-Bold").fillColor("#000000")
+        .text("INVOICE", L, afterLogo, { width: USABLE, align: "center" });
 
       // ── Divider ───────────────────────────────────────────────────────────────
       const divY = doc.y + 6;
