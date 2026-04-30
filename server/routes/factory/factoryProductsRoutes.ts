@@ -732,9 +732,12 @@ export function registerFactoryProductsRoutes(app: Express) {
           month: sql<number>`EXTRACT(MONTH FROM ${factoryBales.createdAt})`.as("month"),
           balesIn: sql<number>`COUNT(*)::int`.as("bales_in"),
           balesOut: sql<number>`SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED','DELETED','DISPATCHED') THEN 1 ELSE 0 END)::int`.as("bales_out"),
+          // balesPending = bales from this month that are currently IN_STOCK (= Net for this month)
           balesPending: sql<number>`SUM(CASE WHEN ${factoryBales.status} = 'IN_STOCK' THEN 1 ELSE 0 END)::int`.as("bales_pending"),
           totalWeightIn: sql<number>`COALESCE(SUM(${factoryBales.weightKg}::numeric), 0)`.as("total_weight_in"),
           totalWeightOut: sql<number>`COALESCE(SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED','DELETED','DISPATCHED') THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_out"),
+          // Weight of bales from this month that are currently IN_STOCK
+          totalWeightInStock: sql<number>`COALESCE(SUM(CASE WHEN ${factoryBales.status} = 'IN_STOCK' THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_in_stock"),
           totalCost: sql<number>`COALESCE(SUM(${factoryBales.totalCost}::numeric), 0)`.as("total_cost"),
         })
         .from(factoryBales)
@@ -749,13 +752,33 @@ export function registerFactoryProductsRoutes(app: Express) {
         .groupBy(sql`EXTRACT(MONTH FROM ${factoryBales.createdAt})`)
         .orderBy(sql`EXTRACT(MONTH FROM ${factoryBales.createdAt})`);
 
+      // Grand Total Net = actual current IN_STOCK bale count (all-time, not year-filtered)
+      // This matches Location Inventory which uses status='IN_STOCK'
+      const [inStockSnapshot] = await db
+        .select({
+          balesNet: sql<number>`COUNT(*)::int`.as("bales_net"),
+          totalWeightNet: sql<number>`COALESCE(SUM(${factoryBales.weightKg}::numeric), 0)`.as("total_weight_net"),
+        })
+        .from(factoryBales)
+        .where(and(
+          eq(factoryBales.companyId, companyId),
+          eq(factoryBales.productId, productId),
+          eq(factoryBales.erpLocationId, locationId),
+          eq(factoryBales.status, "IN_STOCK"),
+        ));
+
+      const realInStockCount = Number(inStockSnapshot?.balesNet ?? 0);
+      const realInStockWeightKg = Number(inStockSnapshot?.totalWeightNet ?? 0);
+
       const monthlyData = rows.map((r: any) => {
         const balesIn = Number(r.balesIn);
         const balesOut = Number(r.balesOut);
         const balesPending = Number(r.balesPending);
-        const balesNet = balesIn - balesOut - balesPending;
+        // Net (In Stock) for a month = bales from that month still currently IN_STOCK
+        const balesNet = balesPending;
         const totalWeightIn = Number(r.totalWeightIn);
         const totalWeightOut = Number(r.totalWeightOut);
+        const totalWeightInStock = Number(r.totalWeightInStock);
         return {
           month: Number(r.month),
           monthName: monthNames[Number(r.month) - 1],
@@ -766,27 +789,33 @@ export function registerFactoryProductsRoutes(app: Express) {
           balesNet,
           totalWeight: totalWeightIn,
           totalWeightOut,
-          totalWeightNet: totalWeightIn - totalWeightOut,
+          totalWeightNet: totalWeightInStock,
           totalCost: Number(r.totalCost),
           totalSellingValue: balesNet * sellingPricePerBale,
         };
       });
 
-      const grandTotal = monthlyData.reduce(
+      // Sum per-month movements for the grand total row (except Net/KG-Net/Value which use snapshot)
+      const grandTotalMovements = monthlyData.reduce(
         (acc: any, m: any) => ({
           baleCount: acc.baleCount + m.balesIn,
           balesIn: acc.balesIn + m.balesIn,
           balesOut: acc.balesOut + m.balesOut,
           balesPending: acc.balesPending + m.balesPending,
-          balesNet: acc.balesNet + m.balesNet,
           totalWeight: acc.totalWeight + m.totalWeight,
           totalWeightOut: acc.totalWeightOut + m.totalWeightOut,
-          totalWeightNet: acc.totalWeightNet + m.totalWeightNet,
           totalCost: acc.totalCost + m.totalCost,
-          totalSellingValue: acc.totalSellingValue + m.totalSellingValue,
         }),
-        { baleCount: 0, balesIn: 0, balesOut: 0, balesPending: 0, balesNet: 0, totalWeight: 0, totalWeightOut: 0, totalWeightNet: 0, totalCost: 0, totalSellingValue: 0 }
+        { baleCount: 0, balesIn: 0, balesOut: 0, balesPending: 0, totalWeight: 0, totalWeightOut: 0, totalCost: 0 }
       );
+
+      // Grand Total Net and KG Net come from the live IN_STOCK snapshot (matches Location Inventory)
+      const grandTotal = {
+        ...grandTotalMovements,
+        balesNet: realInStockCount,
+        totalWeightNet: realInStockWeightKg,
+        totalSellingValue: realInStockCount * sellingPricePerBale,
+      };
 
       res.json({ product, location, year, monthlyData, grandTotal });
     } catch (error: any) {
