@@ -3065,6 +3065,10 @@ export const customerOrderExpectedLines = pgTable("customer_order_expected_lines
 }, (t) => ({
   orderIdx: index("coel_order_idx").on(t.orderId),
   companyIdx: index("coel_company_idx").on(t.companyId),
+  // Uniqueness: one expected line per container per article.
+  // Prevents duplicate rows from concurrent backfill GET requests.
+  // proforma_line_id is always non-null for V5 orders; we key on article_code for semantic clarity.
+  orderArticleUnique: uniqueIndex("coel_order_article_unique").on(t.orderId, t.articleCode),
 }));
 
 export const insertCustomerOrderExpectedLineSchema = createInsertSchema(customerOrderExpectedLines).omit({

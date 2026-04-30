@@ -175,6 +175,10 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       if (proformaIds.length > 0) {
         try {
           await db.execute(
+            // NOT EXISTS is the fast path — avoids any write when rows already exist.
+            // ON CONFLICT DO NOTHING is the race-condition safety net for concurrent GETs
+            // that both reach the backfill simultaneously before the first one commits.
+            // Together these make the backfill fully idempotent with no duplicates.
             sql`INSERT INTO customer_order_expected_lines
                   (company_id, order_id, proforma_id, proforma_line_id, article_code, product_name, expected_qty)
                 SELECT co.company_id, co.id, co.proforma_id_used, cpl.id,
@@ -188,7 +192,8 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
                   AND NOT EXISTS (
                     SELECT 1 FROM customer_order_expected_lines cel
                     WHERE cel.order_id = co.id AND cel.article_code = cpl.article_code
-                  )`,
+                  )
+                ON CONFLICT (order_id, article_code) DO NOTHING`,
           );
         } catch (_backfillErr) {
           // Non-fatal: backfill failure must never block the GET response

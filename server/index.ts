@@ -1750,6 +1750,10 @@ let migrationsDone = false;
     )`,
     `CREATE INDEX IF NOT EXISTS coel_order_idx   ON customer_order_expected_lines (order_id)`,
     `CREATE INDEX IF NOT EXISTS coel_company_idx ON customer_order_expected_lines (company_id)`,
+    // Uniqueness constraint: one expected line per container × article_code.
+    // Prevents duplicate rows if two concurrent GET requests both trigger the backfill.
+    // ON CONFLICT DO NOTHING in the backfill INSERT is the paired application-level guard.
+    `CREATE UNIQUE INDEX IF NOT EXISTS coel_order_article_unique ON customer_order_expected_lines (order_id, article_code)`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
