@@ -96,6 +96,7 @@ const navSections: NavSection[] = [
       { title: "Customers",        url: "/factory/customers",              icon: Users          },
       { title: "Invoicing",        url: "/factory/invoicing",              icon: FileText       },
       { title: "Stock Allocation", url: "/factory/stock-allocation",       icon: LayoutGrid     },
+      { title: "Allocation V5",    url: "/factory/stock-allocation-v5",   icon: LayoutGrid     },
       { title: "Loadings",         url: "/factory/sales/loadings",         icon: Container      },
     ],
   },
