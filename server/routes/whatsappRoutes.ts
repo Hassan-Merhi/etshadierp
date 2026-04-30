@@ -518,8 +518,21 @@ export function registerWhatsAppRoutes(app: Express) {
       const yearStart = `${new Date(today).getFullYear()}-01-01`;
 
       // 1. Stock PDF
-      console.log(`[WhatsApp] Generating stock PDF for ${company.name}…`);
-      const pdfBuf   = await generateStockPdf(companyId, company.name);
+      console.log(`[WhatsApp] Generating stock PDF for ${company.name} (companyId=${companyId})…`);
+      const { buffer: pdfBuf, pageCount, rowCount } = await generateStockPdf(companyId, company.name);
+      const maxExpectedPages = Math.ceil(rowCount / 20) + 5;
+      console.log(`[WhatsApp] Stock PDF generated: companyId=${companyId} company="${company.name}" rowCount=${rowCount} pageCount=${pageCount} maxExpectedPages=${maxExpectedPages}`);
+
+      // Safety guard: refuse to send a suspiciously over-paginated PDF.
+      // Root cause of the 177-page bug: PDFKit ≥0.17 exposes page.maxY as a function;
+      // the old code compared doc.y + need > functionObject which is always false,
+      // so ensureSpace() never added pages and PDFKit auto-broke every row.
+      if (rowCount > 0 && pageCount > maxExpectedPages) {
+        const message = `Refusing to send suspicious stock PDF: ${pageCount} pages for ${rowCount} rows (max expected: ${maxExpectedPages}). company="${company.name}"`;
+        console.error(`[WhatsApp] SAFETY GUARD: ${message}`);
+        return res.status(500).json({ message });
+      }
+
       const pdfName  = `Stock_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.pdf`;
       const pdfCap   = `Stock Inventory with Cost — ${company.name}\nAs of ${today}`;
       const pdfRes   = await sendWhatsAppFileToChatId(chatId, pdfBuf, pdfName, pdfCap, "application/pdf");
