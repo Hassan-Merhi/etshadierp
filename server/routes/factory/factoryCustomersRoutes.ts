@@ -569,7 +569,8 @@ export function registerFactoryCustomersRoutes(app: Express) {
         .where(and(eq(customers.id, customerId), eq(customers.companyId, companyId)));
       if (!customer) return res.status(404).json({ message: "Customer not found" });
 
-      const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
+      const [company]  = await db.select().from(companies).where(eq(companies.id, companyId));
+      const [settings] = await db.select().from(companySettings).where(eq(companySettings.companyId, companyId));
 
       const balanceRows = await db.select().from(customerBalances)
         .where(and(eq(customerBalances.companyId, companyId), eq(customerBalances.customerId, customerId)))
@@ -631,14 +632,17 @@ export function registerFactoryCustomersRoutes(app: Express) {
         const debit = parseFloat(row.debitAmount || "0");
         const credit = parseFloat(row.creditAmount || "0");
         runningBalance += debit - credit;
-        // Use container number as description for INVOICE rows
-        let desc = row.description || "—";
-        let destination = "";
+        // container  — real container number for INVOICE rows only
+        // particulars — destination for INVOICE rows; narration/description for all others
+        let container   = "";
+        let particulars = "";
         if (row.referenceType === "INVOICE" && row.referenceId) {
-          desc = containerNumMap.get(row.referenceId) || desc;
-          destination = destinationMapPdf.get(row.referenceId) || "";
+          container   = containerNumMap.get(row.referenceId) || "";
+          particulars = destinationMapPdf.get(row.referenceId) || "";
+        } else {
+          particulars = row.description || "";
         }
-        return { ...row, debit, credit, desc, destination };
+        return { ...row, debit, credit, container, particulars };
       });
 
       const totalDr = rows.reduce((s: number, r: any) => s + r.debit, 0);
@@ -673,25 +677,48 @@ export function registerFactoryCustomersRoutes(app: Express) {
         return map[type] || type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
       };
 
-      const PDFDocument = (await import("pdfkit")).default;
-      const pathModCust = await import("path");
+      const PDFDocument  = (await import("pdfkit")).default;
+      const pathModCust  = await import("path");
 
-      // Arabic font + reshaper — always load
-      const custFontDir = pathModCust.join(process.cwd(), "server", "fonts");
+      // ── Arabic font ──
+      const custFontDir       = pathModCust.join(process.cwd(), "server", "fonts");
       const custArabicFontPath = pathModCust.join(custFontDir, "Amiri-Regular.ttf");
       const custHasArabicFont = fs.existsSync(custArabicFontPath);
+      const custHmdLogoPath   = path.join(process.cwd(), "server", "hmd-logo.png");
 
-      const doc = new PDFDocument({ margin: 40, size: "A4" });
+      // ── Fetch company logo — prefer companySettings.logoUrl, fall back to disk ──
+      let logoBuffer: Buffer | null = null;
+      const logoUrl = (settings as any)?.logoUrl as string | undefined;
+      if (logoUrl) {
+        try {
+          logoBuffer = await new Promise<Buffer>((resolve, reject) => {
+            const proto = logoUrl.startsWith("https") ? require("https") : require("http");
+            proto.get(logoUrl, (r: any) => {
+              const parts: Buffer[] = [];
+              r.on("data", (d: Buffer) => parts.push(d));
+              r.on("end", () => resolve(Buffer.concat(parts)));
+              r.on("error", reject);
+            }).on("error", reject);
+          });
+        } catch { logoBuffer = null; }
+      }
+      if (!logoBuffer && fs.existsSync(custHmdLogoPath)) {
+        try { logoBuffer = fs.readFileSync(custHmdLogoPath); } catch {}
+      }
+
+      // ── PDF document ──
+      const doc = new PDFDocument({ margin: 40, size: "A4", autoFirstPage: true });
       if (custHasArabicFont) doc.registerFont("Arabic", custArabicFontPath);
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename=statement_${(customer.code || customerId).toString().replace(/\s+/g, "_")}.pdf`);
       doc.pipe(res);
 
+      // ── Arabic reshaper ──
       let custConvAr: ((t: string) => string) | null = null;
       let custBidi: { getEmbeddingLevels: (t: string, d: string) => any; getReorderedString: (t: string, l: any) => string } | null = null;
       try {
         custConvAr = (require("arabic-reshaper") as any).convertArabic;
-        custBidi = (require("bidi-js") as any)();
+        custBidi   = (require("bidi-js") as any)();
       } catch {}
       const custHasAr = (t: string) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(t);
       const custShape = (t: string): string => {
@@ -702,113 +729,185 @@ export function registerFactoryCustomersRoutes(app: Express) {
           return r;
         } catch { return t; }
       };
-      const custRender = (text: string, x: number, yPos: number, w: number, align: "left"|"right" = "left", allowWrap = false) => {
+
+      // ── Page geometry ──
+      const PAGE_W     = doc.page.width;   // 595
+      const MARGIN     = 40;
+      const CONTENT_W  = PAGE_W - MARGIN * 2; // 515
+      const SAFE_BOT   = doc.page.height - 55; // leave 55 px at bottom
+
+      // ── Column layout: Date | Type | Container | Particulars | Debit | Credit ──
+      const colX   = [40,  115, 185, 285, 380, 468] as const;
+      const colW   = [75,   70, 100,  95,  88,  87] as const;
+      const colHdr = ["Date", "Type", "Container", "Particulars", "Debit (Dr)", "Credit (Cr)"];
+      const colAlignArr: Array<"left" | "right"> = ["left", "left", "left", "left", "right", "right"];
+
+      const CP      = 3;   // cell horizontal padding each side
+      const ROW_PAD = 3;   // vertical padding top+bottom per row
+      const MIN_ROW = 14;  // minimum row height
+      const HDR_H   = 16;  // table column-header height
+      const FS      = 7.5; // body font size
+
+      let y = MARGIN;
+
+      // ── Helper: wrapping cell render with Arabic support ──
+      const cellRender = (text: string, x: number, yPos: number, w: number, align: "left" | "right" = "left") => {
+        if (!text) return;
         const ar = custHasArabicFont && custHasAr(text);
-        doc.font(ar ? "Arabic" : "Helvetica").fontSize(8)
-          .text(ar ? custShape(text) : text, x, yPos, { width: w, align: ar ? "right" : align, lineBreak: allowWrap });
+        doc.font(ar ? "Arabic" : "Helvetica").fontSize(FS)
+          .text(ar ? custShape(text) : text, x, yPos, { width: w, align: ar ? "right" : align, lineBreak: true });
       };
 
-      // ── Logo centred, taller ──
-      const pageW = doc.page.width; // 595
-      const logoW = 220;
-      const logoH = 96;
-      const custHmdLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
-      if (fs.existsSync(custHmdLogoPath)) {
-        try { doc.image(custHmdLogoPath, (pageW - logoW) / 2, 10, { width: logoW, height: logoH, fit: [logoW, logoH] }); } catch {}
+      // ── Helper: measure a cell's wrapped height ──
+      const cellH = (text: string, w: number): number => {
+        if (!text) return 0;
+        doc.font("Helvetica").fontSize(FS);
+        return doc.heightOfString(text, { width: w });
+      };
+
+      // ── Helper: draw table column header (updates y) ──
+      const drawTableHdr = () => {
+        doc.rect(MARGIN, y, CONTENT_W, HDR_H).fill("#1F3864");
+        doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(FS);
+        colHdr.forEach((h, i) => {
+          doc.text(h, colX[i] + CP, y + 4, { width: colW[i] - CP * 2, align: colAlignArr[i], lineBreak: false });
+        });
+        doc.fillColor("#000000").font("Helvetica").fontSize(FS);
+        y += HDR_H;
+      };
+
+      // ── Helper: ensure vertical space; add page + redraw header if needed ──
+      const ensureSpace = (needed: number) => {
+        if (y + needed > SAFE_BOT) {
+          doc.addPage();
+          y = MARGIN;
+          drawTableHdr();
+        }
+      };
+
+      // ── Logo — centered, max 180 × 80, aspect-ratio preserved ──
+      const LOGO_MAX_W = 180;
+      const LOGO_MAX_H = 80;
+      if (logoBuffer) {
+        try {
+          doc.image(logoBuffer, (PAGE_W - LOGO_MAX_W) / 2, 12, { fit: [LOGO_MAX_W, LOGO_MAX_H] });
+          y = 12 + LOGO_MAX_H + 6;
+        } catch { y = 40; }
       }
 
-      // ── Dark header bar (centred title) ──
-      const hdrTop = 114;
-      doc.rect(40, hdrTop, 515, 36).fill("#1F3864");
-      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(14)
-        .text("Account Statement", 40, hdrTop + 11, { width: 515, align: "center" });
+      // ── Company name below logo ──
+      doc.fillColor("#000000").font("Helvetica-Bold").fontSize(10)
+        .text(company?.name || "", MARGIN, y, { width: CONTENT_W, align: "center", lineBreak: false });
+      y += 15;
 
-      // ── Customer info block (single line: "Customer: NAME") ──
-      const infoY = 158;
-      doc.fillColor("#000000").font("Helvetica").fontSize(9);
-      const custLabel = "Customer: ";
-      doc.text(custLabel, 40, infoY, { continued: true });
-      doc.font("Helvetica-Bold");
-      custRender(customer.legalName, 40 + doc.widthOfString(custLabel), infoY, 300);
-      doc.font("Helvetica");
+      // ── "Account Statement" banner ──
+      doc.rect(MARGIN, y, CONTENT_W, 30).fill("#1F3864");
+      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(13)
+        .text("Account Statement", MARGIN, y + 8, { width: CONTENT_W, align: "center", lineBreak: false });
+      y += 34;
 
-      // ── Table ──
-      const colX   = [40,  115, 185, 285, 380, 468];
-      const colW   = [75,   70, 100,  95,  88,  87];
-      const colHdr = ["Date", "Type", "Container", "Destination", "Debit (Dr)", "Credit (Cr)"];
-      const colAlign: Array<"left" | "right"> = ["left", "left", "left", "left", "right", "right"];
-      const tableTop = infoY + 22;
+      // ── Customer info line ──
+      doc.fillColor("#000000").font("Helvetica").fontSize(9)
+        .text("Customer:  ", MARGIN, y, { continued: true });
+      const lnm = customer.legalName || "";
+      if (custHasArabicFont && custHasAr(lnm)) {
+        doc.font("Arabic").fontSize(9).text(custShape(lnm));
+      } else {
+        doc.font("Helvetica-Bold").fontSize(9).text(lnm);
+      }
+      y += 18;
 
-      doc.rect(40, tableTop, 515, 14).fill("#1F3864");
-      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(8);
-      colHdr.forEach((h, i) => {
-        doc.text(h, colX[i] + 2, tableTop + 3, { width: colW[i] - 4, align: colAlign[i] });
-      });
+      // ── Table header ──
+      drawTableHdr();
 
-      doc.fillColor("#000000").font("Helvetica").fontSize(8);
-      let y = tableTop + 16;
-
+      // ── Data rows ──
       rows.forEach((row: any, idx: number) => {
-        const rowH = row.rowNote ? 21 : 13;
-        if (y > 760) { doc.addPage(); y = 40; }
-        if (idx % 2 === 1) { doc.rect(40, y, 515, rowH).fill("#F8F8F8"); doc.fillColor("#000000"); }
-        doc.font("Helvetica").fontSize(8);
-        doc.text(fmtDate(row.transactionDate), colX[0] + 2, y + 3, { width: colW[0] - 4, lineBreak: false });
-        doc.text(txLabel(row.transactionType), colX[1] + 2, y + 3, { width: colW[1] - 4, lineBreak: false });
-        custRender(row.desc || "—", colX[2] + 2, y + 3, colW[2] - 4, "left", false);
-        if (row.destination) custRender(row.destination, colX[3] + 2, y + 3, colW[3] - 4, "left", false);
-        doc.font("Helvetica").fontSize(8);
-        if (row.debit > 0) doc.text(fmtAmt(row.debit), colX[4] + 2, y + 3, { width: colW[4] - 4, align: "right", lineBreak: false });
-        if (row.credit > 0) doc.text(fmtAmt(row.credit), colX[5] + 2, y + 3, { width: colW[5] - 4, align: "right", lineBreak: false });
-        if (row.rowNote) {
-          doc.fillColor("#555555").font("Helvetica-Oblique").fontSize(6.5)
-            .text(`↳ ${row.rowNote}`, colX[2] + 4, y + 13, { width: colW[2] + colW[3] + colW[4] + colW[5] - 8 });
+        const cTxt = row.container   || "";
+        const pTxt = row.particulars || "";
+
+        // Calculate row height from the two wrapping columns
+        const rowH = Math.max(MIN_ROW, cellH(cTxt, colW[2] - CP * 2), cellH(pTxt, colW[3] - CP * 2)) + ROW_PAD * 2;
+
+        ensureSpace(rowH);
+
+        // Alternating row background
+        if (idx % 2 === 1) {
+          doc.rect(MARGIN, y, CONTENT_W, rowH).fill("#F7F8FC");
           doc.fillColor("#000000");
         }
+
+        // Bottom separator
+        doc.moveTo(MARGIN, y + rowH - 0.5).lineTo(MARGIN + CONTENT_W, y + rowH - 0.5)
+          .lineWidth(0.2).strokeColor("#DADADA").stroke();
+
+        doc.font("Helvetica").fontSize(FS).fillColor("#000000");
+
+        // Date
+        doc.text(fmtDate(row.transactionDate), colX[0] + CP, y + ROW_PAD, { width: colW[0] - CP * 2, lineBreak: false });
+        // Type
+        doc.text(txLabel(row.transactionType), colX[1] + CP, y + ROW_PAD, { width: colW[1] - CP * 2, lineBreak: false });
+        // Container — only for INVOICE rows
+        cellRender(cTxt, colX[2] + CP, y + ROW_PAD, colW[2] - CP * 2);
+        // Particulars — destination (INVOICE) or narration (others)
+        cellRender(pTxt, colX[3] + CP, y + ROW_PAD, colW[3] - CP * 2);
+        // Reset font after possible Arabic
+        doc.font("Helvetica").fontSize(FS).fillColor("#000000");
+        // Debit
+        if (row.debit > 0)
+          doc.text(fmtAmt(row.debit),  colX[4] + CP, y + ROW_PAD, { width: colW[4] - CP * 2, align: "right", lineBreak: false });
+        // Credit
+        if (row.credit > 0)
+          doc.text(fmtAmt(row.credit), colX[5] + CP, y + ROW_PAD, { width: colW[5] - CP * 2, align: "right", lineBreak: false });
+        // Row note (kept for backward compat)
+        if (row.rowNote) {
+          doc.fillColor("#666666").font("Helvetica-Oblique").fontSize(6)
+            .text(`↳ ${row.rowNote}`, colX[2] + CP + 2, y + rowH - 9,
+              { width: colW[2] + colW[3] + colW[4] + colW[5] - CP * 2, lineBreak: false });
+          doc.fillColor("#000000");
+        }
+
         y += rowH;
       });
 
-      // Separator
-      y += 3;
-      doc.moveTo(40, y).lineTo(555, y).lineWidth(0.5).strokeColor("#888888").stroke();
+      // ── Separator ──
+      ensureSpace(55);
+      y += 4;
+      doc.moveTo(MARGIN, y).lineTo(MARGIN + CONTENT_W, y).lineWidth(0.75).strokeColor("#888888").stroke();
       y += 6;
 
-      // Totals row
-      doc.rect(40, y, 515, 15).fill("#1F3864");
-      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(8);
-      doc.text("TOTAL", colX[2] + 2, y + 4, { width: colW[2] - 4 });
-      doc.text(fmtAmt(totalDr) || "$0", colX[4] + 2, y + 4, { width: colW[4] - 4, align: "right" });
-      doc.text(fmtAmt(totalCr) || "$0", colX[5] + 2, y + 4, { width: colW[5] - 4, align: "right" });
-      y += 17;
+      // ── TOTAL row ──
+      ensureSpace(18);
+      doc.rect(MARGIN, y, CONTENT_W, 16).fill("#1F3864");
+      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(FS);
+      doc.text("TOTAL", colX[2] + CP, y + 4, { width: colW[2] - CP * 2, lineBreak: false });
+      doc.text(fmtAmt(totalDr) || "$0", colX[4] + CP, y + 4, { width: colW[4] - CP * 2, align: "right", lineBreak: false });
+      doc.text(fmtAmt(totalCr) || "$0", colX[5] + CP, y + 4, { width: colW[5] - CP * 2, align: "right", lineBreak: false });
+      y += 18;
 
-      // Closing balance row
-      doc.rect(40, y, 515, 15).fill("#EFF3FB");
-      doc.fillColor("#000000").font("Helvetica-Bold").fontSize(8);
-      doc.text("Closing Balance", colX[2] + 2, y + 4, { width: colW[2] - 4 });
+      // ── Closing Balance row ──
+      ensureSpace(18);
+      doc.rect(MARGIN, y, CONTENT_W, 16).fill("#EFF3FB");
+      doc.fillColor("#000000").font("Helvetica-Bold").fontSize(FS);
+      doc.text("Closing Balance", colX[2] + CP, y + 4, { width: colW[2] - CP * 2, lineBreak: false });
       const closingStr = fmtBalance(closingBalance, closingBalanceSide);
       if (closingBalanceSide === "Dr") {
-        doc.text(closingStr, colX[4] + 2, y + 4, { width: colW[4] - 4, align: "right" });
+        doc.text(closingStr, colX[4] + CP, y + 4, { width: colW[4] - CP * 2, align: "right", lineBreak: false });
       } else {
-        doc.text(closingStr, colX[5] + 2, y + 4, { width: colW[5] - 4, align: "right" });
+        doc.text(closingStr, colX[5] + CP, y + 4, { width: colW[5] - CP * 2, align: "right", lineBreak: false });
       }
       y += 20;
 
-      // Statement note (if set)
+      // ── Statement note ──
       if (customer.statementNote) {
-        if (y > 740) { doc.addPage(); y = 40; }
-        doc.rect(40, y, 515, 13).fill("#F4F6FB");
-        doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8);
-        doc.text("Note:", 42, y + 3, { width: 38 });
-        doc.font("Helvetica").fontSize(8);
-        const noteLines = doc.heightOfString(customer.statementNote, { width: 468 });
-        const noteH = Math.max(13, noteLines + 6);
-        if (noteH > 13) {
-          doc.rect(40, y, 515, noteH).fill("#F4F6FB");
-          doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8);
-          doc.text("Note:", 42, y + 3, { width: 38 });
-          doc.font("Helvetica").fontSize(8);
-        }
-        doc.fillColor("#333333").text(customer.statementNote, 82, y + 3, { width: 468, lineBreak: true });
+        doc.font("Helvetica").fontSize(FS);
+        const noteH = Math.max(16, doc.heightOfString(customer.statementNote, { width: CONTENT_W - 50 }) + 8);
+        ensureSpace(noteH);
+        doc.rect(MARGIN, y, CONTENT_W, noteH).fill("#F4F6FB");
+        doc.fillColor("#333333").font("Helvetica-Bold").fontSize(FS)
+          .text("Note:", MARGIN + 2, y + 4, { width: 38, lineBreak: false });
+        doc.font("Helvetica").fontSize(FS)
+          .text(customer.statementNote, MARGIN + 42, y + 4, { width: CONTENT_W - 50, lineBreak: true });
+        doc.fillColor("#000000");
       }
 
       doc.end();
