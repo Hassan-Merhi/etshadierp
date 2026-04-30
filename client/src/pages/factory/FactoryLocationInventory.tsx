@@ -95,6 +95,7 @@ interface V5LocationRow {
   reservedExpected: number;
   loading: number;
   availableBalance: number;
+  weightPerBaleKg: number;
 }
 interface V5LocationSummary {
   rows: V5LocationRow[];
@@ -1419,6 +1420,7 @@ export default function FactoryLocationInventory() {
                       <th className="px-3 py-2 text-right font-medium text-muted-foreground">In Stock</th>
                       <th className="px-3 py-2 text-right font-medium text-muted-foreground" title="Company-wide: V5 draft containers are not yet location-specific">Co.-Wide Reserved</th>
                       <th className="px-3 py-2 text-right font-medium text-muted-foreground">Loading</th>
+                      <th className="px-3 py-2 text-right font-medium text-muted-foreground">Wt/Bale (KG)</th>
                       <th className="px-3 py-2 text-right font-medium">Available</th>
                     </tr>
                   </thead>
@@ -1436,6 +1438,7 @@ export default function FactoryLocationInventory() {
                         <td className="px-3 py-2 text-right font-mono">{row.inStock.toLocaleString()}</td>
                         <td className="px-3 py-2 text-right font-mono text-muted-foreground">{row.reservedExpected.toLocaleString()}</td>
                         <td className="px-3 py-2 text-right font-mono text-muted-foreground">{row.loading.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right font-mono text-muted-foreground">{row.weightPerBaleKg > 0 ? row.weightPerBaleKg.toLocaleString() : "0"}</td>
                         <td className={`px-3 py-2 text-right font-mono font-semibold ${row.availableBalance < 0 ? "text-destructive" : "text-green-600 dark:text-green-400"}`}
                           data-testid={`text-v5-available-${row.articleCode}`}
                         >

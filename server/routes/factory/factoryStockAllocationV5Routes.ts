@@ -816,16 +816,17 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         ((loadingRaw as any).rows ?? []).map((r: any) => [r.articleCode, Number(r.count)]),
       );
 
-      // 4. Resolve product names (bidirectional code/articleCode lookup — same pattern as V5 GET)
+      // 4. Resolve product names + weight_per_bale_kg (bidirectional code/articleCode lookup)
       const allCodes = new Set([...inStockMap.keys(), ...reservedMap.keys(), ...loadingMap.keys()]);
       const productNameMap = new Map<string, string>();
+      const weightMap = new Map<string, number>();
       if (allCodes.size > 0) {
         const codeArr = sql.raw(
           `ARRAY[${Array.from(allCodes).map(c => `'${c.replace(/'/g, "''")}'`).join(",")}]`,
         );
         const nameRaw = await db.execute(
-          sql`SELECT DISTINCT ON (matched_code) matched_code AS "articleCode", name FROM (
-                SELECT name,
+          sql`SELECT DISTINCT ON (matched_code) matched_code AS "articleCode", name, weight_per_bale_kg AS "weightPerBaleKg" FROM (
+                SELECT name, weight_per_bale_kg,
                   CASE WHEN code        = ANY(${codeArr}) THEN code
                        WHEN article_code = ANY(${codeArr}) THEN article_code
                   END AS matched_code
@@ -838,15 +839,17 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         );
         ((nameRaw as any).rows ?? []).forEach((r: any) => {
           if (r.name) productNameMap.set(r.articleCode, r.name);
+          if (r.weightPerBaleKg != null) weightMap.set(r.articleCode, parseFloat(r.weightPerBaleKg));
         });
       }
 
       // 5. Build per-article rows; exclude rows with all zeros
       const rows = Array.from(allCodes).sort().map(articleCode => {
-        const inStock         = inStockMap.get(articleCode) ?? 0;
+        const inStock          = inStockMap.get(articleCode) ?? 0;
         const reservedExpected = reservedMap.get(articleCode) ?? 0;
         const loading          = loadingMap.get(articleCode) ?? 0;
         const availableBalance = inStock - reservedExpected - loading;
+        const weightPerBaleKg  = weightMap.get(articleCode) ?? 0;
         return {
           articleCode,
           productName: productNameMap.get(articleCode) ?? articleCode,
@@ -854,6 +857,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
           reservedExpected,
           loading,
           availableBalance,
+          weightPerBaleKg,
         };
       }).filter(r => r.inStock > 0 || r.reservedExpected > 0 || r.loading > 0);
 
