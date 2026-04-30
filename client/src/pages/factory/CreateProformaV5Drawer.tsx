@@ -423,8 +423,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
             <thead>
               <tr className="bg-muted sticky top-0 z-10">
                 <th className="text-left px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[200px] sticky left-0 bg-muted z-20">Product</th>
-                <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[100px]">Stock Available</th>
-                <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[90px] text-blue-600 dark:text-blue-400">In Loading</th>
+                <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[120px]">Free to Promise</th>
                 <th className="text-center px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[110px]">Qty / Container</th>
                 {sendToLoading && n > 0 && (
                   <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[110px] text-amber-600 dark:text-amber-400">
@@ -457,15 +456,19 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
                   >
                     <td className="px-3 py-1.5 border-r sticky left-0 bg-inherit z-10">
                       <div className="font-medium truncate max-w-[220px] text-xs leading-tight" title={row.productName}>{row.productName}</div>
-                      {row.productName !== row.articleCode && (
-                        <div className="text-[10px] text-muted-foreground font-mono">{row.articleCode}</div>
-                      )}
+                      <div className="text-[10px] text-muted-foreground font-mono">{row.articleCode}</div>
                     </td>
 
-                    <td className="px-3 py-1.5 border-r text-right font-mono tabular-nums text-xs">{row.stockAvailable}</td>
-
-                    <td className={cn("px-3 py-1.5 border-r text-right font-mono tabular-nums text-xs", row.totalLoaded > 0 && "text-blue-600 dark:text-blue-400")}>
-                      {row.totalLoaded > 0 ? row.totalLoaded : <span className="text-muted-foreground/40">—</span>}
+                    <td className={cn(
+                      "px-3 py-1.5 border-r text-right font-mono tabular-nums text-xs font-semibold",
+                      row.freeToPromise > 0
+                        ? "text-destructive"
+                        : row.freeToPromise === 0
+                        ? "text-muted-foreground"
+                        : "text-green-700 dark:text-green-400",
+                    )}>
+                      {row.freeToPromise > 0 && <AlertTriangle className="inline h-3 w-3 mr-0.5 mb-0.5" />}
+                      {row.freeToPromise}
                     </td>
 
                     <td className="px-2 py-1 border-r">
