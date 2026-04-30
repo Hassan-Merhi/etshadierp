@@ -15,7 +15,7 @@ import {
   insertEmployeeSchema, insertEmployeeGroupSchema, insertSupplierSchema, insertCustomerSchema,
   userLocations, userCompanyRoles, companies, bankAccounts, fixedAssets,
   agentAccounts, auditLog, users, FEATURE_KEYS,
-  erpPayrollRuns, erpPayrollRunItems,
+  erpPayrollRuns, erpPayrollRunItems, salaryAdvances, salaryAdvanceDeductions,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
