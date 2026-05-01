@@ -40,6 +40,7 @@ interface AccountSidebarProps {
   isFactoryCompany?: boolean;
   onAutoCreateAccount?: (name: string) => Promise<Account | null>;
   isAutoCreating?: boolean;
+  activeTargetLabel?: string;
 }
 
 const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
@@ -71,6 +72,7 @@ export default function AccountSidebar({
   isFactoryCompany = false,
   onAutoCreateAccount,
   isAutoCreating = false,
+  activeTargetLabel,
 }: AccountSidebarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -191,7 +193,14 @@ export default function AccountSidebar({
     <Card className="flex flex-col h-full">
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-base font-semibold">Select Account</h3>
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold">Select Account</h3>
+            {activeTargetLabel && (
+              <p className="text-xs text-muted-foreground mt-0.5 truncate" data-testid="text-active-target">
+                Selecting for: <span className="font-medium text-foreground">{activeTargetLabel}</span>
+              </p>
+            )}
+          </div>
           {onCreateAccount && (
             <Button
               type="button"

@@ -17,14 +17,21 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
-  Printer,
-  FileDown,
-  ChevronDown,
-  ChevronUp,
-  ArrowUpCircle,
-  ArrowDownCircle,
-  AlertCircle,
-} from "lucide-react";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,10 +39,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+  Printer,
+  FileDown,
+  ChevronDown,
+  ChevronUp,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  AlertCircle,
+  BookOpen,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AccountAutocomplete } from "@/components/AccountAutocomplete";
 import type { CombinedAccount } from "@/components/AccountAutocomplete";
@@ -125,6 +137,12 @@ export function PaymentReceiptTab({
     return typeof existingNotes === "string" && existingNotes.trim().length > 0;
   });
 
+  // Mobile account drawer
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  // Track whether the Pay From / Receive Into autocomplete is the active target
+  const [payFromActive, setPayFromActive] = useState(false);
+
   const isPayment = activeTab === "payment";
 
   // Tab-specific styling / labels
@@ -140,12 +158,30 @@ export function PaymentReceiptTab({
   const accountPlaceholder = isPayment ? "Pay from..." : "Receive into...";
   const accountTestId = isPayment ? "input-pay-from" : "input-receive-in";
 
+  // Active target label shown in the account sidebar / drawer
+  const activeTargetLabel: string | undefined = payFromActive
+    ? accountLabel
+    : activeRowIndex !== null
+      ? `Row ${activeRowIndex + 1}`
+      : undefined;
+
+  // Wrap handleSidebarAccountSelect to also close the mobile drawer
+  const handleAccountSelect = (account: Account) => {
+    handleSidebarAccountSelect(account);
+    setSheetOpen(false);
+  };
+
   // Action guards
   const hasExport = Boolean(handleExportVoucher);
   const hasAnyEntry = entries.some((e) => (e?.accountId ?? 0) > 0);
   const canRunActions = paymentAccountId !== 0;
   const canPrint = canRunActions && hasAnyEntry;
   const canExport = canRunActions && hasAnyEntry && hasExport;
+
+  // Tooltip reason for disabled print/export
+  const printDisabledReason = !canRunActions
+    ? `Select ${accountLabel} account first`
+    : "Add at least one entry with an amount";
 
   // Validation state for summary warnings
   const validEntryCount = entries.filter(
@@ -171,12 +207,34 @@ export function PaymentReceiptTab({
       : formatAmount(Math.abs(n));
 
   // Projected balance: Payment subtracts total, Receipt adds total.
-  // In edit mode, Payment restores the original amount first then subtracts the new total.
   const projected = isPayment
     ? isEditMode
       ? accountBalance + originalTotal - total
       : accountBalance - total
     : accountBalance + total;
+
+  // Shared AccountSidebar props
+  const sidebarProps = {
+    accounts: sidebarAccounts,
+    filteredAccounts: filteredSidebarAccounts,
+    onSelectAccount: handleAccountSelect,
+    searchValue: sidebarSearchValue,
+    onSearchChange: setSidebarSearchValue,
+    selectedAccountId,
+    selectedAccountType,
+    highlightedIndex: sidebarHighlightedIndex,
+    onHighlightedIndexChange: setSidebarHighlightedIndex,
+    entries,
+    mode: activeTab,
+    paymentAccountId,
+    paymentAccountType,
+    voucherTotal: total,
+    onCreateAccount: isFactoryCompany ? undefined : onCreateAccount,
+    isFactoryCompany,
+    onAutoCreateAccount,
+    isAutoCreating,
+    activeTargetLabel,
+  };
 
   return (
     <div className="flex flex-col lg:flex-row gap-4">
@@ -211,6 +269,24 @@ export function PaymentReceiptTab({
                 </span>
               )}
             </div>
+
+            {/* Mobile accounts drawer trigger — hidden on sm+ */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="sm:hidden shrink-0"
+              onClick={() => setSheetOpen(true)}
+              data-testid="button-open-accounts-drawer"
+            >
+              <BookOpen className="h-4 w-4 mr-1.5" />
+              Accounts
+              {activeTargetLabel && (
+                <span className="ml-1.5 text-xs text-muted-foreground font-normal">
+                  — {activeTargetLabel}
+                </span>
+              )}
+            </Button>
           </CardHeader>
 
           <CardContent>
@@ -230,7 +306,11 @@ export function PaymentReceiptTab({
                       <FormItem className="min-w-0">
                         <FormLabel>{accountLabel}</FormLabel>
                         <FormControl>
-                          <div className="w-full min-w-0">
+                          {/* onFocus on the wrapper detects when the pay-from autocomplete is active */}
+                          <div
+                            className="w-full min-w-0"
+                            onFocus={() => setPayFromActive(true)}
+                          >
                             <AccountAutocomplete
                               value={
                                 paymentAccountId > 0
@@ -346,52 +426,77 @@ export function PaymentReceiptTab({
                     )}
                   />
 
-                  {/* Print / Export */}
+                  {/* Print / Export — with tooltip when disabled */}
                   <div className="flex flex-col gap-1 lg:items-end lg:pt-[22px]">
                     <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="default"
-                        disabled={!canPrint}
-                        onClick={handlePrint}
-                        data-testid="button-print"
-                      >
-                        <Printer className="h-4 w-4 mr-2" />
-                        Print
-                      </Button>
-                      {hasExport && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className={!canPrint ? "cursor-not-allowed" : ""}>
                             <Button
                               type="button"
                               variant="outline"
                               size="default"
-                              disabled={!canExport}
-                              data-testid="button-export"
+                              disabled={!canPrint}
+                              onClick={handlePrint}
+                              data-testid="button-print"
+                              className={!canPrint ? "pointer-events-none" : ""}
                             >
-                              <FileDown className="h-4 w-4 mr-2" />
-                              Export
-                              <ChevronDown className="h-4 w-4 ml-2" />
+                              <Printer className="h-4 w-4 mr-2" />
+                              Print
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleExportVoucher?.(false)}
-                              data-testid="export-summary"
-                            >
-                              <FileDown className="h-4 w-4 mr-2" />
-                              Summary
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleExportVoucher?.(true)}
-                              data-testid="export-detailed"
-                            >
-                              <FileDown className="h-4 w-4 mr-2" />
-                              Detailed
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                          </span>
+                        </TooltipTrigger>
+                        {!canPrint && (
+                          <TooltipContent side="bottom" className="max-w-xs text-center">
+                            {printDisabledReason}
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+
+                      {hasExport && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className={!canExport ? "cursor-not-allowed" : ""}>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="default"
+                                    disabled={!canExport}
+                                    data-testid="button-export"
+                                    className={!canExport ? "pointer-events-none" : ""}
+                                  >
+                                    <FileDown className="h-4 w-4 mr-2" />
+                                    Export
+                                    <ChevronDown className="h-4 w-4 ml-2" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => handleExportVoucher?.(false)}
+                                    data-testid="export-summary"
+                                  >
+                                    <FileDown className="h-4 w-4 mr-2" />
+                                    Summary
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleExportVoucher?.(true)}
+                                    data-testid="export-detailed"
+                                  >
+                                    <FileDown className="h-4 w-4 mr-2" />
+                                    Detailed
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </span>
+                          </TooltipTrigger>
+                          {!canExport && (
+                            <TooltipContent side="bottom" className="max-w-xs text-center">
+                              {printDisabledReason}
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
                       )}
                     </div>
                   </div>
@@ -410,10 +515,11 @@ export function PaymentReceiptTab({
                   sidebarHighlightedIndex={sidebarHighlightedIndex}
                   setSidebarHighlightedIndex={setSidebarHighlightedIndex}
                   setSidebarSearchValue={setSidebarSearchValue}
-                  handleSidebarAccountSelect={handleSidebarAccountSelect}
+                  handleSidebarAccountSelect={handleAccountSelect}
                   sidebarAccounts={sidebarAccounts}
                   onRowFocus={(rowIndex, fieldName) => {
                     if (fieldName === "account") {
+                      setPayFromActive(false);
                       setActiveRowIndex(rowIndex);
                       const currentAccountName =
                         entries[rowIndex]?.accountName || "";
@@ -459,9 +565,7 @@ export function PaymentReceiptTab({
                       {missingAccount && (
                         <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
                           <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                          <span>
-                            {accountLabel} account is required
-                          </span>
+                          <span>{accountLabel} account is required</span>
                         </div>
                       )}
                       {!missingAccount && missingEntries && (
@@ -566,32 +670,33 @@ export function PaymentReceiptTab({
         </Card>
       </div>
 
-      {/* ── Right column: Account Sidebar — hidden on mobile ── */}
+      {/* ── Right column: Account Sidebar — hidden on mobile, visible on sm+ ── */}
       <div
         className="hidden sm:block w-full lg:w-[40%] lg:sticky lg:top-4 h-fit"
         style={{ maxHeight: "calc(100vh - 2rem)" }}
       >
-        <AccountSidebar
-          accounts={sidebarAccounts}
-          filteredAccounts={filteredSidebarAccounts}
-          onSelectAccount={handleSidebarAccountSelect}
-          searchValue={sidebarSearchValue}
-          onSearchChange={setSidebarSearchValue}
-          selectedAccountId={selectedAccountId}
-          selectedAccountType={selectedAccountType}
-          highlightedIndex={sidebarHighlightedIndex}
-          onHighlightedIndexChange={setSidebarHighlightedIndex}
-          entries={entries}
-          mode={activeTab}
-          paymentAccountId={paymentAccountId}
-          paymentAccountType={paymentAccountType}
-          voucherTotal={total}
-          onCreateAccount={isFactoryCompany ? undefined : onCreateAccount}
-          isFactoryCompany={isFactoryCompany}
-          onAutoCreateAccount={onAutoCreateAccount}
-          isAutoCreating={isAutoCreating}
-        />
+        <AccountSidebar {...sidebarProps} />
       </div>
+
+      {/* ── Mobile Account Drawer (Sheet) ── */}
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-sm p-0 flex flex-col"
+          data-testid="sheet-accounts-drawer"
+        >
+          <SheetHeader className="p-4 border-b shrink-0">
+            <SheetTitle className="text-base">
+              {activeTargetLabel
+                ? `Accounts — ${activeTargetLabel}`
+                : "Select Account"}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-hidden">
+            <AccountSidebar {...sidebarProps} />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
