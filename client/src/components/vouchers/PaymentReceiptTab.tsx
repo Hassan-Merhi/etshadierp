@@ -206,12 +206,16 @@ export function PaymentReceiptTab({
         })}`
       : formatAmount(Math.abs(n));
 
-  // Projected balance: Payment subtracts total, Receipt adds total.
+  // Projected balance after save.
+  // Payment edit: undo the original deduction, apply the new one.
+  // Receipt edit: undo the original addition, apply the new one.
   const projected = isPayment
     ? isEditMode
       ? accountBalance + originalTotal - total
       : accountBalance - total
-    : accountBalance + total;
+    : isEditMode
+      ? accountBalance - originalTotal + total
+      : accountBalance + total;
 
   // Shared AccountSidebar props
   const sidebarProps = {

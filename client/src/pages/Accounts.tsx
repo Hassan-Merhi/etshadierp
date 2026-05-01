@@ -2246,7 +2246,7 @@ export default function Accounts() {
                                       {section.rows.map((row: any, idx: number) => (
                                         <TableRow key={`${row.ref}-${idx}`} className="text-xs">
                                           <TableCell className="py-1.5 whitespace-nowrap text-muted-foreground">
-                                            {row.date ? new Date(row.date).toLocaleDateString() : "—"}
+                                            {row.date ? formatDisplayDate(new Date(row.date)) : "—"}
                                           </TableCell>
                                           <TableCell className="py-1.5">
                                             <Badge variant={row.type === "payment" ? "secondary" : row.type === "commission" ? "destructive" : "outline"} className="text-xs py-0 font-normal">
@@ -2390,7 +2390,7 @@ export default function Accounts() {
                                     const cleanAmt = String(e.amount || "0").replace(/^[-−+]/, "");
                                     return (
                                       <TableRow key={e.key}>
-                                        <TableCell className="text-sm whitespace-nowrap">{e.date ? new Date(e.date).toLocaleDateString() : "-"}</TableCell>
+                                        <TableCell className="text-sm whitespace-nowrap">{e.date ? formatDisplayDate(new Date(e.date)) : "-"}</TableCell>
                                         <TableCell className="text-sm">
                                           <span className={`text-xs font-medium ${e.type === "payment" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                                             {e.type === "payment" ? "Payment" : "Purchase"}

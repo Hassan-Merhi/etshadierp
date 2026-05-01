@@ -568,6 +568,14 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     0
   );
 
+  // Original total of the voucher being edited — used for projected-balance correction.
+  // voucherToEdit.totalAmount is the server-side total before any edits begin.
+  const originalTotal = useMemo(() => {
+    if (!voucherIdToEdit || !voucherToEdit) return 0;
+    const parsed = parseFloat(String(voucherToEdit.totalAmount ?? "0"));
+    return isNaN(parsed) ? 0 : parsed;
+  }, [voucherIdToEdit, voucherToEdit]);
+
   // Draft autosave for new vouchers (not edit mode)
   const paymentDraftMode = isFactoryMode ? "factory" : "erp";
   const paymentDraftType = activeTab === "payment" ? "voucher-payment" : "voucher-receipt";
@@ -3874,6 +3882,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               isFactoryCompany={isFactoryCompany}
               onAutoCreateAccount={handleAutoCreateAccount}
               isAutoCreating={isAutoCreating}
+              originalTotal={originalTotal}
               isPending={saveMutation.isPending}
               voucherNumber={voucherToEdit?.voucherNumber}
             />
@@ -3939,6 +3948,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               isFactoryCompany={isFactoryCompany}
               onAutoCreateAccount={handleAutoCreateAccount}
               isAutoCreating={isAutoCreating}
+              originalTotal={originalTotal}
               isPending={saveMutation.isPending}
               voucherNumber={voucherToEdit?.voucherNumber}
             />
