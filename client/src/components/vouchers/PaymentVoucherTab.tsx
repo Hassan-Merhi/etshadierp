@@ -61,6 +61,7 @@ interface PaymentVoucherTabProps {
   isAutoCreating?: boolean;
   isEditMode?: boolean;
   originalTotal?: number;
+  isPending?: boolean;
 }
 
 export function PaymentVoucherTab({
@@ -96,6 +97,7 @@ export function PaymentVoucherTab({
   isAutoCreating = false,
   isEditMode = false,
   originalTotal = 0,
+  isPending = false,
 }: PaymentVoucherTabProps) {
   const { formatAmount } = useCurrencyContext();
   const { formatDisplayDate } = useDateFormat();
@@ -352,10 +354,14 @@ export function PaymentVoucherTab({
                   <Button
                     type="submit"
                     size="default"
-                    disabled={paymentAccountId === 0 || total === 0}
+                    disabled={paymentAccountId === 0 || total === 0 || isPending}
                     data-testid="button-save-voucher"
                   >
-                    {total > 0 ? `Save Voucher · ${formatAmount(total)}` : "Save Voucher"}
+                    {isPending
+                      ? (isEditMode ? "Updating…" : "Saving…")
+                      : isEditMode
+                        ? `Update Voucher${total > 0 ? ` · ${formatAmount(total)}` : ""}`
+                        : `Save Voucher${total > 0 ? ` · ${formatAmount(total)}` : ""}`}
                   </Button>
                 </div>
               </form>

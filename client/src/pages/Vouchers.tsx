@@ -1446,26 +1446,26 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   };
 
   const onSubmit = async (data: VoucherFormData) => {
-    // Validate that all amounts are numeric and positive
-    const validEntries = data.entries.filter(entry => entry.accountId > 0 && entry.amount);
+    // Filter to only valid rows: must have a real account and a positive numeric amount
+    const validEntries = data.entries.filter(
+      entry => entry.accountId > 0 && parseFloat(entry.amount || "0") > 0
+    );
+
     if (validEntries.length === 0) {
       toast({
         title: "Validation Error",
-        description: "Please add at least one valid entry",
+        description: "Please add at least one entry with an account and a positive amount.",
         variant: "destructive",
       });
       return;
     }
 
-    // Calculate total debits and credits to ensure balance
+    // Calculate total from valid entries only
     const totalDebits = validEntries.reduce((sum, entry) => {
       const amount = parseFloat(entry.amount);
       return sum + (isNaN(amount) ? 0 : amount);
     }, 0);
-    
-    const totalCredits = totalDebits; // In our model, each entry creates matching debit/credit pairs
 
-    // Validate numeric totals
     if (isNaN(totalDebits) || totalDebits <= 0) {
       toast({
         title: "Validation Error",
@@ -1475,7 +1475,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       return;
     }
 
-    saveMutation.mutate(data);
+    // Pass only the valid, non-blank entries to the mutation — never send zero/blank rows
+    saveMutation.mutate({ ...data, entries: validEntries });
   };
 
   // Journal form
@@ -3873,6 +3874,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               isFactoryCompany={isFactoryCompany}
               onAutoCreateAccount={handleAutoCreateAccount}
               isAutoCreating={isAutoCreating}
+              isPending={saveMutation.isPending}
             />
           </div>
         )}
@@ -3936,6 +3938,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               isFactoryCompany={isFactoryCompany}
               onAutoCreateAccount={handleAutoCreateAccount}
               isAutoCreating={isAutoCreating}
+              isPending={saveMutation.isPending}
             />
           </div>
         )}

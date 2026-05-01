@@ -61,6 +61,7 @@ interface ReceiptVoucherTabProps {
   isAutoCreating?: boolean;
   isEditMode?: boolean;
   originalTotal?: number;
+  isPending?: boolean;
 }
 
 export function ReceiptVoucherTab({
@@ -95,6 +96,8 @@ export function ReceiptVoucherTab({
   onAutoCreateAccount,
   isAutoCreating = false,
   isEditMode = false,
+  originalTotal = 0,
+  isPending = false,
 }: ReceiptVoucherTabProps) {
   const { formatAmount } = useCurrencyContext();
   const { formatDisplayDate } = useDateFormat();
@@ -176,11 +179,19 @@ export function ReceiptVoucherTab({
                             );
                           }
 
-                          const live = isEditMode ? accountBalance : (total > 0 ? accountBalance + total : accountBalance);
+                          const projected = accountBalance + total;
                           return (
-                            <p className={cn("text-sm mt-1.5 font-mono", balColor(live))}>
-                              Balance: {formatAmount(live)}
-                            </p>
+                            <div className="flex items-center gap-1.5 flex-wrap text-sm mt-1.5 font-mono">
+                              <span className="text-muted-foreground text-xs">Bal:</span>
+                              <span className={cn(balColor(accountBalance))}>{formatAmount(accountBalance)}</span>
+                              {total > 0 && (
+                                <>
+                                  <span className="text-muted-foreground">→</span>
+                                  <span className={cn("font-semibold", balColor(projected))}>{formatAmount(projected)}</span>
+                                  <span className="text-muted-foreground text-xs">after</span>
+                                </>
+                              )}
+                            </div>
                           );
                         })()}
                         <FormMessage />
@@ -335,10 +346,14 @@ export function ReceiptVoucherTab({
                   <Button
                     type="submit"
                     size="default"
-                    disabled={paymentAccountId === 0 || total === 0}
+                    disabled={paymentAccountId === 0 || total === 0 || isPending}
                     data-testid="button-save-voucher"
                   >
-                    {total > 0 ? `Save Voucher · ${formatAmount(total)}` : "Save Voucher"}
+                    {isPending
+                      ? (isEditMode ? "Updating…" : "Saving…")
+                      : isEditMode
+                        ? `Update Voucher${total > 0 ? ` · ${formatAmount(total)}` : ""}`
+                        : `Save Voucher${total > 0 ? ` · ${formatAmount(total)}` : ""}`}
                   </Button>
                 </div>
               </form>
