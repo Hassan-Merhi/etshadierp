@@ -1445,6 +1445,15 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     }
   };
 
+  const originalTotal = useMemo(() => {
+    if (!voucherToEdit || !voucherIdToEdit) return 0;
+    const editedEntries = (voucherToEdit.entries || []) as any[];
+    return editedEntries.reduce(
+      (sum: number, e: any) => sum + (parseFloat(String(e.amount ?? "0")) || 0),
+      0
+    );
+  }, [voucherToEdit, voucherIdToEdit]);
+
   const onSubmit = async (data: VoucherFormData) => {
     // Filter to only valid rows: must have a real account and a positive numeric amount
     const validEntries = data.entries.filter(
@@ -3875,6 +3884,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               onAutoCreateAccount={handleAutoCreateAccount}
               isAutoCreating={isAutoCreating}
               isPending={saveMutation.isPending}
+              originalTotal={originalTotal}
               voucherNumber={voucherToEdit?.voucherNumber}
             />
           </div>
@@ -3940,6 +3950,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               onAutoCreateAccount={handleAutoCreateAccount}
               isAutoCreating={isAutoCreating}
               isPending={saveMutation.isPending}
+              originalTotal={originalTotal}
               voucherNumber={voucherToEdit?.voucherNumber}
             />
           </div>

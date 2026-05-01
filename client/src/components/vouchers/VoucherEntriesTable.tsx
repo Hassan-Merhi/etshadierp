@@ -237,7 +237,7 @@ export function VoucherEntriesTable({
                             {typeBadge.label}
                           </span>
                         )}
-                        {renderBalanceLine(index)}
+                        {isActive && renderBalanceLine(index)}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -275,7 +275,7 @@ export function VoucherEntriesTable({
                       size="icon"
                       onClick={() => remove(index)}
                       data-testid={`button-remove-${index}`}
-                      className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      className="text-muted-foreground"
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -337,7 +337,7 @@ export function VoucherEntriesTable({
                   size="icon"
                   onClick={() => remove(index)}
                   data-testid={`button-remove-mobile-${index}`}
-                  className="shrink-0 h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  className="shrink-0 text-muted-foreground"
                 >
                   <X className="h-3.5 w-3.5" />
                 </Button>
