@@ -1352,16 +1352,31 @@ export function registerFiscalTransferRoutes(app: Express) {
             }
           } else if (newQty > 0) {
             // New item added by POS user that doesn't exist in the original transfer — insert it.
-            // Rate is not stored in revision data; default to 0 so the row is visible and the admin
-            // can update the rate on the transfer after approval.
-            const rate = 0;
+            // Look up rate from inventory.averageRate (same pattern as normal transfer creation
+            // auto-fill for POS users who don't send cost price). Falls back to 0 safely if
+            // the item has no inventory record at the source location.
+            let rate = 0;
+            if (netItem.sourceLocationId) {
+              const [invRow] = await tx
+                .select({ averageRate: inventory.averageRate })
+                .from(inventory)
+                .where(and(
+                  eq(inventory.locationId, netItem.sourceLocationId),
+                  eq(inventory.stockItemId, netItem.stockItemId)
+                ))
+                .limit(1);
+              const parsed = parseFloat(invRow?.averageRate ?? "0");
+              rate = isNaN(parsed) ? 0 : parsed;
+            }
+            const totalAmount = newQty * rate;
+
             await tx.insert(stockTransferItems).values({
               transferId: transfer.id,
               stockItemId: netItem.stockItemId,
               sourceLocationId: netItem.sourceLocationId ?? undefined,
               quantity: String(newQty),
-              rate: "0",
-              totalAmount: "0.00",
+              rate: rate.toFixed(2),
+              totalAmount: totalAmount.toFixed(2),
             });
 
             // Apply inventory adjustment for the new item if inventory was already applied
