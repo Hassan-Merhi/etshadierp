@@ -180,11 +180,11 @@ export function VoucherEntriesTable({
       {/* ── Desktop / tablet: original table ── */}
       <div className="hidden sm:block border rounded-md overflow-hidden">
         <table className="w-full">
-          <thead className="bg-muted/50 sticky top-0 z-10 border-b">
+          <thead className="bg-muted/50 sticky top-0 z-10">
             <tr>
-              <th className="text-center px-2 py-2.5 w-8 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">#</th>
-              <th className="text-left px-2 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Account</th>
-              <th className="text-right px-2 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground w-[30%]">Amount</th>
+              <th className="text-center p-3 font-medium w-8 text-muted-foreground">#</th>
+              <th className="text-left p-3 font-medium">Account</th>
+              <th className="text-right p-3 font-medium w-[32%]">Amount</th>
               <th className="w-10"></th>
             </tr>
           </thead>
@@ -193,25 +193,12 @@ export function VoucherEntriesTable({
               const entry = entries[index];
               const isEmpty = !entry?.accountId || entry.accountId === 0;
               const typeBadge = entry?.accountType ? ENTRY_TYPE_BADGE[entry.accountType] : null;
-              const isActive = activeRow === index && !isEmpty;
               return (
-              <tr
-                key={field.id}
-                className={cn(
-                  "border-t transition-colors",
-                  isEmpty ? "bg-muted/20" : "hover-elevate",
-                  isActive && "bg-primary/10 dark:bg-primary/15"
-                )}
-              >
-                <td
-                  className={cn(
-                    "px-2 py-2.5 text-center text-xs tabular-nums",
-                    isActive ? "text-primary font-semibold" : "text-muted-foreground font-medium"
-                  )}
-                >
+              <tr key={field.id} className={cn("border-t hover-elevate", isEmpty && "bg-muted/20", activeRow === index && !isEmpty && "bg-primary/5 dark:bg-primary/10")}>
+                <td className="px-2 py-3 text-center text-xs font-medium text-muted-foreground tabular-nums">
                   {index + 1}
                 </td>
-                <td className="px-2 py-2">
+                <td className="p-2">
                   <FormField
                     control={form.control}
                     name={`entries.${index}.accountName`}
@@ -237,13 +224,13 @@ export function VoucherEntriesTable({
                             {typeBadge.label}
                           </span>
                         )}
-                        {isActive && renderBalanceLine(index)}
+                        {renderBalanceLine(index)}
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </td>
-                <td className="px-2 py-2">
+                <td className="p-2">
                   <FormField
                     control={form.control}
                     name={`entries.${index}.amount`}
@@ -267,7 +254,7 @@ export function VoucherEntriesTable({
                     )}
                   />
                 </td>
-                <td className="px-1 py-2">
+                <td className="p-2">
                   {fields.length > 1 && (
                     <Button
                       type="button"
@@ -275,9 +262,8 @@ export function VoucherEntriesTable({
                       size="icon"
                       onClick={() => remove(index)}
                       data-testid={`button-remove-${index}`}
-                      className="text-muted-foreground"
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-4 w-4 text-muted-foreground" />
                     </Button>
                   )}
                 </td>
@@ -285,10 +271,10 @@ export function VoucherEntriesTable({
               );
             })}
           </tbody>
-          <tfoot className="bg-muted/30 border-t">
+          <tfoot className="bg-muted/40 border-t-2">
             <tr>
               <td></td>
-              <td className="px-2 py-2.5">
+              <td className="p-3">
                 <Button
                   type="button"
                   variant="outline"
@@ -296,13 +282,13 @@ export function VoucherEntriesTable({
                   onClick={handleAddRow}
                   data-testid="button-add-row"
                 >
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  <Plus className="h-4 w-4 mr-2" />
                   Add Row
                 </Button>
               </td>
-              <td className="px-2 py-2.5 text-right">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Total</div>
-                <div className={cn("text-base font-bold font-mono tabular-nums", total > 0 ? "text-foreground" : "text-muted-foreground")}>
+              <td className="p-3 text-right">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Total</div>
+                <div className={cn("text-base font-bold font-mono", total > 0 ? "text-foreground" : "text-muted-foreground")}>
                   {formatAmount(total)}
                 </div>
               </td>
@@ -314,22 +300,61 @@ export function VoucherEntriesTable({
 
       {/* ── Mobile: one card per entry ── */}
       <div className="sm:hidden space-y-2">
-        {fields.map((field, index) => {
-          const entry = entries[index];
-          const isActive = activeRow === index && entry?.accountId > 0;
-          return (
-          <div
-            key={field.id}
-            className={cn(
-              "border rounded-md p-3 space-y-2 bg-card transition-colors",
-              isActive && "border-primary/40 bg-primary/5 dark:bg-primary/10"
-            )}
-          >
-            {/* Row number chip */}
-            <div className="flex items-center justify-between gap-2">
-              <span className={cn("text-[10px] font-medium uppercase tracking-wide", isActive ? "text-primary" : "text-muted-foreground")}>
-                Entry {index + 1}
-              </span>
+        {fields.map((field, index) => (
+          <div key={field.id} className="border rounded-md p-3 space-y-2 bg-card">
+            {/* Account field + remove button */}
+            <div className="flex items-start gap-2">
+              <div className="flex-1 min-w-0">
+                <FormField
+                  control={form.control}
+                  name={`entries.${index}.accountName`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input
+                          value={field.value}
+                          name={field.name}
+                          placeholder="Type to search account..."
+                          className="text-sm"
+                          data-testid={`input-account-mobile-${index}`}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setSidebarSearchValue(e.target.value);
+                          }}
+                          onFocus={() => onRowFocus(index, "account")}
+                          onKeyDown={(e) => handleAccountKeyDown(e, index)}
+                          onBlur={() => setTimeout(() => onRowBlur(), 200)}
+                        />
+                      </FormControl>
+                      {/* Inline account suggestions (replaces sidebar on mobile) */}
+                      {activeRow === index && filteredSidebarAccounts.length > 0 && (
+                        <div className="mt-1 border rounded-md bg-popover shadow-md max-h-44 overflow-y-auto z-20 relative">
+                          {filteredSidebarAccounts.slice(0, 10).map((account) => (
+                            <button
+                              key={`${account.type}-${account.id}`}
+                              type="button"
+                              className="w-full text-left px-3 py-2.5 text-sm hover-elevate border-b last:border-b-0"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleSidebarAccountSelect(account);
+                              }}
+                            >
+                              <div className="font-medium truncate">{account.name}</div>
+                              {account.balance != null && (
+                                <div className="text-xs text-muted-foreground font-mono">
+                                  {formatAmount(typeof account.balance === "string" ? parseFloat(account.balance) : account.balance)}
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {renderBalanceLine(index)}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               {fields.length > 1 && (
                 <Button
                   type="button"
@@ -337,62 +362,12 @@ export function VoucherEntriesTable({
                   size="icon"
                   onClick={() => remove(index)}
                   data-testid={`button-remove-mobile-${index}`}
-                  className="shrink-0 text-muted-foreground"
+                  className="shrink-0"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-4 w-4" />
                 </Button>
               )}
             </div>
-            {/* Account field */}
-            <FormField
-              control={form.control}
-              name={`entries.${index}.accountName`}
-              render={({ field }) => (
-                <FormItem>
-                  <FormControl>
-                    <Input
-                      value={field.value}
-                      name={field.name}
-                      placeholder="Type to search account..."
-                      className="text-sm"
-                      data-testid={`input-account-mobile-${index}`}
-                      onChange={(e) => {
-                        field.onChange(e);
-                        setSidebarSearchValue(e.target.value);
-                      }}
-                      onFocus={() => onRowFocus(index, "account")}
-                      onKeyDown={(e) => handleAccountKeyDown(e, index)}
-                      onBlur={() => setTimeout(() => onRowBlur(), 200)}
-                    />
-                  </FormControl>
-                  {/* Inline account suggestions */}
-                  {activeRow === index && filteredSidebarAccounts.length > 0 && (
-                    <div className="mt-1 border rounded-md bg-popover shadow-md max-h-44 overflow-y-auto z-20 relative">
-                      {filteredSidebarAccounts.slice(0, 10).map((account) => (
-                        <button
-                          key={`${account.type}-${account.id}`}
-                          type="button"
-                          className="w-full text-left px-3 py-2.5 text-sm hover-elevate border-b last:border-b-0"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            handleSidebarAccountSelect(account);
-                          }}
-                        >
-                          <div className="font-medium truncate">{account.name}</div>
-                          {account.balance != null && (
-                            <div className="text-xs text-muted-foreground font-mono">
-                              {formatAmount(typeof account.balance === "string" ? parseFloat(account.balance) : account.balance)}
-                            </div>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {renderBalanceLine(index)}
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             {/* Amount field */}
             <FormField
@@ -423,11 +398,10 @@ export function VoucherEntriesTable({
               )}
             />
           </div>
-          );
-        })}
+        ))}
 
         {/* Add row + total footer */}
-        <div className="flex items-center justify-between pt-2 px-0.5">
+        <div className="flex items-center justify-between pt-1 px-0.5">
           <Button
             type="button"
             variant="outline"
@@ -435,14 +409,11 @@ export function VoucherEntriesTable({
             onClick={handleAddRow}
             data-testid="button-add-row-mobile"
           >
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            <Plus className="h-4 w-4 mr-2" />
             Add Row
           </Button>
-          <div className="text-right">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Total</div>
-            <div className={cn("font-bold font-mono text-base tabular-nums", total > 0 ? "text-foreground" : "text-muted-foreground")}>
-              {formatAmount(total)}
-            </div>
+          <div className="font-bold font-mono text-sm">
+            Total: {formatAmount(total)}
           </div>
         </div>
       </div>
