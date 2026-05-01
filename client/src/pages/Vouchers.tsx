@@ -3875,6 +3875,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               onAutoCreateAccount={handleAutoCreateAccount}
               isAutoCreating={isAutoCreating}
               isPending={saveMutation.isPending}
+              voucherNumber={voucherToEdit?.voucherNumber}
             />
           </div>
         )}
@@ -3939,6 +3940,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               onAutoCreateAccount={handleAutoCreateAccount}
               isAutoCreating={isAutoCreating}
               isPending={saveMutation.isPending}
+              voucherNumber={voucherToEdit?.voucherNumber}
             />
           </div>
         )}
