@@ -1,15 +1,21 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { KeyRound } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { KeyRound, CalendarDays } from "lucide-react";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+
+type DateFormatType = "MM/DD/YYYY" | "DD/MM/YYYY";
 
 export default function MySettings() {
   const { toast } = useToast();
+  const { dateFormat } = useDateFormat();
+
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -41,6 +47,25 @@ export default function MySettings() {
     },
   });
 
+  const updateDateFormatMutation = useMutation({
+    mutationFn: async (newFormat: DateFormatType) => {
+      const res = await apiRequest("PUT", "/api/user-preferences", { dateFormat: newFormat });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to update date format");
+      }
+      return res.json();
+    },
+    onSuccess: (_data, newFormat) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user-preferences"] });
+      toast({ title: "Date format updated", description: `Dates will now display as ${newFormat}.` });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setClientError(null);
@@ -66,8 +91,38 @@ export default function MySettings() {
   };
 
   return (
-    <div className="p-6 max-w-md mx-auto">
-      <h1 className="text-2xl font-semibold mb-6">My Settings</h1>
+    <div className="p-6 max-w-md mx-auto space-y-6">
+      <h1 className="text-2xl font-semibold">My Settings</h1>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CalendarDays className="h-4 w-4" />
+            Date Format
+          </CardTitle>
+          <CardDescription>
+            Choose how dates are displayed across your account.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <Label htmlFor="select-date-format">Display format</Label>
+            <Select
+              value={dateFormat}
+              onValueChange={(val) => updateDateFormatMutation.mutate(val as DateFormatType)}
+              disabled={updateDateFormatMutation.isPending}
+            >
+              <SelectTrigger id="select-date-format" data-testid="select-date-format">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="MM/DD/YYYY" data-testid="option-date-format-mmddyyyy">MM/DD/YYYY</SelectItem>
+                <SelectItem value="DD/MM/YYYY" data-testid="option-date-format-ddmmyyyy">DD/MM/YYYY</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
