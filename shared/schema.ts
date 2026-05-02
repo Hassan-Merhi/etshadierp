@@ -2483,7 +2483,7 @@ export const factoryContainers = pgTable("factory_containers", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
   containerNumber: varchar("container_number", { length: 100 }).notNull(),
-  supplierId: integer("supplier_id"),
+  supplierId: integer("supplier_id").references(() => factorySuppliers.id, { onDelete: "restrict" }),
   origin: text("origin"),
   totalKg: decimal("total_kg", { precision: 15, scale: 3 }),
   ratePerKg: decimal("rate_per_kg", { precision: 20, scale: 4 }),
@@ -2585,7 +2585,7 @@ export const factoryOffloadAdditionalCharges = pgTable("factory_offload_addition
   currencyCode: text("currency_code").default("USD"),
   fxRateToUsd: decimal("fx_rate_to_usd", { precision: 20, scale: 6 }).default("1"),
   ledgerAccountId: integer("ledger_account_id"),
-  supplierId: integer("supplier_id"),
+  supplierId: integer("supplier_id").references(() => factorySuppliers.id, { onDelete: "restrict" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   companyIdx: index("factory_offload_additional_charges_company_idx").on(t.companyId),
@@ -2624,7 +2624,7 @@ export const factoryRawStock = pgTable("factory_raw_stock", {
   commissionFxRateToUsd: decimal("commission_fx_rate_to_usd", { precision: 20, scale: 8 }),
   commissionAmountUsd: decimal("commission_amount_usd", { precision: 20, scale: 4 }),
   commissionLedgerAccountId: integer("commission_ledger_account_id"),
-  commissionSupplierId: integer("commission_supplier_id"),
+  commissionSupplierId: integer("commission_supplier_id").references(() => factorySuppliers.id, { onDelete: "restrict" }),
   offloadedAt: timestamp("offloaded_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
@@ -2662,7 +2662,7 @@ export const factoryRawMaterialAdjustments = pgTable("factory_raw_material_adjus
   kg: decimal("kg", { precision: 15, scale: 3 }).notNull(),
   costPerKg: decimal("cost_per_kg", { precision: 20, scale: 4 }).default("0"),
   currencyCode: varchar("currency_code", { length: 10 }).default("USD"),
-  supplierId: integer("supplier_id"), // optional: link to a factory supplier row
+  supplierId: integer("supplier_id").references(() => factorySuppliers.id, { onDelete: "restrict" }), // optional: link to a factory supplier row
   materialLabel: varchar("material_label", { length: 200 }), // for standalone manual materials
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -2675,7 +2675,7 @@ export type FactoryRawMaterialAdjustment = typeof factoryRawMaterialAdjustments.
 export const factorySupplierPayments = pgTable("factory_supplier_payments", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  supplierId: integer("supplier_id").notNull(),
+  supplierId: integer("supplier_id").notNull().references(() => factorySuppliers.id, { onDelete: "restrict" }),
   date: varchar("date", { length: 20 }).notNull(),
   amount: decimal("amount", { precision: 20, scale: 4 }).notNull(),
   currencyCode: varchar("currency_code", { length: 10 }).notNull().default("USD"),
@@ -2785,7 +2785,7 @@ export const factoryMixBatchSources = pgTable("factory_mix_batch_sources", {
   id: serial("id").primaryKey(),
   mixBatchId: integer("mix_batch_id").notNull(),
   containerId: integer("container_id").references(() => containers.id, { onDelete: "restrict" }),
-  supplierId: integer("supplier_id"),
+  supplierId: integer("supplier_id").references(() => factorySuppliers.id, { onDelete: "restrict" }),
   sourceBatchId: integer("source_batch_id"),
   sourceType: text("source_type"),
   sourceId: integer("source_id"),
@@ -3756,7 +3756,7 @@ export const factoryWasteEntries = pgTable("factory_waste_entries", {
   companyId: integer("company_id").notNull(),
   date: date("date").notNull(),
   mixBatchId: integer("mix_batch_id"),
-  supplierId: integer("supplier_id"),
+  supplierId: integer("supplier_id").references(() => factorySuppliers.id, { onDelete: "restrict" }),
   containerId: integer("container_id").references(() => containers.id, { onDelete: "restrict" }),
   wasteType: varchar("waste_type", { length: 50 }),
   kgWaste: decimal("kg_waste", { precision: 15, scale: 3 }).notNull(),
@@ -3839,7 +3839,7 @@ export type FactoryDailyKpiSnapshot = typeof factoryDailyKpiSnapshots.$inferSele
 export const factorySupplierScoreSnapshots = pgTable("factory_supplier_score_snapshots", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  supplierId: integer("supplier_id").notNull(),
+  supplierId: integer("supplier_id").notNull().references(() => factorySuppliers.id, { onDelete: "restrict" }),
   fromDate: date("from_date").notNull(),
   toDate: date("to_date").notNull(),
   totalKg: decimal("total_kg", { precision: 15, scale: 3 }).default("0"),

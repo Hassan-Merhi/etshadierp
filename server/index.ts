@@ -2059,6 +2059,20 @@ let migrationsDone = false;
     `DO $$ BEGIN ALTER TABLE supplier_containers ADD CONSTRAINT supplier_containers_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE supplier_proformas ADD CONSTRAINT supplier_proformas_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE voucher_entries ADD CONSTRAINT voucher_entries_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+
+    // ── F-Phase 4e (May 2026) — factory_suppliers children, 9 of 10 candidates applied ──
+    // factory_suppliers is a SEPARATE parent table from suppliers (factory subsystem). 7 rows in dev (IDs 26-32).
+    // All 9 RESTRICT — financial / commission / production audit trail; supplier rows must not be casually deleted.
+    // DEFERRED: voucher_entries.factory_supplier_id has 2 orphan rows (voucher_id 4468/4469, factory_supplier_id=10, NASSRA payments) — needs user decision: NULL them out (preserves accounting balance) or delete entire entries (would unbalance vouchers).
+    `DO $$ BEGIN ALTER TABLE factory_containers ADD CONSTRAINT factory_containers_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES factory_suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_containers ADD CONSTRAINT factory_containers_commission_supplier_id_fkey FOREIGN KEY (commission_supplier_id) REFERENCES factory_suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_mix_batch_sources ADD CONSTRAINT factory_mix_batch_sources_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES factory_suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_offload_additional_charges ADD CONSTRAINT factory_offload_additional_charges_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES factory_suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_raw_material_adjustments ADD CONSTRAINT factory_raw_material_adjustments_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES factory_suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_raw_stock ADD CONSTRAINT factory_raw_stock_commission_supplier_id_fkey FOREIGN KEY (commission_supplier_id) REFERENCES factory_suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_supplier_payments ADD CONSTRAINT factory_supplier_payments_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES factory_suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_supplier_score_snapshots ADD CONSTRAINT factory_supplier_score_snapshots_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES factory_suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_waste_entries ADD CONSTRAINT factory_waste_entries_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES factory_suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
