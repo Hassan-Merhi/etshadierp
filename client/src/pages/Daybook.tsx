@@ -450,7 +450,7 @@ function saveDaybookState(state: DaybookUIState): void {
 export default function Daybook({ user }: { user?: any } = {}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
-  const { formatDisplayDate } = useDateFormat();
+  const { formatDisplayDate, formatDisplayTime } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
@@ -2129,7 +2129,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {formatDisplayDate(parseISO(voucher.voucherDate))}
-                      <span className="ml-2 text-xs">{format(new Date(voucher.createdAt), "hh:mm a")}</span>
+                      <span className="ml-2 text-xs">{formatDisplayTime(voucher.createdAt)}</span>
                     </div>
                     <p className="text-sm truncate">
                       {voucher.description ||
@@ -2457,7 +2457,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               <TableCell className="font-medium sticky left-0 bg-background z-10">
                                 <div className="flex flex-col">
                                   <span>{formatDisplayDate(parseISO(voucher.voucherDate))}</span>
-                                  <span className="text-xs text-muted-foreground">{format(new Date(voucher.createdAt), "hh:mm a")}</span>
+                                  <span className="text-xs text-muted-foreground">{formatDisplayTime(voucher.createdAt)}</span>
                                 </div>
                               </TableCell>
                               <TableCell>

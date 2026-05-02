@@ -10,6 +10,8 @@ interface DateFormatContextType {
   setDateFormat: (format: DateFormatType) => void;
   formatDisplayDate: (date: Date | string) => string;
   formatShortDate: (date: Date | string) => string;
+  formatDisplayTime: (date: Date | string) => string;
+  formatDisplayDateTime: (date: Date | string) => string;
   isLoading: boolean;
   isPending: boolean;
 }
@@ -81,6 +83,20 @@ export function DateFormatProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const formatDisplayTime = (date: Date | string): string => {
+    try {
+      const dateObj = typeof date === "string" ? new Date(date) : date;
+      if (isNaN(dateObj.getTime())) return "";
+      return dateObj.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return "";
+    }
+  };
+
+  const formatDisplayDateTime = (date: Date | string): string => {
+    return `${formatDisplayDate(date)}, ${formatDisplayTime(date)}`;
+  };
+
   return (
     <DateFormatContext.Provider
       value={{
@@ -88,6 +104,8 @@ export function DateFormatProvider({ children }: { children: ReactNode }) {
         setDateFormat,
         formatDisplayDate,
         formatShortDate,
+        formatDisplayTime,
+        formatDisplayDateTime,
         isLoading,
         isPending: updateMutation.isPending,
       }}

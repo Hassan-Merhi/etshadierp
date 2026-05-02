@@ -415,7 +415,7 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
 
 export default function FactoryDaybook() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
-  const { formatDisplayDate } = useDateFormat();
+  const { formatDisplayDate, formatDisplayTime } = useDateFormat();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const appMode = useAppMode();
@@ -1379,7 +1379,7 @@ export default function FactoryDaybook() {
                           <TableCell className="whitespace-nowrap py-4">
                             <div className="font-medium text-sm">{formatDisplayDate(entry.txDate + "T00:00:00")}</div>
                             <div className="text-xs text-muted-foreground mt-0.5 font-mono">
-                              {format(new Date(entry.createdAt), "hh:mm a")}
+                              {formatDisplayTime(entry.createdAt)}
                             </div>
                             <div className="flex items-center gap-1 flex-wrap mt-1">
                               <Badge variant={bv} className={cn(bc, "whitespace-nowrap")} data-testid={`badge-type-${entry.id}`}>
