@@ -1,6 +1,7 @@
 import { eq, and, or, sql, inArray, desc, ne, isNull, isNotNull, asc } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
+import { adjustInventory } from "./inventoryHelper";
 import type {
   User,
   InsertUser,
@@ -3414,7 +3415,11 @@ export class DbStorage implements IStorage {
 
       // STEP 1: Reverse inventory movements based on voucher type
       if (voucher.voucherType === "Sales" && voucher.locationId) {
-        // Restore items back to location inventory
+        // Restore items back to location inventory using the centralized adjustInventory
+        // helper. The previous inline math here did not settle negative layers and
+        // computed averageRate differently from adjustInventory's costing rules,
+        // which caused inventory desync when a Sales voucher was deleted on stock
+        // that had gone negative.
         const salesItemsList = await tx
           .select()
           .from(schema.salesItems)
@@ -3424,38 +3429,16 @@ export class DbStorage implements IStorage {
           const quantity = parseFloat(saleItem.quantity);
           const costPrice = parseFloat(saleItem.costPrice);
 
-          // Get current inventory (with row lock)
-          const currentInventoryRows = await (tx as any).execute(
-            sql`SELECT * FROM inventory WHERE location_id = ${voucher.locationId} AND stock_item_id = ${saleItem.stockItemId} FOR UPDATE`
+          await adjustInventory(
+            tx,
+            voucher.locationId,
+            saleItem.stockItemId,
+            quantity,           // positive delta = restore
+            voucher.companyId,
+            costPrice,          // incoming rate = original cost of the sale line
+            "Sales-Reversal",
+            id,
           );
-          const currentInventory = currentInventoryRows.rows?.[0] || currentInventoryRows[0];
-
-          if (currentInventory) {
-            // Add back the quantity
-            const newQuantity = parseFloat(currentInventory.quantity) + quantity;
-            const currentTotalValue = parseFloat(currentInventory.total_value);
-            const newTotalValue = currentTotalValue + (quantity * costPrice);
-            const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
-
-            await tx
-              .update(schema.inventory)
-              .set({
-                quantity: newQuantity.toFixed(3),
-                averageRate: newAverageRate.toFixed(2),
-                totalValue: newTotalValue.toFixed(2),
-              })
-              .where(eq(schema.inventory.id, currentInventory.id));
-          } else {
-            // Create new inventory record (shouldn't normally happen, but handle it)
-            await tx.insert(schema.inventory).values({
-              companyId: voucher.companyId,
-              locationId: voucher.locationId,
-              stockItemId: saleItem.stockItemId,
-              quantity: quantity.toFixed(3),
-              averageRate: costPrice.toFixed(2),
-              totalValue: (quantity * costPrice).toFixed(2),
-            });
-          }
         }
 
         // Delete sales items
