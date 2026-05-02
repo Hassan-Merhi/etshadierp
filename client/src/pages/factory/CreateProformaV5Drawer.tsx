@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Save, Loader2, CheckCircle, Plus, Trash2, Container } from "lucide-react";
+import { AlertTriangle, Save, Loader2, CheckCircle, CheckCircle2, Plus, Trash2, Container } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -73,6 +73,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
   const [containerCount, setContainerCount] = useState(draft?.containerCount ?? "1");
   const [containerNames, setContainerNames] = useState<string[]>(draft?.containerNames ?? ["Container 1"]);
   const [draftStatus, setDraftStatus]       = useState<"idle" | "saved">("idle");
+  const [appliedPrice, setAppliedPrice]     = useState<"sell" | "prod" | null>(null);
   const [errors, setErrors]                 = useState<Record<string, string>>({});
   const [showZeroItems, setShowZeroItems]   = useState(false);
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -402,20 +403,24 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
           <div className="flex items-center gap-2 ml-auto flex-wrap">
             <Button
               size="sm"
-              variant="outline"
-              onClick={applyCatalogSellingPrice}
+              variant={appliedPrice === "sell" ? "secondary" : "outline"}
+              onClick={() => { applyCatalogSellingPrice(); setAppliedPrice("sell"); }}
               disabled={!productsQuery.data}
               data-testid="button-v5-apply-sell-price"
+              className={cn(appliedPrice === "sell" && "ring-2 ring-primary/40")}
             >
+              {appliedPrice === "sell" && <CheckCircle2 className="h-3.5 w-3.5 mr-1.5 text-primary" />}
               Apply Sell Price
             </Button>
             <Button
               size="sm"
-              variant="outline"
-              onClick={applyCatalogProductionPrice}
+              variant={appliedPrice === "prod" ? "secondary" : "outline"}
+              onClick={() => { applyCatalogProductionPrice(); setAppliedPrice("prod"); }}
               disabled={!productsQuery.data}
               data-testid="button-v5-apply-prod-price"
+              className={cn(appliedPrice === "prod" && "ring-2 ring-primary/40")}
             >
+              {appliedPrice === "prod" && <CheckCircle2 className="h-3.5 w-3.5 mr-1.5 text-primary" />}
               Apply Prod Price
             </Button>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground h-9">

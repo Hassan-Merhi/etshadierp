@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, Fragment, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock, Pencil, X } from "lucide-react";
@@ -66,6 +66,7 @@ export default function FactoryStockAllocationV5() {
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
   const [expandedRows, setExpandedRows]         = useState<Set<string>>(new Set());
   const [hideZero, setHideZero]                 = useState(true);
+  const [refreshFlash, setRefreshFlash]         = useState(false);
 
   /* ── Add-Containers dialog state ────────────────────────────────────────── */
   const [addCtDialog, setAddCtDialog] = useState<{
@@ -255,6 +256,13 @@ export default function FactoryStockAllocationV5() {
   const rows   = query.data?.rows ?? [];
   const totals = query.data?.totals;
 
+  const handleRefresh = useCallback(() => {
+    query.refetch().then(() => {
+      setRefreshFlash(true);
+      setTimeout(() => setRefreshFlash(false), 1500);
+    });
+  }, [query]);
+
   function toggleRow(code: string) {
     setExpandedRows(prev => {
       const next = new Set(prev);
@@ -300,8 +308,19 @@ export default function FactoryStockAllocationV5() {
           <Button size="default" onClick={() => setCreateDrawerOpen(true)} data-testid="button-v5-open-create-proforma">
             <Plus className="h-4 w-4 mr-2" />Create Proforma
           </Button>
-          <Button variant="outline" size="default" onClick={() => query.refetch()} data-testid="button-v5-refresh">
-            <RefreshCw className="h-4 w-4 mr-2" />Refresh
+          <Button
+            variant={refreshFlash ? "secondary" : "outline"}
+            size="default"
+            onClick={handleRefresh}
+            disabled={query.isFetching}
+            data-testid="button-v5-refresh"
+            className={cn(refreshFlash && "ring-2 ring-primary/40")}
+          >
+            {refreshFlash
+              ? <><CheckCircle2 className="h-4 w-4 mr-2 text-primary" />Refreshed</>
+              : query.isFetching
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Refreshing…</>
+                : <><RefreshCw className="h-4 w-4 mr-2" />Refresh</>}
           </Button>
         </div>
       </div>
