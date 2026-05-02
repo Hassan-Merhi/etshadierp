@@ -13,6 +13,8 @@ import {
   factoryDaybookEntries,
   factoryAttendance,
   factoryWorkerAdvances,
+  vouchers,
+  voucherEntries,
   companies,
   insertFactoryPayrollSchema,
 } from "@shared/schema";
@@ -450,6 +452,26 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
             eq(factoryDaybookEntries.referenceTable, "factory_payrolls"),
           )
         );
+
+        // 2b. Delete the mark-paid voucher (PAYMENT-PAY-{id}-*) and its entries.
+        // These are created by the mark-paid endpoint: DR Payroll Payable / CR Cash.
+        // Only the payment voucher is reversed here; the generate-time expense voucher
+        // (PAYROLL-GEN-*) is a batch voucher shared across workers and is intentionally
+        // kept since we only revert to DRAFT (not delete the payroll entirely).
+        const paymentVouchers = await tx
+          .select({ id: vouchers.id })
+          .from(vouchers)
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              sql`${vouchers.voucherNumber} LIKE ${'PAYMENT-PAY-' + id + '-%'}`,
+            )
+          );
+        if (paymentVouchers.length > 0) {
+          const vIds = paymentVouchers.map((v: any) => v.id);
+          await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
+          await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
+        }
 
         // 3. If PAID → revert to DRAFT. If DRAFT → delete entirely.
         if (existing.status === "PAID") {

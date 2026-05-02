@@ -1441,17 +1441,36 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
             .where(eq(factoryAdvanceRepayments.advanceId, id));
         }
 
+        // Delete the advance payment voucher (PAYMENT-ADV-{id}-*) and its entries.
+        // These were created when the advance was given with a cash account:
+        //   DR Factory Worker Advances / CR Cash.
+        const advanceVouchers = await tx
+          .select({ id: vouchers.id })
+          .from(vouchers)
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              sql`${vouchers.voucherNumber} LIKE ${'PAYMENT-ADV-' + id + '-%'}`,
+            )
+          );
+        if (advanceVouchers.length > 0) {
+          const vIds = advanceVouchers.map((v: any) => v.id);
+          await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
+          await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
+        }
+
         await tx.delete(factoryWorkerAdvances)
           .where(and(eq(factoryWorkerAdvances.id, id), eq(factoryWorkerAdvances.companyId, companyId)));
 
         const repayNote = repayments.length > 0 ? ` (${repayments.length} repayment(s) also removed)` : "";
+        const voucherNote = advanceVouchers.length > 0 ? "; voucher reversed" : "";
         await writeDaybookEntry(tx, {
           companyId,
           txDate: today,
           txType: "ADVANCE_DELETED",
           referenceId: id,
           referenceTable: "factory_worker_advances",
-          description: `Advance deleted for ${worker?.fullName || "Unknown"}: $${parseFloat(advance.amount).toFixed(2)}${repayNote}`,
+          description: `Advance deleted for ${worker?.fullName || "Unknown"}: $${parseFloat(advance.amount).toFixed(2)}${repayNote}${voucherNote}`,
           createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
         });
       });
