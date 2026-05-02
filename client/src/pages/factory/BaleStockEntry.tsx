@@ -913,6 +913,57 @@
               </CardContent>
             </Card>
 
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Upload className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm">Label Logo</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Select value={selectedCustomerId} onValueChange={(v) => { setSelectedCustomerId(v); setSelectedLogoId(null); }}>
+                  <SelectTrigger className="text-sm" data-testid="select-label-customer">
+                    <SelectValue placeholder="No customer (HMD logo)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No customer (HMD logo)</SelectItem>
+                    {allCustomers.filter((c: any) => c.active).map((c: any) => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.legalName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedCustomerId && (
+                  customerLogosForPrint.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-1">No logos uploaded for this customer.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {customerLogosForPrint.map((logo: any) => (
+                        <button
+                          key={logo.id}
+                          type="button"
+                          onClick={() => setSelectedLogoId(selectedLogoId === logo.id ? null : logo.id)}
+                          className={`flex flex-col items-center gap-1 p-2 rounded-md border text-xs ${selectedLogoId === logo.id ? "border-primary bg-primary/10" : "border-border hover-elevate"}`}
+                          data-testid={`button-select-logo-${logo.id}`}
+                        >
+                          <img src={`/api/factory/customer-logos/${logo.id}/image`} alt={logo.name} className="h-8 w-14 object-contain" />
+                          <span className="truncate max-w-[72px]">{logo.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )
+                )}
+                {selectedLogoId && (
+                  <button
+                    className="text-xs text-muted-foreground underline hover:text-foreground"
+                    onClick={() => setSelectedLogoId(null)}
+                    data-testid="button-clear-logo"
+                  >
+                    Clear logo
+                  </button>
+                )}
+              </CardContent>
+            </Card>
+
             <Button
               className="w-full gap-2"
               disabled={cart.length === 0 || !selectedLocationId || stockEntryMutation.isPending}
@@ -967,42 +1018,12 @@
                 <span>Total: {totalQty} bales</span>
                 <span>{formatNumber(totalKg)} kg</span>
               </div>
-              <div className="border-t pt-3 space-y-2">
-                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Customer Label (Optional)</div>
-                <Select value={selectedCustomerId} onValueChange={(v) => { setSelectedCustomerId(v); setSelectedLogoId(null); }}>
-                  <SelectTrigger data-testid="select-label-customer">
-                    <SelectValue placeholder="No customer logo — use default" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">No customer logo</SelectItem>
-                    {allCustomers.filter((c: any) => c.active).map((c: any) => (
-                      <SelectItem key={c.id} value={String(c.id)}>{c.legalName}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedCustomerId && (
-                  <div>
-                    {customerLogosForPrint.length === 0 ? (
-                      <p className="text-xs text-muted-foreground py-1">No logos uploaded for this customer.</p>
-                    ) : (
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        {customerLogosForPrint.map((logo: any) => (
-                          <button
-                            key={logo.id}
-                            type="button"
-                            onClick={() => setSelectedLogoId(selectedLogoId === logo.id ? null : logo.id)}
-                            className={`flex flex-col items-center gap-1 p-2 rounded-md border text-xs transition-colors ${selectedLogoId === logo.id ? "border-primary bg-primary/10" : "border-border hover-elevate"}`}
-                            data-testid={`button-select-logo-${logo.id}`}
-                          >
-                            <img src={`/api/factory/customer-logos/${logo.id}/image`} alt={logo.name} className="h-10 w-16 object-contain" />
-                            <span className="truncate max-w-[80px]">{logo.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              {selectedLogoId && (
+                <div className="border-t pt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                  <img src={`/api/factory/customer-logos/${selectedLogoId}/image`} alt="Selected logo" className="h-6 w-10 object-contain rounded" />
+                  <span>Custom logo will be used on labels</span>
+                </div>
+              )}
             </div>
             <DialogFooter className="gap-2">
               <Button variant="outline" onClick={() => setConfirmDialogOpen(false)}>Cancel</Button>
