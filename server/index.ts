@@ -2136,11 +2136,14 @@ let migrationsDone = false;
     `DO $$ BEGIN ALTER TABLE salary_advances ADD CONSTRAINT salary_advances_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE waste_dispatches ADD CONSTRAINT waste_dispatches_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
 
-    // ── F-Phase 4k (May 2026) — stock_transfer_vouchers.voucher_id (1 FK, user-approved orphan deletion) ──
+    // ── F-Phase 4k (May 2026) — stock_transfer_vouchers.voucher_id (1 FK, user-approved cascade-style cleanup) ──
     // 17 orphan stock_transfer_vouchers rows (Nov 1 – Dec 3 2025) had voucher_id pointing at deleted vouchers (3, 83-88, 134-137, 165, 240, 941, 942, 1046, 1047, 1088).
     // Column is NOT NULL so couldn't sweep-NULL — user explicitly approved DELETE.
-    // All 17 had inventory_applied=false (never posted to stock) and zero downstream FKs (nothing referenced their ids), so deletion is non-destructive.
-    // Idempotent: DELETE filter is empty after FK enforcement; ALTER guarded by EXCEPTION.
+    // All 17 had inventory_applied=false (never posted to stock), so deleting them and their child line items is non-destructive (no real inventory ever moved).
+    // ORDER MATTERS: delete child line items FIRST (stock_transfer_items.transfer_id is a logical reference but no FK enforced yet — F-Phase 4l queued), THEN delete parents.
+    // Idempotent: both DELETE filters return 0 rows after first run; ALTER guarded by EXCEPTION.
+    // Note: this only cleans items whose parent is in the orphan-parent set. The broader stock_transfer_items orphan backlog (~953 pre-existing) is queued for F-Phase 4l alongside the FK on stock_transfer_items.transfer_id.
+    `DELETE FROM stock_transfer_items WHERE transfer_id IN (SELECT id FROM stock_transfer_vouchers WHERE voucher_id NOT IN (SELECT id FROM vouchers));`,
     `DELETE FROM stock_transfer_vouchers WHERE voucher_id NOT IN (SELECT id FROM vouchers);`,
     `DO $$ BEGIN ALTER TABLE stock_transfer_vouchers ADD CONSTRAINT stock_transfer_vouchers_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   ];
