@@ -537,6 +537,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
+      const paymentDate = req.body.paymentDate || getClientDate(req);
 
       // Pre-resolve ledger OUTSIDE the transaction to prevent concurrent insert conflicts
       const payableAccSingle = cashAccountId
@@ -545,7 +546,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
 
       const updated = await db.transaction(async (tx: any) => {
         const [payroll] = await tx.update(factoryPayrolls)
-          .set({ status: "PAID", paidAt: new Date(), cashAccountId } as any)
+          .set({ status: "PAID", paidAt: new Date(paymentDate), cashAccountId } as any)
           .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)))
           .returning();
         if (!payroll) throw new Error("Payroll record not found");
@@ -553,7 +554,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
         const [prWorker] = await tx.select({ fullName: factoryWorkers.fullName })
           .from(factoryWorkers).where(eq(factoryWorkers.id, payroll.workerId));
         const workerName = prWorker?.fullName?.trim() || `Worker #${payroll.workerId}`;
-        const prToday = getClientDate(req);
+        const prToday = paymentDate;
 
         if (cashAccountId) {
           // Accounting: Dr Payroll Payable / Cr Cash (settling the liability created at run time)
@@ -712,6 +713,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       const { payrollIds, cashAccountId } = req.body;
       if (!payrollIds?.length) return res.status(400).json({ message: "payrollIds required" });
       const cashId = cashAccountId ? parseInt(cashAccountId) : null;
+      const bulkPrToday = req.body.paymentDate || getClientDate(req);
 
       // Pre-resolve ledger OUTSIDE the transaction to prevent concurrent insert conflicts
       const payableAccBulk = cashId
@@ -723,10 +725,9 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
           .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, payrollIds)));
 
         await tx.update(factoryPayrolls)
-          .set({ status: "PAID", paidAt: new Date(), cashAccountId: cashId } as any)
+          .set({ status: "PAID", paidAt: new Date(bulkPrToday), cashAccountId: cashId } as any)
           .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, payrollIds)));
 
-        const bulkPrToday = getClientDate(req);
 
         // Accounting: Dr Payroll Payable / Cr Cash (settling liability created at run time)
         const payableAcc = payableAccBulk;

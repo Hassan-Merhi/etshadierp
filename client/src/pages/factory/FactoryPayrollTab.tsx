@@ -244,9 +244,11 @@ export default function FactoryPayrollTab() {
   const [payOpen, setPayOpen] = useState(false);
   const [payTargetId, setPayTargetId] = useState<number | null>(null);
   const [payCashAccountId, setPayCashAccountId] = useState("");
+  const [payPaymentDate, setPayPaymentDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkPayOpen, setBulkPayOpen] = useState(false);
   const [bulkCashAccountId, setBulkCashAccountId] = useState("");
+  const [bulkPaymentDate, setBulkPaymentDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [undoTargetId, setUndoTargetId] = useState<number | null>(null);
   const [deleteBatchGroup, setDeleteBatchGroup] = useState<PayrollGroup | null>(null);
@@ -416,9 +418,10 @@ export default function FactoryPayrollTab() {
   });
 
   const markPaidMutation = useMutation({
-    mutationFn: async ({ id, cashId }: { id: number; cashId: string }) => {
+    mutationFn: async ({ id, cashId, paymentDate }: { id: number; cashId: string; paymentDate: string }) => {
       const res = await apiRequest("PATCH", `/api/factory/payrolls/${id}/mark-paid`, {
         cashAccountId: cashId ? parseInt(cashId) : undefined,
+        paymentDate,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed");
@@ -440,9 +443,9 @@ export default function FactoryPayrollTab() {
   });
 
   const bulkMarkPaidMutation = useMutation({
-    mutationFn: async (cashId: string) => {
+    mutationFn: async ({ cashId, paymentDate }: { cashId: string; paymentDate: string }) => {
       const res = await apiRequest("POST", "/api/factory/payrolls/mark-paid-bulk", {
-        payrollIds: [...selectedIds], cashAccountId: cashId ? parseInt(cashId) : undefined,
+        payrollIds: [...selectedIds], cashAccountId: cashId ? parseInt(cashId) : undefined, paymentDate,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed");
@@ -1054,9 +1057,18 @@ export default function FactoryPayrollTab() {
         <DialogContent data-testid="dialog-mark-paid">
           <DialogHeader>
             <DialogTitle>Pay Worker</DialogTitle>
-            <DialogDescription>Select the cash or bank account to record this payment. This will settle the payroll liability.</DialogDescription>
+            <DialogDescription>Select the payment date and cash or bank account. This will settle the payroll liability.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Payment Date</Label>
+              <Input
+                type="date"
+                value={payPaymentDate}
+                onChange={(e) => setPayPaymentDate(e.target.value)}
+                data-testid="input-pay-payment-date"
+              />
+            </div>
             <div className="space-y-1">
               <Label className="text-xs">Cash / Bank Account</Label>
               <Select value={payCashAccountId} onValueChange={setPayCashAccountId}>
@@ -1070,8 +1082,8 @@ export default function FactoryPayrollTab() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setPayOpen(false)}>Cancel</Button>
             <Button
-              onClick={() => payTargetId && markPaidMutation.mutate({ id: payTargetId, cashId: payCashAccountId })}
-              disabled={markPaidMutation.isPending}
+              onClick={() => payTargetId && markPaidMutation.mutate({ id: payTargetId, cashId: payCashAccountId, paymentDate: payPaymentDate })}
+              disabled={markPaidMutation.isPending || !payPaymentDate}
               data-testid="button-confirm-pay"
             >
               {markPaidMutation.isPending ? "Saving..." : "Confirm Payment"}
@@ -1121,9 +1133,18 @@ export default function FactoryPayrollTab() {
         <DialogContent data-testid="dialog-bulk-pay">
           <DialogHeader>
             <DialogTitle>Pay {selectedIds.size} Records</DialogTitle>
-            <DialogDescription>Select the cash or bank account for this bulk payment. This settles the payroll liability for all selected workers.</DialogDescription>
+            <DialogDescription>Select the payment date and cash or bank account for this bulk payment. This settles the payroll liability for all selected workers.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Payment Date</Label>
+              <Input
+                type="date"
+                value={bulkPaymentDate}
+                onChange={(e) => setBulkPaymentDate(e.target.value)}
+                data-testid="input-bulk-payment-date"
+              />
+            </div>
             <div className="space-y-1">
               <Label className="text-xs">Cash / Bank Account</Label>
               <Select value={bulkCashAccountId} onValueChange={setBulkCashAccountId}>
@@ -1137,8 +1158,8 @@ export default function FactoryPayrollTab() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkPayOpen(false)}>Cancel</Button>
             <Button
-              onClick={() => bulkMarkPaidMutation.mutate(bulkCashAccountId)}
-              disabled={bulkMarkPaidMutation.isPending}
+              onClick={() => bulkMarkPaidMutation.mutate({ cashId: bulkCashAccountId, paymentDate: bulkPaymentDate })}
+              disabled={bulkMarkPaidMutation.isPending || !bulkPaymentDate}
               data-testid="button-confirm-bulk-pay"
             >
               {bulkMarkPaidMutation.isPending ? "Processing..." : "Confirm Payment"}
