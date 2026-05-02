@@ -604,6 +604,29 @@ export function registerPosRoutes(app: Express) {
           accountType === "credit"
         ) {
           debitEntry.ledgerAccountId = accountId;
+          // For credit sales, also stamp the customerId on the receivable
+          // entry whenever the receivable ledger is linked to a customer.
+          // Without this, the customer ledger / statement views can't
+          // attribute the entry to the customer.
+          if (isCreditSale && accountType === "credit") {
+            try {
+              const [linkedCust] = await tx
+                .select({ id: customers.id })
+                .from(customers)
+                .where(
+                  and(
+                    eq(customers.ledgerAccountId, accountId),
+                    eq(customers.companyId, req.session.currentCompanyId!),
+                  ),
+                )
+                .limit(1);
+              if (linkedCust) {
+                debitEntry.customerId = linkedCust.id;
+              }
+            } catch (e) {
+              console.error("[POS Sale] customer lookup for credit-sale entry failed:", e);
+            }
+          }
           console.log("[POS Sale] Using ledgerAccountId for cash/credit:", accountId);
         } else {
           debitEntry.bankAccountId = accountId;

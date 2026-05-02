@@ -18,7 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { queryClient, keyStartsWith } from "@/lib/queryClient";
+import { queryClient, keyStartsWith, invalidateCustomerBalances } from "@/lib/queryClient";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -100,6 +100,7 @@ export default function FactoryInvoices() {
     onSuccess: () => {
       toast({ title: "Deleted", description: "Invoice deleted successfully." });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+      invalidateCustomerBalances();
     },
     onError: (error: any) => {
       if (error?._handledGlobally) return;
@@ -119,7 +120,7 @@ export default function FactoryInvoices() {
     onSuccess: () => {
       toast({ title: "Reverted to Pending", description: "Invoice has been reverted. You can now edit and re-finalize it." });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
+      invalidateCustomerBalances();
     },
     onError: (error: any) => {
       if (error?._handledGlobally) return;

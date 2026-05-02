@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, keyStartsWith } from "@/lib/queryClient";
+import { queryClient, keyStartsWith, invalidateCustomerBalances } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -213,7 +213,7 @@ export default function FactoryInvoiceCreate() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
+      invalidateCustomerBalances(customerId ?? undefined);
       toast({ title: "Invoice finalized", description: "Invoice has been created successfully" });
       setShowFinalizeDialog(false);
       navigate(`/factory/sales/invoices/${orderId}`);

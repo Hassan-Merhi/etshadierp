@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { queryClient, keyStartsWith } from "@/lib/queryClient";
+import { queryClient, keyStartsWith, invalidateCustomerBalances } from "@/lib/queryClient";
 import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -183,6 +183,7 @@ export default function FactoryInvoiceDetail() {
     onSuccess: () => {
       toast({ title: "Deleted", description: "Invoice deleted successfully." });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+      invalidateCustomerBalances(order?.customerId ?? undefined);
       navigate("/factory/invoicing?tab=invoices");
     },
     onError: (error: any) => {
@@ -250,6 +251,7 @@ export default function FactoryInvoiceDetail() {
     onSuccess: () => {
       toast({ title: "Reverted to Draft", description: "Invoice has been reverted. You can now edit prices." });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+      invalidateCustomerBalances(order?.customerId ?? undefined);
     },
     onError: (error: any) => {
       if (error?._handledGlobally) return;

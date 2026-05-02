@@ -185,6 +185,23 @@ The app has a layered offline-first foundation:
 - **`client/src/pages/StockEntryHistory.tsx`** — "Send Worker PDF to WhatsApp" option in Actions menu
 - **`client/src/pages/factory/FactorySettings.tsx`** — "Production WhatsApp Group" picker card using `/api/whatsapp/chats/pos`; stored in `factory_settings.extraSettings.productionWorkerMatrixWhatsappGroupId`
 
+## Factory Customer Ledger Audit (May 2026)
+
+A multi-phase audit (`.local/audit_plan.md`) hardened the Customers ↔ Accounts ledger consistency for factory companies. Phases 0–5, 7, 8 and 10 are complete; Phases 6, 9 and 11 are deferred per the plan's "no destructive changes without approval" rule.
+
+- **Single source of truth helper**: `server/lib/factoryCustomerLedger.ts` — `buildFactoryCustomerLedgerEntries()` and `getFactoryCustomerLedgerPrePeriodTotals()`. Used by both `/api/accounts/ledger/:id/transactions` and the PDF generator (`server/lib/accountStatementPdfGenerator.ts`) so the on-screen ledger and the PDF cannot drift apart.
+- **Read-only statement endpoint**: `GET /api/factory/customers/:id/statement` no longer silently UPDATEs `customer_balances`; it now recomputes INVOICE rows on the fly via `invoiceGrandTotalMap`.
+- **POS credit sale stamps `customerId`**: `server/routes/posRoutes.ts` now sets BOTH `ledgerAccountId` AND `customerId` on the receivable voucher entry. Backfill script for historical rows: `scripts/backfill-voucher-entry-customer-id.ts` (dry-run by default; `--apply` to commit; `--company <id>` to scope).
+- **Voucher form auto-corrects ledger**: `POST /api/vouchers/with-entries` and `POST /api/vouchers/payment-receipt` auto-fill `ledgerAccountId` from the chosen customer and reject mismatches.
+- **Bidirectional OB sync**: `PUT /api/ledger-accounts/:id` now reverse-syncs Opening Balance to the linked customer.
+- **Cache invalidation helper**: `client/src/lib/queryClient.ts` exports `invalidateCustomerBalances(customerId?)`. Wired into FactoryInvoiceCreate (finalize), FactoryInvoiceDetail (delete + unfinalize), FactoryInvoices (delete + unfinalize), and POS sale flow so Customers list, Accounts list, ledger card, ledger transactions, and statement all refresh together.
+
+Pending (require user approval):
+- Phase 3 — run backfill script with `--apply` against real data
+- Phase 6 — schema migration for explicit charge-voucher FK linkage (`source_order_charge_id`)
+- Phase 9 — combine 4 factory-override queries into one + add indexes (perf only)
+- Phase 11 — server-side timezone consolidation refactor
+
 ## External Dependencies
 
 -   **AI/ML**: Google Gemini API

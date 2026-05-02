@@ -11,6 +11,11 @@ import {
   vouchers, voucherEntries,
 } from "@shared/schema";
 import { eq, and, isNull, sql } from "drizzle-orm";
+import {
+  buildFactoryCustomerLedgerEntries,
+  getCustomerByLedgerId,
+  getFactoryCustomerLedgerPrePeriodTotals,
+} from "./factoryCustomerLedger";
 
 export interface StatementPdfOptions {
   accountType: string;
@@ -60,18 +65,43 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
   let obSide = "Dr";
 
   if (accountType === "ledger") {
-    rawEntries = await storage.getVoucherEntriesByLedger(accountId, startDate, endDate);
     const [acct] = await db.select().from(ledgerAccounts).where(eq(ledgerAccounts.id, accountId));
     accountName = acct?.name ?? "Ledger Account";
     // If this ledger account is linked to a customer, the customer's
     // opening balance is the authoritative source of truth.
     const [linkedCust] = await db
-      .select({ openingBalance: customers.openingBalance, openingBalanceSide: customers.openingBalanceSide })
+      .select({
+        id: customers.id,
+        companyId: customers.companyId,
+        openingBalance: customers.openingBalance,
+        openingBalanceSide: customers.openingBalanceSide,
+      })
       .from(customers)
       .where(eq(customers.ledgerAccountId, accountId))
       .limit(1);
     rawOB = parseFloat((linkedCust?.openingBalance ?? acct?.openingBalance) ?? "0") || 0;
     obSide = linkedCust?.openingBalanceSide ?? acct?.openingBalanceSide ?? "Dr";
+
+    // For factory companies, use the unified customer-ledger view so the
+    // statement reconciles with the Customers page balance.
+    let useFactoryView = false;
+    if (linkedCust) {
+      const company = await storage.getCompanyById(linkedCust.companyId);
+      if (company?.companyType === "factory") {
+        useFactoryView = true;
+      }
+    }
+    if (useFactoryView && linkedCust) {
+      rawEntries = await buildFactoryCustomerLedgerEntries(
+        linkedCust.id,
+        accountId,
+        linkedCust.companyId,
+        startDate,
+        endDate,
+      );
+    } else {
+      rawEntries = await storage.getVoucherEntriesByLedger(accountId, startDate, endDate);
+    }
   } else if (accountType === "bank") {
     rawEntries = await storage.getVoucherEntriesByBankAccount(accountId, startDate, endDate);
     const [acct] = await db.select().from(bankAccounts).where(eq(bankAccounts.id, accountId));
@@ -120,14 +150,44 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
   let openingBalance = isSupplier ? rawOB : (obSide === "Cr" ? -rawOB : rawOB);
 
   if (startDate) {
+    // Track whether the factory-customer pre-period override has already been
+    // applied; if so, we must NOT also run the generic ledger pre-period calc
+    // below (which would double-count the same voucher entries).
+    let factoryPrePeriodApplied = false;
+
+    // For factory-customer ledger view, compute pre-period totals from the
+    // unified entry set so the opening line matches the Customers page.
+    if (accountType === "ledger") {
+      const linkedCust = await getCustomerByLedgerId(accountId);
+      if (linkedCust) {
+        const company = await storage.getCompanyById(linkedCust.companyId);
+        if (company?.companyType === "factory") {
+          const tot = await getFactoryCustomerLedgerPrePeriodTotals(
+            linkedCust.id,
+            accountId,
+            linkedCust.companyId,
+            startDate,
+          );
+          openingBalance += tot.debit - tot.credit;
+          factoryPrePeriodApplied = true;
+        }
+      }
+    }
+
     const typeToColumn: Record<string, any> = {
-      ledger: voucherEntries.ledgerAccountId,
       bank: voucherEntries.bankAccountId,
       "fixed-asset": voucherEntries.fixedAssetId,
       supplier: voucherEntries.supplierId,
       employee: voucherEntries.employeeId,
       customer: voucherEntries.customerId,
     };
+    // For ledger accounts, run the generic voucher-based pre-period calc
+    // unless the factory-customer override already handled it. This covers
+    // both unlinked ledgers AND non-factory linked ledgers (ERP companies),
+    // which previously had a missing opening balance.
+    if (accountType === "ledger" && !factoryPrePeriodApplied) {
+      typeToColumn.ledger = voucherEntries.ledgerAccountId;
+    }
     const col = typeToColumn[accountType];
     if (col) {
       const [tot] = await db.select({

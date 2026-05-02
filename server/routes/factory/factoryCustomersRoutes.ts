@@ -368,39 +368,28 @@ export function registerFactoryCustomersRoutes(app: Express) {
         invoices.map((inv: any) => [inv.id, parseFloat(inv.totalWeightKg ?? "0")])
       );
 
-      // Auto-sync: update any INVOICE-type balance rows whose debitAmount differs from
-      // the current invoice grandTotal (happens when the invoice was repriced after finalization)
-      const invoiceBalanceEntries = await db.select({
-        id: customerBalances.id,
-        referenceId: customerBalances.referenceId,
-        debitAmount: customerBalances.debitAmount,
-      }).from(customerBalances)
-        .where(and(
-          eq(customerBalances.companyId, companyId),
-          eq(customerBalances.customerId, customerId),
-          eq(customerBalances.referenceType, "INVOICE"),
-        ));
-
-      for (const entry of invoiceBalanceEntries) {
-        if (!entry.referenceId) continue;
-        const [inv] = await db.select({ grandTotal: customerOrders.grandTotal })
-          .from(customerOrders)
-          .where(eq(customerOrders.id, entry.referenceId));
-        if (inv) {
-          const storedAmt = parseFloat(entry.debitAmount || "0");
-          const actualAmt = parseFloat(inv.grandTotal || "0");
-          if (Math.abs(storedAmt - actualAmt) > 0.001) {
-            await db.update(customerBalances)
-              .set({ debitAmount: String(actualAmt), balance: String(actualAmt) })
-              .where(eq(customerBalances.id, entry.id));
-          }
-        }
-      }
+      // Build a map of orderId → current grandTotal so we can correct stale
+      // INVOICE rows on the fly (read-only — no DB writes from a GET).
+      const invoiceGrandTotalMap = new Map<number, string>(
+        invoices.map((inv: any) => [inv.id, inv.grandTotal]),
+      );
 
       // Get all balance history entries ordered by date
-      const balanceRows = await db.select().from(customerBalances)
+      const rawBalanceRows = await db.select().from(customerBalances)
         .where(and(eq(customerBalances.companyId, companyId), eq(customerBalances.customerId, customerId)))
         .orderBy(customerBalances.transactionDate, customerBalances.id);
+
+      const balanceRows = rawBalanceRows.map((row: any) => {
+        if (
+          row.referenceType === "INVOICE" &&
+          row.referenceId &&
+          invoiceGrandTotalMap.has(row.referenceId)
+        ) {
+          const actualAmt = invoiceGrandTotalMap.get(row.referenceId)!;
+          return { ...row, debitAmount: actualAmt, balance: actualAmt };
+        }
+        return row;
+      });
 
       // Also pull voucher entries for this customer (by ledgerAccountId or direct customerId link)
       // to include manual accounting vouchers that don't flow through customerBalances.

@@ -201,6 +201,34 @@ export function keyStartsWith(prefix: string) {
     (query.queryKey[0] as string).startsWith(prefix);
 }
 
+/**
+ * Invalidate every query that depends on a customer's balance.
+ *
+ * Use this in any `useMutation.onSuccess` that creates / edits / deletes a
+ * voucher, voucher entry, customer order, charge, finalize/un-finalize, or
+ * any factory customer write.  It guarantees the Customers list, Accounts
+ * page, ledger card, ledger transactions list, pre-period block, and the
+ * customer statement all refresh together — eliminating the "balance updates
+ * here but not there" UX.
+ *
+ * Pass the `customerId` only when known; without it we still invalidate
+ * the broad list keys.
+ */
+export function invalidateCustomerBalances(customerId?: number | string) {
+  // Customers list (factory + ERP)
+  queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customers") });
+  queryClient.invalidateQueries({ predicate: keyStartsWith("/api/customers") });
+  // Accounts list / ledger balance / pre-period
+  queryClient.invalidateQueries({ predicate: keyStartsWith("/api/accounts") });
+  // Voucher list (caller may also invalidate detail key directly)
+  queryClient.invalidateQueries({ predicate: keyStartsWith("/api/vouchers") });
+  if (customerId !== undefined && customerId !== null) {
+    queryClient.invalidateQueries({
+      queryKey: ["/api/factory/customers", customerId, "statement"],
+    });
+  }
+}
+
 export const queryClient = new QueryClient({
   mutationCache: globalMutationCache,
   defaultOptions: {

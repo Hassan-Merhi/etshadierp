@@ -19,7 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { apiRequest, queryClient, getAppDate } from "@/lib/queryClient";
+import { apiRequest, queryClient, getAppDate, invalidateCustomerBalances } from "@/lib/queryClient";
 import { useCurrencyContext, type Currency } from "@/contexts/CurrencyContext";
 import { useToast } from "@/hooks/use-toast";
 import { useReactToPrint } from "react-to-print";
@@ -666,7 +666,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       if (editVoucherId) {
         queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${editVoucherId}`] });
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      // A POS sale (cash or credit) impacts customer + ledger balances; invalidate
+      // every related view so Customers, Accounts and ledger transactions all
+      // refresh together.
+      invalidateCustomerBalances(data?.voucher?.customerId ?? undefined);
 
       // Always open the print dialog
       toast({

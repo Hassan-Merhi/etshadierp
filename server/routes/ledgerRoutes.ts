@@ -268,7 +268,46 @@ export function registerLedgerRoutes(app: Express) {
           }
         }
 
-        const updatedAccount = await storage.updateLedgerAccount(parsed);
+        // Atomic: ledger update + reverse-sync to linked customer must succeed
+        // together or both roll back. Otherwise a sync failure would leave
+        // ledger.openingBalance and customer.openingBalance permanently out of
+        // sync — exactly the bug Phase 5 was meant to prevent.
+        const updatedAccount = await db.transaction(async (tx) => {
+          const [updated] = await tx
+            .update(ledgerAccounts)
+            .set(parsed)
+            .where(eq(ledgerAccounts.id, accountId))
+            .returning();
+
+          if (
+            parsed.openingBalance !== undefined ||
+            parsed.openingBalanceSide !== undefined
+          ) {
+            const [linkedCust] = await tx
+              .select({ id: customers.id })
+              .from(customers)
+              .where(eq(customers.ledgerAccountId, accountId))
+              .limit(1);
+            if (linkedCust) {
+              const update: { openingBalance?: string; openingBalanceSide?: string } = {};
+              if (parsed.openingBalance !== undefined) {
+                update.openingBalance = updated.openingBalance ?? "0";
+              }
+              if (parsed.openingBalanceSide !== undefined) {
+                update.openingBalanceSide = updated.openingBalanceSide ?? "Dr";
+              }
+              if (Object.keys(update).length > 0) {
+                await tx
+                  .update(customers)
+                  .set(update)
+                  .where(eq(customers.id, linkedCust.id));
+              }
+            }
+          }
+
+          return updated;
+        });
+
         res.json(updatedAccount);
       } catch (error: any) {
         res.status(400).json({ message: error.message });

@@ -487,11 +487,47 @@ export function registerVoucherRoutes(app: Express) {
 
           // Create voucher entries
           for (const entry of entries) {
+            // Cross-field validation: when an entry references a customer/
+            // supplier/employee that has a linked ledger account, fill in
+            // the missing ledger so the linked-ledger view stays consistent.
+            // Reject the request if the user provided a *different* ledger
+            // than the one the party is linked to.
+            let ledgerAccountId = entry.ledgerAccountId || null;
+
+            if (entry.customerId) {
+              // Scope the customer lookup by current company to prevent
+              // cross-company customer IDs from being used in this voucher.
+              const [linkedCust] = await db
+                .select({ ledgerAccountId: customers.ledgerAccountId })
+                .from(customers)
+                .where(and(
+                  eq(customers.id, entry.customerId),
+                  eq(customers.companyId, req.session.currentCompanyId!),
+                ))
+                .limit(1);
+              if (!linkedCust) {
+                throw new Error(
+                  `Customer ${entry.customerId} not found in current company.`,
+                );
+              }
+              const linkedLedgerId = linkedCust.ledgerAccountId ?? null;
+              if (linkedLedgerId) {
+                if (ledgerAccountId && ledgerAccountId !== linkedLedgerId) {
+                  throw new Error(
+                    `Customer ${entry.customerId} is linked to ledger ${linkedLedgerId}, ` +
+                      `but the entry specifies ledger ${ledgerAccountId}. ` +
+                      `Use the customer's linked ledger or remove the customer reference.`,
+                  );
+                }
+                ledgerAccountId = linkedLedgerId;
+              }
+            }
+
             const [createdEntry] = await db
               .insert(voucherEntries)
               .values({
                 voucherId: createdVoucher.id,
-                ledgerAccountId: entry.ledgerAccountId || null,
+                ledgerAccountId,
                 bankAccountId: entry.bankAccountId || null,
                 fixedAssetId: entry.fixedAssetId || null,
                 supplierId: entry.supplierId || null,
@@ -594,12 +630,78 @@ export function registerVoucherRoutes(app: Express) {
         const voucherNumber = `${voucherType.toUpperCase()}-${Date.now()}`;
 
         // Use database transaction for atomic operation
+        const companyId = req.session.currentCompanyId!;
+
+        // Helper: build the voucher-entry account field set for a given
+        // (accountType, accountId).  Handles three things in one place:
+        //   1. Validates the referenced row belongs to the current company
+        //      (security: prevents cross-company injection).
+        //   2. For accountType === "customer", also stamps ledgerAccountId
+        //      from the linked customer ledger so the row shows up in BOTH
+        //      the Customers view and the linked-ledger view (Phase 4).
+        //   3. For accountType === "ledger" where the ledger is linked to a
+        //      customer, also stamps customerId for the same reason.
+        // The OR clause in factoryCustomerLedger.buildFactoryCustomerLedgerEntries
+        // makes this denormalization safe (no double-counting).
+        const buildAccountField = async (
+          accountType: string,
+          accountId: number,
+        ): Promise<Record<string, number>> => {
+          const field: Record<string, number> = {};
+          if (accountType === "ledger") {
+            const [acct] = await db
+              .select({ id: ledgerAccounts.id, companyId: ledgerAccounts.companyId })
+              .from(ledgerAccounts)
+              .where(eq(ledgerAccounts.id, accountId))
+              .limit(1);
+            if (!acct || acct.companyId !== companyId) {
+              throw new Error(`Ledger account ${accountId} not found in current company.`);
+            }
+            field.ledgerAccountId = accountId;
+            // Auto-fill customerId if this ledger is customer-linked
+            const [linkedCust] = await db
+              .select({ id: customers.id })
+              .from(customers)
+              .where(and(
+                eq(customers.ledgerAccountId, accountId),
+                eq(customers.companyId, companyId),
+              ))
+              .limit(1);
+            if (linkedCust) field.customerId = linkedCust.id;
+          } else if (accountType === "customer") {
+            const [cust] = await db
+              .select({ id: customers.id, ledgerAccountId: customers.ledgerAccountId })
+              .from(customers)
+              .where(and(
+                eq(customers.id, accountId),
+                eq(customers.companyId, companyId),
+              ))
+              .limit(1);
+            if (!cust) {
+              throw new Error(`Customer ${accountId} not found in current company.`);
+            }
+            field.customerId = accountId;
+            if (cust.ledgerAccountId) field.ledgerAccountId = cust.ledgerAccountId;
+          } else if (accountType === "bank") {
+            field.bankAccountId = accountId;
+          } else if (accountType === "supplier") {
+            field.supplierId = accountId;
+          } else if (accountType === "factorySupplier") {
+            field.factorySupplierId = accountId;
+          } else if (accountType === "employee") {
+            field.employeeId = accountId;
+          } else if (accountType === "fixedAsset") {
+            field.fixedAssetId = accountId;
+          }
+          return field;
+        };
+
         const result = await db.transaction(async (tx) => {
           // Create voucher
           const [createdVoucher] = await tx
             .insert(vouchers)
             .values({
-              companyId: req.session.currentCompanyId!,
+              companyId,
               voucherNumber,
               voucherType,
               voucherDate,
@@ -613,46 +715,15 @@ export function registerVoucherRoutes(app: Express) {
 
           const voucherEntriesToCreate = [];
 
+          // Pre-compute the payment-account field once (same for every entry)
+          const paymentAccountField = await buildAccountField(paymentAccountType, paymentAccountId);
+
           // Create entries based on voucher type
           for (const entry of entries) {
             const amount = entry.amount;
             const narration = notes || null;
 
-            // Determine account field for entry account
-            const entryAccountField: any = {};
-            if (entry.accountType === "ledger") {
-              entryAccountField.ledgerAccountId = entry.accountId;
-            } else if (entry.accountType === "bank") {
-              entryAccountField.bankAccountId = entry.accountId;
-            } else if (entry.accountType === "supplier") {
-              entryAccountField.supplierId = entry.accountId;
-            } else if (entry.accountType === "factorySupplier") {
-              entryAccountField.factorySupplierId = entry.accountId;
-            } else if (entry.accountType === "employee") {
-              entryAccountField.employeeId = entry.accountId;
-            } else if (entry.accountType === "fixedAsset") {
-              entryAccountField.fixedAssetId = entry.accountId;
-            } else if (entry.accountType === "customer") {
-              entryAccountField.customerId = entry.accountId;
-            }
-
-            // Determine account field for payment account
-            const paymentAccountField: any = {};
-            if (paymentAccountType === "ledger") {
-              paymentAccountField.ledgerAccountId = paymentAccountId;
-            } else if (paymentAccountType === "bank") {
-              paymentAccountField.bankAccountId = paymentAccountId;
-            } else if (paymentAccountType === "supplier") {
-              paymentAccountField.supplierId = paymentAccountId;
-            } else if (paymentAccountType === "factorySupplier") {
-              paymentAccountField.factorySupplierId = paymentAccountId;
-            } else if (paymentAccountType === "employee") {
-              paymentAccountField.employeeId = paymentAccountId;
-            } else if (paymentAccountType === "fixedAsset") {
-              paymentAccountField.fixedAssetId = paymentAccountId;
-            } else if (paymentAccountType === "customer") {
-              paymentAccountField.customerId = paymentAccountId;
-            }
+            const entryAccountField = await buildAccountField(entry.accountType, entry.accountId);
 
             const isLiabilityPaymentAccount = paymentAccountType === "supplier" || paymentAccountType === "factorySupplier" || paymentAccountType === "employee";
 

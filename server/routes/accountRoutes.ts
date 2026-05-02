@@ -37,6 +37,10 @@ import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
+import {
+  buildFactoryCustomerLedgerEntries,
+  getCustomerByLedgerId,
+} from "../lib/factoryCustomerLedger";
 
 
 export function registerAccountRoutes(app: Express) {
@@ -994,6 +998,30 @@ export function registerAccountRoutes(app: Express) {
       }
 
       const { startDate, endDate } = req.query;
+
+      // If this ledger is linked to a factory customer, return the unified
+      // factory-customer ledger view so the running balance reconciles with
+      // the figure shown on the Customers page (sales + balances + vouchers).
+      try {
+        const linkedCust = await getCustomerByLedgerId(ledgerAccountId);
+        if (linkedCust) {
+          const company = await storage.getCompanyById(linkedCust.companyId);
+          if (company?.companyType === "factory") {
+            const entries = await buildFactoryCustomerLedgerEntries(
+              linkedCust.id,
+              ledgerAccountId,
+              linkedCust.companyId,
+              startDate as string | undefined,
+              endDate as string | undefined,
+            );
+            return res.json(entries);
+          }
+        }
+      } catch (e) {
+        // If the factory-customer lookup fails for any reason, fall back to
+        // the regular ledger entries so the page never breaks.
+        console.error("[ledger transactions] factory-customer lookup failed:", e);
+      }
 
       const transactions = await storage.getVoucherEntriesByLedger(
         ledgerAccountId,
