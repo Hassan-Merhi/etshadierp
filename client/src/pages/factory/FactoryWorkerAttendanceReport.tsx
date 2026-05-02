@@ -699,19 +699,19 @@ export default function FactoryWorkerAttendanceReport() {
             <div className="overflow-auto rounded-md border print:overflow-visible print:border-0">
               <table className="w-full text-xs border-collapse min-w-max print:text-[9px]">
                 <thead>
-                  <tr className="bg-muted sticky top-0 z-10 print:bg-gray-100">
-                    <th className="text-left px-2 py-2 font-medium border-b border-r whitespace-nowrap sticky left-0 bg-muted z-20 min-w-[70px] print:bg-gray-100">
+                  <tr className="bg-muted print:bg-gray-100">
+                    <th className="text-left px-2 py-2 font-medium border-b border-r whitespace-nowrap sticky top-0 left-0 bg-muted z-30 min-w-[70px] print:bg-gray-100">
                       Code
                     </th>
-                    <th className="text-left px-3 py-2 font-medium border-b border-r whitespace-nowrap sticky left-[70px] bg-muted z-20 min-w-[160px] print:bg-gray-100">
+                    <th className="text-left px-3 py-2 font-medium border-b border-r whitespace-nowrap sticky top-0 left-[70px] bg-muted z-30 min-w-[160px] print:bg-gray-100">
                       Worker
                     </th>
                     {data.dates.map(({ date, label, abbr, isWeekend }) => (
                       <th
                         key={date}
                         className={cn(
-                          "text-center px-0 py-1 font-medium border-b border-r w-8 min-w-[32px]",
-                          isWeekend ? "text-amber-600 dark:text-amber-400 bg-amber-50/60 dark:bg-amber-900/10" : "",
+                          "text-center px-0 py-1 font-medium border-b border-r w-8 min-w-[32px] sticky top-0 z-20",
+                          isWeekend ? "text-amber-600 dark:text-amber-400 bg-amber-50/60 dark:bg-amber-900/10" : "bg-muted",
                         )}
                       >
                         <div className="flex flex-col items-center gap-0 leading-tight">
@@ -720,9 +720,9 @@ export default function FactoryWorkerAttendanceReport() {
                         </div>
                       </th>
                     ))}
-                    <th className="text-center px-2 py-2 font-medium border-b border-r whitespace-nowrap min-w-[52px] text-emerald-700 dark:text-emerald-400">P</th>
-                    <th className="text-center px-2 py-2 font-medium border-b border-r whitespace-nowrap min-w-[52px] text-red-500 dark:text-red-400">A</th>
-                    <th className="text-center px-2 py-2 font-medium border-b whitespace-nowrap min-w-[52px]">%</th>
+                    <th className="text-center px-2 py-2 font-medium border-b border-r whitespace-nowrap min-w-[52px] text-emerald-700 dark:text-emerald-400 sticky top-0 z-20 bg-muted print:bg-gray-100">P</th>
+                    <th className="text-center px-2 py-2 font-medium border-b border-r whitespace-nowrap min-w-[52px] text-red-500 dark:text-red-400 sticky top-0 z-20 bg-muted print:bg-gray-100">A</th>
+                    <th className="text-center px-2 py-2 font-medium border-b whitespace-nowrap min-w-[52px] sticky top-0 z-20 bg-muted print:bg-gray-100">%</th>
                   </tr>
                 </thead>
 
