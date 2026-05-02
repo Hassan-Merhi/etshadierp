@@ -2,7 +2,7 @@
   import { useQuery, useMutation } from "@tanstack/react-query";
   import {
     Plus, Minus, Trash2, Printer, ScanLine, AlertCircle, Package, CheckCircle,
-    XCircle, ShieldAlert, Lock, Upload, FileSpreadsheet, CalendarDays, List, LayoutList, Download, Palette, Square, Loader2, MessageCircle
+    XCircle, ShieldAlert, Lock, Upload, FileSpreadsheet, CalendarDays, List, LayoutList, Download, Palette, Square, Loader2, MessageCircle, ImagePlus
   } from "lucide-react";
   import { Button } from "@/components/ui/button";
   import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,9 +54,90 @@
     qty: number;
     weightPerBaleKg: number;
     finalizedBy: number | null;
-    overrideColor: A4DesignColor | null;
+    overrideLogoId: number | null;
   }
 
+  function BaleLogoPickerPopover({
+    productId, overrideLogoId, allCustomers, onSelect, open, onOpenChange,
+  }: {
+    productId: number;
+    overrideLogoId: number | null;
+    allCustomers: any[];
+    onSelect: (logoId: number | null) => void;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+  }) {
+    const [pickerCustomerId, setPickerCustomerId] = useState("none");
+    const { data: logos = [] } = useQuery<any[]>({
+      queryKey: ["/api/factory/customers", pickerCustomerId, "logos"],
+      queryFn: () => fetch(`/api/factory/customers/${pickerCustomerId}/logos`, { credentials: "include" }).then(r => r.json()),
+      enabled: pickerCustomerId !== "none",
+    });
+    const activeCustomers = allCustomers.filter((c: any) => c.active);
+    return (
+      <Popover open={open} onOpenChange={onOpenChange}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            data-testid={`button-logo-override-${productId}`}
+            title={overrideLogoId ? "Custom logo assigned — click to change" : "Assign customer logo for this bale"}
+          >
+            {overrideLogoId ? (
+              <img src={`/api/factory/customer-logos/${overrideLogoId}/image`} alt="Logo" className="h-5 w-8 object-contain rounded" />
+            ) : (
+              <ImagePlus className="h-4 w-4 text-muted-foreground" />
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-64 p-3" align="end">
+          <p className="text-xs font-medium text-muted-foreground mb-2">Label logo (this bale only)</p>
+          <div className="space-y-2">
+            <Select value={pickerCustomerId} onValueChange={setPickerCustomerId}>
+              <SelectTrigger className="text-sm">
+                <SelectValue placeholder="Choose customer..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— Choose customer —</SelectItem>
+                {activeCustomers.map((c: any) => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.legalName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {pickerCustomerId !== "none" && (
+              logos.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-1">No logos uploaded for this customer.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {logos.map((logo: any) => (
+                    <button
+                      key={logo.id}
+                      type="button"
+                      onClick={() => { onSelect(logo.id); onOpenChange(false); }}
+                      className={`flex flex-col items-center gap-0.5 p-1.5 rounded-md border text-xs ${overrideLogoId === logo.id ? "border-primary bg-primary/10" : "border-border hover-elevate"}`}
+                      data-testid={`bale-logo-option-${productId}-${logo.id}`}
+                    >
+                      <img src={`/api/factory/customer-logos/${logo.id}/image`} alt={logo.name} className="h-6 w-10 object-contain" />
+                      <span className="truncate max-w-[56px]">{logo.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )
+            )}
+            {overrideLogoId && (
+              <button
+                className="text-xs text-muted-foreground underline hover:text-foreground mt-1"
+                onClick={() => { onSelect(null); onOpenChange(false); }}
+                data-testid={`bale-logo-clear-${productId}`}
+              >
+                Clear logo
+              </button>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  }
 
   function StockEntryTab() {
     const [cart, setCart] = useState<CartItem[]>([]);
@@ -157,7 +238,7 @@
         setScanInput("");
         setShowDropdown(false);
         const defaultWeight = newProduct.weightPerBaleKg ? parseFloat(newProduct.weightPerBaleKg) : 25;
-        setCart((prev) => [...prev, { productId: newProduct.id, product: newProduct, qty: 1, weightPerBaleKg: defaultWeight }]);
+        setCart((prev) => [...prev, { productId: newProduct.id, product: newProduct, qty: 1, weightPerBaleKg: defaultWeight, finalizedBy: null, overrideLogoId: null }]);
       },
       onError: (error: Error) => {
         if (error?._handledGlobally) return;
@@ -206,7 +287,7 @@
             item.productId === product.id ? { ...item, qty: item.qty + 1 } : item
           );
         }
-        return [...prev, { productId: product.id, product, qty: 1, weightPerBaleKg: defaultWeight, finalizedBy: null, overrideColor: null }];
+        return [...prev, { productId: product.id, product, qty: 1, weightPerBaleKg: defaultWeight, finalizedBy: null, overrideLogoId: null }];
       });
 
       setScanInput("");
@@ -242,7 +323,7 @@
             item.productId === product.id ? { ...item, qty: item.qty + 1 } : item
           );
         }
-        return [...prev, { productId: product.id, product, qty: 1, weightPerBaleKg: defaultWeight, finalizedBy: null, overrideColor: null }];
+        return [...prev, { productId: product.id, product, qty: 1, weightPerBaleKg: defaultWeight, finalizedBy: null, overrideLogoId: null }];
       });
       setScanInput("");
       setScanError("");
@@ -279,11 +360,11 @@
       setCart((prev) => prev.map((item) => item.productId === productId ? { ...item, finalizedBy: workerId } : item));
     };
 
-    const setColorOverride = (productId: number, color: A4DesignColor | null) => {
-      setCart((prev) => prev.map((item) => item.productId === productId ? { ...item, overrideColor: color } : item));
+    const setLogoOverride = (productId: number, logoId: number | null) => {
+      setCart((prev) => prev.map((item) => item.productId === productId ? { ...item, overrideLogoId: logoId } : item));
     };
 
-    const [colorPickerOpen, setColorPickerOpen] = useState<number | null>(null);
+    const [logoPickerOpen, setLogoPickerOpen] = useState<number | null>(null);
 
     const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
     const totalKg = cart.reduce((sum, item) => sum + item.qty * item.weightPerBaleKg, 0);
@@ -311,15 +392,16 @@
     const openBrowserPrint = (labels: LabelData[], designColor?: A4DesignColor) => {
       const paperFormat = getPaperFormat();
       const hasPerLabelColors = labels.some((l) => l.designColor);
-      // Labels that have an effective color (global or per-label) → go to A4/A5 design window
-      const labelsForA4 = designColor ? labels : labels.filter((l) => l.designColor);
+      const hasPerLabelLogos = labels.some((l) => l.customerLogoUrl);
+      // Labels that have a color or logo go to A4/A5 design window
+      const labelsForA4 = designColor ? labels : labels.filter((l) => l.designColor || l.customerLogoUrl);
 
       // Consume pre-opened windows if available, otherwise fall back to window.open
       const preOpened = preOpenedWindowsRef.current;
       preOpenedWindowsRef.current = null;
 
-      if (paperFormat === "A4" && !designColor && !hasPerLabelColors) {
-        // All labels have no color assigned — barcode/sticker only, close unused A4 window
+      if (paperFormat === "A4" && !designColor && !hasPerLabelColors && !hasPerLabelLogos) {
+        // All labels have no color or logo assigned — barcode/sticker only, close unused A4 window
         if (preOpened?.a4 && !preOpened.a4.closed) preOpened.a4.close();
       } else if (labelsForA4.length > 0) {
         const labelHtml = paperFormat === "A5" ? generateA5LabelsHtml(labelsForA4) : generateCombinedLabelsHtml(labelsForA4, designColor);
@@ -374,12 +456,18 @@
 
         const { labelPrints } = await labelResponse.json();
 
+        // Build label productId map for logo assignment
+        const labelProductIds: number[] = [];
         const labels: LabelData[] = labelPrints.map((lp: any) => {
           const bale = bales.find((b: any) => b.id === lp.productionBaleId);
           const product = baleProducts?.find((p) => p.id === bale?.productId);
           const cartItem = cart.find((c) => c.productId === bale?.productId);
-          const effectiveColor: A4DesignColor | null =
-            cartItem?.overrideColor || (product?.labelDesignColor as A4DesignColor | null | undefined) || null;
+          labelProductIds.push(bale?.productId ?? 0);
+          // Only use product default color if no logo will be applied (per-bale or global)
+          const hasLogo = cartItem?.overrideLogoId || selectedLogoId;
+          const effectiveColor: A4DesignColor | null = hasLogo
+            ? null
+            : ((product?.labelDesignColor as A4DesignColor | null | undefined) || null);
           return {
             referenceNumber: lp.referenceNumber,
             articleCode: lp.articleCode || bale?.articleCode || "",
@@ -390,21 +478,36 @@
           };
         });
 
-        // Fetch customer logo and attach as base64 data URL to each label
-        if (selectedLogoId && !isZebraMode()) {
-          try {
-            const logoResp = await fetch(`/api/factory/customer-logos/${selectedLogoId}/image`, { credentials: "include" });
-            if (logoResp.ok) {
-              const blob = await logoResp.blob();
-              const logoDataUrl = await new Promise<string>((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result as string);
-                reader.readAsDataURL(blob);
-              });
-              labels.forEach(l => { l.customerLogoUrl = logoDataUrl; });
+        // Fetch all needed logos (per-bale overrides + global fallback) and embed as base64
+        if (!isZebraMode()) {
+          const logoIdToUrl = new Map<number, string>();
+          const logoIdsNeeded = new Set<number>();
+          for (let i = 0; i < labels.length; i++) {
+            const cartItem = cart.find((c) => c.productId === labelProductIds[i]);
+            const logoId = cartItem?.overrideLogoId ?? selectedLogoId ?? null;
+            if (logoId) logoIdsNeeded.add(logoId);
+          }
+          await Promise.all([...logoIdsNeeded].map(async (logoId) => {
+            try {
+              const logoResp = await fetch(`/api/factory/customer-logos/${logoId}/image`, { credentials: "include" });
+              if (logoResp.ok) {
+                const blob = await logoResp.blob();
+                const logoDataUrl = await new Promise<string>((resolve) => {
+                  const reader = new FileReader();
+                  reader.onloadend = () => resolve(reader.result as string);
+                  reader.readAsDataURL(blob);
+                });
+                logoIdToUrl.set(logoId, logoDataUrl);
+              }
+            } catch { /* logo fetch failed — fall back to HMD default */ }
+          }));
+          for (let i = 0; i < labels.length; i++) {
+            const cartItem = cart.find((c) => c.productId === labelProductIds[i]);
+            const logoId = cartItem?.overrideLogoId ?? selectedLogoId ?? null;
+            if (logoId && logoIdToUrl.has(logoId)) {
+              labels[i].customerLogoUrl = logoIdToUrl.get(logoId);
+              delete labels[i].designColor;
             }
-          } catch {
-            // logo fetch failed — use default HMD logo
           }
         }
 
@@ -735,7 +838,7 @@
                         <TableHead className="text-right w-32">Wt/Bale (kg)</TableHead>
                         <TableHead className="text-right w-32">Total (kg)</TableHead>
                         <TableHead className="w-44">Worker</TableHead>
-                        <TableHead className="w-10"></TableHead>
+                        <TableHead className="w-10">Logo</TableHead>
                         <TableHead className="w-12"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -795,61 +898,14 @@
                             </Select>
                           </TableCell>
                           <TableCell>
-                            {(() => {
-                              const productDefaultColor = item.product?.labelDesignColor as A4DesignColor | null | undefined;
-                              const activeColor = item.overrideColor ?? productDefaultColor ?? null;
-                              const colorDot = activeColor
-                                ? A4_DESIGN_OPTIONS.find((o) => o.value === activeColor)?.color
-                                : null;
-                              return (
-                                <Popover open={colorPickerOpen === item.productId} onOpenChange={(open) => setColorPickerOpen(open ? item.productId : null)}>
-                                  <PopoverTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      data-testid={`button-color-override-${item.productId}`}
-                                      title={item.overrideColor ? `Color override: ${item.overrideColor}` : "Change label color for this entry"}
-                                    >
-                                      {colorDot ? (
-                                        <span
-                                          className="inline-block h-4 w-4 rounded-full border border-border"
-                                          style={{ background: colorDot }}
-                                        />
-                                      ) : (
-                                        <Palette className="h-4 w-4 text-muted-foreground" />
-                                      )}
-                                    </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-48 p-2" align="end">
-                                    <p className="text-xs font-medium text-muted-foreground mb-2">Label color (this entry only)</p>
-                                    <div className="space-y-1">
-                                      <button
-                                        className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover-elevate ${!item.overrideColor ? "bg-accent text-accent-foreground" : ""}`}
-                                        onClick={() => { setColorOverride(item.productId, null); setColorPickerOpen(null); }}
-                                        data-testid={`color-option-default-${item.productId}`}
-                                      >
-                                        <span className="inline-block h-3.5 w-3.5 rounded-full border border-border bg-muted" />
-                                        <span>Product default</span>
-                                      </button>
-                                      {A4_DESIGN_OPTIONS.map((opt) => (
-                                        <button
-                                          key={opt.value}
-                                          className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover-elevate ${item.overrideColor === opt.value ? "bg-accent text-accent-foreground" : ""}`}
-                                          onClick={() => { setColorOverride(item.productId, opt.value); setColorPickerOpen(null); }}
-                                          data-testid={`color-option-${opt.value}-${item.productId}`}
-                                        >
-                                          <span
-                                            className="inline-block h-3.5 w-3.5 rounded-full border border-border flex-shrink-0"
-                                            style={{ background: opt.color }}
-                                          />
-                                          <span>{opt.label}</span>
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </PopoverContent>
-                                </Popover>
-                              );
-                            })()}
+                            <BaleLogoPickerPopover
+                              productId={item.productId}
+                              overrideLogoId={item.overrideLogoId}
+                              allCustomers={allCustomers}
+                              onSelect={(logoId) => setLogoOverride(item.productId, logoId)}
+                              open={logoPickerOpen === item.productId}
+                              onOpenChange={(open) => setLogoPickerOpen(open ? item.productId : null)}
+                            />
                           </TableCell>
                           <TableCell>
                             <Button variant="ghost" size="icon" onClick={() => removeItem(item.productId)} data-testid={`button-remove-${item.productId}`}>
