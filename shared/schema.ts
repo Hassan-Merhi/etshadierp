@@ -577,7 +577,7 @@ export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
 export const poLineItems = pgTable("po_line_items", {
   id: serial("id").primaryKey(),
   poId: integer("po_id").notNull().references(() => purchaseOrders.id, { onDelete: "cascade" }),
-  stockItemId: integer("stock_item_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "restrict" }),
   itemName: text("item_name").notNull(),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
   rate: decimal("rate", { precision: 15, scale: 2 }).notNull(),
@@ -729,7 +729,7 @@ export type OffloadRequest = z.infer<typeof offloadRequestSchema>;
 export const containerOffloadItems = pgTable("container_offload_items", {
   id: serial("id").primaryKey(),
   offloadId: integer("offload_id").notNull().references(() => containerOffloads.id, { onDelete: "cascade" }),
-  stockItemId: integer("stock_item_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "restrict" }),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
   rate: decimal("rate", { precision: 20, scale: 2 }).notNull(),
   totalValue: decimal("total_value", { precision: 20, scale: 2 }).notNull(),

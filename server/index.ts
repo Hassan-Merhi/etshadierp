@@ -1979,6 +1979,15 @@ let migrationsDone = false;
     `DO $$ BEGIN ALTER TABLE stock_transfer_items ADD CONSTRAINT stock_transfer_items_stock_item_id_fkey FOREIGN KEY (stock_item_id) REFERENCES stock_items(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE stock_transfer_revision_items ADD CONSTRAINT stock_transfer_revision_items_stock_item_id_fkey FOREIGN KEY (stock_item_id) REFERENCES stock_items(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE waste_dispatch_items ADD CONSTRAINT waste_dispatch_items_stock_item_id_fkey FOREIGN KEY (stock_item_id) REFERENCES stock_items(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+
+    // ── F-Phase 4a CLOSURE — orphan-cleanup + 2 final FKs (po_line_items + container_offload_items) ──
+    // Pre-cleanup: hard-delete orphan rows (point to deleted stock_items 1989/2003/2004/2261, etc).
+    // Idempotent: after first run, FK below prevents new orphans, so DELETE is a no-op forever.
+    // Acceptable to delete because the rows already reference dead parents — data was already broken.
+    `DELETE FROM po_line_items WHERE stock_item_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM stock_items p WHERE p.id = po_line_items.stock_item_id)`,
+    `DELETE FROM container_offload_items WHERE stock_item_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM stock_items p WHERE p.id = container_offload_items.stock_item_id)`,
+    `DO $$ BEGIN ALTER TABLE po_line_items ADD CONSTRAINT po_line_items_stock_item_id_fkey FOREIGN KEY (stock_item_id) REFERENCES stock_items(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE container_offload_items ADD CONSTRAINT container_offload_items_stock_item_id_fkey FOREIGN KEY (stock_item_id) REFERENCES stock_items(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
