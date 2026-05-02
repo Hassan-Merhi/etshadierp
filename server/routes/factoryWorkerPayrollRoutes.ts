@@ -1887,6 +1887,135 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
     }
   });
 
+  app.post("/api/factory/workers/:id/bulk-repay-advances", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.body.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const workerId = parseInt(req.params.id);
+
+      const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
+      const repaymentDate = req.body.repaymentDate || getClientDate(req);
+      const notes = req.body.notes || null;
+
+      if (cashAccountId) {
+        const [acct] = await db.select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
+        if (!acct) return res.status(400).json({ message: "Cash account not found" });
+      }
+
+      const [worker] = await db.select({ fullName: factoryWorkers.fullName })
+        .from(factoryWorkers).where(eq(factoryWorkers.id, workerId));
+      if (!worker) return res.status(404).json({ message: "Worker not found" });
+
+      const outstandingAdvances = await db.select().from(factoryWorkerAdvances)
+        .where(and(
+          eq(factoryWorkerAdvances.companyId, companyId),
+          eq(factoryWorkerAdvances.workerId, workerId),
+          eq(factoryWorkerAdvances.repaymentType, "manual_repayment"),
+          eq(factoryWorkerAdvances.fullyPaid, false),
+        ));
+
+      const toRepay = outstandingAdvances.filter((a) => parseFloat(a.remainingBalance || "0") > 0.001);
+      if (toRepay.length === 0) {
+        return res.status(400).json({ message: "No outstanding manual repayment advances found for this worker" });
+      }
+
+      const result = await db.transaction(async (tx: any) => {
+        let advancesAccountId: number | null = null;
+        if (cashAccountId) {
+          let [found] = await tx.select({ id: ledgerAccounts.id })
+            .from(ledgerAccounts)
+            .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Worker Advances")));
+          if (!found) {
+            const maxCodeResult = await tx.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+              .from(ledgerAccounts)
+              .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
+            const nextCode = String((parseInt(maxCodeResult[0]?.maxCode || "0") || 0) + 1);
+            [found] = await tx.insert(ledgerAccounts).values({
+              companyId, code: nextCode, name: "Factory Worker Advances",
+              accountType: "Asset", active: true, isHidden: false,
+            }).returning();
+          }
+          advancesAccountId = found.id;
+        }
+
+        const repaymentResults = [];
+        let totalRepaid = 0;
+
+        for (const advance of toRepay) {
+          const effectiveAmount = parseFloat(advance.remainingBalance || "0");
+          if (effectiveAmount <= 0) continue;
+
+          const [repayment] = await tx.insert(factoryAdvanceRepayments).values({
+            companyId,
+            advanceId: advance.id,
+            workerId,
+            repaymentDate,
+            amount: effectiveAmount.toFixed(2),
+            cashAccountId,
+            notes,
+          }).returning();
+
+          await tx.update(factoryWorkerAdvances).set({
+            remainingBalance: "0.00",
+            fullyPaid: true,
+          }).where(eq(factoryWorkerAdvances.id, advance.id));
+
+          if (cashAccountId && advancesAccountId) {
+            const voucherNumber = `RECEIPT-REPAY-${repayment.id}-${Date.now()}`;
+            const narration = `Bulk advance repayment from ${worker.fullName}: $${effectiveAmount.toFixed(2)} (advance #${advance.id})`;
+            const [createdVoucher] = await tx.insert(vouchers).values({
+              companyId, voucherNumber, voucherType: "Receipt",
+              voucherDate: repaymentDate, description: narration,
+              totalAmount: effectiveAmount.toFixed(2), currency: "USD",
+              sourceModule: "FACTORY",
+            }).returning();
+
+            await tx.insert(voucherEntries).values([
+              {
+                voucherId: createdVoucher.id,
+                ledgerAccountId: cashAccountId,
+                debitAmount: effectiveAmount.toFixed(2),
+                creditAmount: "0",
+                narration,
+              },
+              {
+                voucherId: createdVoucher.id,
+                ledgerAccountId: advancesAccountId,
+                debitAmount: "0",
+                creditAmount: effectiveAmount.toFixed(2),
+                narration,
+              },
+            ]);
+          }
+
+          await writeDaybookEntry(tx, {
+            companyId, txDate: repaymentDate,
+            txType: "ADVANCE_REPAYMENT",
+            referenceId: repayment.id,
+            referenceTable: "factory_advance_repayments",
+            description: `Bulk advance repayment from ${worker.fullName}: $${effectiveAmount.toFixed(2)} (advance #${advance.id})`,
+            amountCurrency: effectiveAmount,
+            currencyCode: "USD",
+            amountUsd: effectiveAmount,
+            createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+          });
+
+          repaymentResults.push(repayment);
+          totalRepaid += effectiveAmount;
+        }
+
+        return { count: repaymentResults.length, totalRepaid, repayments: repaymentResults };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error bulk repaying advances:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/factory/advance-repayments/:id", requireAuth, async (req: any, res: any) => {
     try {
       const currentRole = (req.session as any).currentRole;

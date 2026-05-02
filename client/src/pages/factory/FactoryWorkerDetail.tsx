@@ -273,6 +273,10 @@ export default function FactoryWorkerDetail() {
   const [repayCashAccountId, setRepayCashAccountId] = useState("");
   const [repayNotes, setRepayNotes] = useState("");
   const [expandedAdvanceId, setExpandedAdvanceId] = useState<number | null>(null);
+
+  const [bulkRepayOpen, setBulkRepayOpen] = useState(false);
+  const [bulkRepayCashAccountId, setBulkRepayCashAccountId] = useState("");
+  const [bulkRepayDate, setBulkRepayDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [pendingDeleteDocId, setPendingDeleteDocId] = useState<number | null>(null);
 
   const { data: worker, isLoading: workerLoading, error: workerError } = useQuery<WorkerWithStats>({
@@ -383,6 +387,21 @@ export default function FactoryWorkerDetail() {
       setRepayAmount("");
       setRepayNotes("");
       setRepayCashAccountId("");
+    },
+    onError: (err: Error) => { if ((err as any)?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
+  });
+
+  const bulkRepayMutation = useMutation({
+    mutationFn: async (data: { repaymentDate: string; cashAccountId?: number; notes?: string }) => {
+      const res = await apiRequest("POST", `/api/factory/workers/${workerId}/bulk-repay-advances`, data);
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", workerId, "advances"] });
+      toast({ title: `${data.count} advance${data.count !== 1 ? "s" : ""} repaid`, description: `Total: $${data.totalRepaid.toFixed(2)}` });
+      setBulkRepayOpen(false);
+      setBulkRepayCashAccountId("");
     },
     onError: (err: Error) => { if ((err as any)?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
   });
@@ -1066,9 +1085,19 @@ export default function FactoryWorkerDetail() {
                             </Badge>
                           )}
                           {loanBal > 0 && (
-                            <Badge variant="outline" className="border-blue-400 text-blue-700 dark:text-blue-400" data-testid="badge-advance-loan-balance">
-                              Loan: {fmt(loanBal)}
-                            </Badge>
+                            <>
+                              <Badge variant="outline" className="border-blue-400 text-blue-700 dark:text-blue-400" data-testid="badge-advance-loan-balance">
+                                Loan: {fmt(loanBal)}
+                              </Badge>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => { setBulkRepayOpen(true); setBulkRepayDate(new Date().toLocaleDateString('en-CA')); setBulkRepayCashAccountId(""); }}
+                                data-testid="button-bulk-repay-all"
+                              >
+                                <RotateCcw className="h-4 w-4 mr-1" /> Repay All Loans
+                              </Button>
+                            </>
                           )}
                         </>
                       );
@@ -1321,6 +1350,76 @@ export default function FactoryWorkerDetail() {
                           data-testid="button-submit-repay"
                         >
                           {repaymentMutation.isPending ? "Saving..." : "Record Repayment"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                );
+              })()}
+
+              {/* Bulk Repay All Loans Dialog */}
+              {bulkRepayOpen && (() => {
+                const outstandingLoans = (workerAdvances || []).filter((a) => a.repaymentType === "manual_repayment" && !a.fullyPaid && parseFloat(a.remainingBalance || "0") > 0);
+                const totalToClear = outstandingLoans.reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
+                return (
+                  <Dialog open={true} onOpenChange={(open) => { if (!open) setBulkRepayOpen(false); }}>
+                    <DialogContent data-testid="dialog-bulk-repay">
+                      <DialogHeader>
+                        <DialogTitle>Repay All Outstanding Loans</DialogTitle>
+                        <DialogDescription>
+                          This will clear {outstandingLoans.length} outstanding loan{outstandingLoans.length !== 1 ? "s" : ""} totalling {fmt(totalToClear)} in one action.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-2">
+                        <div className="rounded-md border divide-y max-h-48 overflow-y-auto">
+                          {outstandingLoans.map((a) => (
+                            <div key={a.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                              <span className="text-muted-foreground">{formatDate(a.advanceDate)}</span>
+                              <span className="font-mono">{fmt(a.remainingBalance)}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex items-center justify-between px-1 text-sm font-semibold">
+                          <span>Total to repay</span>
+                          <span className="font-mono text-blue-700 dark:text-blue-400">{fmt(totalToClear)}</span>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Date</Label>
+                          <input
+                            type="date"
+                            value={bulkRepayDate}
+                            onChange={(e) => setBulkRepayDate(e.target.value)}
+                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                            data-testid="input-bulk-repay-date"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Cash Account (receives repayment)</Label>
+                          <Select value={bulkRepayCashAccountId} onValueChange={setBulkRepayCashAccountId}>
+                            <SelectTrigger data-testid="select-bulk-repay-cash">
+                              <SelectValue placeholder="Select cash account (optional)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(cashAccounts || []).map((a) => (
+                                <SelectItem key={a.id} value={String(a.id)}>{a.name} ({a.code})</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setBulkRepayOpen(false)} data-testid="button-cancel-bulk-repay">
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={() => wrapAdminAction(() => bulkRepayMutation.mutate({
+                            repaymentDate: bulkRepayDate,
+                            cashAccountId: bulkRepayCashAccountId ? parseInt(bulkRepayCashAccountId) : undefined,
+                          }), "Repay All Loans")}
+                          disabled={bulkRepayMutation.isPending || outstandingLoans.length === 0}
+                          data-testid="button-confirm-bulk-repay"
+                        >
+                          {bulkRepayMutation.isPending ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Processing...</> : `Repay All ${fmt(totalToClear)}`}
                         </Button>
                       </DialogFooter>
                     </DialogContent>
