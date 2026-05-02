@@ -831,6 +831,11 @@ export default function FactoryNetPosition() {
         </div>
       )}
 
+      {/* Custom Net Position View — view-only, user-configurable account visibility */}
+      {!isLoading && data && (
+        <CustomNetPositionView data={data} />
+      )}
+
       {/* Broker Balance Breakdown */}
       {!isLoading && (data?.onUs.accounts ?? []).some(a => a.code === "SUPPLIER" && a.breakdown?.length) && (
         <Card data-testid="card-broker-breakdown">
@@ -952,11 +957,6 @@ export default function FactoryNetPosition() {
 
       {/* Payroll Payable / Employees — view-only, below main Net Position */}
       <PayrollPayableTable />
-
-      {/* Custom Net Position View — view-only, user-configurable account visibility */}
-      {!isLoading && data && (
-        <CustomNetPositionView data={data} />
-      )}
 
       {/* Sub-totals info */}
       {!isLoading && data && (data.supplierLiabilities > 0 || data.ledgerAssets > 0 || data.inventoryValue > 0 || data.rawMaterialValue > 0) && (
