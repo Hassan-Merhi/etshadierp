@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useState, useRef, lazy, Suspense } from "react";
+import { useButtonClickFeedback } from "@/hooks/use-button-click-feedback";
 import { Switch, Route, useLocation, Redirect } from "wouter";
 import { queryClient, getQueryFn, setAppTimezone } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -748,11 +749,14 @@ function AuthenticatedApp() {
     return <Redirect to={factoryDefaultPage} />;
   }
 
+  const factoryContainerRef = useRef<HTMLDivElement>(null);
+  useButtonClickFeedback(factoryContainerRef);
+
   if (isFactoryRoute || isFactoryCompany) {
     return (
       <AppModeProvider mode="factory">
         <SidebarProvider style={style as React.CSSProperties}>
-          <div className="flex h-screen w-full">
+          <div ref={factoryContainerRef} className="flex h-screen w-full">
             {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
             <FactorySidebar user={user} />
             <div className="flex flex-col flex-1 overflow-hidden">
