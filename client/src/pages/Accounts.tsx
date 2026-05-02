@@ -393,12 +393,14 @@ export default function Accounts() {
   // Filter out inventory accounts - they have their own dedicated page
   // Filter out supplier accounts - they have their own dedicated Suppliers page
   // Type comparison uses lowercase to match API response
-  const baseAccounts = allAccounts.filter(
-    (account) =>
+  const baseAccounts = allAccounts.filter((account) => {
+    const type = (account.type || "").toLowerCase();
+    return (
+      type === "ledger" &&
       account.code !== "PURCHASES" &&
-      account.code !== "IMPORT_CHARGES" &&
-      account.type?.toLowerCase() !== "supplier",
-  );
+      account.code !== "IMPORT_CHARGES"
+    );
+  });
 
   // In factory mode, append factory suppliers as accounts
   const factorySupplierAccounts: Account[] = appMode === "factory"
@@ -442,7 +444,7 @@ export default function Accounts() {
         })
     : [];
 
-  const accounts = [...baseAccounts, ...factorySupplierAccounts, ...factoryWorkerAccounts];
+  const accounts = baseAccounts;
 
   const { data: ledgerAccounts = [], isLoading: ledgerAccountsLoading } =
     useQuery<LedgerAccount[]>({
@@ -666,7 +668,7 @@ export default function Accounts() {
     setSelectedAccount(account || null);
     setSearchTerm("");
     // Reset period filter to this_month when switching accounts
-    const defaultPeriod = getDefaultPeriodValue("today");
+    const defaultPeriod = getDefaultPeriodValue("this_month");
     setPeriodFilter(defaultPeriod);
     // Save to URL
     if (account) {
