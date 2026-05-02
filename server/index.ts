@@ -2146,6 +2146,16 @@ let migrationsDone = false;
     `DELETE FROM stock_transfer_items WHERE transfer_id IN (SELECT id FROM stock_transfer_vouchers WHERE voucher_id NOT IN (SELECT id FROM vouchers));`,
     `DELETE FROM stock_transfer_vouchers WHERE voucher_id NOT IN (SELECT id FROM vouchers);`,
     `DO $$ BEGIN ALTER TABLE stock_transfer_vouchers ADD CONSTRAINT stock_transfer_vouchers_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+
+    // ── F-Phase 4j (May 2026) — customers long-tail FKs (5 clean, 0 orphans) ──
+    // customers parent has 22 rows (ids 2–26); 4 children already had FKs (customer_balances, customer_logos, customer_orders, customer_proformas).
+    // Remaining 5 unenforced columns surveyed — all ZERO orphans, no cleanup needed.
+    // RESTRICT on all — customer-linked sales/POS/voucher entries are accounting/audit history; deleting a customer with bales/sales/POS history must be blocked.
+    `DO $$ BEGIN ALTER TABLE bales ADD CONSTRAINT bales_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE container_sales ADD CONSTRAINT container_sales_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_invoice_loading_sessions ADD CONSTRAINT factory_invoice_loading_sessions_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_pos_sales ADD CONSTRAINT factory_pos_sales_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE voucher_entries ADD CONSTRAINT voucher_entries_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
