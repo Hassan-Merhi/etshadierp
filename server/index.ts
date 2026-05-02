@@ -2021,6 +2021,34 @@ let migrationsDone = false;
     // container_offloads.location_id (55), stock_adjustment_vouchers.location_id (53).
     // All point to deleted location IDs 1-103 in dev (current locations table has IDs 113-143).
     // Treatment requires investigating prod-DB state first — do NOT auto-delete production rows.
+
+    // ── F-Phase 4c (May 2026) — containers children, 17 of 21 applied (4 deferred due to historical orphans) ──
+    // CASCADE for per-container detail (charges/docs/freight/snapshots — meaningless without parent container).
+    // RESTRICT for everything historical / financial / inventory / audit.
+    `DO $$ BEGIN ALTER TABLE bales ADD CONSTRAINT bales_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE container_charges ADD CONSTRAINT container_charges_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE container_documents ADD CONSTRAINT container_documents_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE container_freight ADD CONSTRAINT container_freight_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    // container_freight_payments.container_id was missing from schema.ts (drift) — add defensively before FK so prod gets the column too
+    `ALTER TABLE container_freight_payments ADD COLUMN IF NOT EXISTS container_id integer;`,
+    `DO $$ BEGIN ALTER TABLE container_freight_payments ADD CONSTRAINT container_freight_payments_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE container_offloads ADD CONSTRAINT container_offloads_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE container_sales ADD CONSTRAINT container_sales_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_container_other_charges ADD CONSTRAINT factory_container_other_charges_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_container_profit_snapshots ADD CONSTRAINT factory_container_profit_snapshots_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_duty_audit_log ADD CONSTRAINT factory_duty_audit_log_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_mix_batch_sources ADD CONSTRAINT factory_mix_batch_sources_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_offload_additional_charges ADD CONSTRAINT factory_offload_additional_charges_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_waste_entries ADD CONSTRAINT factory_waste_entries_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE mix_batch_sources ADD CONSTRAINT mix_batch_sources_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE production_raw_stock ADD CONSTRAINT production_raw_stock_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE purchase_orders ADD CONSTRAINT purchase_orders_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE supplier_container_loaded_items ADD CONSTRAINT supplier_container_loaded_items_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    // ── F-Phase 4c DEFERRED (4 with historical orphans — financial/audit, need user decision) ──
+    // import_logs (54 orphans, IDs 1-208, NULLABLE — could NULL out safely),
+    // factory_fx_allocations (8 orphans, IDs 51-64, NOT NULL — financial, need cleanup decision),
+    // factory_container_commissions (7 orphans, IDs 51-64, NOT NULL — financial, need cleanup decision),
+    // factory_raw_stock (7 orphans, IDs 51-64, NULLABLE — could NULL out).
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
