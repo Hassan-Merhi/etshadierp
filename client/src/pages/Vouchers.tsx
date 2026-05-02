@@ -808,6 +808,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     const searchLower = sidebarSearchValue.toLowerCase().trim();
     return sidebarAccounts
       .filter((acc) => {
+        // Never show customer accounts in the voucher account selector
+        if (acc.type === "customer") return false;
         // Exclude the currently selected payment account from the entries list
         if (paymentAccountId > 0 && acc.id === paymentAccountId && acc.type === paymentAccountType) {
           return false;

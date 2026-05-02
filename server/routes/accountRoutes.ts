@@ -56,7 +56,6 @@ export function registerAccountRoutes(app: Express) {
       const assets = await storage.getAllFixedAssets(companyId);
       const employees = await storage.getAllEmployees(companyId);
       const suppliers = isFactoryCompany ? [] : await storage.getAllSuppliers();
-      const customers = await storage.getAllCustomers(companyId);
 
       // Optional date range filter for account balances
       const balStartDate = req.query.startDate as string | undefined;
@@ -183,50 +182,8 @@ export function registerAccountRoutes(app: Express) {
         return { balance: absoluteBalance, balanceSide };
       };
 
-      // For factory companies, build a map of ledgerAccountId -> {customerId, balance, balanceSide}
-      // so customer accounts show the real customer balance (sales + adjustments) not just voucher entries
-      const customerLedgerMap = new Map<number, { customerId: number; balance: number; balanceSide: string }>();
-      if (isFactoryCompany && customers.length > 0) {
-        const customerIds = customers.map((c: any) => c.id);
-        const salesRows = await db.select({
-          customerId: customerOrders.customerId,
-          total: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric)), 0)`,
-        })
-          .from(customerOrders)
-          .where(and(inArray(customerOrders.customerId, customerIds), eq(customerOrders.companyId, companyId), eq(customerOrders.status, "FINALIZED")))
-          .groupBy(customerOrders.customerId);
-
-        const nonInvRows = await db.select({
-          customerId: customerBalances.customerId,
-          net: sql<string>`COALESCE(SUM(CAST(${customerBalances.debitAmount} AS numeric) - CAST(${customerBalances.creditAmount} AS numeric)), 0)`,
-        })
-          .from(customerBalances)
-          .where(and(inArray(customerBalances.customerId, customerIds), eq(customerBalances.companyId, companyId), sql`${customerBalances.referenceType} IS DISTINCT FROM 'INVOICE'`))
-          .groupBy(customerBalances.customerId);
-
-        const salesMap = new Map(salesRows.map((r: any) => [r.customerId, parseFloat(r.total || "0")]));
-        const nonInvMap = new Map(nonInvRows.map((r: any) => [r.customerId, parseFloat(r.net || "0")]));
-
-        for (const cust of customers as any[]) {
-          if (!cust.ledgerAccountId) continue;
-          const openingBalance = parseFloat(cust.openingBalance || "0");
-          const openingSide = cust.openingBalanceSide || "Dr";
-          const salesTotal = salesMap.get(cust.id) ?? 0;
-          const nonInvNet = nonInvMap.get(cust.id) ?? 0;
-          const totalBalance = (openingSide === "Dr" ? openingBalance : -openingBalance) + salesTotal + nonInvNet;
-          customerLedgerMap.set(cust.ledgerAccountId, {
-            customerId: cust.id,
-            balance: Math.abs(totalBalance),
-            balanceSide: totalBalance >= 0 ? "Dr" : "Cr",
-          });
-        }
-      }
-
       const accounts = [
         ...ledgers
-          // Hide ledger accounts that are the auto-created mirror of a customer — the customer
-          // entry (type="customer") already appears in the list with the correct balance.
-          .filter((account) => !customerLedgerMap.has(account.id))
           .map((account) => {
           const movements = ledgerBalances.get(account.id) || {
             debits: 0,
@@ -239,9 +196,6 @@ export function registerAccountRoutes(app: Express) {
             movements.credits,
           );
 
-          // For factory customer accounts: override balance with real customer balance and include customerId
-          const custInfo = customerLedgerMap.get(account.id);
-
           return {
             id: `ledger-${account.id}`,
             accountId: account.id,
@@ -250,13 +204,12 @@ export function registerAccountRoutes(app: Express) {
             name: account.name,
             accountType: account.accountType,
             subType: account.subType,
-            balance: (custInfo ? custInfo.balance : balance).toFixed(2),
-            balanceSide: custInfo ? custInfo.balanceSide : balanceSide,
+            balance: balance.toFixed(2),
+            balanceSide,
             openingBalance: parseFloat(account.openingBalance || "0"),
             openingBalanceSide: account.openingBalanceSide || "Dr",
             active: account.active,
             parentId: account.parentId,
-            ...(custInfo ? { customerId: custInfo.customerId } : {}),
           };
         }),
         ...banks.map((account) => {
@@ -381,35 +334,8 @@ export function registerAccountRoutes(app: Express) {
         })
       );
 
-      // Build customer accounts list with running balance from customerBalances table
-      const customerAccountsList = await Promise.all(
-        customers
-          .filter((c) => !c.deletedAt)
-          .map(async (customer) => {
-            const runningBalance = await storage.getCustomerBalance(customer.id, companyId);
-            const openingBalance = parseFloat(customer.openingBalance || "0");
-            // Use running balance if available, otherwise fall back to opening balance
-            const effectiveBalance = runningBalance !== 0 ? runningBalance : openingBalance;
-            const balanceSide = effectiveBalance >= 0 ? "Dr" : "Cr"; // Customers are receivable (Dr)
-
-            return {
-              id: `customer-${customer.id}`,
-              accountId: customer.id,
-              type: "customer",
-              code: customer.code,
-              name: customer.legalName,
-              balance: effectiveBalance.toFixed(2),
-              balanceSide,
-              openingBalance: openingBalance,
-              openingBalanceSide: customer.openingBalanceSide || "Dr",
-              active: customer.active,
-              parentId: null,
-            };
-          })
-      );
-
-      // Combine all accounts
-      const allAccounts = [...accounts, ...supplierAccountsList, ...customerAccountsList];
+      // Combine all accounts — customers are excluded from the voucher account selector
+      const allAccounts = [...accounts, ...supplierAccountsList];
 
       res.json(allAccounts);
     } catch (error: any) {
@@ -809,25 +735,8 @@ export function registerAccountRoutes(app: Express) {
         }),
       ];
 
-      // Build customer entries using the accurate running-balance from customerBalances table
-      const customerEntries = await Promise.all(
-        companyCustomers
-          .filter((c) => !c.deletedAt && c.active !== false)
-          .map(async (customer) => {
-            const runningBalance = await storage.getCustomerBalance(customer.id, companyId);
-            const openingBalance = parseFloat(customer.openingBalance || "0");
-            const effectiveBalance = runningBalance !== 0 ? runningBalance : openingBalance;
-            return {
-              id: customer.id,
-              type: "customer" as const,
-              name: customer.legalName,
-              code: customer.code,
-              balance: effectiveBalance,
-            };
-          })
-      );
-
-      res.json([...accounts, ...customerEntries]);
+      // Customers are excluded from the voucher account selector — only ledger/bank/supplier accounts appear
+      res.json(accounts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
