@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -18,6 +18,9 @@ import {
   ChevronDown,
   ChevronRight,
   RefreshCw,
+  Eye,
+  EyeOff,
+  RotateCcw,
 } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
@@ -205,6 +208,167 @@ function CollapsibleSection({
   );
 }
 
+const STORAGE_KEY = "netpos_details_custom_view_hidden";
+
+function CustomNetPositionView({ data, formatAmount }: { data: FactoryNetPositionData; formatAmount: (n: number) => string }) {
+  const allAccounts = useMemo(() => [
+    ...(data.forUs.accounts || []).map((a) => ({ ...a, side: "forUs" as const })),
+    ...(data.onUs.accounts || []).map((a) => ({ ...a, side: "onUs" as const })),
+  ], [data]);
+
+  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  const toggleKey = useCallback((key: string) => {
+    setHiddenKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }, []);
+
+  const showAll = useCallback(() => {
+    setHiddenKeys(new Set());
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+  }, []);
+
+  const visibleForUs = useMemo(
+    () => (data.forUs.accounts || []).filter((a) => !hiddenKeys.has(`forUs:${a.name}`)),
+    [data, hiddenKeys]
+  );
+  const visibleOnUs = useMemo(
+    () => (data.onUs.accounts || []).filter((a) => !hiddenKeys.has(`onUs:${a.name}`)),
+    [data, hiddenKeys]
+  );
+
+  const visibleForUsTotal = visibleForUs.reduce((s, a) => s + Math.abs(a.value), 0);
+  const visibleOnUsTotal = visibleOnUs.reduce((s, a) => s + Math.abs(a.value), 0);
+  const customNet = visibleForUsTotal - visibleOnUsTotal;
+  const isPositive = customNet >= 0;
+
+  const forUsAccounts = useMemo(
+    () => (data.forUs.accounts || []).map((a) => ({ ...a, side: "forUs" as const })),
+    [data]
+  );
+  const onUsAccounts = useMemo(
+    () => (data.onUs.accounts || []).map((a) => ({ ...a, side: "onUs" as const })),
+    [data]
+  );
+
+  return (
+    <Card data-testid="card-custom-net-position">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <CardTitle className="text-base">Custom Net Position View</CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Hide accounts to see an adjusted subtotal — does not affect the real Net Position
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {hiddenKeys.size > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={showAll}
+                data-testid="button-show-all-accounts"
+              >
+                <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                Show all ({hiddenKeys.size} hidden)
+              </Button>
+            )}
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold font-mono ${isPositive ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300" : "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300"}`}>
+              <Equal className="h-3.5 w-3.5" />
+              {formatAmount(customNet)}
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {/* For Us */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 mb-2">
+              <Plus className="h-3.5 w-3.5 text-green-600 shrink-0" />
+              <span className="text-xs font-semibold text-green-600 uppercase tracking-wide">What We Have</span>
+            </div>
+            {forUsAccounts.map((a) => {
+              const key = `forUs:${a.name}`;
+              const hidden = hiddenKeys.has(key);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => toggleKey(key)}
+                  data-testid={`button-toggle-${key}`}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm hover-elevate transition-opacity ${hidden ? "opacity-40" : ""}`}
+                >
+                  <div className="flex items-center gap-2">
+                    {hidden
+                      ? <EyeOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      : <Eye className="h-3.5 w-3.5 text-green-500 shrink-0" />}
+                    <span className={hidden ? "text-muted-foreground line-through" : "text-foreground"}>{a.name}</span>
+                  </div>
+                  <span className={`font-mono tabular-nums ${hidden ? "text-muted-foreground" : "text-green-600"}`}>
+                    {formatAmount(Math.abs(a.value))}
+                  </span>
+                </button>
+              );
+            })}
+            <div className="flex justify-between items-center px-3 py-2 rounded-md bg-green-50 dark:bg-green-950/30 mt-1">
+              <span className="text-xs font-semibold text-green-700 dark:text-green-300">Visible subtotal</span>
+              <span className="font-mono font-bold text-green-600">{formatAmount(visibleForUsTotal)}</span>
+            </div>
+          </div>
+
+          {/* On Us */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 mb-2">
+              <Minus className="h-3.5 w-3.5 text-red-600 shrink-0" />
+              <span className="text-xs font-semibold text-red-600 uppercase tracking-wide">What We Owe</span>
+            </div>
+            {onUsAccounts.map((a) => {
+              const key = `onUs:${a.name}`;
+              const hidden = hiddenKeys.has(key);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => toggleKey(key)}
+                  data-testid={`button-toggle-${key}`}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm hover-elevate transition-opacity ${hidden ? "opacity-40" : ""}`}
+                >
+                  <div className="flex items-center gap-2">
+                    {hidden
+                      ? <EyeOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      : <Eye className="h-3.5 w-3.5 text-red-500 shrink-0" />}
+                    <span className={hidden ? "text-muted-foreground line-through" : "text-foreground"}>{a.name}</span>
+                  </div>
+                  <span className={`font-mono tabular-nums ${hidden ? "text-muted-foreground" : "text-red-600"}`}>
+                    {formatAmount(Math.abs(a.value))}
+                  </span>
+                </button>
+              );
+            })}
+            <div className="flex justify-between items-center px-3 py-2 rounded-md bg-red-50 dark:bg-red-950/30 mt-1">
+              <span className="text-xs font-semibold text-red-700 dark:text-red-300">Visible subtotal</span>
+              <span className="font-mono font-bold text-red-600">{formatAmount(visibleOnUsTotal)}</span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function FactoryNetPositionDetails() {
   const { formatAmount } = useCurrencyContext();
 
@@ -326,6 +490,10 @@ export default function FactoryNetPositionDetails() {
           formatAmount={formatAmount}
         />
       </div>
+
+      {data && (
+        <CustomNetPositionView data={data} formatAmount={formatAmount} />
+      )}
     </div>
   );
 }
