@@ -1896,6 +1896,13 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
       const repaymentDate = req.body.repaymentDate || getClientDate(req);
       const notes = req.body.notes || null;
+      // Per-advance repayment dates sent from the frontend preview (each loan on its own month)
+      const perAdvanceDates: Record<number, string> = {};
+      if (Array.isArray(req.body.advances)) {
+        for (const a of req.body.advances) {
+          if (a.id && a.repaymentDate) perAdvanceDates[parseInt(a.id)] = a.repaymentDate;
+        }
+      }
 
       if (cashAccountId) {
         const [acct] = await db.select({ id: ledgerAccounts.id })
@@ -1947,11 +1954,14 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
           const effectiveAmount = parseFloat(advance.remainingBalance || "0");
           if (effectiveAmount <= 0) continue;
 
+          // Use per-advance date if provided (each loan on its own month), else fall back to global date
+          const effectiveRepaymentDate = perAdvanceDates[advance.id] || repaymentDate;
+
           const [repayment] = await tx.insert(factoryAdvanceRepayments).values({
             companyId,
             advanceId: advance.id,
             workerId,
-            repaymentDate,
+            repaymentDate: effectiveRepaymentDate,
             amount: effectiveAmount.toFixed(2),
             cashAccountId,
             notes,
@@ -1967,7 +1977,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
             const narration = `Bulk advance repayment from ${worker.fullName}: $${effectiveAmount.toFixed(2)} (advance #${advance.id})`;
             const [createdVoucher] = await tx.insert(vouchers).values({
               companyId, voucherNumber, voucherType: "Receipt",
-              voucherDate: repaymentDate, description: narration,
+              voucherDate: effectiveRepaymentDate, description: narration,
               totalAmount: effectiveAmount.toFixed(2), currency: "USD",
               sourceModule: "FACTORY",
             }).returning();
@@ -1991,7 +2001,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
           }
 
           await writeDaybookEntry(tx, {
-            companyId, txDate: repaymentDate,
+            companyId, txDate: effectiveRepaymentDate,
             txType: "ADVANCE_REPAYMENT",
             referenceId: repayment.id,
             referenceTable: "factory_advance_repayments",

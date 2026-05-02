@@ -276,8 +276,14 @@ export default function FactoryWorkerDetail() {
 
   const [bulkRepayOpen, setBulkRepayOpen] = useState(false);
   const [bulkRepayCashAccountId, setBulkRepayCashAccountId] = useState("");
-  const [bulkRepayDate, setBulkRepayDate] = useState(new Date().toLocaleDateString('en-CA'));
+  const [bulkRepayDates, setBulkRepayDates] = useState<Record<number, string>>({});
   const [pendingDeleteDocId, setPendingDeleteDocId] = useState<number | null>(null);
+
+  const getEndOfMonth = (dateStr: string): string => {
+    const d = new Date(dateStr + "T00:00:00");
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    return lastDay.toLocaleDateString('en-CA');
+  };
 
   const { data: worker, isLoading: workerLoading, error: workerError } = useQuery<WorkerWithStats>({
     queryKey: ["/api/factory/workers", workerId],
@@ -392,7 +398,7 @@ export default function FactoryWorkerDetail() {
   });
 
   const bulkRepayMutation = useMutation({
-    mutationFn: async (data: { repaymentDate: string; cashAccountId?: number; notes?: string }) => {
+    mutationFn: async (data: { advances: { id: number; repaymentDate: string }[]; cashAccountId?: number; notes?: string }) => {
       const res = await apiRequest("POST", `/api/factory/workers/${workerId}/bulk-repay-advances`, data);
       if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
       return res.json();
@@ -402,6 +408,7 @@ export default function FactoryWorkerDetail() {
       toast({ title: `${data.count} advance${data.count !== 1 ? "s" : ""} repaid`, description: `Total: $${data.totalRepaid.toFixed(2)}` });
       setBulkRepayOpen(false);
       setBulkRepayCashAccountId("");
+      setBulkRepayDates({});
     },
     onError: (err: Error) => { if ((err as any)?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
   });
@@ -1092,7 +1099,14 @@ export default function FactoryWorkerDetail() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => { setBulkRepayOpen(true); setBulkRepayDate(new Date().toLocaleDateString('en-CA')); setBulkRepayCashAccountId(""); }}
+                                onClick={() => {
+                                  const loans = (workerAdvances || []).filter((a) => a.repaymentType === "manual_repayment" && !a.fullyPaid && parseFloat(a.remainingBalance || "0") > 0);
+                                  const initialDates: Record<number, string> = {};
+                                  for (const loan of loans) initialDates[loan.id] = getEndOfMonth(loan.advanceDate);
+                                  setBulkRepayDates(initialDates);
+                                  setBulkRepayCashAccountId("");
+                                  setBulkRepayOpen(true);
+                                }}
                                 data-testid="button-bulk-repay-all"
                               >
                                 <RotateCcw className="h-4 w-4 mr-1" /> Repay All Loans
@@ -1363,35 +1377,43 @@ export default function FactoryWorkerDetail() {
                 const totalToClear = outstandingLoans.reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
                 return (
                   <Dialog open={true} onOpenChange={(open) => { if (!open) setBulkRepayOpen(false); }}>
-                    <DialogContent data-testid="dialog-bulk-repay">
+                    <DialogContent className="max-w-lg" data-testid="dialog-bulk-repay">
                       <DialogHeader>
                         <DialogTitle>Repay All Outstanding Loans</DialogTitle>
                         <DialogDescription>
-                          This will clear {outstandingLoans.length} outstanding loan{outstandingLoans.length !== 1 ? "s" : ""} totalling {fmt(totalToClear)} in one action.
+                          Each loan is repaid on the last day of its own month. Adjust any date if needed, then confirm.
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4 py-2">
-                        <div className="rounded-md border divide-y max-h-48 overflow-y-auto">
-                          {outstandingLoans.map((a) => (
-                            <div key={a.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                              <span className="text-muted-foreground">{formatDate(a.advanceDate)}</span>
-                              <span className="font-mono">{fmt(a.remainingBalance)}</span>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="flex items-center justify-between px-1 text-sm font-semibold">
-                          <span>Total to repay</span>
-                          <span className="font-mono text-blue-700 dark:text-blue-400">{fmt(totalToClear)}</span>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Date</Label>
-                          <input
-                            type="date"
-                            value={bulkRepayDate}
-                            onChange={(e) => setBulkRepayDate(e.target.value)}
-                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                            data-testid="input-bulk-repay-date"
-                          />
+                        {/* Per-loan preview with individual editable dates */}
+                        <div className="rounded-md border overflow-hidden">
+                          <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 px-3 py-1.5 bg-muted text-xs font-medium text-muted-foreground">
+                            <span>Loan Issued</span>
+                            <span className="text-right">Amount</span>
+                            <span className="text-right">Repay On</span>
+                          </div>
+                          <div className="divide-y max-h-56 overflow-y-auto">
+                            {outstandingLoans.map((a) => {
+                              const repayDate = bulkRepayDates[a.id] || getEndOfMonth(a.advanceDate);
+                              return (
+                                <div key={a.id} className="grid grid-cols-[1fr_auto_auto] gap-x-3 items-center px-3 py-2 text-sm">
+                                  <span className="text-muted-foreground whitespace-nowrap">{formatDate(a.advanceDate)}</span>
+                                  <span className="font-mono text-right whitespace-nowrap">{fmt(a.remainingBalance)}</span>
+                                  <input
+                                    type="date"
+                                    value={repayDate}
+                                    onChange={(e) => setBulkRepayDates((prev) => ({ ...prev, [a.id]: e.target.value }))}
+                                    className="h-7 rounded border border-input bg-transparent px-2 text-xs w-32"
+                                    data-testid={`input-bulk-repay-date-${a.id}`}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-t text-sm font-semibold">
+                            <span>Total</span>
+                            <span className="font-mono text-blue-700 dark:text-blue-400">{fmt(totalToClear)}</span>
+                          </div>
                         </div>
                         <div className="space-y-2">
                           <Label>Cash Account (receives repayment)</Label>
@@ -1413,7 +1435,10 @@ export default function FactoryWorkerDetail() {
                         </Button>
                         <Button
                           onClick={() => wrapAdminAction(() => bulkRepayMutation.mutate({
-                            repaymentDate: bulkRepayDate,
+                            advances: outstandingLoans.map((a) => ({
+                              id: a.id,
+                              repaymentDate: bulkRepayDates[a.id] || getEndOfMonth(a.advanceDate),
+                            })),
                             cashAccountId: bulkRepayCashAccountId ? parseInt(bulkRepayCashAccountId) : undefined,
                           }), "Repay All Loans")}
                           disabled={bulkRepayMutation.isPending || outstandingLoans.length === 0}
