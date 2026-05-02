@@ -1988,6 +1988,39 @@ let migrationsDone = false;
     `DELETE FROM container_offload_items WHERE stock_item_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM stock_items p WHERE p.id = container_offload_items.stock_item_id)`,
     `DO $$ BEGIN ALTER TABLE po_line_items ADD CONSTRAINT po_line_items_stock_item_id_fkey FOREIGN KEY (stock_item_id) REFERENCES stock_items(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE container_offload_items ADD CONSTRAINT container_offload_items_stock_item_id_fkey FOREIGN KEY (stock_item_id) REFERENCES stock_items(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+
+    // ── F-Phase 4b (May 2026) — locations children, 21 of 27 applied (6 deferred due to large historical orphan set) ──
+    // Defensive: bales.location_id column may be missing on some older deploys (DB-only schema drift). Add idempotently before FK.
+    `ALTER TABLE bales ADD COLUMN IF NOT EXISTS location_id integer`,
+    // CASCADE for ephemeral / per-location config that has no meaning without the parent location.
+    // RESTRICT for everything historical / financial / inventory — admin must explicitly clean up before deleting a location.
+    `DO $$ BEGIN ALTER TABLE bale_transfers ADD CONSTRAINT bale_transfers_destination_location_id_fkey FOREIGN KEY (destination_location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE bale_transfers ADD CONSTRAINT bale_transfers_source_location_id_fkey FOREIGN KEY (source_location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE bales ADD CONSTRAINT bales_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE credit_note_items ADD CONSTRAINT credit_note_items_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE customer_order_bales ADD CONSTRAINT customer_order_bales_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE customer_orders ADD CONSTRAINT customer_orders_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE draft_pos_sales ADD CONSTRAINT draft_pos_sales_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE employee_bale_pct_rates ADD CONSTRAINT employee_bale_pct_rates_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE employee_bale_rates ADD CONSTRAINT employee_bale_rates_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_invoice_loading_sessions ADD CONSTRAINT factory_invoice_loading_sessions_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_pos_sales ADD CONSTRAINT factory_pos_sales_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE inventory_negative_layers ADD CONSTRAINT inventory_negative_layers_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE pos_offline_queue ADD CONSTRAINT pos_offline_queue_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE pos_shifts ADD CONSTRAINT pos_shifts_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE production_bales ADD CONSTRAINT production_bales_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE stock_group_location_archives ADD CONSTRAINT stock_group_location_archives_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE stock_item_location_prices ADD CONSTRAINT stock_item_location_prices_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE stock_transfer_revision_items ADD CONSTRAINT stock_transfer_revision_items_source_location_id_fkey FOREIGN KEY (source_location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE user_locations ADD CONSTRAINT user_locations_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE vouchers ADD CONSTRAINT vouchers_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE waste_dispatches ADD CONSTRAINT waste_dispatches_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    // ── F-Phase 4b DEFERRED (6 candidates with large historical orphan sets — needs prod-DB orphan check + cleanup decision before applying) ──
+    // inventory.location_id (14460 dev orphans), stock_transfer_items.source_location_id (1250),
+    // stock_transfer_vouchers.destination_location_id (145), stock_transfer_vouchers.source_location_id (145),
+    // container_offloads.location_id (55), stock_adjustment_vouchers.location_id (53).
+    // All point to deleted location IDs 1-103 in dev (current locations table has IDs 113-143).
+    // Treatment requires investigating prod-DB state first — do NOT auto-delete production rows.
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
