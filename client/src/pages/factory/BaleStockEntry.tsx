@@ -865,7 +865,7 @@
             </Card>
           </div>
 
-          <div className="w-72 space-y-4">
+          <div className="w-72 space-y-4 sticky top-4 self-start overflow-y-auto max-h-[calc(100vh-8rem)]">
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2">
