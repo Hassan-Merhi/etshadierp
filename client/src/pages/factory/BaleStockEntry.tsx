@@ -66,7 +66,7 @@
     const [selectedLocationId, setSelectedLocationId] = useState<string>("");
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const [entryDate, setEntryDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
-    const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+    const [selectedCustomerId, setSelectedCustomerId] = useState<string>("none");
     const [selectedLogoId, setSelectedLogoId] = useState<number | null>(null);
     const scanRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
@@ -105,7 +105,7 @@
     const { data: customerLogosForPrint = [] } = useQuery<any[]>({
       queryKey: ["/api/factory/customers", selectedCustomerId, "logos"],
       queryFn: () => fetch(`/api/factory/customers/${selectedCustomerId}/logos`, { credentials: "include" }).then(r => r.json()),
-      enabled: !!selectedCustomerId,
+      enabled: !!selectedCustomerId && selectedCustomerId !== "none",
     });
 
     const [workerCategoryFilter, setWorkerCategoryFilter] = useState("all");
@@ -926,13 +926,13 @@
                     <SelectValue placeholder="No customer (HMD logo)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No customer (HMD logo)</SelectItem>
+                    <SelectItem value="none">No customer (HMD logo)</SelectItem>
                     {allCustomers.filter((c: any) => c.active).map((c: any) => (
                       <SelectItem key={c.id} value={String(c.id)}>{c.legalName}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {selectedCustomerId && (
+                {selectedCustomerId && selectedCustomerId !== "none" && (
                   customerLogosForPrint.length === 0 ? (
                     <p className="text-xs text-muted-foreground py-1">No logos uploaded for this customer.</p>
                   ) : (
