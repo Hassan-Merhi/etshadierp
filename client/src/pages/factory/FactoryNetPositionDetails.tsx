@@ -210,12 +210,14 @@ function CollapsibleSection({
 
 const STORAGE_KEY = "netpos_details_custom_view_hidden";
 
-function CustomNetPositionView({ data, formatAmount }: { data: FactoryNetPositionData; formatAmount: (n: number) => string }) {
-  const allAccounts = useMemo(() => [
-    ...(data.forUs.accounts || []).map((a) => ({ ...a, side: "forUs" as const })),
-    ...(data.onUs.accounts || []).map((a) => ({ ...a, side: "onUs" as const })),
-  ], [data]);
+interface PayrollEmployee {
+  id: number;
+  name: string;
+  code: string;
+  balance: number;
+}
 
+function CustomNetPositionView({ data, formatAmount }: { data: FactoryNetPositionData; formatAmount: (n: number) => string }) {
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -224,6 +226,19 @@ function CustomNetPositionView({ data, formatAmount }: { data: FactoryNetPositio
       return new Set();
     }
   });
+
+  // Fetch per-employee payroll breakdown
+  const { data: payrollData } = useQuery<{ employees: PayrollEmployee[] }>({
+    queryKey: ["/api/factory/net-position/payroll-breakdown"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/net-position/payroll-breakdown", { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    staleTime: 30_000,
+  });
+
+  const payrollEmployees = payrollData?.employees ?? [];
 
   const toggleKey = useCallback((key: string) => {
     setHiddenKeys((prev) => {
@@ -240,28 +255,36 @@ function CustomNetPositionView({ data, formatAmount }: { data: FactoryNetPositio
     try { localStorage.removeItem(STORAGE_KEY); } catch {}
   }, []);
 
-  const visibleForUs = useMemo(
-    () => (data.forUs.accounts || []).filter((a) => !hiddenKeys.has(`forUs:${a.name}`)),
-    [data, hiddenKeys]
-  );
-  const visibleOnUs = useMemo(
-    () => (data.onUs.accounts || []).filter((a) => !hiddenKeys.has(`onUs:${a.name}`)),
-    [data, hiddenKeys]
-  );
-
-  const visibleForUsTotal = visibleForUs.reduce((s, a) => s + Math.abs(a.value), 0);
-  const visibleOnUsTotal = visibleOnUs.reduce((s, a) => s + Math.abs(a.value), 0);
-  const customNet = visibleForUsTotal - visibleOnUsTotal;
-  const isPositive = customNet >= 0;
-
   const forUsAccounts = useMemo(
     () => (data.forUs.accounts || []).map((a) => ({ ...a, side: "forUs" as const })),
     [data]
   );
+
+  // Exclude the aggregated "Payroll Payable" row — rendered as individual employee rows instead
   const onUsAccounts = useMemo(
-    () => (data.onUs.accounts || []).map((a) => ({ ...a, side: "onUs" as const })),
+    () => (data.onUs.accounts || [])
+      .filter((a) => a.name !== "Payroll Payable")
+      .map((a) => ({ ...a, side: "onUs" as const })),
     [data]
   );
+
+  const visibleForUs = useMemo(
+    () => forUsAccounts.filter((a) => !hiddenKeys.has(`forUs:${a.name}`)),
+    [forUsAccounts, hiddenKeys]
+  );
+  const visibleOnUs = useMemo(
+    () => onUsAccounts.filter((a) => !hiddenKeys.has(`onUs:${a.name}`)),
+    [onUsAccounts, hiddenKeys]
+  );
+  const visiblePayrollTotal = useMemo(
+    () => payrollEmployees.filter((e) => !hiddenKeys.has(`payroll:${e.id}`)).reduce((s, e) => s + e.balance, 0),
+    [payrollEmployees, hiddenKeys]
+  );
+
+  const visibleForUsTotal = visibleForUs.reduce((s, a) => s + Math.abs(a.value), 0);
+  const visibleOnUsTotal = visibleOnUs.reduce((s, a) => s + Math.abs(a.value), 0) + visiblePayrollTotal;
+  const customNet = visibleForUsTotal - visibleOnUsTotal;
+  const isPositive = customNet >= 0;
 
   return (
     <Card data-testid="card-custom-net-position">
@@ -294,7 +317,7 @@ function CustomNetPositionView({ data, formatAmount }: { data: FactoryNetPositio
       </CardHeader>
       <CardContent className="pt-0">
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {/* For Us */}
+          {/* What We Have */}
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 mb-2">
               <Plus className="h-3.5 w-3.5 text-green-600 shrink-0" />
@@ -329,12 +352,14 @@ function CustomNetPositionView({ data, formatAmount }: { data: FactoryNetPositio
             </div>
           </div>
 
-          {/* On Us */}
+          {/* What We Owe */}
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 mb-2">
               <Minus className="h-3.5 w-3.5 text-red-600 shrink-0" />
               <span className="text-xs font-semibold text-red-600 uppercase tracking-wide">What We Owe</span>
             </div>
+
+            {/* Regular onUs account rows */}
             {onUsAccounts.map((a) => {
               const key = `onUs:${a.name}`;
               const hidden = hiddenKeys.has(key);
@@ -358,6 +383,39 @@ function CustomNetPositionView({ data, formatAmount }: { data: FactoryNetPositio
                 </button>
               );
             })}
+
+            {/* Payroll Payable — broken into per-employee rows */}
+            {payrollEmployees.length > 0 && (
+              <>
+                <div className="flex items-center justify-between px-3 py-2 text-sm">
+                  <span className="font-medium text-foreground">Payroll Payable</span>
+                </div>
+                {payrollEmployees.map((emp) => {
+                  const key = `payroll:${emp.id}`;
+                  const hidden = hiddenKeys.has(key);
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => toggleKey(key)}
+                      data-testid={`button-toggle-${key}`}
+                      className={`w-full flex items-center justify-between pl-6 pr-3 py-2 rounded-md text-sm hover-elevate transition-opacity ${hidden ? "opacity-40" : ""}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {hidden
+                          ? <EyeOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          : <Eye className="h-3.5 w-3.5 text-red-500 shrink-0" />}
+                        <span className={hidden ? "text-muted-foreground line-through" : "text-foreground"}>{emp.name}</span>
+                      </div>
+                      <span className={`font-mono tabular-nums ${hidden ? "text-muted-foreground" : "text-red-600"}`}>
+                        {formatAmount(emp.balance)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </>
+            )}
+
             <div className="flex justify-between items-center px-3 py-2 rounded-md bg-red-50 dark:bg-red-950/30 mt-1">
               <span className="text-xs font-semibold text-red-700 dark:text-red-300">Visible subtotal</span>
               <span className="font-mono font-bold text-red-600">{formatAmount(visibleOnUsTotal)}</span>
