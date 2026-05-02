@@ -2082,6 +2082,24 @@ let migrationsDone = false;
     // The sweep is idempotent — once enforced by the FK, no rows will ever match the WHERE again.
     `UPDATE voucher_entries SET factory_supplier_id = NULL WHERE factory_supplier_id IS NOT NULL AND factory_supplier_id NOT IN (SELECT id FROM factory_suppliers);`,
     `DO $$ BEGIN ALTER TABLE voucher_entries ADD CONSTRAINT voucher_entries_factory_supplier_id_fkey FOREIGN KEY (factory_supplier_id) REFERENCES factory_suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+
+    // ── F-Phase 4g (May 2026) — cash_account_id columns → ledger_accounts ──
+    // No `cash_accounts` table exists; these 12 dangling cash_account_id (and 1 paid_from_account_id) columns all really point to ledger_accounts (444 rows).
+    // Confirmed in dev: schema.ts comment on property_payments.cash_account_id says "FK to ledgerAccounts (the cash box used)" and 100% of non-null values (49 rows: 35 in factory_worker_advances + 14 in user_company_roles) match ledger_accounts ids; 0 orphans across all 12 columns.
+    // RESTRICT on all — these are accounting/audit trail (advances, payrolls, POS sales, supplier payments, transporter txs, property payments, role assignments). Deleting a referenced cash-box ledger account would orphan financial history.
+    // Excluded: rental_auto_transfer_configs.source_cash_account_ids (integer[] array column — Postgres can't FK an array directly; will be handled separately if needed).
+    `DO $$ BEGIN ALTER TABLE employee_advance_repayments ADD CONSTRAINT employee_advance_repayments_cash_account_id_fkey FOREIGN KEY (cash_account_id) REFERENCES ledger_accounts(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE employee_advances ADD CONSTRAINT employee_advances_cash_account_id_fkey FOREIGN KEY (cash_account_id) REFERENCES ledger_accounts(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_advance_repayments ADD CONSTRAINT factory_advance_repayments_cash_account_id_fkey FOREIGN KEY (cash_account_id) REFERENCES ledger_accounts(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_payrolls ADD CONSTRAINT factory_payrolls_cash_account_id_fkey FOREIGN KEY (cash_account_id) REFERENCES ledger_accounts(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_pos_sales ADD CONSTRAINT factory_pos_sales_cash_account_id_fkey FOREIGN KEY (cash_account_id) REFERENCES ledger_accounts(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_supplier_payments ADD CONSTRAINT factory_supplier_payments_paid_from_account_id_fkey FOREIGN KEY (paid_from_account_id) REFERENCES ledger_accounts(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_transporter_transactions ADD CONSTRAINT factory_transporter_transactions_cash_account_id_fkey FOREIGN KEY (cash_account_id) REFERENCES ledger_accounts(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_worker_advances ADD CONSTRAINT factory_worker_advances_cash_account_id_fkey FOREIGN KEY (cash_account_id) REFERENCES ledger_accounts(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE pos_shifts ADD CONSTRAINT pos_shifts_cash_account_id_fkey FOREIGN KEY (cash_account_id) REFERENCES ledger_accounts(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE property_payments ADD CONSTRAINT property_payments_cash_account_id_fkey FOREIGN KEY (cash_account_id) REFERENCES ledger_accounts(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE user_company_roles ADD CONSTRAINT user_company_roles_cash_account_id_fkey FOREIGN KEY (cash_account_id) REFERENCES ledger_accounts(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE worker_bonuses ADD CONSTRAINT worker_bonuses_cash_account_id_fkey FOREIGN KEY (cash_account_id) REFERENCES ledger_accounts(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

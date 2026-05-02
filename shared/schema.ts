@@ -63,7 +63,7 @@ export const userCompanyRoles = pgTable("user_company_roles", {
   companyId: integer("company_id").notNull(),
   role: text("role").notNull(),
   assignedLocationId: integer("assigned_location_id"),
-  cashAccountId: integer("cash_account_id"),
+  cashAccountId: integer("cash_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }),
   posStation: integer("pos_station"),
   canSellNegativeStock: boolean("can_sell_negative_stock").notNull().default(false),
   daybookEditDays: integer("daybook_edit_days").notNull().default(0),
@@ -2200,7 +2200,7 @@ export const posShifts = pgTable("pos_shifts", {
   locationId: integer("location_id").notNull().references(() => locations.id, { onDelete: "restrict" }),
   userId: varchar("user_id").notNull(),
   username: text("username").notNull(),
-  cashAccountId: integer("cash_account_id"),
+  cashAccountId: integer("cash_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }),
   posStation: integer("pos_station"),
   status: text("status").notNull().default("open"),
   openedAt: timestamp("opened_at").notNull().defaultNow(),
@@ -2681,7 +2681,7 @@ export const factorySupplierPayments = pgTable("factory_supplier_payments", {
   currencyCode: varchar("currency_code", { length: 10 }).notNull().default("USD"),
   fxRateToUsd: decimal("fx_rate_to_usd", { precision: 20, scale: 8 }).notNull().default("1"),
   amountUsd: decimal("amount_usd", { precision: 20, scale: 4 }).notNull(),
-  paidFromAccountId: integer("paid_from_account_id"),
+  paidFromAccountId: integer("paid_from_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
@@ -3564,7 +3564,7 @@ export const factoryPayrolls = pgTable("factory_payrolls", {
   absentDays: decimal("absent_days", { precision: 10, scale: 1 }).default("0"),
   notes: text("notes"),
   status: varchar("status", { length: 30 }).notNull().default("DRAFT"),
-  cashAccountId: integer("cash_account_id"),
+  cashAccountId: integer("cash_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }),
   paidAt: timestamp("paid_at"),
   generatedAt: timestamp("generated_at").notNull().defaultNow(),
   approvedAt: timestamp("approved_at"),
@@ -3615,7 +3615,7 @@ export const factoryWorkerAdvances = pgTable("factory_worker_advances", {
   advanceDate: date("advance_date").notNull(),
   amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
   remainingBalance: decimal("remaining_balance", { precision: 20, scale: 2 }).notNull().default("0"),
-  cashAccountId: integer("cash_account_id"),
+  cashAccountId: integer("cash_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }),
   notes: text("notes"),
   fullyPaid: boolean("fully_paid").notNull().default(false),
   repaymentType: varchar("repayment_type", { length: 30 }).notNull().default("salary_deduction"),
@@ -3648,7 +3648,7 @@ export const factoryAdvanceRepayments = pgTable("factory_advance_repayments", {
   workerId: integer("worker_id").notNull(),
   repaymentDate: date("repayment_date").notNull(),
   amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
-  cashAccountId: integer("cash_account_id"),
+  cashAccountId: integer("cash_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
@@ -4322,7 +4322,7 @@ export const factoryPosSales = pgTable("factory_pos_sales", {
   notes: text("notes"),
   totalAmount: decimal("total_amount", { precision: 20, scale: 2 }).notNull().default("0"),
   currencyCode: varchar("currency_code", { length: 10 }).notNull().default("USD"),
-  cashAccountId: integer("cash_account_id"),
+  cashAccountId: integer("cash_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }),
   paymentType: text("payment_type").notNull().default("CASH"),
   depositAmount: decimal("deposit_amount", { precision: 20, scale: 2 }).default("0"),
   status: text("status").notNull().default("COMPLETED"),
@@ -4561,7 +4561,7 @@ export const propertyPayments = pgTable("property_payments", {
   contractId: integer("contract_id").notNull(),
   unitId: integer("unit_id").notNull(),
   ledgerRowId: integer("ledger_row_id"), // FK to propertyMonthlyLedger - which month it was applied to
-  cashAccountId: integer("cash_account_id"), // FK to ledgerAccounts (the cash box used)
+  cashAccountId: integer("cash_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }), // FK to ledgerAccounts (the cash box used)
   voucherId: integer("voucher_id"), // FK to vouchers - the Receipt voucher posted to main accounting
   amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
   paymentDate: date("payment_date").notNull(),
@@ -4643,7 +4643,7 @@ export const factoryTransporterTransactions = pgTable("factory_transporter_trans
   txDate: date("tx_date").notNull(),
   description: text("description"),
   expenseAccountId: integer("expense_account_id"),
-  cashAccountId: integer("cash_account_id"),
+  cashAccountId: integer("cash_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }),
   voucherId: integer("voucher_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
