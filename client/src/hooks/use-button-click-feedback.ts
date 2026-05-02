@@ -5,6 +5,8 @@ export function useButtonClickFeedback(containerRef: RefObject<HTMLElement | nul
     const el = containerRef.current;
     if (!el) return;
 
+    let lastHighlighted: HTMLElement | null = null;
+
     function handleClick(e: MouseEvent) {
       const target = (e.target as HTMLElement).closest(
         "button:not([disabled]), [role='button']:not([aria-disabled='true'])"
@@ -12,12 +14,11 @@ export function useButtonClickFeedback(containerRef: RefObject<HTMLElement | nul
       if (!target) return;
       if (target.hasAttribute("data-no-flash")) return;
 
-      target.classList.remove("btn-click-flash");
-      void target.offsetWidth;
+      if (lastHighlighted && lastHighlighted !== target) {
+        lastHighlighted.classList.remove("btn-click-flash");
+      }
       target.classList.add("btn-click-flash");
-
-      const cleanup = () => target.classList.remove("btn-click-flash");
-      target.addEventListener("animationend", cleanup, { once: true });
+      lastHighlighted = target;
     }
 
     el.addEventListener("click", handleClick);

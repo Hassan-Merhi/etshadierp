@@ -512,14 +512,10 @@
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* ── Button click feedback flash ── */
-@keyframes btn-click-flash {
-  0%   { outline: 2px solid hsl(var(--primary) / 0.7); outline-offset: 1px; }
-  60%  { outline: 2px solid hsl(var(--primary) / 0.25); outline-offset: 3px; }
-  100% { outline: 2px solid hsl(var(--primary) / 0);   outline-offset: 5px; }
-}
+/* ── Button click feedback — persistent ring on last-clicked button ── */
 .btn-click-flash {
-  animation: btn-click-flash 0.5s ease-out forwards !important;
+  outline: 2px solid hsl(var(--primary) / 0.7) !important;
+  outline-offset: 1px !important;
 }
 
 /* Hide browser-native password reveal/eye icons so our custom one is the only one */
