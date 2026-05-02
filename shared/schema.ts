@@ -62,7 +62,7 @@ export const userCompanyRoles = pgTable("user_company_roles", {
   userId: varchar("user_id").notNull(),
   companyId: integer("company_id").notNull(),
   role: text("role").notNull(),
-  assignedLocationId: integer("assigned_location_id"),
+  assignedLocationId: integer("assigned_location_id").references(() => locations.id, { onDelete: "restrict" }),
   cashAccountId: integer("cash_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }),
   posStation: integer("pos_station"),
   canSellNegativeStock: boolean("can_sell_negative_stock").notNull().default(false),
@@ -230,7 +230,7 @@ export const employees = pgTable("employees", {
   active: boolean("active").notNull().default(true),
   salesBonusPct: decimal("sales_bonus_pct", { precision: 10, scale: 4 }),
   salesBonusPctSourceCompanyId: integer("sales_bonus_pct_source_company_id").references(() => companies.id),
-  salesBonusPctLocationId: integer("sales_bonus_pct_location_id"),
+  salesBonusPctLocationId: integer("sales_bonus_pct_location_id").references(() => locations.id, { onDelete: "restrict" }),
   balesBonusRate: decimal("bales_bonus_rate", { precision: 10, scale: 4 }),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -626,7 +626,7 @@ export const importLogs = pgTable("import_logs", {
   fileName: text("file_name").notNull(),
   fileHash: text("file_hash").notNull().unique(),
   rowCount: integer("row_count").notNull(),
-  containerId: integer("container_id"),
+  containerId: integer("container_id").references(() => containers.id, { onDelete: "restrict" }),
   status: text("status").notNull(),
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -648,7 +648,7 @@ export type ImportLog = typeof importLogs.$inferSelect;
 export const inventory = pgTable("inventory", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  locationId: integer("location_id").notNull(),
+  locationId: integer("location_id").notNull().references(() => locations.id, { onDelete: "restrict" }),
   stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "restrict" }),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull().default("0"),
   averageRate: decimal("average_rate", { precision: 20, scale: 2 }).notNull().default("0"),
@@ -676,7 +676,7 @@ export type Inventory = typeof inventory.$inferSelect;
 export const containerOffloads = pgTable("container_offloads", {
   id: serial("id").primaryKey(),
   containerId: integer("container_id").notNull().references(() => containers.id, { onDelete: "restrict" }),
-  locationId: integer("location_id").notNull(),
+  locationId: integer("location_id").notNull().references(() => locations.id, { onDelete: "restrict" }),
   duties: decimal("duties", { precision: 20, scale: 2 }).notNull().default("0"),
   officeCharges: decimal("office_charges", { precision: 20, scale: 2 }).notNull().default("0"),
   transferCharges: decimal("transfer_charges", { precision: 20, scale: 2 }).notNull().default("0"),
@@ -893,8 +893,8 @@ export type FiscalPeriodClosure = typeof fiscalPeriodClosures.$inferSelect;
 export const stockTransferVouchers = pgTable("stock_transfer_vouchers", {
   id: serial("id").primaryKey(),
   voucherId: integer("voucher_id").notNull().references(() => vouchers.id, { onDelete: "restrict" }),
-  sourceLocationId: integer("source_location_id"), // Nullable for multi-source transfers
-  destinationLocationId: integer("destination_location_id").notNull(),
+  sourceLocationId: integer("source_location_id").references(() => locations.id, { onDelete: "restrict" }), // Nullable for multi-source transfers
+  destinationLocationId: integer("destination_location_id").notNull().references(() => locations.id, { onDelete: "restrict" }),
   notes: text("notes"),
   inventoryApplied: boolean("inventory_applied").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -917,7 +917,7 @@ export const stockTransferItems = pgTable("stock_transfer_items", {
   id: serial("id").primaryKey(),
   transferId: integer("transfer_id").notNull().references(() => stockTransferVouchers.id, { onDelete: "restrict" }),
   stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "restrict" }),
-  sourceLocationId: integer("source_location_id"),
+  sourceLocationId: integer("source_location_id").references(() => locations.id, { onDelete: "restrict" }),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
   rate: decimal("rate", { precision: 15, scale: 2 }).notNull(),
   totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
@@ -942,7 +942,7 @@ export type StockTransferItem = typeof stockTransferItems.$inferSelect;
 export const stockAdjustmentVouchers = pgTable("stock_adjustment_vouchers", {
   id: serial("id").primaryKey(),
   voucherId: integer("voucher_id").notNull().references(() => vouchers.id, { onDelete: "cascade" }),
-  locationId: integer("location_id").notNull(),
+  locationId: integer("location_id").notNull().references(() => locations.id, { onDelete: "restrict" }),
   adjustmentType: text("adjustment_type").notNull(), // "Production" or "Consumption"
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -1655,7 +1655,7 @@ export const pressingBatches = pgTable("pressing_batches", {
   status: text("status").notNull().default("PENDING"),
   createdBy: integer("created_by"),
   finalizedAt: timestamp("finalized_at"),
-  finalizedLocationId: integer("finalized_location_id"),
+  finalizedLocationId: integer("finalized_location_id").references(() => locations.id, { onDelete: "restrict" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   companyIdx: index("pressing_batches_company_idx").on(t.companyId),
@@ -2613,7 +2613,7 @@ export type FactoryContainerOtherCharge = typeof factoryContainerOtherCharges.$i
 export const factoryRawStock = pgTable("factory_raw_stock", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  containerId: integer("container_id").notNull(),
+  containerId: integer("container_id").notNull().references(() => containers.id, { onDelete: "restrict" }),
   receivedKg: decimal("received_kg", { precision: 15, scale: 3 }).notNull(),
   usedKg: decimal("used_kg", { precision: 15, scale: 3 }).notNull().default("0"),
   costPerKg: decimal("cost_per_kg", { precision: 20, scale: 4 }).notNull(),
@@ -2726,7 +2726,7 @@ export const factoryFxAllocations = pgTable("factory_fx_allocations", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
   fxTransferId: integer("fx_transfer_id").notNull(),
-  containerId: integer("container_id").notNull(),
+  containerId: integer("container_id").notNull().references(() => containers.id, { onDelete: "restrict" }),
   sourceType: varchar("source_type", { length: 20 }).notNull().default("supplier"),
   allocatedAmount: decimal("allocated_amount", { precision: 20, scale: 4 }).notNull(),
   currencyCode: varchar("currency_code", { length: 10 }).notNull(),
@@ -2844,7 +2844,7 @@ export const factoryPressingBatches = pgTable("factory_pressing_batches", {
   notes: text("notes"),
   createdBy: integer("created_by"),
   finalizedAt: timestamp("finalized_at"),
-  finalizedLocationId: integer("finalized_location_id"),
+  finalizedLocationId: integer("finalized_location_id").references(() => locations.id, { onDelete: "restrict" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   companyIdx: index("factory_pressing_batches_company_idx").on(t.companyId),
@@ -2864,7 +2864,7 @@ export const factoryBales = pgTable("factory_bales", {
   mixBatchId: integer("mix_batch_id"),
   productId: integer("product_id"),
   pressingBatchId: integer("pressing_batch_id"),
-  erpLocationId: integer("erp_location_id"),
+  erpLocationId: integer("erp_location_id").references(() => locations.id, { onDelete: "restrict" }),
   baleCode: varchar("bale_code", { length: 50 }).notNull(),
   referenceNumber: varchar("reference_number", { length: 100 }).notNull(),
   articleCode: varchar("article_code", { length: 50 }),
@@ -2959,7 +2959,7 @@ export type FactoryBaleImportBatch = typeof factoryBaleImportBatches.$inferSelec
 export const factoryContainerCommissions = pgTable("factory_container_commissions", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  containerId: integer("container_id").notNull(),
+  containerId: integer("container_id").notNull().references(() => containers.id, { onDelete: "restrict" }),
   personName: text("person_name").notNull(),
   commissionType: text("commission_type").notNull().default("PER_KG"),
   commissionRate: decimal("commission_rate", { precision: 20, scale: 4 }).notNull(),
@@ -4682,8 +4682,8 @@ export type CustomerOrderBaleRemoval = typeof customerOrderBaleRemovals.$inferSe
 export const locationPriceGroups = pgTable("location_price_groups", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  masterLocationId: integer("master_location_id").notNull(),
-  followerLocationId: integer("follower_location_id").notNull(),
+  masterLocationId: integer("master_location_id").notNull().references(() => locations.id, { onDelete: "restrict" }),
+  followerLocationId: integer("follower_location_id").notNull().references(() => locations.id, { onDelete: "restrict" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   companyIdx: index("location_price_groups_company_idx").on(t.companyId),
