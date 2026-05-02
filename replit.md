@@ -230,6 +230,19 @@ A 52-finding audit was applied across batches A–G, G2, F. Code-level fixes (ba
   - **Unwrapped `JSON.parse` calls wrapped** — 3 sites in `factoryProductionPlannerRoutes.ts` (×2) and `factoryDocsUsersRoutes.ts` now fall back gracefully on bad JSON instead of throwing an uncaught 500.
   - **Helmet middleware added** — `server/index.ts` now installs `helmet` with safe defaults (`X-Frame-Options DENY`, `X-Content-Type-Options nosniff`, HSTS, `Referrer-Policy`). `contentSecurityPolicy` and `crossOriginEmbedderPolicy` are intentionally disabled to avoid breaking the Vite-served SPA and external image loads. Package: `helmet ^8.1.0`.
   - **Auth + path-traversal fixed on 3 file-serving routes**: `/api/pos/temp-pdf/:id` (added `requireAuth`), `/api/factory/uploads/bale-photos/:filename` and `/api/factory/uploads/workers/:filename` (added `requireAuth` plus `path.basename` + `path.resolve` containment check so `../` traversal is rejected with 400).
+- **Batch I (May 2026) — Final `sql.raw` sweep**:
+  - **Eliminated all remaining `sql.raw(...)` interpolation in server/** — converted 22 sites across 9 files to direct array binding (`= ANY(${arr})` or `<> ALL(${arr})`):
+    - `factoryReportRoutes.ts` (1 — container IDs)
+    - `factoryProductsRoutes.ts` (1 — bale-product merge transaction, was `sourceIds` reused 4x via a `sourceIdsLiteral` helper)
+    - `factorySuppliersRoutes.ts` (5 — missing-container lookup, FX transfers ×2, offload charges, container-other-charges)
+    - `factoryCustomerProformaRoutes.ts` (4 — order IDs ×2, article codes ×2)
+    - `factoryEmployeesPosRoutes.ts` (2 — attendance + payroll worker-ID filters)
+    - `factoryStockAllocationV2Routes.ts` (3 — bidirectional code lookup ×2, order IDs)
+    - `factoryStockAllocationV3Routes.ts` (1 — bale-IDs SOLD update on V3 load finalize)
+    - `factoryStockAllocationV5Routes.ts` (6 — proforma IDs ×2, order IDs ×2, status array, bidirectional code lookup ×2)
+    - `_stockReservationHelper.ts` (1 — proforma reservation cleanup, NOT IN → `<> ALL(${arr})`)
+  - All sites used either numeric IDs or properly escaped string codes, so no exploitable injection existed; conversion removes the fragile pattern entirely. Drizzle binds JS arrays as native PostgreSQL arrays so the `ARRAY[...]` literal construction is unnecessary. `ACTIVE_ORDER_STATUSES` (constant string-union array) bound via `${ACTIVE_ORDER_STATUSES as unknown as string[]}`.
+  - **Verification**: `rg "sql\.raw\(" server/` now returns zero matches. Workflow restarted cleanly. No new TS errors introduced (the TS2352 `(QueryResult as any[])` casts and TS2802 downlevel-iteration warnings flagged in the diff are pre-existing patterns at shifted line numbers from the Batch I edits — not new).
   - **Verified clean** (no action): cookie/session security flags, trust proxy, body-parser limits, hardcoded secrets, `eval`/`Function`, `dangerouslySetInnerHTML` (all 7 sites are static print CSS), TODO/FIXME (only XXX placeholders in regex/comments), and the remaining 9 unauth'd routes (login, logout, presence-leave, 5 CSV templates, dev-only seed gated by `NODE_ENV`).
   - **Deferred**: full CSRF middleware (cookie `SameSite=lax` already mitigates the common cases), and reducing the 170 `console.log` calls in server code (operational noise, not a security issue).
 

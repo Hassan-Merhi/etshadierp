@@ -447,7 +447,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         await db.execute(sql`
           UPDATE factory_bales
           SET status = 'SOLD'
-          WHERE id = ANY(${sql.raw(`ARRAY[${baleIds.join(",")}]`)}::int[])
+          WHERE id = ANY(${baleIds})
             AND company_id = ${companyId}
         `);
       }

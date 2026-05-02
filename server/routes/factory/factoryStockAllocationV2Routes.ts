@@ -203,16 +203,15 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
       ])];
       const productNamesMap: Record<string, string> = {};
       if (allCodes.length > 0) {
-        const codeArr = sql.raw(`ARRAY[${allCodes.map(c => `'${c.replace(/'/g, "''")}'`).join(',')}]`);
         const prodRaw = await db.execute(
           sql`SELECT DISTINCT ON (matched_code) matched_code as "articleCode", name FROM (
                 SELECT name,
-                  CASE WHEN code = ANY(${codeArr}) THEN code
-                       WHEN article_code = ANY(${codeArr}) THEN article_code
+                  CASE WHEN code = ANY(${allCodes}) THEN code
+                       WHEN article_code = ANY(${allCodes}) THEN article_code
                   END as matched_code
                 FROM factory_bale_products
                 WHERE company_id = ${companyId}
-                  AND (code = ANY(${codeArr}) OR article_code = ANY(${codeArr}))
+                  AND (code = ANY(${allCodes}) OR article_code = ANY(${allCodes}))
               ) sub
               WHERE matched_code IS NOT NULL
               ORDER BY matched_code`
@@ -300,7 +299,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
           sql`SELECT cob.order_id as "orderId", fb.article_code as "articleCode", COUNT(*)::int as count
               FROM customer_order_bales cob
               JOIN factory_bales fb ON fb.id = cob.bale_id
-              WHERE cob.order_id = ANY(${sql.raw(`ARRAY[${ids.join(',')}]`)})
+              WHERE cob.order_id = ANY(${ids})
               GROUP BY cob.order_id, fb.article_code`
         );
         loadingBales = (balesRaw.rows || (balesRaw as any[])).map((r: any) => ({
@@ -356,16 +355,15 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
       const productNameByCode = new Map<string, string>();
       if (articleCodeSet.size > 0) {
         const codes = Array.from(articleCodeSet);
-        const codeArr2 = sql.raw(`ARRAY[${codes.map(c => `'${c.replace(/'/g, "''")}'`).join(',')}]`);
         const prodRaw = await db.execute(
           sql`SELECT DISTINCT ON (matched_code) matched_code as "articleCode", name FROM (
                 SELECT name,
-                  CASE WHEN code = ANY(${codeArr2}) THEN code
-                       WHEN article_code = ANY(${codeArr2}) THEN article_code
+                  CASE WHEN code = ANY(${codes}) THEN code
+                       WHEN article_code = ANY(${codes}) THEN article_code
                   END as matched_code
                 FROM factory_bale_products
                 WHERE company_id = ${companyId}
-                  AND (code = ANY(${codeArr2}) OR article_code = ANY(${codeArr2}))
+                  AND (code = ANY(${codes}) OR article_code = ANY(${codes}))
               ) sub
               WHERE matched_code IS NOT NULL
               ORDER BY matched_code`

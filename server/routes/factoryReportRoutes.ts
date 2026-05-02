@@ -109,7 +109,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
           createdAt: factoryMixBatchSources.createdAt,
         })
         .from(factoryMixBatchSources)
-        .where(sql`${factoryMixBatchSources.containerId} IN (${sql.raw(containerIds.join(","))})`);
+        .where(sql`${factoryMixBatchSources.containerId} = ANY(${containerIds})`);
 
       const allMixBatches = await db
         .select()

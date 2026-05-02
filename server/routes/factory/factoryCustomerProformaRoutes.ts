@@ -741,7 +741,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       if (activeOrders.length > 0) {
         const orderIds = activeOrders.map((o: any) => o.id);
         const activeOrderBalesRaw = await db.execute(
-          sql`SELECT order_id as "orderId", article_code as "articleCode", COUNT(*)::int as count FROM customer_order_bales WHERE order_id = ANY(${sql.raw(`ARRAY[${orderIds.join(',')}]`)}) GROUP BY order_id, article_code`
+          sql`SELECT order_id as "orderId", article_code as "articleCode", COUNT(*)::int as count FROM customer_order_bales WHERE order_id = ANY(${orderIds}) GROUP BY order_id, article_code`
         );
         activeOrderBales = (activeOrderBalesRaw.rows || activeOrderBalesRaw as any[]).map((b: any) => ({
           orderId: b.orderId,
@@ -771,7 +771,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           sql`SELECT DISTINCT ON (article_code) article_code as "articleCode", name
               FROM factory_bale_products
               WHERE company_id = ${companyId}
-                AND article_code = ANY(${sql.raw(`ARRAY[${allArticleCodes.map((c: string) => `'${c.replace(/'/g, "''")}'`).join(',')}]`)})
+                AND article_code = ANY(${allArticleCodes})
               ORDER BY article_code`
         );
         (prodRaw.rows || prodRaw as any[]).forEach((r: any) => {
@@ -852,7 +852,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           sql`SELECT cob.order_id as "orderId", fb.article_code as "articleCode", COUNT(*)::int as count
               FROM customer_order_bales cob
               JOIN factory_bales fb ON fb.id = cob.bale_id
-              WHERE cob.order_id = ANY(${sql.raw(`ARRAY[${ids.join(',')}]`)})
+              WHERE cob.order_id = ANY(${ids})
               GROUP BY cob.order_id, fb.article_code`
         );
         loadingBales = (balesRaw.rows || balesRaw as any[]).map((r: any) => ({
@@ -911,7 +911,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           sql`SELECT DISTINCT ON (fbp.article_code) fbp.article_code as "articleCode", fbp.name
               FROM factory_bale_products fbp
               WHERE fbp.company_id = ${companyId}
-                AND fbp.article_code = ANY(${sql.raw(`ARRAY[${codes.map((c: string) => `'${c.replace(/'/g, "''")}'`).join(',')}]`)})
+                AND fbp.article_code = ANY(${codes})
               ORDER BY fbp.article_code`
         );
         (prodRaw.rows || prodRaw as any[]).forEach((r: any) => {

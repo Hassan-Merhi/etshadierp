@@ -103,14 +103,12 @@ export async function syncProformaReservations(
 
   // 5. Delete stale rows for article codes that no longer have a line
   if (currentCodes.size > 0) {
-    const quotedCodes = Array.from(currentCodes)
-      .map(c => `'${c.replace(/'/g, "''")}'`)
-      .join(",");
+    const codeArr = Array.from(currentCodes);
     await tx.execute(
       sql`DELETE FROM proforma_stock_reservations
           WHERE company_id  = ${companyId}
             AND proforma_id = ${proformaId}
-            AND article_code NOT IN (${sql.raw(quotedCodes)})`,
+            AND article_code <> ALL(${codeArr})`,
     );
   }
 }

@@ -3409,7 +3409,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
             WHERE company_id = ${companyId}
               AND attendance_date::date >= ${startDate}::date
               AND attendance_date::date <= ${endDate}::date
-              AND worker_id = ANY(${sql.raw(`ARRAY[${workerIds.join(",")}]`)})
+              AND worker_id = ANY(${workerIds})
             ORDER BY attendance_date`
       );
       const attRecords: { workerId: number; date: string; status: string }[] =
@@ -3443,7 +3443,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
               AND status = 'PAID'
               AND period_start <= ${endDate}::date
               AND period_end   >= ${startDate}::date
-              AND worker_id = ANY(${sql.raw(`ARRAY[${workerIds.join(",")}]`)})`
+              AND worker_id = ANY(${workerIds})`
       );
       const paidPayrollList: { workerId: number; netSalary: string }[] =
         ((paidPayrollRows as any).rows ?? (paidPayrollRows as any[])).map((r: any) => ({

@@ -1899,7 +1899,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           .from(factoryContainers)
           .where(and(
             eq(factoryContainers.companyId, companyId),
-            sql`${factoryContainers.id} = ANY(${sql.raw(`ARRAY[${missingContainerIds.join(",")}]`)})`
+            sql`${factoryContainers.id} = ANY(${missingContainerIds})`
           ));
         for (const c of extraContainers) containerMap[c.id] = c;
       }
@@ -2248,7 +2248,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
       ? await db.select().from(factorySupplierFxTransfers)
           .where(and(
             eq(factorySupplierFxTransfers.companyId, companyId),
-            sql`(${factorySupplierFxTransfers.fromSupplierId} = ANY(${sql.raw(`ARRAY[${allSupplierIds.join(",")}]`)}) OR ${factorySupplierFxTransfers.toSupplierId} = ANY(${sql.raw(`ARRAY[${allSupplierIds.join(",")}]`)}))`
+            sql`(${factorySupplierFxTransfers.fromSupplierId} = ANY(${allSupplierIds}) OR ${factorySupplierFxTransfers.toSupplierId} = ANY(${allSupplierIds}))`
           ))
           .orderBy(factorySupplierFxTransfers.date)
       : [];
@@ -2268,7 +2268,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         .from(factoryOffloadAdditionalCharges)
         .where(and(
           eq(factoryOffloadAdditionalCharges.companyId, companyId),
-          sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${sql.raw(`ARRAY[${allSupplierIds.join(",")}]`)})`
+          sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${allSupplierIds})`
         ))
         .orderBy(factoryOffloadAdditionalCharges.createdAt)
       : [];
@@ -2520,7 +2520,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           .from(factoryContainers)
           .where(and(
             eq(factoryContainers.companyId, companyId),
-            sql`${factoryContainers.otherChargesSupplierId} = ANY(${sql.raw(`ARRAY[${allSupplierIds.join(",")}]`)})`,
+            sql`${factoryContainers.otherChargesSupplierId} = ANY(${allSupplierIds})`,
             sql`${factoryContainers.otherCharges}::numeric > 0`
           ))
       : [];
@@ -2837,7 +2837,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
       let fxQuery = db.select().from(factorySupplierFxTransfers)
         .where(and(
           eq(factorySupplierFxTransfers.companyId, companyId),
-          sql`(${factorySupplierFxTransfers.fromSupplierId} = ANY(${sql.raw(`ARRAY[${allSupplierIds.join(",")}]`)}) OR ${factorySupplierFxTransfers.toSupplierId} = ANY(${sql.raw(`ARRAY[${allSupplierIds.join(",")}]`)}))`
+          sql`(${factorySupplierFxTransfers.fromSupplierId} = ANY(${allSupplierIds}) OR ${factorySupplierFxTransfers.toSupplierId} = ANY(${allSupplierIds}))`
         ))
         .$dynamic();
       if (from) fxQuery = fxQuery.where(sql`${factorySupplierFxTransfers.date} >= ${from}`);
