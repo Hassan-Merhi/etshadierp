@@ -910,7 +910,7 @@ let migrationsDone = false;
     )`,
     `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS daily_auto_send boolean NOT NULL DEFAULT false`,
     `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS daily_recipient_id integer`,
-    // WhatsApp recipients (individual numbers or group chatIds)
+    // WhatsApp recipients (individual numbers or group chatIds) — per-tenant
     `CREATE TABLE IF NOT EXISTS whatsapp_recipients (
       id serial PRIMARY KEY,
       chat_id varchar(255) NOT NULL UNIQUE,
@@ -919,6 +919,13 @@ let migrationsDone = false;
       active boolean NOT NULL DEFAULT true,
       created_at timestamp NOT NULL DEFAULT now()
     )`,
+    // Tenant isolation (May 2026): scope every recipient to a company
+    `ALTER TABLE whatsapp_recipients ADD COLUMN IF NOT EXISTS company_id integer`,
+    // Backfill any pre-existing rows to the lowest companyId (parent company convention)
+    `UPDATE whatsapp_recipients SET company_id = (SELECT MIN(id) FROM companies) WHERE company_id IS NULL`,
+    // Drop the old global UNIQUE on chat_id; replace with per-tenant uniqueness
+    `ALTER TABLE whatsapp_recipients DROP CONSTRAINT IF EXISTS whatsapp_recipients_chat_id_key`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS whatsapp_recipients_company_chat_unique ON whatsapp_recipients (company_id, chat_id)`,
     // Stock + Net Position report — per-company config sent to one specific group
     `CREATE TABLE IF NOT EXISTS whatsapp_stock_settings (
       id serial PRIMARY KEY,

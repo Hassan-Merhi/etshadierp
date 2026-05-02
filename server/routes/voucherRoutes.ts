@@ -135,34 +135,39 @@ async function syncJournalToOrderCharge(
     const oldAmount = parseFloat(charge.amount || "0");
     const amountChanged = Math.abs(oldAmount - newAmount) >= 0.01;
 
-    // Update charge amount and stamp voucherId for direct future lookups
-    await db.update(customerOrderCharges)
-      .set({
-        amount: newAmount.toFixed(2),
-        ...(voucherId ? { voucherId } : {}),
-      })
-      .where(eq(customerOrderCharges.id, charge.id));
+    // Atomically: update charge amount, recalc order totals, sync customerBalances.
+    // Without a transaction a crash between the three writes leaves the order's grand
+    // total inconsistent with the underlying charge rows.
+    await db.transaction(async (tx) => {
+      // Update charge amount and stamp voucherId for direct future lookups
+      await tx.update(customerOrderCharges)
+        .set({
+          amount: newAmount.toFixed(2),
+          ...(voucherId ? { voucherId } : {}),
+        })
+        .where(eq(customerOrderCharges.id, charge.id));
 
-    if (!amountChanged) continue; // voucherId stamp done, but no recalc needed
+      if (!amountChanged) return; // voucherId stamp done, but no recalc needed
 
-    // Recalculate and save order totals
-    await recalculateOrderTotals(db, charge.orderId);
+      // Recalculate and save order totals
+      await recalculateOrderTotals(tx, charge.orderId);
 
-    // Also sync the invoice debit in customerBalances
-    const [updatedOrder] = await db
-      .select({ grandTotal: customerOrders.grandTotal })
-      .from(customerOrders)
-      .where(eq(customerOrders.id, charge.orderId));
+      // Also sync the invoice debit in customerBalances
+      const [updatedOrder] = await tx
+        .select({ grandTotal: customerOrders.grandTotal })
+        .from(customerOrders)
+        .where(eq(customerOrders.id, charge.orderId));
 
-    if (updatedOrder) {
-      await db.update(customerBalances)
-        .set({ debitAmount: updatedOrder.grandTotal, balance: updatedOrder.grandTotal })
-        .where(and(
-          eq(customerBalances.companyId, companyId),
-          eq(customerBalances.referenceId, charge.orderId),
-          eq(customerBalances.referenceType, "INVOICE"),
-        ));
-    }
+      if (updatedOrder) {
+        await tx.update(customerBalances)
+          .set({ debitAmount: updatedOrder.grandTotal, balance: updatedOrder.grandTotal })
+          .where(and(
+            eq(customerBalances.companyId, companyId),
+            eq(customerBalances.referenceId, charge.orderId),
+            eq(customerBalances.referenceType, "INVOICE"),
+          ));
+      }
+    });
   }
 }
 

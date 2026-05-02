@@ -95,10 +95,13 @@ export function registerWhatsAppRoutes(app: Express) {
 
   // ── Recipients ─────────────────────────────────────────────────────────────
 
-  app.get("/api/whatsapp/recipients", requireAuth, async (_req, res) => {
+  app.get("/api/whatsapp/recipients", requireAuth, async (req, res) => {
     try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const result = await pool.query(
-        "SELECT id, chat_id, name, is_group, active FROM whatsapp_recipients ORDER BY id",
+        "SELECT id, chat_id, name, is_group, active FROM whatsapp_recipients WHERE company_id = $1 ORDER BY id",
+        [companyId],
       );
       res.json(result.rows.map((r) => ({
         id:      r.id,
@@ -114,6 +117,8 @@ export function registerWhatsAppRoutes(app: Express) {
 
   app.post("/api/whatsapp/recipients", requireAuth, async (req, res) => {
     try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { chatId: rawChatId, name } = req.body as { chatId: string; name?: string };
       if (!rawChatId?.trim()) return res.status(400).json({ message: "chatId is required" });
 
@@ -122,11 +127,11 @@ export function registerWhatsAppRoutes(app: Express) {
       const label   = (name?.trim()) || chatId;
 
       const result = await pool.query(
-        `INSERT INTO whatsapp_recipients (chat_id, name, is_group, active)
-         VALUES ($1, $2, $3, true)
-         ON CONFLICT (chat_id) DO UPDATE SET name = $2, active = true
+        `INSERT INTO whatsapp_recipients (company_id, chat_id, name, is_group, active)
+         VALUES ($1, $2, $3, $4, true)
+         ON CONFLICT (company_id, chat_id) DO UPDATE SET name = $3, active = true
          RETURNING id, chat_id, name, is_group, active`,
-        [chatId, label, isGroup],
+        [companyId, chatId, label, isGroup],
       );
       const r = result.rows[0];
       res.json({ id: r.id, chatId: r.chat_id, name: r.name, isGroup: r.is_group, active: r.active });
@@ -137,15 +142,20 @@ export function registerWhatsAppRoutes(app: Express) {
 
   app.put("/api/whatsapp/recipients/:id", requireAuth, async (req, res) => {
     try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       const { name, active } = req.body as { name?: string; active?: boolean };
-      await pool.query(
+      const result = await pool.query(
         `UPDATE whatsapp_recipients SET
            name   = COALESCE($1, name),
            active = COALESCE($2, active)
-         WHERE id = $3`,
-        [name ?? null, active ?? null, id],
+         WHERE id = $3 AND company_id = $4`,
+        [name ?? null, active ?? null, id, companyId],
       );
+      if (result.rowCount === 0) {
+        return res.status(404).json({ message: "Recipient not found" });
+      }
       res.json({ message: "Updated" });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -154,8 +164,16 @@ export function registerWhatsAppRoutes(app: Express) {
 
   app.delete("/api/whatsapp/recipients/:id", requireAuth, async (req, res) => {
     try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
-      await pool.query("DELETE FROM whatsapp_recipients WHERE id = $1", [id]);
+      const result = await pool.query(
+        "DELETE FROM whatsapp_recipients WHERE id = $1 AND company_id = $2",
+        [id, companyId],
+      );
+      if (result.rowCount === 0) {
+        return res.status(404).json({ message: "Recipient not found" });
+      }
       res.json({ message: "Deleted" });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -452,10 +470,11 @@ export function registerWhatsAppRoutes(app: Express) {
 
       // WhatsApp send
       const recipientId = reqRecipientId ? parseInt(reqRecipientId) : null;
+      const sessCompanyId = req.session.currentCompanyId;
       if (recipientId) {
         const rq = await pool.query(
-          "SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true",
-          [recipientId],
+          "SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true AND company_id = $2",
+          [recipientId, sessCompanyId],
         );
         if (rq.rows.length) {
           const chatId = rq.rows[0].chat_id as string;
@@ -507,9 +526,10 @@ export function registerWhatsAppRoutes(app: Express) {
       const recipientId = reqRecipientId ? parseInt(reqRecipientId) : null;
       if (!recipientId) return res.status(400).json({ message: "recipientId is required" });
 
+      const sessCompanyId = req.session.currentCompanyId;
       const rResult = await pool.query(
-        "SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true",
-        [recipientId],
+        "SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true AND company_id = $2",
+        [recipientId, sessCompanyId],
       );
       if (!rResult.rows.length) return res.status(404).json({ message: "Recipient not found or inactive" });
       const chatId = rResult.rows[0].chat_id as string;

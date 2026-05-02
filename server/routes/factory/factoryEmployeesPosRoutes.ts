@@ -267,65 +267,69 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       }
       if (!date) return res.status(400).json({ message: "Date is required" });
 
-      const [emp] = await db.select().from(employees).where(
-        and(eq(employees.id, id), eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"))
-      );
-      if (!emp) return res.status(404).json({ message: "Employee not found" });
+      const result = await db.transaction(async (tx) => {
+        const [emp] = await tx.select().from(employees).where(
+          and(eq(employees.id, id), eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"))
+        );
+        if (!emp) throw new Error("EMPLOYEE_NOT_FOUND");
 
-      // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account
-      let [payrollExpenseAccount] = await db.select().from(ledgerAccounts).where(
-        and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "PAYROLL_DEPOSIT_EXPENSE"))
-      );
-      if (!payrollExpenseAccount) {
-        [payrollExpenseAccount] = await db.insert(ledgerAccounts).values({
+        // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account
+        let [payrollExpenseAccount] = await tx.select().from(ledgerAccounts).where(
+          and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "PAYROLL_DEPOSIT_EXPENSE"))
+        );
+        if (!payrollExpenseAccount) {
+          [payrollExpenseAccount] = await tx.insert(ledgerAccounts).values({
+            companyId,
+            code: "PAYROLL_DEPOSIT_EXPENSE",
+            name: "Payroll Deposit Expense",
+            accountType: "Indirect Expense",
+            openingBalance: "0",
+            active: true,
+          }).returning();
+        }
+
+        const voucherNumber = `EMP-DEP-${Date.now()}`;
+        const [voucher] = await tx.insert(vouchers).values({
           companyId,
-          code: "PAYROLL_DEPOSIT_EXPENSE",
-          name: "Payroll Deposit Expense",
-          accountType: "Indirect Expense",
-          openingBalance: "0",
-          active: true,
+          voucherNumber,
+          voucherType: "Journal",
+          voucherDate: date,
+          description: notes || `Salary deposit for ${emp.firstName} ${emp.lastName}`,
+          totalAmount: depositAmount.toFixed(2),
         }).returning();
-      }
 
-      const voucherNumber = `EMP-DEP-${Date.now()}`;
-      const [voucher] = await db.insert(vouchers).values({
-        companyId,
-        voucherNumber,
-        voucherType: "Journal",
-        voucherDate: date,
-        description: notes || `Salary deposit for ${emp.firstName} ${emp.lastName}`,
-        totalAmount: depositAmount.toFixed(2),
-      }).returning();
+        // DR: Payroll Expense
+        await tx.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: payrollExpenseAccount.id,
+          debitAmount: depositAmount.toFixed(2),
+          creditAmount: "0",
+          narration: notes || `Salary deposit - ${voucherNumber}`,
+        });
 
-      // DR: Payroll Expense
-      await db.insert(voucherEntries).values({
-        voucherId: voucher.id,
-        ledgerAccountId: payrollExpenseAccount.id,
-        debitAmount: depositAmount.toFixed(2),
-        creditAmount: "0",
-        narration: notes || `Salary deposit - ${voucherNumber}`,
+        // CR: Employee
+        await tx.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: null,
+          employeeId: id,
+          debitAmount: "0",
+          creditAmount: depositAmount.toFixed(2),
+          narration: notes || `Salary deposit - ${voucherNumber}`,
+        });
+
+        // Update employee balance
+        const newBalance = parseFloat(emp.currentBalance || "0") + depositAmount;
+        const newDeposits = parseFloat(emp.totalDeposits || "0") + depositAmount;
+        await tx.update(employees).set({
+          currentBalance: newBalance.toFixed(2),
+          totalDeposits: newDeposits.toFixed(2),
+        }).where(eq(employees.id, id));
+
+        const [updated] = await tx.select().from(employees).where(eq(employees.id, id));
+        return { voucher, employee: updated };
       });
 
-      // CR: Employee
-      await db.insert(voucherEntries).values({
-        voucherId: voucher.id,
-        ledgerAccountId: null,
-        employeeId: id,
-        debitAmount: "0",
-        creditAmount: depositAmount.toFixed(2),
-        narration: notes || `Salary deposit - ${voucherNumber}`,
-      });
-
-      // Update employee balance
-      const newBalance = parseFloat(emp.currentBalance || "0") + depositAmount;
-      const newDeposits = parseFloat(emp.totalDeposits || "0") + depositAmount;
-      await db.update(employees).set({
-        currentBalance: newBalance.toFixed(2),
-        totalDeposits: newDeposits.toFixed(2),
-      }).where(eq(employees.id, id));
-
-      const [updated] = await db.select().from(employees).where(eq(employees.id, id));
-      res.json({ voucher, employee: updated });
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -349,56 +353,60 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       if (!date) return res.status(400).json({ message: "Date is required" });
       if (!cashAccountId) return res.status(400).json({ message: "Cash account is required" });
 
-      const [emp] = await db.select().from(employees).where(
-        and(eq(employees.id, id), eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"))
-      );
-      if (!emp) return res.status(404).json({ message: "Employee not found" });
+      const result = await db.transaction(async (tx) => {
+        const [emp] = await tx.select().from(employees).where(
+          and(eq(employees.id, id), eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"))
+        );
+        if (!emp) throw new Error("EMPLOYEE_NOT_FOUND");
 
-      // Verify cash account belongs to this company
-      const [cashAccount] = await db.select().from(ledgerAccounts).where(
-        and(eq(ledgerAccounts.id, parseInt(cashAccountId)), eq(ledgerAccounts.companyId, companyId))
-      );
-      if (!cashAccount) return res.status(404).json({ message: "Cash account not found" });
+        // Verify cash account belongs to this company
+        const [cashAccount] = await tx.select().from(ledgerAccounts).where(
+          and(eq(ledgerAccounts.id, parseInt(cashAccountId)), eq(ledgerAccounts.companyId, companyId))
+        );
+        if (!cashAccount) throw new Error("CASH_ACCOUNT_NOT_FOUND");
 
-      const voucherNumber = `EMP-WD-${Date.now()}`;
-      const [voucher] = await db.insert(vouchers).values({
-        companyId,
-        voucherNumber,
-        voucherType: "Journal",
-        voucherDate: date,
-        description: notes || `Withdrawal for ${emp.firstName} ${emp.lastName}`,
-        totalAmount: withdrawAmount.toFixed(2),
-      }).returning();
+        const voucherNumber = `EMP-WD-${Date.now()}`;
+        const [voucher] = await tx.insert(vouchers).values({
+          companyId,
+          voucherNumber,
+          voucherType: "Journal",
+          voucherDate: date,
+          description: notes || `Withdrawal for ${emp.firstName} ${emp.lastName}`,
+          totalAmount: withdrawAmount.toFixed(2),
+        }).returning();
 
-      // DR: Employee
-      await db.insert(voucherEntries).values({
-        voucherId: voucher.id,
-        ledgerAccountId: null,
-        employeeId: id,
-        debitAmount: withdrawAmount.toFixed(2),
-        creditAmount: "0",
-        narration: notes || `Withdrawal - ${voucherNumber}`,
+        // DR: Employee
+        await tx.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: null,
+          employeeId: id,
+          debitAmount: withdrawAmount.toFixed(2),
+          creditAmount: "0",
+          narration: notes || `Withdrawal - ${voucherNumber}`,
+        });
+
+        // CR: Cash
+        await tx.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: cashAccount.id,
+          debitAmount: "0",
+          creditAmount: withdrawAmount.toFixed(2),
+          narration: notes || `Withdrawal - ${voucherNumber}`,
+        });
+
+        // Update employee balance (can go negative)
+        const newBalance = parseFloat(emp.currentBalance || "0") - withdrawAmount;
+        const newWithdrawals = parseFloat(emp.totalWithdrawals || "0") + withdrawAmount;
+        await tx.update(employees).set({
+          currentBalance: newBalance.toFixed(2),
+          totalWithdrawals: newWithdrawals.toFixed(2),
+        }).where(eq(employees.id, id));
+
+        const [updated] = await tx.select().from(employees).where(eq(employees.id, id));
+        return { voucher, employee: updated };
       });
 
-      // CR: Cash
-      await db.insert(voucherEntries).values({
-        voucherId: voucher.id,
-        ledgerAccountId: cashAccount.id,
-        debitAmount: "0",
-        creditAmount: withdrawAmount.toFixed(2),
-        narration: notes || `Withdrawal - ${voucherNumber}`,
-      });
-
-      // Update employee balance (can go negative)
-      const newBalance = parseFloat(emp.currentBalance || "0") - withdrawAmount;
-      const newWithdrawals = parseFloat(emp.totalWithdrawals || "0") + withdrawAmount;
-      await db.update(employees).set({
-        currentBalance: newBalance.toFixed(2),
-        totalWithdrawals: newWithdrawals.toFixed(2),
-      }).where(eq(employees.id, id));
-
-      const [updated] = await db.select().from(employees).where(eq(employees.id, id));
-      res.json({ voucher, employee: updated });
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -426,125 +434,129 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         return res.status(400).json({ message: "No valid deposit amounts provided" });
       }
 
-      // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account
-      let [payrollExpenseAccount] = await db.select().from(ledgerAccounts).where(
-        and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "PAYROLL_DEPOSIT_EXPENSE"))
-      );
-      if (!payrollExpenseAccount) {
-        [payrollExpenseAccount] = await db.insert(ledgerAccounts).values({
-          companyId,
-          code: "PAYROLL_DEPOSIT_EXPENSE",
-          name: "Payroll Deposit Expense",
-          accountType: "Indirect Expense",
-          openingBalance: "0",
-          active: true,
-        }).returning();
-      }
-
-      // Get or create PAYROLL_DEDUCTION_RECOVERY account for deductions
-      let [deductionAccount] = await db.select().from(ledgerAccounts).where(
-        and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "PAYROLL_DEDUCTION_RECOVERY"))
-      );
-      if (!deductionAccount) {
-        [deductionAccount] = await db.insert(ledgerAccounts).values({
-          companyId,
-          code: "PAYROLL_DEDUCTION_RECOVERY",
-          name: "Payroll Deduction Recovery",
-          accountType: "Indirect Income",
-          openingBalance: "0",
-          active: true,
-        }).returning();
-      }
-
       const totalSalary = validDeposits.reduce((sum: number, d: any) => sum + (parseFloat(d.amount) || 0), 0);
       const totalDeduction = validDeposits.reduce((sum: number, d: any) => sum + (parseFloat(d.deduction) || 0), 0);
       const totalNet = totalSalary - totalDeduction;
       const voucherNumber = `EMP-PAY-${Date.now()}`;
 
-      // Single bulk voucher (totalAmount = gross salary for accounting)
-      const [bulkVoucher] = await db.insert(vouchers).values({
-        companyId,
-        voucherNumber,
-        voucherType: "Journal",
-        voucherDate: date,
-        description: notes || `Bulk payroll - ${validDeposits.length} employees`,
-        totalAmount: Math.abs(totalNet).toFixed(2),
-      }).returning();
-
-      // DR: Payroll Expense (gross salary)
-      if (totalSalary > 0) {
-        await db.insert(voucherEntries).values({
-          voucherId: bulkVoucher.id,
-          ledgerAccountId: payrollExpenseAccount.id,
-          debitAmount: totalSalary.toFixed(2),
-          creditAmount: "0",
-          narration: notes || `Bulk payroll gross - ${validDeposits.length} employees - ${voucherNumber}`,
-        });
-      }
-
-      // CR: Deduction Recovery (total deductions)
-      if (totalDeduction > 0) {
-        await db.insert(voucherEntries).values({
-          voucherId: bulkVoucher.id,
-          ledgerAccountId: deductionAccount.id,
-          debitAmount: "0",
-          creditAmount: totalDeduction.toFixed(2),
-          narration: `Payroll deductions - ${voucherNumber}`,
-        });
-      }
-
-      // Per-employee: credit salary, debit deduction → net balance change
-      const results = [];
-      for (const dep of validDeposits) {
-        const empId = parseInt(dep.employeeId);
-        const amount = parseFloat(dep.amount) || 0;
-        const deduction = parseFloat(dep.deduction) || 0;
-        const net = amount - deduction;
-
-        const [emp] = await db.select().from(employees).where(
-          and(eq(employees.id, empId), eq(employees.companyId, companyId))
+      const txResult = await db.transaction(async (tx) => {
+        // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account
+        let [payrollExpenseAccount] = await tx.select().from(ledgerAccounts).where(
+          and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "PAYROLL_DEPOSIT_EXPENSE"))
         );
-        if (!emp) continue;
-
-        // CR employee: salary earned
-        if (amount > 0) {
-          await db.insert(voucherEntries).values({
-            voucherId: bulkVoucher.id,
-            ledgerAccountId: null,
-            employeeId: empId,
-            debitAmount: "0",
-            creditAmount: amount.toFixed(2),
-            narration: `Salary for ${emp.firstName} ${emp.lastName} - ${voucherNumber}`,
-          });
+        if (!payrollExpenseAccount) {
+          [payrollExpenseAccount] = await tx.insert(ledgerAccounts).values({
+            companyId,
+            code: "PAYROLL_DEPOSIT_EXPENSE",
+            name: "Payroll Deposit Expense",
+            accountType: "Indirect Expense",
+            openingBalance: "0",
+            active: true,
+          }).returning();
         }
 
-        // DR employee: deduction applied
-        if (deduction > 0) {
-          await db.insert(voucherEntries).values({
+        // Get or create PAYROLL_DEDUCTION_RECOVERY account for deductions
+        let [deductionAccount] = await tx.select().from(ledgerAccounts).where(
+          and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "PAYROLL_DEDUCTION_RECOVERY"))
+        );
+        if (!deductionAccount) {
+          [deductionAccount] = await tx.insert(ledgerAccounts).values({
+            companyId,
+            code: "PAYROLL_DEDUCTION_RECOVERY",
+            name: "Payroll Deduction Recovery",
+            accountType: "Indirect Income",
+            openingBalance: "0",
+            active: true,
+          }).returning();
+        }
+
+        // Single bulk voucher (totalAmount = gross salary for accounting)
+        const [bulkVoucher] = await tx.insert(vouchers).values({
+          companyId,
+          voucherNumber,
+          voucherType: "Journal",
+          voucherDate: date,
+          description: notes || `Bulk payroll - ${validDeposits.length} employees`,
+          totalAmount: Math.abs(totalNet).toFixed(2),
+        }).returning();
+
+        // DR: Payroll Expense (gross salary)
+        if (totalSalary > 0) {
+          await tx.insert(voucherEntries).values({
             voucherId: bulkVoucher.id,
-            ledgerAccountId: null,
-            employeeId: empId,
-            debitAmount: deduction.toFixed(2),
+            ledgerAccountId: payrollExpenseAccount.id,
+            debitAmount: totalSalary.toFixed(2),
             creditAmount: "0",
-            narration: `Deduction for ${emp.firstName} ${emp.lastName} - ${voucherNumber}`,
+            narration: notes || `Bulk payroll gross - ${validDeposits.length} employees - ${voucherNumber}`,
           });
         }
 
-        // Update employee balance: net = salary - deduction (can go negative)
-        const currentBal = parseFloat(emp.currentBalance || "0");
-        const newBalance = currentBal + net;
-        const newDeposits = parseFloat(emp.totalDeposits || "0") + amount;
-        const newWithdrawals = parseFloat(emp.totalWithdrawals || "0") + deduction;
-        await db.update(employees).set({
-          currentBalance: newBalance.toFixed(2),
-          totalDeposits: newDeposits.toFixed(2),
-          ...(deduction > 0 ? { totalWithdrawals: newWithdrawals.toFixed(2) } : {}),
-        }).where(eq(employees.id, empId));
+        // CR: Deduction Recovery (total deductions)
+        if (totalDeduction > 0) {
+          await tx.insert(voucherEntries).values({
+            voucherId: bulkVoucher.id,
+            ledgerAccountId: deductionAccount.id,
+            debitAmount: "0",
+            creditAmount: totalDeduction.toFixed(2),
+            narration: `Payroll deductions - ${voucherNumber}`,
+          });
+        }
 
-        results.push({ employeeId: empId, amount, deduction, net, name: `${emp.firstName} ${emp.lastName}` });
-      }
+        // Per-employee: credit salary, debit deduction → net balance change
+        const results = [];
+        for (const dep of validDeposits) {
+          const empId = parseInt(dep.employeeId);
+          const amount = parseFloat(dep.amount) || 0;
+          const deduction = parseFloat(dep.deduction) || 0;
+          const net = amount - deduction;
 
-      res.json({ voucher: bulkVoucher, results, totalSalary, totalDeduction, totalNet });
+          const [emp] = await tx.select().from(employees).where(
+            and(eq(employees.id, empId), eq(employees.companyId, companyId))
+          );
+          if (!emp) continue;
+
+          // CR employee: salary earned
+          if (amount > 0) {
+            await tx.insert(voucherEntries).values({
+              voucherId: bulkVoucher.id,
+              ledgerAccountId: null,
+              employeeId: empId,
+              debitAmount: "0",
+              creditAmount: amount.toFixed(2),
+              narration: `Salary for ${emp.firstName} ${emp.lastName} - ${voucherNumber}`,
+            });
+          }
+
+          // DR employee: deduction applied
+          if (deduction > 0) {
+            await tx.insert(voucherEntries).values({
+              voucherId: bulkVoucher.id,
+              ledgerAccountId: null,
+              employeeId: empId,
+              debitAmount: deduction.toFixed(2),
+              creditAmount: "0",
+              narration: `Deduction for ${emp.firstName} ${emp.lastName} - ${voucherNumber}`,
+            });
+          }
+
+          // Update employee balance: net = salary - deduction (can go negative)
+          const currentBal = parseFloat(emp.currentBalance || "0");
+          const newBalance = currentBal + net;
+          const newDeposits = parseFloat(emp.totalDeposits || "0") + amount;
+          const newWithdrawals = parseFloat(emp.totalWithdrawals || "0") + deduction;
+          await tx.update(employees).set({
+            currentBalance: newBalance.toFixed(2),
+            totalDeposits: newDeposits.toFixed(2),
+            ...(deduction > 0 ? { totalWithdrawals: newWithdrawals.toFixed(2) } : {}),
+          }).where(eq(employees.id, empId));
+
+          results.push({ employeeId: empId, amount, deduction, net, name: `${emp.firstName} ${emp.lastName}` });
+        }
+
+        return { bulkVoucher, results };
+      });
+
+      res.json({ voucher: txResult.bulkVoucher, results: txResult.results, totalSalary, totalDeduction, totalNet });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
