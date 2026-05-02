@@ -576,7 +576,7 @@ export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
 
 export const poLineItems = pgTable("po_line_items", {
   id: serial("id").primaryKey(),
-  poId: integer("po_id").notNull(),
+  poId: integer("po_id").notNull().references(() => purchaseOrders.id, { onDelete: "cascade" }),
   stockItemId: integer("stock_item_id").notNull(),
   itemName: text("item_name").notNull(),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
@@ -728,7 +728,7 @@ export type OffloadRequest = z.infer<typeof offloadRequestSchema>;
 
 export const containerOffloadItems = pgTable("container_offload_items", {
   id: serial("id").primaryKey(),
-  offloadId: integer("offload_id").notNull(),
+  offloadId: integer("offload_id").notNull().references(() => containerOffloads.id, { onDelete: "cascade" }),
   stockItemId: integer("stock_item_id").notNull(),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
   rate: decimal("rate", { precision: 20, scale: 2 }).notNull(),
@@ -783,7 +783,7 @@ export type Voucher = typeof vouchers.$inferSelect;
 
 export const voucherEntries = pgTable("voucher_entries", {
   id: serial("id").primaryKey(),
-  voucherId: integer("voucher_id").notNull(),
+  voucherId: integer("voucher_id").notNull().references(() => vouchers.id, { onDelete: "cascade" }),
   ledgerAccountId: integer("ledger_account_id"),
   bankAccountId: integer("bank_account_id"),
   fixedAssetId: integer("fixed_asset_id"),
@@ -1317,7 +1317,7 @@ export type SalaryAdvance = typeof salaryAdvances.$inferSelect;
 // Salary Advance Deductions - track deductions from employee salary
 export const salaryAdvanceDeductions = pgTable("salary_advance_deductions", {
   id: serial("id").primaryKey(),
-  salaryAdvanceId: integer("salary_advance_id").notNull(),
+  salaryAdvanceId: integer("salary_advance_id").notNull().references(() => salaryAdvances.id, { onDelete: "cascade" }),
   payrollMonth: text("payroll_month").notNull(),
   deductionAmount: decimal("deduction_amount", { precision: 15, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -3022,7 +3022,7 @@ export type CustomerProforma = typeof customerProformas.$inferSelect;
 
 export const customerProformaLines = pgTable("customer_proforma_lines", {
   id: serial("id").primaryKey(),
-  proformaId: integer("proforma_id").notNull(),
+  proformaId: integer("proforma_id").notNull().references(() => customerProformas.id, { onDelete: "cascade" }),
   articleCode: varchar("article_code", { length: 50 }).notNull(),
   productName: text("product_name").notNull(),
   quantity: integer("quantity").notNull().default(0),
@@ -3051,7 +3051,7 @@ export type CustomerProformaLine = typeof customerProformaLines.$inferSelect;
 export const customerOrders = pgTable("customer_orders", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  customerId: integer("customer_id").notNull(),
+  customerId: integer("customer_id").notNull().references(() => customers.id, { onDelete: "restrict" }),
   invoiceNumber: varchar("invoice_number", { length: 50 }),
   orderDate: date("order_date").notNull(),
   proformaIdUsed: integer("proforma_id_used"),
@@ -3111,7 +3111,7 @@ export type CustomerOrder = typeof customerOrders.$inferSelect;
 
 export const customerOrderLines = pgTable("customer_order_lines", {
   id: serial("id").primaryKey(),
-  orderId: integer("order_id").notNull(),
+  orderId: integer("order_id").notNull().references(() => customerOrders.id, { onDelete: "cascade" }),
   articleCode: varchar("article_code", { length: 50 }).notNull(),
   baleName: text("bale_name").notNull(),
   qty: integer("qty").notNull().default(1),
@@ -3127,7 +3127,7 @@ export type CustomerOrderLine = typeof customerOrderLines.$inferSelect;
 
 export const customerOrderBales = pgTable("customer_order_bales", {
   id: serial("id").primaryKey(),
-  orderId: integer("order_id").notNull(),
+  orderId: integer("order_id").notNull().references(() => customerOrders.id, { onDelete: "cascade" }),
   baleId: integer("bale_id").notNull(),
   baleReference: varchar("bale_reference", { length: 100 }).notNull(),
   locationId: integer("location_id").notNull(),
@@ -3176,7 +3176,7 @@ export type CustomerOrderExpectedLine = typeof customerOrderExpectedLines.$infer
 
 export const customerOrderCharges = pgTable("customer_order_charges", {
   id: serial("id").primaryKey(),
-  orderId: integer("order_id").notNull(),
+  orderId: integer("order_id").notNull().references(() => customerOrders.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
   chargeType: text("charge_type").notNull().default("OTHER"),
@@ -3778,7 +3778,7 @@ export type FactoryWasteEntry = typeof factoryWasteEntries.$inferSelect;
 export const factoryBalePhotos = pgTable("factory_bale_photos", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  baleId: integer("bale_id").notNull(),
+  baleId: integer("bale_id").notNull().references(() => factoryBales.id, { onDelete: "cascade" }),
   url: text("url").notNull(),
   fileName: varchar("file_name", { length: 255 }),
   uploadedBy: varchar("uploaded_by"),
@@ -3863,7 +3863,7 @@ export type FactorySupplierScoreSnapshot = typeof factorySupplierScoreSnapshots.
 export const factoryBaleCostSnapshots = pgTable("factory_bale_cost_snapshots", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  baleId: integer("bale_id").notNull(),
+  baleId: integer("bale_id").notNull().references(() => factoryBales.id, { onDelete: "cascade" }),
   materialCost: decimal("material_cost", { precision: 15, scale: 4 }).default("0"),
   laborCost: decimal("labor_cost", { precision: 15, scale: 4 }).default("0"),
   overheadCost: decimal("overhead_cost", { precision: 15, scale: 4 }).default("0"),
@@ -4141,7 +4141,7 @@ export type BaleRecodeSession = typeof baleRecodeSessions.$inferSelect;
 
 export const baleRecodeItems = pgTable("bale_recode_items", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").notNull(),
+  sessionId: integer("session_id").notNull().references(() => baleRecodeSessions.id, { onDelete: "cascade" }),
   oldReferenceCode: text("old_reference_code").notNull(),
   newReferenceCode: text("new_reference_code"),
   productName: text("product_name"),

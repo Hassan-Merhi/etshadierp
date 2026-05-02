@@ -1923,6 +1923,26 @@ let migrationsDone = false;
        END IF;
      END
      $f_phase0$;`,
+
+    // ── F-Phase 2 (May 2026) — 12 FOREIGN KEY constraints (data integrity) ──
+    // All 12 verified orphan-clean in dev before applying. Each ALTER is
+    // wrapped in its own DO block that swallows ONLY duplicate_object
+    // (constraint already exists from a prior boot) — every other error
+    // surfaces through the migration-runner's outer "Migration skipped: …"
+    // log line. Order matters only insofar as parents must already have a
+    // PRIMARY KEY, which F-Phase 0 above guarantees on this same boot.
+    `DO $$ BEGIN ALTER TABLE voucher_entries ADD CONSTRAINT voucher_entries_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE customer_orders ADD CONSTRAINT customer_orders_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE customer_order_lines ADD CONSTRAINT customer_order_lines_order_id_fkey FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE customer_order_charges ADD CONSTRAINT customer_order_charges_order_id_fkey FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE customer_order_bales ADD CONSTRAINT customer_order_bales_order_id_fkey FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE customer_proforma_lines ADD CONSTRAINT customer_proforma_lines_proforma_id_fkey FOREIGN KEY (proforma_id) REFERENCES customer_proformas(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE po_line_items ADD CONSTRAINT po_line_items_po_id_fkey FOREIGN KEY (po_id) REFERENCES purchase_orders(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE container_offload_items ADD CONSTRAINT container_offload_items_offload_id_fkey FOREIGN KEY (offload_id) REFERENCES container_offloads(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_bale_photos ADD CONSTRAINT factory_bale_photos_bale_id_fkey FOREIGN KEY (bale_id) REFERENCES factory_bales(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_bale_cost_snapshots ADD CONSTRAINT factory_bale_cost_snapshots_bale_id_fkey FOREIGN KEY (bale_id) REFERENCES factory_bales(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE bale_recode_items ADD CONSTRAINT bale_recode_items_session_id_fkey FOREIGN KEY (session_id) REFERENCES bale_recode_sessions(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE salary_advance_deductions ADD CONSTRAINT salary_advance_deductions_salary_advance_id_fkey FOREIGN KEY (salary_advance_id) REFERENCES salary_advances(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
