@@ -1458,6 +1458,27 @@ import { UsersSection } from "./settings/UsersSection";
                   </Card>
                 </Link>
 
+                {appMode === "factory" && (
+                <Link href="/factory/customer-logos">
+                  <Card className="p-6 hover-elevate cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-indigo-500/10 rounded-lg">
+                          <Upload className="h-6 w-6 text-indigo-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="link-customer-logos">Customer Logos</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Upload and manage per-customer logos used on bale labels
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </Card>
+                </Link>
+                )}
+
                 {currentUser?.role === "Developer" && (
                 <Card className="p-6">
                   <div className="flex items-center justify-between gap-4">
