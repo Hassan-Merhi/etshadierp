@@ -572,108 +572,128 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
             sql`LOWER(${factoryBales.productName}) = ${scanLower}`
           );
 
-      const [bale] = await db.select().from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          eq(factoryBales.status, "IN_STOCK"),
-          eq(factoryBales.erpLocationId, parseInt(locationId)),
-          nameConditions
-        ))
-        .orderBy(factoryBales.id)
-        .limit(1);
+      // Pick the bale + verify it's not already in this order + (V5) check no
+      // other active order has it + insert the join row + flip status — all
+      // inside one transaction with SELECT FOR UPDATE so two concurrent scans
+      // of the same article cannot both claim the same physical bale.
+      // Errors with `httpStatus` and `body` are thrown to bubble out of the
+      // tx, then translated back to res.status(...).json(...) below.
+      type PickResult =
+        | { ok: true; baleId: number }
+        | { ok: false; httpStatus: number; body: any };
 
-      if (!bale) return res.status(404).json({ message: "Bale not found, not at this location, or not available for sale" });
-
-      const [alreadyAdded] = await db.select().from(customerOrderBales)
-        .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.baleId, bale.id)));
-      if (alreadyAdded) return res.status(400).json({ message: "Bale already added to this order" });
-
-      // V5 guard: proformaIdUsed IS NOT NULL
-      // V5 bales remain IN_STOCK during loading so the RESERVED_FOR_ORDER check above cannot
-      // catch cross-order duplicates. Explicitly verify this bale is not already linked to
-      // any other active (non-CANCELLED) order.
-      if (order.proformaIdUsed) {
-        const v5DupCheck = await db.execute(
-          sql`SELECT cob.order_id FROM customer_order_bales cob
-              JOIN customer_orders co ON co.id = cob.order_id
-              WHERE cob.bale_id = ${bale.id}
-                AND co.status != 'CANCELLED'
-                AND cob.order_id != ${orderId}
-              LIMIT 1`,
-        );
-        const v5DupRow = (v5DupCheck as any).rows?.[0];
-        if (v5DupRow) {
-          return res.status(400).json({ message: `Bale ${bale.referenceNumber || scanCode} is already loaded in another active order` });
-        }
-      }
-
-      let priceUsed = "0";
-      let proformaLine: any = null;
-      if (order.proformaIdUsed) {
-        const [pl] = await db.select().from(customerProformaLines)
+      const result: PickResult = await db.transaction(async (tx: any) => {
+        const [bale] = await tx.select().from(factoryBales)
           .where(and(
-            eq(customerProformaLines.proformaId, order.proformaIdUsed),
-            eq(customerProformaLines.articleCode, bale.articleCode || "")
-          ));
-        proformaLine = pl || null;
-        if (proformaLine) {
-          priceUsed = proformaLine.pricePerBale;
-          // Overload check: count existing bales of this article in the order
-          if (!req.body.allowBypassOverload) {
-            const [countResult] = await db
-              .select({ count: sql<number>`COUNT(*)::int` })
-              .from(customerOrderBales)
-              .where(and(
-                eq(customerOrderBales.orderId, orderId),
-                eq(customerOrderBales.articleCode, bale.articleCode || "")
-              ));
-            const currentCount = countResult?.count || 0;
-            if (currentCount >= proformaLine.quantity) {
-              return res.status(400).json({
-                overloaded: true,
-                message: `Quantity exceeded (${currentCount}/${proformaLine.quantity}). Scan again to bypass.`,
-              });
-            }
+            eq(factoryBales.companyId, companyId),
+            eq(factoryBales.status, "IN_STOCK"),
+            eq(factoryBales.erpLocationId, parseInt(locationId)),
+            nameConditions
+          ))
+          .orderBy(factoryBales.id)
+          .limit(1)
+          .for("update");
+
+        if (!bale) {
+          return { ok: false, httpStatus: 404, body: { message: "Bale not found, not at this location, or not available for sale" } };
+        }
+
+        const [alreadyAdded] = await tx.select().from(customerOrderBales)
+          .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.baleId, bale.id)));
+        if (alreadyAdded) {
+          return { ok: false, httpStatus: 400, body: { message: "Bale already added to this order" } };
+        }
+
+        // V5 guard: proformaIdUsed IS NOT NULL
+        // V5 bales remain IN_STOCK during loading so the RESERVED_FOR_ORDER check above cannot
+        // catch cross-order duplicates. Explicitly verify this bale is not already linked to
+        // any other active (non-CANCELLED) order.
+        if (order.proformaIdUsed) {
+          const v5DupCheck = await tx.execute(
+            sql`SELECT cob.order_id FROM customer_order_bales cob
+                JOIN customer_orders co ON co.id = cob.order_id
+                WHERE cob.bale_id = ${bale.id}
+                  AND co.status != 'CANCELLED'
+                  AND cob.order_id != ${orderId}
+                LIMIT 1`,
+          );
+          const v5DupRow = (v5DupCheck as any).rows?.[0];
+          if (v5DupRow) {
+            return { ok: false, httpStatus: 400, body: { message: `Bale ${bale.referenceNumber || scanCode} is already loaded in another active order` } };
           }
-        } else if (!req.body.allowBypassProforma) {
-          return res.status(400).json({
-            notInProforma: true,
-            message: "Item loaded not requested. Please scan again to bypass.",
-          });
         }
-      }
 
-      let productForBale: any = null;
-      if (bale.productId) {
-        const [p] = await db.select().from(factoryBaleProducts)
-          .where(eq(factoryBaleProducts.id, bale.productId));
-        productForBale = p || null;
-        if (productForBale && priceUsed === "0" && productForBale.sellingPrice) {
-          priceUsed = productForBale.sellingPrice;
+        let priceUsed = "0";
+        let proformaLine: any = null;
+        if (order.proformaIdUsed) {
+          const [pl] = await tx.select().from(customerProformaLines)
+            .where(and(
+              eq(customerProformaLines.proformaId, order.proformaIdUsed),
+              eq(customerProformaLines.articleCode, bale.articleCode || "")
+            ));
+          proformaLine = pl || null;
+          if (proformaLine) {
+            priceUsed = proformaLine.pricePerBale;
+            // Overload check: count existing bales of this article in the order
+            if (!req.body.allowBypassOverload) {
+              const [countResult] = await tx
+                .select({ count: sql<number>`COUNT(*)::int` })
+                .from(customerOrderBales)
+                .where(and(
+                  eq(customerOrderBales.orderId, orderId),
+                  eq(customerOrderBales.articleCode, bale.articleCode || "")
+                ));
+              const currentCount = countResult?.count || 0;
+              if (currentCount >= proformaLine.quantity) {
+                return { ok: false, httpStatus: 400, body: {
+                  overloaded: true,
+                  message: `Quantity exceeded (${currentCount}/${proformaLine.quantity}). Scan again to bypass.`,
+                } };
+              }
+            }
+          } else if (!req.body.allowBypassProforma) {
+            return { ok: false, httpStatus: 400, body: {
+              notInProforma: true,
+              message: "Item loaded not requested. Please scan again to bypass.",
+            } };
+          }
         }
-      }
 
-      // Always prefer the canonical product name from factoryBaleProducts
-      const resolvedBaleName = productForBale?.name || bale.productName || bale.articleCode || bale.baleCode;
+        let productForBale: any = null;
+        if (bale.productId) {
+          const [p] = await tx.select().from(factoryBaleProducts)
+            .where(eq(factoryBaleProducts.id, bale.productId));
+          productForBale = p || null;
+          if (productForBale && priceUsed === "0" && productForBale.sellingPrice) {
+            priceUsed = productForBale.sellingPrice;
+          }
+        }
 
-      await db.insert(customerOrderBales).values({
-        orderId,
-        baleId: bale.id,
-        baleReference: bale.referenceNumber,
-        locationId: parseInt(locationId),
-        weight: bale.weightKg,
-        articleCode: bale.articleCode,
-        baleName: resolvedBaleName,
-        priceUsed,
+        // Always prefer the canonical product name from factoryBaleProducts
+        const resolvedBaleName = productForBale?.name || bale.productName || bale.articleCode || bale.baleCode;
+
+        await tx.insert(customerOrderBales).values({
+          orderId,
+          baleId: bale.id,
+          baleReference: bale.referenceNumber,
+          locationId: parseInt(locationId),
+          weight: bale.weightKg,
+          articleCode: bale.articleCode,
+          baleName: resolvedBaleName,
+          priceUsed,
+        });
+
+        // V5 guard: proformaIdUsed IS NOT NULL
+        // V5 bales remain IN_STOCK during loading — only legacy V2/V3 orders set RESERVED_FOR_ORDER.
+        if (!order.proformaIdUsed) {
+          await tx.update(factoryBales).set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() }).where(eq(factoryBales.id, bale.id));
+        }
+
+        await recalculateOrderTotals(tx, orderId);
+        return { ok: true, baleId: bale.id };
       });
 
-      // V5 guard: proformaIdUsed IS NOT NULL
-      // V5 bales remain IN_STOCK during loading — only legacy V2/V3 orders set RESERVED_FOR_ORDER.
-      if (!order.proformaIdUsed) {
-        await db.update(factoryBales).set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() }).where(eq(factoryBales.id, bale.id));
-      }
-
-      await recalculateOrderTotals(db, orderId);
+      if (!result.ok) return res.status(result.httpStatus).json(result.body);
 
       const updatedBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
       const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
@@ -737,78 +757,90 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           const refNum = String(rawRef).trim();
           if (!refNum) continue;
 
-          // Try referenceNumber first, then fall back to baleCode
-          let [bale] = await db.select().from(factoryBales)
-            .where(and(
-              eq(factoryBales.companyId, companyId),
-              eq(factoryBales.referenceNumber, refNum),
-              eq(factoryBales.status, "IN_STOCK")
-            ));
-
-          if (!bale) {
-            [bale] = await db.select().from(factoryBales)
+          // Per-refNum tx: lock the bale with SELECT FOR UPDATE, then insert
+          // the join row + flip status atomically. Two concurrent bulk-imports
+          // referencing the same physical bale will block at the lock; only
+          // one will see status='IN_STOCK', the other will skip.
+          const refResult = await db.transaction(async (tx: any) => {
+            // Try referenceNumber first, then fall back to baleCode
+            let [bale] = await tx.select().from(factoryBales)
               .where(and(
                 eq(factoryBales.companyId, companyId),
-                eq(factoryBales.baleCode, refNum),
+                eq(factoryBales.referenceNumber, refNum),
                 eq(factoryBales.status, "IN_STOCK")
-              ));
-          }
+              ))
+              .for("update");
 
-          if (!bale) { notFoundRefs.push(refNum); continue; }
-          if (alreadyAddedBaleIds.has(bale.id)) continue;
+            if (!bale) {
+              [bale] = await tx.select().from(factoryBales)
+                .where(and(
+                  eq(factoryBales.companyId, companyId),
+                  eq(factoryBales.baleCode, refNum),
+                  eq(factoryBales.status, "IN_STOCK")
+                ))
+                .for("update");
+            }
 
-          // V5 guard: proformaIdUsed IS NOT NULL
-          // V5 bales stay IN_STOCK, so the same bale could appear as available in multiple orders.
-          // Reject if this bale is already linked to any other active (non-CANCELLED) order.
-          if (order.proformaIdUsed) {
-            const v5DupCheck = await db.execute(
-              sql`SELECT cob.order_id FROM customer_order_bales cob
-                  JOIN customer_orders co ON co.id = cob.order_id
-                  WHERE cob.bale_id = ${bale.id}
-                    AND co.status != 'CANCELLED'
-                    AND cob.order_id != ${orderId}
-                  LIMIT 1`,
-            );
-            const v5DupRow = (v5DupCheck as any).rows?.[0];
-            if (v5DupRow) { notFoundRefs.push(refNum); continue; }
-          }
+            if (!bale) return { kind: "notFound" as const };
+            if (alreadyAddedBaleIds.has(bale.id)) return { kind: "skipDuplicate" as const };
 
-          let priceUsed = "0";
-          if (order.proformaIdUsed) {
-            const [pl] = await db.select().from(customerProformaLines)
-              .where(and(
-                eq(customerProformaLines.proformaId, order.proformaIdUsed),
-                eq(customerProformaLines.articleCode, bale.articleCode || "")
-              ));
-            if (pl) priceUsed = pl.pricePerBale;
-          }
-          if (priceUsed === "0" && bale.productId) {
-            const product = allProducts.find((p: any) => p.id === bale.productId);
-            if (product?.sellingPrice) priceUsed = product.sellingPrice;
-          }
+            // V5 guard: proformaIdUsed IS NOT NULL
+            // V5 bales stay IN_STOCK, so the same bale could appear as available in multiple orders.
+            // Reject if this bale is already linked to any other active (non-CANCELLED) order.
+            if (order.proformaIdUsed) {
+              const v5DupCheck = await tx.execute(
+                sql`SELECT cob.order_id FROM customer_order_bales cob
+                    JOIN customer_orders co ON co.id = cob.order_id
+                    WHERE cob.bale_id = ${bale.id}
+                      AND co.status != 'CANCELLED'
+                      AND cob.order_id != ${orderId}
+                    LIMIT 1`,
+              );
+              const v5DupRow = (v5DupCheck as any).rows?.[0];
+              if (v5DupRow) return { kind: "notFound" as const };
+            }
 
-          const baleProductForName1 = bale.productId ? allProducts.find((p: any) => p.id === bale.productId) : null;
+            let priceUsed = "0";
+            if (order.proformaIdUsed) {
+              const [pl] = await tx.select().from(customerProformaLines)
+                .where(and(
+                  eq(customerProformaLines.proformaId, order.proformaIdUsed),
+                  eq(customerProformaLines.articleCode, bale.articleCode || "")
+                ));
+              if (pl) priceUsed = pl.pricePerBale;
+            }
+            if (priceUsed === "0" && bale.productId) {
+              const product = allProducts.find((p: any) => p.id === bale.productId);
+              if (product?.sellingPrice) priceUsed = product.sellingPrice;
+            }
 
-          await db.insert(customerOrderBales).values({
-            orderId,
-            baleId: bale.id,
-            baleReference: bale.referenceNumber,
-            locationId: bale.erpLocationId ?? parsedLocationId,
-            weight: bale.weightKg,
-            articleCode: bale.articleCode,
-            baleName: baleProductForName1?.name || bale.productName || bale.articleCode || bale.baleCode,
-            priceUsed,
+            const baleProductForName1 = bale.productId ? allProducts.find((p: any) => p.id === bale.productId) : null;
+
+            await tx.insert(customerOrderBales).values({
+              orderId,
+              baleId: bale.id,
+              baleReference: bale.referenceNumber,
+              locationId: bale.erpLocationId ?? parsedLocationId,
+              weight: bale.weightKg,
+              articleCode: bale.articleCode,
+              baleName: baleProductForName1?.name || bale.productName || bale.articleCode || bale.baleCode,
+              priceUsed,
+            });
+
+            // V5 guard: proformaIdUsed IS NOT NULL
+            // V5 bales remain IN_STOCK during loading — only legacy V2/V3 orders set RESERVED_FOR_ORDER.
+            if (!order.proformaIdUsed) {
+              await tx.update(factoryBales)
+                .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
+                .where(eq(factoryBales.id, bale.id));
+            }
+
+            return { kind: "added" as const, baleId: bale.id };
           });
 
-          // V5 guard: proformaIdUsed IS NOT NULL
-          // V5 bales remain IN_STOCK during loading — only legacy V2/V3 orders set RESERVED_FOR_ORDER.
-          if (!order.proformaIdUsed) {
-            await db.update(factoryBales)
-              .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
-              .where(eq(factoryBales.id, bale.id));
-          }
-
-          alreadyAddedBaleIds.add(bale.id);
+          if (refResult.kind === "notFound") { notFoundRefs.push(refNum); continue; }
+          if (refResult.kind === "skipDuplicate") continue;
+          alreadyAddedBaleIds.add(refResult.baleId);
           totalAdded++;
         }
 
@@ -860,65 +892,102 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
             )
           : sql`LOWER(${factoryBales.articleCode}) = ${codeLower}`;
 
-        // Find available bales, oldest first
-        const availableBales = await db.select().from(factoryBales)
-          .where(and(
-            eq(factoryBales.companyId, companyId),
-            eq(factoryBales.status, "IN_STOCK"),
-            eq(factoryBales.erpLocationId, parsedLocationId),
-            matchConditions
-          ))
-          .orderBy(factoryBales.createdAt)
-          .limit(qty * 5);
+        // Per-article tx: lock candidate bales with SELECT FOR UPDATE, filter
+        // the locked set in-memory to drop already-claimed/cross-order ones,
+        // then insert + status-update inside the same tx. Concurrent imports
+        // for the same article will block at the lock and re-evaluate, so
+        // they cannot grab the same physical bales.
+        const articleResult = await db.transaction(async (tx: any) => {
+          // Find available bales, oldest first
+          const availableBales = await tx.select().from(factoryBales)
+            .where(and(
+              eq(factoryBales.companyId, companyId),
+              eq(factoryBales.status, "IN_STOCK"),
+              eq(factoryBales.erpLocationId, parsedLocationId),
+              matchConditions
+            ))
+            .orderBy(factoryBales.createdAt)
+            .limit(qty * 5)
+            .for("update");
 
-        // Filter out bales already in this order, or (V5 only) linked to another active order.
-        const candidateBales = availableBales.filter((b: any) =>
-          !alreadyAddedBaleIds.has(b.id) && !v5BlockedBaleIds.has(b.id)
-        );
-        const balesToAdd = candidateBales.slice(0, qty);
+          // Filter out bales already in this order, or (V5 only) bales we
+          // already know are claimed by another active order from the snapshot
+          // taken before this tx. Note: the snapshot can be stale, so for V5
+          // we re-verify each candidate inside the tx below before inserting.
+          const candidateBales = availableBales.filter((b: any) =>
+            !alreadyAddedBaleIds.has(b.id) && !v5BlockedBaleIds.has(b.id)
+          );
 
-        if (balesToAdd.length < qty) {
-          notFound.push({ articleCode, requestedQty: qty, foundQty: balesToAdd.length });
+          const addedIds: number[] = [];
+          for (const bale of candidateBales) {
+            if (addedIds.length >= qty) break;
+
+            // V5 guard: proformaIdUsed IS NOT NULL
+            // The outer v5BlockedBaleIds snapshot can race with concurrent V5
+            // imports — re-verify inside the tx that no other active order
+            // has linked this bale since we took the snapshot. Without this
+            // recheck, two concurrent ARTICLE imports could both claim the
+            // same V5 bale (V5 keeps bale IN_STOCK so the FOR UPDATE lock
+            // alone does not block the second tx from picking it up).
+            if (order.proformaIdUsed) {
+              const v5DupCheck = await tx.execute(
+                sql`SELECT cob.order_id FROM customer_order_bales cob
+                    JOIN customer_orders co ON co.id = cob.order_id
+                    WHERE cob.bale_id = ${bale.id}
+                      AND co.status != 'CANCELLED'
+                      AND cob.order_id != ${orderId}
+                    LIMIT 1`,
+              );
+              if ((v5DupCheck as any).rows?.[0]) continue;
+            }
+
+            // Determine price
+            let priceUsed = "0";
+            if (order.proformaIdUsed) {
+              const [pl] = await tx.select().from(customerProformaLines)
+                .where(and(
+                  eq(customerProformaLines.proformaId, order.proformaIdUsed),
+                  eq(customerProformaLines.articleCode, bale.articleCode || "")
+                ));
+              if (pl) priceUsed = pl.pricePerBale;
+            }
+            if (priceUsed === "0" && bale.productId) {
+              const product = allProducts.find((p: any) => p.id === bale.productId);
+              if (product?.sellingPrice) priceUsed = product.sellingPrice;
+            }
+
+            const baleProductForName2 = bale.productId ? allProducts.find((p: any) => p.id === bale.productId) : null;
+
+            await tx.insert(customerOrderBales).values({
+              orderId,
+              baleId: bale.id,
+              baleReference: bale.referenceNumber,
+              locationId: parsedLocationId,
+              weight: bale.weightKg,
+              articleCode: bale.articleCode,
+              baleName: baleProductForName2?.name || bale.productName || bale.articleCode || bale.baleCode,
+              priceUsed,
+            });
+
+            // V5 guard: proformaIdUsed IS NOT NULL
+            // V5 bales remain IN_STOCK during loading — only legacy V2/V3 orders set RESERVED_FOR_ORDER.
+            if (!order.proformaIdUsed) {
+              await tx.update(factoryBales)
+                .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
+                .where(eq(factoryBales.id, bale.id));
+            }
+
+            addedIds.push(bale.id);
+          }
+
+          return addedIds;
+        });
+
+        if (articleResult.length < qty) {
+          notFound.push({ articleCode, requestedQty: qty, foundQty: articleResult.length });
         }
-
-        for (const bale of balesToAdd) {
-          // Determine price
-          let priceUsed = "0";
-          if (order.proformaIdUsed) {
-            const [pl] = await db.select().from(customerProformaLines)
-              .where(and(
-                eq(customerProformaLines.proformaId, order.proformaIdUsed),
-                eq(customerProformaLines.articleCode, bale.articleCode || "")
-              ));
-            if (pl) priceUsed = pl.pricePerBale;
-          }
-          if (priceUsed === "0" && bale.productId) {
-            const product = allProducts.find((p: any) => p.id === bale.productId);
-            if (product?.sellingPrice) priceUsed = product.sellingPrice;
-          }
-
-          const baleProductForName2 = bale.productId ? allProducts.find((p: any) => p.id === bale.productId) : null;
-
-          await db.insert(customerOrderBales).values({
-            orderId,
-            baleId: bale.id,
-            baleReference: bale.referenceNumber,
-            locationId: parsedLocationId,
-            weight: bale.weightKg,
-            articleCode: bale.articleCode,
-            baleName: baleProductForName2?.name || bale.productName || bale.articleCode || bale.baleCode,
-            priceUsed,
-          });
-
-          // V5 guard: proformaIdUsed IS NOT NULL
-          // V5 bales remain IN_STOCK during loading — only legacy V2/V3 orders set RESERVED_FOR_ORDER.
-          if (!order.proformaIdUsed) {
-            await db.update(factoryBales)
-              .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
-              .where(eq(factoryBales.id, bale.id));
-          }
-
-          alreadyAddedBaleIds.add(bale.id);
+        for (const id of articleResult) {
+          alreadyAddedBaleIds.add(id);
           totalAdded++;
         }
       }
@@ -1020,7 +1089,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           .where(and(eq(customerOrderBales.id, orderBaleId), eq(customerOrderBales.orderId, orderId)));
         if (!oldOrderBale) throw new Error("Bale not found in this order");
 
-        // Find the new bale in stock
+        // Find the new bale in stock — FOR UPDATE prevents a concurrent
+        // exchange or sale from grabbing the same physical bale.
         const newRef = newBaleReference.trim();
         const [newBale] = await tx.select().from(factoryBales)
           .where(and(
@@ -1030,7 +1100,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
               eq(factoryBales.referenceNumber, newRef),
               eq(factoryBales.baleCode, newRef)
             )
-          ));
+          ))
+          .for("update");
         if (!newBale) throw new Error(`Bale "${newRef}" not found in stock or not available`);
 
         // Resolve product name for new bale
