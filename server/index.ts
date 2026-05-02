@@ -2075,9 +2075,12 @@ let migrationsDone = false;
     `DO $$ BEGIN ALTER TABLE factory_waste_entries ADD CONSTRAINT factory_waste_entries_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES factory_suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
 
     // ── F-Phase 4f (May 2026) — voucher_entries.factory_supplier_id ──
-    // 2 orphan rows (ids 15999, 16001 — voucher_ids 4468/4469, factory_supplier_id=10 NASSRA, dated 2026-03-10) NULL'd in dev (preserves voucher accounting balance, only severs the dangling pointer).
-    // The cleanup statement is idempotent (uses WHERE factory_supplier_id=10 AND id IN (...)) and runs BEFORE the FK so prod can apply cleanly even if it has the same orphans.
-    `UPDATE voucher_entries SET factory_supplier_id = NULL WHERE id IN (15999, 16001) AND factory_supplier_id = 10;`,
+    // Defensive SWEEP cleanup: NULL any factory_supplier_id that doesn't exist in factory_suppliers.
+    // In dev this matched 2 NASSRA payment rows (ids 15999, 16001, voucher_ids 4468/4469, factory_supplier_id=10, dated 2026-03-10).
+    // In prod this guarantees the FK ALTER below succeeds even if prod has different/additional orphan refs.
+    // NULL preserves voucher accounting balance (debit/credit untouched); only the dangling pointer is severed.
+    // The sweep is idempotent — once enforced by the FK, no rows will ever match the WHERE again.
+    `UPDATE voucher_entries SET factory_supplier_id = NULL WHERE factory_supplier_id IS NOT NULL AND factory_supplier_id NOT IN (SELECT id FROM factory_suppliers);`,
     `DO $$ BEGIN ALTER TABLE voucher_entries ADD CONSTRAINT voucher_entries_factory_supplier_id_fkey FOREIGN KEY (factory_supplier_id) REFERENCES factory_suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
