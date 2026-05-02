@@ -13,6 +13,7 @@ export type LabelData = {
   approxWeightKg: string;
   productName: string;
   designColor?: A4DesignColor | null;
+  customerLogoUrl?: string;
 };
 
 function getHeaderImage(code: string): string {
@@ -32,7 +33,7 @@ function buildDetailBlock(label: LabelData) {
   return `<div class="code-label">
     <div class="label-top">
       <div class="logo-section">
-        <img class="logo-img" src="${HMD_LOGO_BASE64}" alt="HMD" />
+        <img class="logo-img" src="${label.customerLogoUrl || HMD_LOGO_BASE64}" alt="Logo" />
       </div>
       <div class="info-section">
         <div class="info-row"><span class="info-key">PIECES:</span> <span class="info-val">${formatLabelNum(label.pieces)}</span></div>
@@ -49,11 +50,10 @@ function buildDetailBlock(label: LabelData) {
 }
 
 function buildDetailBlockNoBanner(label: LabelData) {
-  const imgSrc = HMD_LOGO_BASE64;
   return `<div class="code-label">
     <div class="label-top">
       <div class="logo-section">
-        <img class="logo-img" src="${imgSrc}" alt="HMD" />
+        <img class="logo-img" src="${label.customerLogoUrl || HMD_LOGO_BASE64}" alt="Logo" />
       </div>
       <div class="info-section">
         <div class="info-row"><span class="info-key">PIECES:</span> <span class="info-val">${formatLabelNum(label.pieces)}</span></div>
@@ -242,7 +242,7 @@ export function generateStickerLabelsHtml(labels: LabelData[]) {
         <div class="label">
           <div class="label-content">
             <div class="label-top">
-              <div class="logo-section"><img class="sticker-logo" src="${HMD_LOGO_BASE64}" alt="HMD" /></div>
+              <div class="logo-section"><img class="sticker-logo" src="${label.customerLogoUrl || HMD_LOGO_BASE64}" alt="Logo" /></div>
               <div class="info-section">
                 <div><span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
                 <div><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>

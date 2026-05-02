@@ -2245,6 +2245,7 @@ export const baleLabelPrints = pgTable("bale_label_prints", {
   printedAt: timestamp("printed_at").notNull().defaultNow(),
   scannedByUserId: varchar("scanned_by_user_id"),
   scannedAt: timestamp("scanned_at"),
+  customerLogoId: integer("customer_logo_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   uniqueReference: uniqueIndex("bale_label_prints_reference_unique").on(t.companyId, t.referenceNumber),
@@ -2265,10 +2266,32 @@ export const insertBaleLabelPrintSchema = createInsertSchema(baleLabelPrints).om
   printedAt: z.date().optional(),
   scannedByUserId: z.string().optional(),
   scannedAt: z.date().optional(),
+  customerLogoId: z.number().optional(),
 });
 
 export type InsertBaleLabelPrint = z.infer<typeof insertBaleLabelPrintSchema>;
 export type BaleLabelPrint = typeof baleLabelPrints.$inferSelect;
+
+// Customer Logos — per-customer brand logos for bale label printing
+export const customerLogos = pgTable("customer_logos", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  customerId: integer("customer_id").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  filePath: varchar("file_path", { length: 500 }).notNull(),
+  mimeType: varchar("mime_type", { length: 50 }).notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertCustomerLogoSchema = createInsertSchema(customerLogos).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCustomerLogo = z.infer<typeof insertCustomerLogoSchema>;
+export type CustomerLogo = typeof customerLogos.$inferSelect;
 
 // ============================================================
 // FACTORY DOMAIN TABLES (isolated from ERP)

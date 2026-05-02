@@ -1754,6 +1754,21 @@ let migrationsDone = false;
     // Prevents duplicate rows if two concurrent GET requests both trigger the backfill.
     // ON CONFLICT DO NOTHING in the backfill INSERT is the paired application-level guard.
     `CREATE UNIQUE INDEX IF NOT EXISTS coel_order_article_unique ON customer_order_expected_lines (order_id, article_code)`,
+
+    // ── Customer Logos — per-customer brand logos for bale label printing (May 2026) ──
+    `CREATE TABLE IF NOT EXISTS customer_logos (
+      id          serial PRIMARY KEY,
+      company_id  integer NOT NULL,
+      customer_id integer NOT NULL,
+      name        varchar(100) NOT NULL,
+      file_path   varchar(500) NOT NULL,
+      mime_type   varchar(50) NOT NULL,
+      active      boolean NOT NULL DEFAULT true,
+      created_at  timestamp NOT NULL DEFAULT now(),
+      updated_at  timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS customer_logos_company_customer_idx ON customer_logos (company_id, customer_id)`,
+    `ALTER TABLE bale_label_prints ADD COLUMN IF NOT EXISTS customer_logo_id integer`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

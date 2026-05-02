@@ -66,6 +66,8 @@
     const [selectedLocationId, setSelectedLocationId] = useState<string>("");
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const [entryDate, setEntryDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
+    const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+    const [selectedLogoId, setSelectedLogoId] = useState<number | null>(null);
     const scanRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
     const appMode = useAppMode();
@@ -95,6 +97,15 @@
     const { data: workerCategoryGroups = [] } = useQuery<any[]>({
       queryKey: ["/api/factory/worker-categories"],
       queryFn: () => fetch("/api/factory/worker-categories", { credentials: "include" }).then(r => r.json()),
+    });
+    const { data: allCustomers = [] } = useQuery<any[]>({
+      queryKey: ["/api/factory/customers"],
+      queryFn: () => fetch("/api/factory/customers", { credentials: "include" }).then(r => r.json()),
+    });
+    const { data: customerLogosForPrint = [] } = useQuery<any[]>({
+      queryKey: ["/api/factory/customers", selectedCustomerId, "logos"],
+      queryFn: () => fetch(`/api/factory/customers/${selectedCustomerId}/logos`, { credentials: "include" }).then(r => r.json()),
+      enabled: !!selectedCustomerId,
     });
 
     const [workerCategoryFilter, setWorkerCategoryFilter] = useState("all");
@@ -378,6 +389,24 @@
             ...(effectiveColor ? { designColor: effectiveColor } : {}),
           };
         });
+
+        // Fetch customer logo and attach as base64 data URL to each label
+        if (selectedLogoId && !isZebraMode()) {
+          try {
+            const logoResp = await fetch(`/api/factory/customer-logos/${selectedLogoId}/image`, { credentials: "include" });
+            if (logoResp.ok) {
+              const blob = await logoResp.blob();
+              const logoDataUrl = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.readAsDataURL(blob);
+              });
+              labels.forEach(l => { l.customerLogoUrl = logoDataUrl; });
+            }
+          } catch {
+            // logo fetch failed — use default HMD logo
+          }
+        }
 
         if (isZebraMode()) {
           try {
@@ -937,6 +966,42 @@
               <div className="border-t pt-2 flex justify-between items-center font-semibold">
                 <span>Total: {totalQty} bales</span>
                 <span>{formatNumber(totalKg)} kg</span>
+              </div>
+              <div className="border-t pt-3 space-y-2">
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Customer Label (Optional)</div>
+                <Select value={selectedCustomerId} onValueChange={(v) => { setSelectedCustomerId(v); setSelectedLogoId(null); }}>
+                  <SelectTrigger data-testid="select-label-customer">
+                    <SelectValue placeholder="No customer logo — use default" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No customer logo</SelectItem>
+                    {allCustomers.filter((c: any) => c.active).map((c: any) => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.legalName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedCustomerId && (
+                  <div>
+                    {customerLogosForPrint.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-1">No logos uploaded for this customer.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {customerLogosForPrint.map((logo: any) => (
+                          <button
+                            key={logo.id}
+                            type="button"
+                            onClick={() => setSelectedLogoId(selectedLogoId === logo.id ? null : logo.id)}
+                            className={`flex flex-col items-center gap-1 p-2 rounded-md border text-xs transition-colors ${selectedLogoId === logo.id ? "border-primary bg-primary/10" : "border-border hover-elevate"}`}
+                            data-testid={`button-select-logo-${logo.id}`}
+                          >
+                            <img src={`/api/factory/customer-logos/${logo.id}/image`} alt={logo.name} className="h-10 w-16 object-contain" />
+                            <span className="truncate max-w-[80px]">{logo.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             <DialogFooter className="gap-2">

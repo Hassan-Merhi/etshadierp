@@ -8,12 +8,12 @@ import { drCrClass } from "@/lib/formatNumber";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Search, Phone, User, Trash2, FileText, RotateCcw, History, Clock } from "lucide-react";
+import { Plus, Pencil, Search, Phone, User, Trash2, FileText, RotateCcw, History, Clock, Upload } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
@@ -492,7 +492,7 @@ export default function FactoryCustomers() {
       </Dialog>
 
       <Dialog open={!!editingCustomer} onOpenChange={(open) => { if (!open) { setEditingCustomer(null); resetForm(); } }}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="h-5 w-5" />
@@ -559,7 +559,12 @@ export default function FactoryCustomers() {
               )}
               <p className="text-xs text-muted-foreground mt-1">A WhatsApp reminder is sent at 9 AM when this customer has an outstanding balance past their due date.</p>
             </div>
-            <div className="flex justify-end gap-2">
+            {editingCustomer && (
+              <div className="border-t pt-4">
+                <CustomerLogosSection customerId={editingCustomer.id} />
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => { setEditingCustomer(null); resetForm(); }} data-testid="button-cancel-edit">
                 Cancel
               </Button>
@@ -595,6 +600,156 @@ export default function FactoryCustomers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+function CustomerLogosSection({ customerId }: { customerId: number }) {
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+
+  const { data: logos = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/factory/customers", customerId, "logos"],
+    queryFn: () => fetch(`/api/factory/customers/${customerId}/logos`, { credentials: "include" }).then(r => r.json()),
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("name", file.name.replace(/\.[^.]+$/, ""));
+      const resp = await fetch(`/api/factory/customers/${customerId}/logos`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!resp.ok) throw new Error((await resp.json()).message);
+      return resp.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Logo uploaded" });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers", customerId, "logos"] });
+    },
+    onError: (e: Error) => toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
+  });
+
+  const renameMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      const resp = await fetch(`/api/factory/customer-logos/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name }),
+      });
+      if (!resp.ok) throw new Error((await resp.json()).message);
+      return resp.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Logo renamed" });
+      setRenamingId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers", customerId, "logos"] });
+    },
+    onError: (e: Error) => toast({ title: "Rename failed", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const resp = await fetch(`/api/factory/customer-logos/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!resp.ok) throw new Error((await resp.json()).message);
+      return resp.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Logo removed" });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers", customerId, "logos"] });
+    },
+    onError: (e: Error) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-1">
+        <label className="text-sm font-medium">Logos</label>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploadMutation.isPending}
+          data-testid="button-upload-customer-logo"
+        >
+          <Upload className="h-3.5 w-3.5 mr-1" />
+          {uploadMutation.isPending ? "Uploading..." : "Upload Logo"}
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) uploadMutation.mutate(file);
+            e.target.value = "";
+          }}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">PNG, JPG or WEBP, max 500 KB. Used on bale labels in place of the default logo.</p>
+      {isLoading ? (
+        <div className="text-sm text-muted-foreground py-2">Loading logos...</div>
+      ) : logos.length === 0 ? (
+        <div className="text-sm text-muted-foreground py-2">No logos yet.</div>
+      ) : (
+        <div className="space-y-2">
+          {logos.map((logo: any) => (
+            <div key={logo.id} className="flex items-center gap-3 p-2 rounded-md border" data-testid={`row-logo-${logo.id}`}>
+              <img
+                src={`/api/factory/customer-logos/${logo.id}/image`}
+                alt={logo.name}
+                className="h-10 w-16 object-contain rounded shrink-0"
+              />
+              {renamingId === logo.id ? (
+                <div className="flex items-center gap-1 flex-1 flex-wrap">
+                  <Input
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    className="h-8 text-sm flex-1 min-w-0"
+                    autoFocus
+                    data-testid={`input-rename-logo-${logo.id}`}
+                    onKeyDown={(e) => { if (e.key === "Enter" && renameValue.trim()) renameMutation.mutate({ id: logo.id, name: renameValue.trim() }); if (e.key === "Escape") setRenamingId(null); }}
+                  />
+                  <Button size="sm" onClick={() => renameMutation.mutate({ id: logo.id, name: renameValue.trim() })} disabled={!renameValue.trim() || renameMutation.isPending}>Save</Button>
+                  <Button size="sm" variant="outline" onClick={() => setRenamingId(null)}>Cancel</Button>
+                </div>
+              ) : (
+                <>
+                  <span className="flex-1 text-sm truncate" data-testid={`text-logo-name-${logo.id}`}>{logo.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => { setRenamingId(logo.id); setRenameValue(logo.name); }}
+                    data-testid={`button-rename-logo-${logo.id}`}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive"
+                    onClick={() => deleteMutation.mutate(logo.id)}
+                    disabled={deleteMutation.isPending}
+                    data-testid={`button-delete-logo-${logo.id}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
