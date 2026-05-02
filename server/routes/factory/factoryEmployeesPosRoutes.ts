@@ -1631,7 +1631,13 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
             currencyCode: currencyCode || "USD",
           });
 
-          // 3. Mark N bales as SOLD (pick oldest available by id)
+          // 3. Mark N bales as SOLD (pick oldest available by id).
+          // FOR UPDATE serializes concurrent POS sales: a second sale that
+          // tries to grab the same rows will block on the locked rows, then
+          // re-evaluate the WHERE after the first transaction commits and
+          // correctly skip the now-SOLD rows. If we cannot find as many
+          // physical bales as the line item claims, abort the entire sale
+          // so the customer is never billed for inventory that doesn't exist.
           if (item.productId && locationId) {
             const availableBales = await tx
               .select({ id: factoryBales.id })
@@ -1643,13 +1649,17 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
                 eq(factoryBales.status, "IN_STOCK"),
               ))
               .orderBy(factoryBales.id)
-              .limit(qty);
-            const baleIds = availableBales.map((b: any) => b.id);
-            if (baleIds.length > 0) {
-              await tx.update(factoryBales)
-                .set({ status: "SOLD", updatedAt: new Date() })
-                .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
+              .limit(qty)
+              .for("update");
+            if (availableBales.length < qty) {
+              throw new Error(
+                `INSUFFICIENT_BALE_STOCK: requested ${qty} bale(s) of "${item.productName || item.articleCode || item.productId}" at this location, only ${availableBales.length} available`,
+              );
             }
+            const baleIds = availableBales.map((b: any) => b.id);
+            await tx.update(factoryBales)
+              .set({ status: "SOLD", updatedAt: new Date() })
+              .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
           }
         }
 
@@ -1835,7 +1845,8 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
                 eq(factoryBales.status, "SOLD"),
               ))
               .orderBy(desc(factoryBales.id))
-              .limit(oldItem.quantity);
+              .limit(oldItem.quantity)
+              .for("update");
             const baleIds = soldBales.map((b: any) => b.id);
             if (baleIds.length > 0) {
               await tx.update(factoryBales)
@@ -1893,13 +1904,17 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
                 eq(factoryBales.status, "IN_STOCK"),
               ))
               .orderBy(factoryBales.id)
-              .limit(qty);
-            const baleIds = availableBales.map((b: any) => b.id);
-            if (baleIds.length > 0) {
-              await tx.update(factoryBales)
-                .set({ status: "SOLD", updatedAt: new Date() })
-                .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
+              .limit(qty)
+              .for("update");
+            if (availableBales.length < qty) {
+              throw new Error(
+                `INSUFFICIENT_BALE_STOCK: requested ${qty} bale(s) of "${item.productName || item.articleCode || item.productId}" at this location, only ${availableBales.length} available`,
+              );
             }
+            const baleIds = availableBales.map((b: any) => b.id);
+            await tx.update(factoryBales)
+              .set({ status: "SOLD", updatedAt: new Date() })
+              .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
           }
         }
 
@@ -2078,7 +2093,8 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
                 eq(factoryBales.status, "SOLD"),
               ))
               .orderBy(desc(factoryBales.id))
-              .limit(item.quantity);
+              .limit(item.quantity)
+              .for("update");
             const baleIds = soldBales.map((b: any) => b.id);
             if (baleIds.length > 0) {
               await tx.update(factoryBales)
