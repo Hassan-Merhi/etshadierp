@@ -892,7 +892,7 @@ export type FiscalPeriodClosure = typeof fiscalPeriodClosures.$inferSelect;
 // Stock Transfer Vouchers
 export const stockTransferVouchers = pgTable("stock_transfer_vouchers", {
   id: serial("id").primaryKey(),
-  voucherId: integer("voucher_id").notNull(),
+  voucherId: integer("voucher_id").notNull().references(() => vouchers.id, { onDelete: "restrict" }),
   sourceLocationId: integer("source_location_id"), // Nullable for multi-source transfers
   destinationLocationId: integer("destination_location_id").notNull(),
   notes: text("notes"),

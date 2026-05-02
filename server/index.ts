@@ -2135,6 +2135,14 @@ let migrationsDone = false;
     `DO $$ BEGIN ALTER TABLE purchase_orders ADD CONSTRAINT purchase_orders_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE salary_advances ADD CONSTRAINT salary_advances_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE waste_dispatches ADD CONSTRAINT waste_dispatches_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+
+    // ── F-Phase 4k (May 2026) — stock_transfer_vouchers.voucher_id (1 FK, user-approved orphan deletion) ──
+    // 17 orphan stock_transfer_vouchers rows (Nov 1 – Dec 3 2025) had voucher_id pointing at deleted vouchers (3, 83-88, 134-137, 165, 240, 941, 942, 1046, 1047, 1088).
+    // Column is NOT NULL so couldn't sweep-NULL — user explicitly approved DELETE.
+    // All 17 had inventory_applied=false (never posted to stock) and zero downstream FKs (nothing referenced their ids), so deletion is non-destructive.
+    // Idempotent: DELETE filter is empty after FK enforcement; ALTER guarded by EXCEPTION.
+    `DELETE FROM stock_transfer_vouchers WHERE voucher_id NOT IN (SELECT id FROM vouchers);`,
+    `DO $$ BEGIN ALTER TABLE stock_transfer_vouchers ADD CONSTRAINT stock_transfer_vouchers_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
