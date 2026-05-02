@@ -3235,6 +3235,47 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
     }
   });
 
+  // ─── Payroll Payable Breakdown (view-only, for Net Position page) ────────────
+  // GET /api/factory/net-position/payroll-breakdown
+  // Returns one row per active employee whose currentBalance > 0.
+  // This endpoint is purely informational and does NOT affect any Net Position
+  // calculation, account, or balance — it is read-only.
+  app.get("/api/factory/net-position/payroll-breakdown", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rows = await db
+        .select({
+          id: employees.id,
+          firstName: employees.firstName,
+          lastName: employees.lastName,
+          code: employees.code,
+          currentBalance: employees.currentBalance,
+        })
+        .from(employees)
+        .where(and(
+          eq(employees.companyId, companyId),
+          eq(employees.employeeType, "Employee"),
+          eq(employees.active, true),
+          isNull(employees.deletedAt),
+        ))
+        .orderBy(employees.firstName, employees.lastName);
+
+      const result = rows.map(r => ({
+        id: r.id,
+        name: `${r.firstName} ${r.lastName}`.trim(),
+        code: r.code ?? "",
+        balance: parseFloat(r.currentBalance || "0"),
+      }));
+
+      res.json({ employees: result });
+    } catch (error: any) {
+      console.error("Payroll breakdown error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ─── Monthly Attendance Report ───────────────────────────────────────────────
   // GET /api/factory/workers/attendance-report?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
   // Also supports legacy ?year=YYYY&month=M params.

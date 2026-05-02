@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,10 @@ import {
   Clock,
   CheckCircle2,
   PackageOpen,
+  Users,
+  EyeOff,
+  Eye,
+  RotateCcw,
 } from "lucide-react";
 
 interface BrokerBreakdownLine {
@@ -331,6 +335,169 @@ function OrderGroup({
   );
 }
 
+/* ── Types for Payroll Breakdown ──────────────────────────────────────────── */
+interface PayrollEmployee {
+  id: number;
+  name: string;
+  code: string;
+  balance: number;
+}
+
+const PAYROLL_HIDDEN_KEY = "netpos_payroll_hidden_ids";
+
+function loadHiddenIds(): Set<number> {
+  try {
+    const raw = localStorage.getItem(PAYROLL_HIDDEN_KEY);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw) as number[]);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveHiddenIds(ids: Set<number>) {
+  localStorage.setItem(PAYROLL_HIDDEN_KEY, JSON.stringify(Array.from(ids)));
+}
+
+/* ── PayrollPayableTable ──────────────────────────────────────────────────── */
+function PayrollPayableTable() {
+  const [hiddenIds, setHiddenIds] = useState<Set<number>>(() => loadHiddenIds());
+
+  const { data, isLoading, error } = useQuery<{ employees: PayrollEmployee[] }>({
+    queryKey: ["/api/factory/net-position/payroll-breakdown"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/net-position/payroll-breakdown", { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    staleTime: 30_000,
+  });
+
+  const toggle = useCallback((id: number) => {
+    setHiddenIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      saveHiddenIds(next);
+      return next;
+    });
+  }, []);
+
+  const resetAll = useCallback(() => {
+    setHiddenIds(new Set());
+    saveHiddenIds(new Set());
+  }, []);
+
+  const allEmployees = data?.employees ?? [];
+  const visibleEmployees = allEmployees.filter(e => !hiddenIds.has(e.id));
+  const subtotal = visibleEmployees.reduce((s, e) => s + e.balance, 0);
+  const hiddenCount = hiddenIds.size;
+
+  return (
+    <Card data-testid="card-payroll-payable-table">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-orange-500" />
+            <CardTitle className="text-base">Payroll Payable / Employees</CardTitle>
+            <Badge variant="outline" className="text-xs">View only</Badge>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {hiddenCount > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {hiddenCount} hidden
+              </span>
+            )}
+            {hiddenCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetAll}
+                data-testid="button-payroll-reset-hidden"
+              >
+                <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                Show all
+              </Button>
+            )}
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Per-employee payable balances. Toggle visibility to adjust the subtotal shown here. This does not affect the Net Position calculation above.
+        </p>
+      </CardHeader>
+      <CardContent className="p-0">
+        {isLoading && (
+          <div className="px-4 py-6 space-y-2">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-9 w-full" />)}
+          </div>
+        )}
+        {error && (
+          <div className="px-4 py-4 flex items-center gap-2 text-destructive text-sm">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            Failed to load payroll breakdown.
+          </div>
+        )}
+        {!isLoading && !error && allEmployees.length === 0 && (
+          <p className="px-4 py-6 text-sm text-muted-foreground text-center">
+            No active employees with a payable balance.
+          </p>
+        )}
+        {!isLoading && !error && allEmployees.length > 0 && (
+          <>
+            <div className="divide-y divide-border">
+              {allEmployees.map(emp => {
+                const hidden = hiddenIds.has(emp.id);
+                return (
+                  <div
+                    key={emp.id}
+                    className={`flex items-center justify-between px-4 py-2.5 gap-4 ${hidden ? "opacity-40" : ""}`}
+                    data-testid={`row-payroll-employee-${emp.id}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{emp.name}</p>
+                      {emp.code && (
+                        <p className="text-xs text-muted-foreground font-mono">{emp.code}</p>
+                      )}
+                    </div>
+                    <span className="font-mono text-sm font-semibold text-orange-600 dark:text-orange-400 shrink-0">
+                      {fmt(emp.balance)}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => toggle(emp.id)}
+                      data-testid={`button-payroll-toggle-${emp.id}`}
+                      title={hidden ? "Show in subtotal" : "Hide from subtotal"}
+                    >
+                      {hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="border-t border-border px-4 py-3 flex items-center justify-between bg-muted/30">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold">Subtotal</span>
+                {hiddenCount > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    ({visibleEmployees.length} of {allEmployees.length} accounts)
+                  </span>
+                )}
+              </div>
+              <span
+                className="font-mono text-base font-bold text-orange-600 dark:text-orange-400"
+                data-testid="text-payroll-subtotal"
+              >
+                {fmt(subtotal)}
+              </span>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function FactoryNetPosition() {
   const { data, isLoading, error, refetch, isFetching } = useQuery<NetPositionData>({
     queryKey: ["/api/factory/net-position"],
@@ -577,6 +744,9 @@ export default function FactoryNetPosition() {
           </CardContent>
         </Card>
       )}
+
+      {/* Payroll Payable / Employees — view-only, below main Net Position */}
+      <PayrollPayableTable />
 
       {/* Sub-totals info */}
       {!isLoading && data && (data.supplierLiabilities > 0 || data.ledgerAssets > 0 || data.inventoryValue > 0 || data.rawMaterialValue > 0) && (
