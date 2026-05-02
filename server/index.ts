@@ -2049,6 +2049,16 @@ let migrationsDone = false;
     // factory_fx_allocations (8 orphans, IDs 51-64, NOT NULL — financial, need cleanup decision),
     // factory_container_commissions (7 orphans, IDs 51-64, NOT NULL — financial, need cleanup decision),
     // factory_raw_stock (7 orphans, IDs 51-64, NULLABLE — could NULL out).
+
+    // ── F-Phase 4d (May 2026) — suppliers children, 6 of 15 candidates applied ──
+    // All 6 RESTRICT — suppliers should never be deleted casually (financial/historical impact).
+    // The remaining 9 candidates are factory_* columns that point to factory_suppliers (separate parent table), NOT suppliers — handled in a separate batch.
+    `DO $$ BEGIN ALTER TABLE containers ADD CONSTRAINT containers_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE container_freight ADD CONSTRAINT container_freight_vendor_supplier_id_fkey FOREIGN KEY (vendor_supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE purchase_orders ADD CONSTRAINT purchase_orders_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE supplier_containers ADD CONSTRAINT supplier_containers_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE supplier_proformas ADD CONSTRAINT supplier_proformas_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE voucher_entries ADD CONSTRAINT voucher_entries_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
