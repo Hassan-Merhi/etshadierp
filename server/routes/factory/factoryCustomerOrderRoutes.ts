@@ -44,7 +44,7 @@ import {
   factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
   factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
   factoryPosSales, factoryPosSaleItems, proformaStockReservations,
-  customerOrderBaleRemovals,
+  customerOrderBaleRemovals, customerOrderExpectedLines,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -1338,26 +1338,81 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
     }
   });
 
-  // Link (or unlink) a proforma to an existing loading
+  // Link a proforma to an existing unlinked LOADING order (V5 backfill support).
+  // V5 guard: sets proforma_id_used and backfills customer_order_expected_lines.
+  // Rules: order must be LOADING and currently unlinked (proforma_id_used IS NULL).
+  //        proforma must be active and belong to the same company.
+  //        customer must match if both order and proforma have a customer_id.
   app.patch("/api/factory/customer-orders/:id/link-proforma", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
-      const { proformaId } = req.body; // null to unlink, number to link
+      if (isNaN(orderId)) return res.status(400).json({ message: "Invalid order ID" });
 
+      const { proformaId } = req.body;
+      if (!proformaId) return res.status(400).json({ message: "proformaId is required" });
+      const proformaIdInt = parseInt(proformaId);
+      if (isNaN(proformaIdInt)) return res.status(400).json({ message: "Invalid proformaId" });
+
+      // Confirm order exists for this company
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
-      if (!order) return res.status(404).json({ message: "Loading not found" });
-      if (order.status !== "LOADING") return res.status(400).json({ message: "Can only link a proforma to an active loading" });
+      if (!order) return res.status(404).json({ message: "Order not found" });
 
-      const [updated] = await db.update(customerOrders)
-        .set({ proformaIdUsed: proformaId ? parseInt(proformaId) : null })
-        .where(eq(customerOrders.id, orderId))
-        .returning();
+      // Must be a LOADING order
+      if (order.status !== "LOADING")
+        return res.status(400).json({ message: "Can only link a proforma to a LOADING order" });
 
-      res.json({ success: true, order: updated });
+      // Must not already be linked (V5 guard — only link previously unlinked V2/V3 orders)
+      if (order.proformaIdUsed != null)
+        return res.status(400).json({ message: "Order is already linked to a proforma" });
+
+      // Confirm proforma exists for this company
+      const [proforma] = await db.select().from(customerProformas)
+        .where(and(eq(customerProformas.id, proformaIdInt), eq(customerProformas.companyId, companyId)));
+      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+
+      // Proforma must be active
+      if (!proforma.isActive)
+        return res.status(400).json({ message: "Proforma is not active" });
+
+      // Customer match check — reject if both sides have a customerId and they differ
+      if (order.customerId && proforma.customerId && order.customerId !== proforma.customerId)
+        return res.status(400).json({
+          message: `Customer mismatch: order belongs to customer #${order.customerId} but proforma belongs to customer #${proforma.customerId}. Cannot link.`,
+        });
+
+      // Fetch proforma lines for expected-lines backfill
+      const proformaLines = await db.select().from(customerProformaLines)
+        .where(eq(customerProformaLines.proformaId, proformaIdInt));
+
+      // Link the order → proforma
+      await db.update(customerOrders)
+        .set({ proformaIdUsed: proformaIdInt })
+        .where(eq(customerOrders.id, orderId));
+
+      // Backfill customer_order_expected_lines from proforma lines.
+      // ON CONFLICT DO NOTHING — idempotent and safe to call multiple times.
+      // These lines are for detail/progress only; LOADING orders do NOT
+      // contribute to expectedToLoad in the V5 formula (DRAFT-only).
+      if (proformaLines.length > 0) {
+        await db.execute(
+          sql`INSERT INTO customer_order_expected_lines
+                (company_id, order_id, proforma_id, proforma_line_id, article_code, product_name, expected_qty)
+              SELECT ${companyId}, ${orderId}, cpl.proforma_id, cpl.id,
+                     cpl.article_code, cpl.product_name, cpl.quantity
+              FROM customer_proforma_lines cpl
+              WHERE cpl.proforma_id = ${proformaIdInt}
+              ON CONFLICT (order_id, article_code) DO NOTHING`,
+        );
+      }
+
+      res.json({
+        success: true,
+        linked: { orderId, proformaId: proformaIdInt, linesBackfilled: proformaLines.length },
+      });
     } catch (error: any) {
       console.error("Error linking proforma to loading:", error);
       res.status(500).json({ message: error.message });

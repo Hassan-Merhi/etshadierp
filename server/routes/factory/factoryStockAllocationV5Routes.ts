@@ -8,7 +8,7 @@ import {
   customerOrderExpectedLines,
   customers,
 } from "@shared/schema";
-import { eq, inArray, sql, and, gte, lte } from "drizzle-orm";
+import { eq, inArray, sql, and, gte, lte, isNull } from "drizzle-orm";
 
 // ─── V5 Guard Convention ─────────────────────────────────────────────────────
 // V5 orders are identified by: customer_orders.proforma_id_used IS NOT NULL
@@ -169,9 +169,14 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         }));
       }
 
-      // 5b. Backfill: Insert expected lines for any V5 DRAFT containers that were created before
-      //     Phase B. Idempotent — NOT EXISTS guard prevents duplicates.
+      // 5b. Backfill: Insert expected lines for any V5 DRAFT or LOADING containers that were
+      //     created before Phase B or linked via the link-proforma endpoint.
+      //     Idempotent — NOT EXISTS guard prevents duplicates.
       //     V5 guard: proformaIdUsed IS NOT NULL
+      //
+      //     IMPORTANT: Extending to LOADING does NOT change the expectedToLoad formula.
+      //     expectedToLoad still counts DRAFT orders only (see step 9 below).
+      //     LOADING expected lines are for container detail/progress display only.
       if (proformaIds.length > 0) {
         try {
           await db.execute(
@@ -186,7 +191,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
                 FROM customer_orders co
                 JOIN customer_proforma_lines cpl ON cpl.proforma_id = co.proforma_id_used
                 WHERE co.company_id = ${companyId}
-                  AND co.status = 'DRAFT'
+                  AND co.status IN ('DRAFT', 'LOADING')
                   AND co.proforma_id_used IS NOT NULL
                   AND co.proforma_id_used = ANY(${sql.raw(`ARRAY[${proformaIds.join(",")}]`)})
                   AND NOT EXISTS (
@@ -867,6 +872,51 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       });
     } catch (err: any) {
       console.error("[V5] location-summary error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── GET /api/factory/v5/unlinked-loading-orders ───────────────────────────
+  // Returns LOADING customer_orders that have proforma_id_used IS NULL.
+  // Used by the "Link Existing Container" UI in Stock Allocation V5.
+  // Read-only — does not modify any data.
+  app.get("/api/factory/v5/unlinked-loading-orders", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const raw = await db.execute(
+        sql`SELECT
+              co.id,
+              co.container_number  AS "containerNumber",
+              co.status,
+              co.customer_id       AS "customerId",
+              co.created_at        AS "createdAt",
+              c.legal_name         AS "customerName",
+              COUNT(cob.id)::int   AS "loadedBaleCount"
+            FROM customer_orders co
+            LEFT JOIN customers c ON c.id = co.customer_id
+            LEFT JOIN customer_order_bales cob ON cob.order_id = co.id
+            WHERE co.company_id      = ${companyId}
+              AND co.status          = 'LOADING'
+              AND co.proforma_id_used IS NULL
+            GROUP BY co.id, co.container_number, co.status, co.customer_id, co.created_at, c.legal_name
+            ORDER BY co.created_at DESC`,
+      );
+
+      const orders = ((raw as any).rows ?? (raw as any[])).map((r: any) => ({
+        id:              Number(r.id),
+        containerNumber: r.containerNumber ?? `Order #${r.id}`,
+        status:          r.status,
+        customerId:      r.customerId ? Number(r.customerId) : null,
+        customerName:    r.customerName ?? "Unknown",
+        createdAt:       r.createdAt,
+        loadedBaleCount: Number(r.loadedBaleCount ?? 0),
+      }));
+
+      res.json({ orders });
+    } catch (err: any) {
+      console.error("[V5] unlinked-loading-orders error:", err);
       res.status(500).json({ message: err.message });
     }
   });

@@ -1,7 +1,7 @@
 import { useState, useMemo, Fragment, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock, Pencil, X } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock, Pencil, X, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -209,6 +209,54 @@ export default function FactoryStockAllocationV5() {
     }
     editDraftMut.mutate({ proformaId: editDraftDialog.proformaId, updates });
   }
+
+  /* ── Link-Existing-Container dialog state ───────────────────────────────── */
+  interface UnlinkedOrder {
+    id: number;
+    containerNumber: string;
+    status: string;
+    customerId: number | null;
+    customerName: string;
+    createdAt: string;
+    loadedBaleCount: number;
+  }
+  const [linkDialog, setLinkDialog] = useState<{
+    proformaId: number;
+    proformaName: string;
+    proformaCustomerId: number | null;
+  } | null>(null);
+  const [linkSelected, setLinkSelected] = useState<Set<number>>(new Set());
+
+  const unlinkedQuery = useQuery<{ orders: UnlinkedOrder[] }>({
+    queryKey: ["/api/factory/v5/unlinked-loading-orders"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/v5/unlinked-loading-orders", { credentials: "include" });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Failed"); }
+      return res.json();
+    },
+    enabled: !!linkDialog,
+    staleTime: 0,
+  });
+
+  const linkMut = useMutation({
+    mutationFn: async ({ proformaId, orderIds }: { proformaId: number; orderIds: number[] }) => {
+      const results = [];
+      for (const orderId of orderIds) {
+        const r = await apiRequest("PATCH", `/api/factory/customer-orders/${orderId}/link-proforma`, { proformaId });
+        results.push(r);
+      }
+      return results;
+    },
+    onSuccess: (_data, { orderIds }) => {
+      toast({ title: `Linked ${orderIds.length} container${orderIds.length !== 1 ? "s" : ""} to proforma.` });
+      setLinkDialog(null);
+      setLinkSelected(new Set());
+      query.refetch();
+    },
+    onError: (err: any) => {
+      toast({ title: "Linking failed", description: err.message ?? "Unknown error", variant: "destructive" });
+    },
+  });
 
   /* ── Cancel-Container dialog state ──────────────────────────────────────── */
   const [cancelDialog, setCancelDialog] = useState<{
@@ -476,6 +524,22 @@ export default function FactoryStockAllocationV5() {
                                   <Plus className="h-2.5 w-2.5 mr-1" />Add Containers
                                 </Button>
                               )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-5 px-2 text-[10px]"
+                                data-testid={`button-v5-link-container-${proforma.proformaId}`}
+                                onClick={() => {
+                                  setLinkSelected(new Set());
+                                  setLinkDialog({
+                                    proformaId: proforma.proformaId,
+                                    proformaName: proforma.proformaName,
+                                    proformaCustomerId: proforma.customerId ?? null,
+                                  });
+                                }}
+                              >
+                                <Link2 className="h-2.5 w-2.5 mr-1" />Link Existing
+                              </Button>
                               {/* Edit Draft Quantities — only when at least one DRAFT container has 0 loaded bales */}
                               {!isReadyToClose && proforma.containers.some(c => c.status === "DRAFT" && c.loadedQty === 0) && (
                                 <Button
@@ -774,6 +838,127 @@ export default function FactoryStockAllocationV5() {
               {closeProformaMut.isPending
                 ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Closing…</>
                 : "Close Proforma"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Link Existing Container dialog */}
+      <Dialog open={!!linkDialog} onOpenChange={open => { if (!open) { setLinkDialog(null); setLinkSelected(new Set()); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="h-4 w-4 text-muted-foreground" />
+              Link Existing Container
+            </DialogTitle>
+          </DialogHeader>
+
+          {linkDialog && (
+            <div className="flex flex-col gap-4 py-1">
+              <p className="text-sm text-muted-foreground">
+                Linking to <span className="font-semibold text-foreground">{linkDialog.proformaName}</span>.
+              </p>
+
+              <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  Only link containers that truly belong to this proforma. Expected quantities will be set from this proforma's lines and container progress will appear in Stock Allocation V5.
+                </p>
+              </div>
+
+              {unlinkedQuery.isLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : unlinkedQuery.isError ? (
+                <p className="text-sm text-destructive">Failed to load unlinked containers.</p>
+              ) : (unlinkedQuery.data?.orders ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4 italic">
+                  No unlinked LOADING containers found.
+                </p>
+              ) : (
+                <div className="rounded-md border overflow-hidden max-h-72 overflow-y-auto">
+                  <div className="grid grid-cols-[20px_1fr_80px_64px_56px] bg-muted px-3 py-2 gap-2 text-xs font-medium text-muted-foreground border-b sticky top-0">
+                    <span />
+                    <span>Container / Customer</span>
+                    <span className="text-right">Loaded</span>
+                    <span className="text-right">Date</span>
+                    <span />
+                  </div>
+                  {(unlinkedQuery.data?.orders ?? []).map(order => {
+                    const isSelected = linkSelected.has(order.id);
+                    const customerMismatch =
+                      linkDialog.proformaCustomerId != null &&
+                      order.customerId != null &&
+                      order.customerId !== linkDialog.proformaCustomerId;
+                    return (
+                      <div
+                        key={order.id}
+                        className={cn(
+                          "grid grid-cols-[20px_1fr_80px_64px_56px] px-3 py-2 gap-2 items-center text-xs border-b last:border-0",
+                          customerMismatch ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover-elevate",
+                          isSelected && "bg-primary/5",
+                        )}
+                        onClick={() => {
+                          if (customerMismatch) return;
+                          setLinkSelected(prev => {
+                            const next = new Set(prev);
+                            if (next.has(order.id)) next.delete(order.id); else next.add(order.id);
+                            return next;
+                          });
+                        }}
+                        data-testid={`row-unlinked-order-${order.id}`}
+                      >
+                        <div className={cn(
+                          "w-4 h-4 rounded border flex items-center justify-center shrink-0",
+                          isSelected ? "bg-primary border-primary" : "border-muted-foreground/30",
+                          customerMismatch && "border-muted-foreground/15",
+                        )}>
+                          {isSelected && <CheckCircle2 className="h-3 w-3 text-primary-foreground" />}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{order.containerNumber}</div>
+                          <div className="text-muted-foreground truncate">{order.customerName}</div>
+                          {customerMismatch && (
+                            <div className="text-destructive text-[10px]">Customer mismatch — cannot link</div>
+                          )}
+                        </div>
+                        <div className="text-right font-mono tabular-nums">
+                          <span className="text-blue-600 dark:text-blue-400">{order.loadedBaleCount}</span>
+                          <span className="text-muted-foreground ml-0.5">bales</span>
+                        </div>
+                        <div className="text-right text-muted-foreground tabular-nums">
+                          {new Date(order.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </div>
+                        <div>
+                          <Badge variant="outline" className="text-[9px] h-4 px-1">
+                            {STATUS_LABELS[order.status] ?? order.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setLinkDialog(null); setLinkSelected(new Set()); }}
+              data-testid="button-v5-link-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => linkDialog && linkMut.mutate({ proformaId: linkDialog.proformaId, orderIds: Array.from(linkSelected) })}
+              disabled={linkMut.isPending || linkSelected.size === 0}
+              data-testid="button-v5-link-submit"
+            >
+              {linkMut.isPending
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Linking…</>
+                : `Link ${linkSelected.size > 0 ? linkSelected.size + " " : ""}Container${linkSelected.size !== 1 ? "s" : ""}`}
             </Button>
           </DialogFooter>
         </DialogContent>
