@@ -23,7 +23,7 @@ import { format } from "date-fns";
 import { z } from "zod";
 
 export function registerSupplierRoutes(app: Express) {
-  app.get("/api/suppliers", async (_req, res) => {
+  app.get("/api/suppliers", requireAuth, async (_req, res) => {
     try {
       const suppliers = await storage.getAllSuppliers();
       res.json(suppliers);
@@ -104,7 +104,7 @@ export function registerSupplierRoutes(app: Express) {
     }
   });
 
-  app.get("/api/suppliers/:id", async (req, res) => {
+  app.get("/api/suppliers/:id", requireAuth, async (req, res) => {
     try {
       const supplierId = parseInt(req.params.id);
       if (isNaN(supplierId)) {

@@ -492,8 +492,8 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
-  // Cleanup endpoint to remove orphaned charge vouchers (no auth required for cleanup operations)
-  app.post("/api/cleanup/orphaned-charges", async (req, res) => {
+  // Cleanup endpoint to remove orphaned charge vouchers - admin only (destructive)
+  app.post("/api/cleanup/orphaned-charges", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       // Find all CHARGE vouchers
       const chargeVouchers = await db

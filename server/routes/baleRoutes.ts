@@ -2273,7 +2273,7 @@ export function registerBaleRoutes(app: Express) {
   });
 
   // GET endpoint to return barcode as PNG image (for print labels)
-  app.get("/api/barcode/:code", async (req, res) => {
+  app.get("/api/barcode/:code", requireAuth, async (req, res) => {
     try {
       const code = decodeURIComponent(req.params.code);
       

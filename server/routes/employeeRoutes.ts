@@ -300,9 +300,16 @@ export function registerEmployeeRoutes(app: Express) {
 
   app.get("/api/employee-groups/:id", requireAuth, async (req, res) => {
     try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
       const group = await storage.getEmployeeGroupById(parseInt(req.params.id));
       if (!group) {
         return res.status(404).json({ message: "Employee group not found" });
+      }
+      if (group.companyId !== companyId) {
+        return res.status(403).json({ message: "Access denied: group belongs to a different company" });
       }
       res.json(group);
     } catch (error: any) {

@@ -873,7 +873,7 @@ export function registerAccountRoutes(app: Express) {
   });
 
   // Get balance for a specific ledger account
-  app.get("/api/accounts/ledger/:id/balance", async (req, res) => {
+  app.get("/api/accounts/ledger/:id/balance", requireAuth, async (req, res) => {
     try {
       const ledgerAccountId = parseInt(req.params.id);
 
@@ -952,7 +952,7 @@ export function registerAccountRoutes(app: Express) {
   });
 
   // Get per-currency balance breakdown for a ledger account (all-time, no date filter)
-  app.get("/api/accounts/ledger/:id/currency-balances", async (req, res) => {
+  app.get("/api/accounts/ledger/:id/currency-balances", requireAuth, async (req, res) => {
     try {
       const ledgerAccountId = parseInt(req.params.id);
       if (isNaN(ledgerAccountId)) {
@@ -989,7 +989,7 @@ export function registerAccountRoutes(app: Express) {
   });
 
   // Get transactions for a specific ledger account with optional date filtering
-  app.get("/api/accounts/ledger/:id/transactions", async (req, res) => {
+  app.get("/api/accounts/ledger/:id/transactions", requireAuth, async (req, res) => {
     try {
       const ledgerAccountId = parseInt(req.params.id);
 
@@ -1036,7 +1036,7 @@ export function registerAccountRoutes(app: Express) {
   });
 
   // Get transactions for a specific bank account with optional date filtering
-  app.get("/api/accounts/bank/:id/transactions", async (req, res) => {
+  app.get("/api/accounts/bank/:id/transactions", requireAuth, async (req, res) => {
     try {
       const bankAccountId = parseInt(req.params.id);
 
@@ -1059,7 +1059,7 @@ export function registerAccountRoutes(app: Express) {
   });
 
   // Get transactions for a specific fixed asset with optional date filtering
-  app.get("/api/accounts/fixed-asset/:id/transactions", async (req, res) => {
+  app.get("/api/accounts/fixed-asset/:id/transactions", requireAuth, async (req, res) => {
     try {
       const fixedAssetId = parseInt(req.params.id);
 

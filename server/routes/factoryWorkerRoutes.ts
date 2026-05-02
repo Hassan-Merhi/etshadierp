@@ -322,7 +322,8 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
   // POST /api/factory/workers/import-excel - Bulk import/update workers from Excel
   app.post("/api/factory/workers/import-excel", requireAuth, workerUpload.single("file"), async (req: any, res: any) => {
     try {
-      const companyId = req.body.companyId ? parseInt(req.body.companyId) : getFactoryCompanyId(req);
+      // Always use the session's current company; never trust client-provided companyId
+      const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "companyId required" });
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 

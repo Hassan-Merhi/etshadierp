@@ -178,7 +178,7 @@ export function registerBankAssetRoutes(app: Express) {
     }
   });
 
-  app.post("/api/fixed-assets", async (req, res) => {
+  app.post("/api/fixed-assets", requireAuth, async (req, res) => {
     try {
       const parsed = insertFixedAssetSchema.parse(req.body);
 
