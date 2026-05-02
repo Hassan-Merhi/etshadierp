@@ -926,14 +926,14 @@
         </div>
 
         <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Confirm Stock Entry</DialogTitle>
               <DialogDescription>
                 {totalQty} bale(s) will be entered into stock. Labels ({getPaperFormat()} format) and sticker labels will print for each bale.
               </DialogDescription>
             </DialogHeader>
-            <div className="text-sm space-y-3">
+            <div className="text-sm space-y-3 overflow-y-auto flex-1 pr-1">
               {entryDate !== new Date().toLocaleDateString('en-CA') && (
                 <div className="flex items-center gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-amber-800 dark:text-amber-200 text-xs">
                   <CalendarDays className="h-3.5 w-3.5 shrink-0" />
