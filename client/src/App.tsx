@@ -357,6 +357,8 @@ function AuthenticatedApp() {
   const [currentLocation] = useLocation();
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const factoryContainerRef = useRef<HTMLDivElement>(null);
+  useButtonClickFeedback(factoryContainerRef);
 
   // Reset scroll position on every route change so the new page always starts at top
   useEffect(() => {
@@ -748,9 +750,6 @@ function AuthenticatedApp() {
   if (!isFactoryCompany && !hasErpAccess && hasFactoryAccess && !isFactoryRoute && currentLocation !== "/my-settings") {
     return <Redirect to={factoryDefaultPage} />;
   }
-
-  const factoryContainerRef = useRef<HTMLDivElement>(null);
-  useButtonClickFeedback(factoryContainerRef);
 
   if (isFactoryRoute || isFactoryCompany) {
     return (
