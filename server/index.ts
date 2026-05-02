@@ -2100,6 +2100,41 @@ let migrationsDone = false;
     `DO $$ BEGIN ALTER TABLE property_payments ADD CONSTRAINT property_payments_cash_account_id_fkey FOREIGN KEY (cash_account_id) REFERENCES ledger_accounts(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE user_company_roles ADD CONSTRAINT user_company_roles_cash_account_id_fkey FOREIGN KEY (cash_account_id) REFERENCES ledger_accounts(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE worker_bonuses ADD CONSTRAINT worker_bonuses_cash_account_id_fkey FOREIGN KEY (cash_account_id) REFERENCES ledger_accounts(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+
+    // ── F-Phase 4h (May 2026) — employees parent FKs (10 clean + 1 sweep) ──
+    // employees has 66 rows (ids 51–119); 10 of 11 children had 0 orphans.
+    // voucher_entries.employee_id (nullable) had 32 orphan rows pointing at deleted employee ids 43–50 (all below current min). Defensive sweep NULLs them — preserves voucher accounting balance, only severs the dangling pointer.
+    // RESTRICT on all — HR/payroll/audit history; deleting an employee with payroll/advances/bonuses/attendance must be blocked.
+    `UPDATE voucher_entries SET employee_id = NULL WHERE employee_id IS NOT NULL AND employee_id NOT IN (SELECT id FROM employees);`,
+    `DO $$ BEGIN ALTER TABLE employee_advance_repayments ADD CONSTRAINT employee_advance_repayments_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE employee_advances ADD CONSTRAINT employee_advances_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE employee_attendance ADD CONSTRAINT employee_attendance_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE employee_bale_pct_rates ADD CONSTRAINT employee_bale_pct_rates_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE employee_bale_rates ADD CONSTRAINT employee_bale_rates_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE employee_bonuses ADD CONSTRAINT employee_bonuses_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE employee_group_members ADD CONSTRAINT employee_group_members_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE erp_payroll_run_items ADD CONSTRAINT erp_payroll_run_items_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE erp_worker_docs ADD CONSTRAINT erp_worker_docs_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE salary_advances ADD CONSTRAINT salary_advances_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE voucher_entries ADD CONSTRAINT voucher_entries_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+
+    // ── F-Phase 4i (May 2026) — vouchers long-tail FKs (11 clean + 1 sweep) ──
+    // vouchers has 3,787 rows (ids 28–5416); 12 of 13 candidate child columns clean. purchase_orders.voucher_id had 3 orphans (ids 56/57/104 → missing voucher_ids 67/68/120, all PO-36 from Nov 2025) — defensive sweep NULLs them.
+    // DEFERRED: stock_transfer_vouchers.voucher_id has 17 orphan rows but the column is NOT NULL — can't sweep, would need user decision to DELETE the orphan stock_transfer_vouchers rows. Skipped this batch.
+    // RESTRICT on all — vouchers are accounting source-of-truth (Receipt/Payment/Journal postings); a referenced voucher must not be deleted while child records still point at it.
+    `UPDATE purchase_orders SET voucher_id = NULL WHERE voucher_id IS NOT NULL AND voucher_id NOT IN (SELECT id FROM vouchers);`,
+    `DO $$ BEGIN ALTER TABLE container_sales ADD CONSTRAINT container_sales_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE customer_order_charges ADD CONSTRAINT customer_order_charges_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE employee_bonuses ADD CONSTRAINT employee_bonuses_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_transporter_transactions ADD CONSTRAINT factory_transporter_transactions_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_worker_advances ADD CONSTRAINT factory_worker_advances_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE inter_company_transfers ADD CONSTRAINT inter_company_transfers_from_voucher_id_fkey FOREIGN KEY (from_voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE inter_company_transfers ADD CONSTRAINT inter_company_transfers_to_voucher_id_fkey FOREIGN KEY (to_voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE inventory_negative_layers ADD CONSTRAINT inventory_negative_layers_source_voucher_id_fkey FOREIGN KEY (source_voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE property_payments ADD CONSTRAINT property_payments_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE purchase_orders ADD CONSTRAINT purchase_orders_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE salary_advances ADD CONSTRAINT salary_advances_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE waste_dispatches ADD CONSTRAINT waste_dispatches_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

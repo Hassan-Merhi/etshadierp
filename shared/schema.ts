@@ -293,7 +293,7 @@ export type EmployeeGroup = typeof employeeGroups.$inferSelect;
 export const employeeGroupMembers = pgTable("employee_group_members", {
   id: serial("id").primaryKey(),
   employeeGroupId: integer("employee_group_id").notNull(),
-  employeeId: integer("employee_id").notNull(),
+  employeeId: integer("employee_id").notNull().references(() => employees.id, { onDelete: "restrict" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -538,7 +538,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   poNumber: varchar("po_number", { length: 100 }).notNull(),
   containerId: integer("container_id").notNull().references(() => containers.id, { onDelete: "restrict" }),
   supplierId: integer("supplier_id").notNull().references(() => suppliers.id, { onDelete: "restrict" }),
-  voucherId: integer("voucher_id"),
+  voucherId: integer("voucher_id").references(() => vouchers.id, { onDelete: "restrict" }),
   currency: text("currency").notNull().default("USD"),
   itemsTotal: decimal("items_total", { precision: 20, scale: 2 }).default("0"),
   freight: decimal("freight", { precision: 20, scale: 2 }).default("0"),
@@ -788,7 +788,7 @@ export const voucherEntries = pgTable("voucher_entries", {
   bankAccountId: integer("bank_account_id"),
   fixedAssetId: integer("fixed_asset_id"),
   supplierId: integer("supplier_id").references(() => suppliers.id, { onDelete: "restrict" }),
-  employeeId: integer("employee_id"),
+  employeeId: integer("employee_id").references(() => employees.id, { onDelete: "restrict" }),
   customerId: integer("customer_id"),
   factorySupplierId: integer("factory_supplier_id").references(() => factorySuppliers.id, { onDelete: "restrict" }),
   debitAmount: decimal("debit_amount", { precision: 20, scale: 2 }).default("0"),
@@ -1078,7 +1078,7 @@ export type SalesItem = typeof salesItems.$inferSelect;
 export const employeeBaleRates = pgTable("employee_bale_rates", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  employeeId: integer("employee_id").notNull(),
+  employeeId: integer("employee_id").notNull().references(() => employees.id, { onDelete: "restrict" }),
   locationId: integer("location_id").notNull().references(() => locations.id, { onDelete: "restrict" }),
   rate: decimal("rate", { precision: 10, scale: 4 }).notNull(),
   sourceCompanyId: integer("source_company_id"),
@@ -1091,7 +1091,7 @@ export type EmployeeBaleRate = typeof employeeBaleRates.$inferSelect;
 export const employeeBalePctRates = pgTable("employee_bale_pct_rates", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  employeeId: integer("employee_id").notNull(),
+  employeeId: integer("employee_id").notNull().references(() => employees.id, { onDelete: "restrict" }),
   locationId: integer("location_id").notNull().references(() => locations.id, { onDelete: "restrict" }),
   pct: decimal("pct", { precision: 10, scale: 4 }).notNull(),
   sourceCompanyId: integer("source_company_id"),
@@ -1204,7 +1204,7 @@ export const containerSales = pgTable("container_sales", {
   invoiceNumber: varchar("invoice_number", { length: 100 }),
   paymentStatus: text("payment_status").notNull().default("PENDING"),
   paidAmount: decimal("paid_amount", { precision: 20, scale: 2 }).notNull().default("0"),
-  voucherId: integer("voucher_id"),
+  voucherId: integer("voucher_id").references(() => vouchers.id, { onDelete: "restrict" }),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -1245,8 +1245,8 @@ export const interCompanyTransfers = pgTable("inter_company_transfers", {
   amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
   fromLedgerAccountId: integer("from_ledger_account_id").notNull(),
   toLedgerAccountId: integer("to_ledger_account_id").notNull(),
-  fromVoucherId: integer("from_voucher_id"),
-  toVoucherId: integer("to_voucher_id"),
+  fromVoucherId: integer("from_voucher_id").references(() => vouchers.id, { onDelete: "restrict" }),
+  toVoucherId: integer("to_voucher_id").references(() => vouchers.id, { onDelete: "restrict" }),
   description: text("description"),
   sourcePaymentId: integer("source_payment_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -1286,11 +1286,11 @@ export type IntercompanyPosConfig = typeof intercompanyPosConfigs.$inferSelect;
 export const salaryAdvances = pgTable("salary_advances", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  employeeId: integer("employee_id").notNull(),
+  employeeId: integer("employee_id").notNull().references(() => employees.id, { onDelete: "restrict" }),
   advanceDate: date("advance_date").notNull(),
   amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
   remainingBalance: decimal("remaining_balance", { precision: 15, scale: 2 }).notNull(),
-  voucherId: integer("voucher_id"),
+  voucherId: integer("voucher_id").references(() => vouchers.id, { onDelete: "restrict" }),
   notes: text("notes"),
   fullyPaid: boolean("fully_paid").notNull().default(false),
   isOpeningBalance: boolean("is_opening_balance").notNull().default(false),
@@ -3181,7 +3181,7 @@ export const customerOrderCharges = pgTable("customer_order_charges", {
   amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
   chargeType: text("charge_type").notNull().default("OTHER"),
   ledgerAccountId: integer("ledger_account_id"),
-  voucherId: integer("voucher_id"),
+  voucherId: integer("voucher_id").references(() => vouchers.id, { onDelete: "restrict" }),
 }, (t) => ({
   orderIdx: index("customer_order_charges_order_idx").on(t.orderId),
 }));
@@ -4196,7 +4196,7 @@ export type LiveSpreadsheet = typeof liveSpreadsheets.$inferSelect;
 export const erpWorkerDocs = pgTable("erp_worker_docs", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  employeeId: integer("employee_id").notNull(),
+  employeeId: integer("employee_id").notNull().references(() => employees.id, { onDelete: "restrict" }),
   fileName: text("file_name").notNull(),
   fileType: text("file_type").notNull(),
   fileSize: integer("file_size").notNull(),
@@ -4246,7 +4246,7 @@ export type ErpPayrollRun = typeof erpPayrollRuns.$inferSelect;
 export const erpPayrollRunItems = pgTable("erp_payroll_run_items", {
   id: serial("id").primaryKey(),
   runId: integer("run_id").notNull(),
-  employeeId: integer("employee_id").notNull(),
+  employeeId: integer("employee_id").notNull().references(() => employees.id, { onDelete: "restrict" }),
   employeeName: text("employee_name").notNull(),
   groupName: text("group_name"),
   baseSalary: decimal("base_salary", { precision: 18, scale: 2 }).notNull(),
@@ -4263,7 +4263,7 @@ export const wasteDispatches = pgTable("waste_dispatches", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
   locationId: integer("location_id").notNull().references(() => locations.id, { onDelete: "restrict" }),
-  voucherId: integer("voucher_id"),
+  voucherId: integer("voucher_id").references(() => vouchers.id, { onDelete: "restrict" }),
   dispatchNumber: text("dispatch_number").notNull(),
   dispatchDate: date("dispatch_date").notNull(),
   notes: text("notes"),
@@ -4562,7 +4562,7 @@ export const propertyPayments = pgTable("property_payments", {
   unitId: integer("unit_id").notNull(),
   ledgerRowId: integer("ledger_row_id"), // FK to propertyMonthlyLedger - which month it was applied to
   cashAccountId: integer("cash_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }), // FK to ledgerAccounts (the cash box used)
-  voucherId: integer("voucher_id"), // FK to vouchers - the Receipt voucher posted to main accounting
+  voucherId: integer("voucher_id").references(() => vouchers.id, { onDelete: "restrict" }), // FK to vouchers - the Receipt voucher posted to main accounting
   amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
   paymentDate: date("payment_date").notNull(),
   forYear: integer("for_year").notNull(),
@@ -4644,7 +4644,7 @@ export const factoryTransporterTransactions = pgTable("factory_transporter_trans
   description: text("description"),
   expenseAccountId: integer("expense_account_id"),
   cashAccountId: integer("cash_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }),
-  voucherId: integer("voucher_id"),
+  voucherId: integer("voucher_id").references(() => vouchers.id, { onDelete: "restrict" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   byTransporter: index("factory_transporter_tx_idx").on(t.transporterId),
