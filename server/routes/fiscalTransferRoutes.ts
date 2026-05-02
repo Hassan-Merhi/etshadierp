@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
+import { getClientDate } from "../lib/dateUtils";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries } from "./_helpers";
 import {
   inventory, stockItems, stockGroups, stockGroupArchives, stockItemCodeAliases,
@@ -665,7 +666,7 @@ export function registerFiscalTransferRoutes(app: Express) {
           }
           // Create Stock Transfer voucher, items, and update inventory atomically
           const voucherNumber = `ST-${Date.now()}`;
-          const effectiveDate = voucherDate || format(new Date(), "yyyy-MM-dd");
+          const effectiveDate = voucherDate || getClientDate(req);
 
           const txResult = await db.transaction(async (tx) => {
             const [newVoucher] = await tx

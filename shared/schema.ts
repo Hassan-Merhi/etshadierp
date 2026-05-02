@@ -772,7 +772,11 @@ export const voucherEntries = pgTable("voucher_entries", {
   creditAmount: decimal("credit_amount", { precision: 20, scale: 2 }).default("0"),
   narration: text("narration"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  voucherIdx: index("voucher_entries_voucher_idx").on(t.voucherId),
+  customerIdx: index("voucher_entries_customer_idx").on(t.customerId),
+  ledgerAccountIdx: index("voucher_entries_ledger_account_idx").on(t.ledgerAccountId),
+}));
 
 export const insertVoucherEntrySchema = createInsertSchema(voucherEntries).omit({
   id: true,

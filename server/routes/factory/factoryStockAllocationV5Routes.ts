@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
+import { getClientDate } from "../../lib/dateUtils";
 import {
   customerProformas,
   customerProformaLines,
@@ -469,7 +470,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
 
         let createdOrders: any[] = [];
         if (sendToLoading && names.length > 0) {
-          const today = new Date().toISOString().slice(0, 10);
+          const today = getClientDate(req);
           const orderValues = names.map((containerName: string) => ({
             companyId,
             customerId: Number(customerId),
@@ -581,7 +582,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         .where(eq(customerProformaLines.proformaId, proformaId));
 
       const result = await db.transaction(async (tx: any) => {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getClientDate(req);
         const orderValues = containerNames.map((containerName: string) => ({
           companyId,
           customerId: proforma.customerId,

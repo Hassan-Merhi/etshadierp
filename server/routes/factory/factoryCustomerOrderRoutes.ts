@@ -1153,29 +1153,36 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
             const chargeDesc = order.containerNumber
               ? `${name} for offloaded container - ${order.containerNumber}`
               : `${name} - ${updatedOrder.invoiceNumber}`;
-            const [chargeVoucher] = await db.insert(vouchers).values({
-              companyId,
-              voucherType: "Journal",
-              voucherNumber: chargeVoucherNumber,
-              voucherDate: updatedOrder.orderDate || getClientDate(req),
-              description: chargeDesc,
-              totalAmount: String(chargeAmt),
-              sourceModule: "FACTORY",
-            }).returning();
-            await db.insert(voucherEntries).values({
-              voucherId: chargeVoucher.id,
-              ledgerAccountId: customer.ledgerAccountId,
-              customerId: order.customerId,
-              debitAmount: String(chargeAmt),
-              creditAmount: "0",
-              narration: chargeDesc,
-            });
-            await db.insert(voucherEntries).values({
-              voucherId: chargeVoucher.id,
-              ledgerAccountId: resolvedLedgerAccountId,
-              debitAmount: "0",
-              creditAmount: String(chargeAmt),
-              narration: chargeDesc,
+            // Phase 6: atomic — voucher + entries + FK stamp must all commit together
+            // to avoid orphaned (unlinked) vouchers on mid-flight failure.
+            await db.transaction(async (tx: any) => {
+              const [chargeVoucher] = await tx.insert(vouchers).values({
+                companyId,
+                voucherType: "Journal",
+                voucherNumber: chargeVoucherNumber,
+                voucherDate: updatedOrder.orderDate || getClientDate(req),
+                description: chargeDesc,
+                totalAmount: String(chargeAmt),
+                sourceModule: "FACTORY",
+              }).returning();
+              await tx.insert(voucherEntries).values({
+                voucherId: chargeVoucher.id,
+                ledgerAccountId: customer.ledgerAccountId,
+                customerId: order.customerId,
+                debitAmount: String(chargeAmt),
+                creditAmount: "0",
+                narration: chargeDesc,
+              });
+              await tx.insert(voucherEntries).values({
+                voucherId: chargeVoucher.id,
+                ledgerAccountId: resolvedLedgerAccountId,
+                debitAmount: "0",
+                creditAmount: String(chargeAmt),
+                narration: chargeDesc,
+              });
+              await tx.update(customerOrderCharges)
+                .set({ voucherId: chargeVoucher.id })
+                .where(eq(customerOrderCharges.id, newCharge.id));
             });
           }
         }
@@ -1195,29 +1202,36 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           const chargeDesc = order.containerNumber
             ? `${name} for container - ${order.containerNumber}`
             : `${name} - Order #${orderId}`;
-          const [chargeVoucher] = await db.insert(vouchers).values({
-            companyId,
-            voucherType: "Journal",
-            voucherNumber: preVoucherNumber,
-            voucherDate: order.orderDate || getClientDate(req),
-            description: chargeDesc,
-            totalAmount: String(chargeAmt),
-            sourceModule: "FACTORY",
-          }).returning();
-          await db.insert(voucherEntries).values({
-            voucherId: chargeVoucher.id,
-            ledgerAccountId: customer.ledgerAccountId,
-            customerId: order.customerId,
-            debitAmount: String(chargeAmt),
-            creditAmount: "0",
-            narration: chargeDesc,
-          });
-          await db.insert(voucherEntries).values({
-            voucherId: chargeVoucher.id,
-            ledgerAccountId: resolvedLedgerAccountId,
-            debitAmount: "0",
-            creditAmount: String(chargeAmt),
-            narration: chargeDesc,
+          // Phase 6: atomic — voucher + entries + FK stamp must all commit together
+          // to avoid orphaned (unlinked) vouchers on mid-flight failure.
+          await db.transaction(async (tx: any) => {
+            const [chargeVoucher] = await tx.insert(vouchers).values({
+              companyId,
+              voucherType: "Journal",
+              voucherNumber: preVoucherNumber,
+              voucherDate: order.orderDate || getClientDate(req),
+              description: chargeDesc,
+              totalAmount: String(chargeAmt),
+              sourceModule: "FACTORY",
+            }).returning();
+            await tx.insert(voucherEntries).values({
+              voucherId: chargeVoucher.id,
+              ledgerAccountId: customer.ledgerAccountId,
+              customerId: order.customerId,
+              debitAmount: String(chargeAmt),
+              creditAmount: "0",
+              narration: chargeDesc,
+            });
+            await tx.insert(voucherEntries).values({
+              voucherId: chargeVoucher.id,
+              ledgerAccountId: resolvedLedgerAccountId,
+              debitAmount: "0",
+              creditAmount: String(chargeAmt),
+              narration: chargeDesc,
+            });
+            await tx.update(customerOrderCharges)
+              .set({ voucherId: chargeVoucher.id })
+              .where(eq(customerOrderCharges.id, newCharge.id));
           });
         }
       }
@@ -1277,6 +1291,12 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
 
+      // Phase 6: read FK linkage BEFORE deleting the charge so we can drop the linked voucher precisely
+      const [chargeRow] = await db.select({ voucherId: customerOrderCharges.voucherId })
+        .from(customerOrderCharges)
+        .where(and(eq(customerOrderCharges.orderId, orderId), eq(customerOrderCharges.id, chargeId)));
+      const linkedVoucherId = chargeRow?.voucherId ?? null;
+
       await db.delete(customerOrderCharges)
         .where(and(eq(customerOrderCharges.orderId, orderId), eq(customerOrderCharges.id, chargeId)));
 
@@ -1285,16 +1305,28 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
       const updatedCharges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
 
-      // Always clean up the PRE-voucher if one exists (covers PENDING/VERIFIED deletions,
-      // or edge cases where an order was never finalized but had a PRE voucher).
-      const preVoucherNum = `CHARGE-PRE-${orderId}-${chargeId}`;
-      const preVouchersToDelete = await db.select({ id: vouchers.id })
-        .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.voucherNumber, preVoucherNum)));
-      if (preVouchersToDelete.length > 0) {
-        const vIds = preVouchersToDelete.map((v: any) => v.id);
-        await db.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
-        await db.delete(vouchers).where(inArray(vouchers.id, vIds));
+      // Phase 6: prefer FK-based delete; fall back to voucherNumber pattern for legacy unbacked rows
+      let chargeVoucherIdsToDelete: number[] = [];
+      if (linkedVoucherId) {
+        chargeVoucherIdsToDelete.push(linkedVoucherId);
+      } else {
+        // Legacy fallback: PRE-voucher pattern + invoice-number pattern
+        const legacyPatterns: string[] = [`CHARGE-PRE-${orderId}-${chargeId}`];
+        if (order.invoiceNumber) legacyPatterns.push(`CHARGE-${order.invoiceNumber}-${chargeId}-%`);
+        const legacyMatches = await db.select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber })
+          .from(vouchers)
+          .where(and(
+            eq(vouchers.companyId, companyId),
+            sql`(${vouchers.voucherNumber} = ${legacyPatterns[0]}${
+              legacyPatterns.length > 1 ? sql` OR ${vouchers.voucherNumber} LIKE ${legacyPatterns[1]}` : sql``
+            })`,
+          ));
+        chargeVoucherIdsToDelete = legacyMatches.map((v: any) => v.id);
+      }
+
+      if (chargeVoucherIdsToDelete.length > 0) {
+        await db.delete(voucherEntries).where(inArray(voucherEntries.voucherId, chargeVoucherIdsToDelete));
+        await db.delete(vouchers).where(inArray(vouchers.id, chargeVoucherIdsToDelete));
       }
 
       // Sync customerBalances ledger entry if the order is already finalized
@@ -1311,23 +1343,6 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           await db.update(customerBalances)
             .set({ debitAmount: String(newGrandTotal), balance: String(newGrandTotal) })
             .where(eq(customerBalances.id, existingLedgerEntry.id));
-        }
-
-        // Delete the finalized charge voucher (invoice-number-based naming)
-        if (order.invoiceNumber) {
-          const chargeVoucherPattern = `CHARGE-${order.invoiceNumber}-${chargeId}-%`;
-          const chargeVouchersToDelete = await db.select({ id: vouchers.id })
-            .from(vouchers)
-            .where(and(
-              eq(vouchers.companyId, companyId),
-              eq(vouchers.sourceModule, "FACTORY"),
-              sql`${vouchers.voucherNumber} LIKE ${chargeVoucherPattern}`
-            ));
-          if (chargeVouchersToDelete.length > 0) {
-            const vIds = chargeVouchersToDelete.map((v: any) => v.id);
-            await db.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
-            await db.delete(vouchers).where(inArray(vouchers.id, vIds));
-          }
         }
       }
 
@@ -1586,6 +1601,11 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
                 await tx.update(voucherEntries)
                   .set({ narration: chargeDesc })
                   .where(eq(voucherEntries.voucherId, preVoucher.id));
+                // Phase 6: ensure the charge.voucherId FK points at the renamed voucher
+                // (it should already, from the PRE-create stamp, but stay defensive for legacy data)
+                await tx.update(customerOrderCharges)
+                  .set({ voucherId: preVoucher.id })
+                  .where(eq(customerOrderCharges.id, charge.id));
               } else {
                 // No PRE-voucher — charge was added before this feature or on a DRAFT order
                 const [chargeVoucher] = await tx.insert(vouchers).values({
@@ -1614,6 +1634,10 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
                   creditAmount: String(chargeAmount),
                   narration: chargeDesc,
                 });
+                // Phase 6: stamp FK
+                await tx.update(customerOrderCharges)
+                  .set({ voucherId: chargeVoucher.id })
+                  .where(eq(customerOrderCharges.id, charge.id));
               }
             }
           }
@@ -2438,16 +2462,32 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           eq(customerBalances.transactionType, "SALE"),
         ));
 
-        // Delete charge journal vouchers created during finalization (voucherNumber starts with CHARGE-[invoiceNumber]-)
+        // Phase 6: delete charge journal vouchers via FK linkage; fall back to invoice-number
+        // pattern for legacy unbacked rows. After delete, clear the FK on the charge rows so
+        // they can be re-finalized later without dangling references.
+        const linkedChargeRows = await tx.select({ id: customerOrderCharges.id, voucherId: customerOrderCharges.voucherId })
+          .from(customerOrderCharges)
+          .where(and(eq(customerOrderCharges.orderId, orderId), sql`${customerOrderCharges.voucherId} IS NOT NULL`));
+        const linkedVoucherIds = linkedChargeRows.map((r: any) => r.voucherId).filter(Boolean);
+
+        if (linkedVoucherIds.length > 0) {
+          await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, linkedVoucherIds));
+          await tx.delete(vouchers).where(inArray(vouchers.id, linkedVoucherIds));
+          await tx.update(customerOrderCharges)
+            .set({ voucherId: null })
+            .where(and(eq(customerOrderCharges.orderId, orderId), sql`${customerOrderCharges.voucherId} IS NOT NULL`));
+        }
+
+        // Legacy fallback for charge vouchers that were never FK-linked
         if (order.invoiceNumber) {
-          const chargeVouchers = await tx.select({ id: vouchers.id })
+          const legacyChargeVouchers = await tx.select({ id: vouchers.id })
             .from(vouchers)
             .where(and(
               eq(vouchers.companyId, companyId),
               eq(vouchers.sourceModule, "FACTORY"),
               sql`${vouchers.voucherNumber} LIKE ${"CHARGE-" + order.invoiceNumber + "-%"}`,
             ));
-          for (const cv of chargeVouchers) {
+          for (const cv of legacyChargeVouchers) {
             await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, cv.id));
             await tx.delete(vouchers).where(eq(vouchers.id, cv.id));
           }
