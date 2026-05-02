@@ -629,7 +629,7 @@ let migrationsDone = false;
     `CREATE TABLE IF NOT EXISTS employee_advance_repayments (
       id serial PRIMARY KEY,
       company_id integer NOT NULL,
-      advance_id integer NOT NULL REFERENCES employee_advances(id),
+      advance_id integer NOT NULL REFERENCES employee_advances(id) ON DELETE CASCADE,
       employee_id integer NOT NULL,
       repayment_date date NOT NULL,
       amount decimal(20,2) NOT NULL,
@@ -1943,6 +1943,26 @@ let migrationsDone = false;
     `DO $$ BEGIN ALTER TABLE factory_bale_cost_snapshots ADD CONSTRAINT factory_bale_cost_snapshots_bale_id_fkey FOREIGN KEY (bale_id) REFERENCES factory_bales(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE bale_recode_items ADD CONSTRAINT bale_recode_items_session_id_fkey FOREIGN KEY (session_id) REFERENCES bale_recode_sessions(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE salary_advance_deductions ADD CONSTRAINT salary_advance_deductions_salary_advance_id_fkey FOREIGN KEY (salary_advance_id) REFERENCES salary_advances(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+
+    // ── F-Phase 3 (May 2026) — 12 more FOREIGN KEY constraints (data integrity) ──
+    // Same pattern/safety as F-Phase 2: orphan-clean in dev, idempotent on re-run.
+    // Note: employee_advance_repayments.advance_id ALSO appears in the inline
+    // REFERENCES of its CREATE TABLE above (line ~632) — that inline clause
+    // already includes ON DELETE CASCADE so a fresh DB and an existing DB
+    // converge to the same FK. Existing DBs (where the inline REFERENCES never
+    // ran or ran without ON DELETE) get the correct constraint via the ALTER below.
+    `DO $$ BEGIN ALTER TABLE credit_note_items ADD CONSTRAINT credit_note_items_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE sales_items ADD CONSTRAINT sales_items_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE stock_adjustment_vouchers ADD CONSTRAINT stock_adjustment_vouchers_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE customer_order_bale_removals ADD CONSTRAINT customer_order_bale_removals_order_id_fkey FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE customer_order_expected_lines ADD CONSTRAINT customer_order_expected_lines_order_id_fkey FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE customer_balances ADD CONSTRAINT customer_balances_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE customer_logos ADD CONSTRAINT customer_logos_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE customer_proformas ADD CONSTRAINT customer_proformas_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_v3_load_bales ADD CONSTRAINT factory_v3_load_bales_bale_id_fkey FOREIGN KEY (bale_id) REFERENCES factory_bales(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE employee_advance_repayments ADD CONSTRAINT employee_advance_repayments_advance_id_fkey FOREIGN KEY (advance_id) REFERENCES employee_advances(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_advance_repayments ADD CONSTRAINT factory_advance_repayments_advance_id_fkey FOREIGN KEY (advance_id) REFERENCES factory_worker_advances(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE stock_adjustment_items ADD CONSTRAINT stock_adjustment_items_adjustment_id_fkey FOREIGN KEY (adjustment_id) REFERENCES stock_adjustment_vouchers(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

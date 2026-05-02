@@ -823,7 +823,7 @@ export type VoucherEntry = typeof voucherEntries.$inferSelect;
 // Credit/Debit Note Items - tracks which stock items are returned with which voucher
 export const creditNoteItems = pgTable("credit_note_items", {
   id: serial("id").primaryKey(),
-  voucherId: integer("voucher_id").notNull(),
+  voucherId: integer("voucher_id").notNull().references(() => vouchers.id, { onDelete: "cascade" }),
   stockItemId: integer("stock_item_id").notNull(),
   locationId: integer("location_id").notNull(),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
@@ -941,7 +941,7 @@ export type StockTransferItem = typeof stockTransferItems.$inferSelect;
 // Stock Adjustment Vouchers (Production/Consumption)
 export const stockAdjustmentVouchers = pgTable("stock_adjustment_vouchers", {
   id: serial("id").primaryKey(),
-  voucherId: integer("voucher_id").notNull(),
+  voucherId: integer("voucher_id").notNull().references(() => vouchers.id, { onDelete: "cascade" }),
   locationId: integer("location_id").notNull(),
   adjustmentType: text("adjustment_type").notNull(), // "Production" or "Consumption"
   notes: text("notes"),
@@ -963,7 +963,7 @@ export type StockAdjustmentVoucher = typeof stockAdjustmentVouchers.$inferSelect
 // Stock Adjustment Items
 export const stockAdjustmentItems = pgTable("stock_adjustment_items", {
   id: serial("id").primaryKey(),
-  adjustmentId: integer("adjustment_id").notNull(),
+  adjustmentId: integer("adjustment_id").notNull().references(() => stockAdjustmentVouchers.id, { onDelete: "cascade" }),
   stockItemId: integer("stock_item_id").notNull(),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(), // Positive for production, negative for consumption
   rate: decimal("rate", { precision: 15, scale: 2 }).notNull(),
@@ -1045,7 +1045,7 @@ export type UpdateStockAdjustment = z.infer<typeof updateStockAdjustmentSchema>;
 // Sales Items - tracks item-level details for POS sales
 export const salesItems = pgTable("sales_items", {
   id: serial("id").primaryKey(),
-  voucherId: integer("voucher_id").notNull(),
+  voucherId: integer("voucher_id").notNull().references(() => vouchers.id, { onDelete: "cascade" }),
   stockItemId: integer("stock_item_id").notNull(),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
   sellingPrice: decimal("selling_price", { precision: 15, scale: 6 }).notNull(),
@@ -1783,7 +1783,7 @@ export type BaleTransferItem = typeof baleTransferItems.$inferSelect;
 export const customerBalances = pgTable("customer_balances", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  customerId: integer("customer_id").notNull(),
+  customerId: integer("customer_id").notNull().references(() => customers.id, { onDelete: "restrict" }),
   transactionDate: date("transaction_date").notNull(),
   transactionType: text("transaction_type").notNull(),
   referenceId: integer("reference_id"),
@@ -2325,7 +2325,7 @@ export type BaleLabelPrint = typeof baleLabelPrints.$inferSelect;
 export const customerLogos = pgTable("customer_logos", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  customerId: integer("customer_id").notNull(),
+  customerId: integer("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 100 }).notNull(),
   filePath: varchar("file_path", { length: 500 }).notNull(),
   mimeType: varchar("mime_type", { length: 50 }).notNull(),
@@ -2996,7 +2996,7 @@ export type FactoryDutyAuditLog = typeof factoryDutyAuditLog.$inferSelect;
 export const customerProformas = pgTable("customer_proformas", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  customerId: integer("customer_id").notNull(),
+  customerId: integer("customer_id").notNull().references(() => customers.id, { onDelete: "restrict" }),
   name: text("name").notNull(),
   isActive: boolean("is_active").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -3149,7 +3149,7 @@ export type CustomerOrderBale = typeof customerOrderBales.$inferSelect;
 export const customerOrderExpectedLines = pgTable("customer_order_expected_lines", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  orderId: integer("order_id").notNull(),
+  orderId: integer("order_id").notNull().references(() => customerOrders.id, { onDelete: "cascade" }),
   proformaId: integer("proforma_id"),
   proformaLineId: integer("proforma_line_id"),
   articleCode: varchar("article_code", { length: 50 }).notNull(),
@@ -3643,7 +3643,7 @@ export type FactoryWorkerAdvance = typeof factoryWorkerAdvances.$inferSelect;
 export const factoryAdvanceRepayments = pgTable("factory_advance_repayments", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  advanceId: integer("advance_id").notNull().references(() => factoryWorkerAdvances.id),
+  advanceId: integer("advance_id").notNull().references(() => factoryWorkerAdvances.id, { onDelete: "cascade" }),
   workerId: integer("worker_id").notNull(),
   repaymentDate: date("repayment_date").notNull(),
   amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
@@ -4664,7 +4664,7 @@ export type FactoryTransporterTransaction = typeof factoryTransporterTransaction
 // Records every bale removed from a customer order so it's visible in the UI
 export const customerOrderBaleRemovals = pgTable("customer_order_bale_removals", {
   id: serial("id").primaryKey(),
-  orderId: integer("order_id").notNull(),
+  orderId: integer("order_id").notNull().references(() => customerOrders.id, { onDelete: "cascade" }),
   baleId: integer("bale_id").notNull(),
   referenceNumber: varchar("reference_number", { length: 100 }).notNull(),
   articleCode: varchar("article_code", { length: 50 }),
@@ -4757,7 +4757,7 @@ export type InsertFactoryV3Load = z.infer<typeof insertFactoryV3LoadSchema>;
 export const factoryV3LoadBales = pgTable("factory_v3_load_bales", {
   id: serial("id").primaryKey(),
   loadId: integer("load_id").notNull(),
-  baleId: integer("bale_id").notNull(),
+  baleId: integer("bale_id").notNull().references(() => factoryBales.id, { onDelete: "cascade" }),
   baleReference: varchar("bale_reference", { length: 100 }).notNull(),
   articleCode: varchar("article_code", { length: 50 }),
   productName: text("product_name"),
