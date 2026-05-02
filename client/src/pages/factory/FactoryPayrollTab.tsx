@@ -2,7 +2,7 @@ import { useState, useMemo, type Dispatch, type SetStateAction } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import {
-  Play, CheckCircle2, Clock, DollarSign, ChevronDown, ChevronRight, X, Users, Trash2, CalendarDays, Printer, RotateCcw, Wrench, FileDown,
+  Play, CheckCircle2, Clock, DollarSign, ChevronDown, ChevronRight, X, Users, Trash2, CalendarDays, Printer, RotateCcw, Wrench, FileDown, ShieldCheck,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
@@ -253,6 +253,8 @@ export default function FactoryPayrollTab() {
   const [undoTargetId, setUndoTargetId] = useState<number | null>(null);
   const [deleteBatchGroup, setDeleteBatchGroup] = useState<PayrollGroup | null>(null);
   const [showCompletedBatches, setShowCompletedBatches] = useState(false);
+  const [repairOpen, setRepairOpen] = useState(false);
+  const [repairResult, setRepairResult] = useState<{ deletedPayrollVouchers: number; deletedAdvanceVouchers: number; total: number } | null>(null);
   const [fixAcctOpen, setFixAcctOpen] = useState(false);
   const [fixAcctTargetId, setFixAcctTargetId] = useState<number | null>(null);
   const [fixAcctCashId, setFixAcctCashId] = useState("");
@@ -527,6 +529,22 @@ export default function FactoryPayrollTab() {
     },
   });
 
+  const repairMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/factory/repair-orphaned-vouchers", {});
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Repair failed");
+      return data as { deletedPayrollVouchers: number; deletedAdvanceVouchers: number; total: number; message: string };
+    },
+    onSuccess: (data) => {
+      setRepairResult(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      toast({ title: "Ledger repaired", description: `${data.total} orphaned voucher${data.total !== 1 ? "s" : ""} removed` });
+    },
+    onError: (e: Error) => toast({ title: "Repair failed", description: e.message, variant: "destructive" }),
+  });
+
   const fixAcctMutation = useMutation({
     mutationFn: async ({ id, cashId }: { id: number; cashId: string }) => {
       const res = await apiRequest("PATCH", `/api/factory/payrolls/${id}/fix-accounting`, {
@@ -620,6 +638,10 @@ export default function FactoryPayrollTab() {
               Pay {selectedIds.size} Selected
             </Button>
           )}
+          <Button variant="outline" onClick={() => { setRepairResult(null); setRepairOpen(true); }} data-testid="button-repair-ledger" title="Remove stale ledger entries from previously undone payrolls/advances">
+            <ShieldCheck className="h-4 w-4 mr-2" />
+            Repair Ledger
+          </Button>
           <Button onClick={() => setRunOpen(true)} data-testid="button-run-payroll">
             <Play className="h-4 w-4 mr-2" />
             Run Payroll
@@ -1268,6 +1290,45 @@ export default function FactoryPayrollTab() {
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Repair Ledger Dialog */}
+      <Dialog open={repairOpen} onOpenChange={(open) => { if (!open) setRepairOpen(false); }}>
+        <DialogContent data-testid="dialog-repair-ledger">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-green-600" />
+              Repair Ledger
+            </DialogTitle>
+            <DialogDescription>
+              This scans for payment vouchers that were left behind when payrolls were undone or advances were deleted — the ones making your cash account balance incorrect. It will permanently remove them from the ledger.
+            </DialogDescription>
+          </DialogHeader>
+
+          {repairResult && (
+            <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
+              <p className="font-medium text-foreground">Repair complete</p>
+              <p className="text-muted-foreground">Payroll payment vouchers removed: <span className="font-semibold text-foreground">{repairResult.deletedPayrollVouchers}</span></p>
+              <p className="text-muted-foreground">Advance payment vouchers removed: <span className="font-semibold text-foreground">{repairResult.deletedAdvanceVouchers}</span></p>
+              <p className="text-muted-foreground">Total removed: <span className="font-semibold text-foreground">{repairResult.total}</span></p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRepairOpen(false)}>
+              {repairResult ? "Close" : "Cancel"}
+            </Button>
+            {!repairResult && (
+              <Button
+                onClick={() => repairMutation.mutate()}
+                disabled={repairMutation.isPending}
+                data-testid="button-confirm-repair"
+              >
+                {repairMutation.isPending ? "Scanning & repairing..." : "Run Repair"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

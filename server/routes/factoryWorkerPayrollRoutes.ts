@@ -2397,4 +2397,101 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // POST /api/factory/repair-orphaned-vouchers
+  // Finds and deletes vouchers that were created for payroll/advance events that have
+  // since been undone or deleted, leaving stale ledger entries (wrong cash balance etc).
+  app.post("/api/factory/repair-orphaned-vouchers", requireAuth, async (req: any, res: any) => {
+    try {
+      const currentRole = (req.session as any).currentRole;
+      if (!["Admin", "Owner", "Developer"].includes(currentRole)) {
+        return res.status(403).json({ message: "Only Admin, Owner, or Developer can run ledger repair" });
+      }
+      const companyId = req.body.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      let deletedPayrollVouchers = 0;
+      let deletedAdvanceVouchers = 0;
+
+      await db.transaction(async (tx: any) => {
+        // ── PAYMENT-PAY-{payrollId}-{ts} ────────────────────────────────────────
+        // Should exist only when the referenced payroll is in PAID status.
+        // If the payroll is DRAFT, APPROVED, or deleted → the voucher is orphaned.
+        const payVouchers = await tx
+          .select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber })
+          .from(vouchers)
+          .where(and(
+            eq(vouchers.companyId, companyId),
+            sql`${vouchers.voucherNumber} LIKE 'PAYMENT-PAY-%'`,
+          ));
+
+        const orphanedPayVoucherIds: number[] = [];
+        for (const v of payVouchers) {
+          const parts = v.voucherNumber.split("-");
+          const payrollId = parseInt(parts[2]);
+          if (!payrollId || isNaN(payrollId)) {
+            orphanedPayVoucherIds.push(v.id);
+            continue;
+          }
+          const [payroll] = await tx
+            .select({ status: factoryPayrolls.status })
+            .from(factoryPayrolls)
+            .where(and(eq(factoryPayrolls.id, payrollId), eq(factoryPayrolls.companyId, companyId)));
+          if (!payroll || payroll.status !== "PAID") {
+            orphanedPayVoucherIds.push(v.id);
+          }
+        }
+
+        if (orphanedPayVoucherIds.length > 0) {
+          await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, orphanedPayVoucherIds));
+          await tx.delete(vouchers).where(inArray(vouchers.id, orphanedPayVoucherIds));
+          deletedPayrollVouchers = orphanedPayVoucherIds.length;
+        }
+
+        // ── PAYMENT-ADV-{advanceId}-{ts} ────────────────────────────────────────
+        // Should exist only when the referenced advance still exists in the table.
+        // If the advance was deleted → the voucher is orphaned.
+        const advVouchers = await tx
+          .select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber })
+          .from(vouchers)
+          .where(and(
+            eq(vouchers.companyId, companyId),
+            sql`${vouchers.voucherNumber} LIKE 'PAYMENT-ADV-%'`,
+          ));
+
+        const orphanedAdvVoucherIds: number[] = [];
+        for (const v of advVouchers) {
+          const parts = v.voucherNumber.split("-");
+          const advanceId = parseInt(parts[2]);
+          if (!advanceId || isNaN(advanceId)) {
+            orphanedAdvVoucherIds.push(v.id);
+            continue;
+          }
+          const [advance] = await tx
+            .select({ id: factoryWorkerAdvances.id })
+            .from(factoryWorkerAdvances)
+            .where(and(eq(factoryWorkerAdvances.id, advanceId), eq(factoryWorkerAdvances.companyId, companyId)));
+          if (!advance) {
+            orphanedAdvVoucherIds.push(v.id);
+          }
+        }
+
+        if (orphanedAdvVoucherIds.length > 0) {
+          await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, orphanedAdvVoucherIds));
+          await tx.delete(vouchers).where(inArray(vouchers.id, orphanedAdvVoucherIds));
+          deletedAdvanceVouchers = orphanedAdvVoucherIds.length;
+        }
+      });
+
+      res.json({
+        message: "Ledger repair complete",
+        deletedPayrollVouchers,
+        deletedAdvanceVouchers,
+        total: deletedPayrollVouchers + deletedAdvanceVouchers,
+      });
+    } catch (error: any) {
+      console.error("Repair orphaned vouchers error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
 }
