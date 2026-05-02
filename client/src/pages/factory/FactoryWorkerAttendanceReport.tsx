@@ -696,7 +696,7 @@ export default function FactoryWorkerAttendanceReport() {
             </Card>
           ) : (
             /* ── Attendance grid ────────────────────────────────────────────── */
-            <div className="overflow-auto rounded-md border print:overflow-visible print:border-0">
+            <div className="overflow-x-auto rounded-md border print:overflow-visible print:border-0">
               <table className="w-full text-xs border-collapse min-w-max print:text-[9px]">
                 <thead>
                   <tr className="bg-muted print:bg-gray-100">
