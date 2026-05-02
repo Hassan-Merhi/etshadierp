@@ -2073,6 +2073,12 @@ let migrationsDone = false;
     `DO $$ BEGIN ALTER TABLE factory_supplier_payments ADD CONSTRAINT factory_supplier_payments_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES factory_suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE factory_supplier_score_snapshots ADD CONSTRAINT factory_supplier_score_snapshots_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES factory_suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE factory_waste_entries ADD CONSTRAINT factory_waste_entries_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES factory_suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+
+    // ── F-Phase 4f (May 2026) — voucher_entries.factory_supplier_id ──
+    // 2 orphan rows (ids 15999, 16001 — voucher_ids 4468/4469, factory_supplier_id=10 NASSRA, dated 2026-03-10) NULL'd in dev (preserves voucher accounting balance, only severs the dangling pointer).
+    // The cleanup statement is idempotent (uses WHERE factory_supplier_id=10 AND id IN (...)) and runs BEFORE the FK so prod can apply cleanly even if it has the same orphans.
+    `UPDATE voucher_entries SET factory_supplier_id = NULL WHERE id IN (15999, 16001) AND factory_supplier_id = 10;`,
+    `DO $$ BEGIN ALTER TABLE voucher_entries ADD CONSTRAINT voucher_entries_factory_supplier_id_fkey FOREIGN KEY (factory_supplier_id) REFERENCES factory_suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

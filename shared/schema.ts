@@ -790,7 +790,7 @@ export const voucherEntries = pgTable("voucher_entries", {
   supplierId: integer("supplier_id").references(() => suppliers.id, { onDelete: "restrict" }),
   employeeId: integer("employee_id"),
   customerId: integer("customer_id"),
-  factorySupplierId: integer("factory_supplier_id"),
+  factorySupplierId: integer("factory_supplier_id").references(() => factorySuppliers.id, { onDelete: "restrict" }),
   debitAmount: decimal("debit_amount", { precision: 20, scale: 2 }).default("0"),
   creditAmount: decimal("credit_amount", { precision: 20, scale: 2 }).default("0"),
   narration: text("narration"),
