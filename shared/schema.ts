@@ -400,7 +400,7 @@ export type StockItem = typeof stockItems.$inferSelect;
 export const stockItemCodeAliases = pgTable("stock_item_code_aliases", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  stockItemId: integer("stock_item_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "cascade" }),
   aliasCode: varchar("alias_code", { length: 50 }).notNull(),
   description: text("description"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -649,7 +649,7 @@ export const inventory = pgTable("inventory", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
   locationId: integer("location_id").notNull(),
-  stockItemId: integer("stock_item_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "restrict" }),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull().default("0"),
   averageRate: decimal("average_rate", { precision: 20, scale: 2 }).notNull().default("0"),
   totalValue: decimal("total_value", { precision: 20, scale: 2 }).notNull().default("0"),
@@ -824,7 +824,7 @@ export type VoucherEntry = typeof voucherEntries.$inferSelect;
 export const creditNoteItems = pgTable("credit_note_items", {
   id: serial("id").primaryKey(),
   voucherId: integer("voucher_id").notNull().references(() => vouchers.id, { onDelete: "cascade" }),
-  stockItemId: integer("stock_item_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "restrict" }),
   locationId: integer("location_id").notNull(),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
   rate: decimal("rate", { precision: 20, scale: 2 }).notNull(),
@@ -916,7 +916,7 @@ export type StockTransferVoucher = typeof stockTransferVouchers.$inferSelect;
 export const stockTransferItems = pgTable("stock_transfer_items", {
   id: serial("id").primaryKey(),
   transferId: integer("transfer_id").notNull(),
-  stockItemId: integer("stock_item_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "restrict" }),
   sourceLocationId: integer("source_location_id"),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
   rate: decimal("rate", { precision: 15, scale: 2 }).notNull(),
@@ -964,7 +964,7 @@ export type StockAdjustmentVoucher = typeof stockAdjustmentVouchers.$inferSelect
 export const stockAdjustmentItems = pgTable("stock_adjustment_items", {
   id: serial("id").primaryKey(),
   adjustmentId: integer("adjustment_id").notNull().references(() => stockAdjustmentVouchers.id, { onDelete: "cascade" }),
-  stockItemId: integer("stock_item_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "restrict" }),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(), // Positive for production, negative for consumption
   rate: decimal("rate", { precision: 15, scale: 2 }).notNull(),
   totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
@@ -999,7 +999,7 @@ export const stockTransferRevisions = pgTable("stock_transfer_revisions", {
 export const stockTransferRevisionItems = pgTable("stock_transfer_revision_items", {
   id: serial("id").primaryKey(),
   revisionId: integer("revision_id").notNull(),
-  stockItemId: integer("stock_item_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "restrict" }),
   stockItemName: text("stock_item_name").notNull(),
   sourceLocationId: integer("source_location_id"),
   sourceLocationName: text("source_location_name"),
@@ -1046,7 +1046,7 @@ export type UpdateStockAdjustment = z.infer<typeof updateStockAdjustmentSchema>;
 export const salesItems = pgTable("sales_items", {
   id: serial("id").primaryKey(),
   voucherId: integer("voucher_id").notNull().references(() => vouchers.id, { onDelete: "cascade" }),
-  stockItemId: integer("stock_item_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "restrict" }),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
   sellingPrice: decimal("selling_price", { precision: 15, scale: 6 }).notNull(),
   costPrice: decimal("cost_price", { precision: 15, scale: 2 }).notNull(),
@@ -1133,7 +1133,7 @@ export type DraftPosSale = typeof draftPosSales.$inferSelect;
 export const draftPosSaleItems = pgTable("draft_pos_sale_items", {
   id: serial("id").primaryKey(),
   draftId: integer("draft_id").notNull(),
-  stockItemId: integer("stock_item_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "cascade" }),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
   rate: decimal("rate", { precision: 15, scale: 2 }).notNull(),
   amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
@@ -1823,7 +1823,7 @@ export type CustomerBalance = typeof customerBalances.$inferSelect;
 // Stock Item Location Prices - allows different selling prices per location
 export const stockItemLocationPrices = pgTable("stock_item_location_prices", {
   id: serial("id").primaryKey(),
-  stockItemId: integer("stock_item_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "cascade" }),
   locationId: integer("location_id").notNull(),
   sellingPrice: decimal("selling_price", { precision: 15, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -1998,7 +1998,7 @@ export type StockGroupLocationArchive = typeof stockGroupLocationArchives.$infer
 export const stockGroupLocationArchiveItems = pgTable("stock_group_location_archive_items", {
   id: serial("id").primaryKey(),
   archiveId: integer("archive_id").notNull(),
-  stockItemId: integer("stock_item_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "restrict" }),
   stockItemCode: varchar("stock_item_code", { length: 50 }).notNull(),
   stockItemName: text("stock_item_name").notNull(),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
@@ -4279,7 +4279,7 @@ export type WasteDispatch = typeof wasteDispatches.$inferSelect;
 export const wasteDispatchItems = pgTable("waste_dispatch_items", {
   id: serial("id").primaryKey(),
   dispatchId: integer("dispatch_id").notNull(),
-  stockItemId: integer("stock_item_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "restrict" }),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
   rate: decimal("rate", { precision: 15, scale: 2 }).notNull(),
   totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
