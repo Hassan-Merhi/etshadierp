@@ -32,10 +32,12 @@ const ACTIVE_ORDER_STATUSES = ["DRAFT", "LOADING", "PENDING_VERIFICATION", "VERI
 //                   (all statuses where bales were actually scanned in)
 const TOTAL_LOADED_STATUSES = ["LOADING", "PENDING_VERIFICATION", "VERIFIED", "FINALIZED"];
 
-// V5 formula (Phase A — interim, to be corrected in Phase B/C):
+// V5 formula (Phase B — corrected):
 //   stockAvailable  = IN_STOCK bales
-//   totalLoaded     = bales scanned into TOTAL_LOADED_STATUSES orders
-//   expectedToLoad  = sum per article of (line.qty × linked active order count)
+//   totalLoaded     = bales scanned into LOADING containers (status = 'LOADING')
+//   expectedToLoad  = remaining expected for DRAFT + LOADING containers:
+//                       DRAFT:   expected_qty (loaded = 0)
+//                       LOADING: max(expected_qty − loaded_qty, 0)
 //   freeToPromise   = stockAvailable − expectedToLoad − totalLoaded
 //     < 0 → shortage (need more bales)   → red
 //     = 0 → exactly covered              → neutral
@@ -312,15 +314,26 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         ordersByProformaId.get(o.proformaId)!.push(o);
       }
 
-      // expectedToLoad: sum of expected_qty from customer_order_expected_lines for DRAFT orders ONLY.
-      // Phase B change: replaces old (line.qty × containerCount) formula.
-      // Only DRAFT orders contribute — LOADING/PENDING/VERIFIED/FINALIZED do NOT inflate Expected to Load.
+      // expectedToLoad: remaining expected quantity for DRAFT + LOADING containers.
+      //   DRAFT:   remaining = expected_qty          (loaded = 0 by definition)
+      //   LOADING: remaining = max(expected_qty − loaded_qty, 0)
+      //   PENDING_VERIFICATION / VERIFIED / FINALIZED: excluded — bales already SOLD
+      //   CANCELLED: excluded
+      //
+      // Available Balance = stockAvailable − expectedToLoad − totalLoaded
+      // This prevents showing free bales that are still needed to complete active containers.
       // V5 guard: proformaIdUsed IS NOT NULL (allExpectedLines already filtered to active V5 orders)
-      const draftOrderIds = new Set(ordersByProforma.filter(o => o.status === "DRAFT").map(o => o.id));
+      const activeDraftLoadingIds = new Set(
+        ordersByProforma.filter(o => o.status === "DRAFT" || o.status === "LOADING").map(o => o.id),
+      );
       const expectedMap = new Map<string, number>();
       allExpectedLines.forEach(el => {
-        if (!draftOrderIds.has(el.orderId)) return;
-        expectedMap.set(el.articleCode, (expectedMap.get(el.articleCode) ?? 0) + el.expectedQty);
+        if (!activeDraftLoadingIds.has(el.orderId)) return;
+        const loaded = loadedBalesByOrder.find(
+          b => b.orderId === el.orderId && b.articleCode === el.articleCode,
+        )?.count ?? 0;
+        const remaining = Math.max(el.expectedQty - loaded, 0);
+        expectedMap.set(el.articleCode, (expectedMap.get(el.articleCode) ?? 0) + remaining);
       });
 
       // 10. Build rows — union of all known codes (including zero-stock active products)
@@ -344,12 +357,14 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               // Phase B: use locked-in per-container expected qty from customer_order_expected_lines.
               // Falls back to lineQty if no expected line exists (e.g. order pre-dates Phase B backfill).
               const containerExpectedQty = perContainerExpectedMap.get(`${o.id}__${articleCode}`) ?? lineQty;
+              const remainingQty = Math.max(containerExpectedQty - loadedBales, 0);
               return {
                 orderId: o.id,
                 containerName: o.containerNumber ?? `Container #${o.id}`,
                 status: o.status,
                 expectedQty: containerExpectedQty,
                 loadedQty: loadedBales,
+                remainingQty,
               };
             });
             // totalExpected: sum of locked-in per-container expected qty for this article

@@ -19,6 +19,7 @@ interface ContainerDetail {
   status: string;
   expectedQty: number;
   loadedQty: number;
+  remainingQty: number;
 }
 interface ProformaDetail {
   proformaId: number;
@@ -580,8 +581,11 @@ export default function FactoryStockAllocationV5() {
                                     </Badge>
                                     <span className="text-muted-foreground tabular-nums">
                                       {c.loadedQty}/{c.expectedQty}
-                                      {c.loadedQty < c.expectedQty && (
-                                        <span className="text-amber-500 ml-1">-{c.expectedQty - c.loadedQty}</span>
+                                      {c.remainingQty > 0 && (
+                                        <span className="text-amber-500 ml-1">-{c.remainingQty}</span>
+                                      )}
+                                      {c.remainingQty === 0 && c.expectedQty > 0 && (
+                                        <span className="text-green-500 ml-1">✓</span>
                                       )}
                                     </span>
                                     {(c.status === "DRAFT" || c.status === "LOADING") && (
