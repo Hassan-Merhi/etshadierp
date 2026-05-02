@@ -915,7 +915,7 @@ export type StockTransferVoucher = typeof stockTransferVouchers.$inferSelect;
 // Stock Transfer Items
 export const stockTransferItems = pgTable("stock_transfer_items", {
   id: serial("id").primaryKey(),
-  transferId: integer("transfer_id").notNull(),
+  transferId: integer("transfer_id").notNull().references(() => stockTransferVouchers.id, { onDelete: "restrict" }),
   stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "restrict" }),
   sourceLocationId: integer("source_location_id"),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),

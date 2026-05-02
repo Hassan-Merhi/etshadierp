@@ -2156,6 +2156,15 @@ let migrationsDone = false;
     `DO $$ BEGIN ALTER TABLE factory_invoice_loading_sessions ADD CONSTRAINT factory_invoice_loading_sessions_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE factory_pos_sales ADD CONSTRAINT factory_pos_sales_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE voucher_entries ADD CONSTRAINT voucher_entries_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+
+    // ── F-Phase 4l (May 2026) — stock_transfer_items.transfer_id (1 FK, NOT VALID — non-destructive future-only enforcement) ──
+    // 953 pre-existing orphan rows ($659K total value, Nov 26 – Dec 31 2025, across 35 deleted parent transfers, ids 72–218).
+    // We CANNOT determine retroactively whether each deleted parent had inventory_applied=true (real stock moved → these items are audit history) or false (pure metadata).
+    // Per user safety mandate ("100% safe, no data loss"), we use NOT VALID: existing orphans preserved untouched, audit trail intact.
+    // NOT VALID means: future inserts/updates ARE checked against the FK (no new orphans can be created), but existing rows are tolerated.
+    // Could be promoted to fully-validated later via `ALTER TABLE ... VALIDATE CONSTRAINT ...` once a remediation plan exists, but that's a separate manual decision.
+    // Idempotent: ALTER guarded by EXCEPTION duplicate_object.
+    `DO $$ BEGIN ALTER TABLE stock_transfer_items ADD CONSTRAINT stock_transfer_items_transfer_id_fkey FOREIGN KEY (transfer_id) REFERENCES stock_transfer_vouchers(id) ON DELETE RESTRICT NOT VALID; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
