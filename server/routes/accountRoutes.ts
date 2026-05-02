@@ -57,6 +57,21 @@ export function registerAccountRoutes(app: Express) {
       const employees = await storage.getAllEmployees(companyId);
       const suppliers = isFactoryCompany ? [] : await storage.getAllSuppliers();
 
+      // Build a map of ledgerAccountId → customer opening balance.
+      // For customer-linked ledger accounts, the customer record is the
+      // authoritative source of opening balance — the ledger account's own
+      // openingBalance may have drifted (e.g. edited directly in Accounts page).
+      const companyCustomers = await storage.getAllCustomers(companyId);
+      const customerObMap = new Map<number, { openingBalance: string; openingBalanceSide: string | null }>();
+      for (const cust of companyCustomers) {
+        if (cust.ledgerAccountId) {
+          customerObMap.set(cust.ledgerAccountId, {
+            openingBalance: cust.openingBalance ?? "0",
+            openingBalanceSide: cust.openingBalanceSide ?? "Dr",
+          });
+        }
+      }
+
       // Optional date range filter for account balances
       const balStartDate = req.query.startDate as string | undefined;
       const balEndDate = req.query.endDate as string | undefined;
@@ -189,9 +204,15 @@ export function registerAccountRoutes(app: Express) {
             debits: 0,
             credits: 0,
           };
+          // If this ledger account is linked to a customer, use the customer's
+          // opening balance as the authoritative source (may differ from the
+          // ledger account's own openingBalance if edited directly).
+          const custOb = customerObMap.get(account.id);
+          const effectiveOB = custOb?.openingBalance ?? account.openingBalance ?? "0";
+          const effectiveOBSide = custOb?.openingBalanceSide ?? account.openingBalanceSide;
           const { balance, balanceSide } = calculateBalance(
-            account.openingBalance || "0",
-            account.openingBalanceSide,
+            effectiveOB,
+            effectiveOBSide,
             movements.debits,
             movements.credits,
           );
@@ -206,8 +227,8 @@ export function registerAccountRoutes(app: Express) {
             subType: account.subType,
             balance: balance.toFixed(2),
             balanceSide,
-            openingBalance: parseFloat(account.openingBalance || "0"),
-            openingBalanceSide: account.openingBalanceSide || "Dr",
+            openingBalance: parseFloat(effectiveOB),
+            openingBalanceSide: effectiveOBSide || "Dr",
             active: account.active,
             parentId: account.parentId,
           };
@@ -766,7 +787,15 @@ export function registerAccountRoutes(app: Express) {
         credits += parseFloat(tx.creditAmount || "0");
       }
 
-      const balance = (parseFloat(account.openingBalance || "0") * (account.openingBalanceSide === "Cr" ? -1 : 1)) + debits - credits;
+      // Use the customer's opening balance if this ledger account is linked to one
+      const [linkedCustomer] = await db
+        .select({ ob: customers.openingBalance, side: customers.openingBalanceSide })
+        .from(customers)
+        .where(eq(customers.ledgerAccountId, ledgerAccountId))
+        .limit(1);
+      const rawOB = parseFloat((linkedCustomer?.ob ?? account.openingBalance) || "0");
+      const rawSide = linkedCustomer?.side ?? account.openingBalanceSide;
+      const balance = (rawOB * (rawSide === "Cr" ? -1 : 1)) + debits - credits;
 
       res.json({ balance });
     } catch (error: any) {
@@ -1077,8 +1106,15 @@ export function registerAccountRoutes(app: Express) {
       if (accountType === "ledger") {
         const [acct] = await db.select({ ob: ledgerAccounts.openingBalance, side: ledgerAccounts.openingBalanceSide })
           .from(ledgerAccounts).where(eq(ledgerAccounts.id, accountId));
-        rawOB = parseFloat(acct?.ob ?? "0") || 0;
-        obSide = acct?.side ?? "Dr";
+        // If this ledger account is linked to a customer, the customer's
+        // opening balance is the authoritative source of truth.
+        const [linkedCust] = await db
+          .select({ ob: customers.openingBalance, side: customers.openingBalanceSide })
+          .from(customers)
+          .where(eq(customers.ledgerAccountId, accountId))
+          .limit(1);
+        rawOB = parseFloat((linkedCust?.ob ?? acct?.ob) ?? "0") || 0;
+        obSide = linkedCust?.side ?? acct?.side ?? "Dr";
       } else if (accountType === "bank") {
         const [acct] = await db.select({ ob: bankAccounts.openingBalance, side: bankAccounts.openingBalanceSide })
           .from(bankAccounts).where(eq(bankAccounts.id, accountId));

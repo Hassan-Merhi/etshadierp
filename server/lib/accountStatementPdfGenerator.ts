@@ -63,8 +63,15 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
     rawEntries = await storage.getVoucherEntriesByLedger(accountId, startDate, endDate);
     const [acct] = await db.select().from(ledgerAccounts).where(eq(ledgerAccounts.id, accountId));
     accountName = acct?.name ?? "Ledger Account";
-    rawOB = parseFloat(acct?.openingBalance ?? "0") || 0;
-    obSide = acct?.openingBalanceSide ?? "Dr";
+    // If this ledger account is linked to a customer, the customer's
+    // opening balance is the authoritative source of truth.
+    const [linkedCust] = await db
+      .select({ openingBalance: customers.openingBalance, openingBalanceSide: customers.openingBalanceSide })
+      .from(customers)
+      .where(eq(customers.ledgerAccountId, accountId))
+      .limit(1);
+    rawOB = parseFloat((linkedCust?.openingBalance ?? acct?.openingBalance) ?? "0") || 0;
+    obSide = linkedCust?.openingBalanceSide ?? acct?.openingBalanceSide ?? "Dr";
   } else if (accountType === "bank") {
     rawEntries = await storage.getVoucherEntriesByBankAccount(accountId, startDate, endDate);
     const [acct] = await db.select().from(bankAccounts).where(eq(bankAccounts.id, accountId));
