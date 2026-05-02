@@ -1850,6 +1850,79 @@ let migrationsDone = false;
     `CREATE INDEX IF NOT EXISTS factory_sheets_company_idx ON factory_sheets (company_id)`,
     `CREATE INDEX IF NOT EXISTS factory_v3_loads_company_idx ON factory_v3_loads (company_id)`,
     `CREATE INDEX IF NOT EXISTS factory_invoice_loading_bales_company_idx ON factory_invoice_loading_bales (company_id)`,
+
+    // ── F-Phase 0 (May 2026) — Add missing PRIMARY KEY (id) constraints ──
+    // Historical drift: ~143 tables in dev (and presumably prod) were created
+    // with `id integer NOT NULL DEFAULT nextval(...)` but no PRIMARY KEY
+    // constraint. PostgreSQL refuses ADD FOREIGN KEY against an unconstrained
+    // column, blocking F-Phase 2/3 (FK constraints).
+    //
+    // Idempotent: loops over every public table with an `id` column but no
+    // PRIMARY KEY and adds one. No-op on a clean DB.
+    //
+    // Failure-handling design (per code-review feedback):
+    //   - Inner per-table EXCEPTION collects failures into an array instead of
+    //     silently swallowing them, so the outer migration-runner's
+    //     "Migration skipped: …" log line carries the actual cause.
+    //   - Mandatory post-check at end: if ANY table still lacks a PK after
+    //     the loop, RAISE EXCEPTION with the failed-table list. This bubbles
+    //     up to the outer try/catch in runMigrations() (loud, visible signal
+    //     in Render logs), instead of pretending success.
+    //   - On a healthy boot the post-check sees 0 missing PKs and the block
+    //     exits silently.
+    `DO $f_phase0$
+     DECLARE
+       r record;
+       failed text[] := ARRAY[]::text[];
+       still_missing int;
+     BEGIN
+       FOR r IN
+         SELECT t.table_name
+         FROM information_schema.tables t
+         WHERE t.table_schema = 'public' AND t.table_type = 'BASE TABLE'
+           AND EXISTS (
+             SELECT 1 FROM information_schema.columns c
+             WHERE c.table_schema = t.table_schema
+               AND c.table_name = t.table_name
+               AND c.column_name = 'id'
+           )
+           AND NOT EXISTS (
+             SELECT 1 FROM information_schema.table_constraints tc
+             WHERE tc.table_schema = t.table_schema
+               AND tc.table_name = t.table_name
+               AND tc.constraint_type = 'PRIMARY KEY'
+           )
+       LOOP
+         BEGIN
+           EXECUTE format('ALTER TABLE public.%I ADD PRIMARY KEY (id)', r.table_name);
+         EXCEPTION WHEN others THEN
+           failed := failed || (r.table_name || ': ' || SQLERRM);
+         END;
+       END LOOP;
+
+       -- Mandatory post-check: re-count tables still missing a PK.
+       SELECT count(*) INTO still_missing
+       FROM information_schema.tables t
+       WHERE t.table_schema = 'public' AND t.table_type = 'BASE TABLE'
+         AND EXISTS (
+           SELECT 1 FROM information_schema.columns c
+           WHERE c.table_schema = t.table_schema
+             AND c.table_name = t.table_name
+             AND c.column_name = 'id'
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM information_schema.table_constraints tc
+           WHERE tc.table_schema = t.table_schema
+             AND tc.table_name = t.table_name
+             AND tc.constraint_type = 'PRIMARY KEY'
+         );
+
+       IF still_missing > 0 THEN
+         RAISE EXCEPTION 'F-Phase 0 INCOMPLETE: % tables still missing PRIMARY KEY. Failures: %',
+           still_missing, COALESCE(array_to_string(failed, ' | '), '(none captured)');
+       END IF;
+     END
+     $f_phase0$;`,
   ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
