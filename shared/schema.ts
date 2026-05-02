@@ -35,7 +35,9 @@ export const exchangeRates = pgTable("exchange_rates", {
   rate: decimal("rate", { precision: 20, scale: 6 }).notNull(),
   effectiveDate: date("effective_date").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("exchange_rates_company_idx").on(t.companyId),
+}));
 
 export const insertExchangeRateSchema = createInsertSchema(exchangeRates).omit({
   id: true,
@@ -67,7 +69,9 @@ export const userCompanyRoles = pgTable("user_company_roles", {
   daybookEditDays: integer("daybook_edit_days").notNull().default(0),
   canAccessCustomers: boolean("can_access_customers").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("user_company_roles_company_idx").on(t.companyId),
+}));
 
 export const insertUserCompanyRoleSchema = createInsertSchema(userCompanyRoles).omit({
   id: true,
@@ -87,7 +91,9 @@ export const userLocations = pgTable("user_locations", {
   companyId: integer("company_id").notNull(),
   locationId: integer("location_id").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("user_locations_company_idx").on(t.companyId),
+}));
 
 export const insertUserLocationSchema = createInsertSchema(userLocations).omit({
   id: true,
@@ -146,7 +152,9 @@ export const locations = pgTable("locations", {
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   whatsappGroupChatId: text("whatsapp_group_chat_id"),
-});
+}, (t) => ({
+  companyIdx: index("locations_company_idx").on(t.companyId),
+}));
 
 export const insertLocationSchema = createInsertSchema(locations).omit({
   id: true,
@@ -226,7 +234,9 @@ export const employees = pgTable("employees", {
   balesBonusRate: decimal("bales_bonus_rate", { precision: 10, scale: 4 }),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("employees_company_idx").on(t.companyId),
+}));
 
 export const insertEmployeeSchema = createInsertSchema(employees).omit({
   id: true,
@@ -263,7 +273,9 @@ export const employeeGroups = pgTable("employee_groups", {
   groupType: text("group_type").notNull().default("Employee"), // "Employee" or "Worker"
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("employee_groups_company_idx").on(t.companyId),
+}));
 
 export const insertEmployeeGroupSchema = createInsertSchema(employeeGroups).omit({
   id: true,
@@ -423,7 +435,9 @@ export const bankAccounts = pgTable("bank_accounts", {
   active: boolean("active").notNull().default(true),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("bank_accounts_company_idx").on(t.companyId),
+}));
 
 export const insertBankAccountSchema = createInsertSchema(bankAccounts).omit({
   id: true,
@@ -453,7 +467,9 @@ export const fixedAssets = pgTable("fixed_assets", {
   openingBalance: decimal("opening_balance", { precision: 15, scale: 2 }),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("fixed_assets_company_idx").on(t.companyId),
+}));
 
 export const insertFixedAssetSchema = createInsertSchema(fixedAssets).omit({
   id: true,
@@ -499,7 +515,9 @@ export const containers = pgTable("containers", {
   docReceived: boolean("doc_received").default(false),
   trackingDescription: text("tracking_description"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("containers_company_idx").on(t.companyId),
+}));
 
 export const insertContainerSchema = createInsertSchema(containers).omit({
   id: true,
@@ -532,7 +550,9 @@ export const purchaseOrders = pgTable("purchase_orders", {
   chargesEdited: boolean("charges_edited").default(false),
   status: text("status").notNull().default("Open"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("purchase_orders_company_idx").on(t.companyId),
+}));
 
 export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({
   id: true,
@@ -635,6 +655,7 @@ export const inventory = pgTable("inventory", {
   totalValue: decimal("total_value", { precision: 20, scale: 2 }).notNull().default("0"),
   lastUpdated: timestamp("last_updated").notNull().defaultNow(),
 }, (t) => ({
+  companyIdx: index("inventory_company_idx").on(t.companyId),
   uniqueLocationItem: uniqueIndex("inventory_location_item_unique").on(t.locationId, t.stockItemId),
 }));
 
@@ -734,7 +755,9 @@ export const vouchers = pgTable("vouchers", {
   isCreditSale: boolean("is_credit_sale").default(false),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("vouchers_company_idx").on(t.companyId),
+}));
 
 export const insertVoucherSchema = createInsertSchema(vouchers).omit({
   id: true,
@@ -1059,7 +1082,9 @@ export const employeeBaleRates = pgTable("employee_bale_rates", {
   locationId: integer("location_id").notNull(),
   rate: decimal("rate", { precision: 10, scale: 4 }).notNull(),
   sourceCompanyId: integer("source_company_id"),
-});
+}, (t) => ({
+  companyIdx: index("employee_bale_rates_company_idx").on(t.companyId),
+}));
 export type EmployeeBaleRate = typeof employeeBaleRates.$inferSelect;
 
 // Per-employee, per-location sales bonus % rates
@@ -1070,7 +1095,9 @@ export const employeeBalePctRates = pgTable("employee_bale_pct_rates", {
   locationId: integer("location_id").notNull(),
   pct: decimal("pct", { precision: 10, scale: 4 }).notNull(),
   sourceCompanyId: integer("source_company_id"),
-});
+}, (t) => ({
+  companyIdx: index("employee_bale_pct_rates_company_idx").on(t.companyId),
+}));
 export type EmployeeBalePctRate = typeof employeeBalePctRates.$inferSelect;
 
 // Draft POS Sales - stores unsaved POS transactions for later completion
@@ -1268,7 +1295,9 @@ export const salaryAdvances = pgTable("salary_advances", {
   fullyPaid: boolean("fully_paid").notNull().default(false),
   isOpeningBalance: boolean("is_opening_balance").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("salary_advances_company_idx").on(t.companyId),
+}));
 
 export const insertSalaryAdvanceSchema = createInsertSchema(salaryAdvances).omit({
   id: true,
@@ -1314,7 +1343,9 @@ export const dashboardCashAccounts = pgTable("dashboard_cash_accounts", {
   accountId: integer("account_id").notNull(),
   displayOrder: integer("display_order").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("dashboard_cash_accounts_company_idx").on(t.companyId),
+}));
 
 export const insertDashboardCashAccountSchema = createInsertSchema(dashboardCashAccounts).omit({
   id: true,
@@ -1336,7 +1367,9 @@ export const dashboardPayableAccounts = pgTable("dashboard_payable_accounts", {
   accountId: integer("account_id").notNull(),
   displayOrder: integer("display_order").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("dashboard_payable_accounts_company_idx").on(t.companyId),
+}));
 
 export const insertDashboardPayableAccountSchema = createInsertSchema(dashboardPayableAccounts).omit({
   id: true,
@@ -1490,7 +1523,9 @@ export const mixBatches = pgTable("mix_batches", {
   status: text("status").notNull().default("ACTIVE"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("mix_batches_company_idx").on(t.companyId),
+}));
 
 export const insertMixBatchSchema = createInsertSchema(mixBatches).omit({
   id: true,
@@ -1622,7 +1657,9 @@ export const pressingBatches = pgTable("pressing_batches", {
   finalizedAt: timestamp("finalized_at"),
   finalizedLocationId: integer("finalized_location_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("pressing_batches_company_idx").on(t.companyId),
+}));
 
 export const insertPressingBatchSchema = createInsertSchema(pressingBatches).omit({
   id: true,
@@ -1693,7 +1730,9 @@ export const baleTransfers = pgTable("bale_transfers", {
   status: text("status").notNull().default("PENDING"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("bale_transfers_company_idx").on(t.companyId),
+}));
 
 export const insertBaleTransferSchema = createInsertSchema(baleTransfers).omit({
   id: true,
@@ -1757,6 +1796,7 @@ export const customerBalances = pgTable("customer_balances", {
   rowNote: text("row_note"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
+  companyIdx: index("customer_balances_company_idx").on(t.companyId),
   customerCompanyIdx: index("customer_balances_customer_company_idx").on(t.customerId, t.companyId),
 }));
 
@@ -1942,7 +1982,9 @@ export const stockGroupLocationArchives = pgTable("stock_group_location_archives
   restoredAt: timestamp("restored_at"),
   deletedAt: timestamp("deleted_at"),
   notes: text("notes"),
-});
+}, (t) => ({
+  companyIdx: index("stock_group_location_archives_company_idx").on(t.companyId),
+}));
 
 export const insertStockGroupLocationArchiveSchema = createInsertSchema(stockGroupLocationArchives).omit({
   id: true,
@@ -2171,7 +2213,9 @@ export const posShifts = pgTable("pos_shifts", {
   salesTotal: decimal("sales_total", { precision: 20, scale: 2 }).default("0"),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("pos_shifts_company_idx").on(t.companyId),
+}));
 
 export const insertPosShiftSchema = createInsertSchema(posShifts).omit({
   id: true,
@@ -2211,6 +2255,7 @@ export const posOfflineQueue = pgTable("pos_offline_queue", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   processedAt: timestamp("processed_at"),
 }, (t) => ({
+  companyIdx: index("pos_offline_queue_company_idx").on(t.companyId),
   uniqueClientId: uniqueIndex("pos_offline_queue_client_unique").on(t.clientId),
 }));
 
@@ -2287,7 +2332,9 @@ export const customerLogos = pgTable("customer_logos", {
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("customer_logos_company_idx").on(t.companyId),
+}));
 
 export const insertCustomerLogoSchema = createInsertSchema(customerLogos).omit({
   id: true,
@@ -2483,7 +2530,9 @@ export const factoryContainers = pgTable("factory_containers", {
   preOffloadOtherChargesSupplierId: integer("pre_offload_other_charges_supplier_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("factory_containers_company_idx").on(t.companyId),
+}));
 
 export const insertFactoryContainerSchema = createInsertSchema(factoryContainers).omit({
   id: true,
@@ -2539,6 +2588,7 @@ export const factoryOffloadAdditionalCharges = pgTable("factory_offload_addition
   supplierId: integer("supplier_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
+  companyIdx: index("factory_offload_additional_charges_company_idx").on(t.companyId),
   containerIdx: index("factory_offload_addl_charges_container_idx").on(t.containerId),
 }));
 
@@ -2554,6 +2604,7 @@ export const factoryContainerOtherCharges = pgTable("factory_container_other_cha
   ledgerAccountId: integer("ledger_account_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
+  companyIdx: index("factory_container_other_charges_company_idx").on(t.companyId),
   containerIdx: index("factory_container_other_charges_container_idx").on(t.containerId),
 }));
 
@@ -2615,7 +2666,9 @@ export const factoryRawMaterialAdjustments = pgTable("factory_raw_material_adjus
   materialLabel: varchar("material_label", { length: 200 }), // for standalone manual materials
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("factory_raw_material_adjustments_company_idx").on(t.companyId),
+}));
 
 export type FactoryRawMaterialAdjustment = typeof factoryRawMaterialAdjustments.$inferSelect;
 
@@ -2631,7 +2684,9 @@ export const factorySupplierPayments = pgTable("factory_supplier_payments", {
   paidFromAccountId: integer("paid_from_account_id"),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("factory_supplier_payments_company_idx").on(t.companyId),
+}));
 
 export const insertFactorySupplierPaymentSchema = createInsertSchema(factorySupplierPayments).omit({
   id: true,
@@ -2654,7 +2709,9 @@ export const factorySupplierFxTransfers = pgTable("factory_supplier_fx_transfers
   notes: text("notes"),
   sourceType: text("source_type"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("factory_supplier_fx_transfers_company_idx").on(t.companyId),
+}));
 
 export const insertFactorySupplierFxTransferSchema = createInsertSchema(factorySupplierFxTransfers).omit({
   id: true,
@@ -2699,7 +2756,9 @@ export const factoryMixBatches = pgTable("factory_mix_batches", {
   carryForwardFromId: integer("carry_forward_from_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("factory_mix_batches_company_idx").on(t.companyId),
+}));
 
 export const insertFactoryMixBatchSchema = createInsertSchema(factoryMixBatches).omit({
   id: true,
@@ -2763,7 +2822,9 @@ export const factoryDailyUsages = pgTable("factory_daily_usages", {
   usedDate: date("used_date").notNull(),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("factory_daily_usages_company_idx").on(t.companyId),
+}));
 
 export const insertFactoryDailyUsageSchema = createInsertSchema(factoryDailyUsages).omit({
   id: true,
@@ -2785,7 +2846,9 @@ export const factoryPressingBatches = pgTable("factory_pressing_batches", {
   finalizedAt: timestamp("finalized_at"),
   finalizedLocationId: integer("finalized_location_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("factory_pressing_batches_company_idx").on(t.companyId),
+}));
 
 export const insertFactoryPressingBatchSchema = createInsertSchema(factoryPressingBatches).omit({
   id: true,
@@ -2881,7 +2944,9 @@ export const factoryBaleImportBatches = pgTable("factory_bale_import_batches", {
   importedByName: text("imported_by_name"),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("factory_bale_import_batches_company_idx").on(t.companyId),
+}));
 
 export const insertFactoryBaleImportBatchSchema = createInsertSchema(factoryBaleImportBatches).omit({
   id: true,
@@ -2922,7 +2987,9 @@ export const factoryDutyAuditLog = pgTable("factory_duty_audit_log", {
   notes: text("notes"),
   updatedByUserId: text("updated_by_user_id").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("factory_duty_audit_log_company_idx").on(t.companyId),
+}));
 
 export type FactoryDutyAuditLog = typeof factoryDutyAuditLog.$inferSelect;
 
@@ -2935,6 +3002,7 @@ export const customerProformas = pgTable("customer_proformas", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
+  companyIdx: index("customer_proformas_company_idx").on(t.companyId),
   customerCompanyIdx: index("customer_proformas_customer_company_idx").on(t.customerId, t.companyId),
 }));
 
@@ -3233,6 +3301,7 @@ export const containerDocuments = pgTable("container_documents", {
   uploadedBy: varchar("uploaded_by"),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
 }, (t) => ({
+  companyIdx: index("container_documents_company_idx").on(t.companyId),
   containerIdx: index("container_docs_container_idx").on(t.containerId),
 }));
 
@@ -3267,6 +3336,7 @@ export const containerFreight = pgTable("container_freight", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
+  companyIdx: index("container_freight_company_idx").on(t.companyId),
   containerIdx: index("container_freight_container_idx").on(t.containerId),
 }));
 
@@ -3301,6 +3371,7 @@ export const containerFreightPayments = pgTable("container_freight_payments", {
   createdBy: integer("created_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
+  companyIdx: index("container_freight_payments_company_idx").on(t.companyId),
   freightIdx: index("freight_payments_freight_idx").on(t.containerFreightId),
 }));
 
@@ -3613,7 +3684,9 @@ export const factoryWorkerDocuments = pgTable("factory_worker_documents", {
   // server redeploys/restarts (Render & Replit have ephemeral disks).
   fileData: text("file_data"),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("factory_worker_documents_company_idx").on(t.companyId),
+}));
 
 export type FactoryWorkerDocument = typeof factoryWorkerDocuments.$inferSelect;
 
@@ -3902,7 +3975,9 @@ export const supplierProformas = pgTable("supplier_proformas", {
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("supplier_proformas_company_idx").on(t.companyId),
+}));
 
 export const insertSupplierProformaSchema = createInsertSchema(supplierProformas).omit({
   id: true,
@@ -3971,7 +4046,9 @@ export const fileFolders = pgTable("file_folders", {
   companyId: integer("company_id").notNull(),
   name: text("name").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("file_folders_company_idx").on(t.companyId),
+}));
 export const insertFileFolderSchema = createInsertSchema(fileFolders).omit({ id: true, createdAt: true });
 export type InsertFileFolder = z.infer<typeof insertFileFolderSchema>;
 export type FileFolder = typeof fileFolders.$inferSelect;
@@ -3988,7 +4065,9 @@ export const storedFiles = pgTable("stored_files", {
   description: text("description"),
   uploadedBy: varchar("uploaded_by"),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("stored_files_company_idx").on(t.companyId),
+}));
 
 export const insertStoredFileSchema = createInsertSchema(storedFiles).omit({
   id: true,
@@ -4016,7 +4095,9 @@ export const spreadsheets = pgTable("spreadsheets", {
   data: jsonb("data").notNull().default([]),
   createdBy: text("created_by"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("spreadsheets_company_idx").on(t.companyId),
+}));
 
 export const insertSpreadsheetSchema = createInsertSchema(spreadsheets).omit({
   id: true,
@@ -4044,7 +4125,9 @@ export const baleRecodeSessions = pgTable("bale_recode_sessions", {
   validRows: integer("valid_rows").notNull().default(0),
   invalidRows: integer("invalid_rows").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("bale_recode_sessions_company_idx").on(t.companyId),
+}));
 
 export const insertBaleRecodeSessionSchema = createInsertSchema(baleRecodeSessions).omit({
   id: true,
@@ -4089,7 +4172,9 @@ export const liveSpreadsheets = pgTable("live_spreadsheets", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("live_spreadsheets_company_idx").on(t.companyId),
+}));
 
 export const insertLiveSpreadsheetSchema = createInsertSchema(liveSpreadsheets).omit({
   id: true,
@@ -4118,7 +4203,9 @@ export const erpWorkerDocs = pgTable("erp_worker_docs", {
   description: text("description"),
   uploadedBy: text("uploaded_by"),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("erp_worker_docs_company_idx").on(t.companyId),
+}));
 
 export const insertErpWorkerDocSchema = createInsertSchema(erpWorkerDocs).omit({
   id: true,
@@ -4147,7 +4234,9 @@ export const erpPayrollRuns = pgTable("erp_payroll_runs", {
   paymentAccountId: integer("payment_account_id"),
   paidAt: text("paid_at"),
   createdAt: text("created_at").notNull(),
-});
+}, (t) => ({
+  companyIdx: index("erp_payroll_runs_company_idx").on(t.companyId),
+}));
 
 export const insertErpPayrollRunSchema = createInsertSchema(erpPayrollRuns).omit({ id: true });
 export type InsertErpPayrollRun = z.infer<typeof insertErpPayrollRunSchema>;
@@ -4179,7 +4268,9 @@ export const wasteDispatches = pgTable("waste_dispatches", {
   notes: text("notes"),
   totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull().default("0"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("waste_dispatches_company_idx").on(t.companyId),
+}));
 
 export const insertWasteDispatchSchema = createInsertSchema(wasteDispatches).omit({ id: true, createdAt: true });
 export type InsertWasteDispatch = z.infer<typeof insertWasteDispatchSchema>;
@@ -4210,7 +4301,9 @@ export const factoryBaleWasteDispatches = pgTable("factory_bale_waste_dispatches
   totalCostWrittenOff: decimal("total_cost_written_off", { precision: 15, scale: 2 }).notNull().default("0"),
   createdBy: integer("created_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("factory_bale_waste_dispatches_company_idx").on(t.companyId),
+}));
 
 export const insertFactoryBaleWasteDispatchSchema = createInsertSchema(factoryBaleWasteDispatches).omit({ id: true, createdAt: true });
 export type InsertFactoryBaleWasteDispatch = z.infer<typeof insertFactoryBaleWasteDispatchSchema>;
@@ -4235,7 +4328,9 @@ export const factoryPosSales = pgTable("factory_pos_sales", {
   createdBy: integer("created_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   expensesJson: text("expenses_json"),
-});
+}, (t) => ({
+  companyIdx: index("factory_pos_sales_company_idx").on(t.companyId),
+}));
 
 export const insertFactoryPosSaleSchema = createInsertSchema(factoryPosSales).omit({ id: true, createdAt: true }).extend({
   companyId: z.number().min(1),
@@ -4267,7 +4362,9 @@ export const factoryPosSaleItems = pgTable("factory_pos_sale_items", {
   unitPrice: decimal("unit_price", { precision: 20, scale: 2 }).notNull().default("0"),
   totalAmount: decimal("total_amount", { precision: 20, scale: 2 }).notNull().default("0"),
   currencyCode: varchar("currency_code", { length: 10 }).notNull().default("USD"),
-});
+}, (t) => ({
+  companyIdx: index("factory_pos_sale_items_company_idx").on(t.companyId),
+}));
 export const insertFactoryPosSaleItemSchema = createInsertSchema(factoryPosSaleItems).omit({ id: true });
 export type InsertFactoryPosSaleItem = z.infer<typeof insertFactoryPosSaleItemSchema>;
 export type FactoryPosSaleItem = typeof factoryPosSaleItems.$inferSelect;
@@ -4278,7 +4375,9 @@ export const factoryWorkerCategories = pgTable("factory_worker_categories", {
   name: varchar("name", { length: 200 }).notNull(),
   workerIds: jsonb("worker_ids").notNull().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("factory_worker_categories_company_idx").on(t.companyId),
+}));
 
 export const insertFactoryWorkerCategorySchema = createInsertSchema(factoryWorkerCategories).omit({
   id: true,
@@ -4441,6 +4540,7 @@ export const propertyMonthlyLedger = pgTable("property_monthly_ledger", {
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
+  companyIdx: index("property_monthly_ledger_company_idx").on(t.companyId),
   uniqContractPeriod: uniqueIndex("property_monthly_ledger_unique").on(t.contractId, t.year, t.month),
   byUnit: index("property_monthly_ledger_unit_idx").on(t.unitId),
 }));
@@ -4584,7 +4684,9 @@ export const locationPriceGroups = pgTable("location_price_groups", {
   masterLocationId: integer("master_location_id").notNull(),
   followerLocationId: integer("follower_location_id").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("location_price_groups_company_idx").on(t.companyId),
+}));
 
 export const insertLocationPriceGroupSchema = createInsertSchema(locationPriceGroups).omit({
   id: true,
@@ -4605,7 +4707,9 @@ export const factorySheets = pgTable("factory_sheets", {
   columns: jsonb("columns").notNull().default([]),
   rows: jsonb("rows").notNull().default([]),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  companyIdx: index("factory_sheets_company_idx").on(t.companyId),
+}));
 
 export const insertFactorySheetSchema = createInsertSchema(factorySheets).omit({
   id: true,
@@ -4635,7 +4739,9 @@ export const factoryV3Loads = pgTable("factory_v3_loads", {
   finalizedBy: integer("finalized_by"),
   finalizedByName: text("finalized_by_name"),
   cancelledAt: timestamp("cancelled_at"),
-});
+}, (t) => ({
+  companyIdx: index("factory_v3_loads_company_idx").on(t.companyId),
+}));
 
 export const insertFactoryV3LoadSchema = createInsertSchema(factoryV3Loads).omit({
   id: true,
@@ -4735,6 +4841,7 @@ export const factoryInvoiceLoadingBales = pgTable("factory_invoice_loading_bales
   scannedByName: text("scanned_by_name"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
+  companyIdx: index("factory_invoice_loading_bales_company_idx").on(t.companyId),
   sessionIdx: index("factory_invoice_loading_bales_session_idx").on(t.sessionId),
   invoiceIdx: index("factory_invoice_loading_bales_invoice_idx").on(t.invoiceId),
   baleIdx: index("factory_invoice_loading_bales_bale_idx").on(t.baleId),

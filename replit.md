@@ -207,6 +207,24 @@ Pending (require user approval):
 - Phase 9 — combine 4 factory-override queries into one + add indexes (perf only)
 - Phase 11 — server-side timezone consolidation refactor
 
+## Security & Data-Integrity Audit (May 2026)
+
+A 52-finding audit was applied across batches A–G, G2, F. Code-level fixes (batches A–G, G2) are committed and ship via the normal deploy. Schema/index changes follow a different path described below.
+
+- **Batches A–E, G, G2** — input validation, authZ, CSRF, file-upload safety, rate-limiting, secret hygiene, error redaction, etc. (committed).
+- **Batch F-Phase 1 (May 2026) — Composite indexes on tenant scoping**:
+  - 59 `companyIdx: index("<table>_company_idx").on(t.companyId)` entries added to `shared/schema.ts` covering every multi-tenant table missing one.
+  - All 59 `CREATE INDEX IF NOT EXISTS` DDLs applied to dev DB in a single transaction.
+  - The same 59 DDLs are also wired into the runtime startup `migrations` array in `server/index.ts` (just before the array close, marked with a `F-Phase 1 (May 2026)` comment) so they run automatically on every fresh boot — including production — using the same idempotent path the rest of the schema uses.
+  - Substantial improvement to per-tenant query performance with zero behavioural change.
+- **Batch F-Phase 2 (FK constraints) — DEFERRED**:
+  - 12 clean FK constraints (e.g. `voucher_entries.voucher_id → vouchers.id`, `customer_orders.customer_id → customers.id`, etc.) were prepared with orphan checks (all clean) and per-FK `ON DELETE` semantics chosen.
+  - Blocked by a pre-existing dev-DB drift issue: most tenant parent tables (`vouchers`, `customers`, `companies`, `customer_orders`, `factory_bales`, `purchase_orders`, `container_offloads`, `stock_items`, `factory_bale_products`) currently have **no PRIMARY KEY constraint** in dev (only auto-generated NOT-NULL CHECKs and a `*_id_seq` sequence on the id column). PostgreSQL refuses `ADD CONSTRAINT FOREIGN KEY` against an unconstrained column.
+  - Schema.ts was reverted for these 12 FKs to avoid breaking deployment if production exhibits the same PK gap.
+  - Resolution path (separate future batch, requires user approval): audit prod DB PK presence; if missing, apply `ALTER TABLE … ADD PRIMARY KEY (id)` after verifying id uniqueness; then re-apply Phase 2 FK additions to both schema.ts and DBs.
+- **Batch F-Phase 3 (long-tail FKs)** — deferred (also blocked by missing PKs).
+- **Pre-existing migration approach**: the dev DB is bootstrapped via raw `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE ADD COLUMN IF NOT EXISTS` SQL embedded in `server/index.ts` (the `migrations` array), NOT via `drizzle-kit push`. `drizzle-kit push` is currently blocked by drift (e.g. `fiscal_period_closures` has fewer columns in dev than in schema). Schema.ts edits are still authoritative for any future clean rebuild but are NOT auto-applied at runtime.
+
 ## External Dependencies
 
 -   **AI/ML**: Google Gemini API
