@@ -745,10 +745,19 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
   });
 
   // GET /api/factory/uploads/workers/:filename - Serve worker photos
-  app.get("/api/factory/uploads/workers/:filename", (req: any, res: any) => {
+  app.get("/api/factory/uploads/workers/:filename", requireAuth, (req: any, res: any) => {
     try {
-      const filename = req.params.filename;
-      const filePath = path.join(process.cwd(), "uploads", "workers", filename);
+      // Defence in depth: strip any directory component from the requested name
+      // and ensure the resolved path stays within the workers uploads directory.
+      const safeName = path.basename(req.params.filename || "");
+      if (!safeName || safeName.startsWith(".")) {
+        return res.status(400).json({ message: "Invalid filename" });
+      }
+      const baseDir = path.resolve(process.cwd(), "uploads", "workers");
+      const filePath = path.resolve(baseDir, safeName);
+      if (!filePath.startsWith(baseDir + path.sep)) {
+        return res.status(400).json({ message: "Invalid filename" });
+      }
       if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
       res.sendFile(filePath);
     } catch (error: any) {

@@ -1262,10 +1262,19 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
     }
   });
 
-  app.get("/api/factory/uploads/bale-photos/:filename", (req: any, res: any) => {
+  app.get("/api/factory/uploads/bale-photos/:filename", requireAuth, (req: any, res: any) => {
     try {
-      const filename = req.params.filename;
-      const filePath = path.join(process.cwd(), "uploads", "bale-photos", filename);
+      // Strip any directory component from the supplied filename so a caller
+      // cannot escape the uploads/bale-photos directory with "../" segments.
+      const safeName = path.basename(req.params.filename || "");
+      if (!safeName || safeName.startsWith(".")) {
+        return res.status(400).json({ message: "Invalid filename" });
+      }
+      const baseDir = path.resolve(process.cwd(), "uploads", "bale-photos");
+      const filePath = path.resolve(baseDir, safeName);
+      if (!filePath.startsWith(baseDir + path.sep)) {
+        return res.status(400).json({ message: "Invalid filename" });
+      }
       if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
       res.sendFile(filePath);
     } catch (error: any) {

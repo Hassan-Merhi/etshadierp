@@ -38,7 +38,13 @@ export function registerProductionPlannerRoutes(app: Express) {
       const entries: any[] = Array.isArray(entryResult) ? entryResult : (entryResult as any).rows ?? [];
 
       const workerIds = entries.map((e: any) => Number(e.workerId));
-      const categoryIds: number[] = JSON.parse(plan.category_ids || "[]");
+      let categoryIds: number[] = [];
+      try {
+        const parsed = JSON.parse(plan.category_ids || "[]");
+        if (Array.isArray(parsed)) categoryIds = parsed.map(Number).filter((n) => !isNaN(n));
+      } catch {
+        categoryIds = [];
+      }
 
       let actuals: Record<number, number> = {};
       if (workerIds.length > 0) {
@@ -48,7 +54,7 @@ export function registerProductionPlannerRoutes(app: Express) {
           const wcResult = await db.execute(sql`
             SELECT worker_ids FROM factory_worker_categories
             WHERE company_id = ${companyId}
-              AND id = ANY(ARRAY[${sql.raw(categoryIds.join(","))}]::integer[])
+              AND id = ANY(${categoryIds})
           `);
           const wcRows: any[] = Array.isArray(wcResult) ? wcResult : (wcResult as any).rows ?? [];
           const teamWorkerIds = wcRows.flatMap((r: any) => {
@@ -57,7 +63,7 @@ export function registerProductionPlannerRoutes(app: Express) {
             try { return JSON.parse(ids || "[]").map(Number); } catch { return []; }
           });
           if (teamWorkerIds.length > 0) {
-            teamWorkerFilter = sql`AND fb.finalized_by = ANY(ARRAY[${sql.raw(teamWorkerIds.join(","))}]::integer[])`;
+            teamWorkerFilter = sql`AND fb.finalized_by = ANY(${teamWorkerIds})`;
           } else {
             skipActuals = true;
           }
@@ -69,7 +75,7 @@ export function registerProductionPlannerRoutes(app: Express) {
             FROM factory_bales fb
             WHERE fb.company_id = ${companyId}
               AND fb.stock_entry_date = ${date}
-              AND fb.finalized_by = ANY(ARRAY[${sql.raw(workerIds.join(","))}]::integer[])
+              AND fb.finalized_by = ANY(${workerIds})
               AND fb.status IN ('IN_STOCK','SOLD','RESERVED_FOR_ORDER','DISPATCHED','FINALIZED')
               ${teamWorkerFilter}
             GROUP BY fb.finalized_by
@@ -177,9 +183,16 @@ export function registerProductionPlannerRoutes(app: Express) {
       `);
       const entries: any[] = Array.isArray(entryResult) ? entryResult : (entryResult as any).rows ?? [];
 
+      let prevCategoryIds: number[] = [];
+      try {
+        const parsed = JSON.parse(prevRows[0].category_ids || "[]");
+        if (Array.isArray(parsed)) prevCategoryIds = parsed.map(Number).filter((n) => !isNaN(n));
+      } catch {
+        prevCategoryIds = [];
+      }
       res.json({
         entries,
-        categoryIds: JSON.parse(prevRows[0].category_ids || "[]"),
+        categoryIds: prevCategoryIds,
         notes: prevRows[0].notes ?? "",
         fromDate: String(prevRows[0].plan_date),
       });

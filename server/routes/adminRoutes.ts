@@ -210,22 +210,17 @@ export function registerAdminRoutes(app: Express) {
       }
       
       const orphanedIds = orphanedVouchers.map(v => v.id);
-      
-      // Delete all related records using raw SQL for maximum compatibility across schema versions
-      // Build a comma-separated list of IDs for SQL
-      const idList = orphanedIds.join(',');
       console.log("[DELETE-ALL] Deleting from related tables for", orphanedIds.length, "vouchers");
-      
+
+      // Use parameterized array binding (= ANY($1)) instead of string-interpolated IN list
+      // to keep the query injection-safe even if the source of the IDs ever changes.
       await db.transaction(async (tx) => {
-        // Delete from core tables that definitely exist
-        await tx.execute(sql`DELETE FROM voucher_entries WHERE voucher_id IN (${sql.raw(idList)})`);
-        await tx.execute(sql`DELETE FROM stock_transfer_vouchers WHERE voucher_id IN (${sql.raw(idList)})`);
-        await tx.execute(sql`DELETE FROM stock_adjustment_vouchers WHERE voucher_id IN (${sql.raw(idList)})`);
-        await tx.execute(sql`DELETE FROM sales_items WHERE voucher_id IN (${sql.raw(idList)})`);
-        await tx.execute(sql`DELETE FROM salary_advances WHERE voucher_id IN (${sql.raw(idList)})`);
-        
-        // Finally delete the vouchers themselves
-        await tx.execute(sql`DELETE FROM vouchers WHERE id IN (${sql.raw(idList)})`);
+        await tx.execute(sql`DELETE FROM voucher_entries WHERE voucher_id = ANY(${orphanedIds})`);
+        await tx.execute(sql`DELETE FROM stock_transfer_vouchers WHERE voucher_id = ANY(${orphanedIds})`);
+        await tx.execute(sql`DELETE FROM stock_adjustment_vouchers WHERE voucher_id = ANY(${orphanedIds})`);
+        await tx.execute(sql`DELETE FROM sales_items WHERE voucher_id = ANY(${orphanedIds})`);
+        await tx.execute(sql`DELETE FROM salary_advances WHERE voucher_id = ANY(${orphanedIds})`);
+        await tx.execute(sql`DELETE FROM vouchers WHERE id = ANY(${orphanedIds})`);
       });
       
       res.json({ success: true, deleted: orphanedIds.length });
@@ -2626,33 +2621,28 @@ export function registerAdminRoutes(app: Express) {
         console.log("Vouchers preserved (OTW + inter-company):", allVouchers.length - voucherIdsToDelete.length);
 
         if (voucherIdsToDelete.length > 0) {
-          // Format voucherIds as PostgreSQL array literal
-          const voucherIdsArray = `ARRAY[${voucherIdsToDelete.join(',')}]::int[]`;
-          
           // SOFT DELETE vouchers only - DON'T delete voucher entries
           // This allows undo to work properly
           await tx
             .update(vouchers)
             .set({ deletedAt: new Date() })
-            .where(sql.raw(`"vouchers"."id" = ANY(${voucherIdsArray})`));
-          
+            .where(inArray(vouchers.id, voucherIdsToDelete));
+
           results.vouchersDeleted = voucherIdsToDelete.length;
         }
 
         // 4. Clear opening balances for selected accounts
         if (accountIds.length > 0) {
-          const accountIdsArray = `ARRAY[${accountIds.join(',')}]::int[]`;
-          
           await tx
             .update(ledgerAccounts)
             .set({ openingBalance: "0", openingBalanceSide: null })
             .where(
               and(
                 eq(ledgerAccounts.companyId, companyId),
-                sql.raw(`"ledger_accounts"."id" = ANY(${accountIdsArray})`)
+                inArray(ledgerAccounts.id, accountIds)
               )
             );
-          
+
           results.openingBalancesCleared = accountIds.length;
         }
 

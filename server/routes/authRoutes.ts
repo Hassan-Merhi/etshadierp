@@ -435,7 +435,9 @@ export function registerAuthRoutes(app: Express) {
           username = dbUser.username;
           req.session.username = username;
         }
-      } catch (_) {}
+      } catch (err: any) {
+        console.warn("[auth/me] Could not hydrate username from DB:", err?.message);
+      }
     }
     const { password: _, ...userWithoutPassword } = req.user as any;
     res.json({ ...userWithoutPassword, username });

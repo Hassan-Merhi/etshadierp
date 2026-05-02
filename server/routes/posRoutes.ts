@@ -59,7 +59,10 @@ const storeTempPdf = storeTempFile;
 
 export function registerPosRoutes(app: Express) {
   // ── Serve temporarily stored PDFs (used by WhatsApp sendFileByUrl) ──────────
-  app.get("/api/pos/temp-pdf/:id", (req, res) => {
+  // Auth-gated: even though the ID is a random unguessable key, we require an
+  // authenticated session to defend against accidental URL leakage in browser
+  // history, referrer headers, or chat logs.
+  app.get("/api/pos/temp-pdf/:id", requireAuth, (req, res) => {
     const entry = tempPdfStore.get(req.params.id);
     if (!entry || entry.expiresAt < Date.now()) {
       return res.status(404).json({ message: "File not found or expired" });

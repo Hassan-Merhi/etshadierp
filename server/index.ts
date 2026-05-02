@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";
+import helmet from "helmet";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import path from "path";
@@ -33,6 +34,18 @@ const app = express();
 
 // Compress all HTTP responses (gzip/deflate) — reduces bandwidth by 60-80%
 app.use(compression());
+
+// Security headers (X-Frame-Options, X-Content-Type-Options, HSTS, Referrer-Policy, etc.)
+// CSP is intentionally disabled — the SPA relies on inline scripts/styles via Vite,
+// and a wrong CSP would break the app silently. Other defaults are safe.
+// crossOriginEmbedderPolicy is disabled to allow loading external images (logos, etc.).
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 
 declare global {
   namespace Express {

@@ -837,18 +837,25 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { employeeId, status } = req.query as { employeeId?: string; status?: string };
 
-      let query = `SELECT ea.*, e.first_name, e.last_name, e.code as employee_code,
-        la.name as cash_account_name
+      const empFilter = employeeId
+        ? sql`AND ea.employee_id = ${parseInt(employeeId)}`
+        : sql``;
+      const paidFilter =
+        status === "open" ? sql`AND ea.fully_paid = false`
+        : status === "paid" ? sql`AND ea.fully_paid = true`
+        : sql``;
+
+      const result = await db.execute(sql`
+        SELECT ea.*, e.first_name, e.last_name, e.code as employee_code,
+               la.name as cash_account_name
         FROM employee_advances ea
         LEFT JOIN employees e ON e.id = ea.employee_id
         LEFT JOIN ledger_accounts la ON la.id = ea.cash_account_id
-        WHERE ea.company_id = ${companyId}`;
-      if (employeeId) query += ` AND ea.employee_id = ${parseInt(employeeId)}`;
-      if (status === "open") query += ` AND ea.fully_paid = false`;
-      if (status === "paid") query += ` AND ea.fully_paid = true`;
-      query += ` ORDER BY ea.advance_date DESC, ea.id DESC`;
-
-      const result = await db.execute(sql.raw(query));
+        WHERE ea.company_id = ${companyId}
+          ${empFilter}
+          ${paidFilter}
+        ORDER BY ea.advance_date DESC, ea.id DESC
+      `);
       res.json(result.rows);
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
@@ -906,14 +913,18 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { advanceId } = req.query as { advanceId?: string };
-      let query = `SELECT r.*, e.first_name, e.last_name, ea.amount as advance_amount, ea.advance_date
+      const advFilter = advanceId
+        ? sql`AND r.advance_id = ${parseInt(advanceId)}`
+        : sql``;
+      const result = await db.execute(sql`
+        SELECT r.*, e.first_name, e.last_name, ea.amount as advance_amount, ea.advance_date
         FROM employee_advance_repayments r
         LEFT JOIN employees e ON e.id = r.employee_id
         LEFT JOIN employee_advances ea ON ea.id = r.advance_id
-        WHERE r.company_id = ${companyId}`;
-      if (advanceId) query += ` AND r.advance_id = ${parseInt(advanceId)}`;
-      query += ` ORDER BY r.repayment_date DESC`;
-      const result = await db.execute(sql.raw(query));
+        WHERE r.company_id = ${companyId}
+          ${advFilter}
+        ORDER BY r.repayment_date DESC
+      `);
       res.json(result.rows);
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
@@ -935,13 +946,17 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { employeeId } = req.query as { employeeId?: string };
-      let query = `SELECT eb.*, e.first_name, e.last_name, e.code as employee_code
+      const empFilter = employeeId
+        ? sql`AND eb.employee_id = ${parseInt(employeeId)}`
+        : sql``;
+      const result = await db.execute(sql`
+        SELECT eb.*, e.first_name, e.last_name, e.code as employee_code
         FROM employee_bonuses eb
         LEFT JOIN employees e ON e.id = eb.employee_id
-        WHERE eb.company_id = ${companyId}`;
-      if (employeeId) query += ` AND eb.employee_id = ${parseInt(employeeId)}`;
-      query += ` ORDER BY eb.bonus_date DESC, eb.id DESC`;
-      const result = await db.execute(sql.raw(query));
+        WHERE eb.company_id = ${companyId}
+          ${empFilter}
+        ORDER BY eb.bonus_date DESC, eb.id DESC
+      `);
       res.json(result.rows);
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
@@ -1023,16 +1038,23 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { workerId, status } = req.query as { workerId?: string; status?: string };
-      let query = `SELECT wb.*, fw.full_name as worker_name, fw.employee_code,
-        la.name as cash_account_name
+      const workerFilter = workerId
+        ? sql`AND wb.worker_id = ${parseInt(workerId)}`
+        : sql``;
+      const statusFilter = status
+        ? sql`AND wb.status = ${status}`
+        : sql``;
+      const result = await db.execute(sql`
+        SELECT wb.*, fw.full_name as worker_name, fw.employee_code,
+          la.name as cash_account_name
         FROM worker_bonuses wb
         LEFT JOIN factory_workers fw ON fw.id = wb.worker_id
         LEFT JOIN ledger_accounts la ON la.id = wb.cash_account_id
-        WHERE wb.company_id = ${companyId}`;
-      if (workerId) query += ` AND wb.worker_id = ${parseInt(workerId)}`;
-      if (status) query += ` AND wb.status = '${status}'`;
-      query += ` ORDER BY wb.bonus_date DESC, wb.id DESC`;
-      const result = await db.execute(sql.raw(query));
+        WHERE wb.company_id = ${companyId}
+          ${workerFilter}
+          ${statusFilter}
+        ORDER BY wb.bonus_date DESC, wb.id DESC
+      `);
       res.json(result.rows);
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });

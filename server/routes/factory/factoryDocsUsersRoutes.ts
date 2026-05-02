@@ -1562,9 +1562,14 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
           if (!targetCompanyId) return res.status(400).json({ message: "No company selected" });
 
           const jsonStr = req.file.buffer.toString("utf-8");
-          const payload = JSON.parse(jsonStr);
+          let payload: any;
+          try {
+            payload = JSON.parse(jsonStr);
+          } catch {
+            return res.status(400).json({ message: "Uploaded file is not valid JSON" });
+          }
 
-          if (!payload.tables || !payload.sourceCompanyId) {
+          if (!payload || typeof payload !== "object" || !payload.tables || !payload.sourceCompanyId) {
             return res.status(400).json({ message: "Invalid export file format" });
           }
 
