@@ -72,6 +72,89 @@ export function registerAccountRoutes(app: Express) {
         }
       }
 
+      // For factory companies, compute a combined balance for customer-linked ledger accounts
+      // using the same multi-source formula as /api/factory/customers so both pages agree.
+      // Formula: OB + finalized order totals + customerBalances non-INVOICE + voucherNet (excl CHARGE-*)
+      const customerLedgerOverrides = new Map<number, { balance: string; balanceSide: string }>();
+      if (isFactoryCompany) {
+        const linkedCustomers = companyCustomers.filter((c) => c.ledgerAccountId);
+        if (linkedCustomers.length > 0) {
+          const linkedCustIds = linkedCustomers.map((c) => c.id);
+          const linkedLedgerIds = linkedCustomers.map((c) => c.ledgerAccountId!);
+
+          const [salesRows, cbRows, lVoucherRows, cVoucherRows] = await Promise.all([
+            db.select({
+              customerId: customerOrders.customerId,
+              total: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric)), 0)`,
+            }).from(customerOrders)
+              .where(and(
+                inArray(customerOrders.customerId, linkedCustIds),
+                eq(customerOrders.companyId, companyId),
+                eq(customerOrders.status, "FINALIZED"),
+              )).groupBy(customerOrders.customerId),
+
+            db.select({
+              customerId: customerBalances.customerId,
+              net: sql<string>`COALESCE(SUM(CAST(${customerBalances.debitAmount} AS numeric) - CAST(${customerBalances.creditAmount} AS numeric)), 0)`,
+            }).from(customerBalances)
+              .where(and(
+                inArray(customerBalances.customerId, linkedCustIds),
+                eq(customerBalances.companyId, companyId),
+                sql`${customerBalances.referenceType} IS DISTINCT FROM 'INVOICE'`,
+              )).groupBy(customerBalances.customerId),
+
+            db.select({
+              ledgerAccountId: voucherEntries.ledgerAccountId,
+              net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
+            }).from(voucherEntries)
+              .innerJoin(vouchers, and(
+                eq(voucherEntries.voucherId, vouchers.id),
+                eq(vouchers.companyId, companyId),
+                eq(vouchers.optional, false),
+                isNull(vouchers.deletedAt),
+                sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
+              ))
+              .where(inArray(voucherEntries.ledgerAccountId as any, linkedLedgerIds))
+              .groupBy(voucherEntries.ledgerAccountId),
+
+            db.select({
+              customerId: voucherEntries.customerId,
+              net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
+            }).from(voucherEntries)
+              .innerJoin(vouchers, and(
+                eq(voucherEntries.voucherId, vouchers.id),
+                eq(vouchers.companyId, companyId),
+                eq(vouchers.optional, false),
+                isNull(vouchers.deletedAt),
+                sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
+              ))
+              .where(and(
+                inArray(voucherEntries.customerId as any, linkedCustIds),
+                isNull(voucherEntries.ledgerAccountId),
+              ))
+              .groupBy(voucherEntries.customerId),
+          ]);
+
+          const salesMap = new Map(salesRows.map((r) => [r.customerId!, parseFloat(r.total || "0")]));
+          const nonInvMap = new Map(cbRows.map((r) => [r.customerId!, parseFloat(r.net || "0")]));
+          const vNetByLedger = new Map(lVoucherRows.filter((r) => r.ledgerAccountId).map((r) => [r.ledgerAccountId!, parseFloat(r.net || "0")]));
+          const vNetByCustomer = new Map(cVoucherRows.filter((r) => r.customerId).map((r) => [r.customerId!, parseFloat(r.net || "0")]));
+
+          for (const cust of linkedCustomers) {
+            const salesTotal = salesMap.get(cust.id) ?? 0;
+            const nonInvNet = nonInvMap.get(cust.id) ?? 0;
+            const voucherNet = (vNetByLedger.get(cust.ledgerAccountId!) ?? 0) + (vNetByCustomer.get(cust.id) ?? 0);
+            const ob = parseFloat(cust.openingBalance || "0");
+            const obSide = cust.openingBalanceSide || "Dr";
+            const total = (obSide === "Dr" ? ob : -ob) + salesTotal + nonInvNet + voucherNet;
+            customerLedgerOverrides.set(cust.ledgerAccountId!, {
+              balance: Math.abs(total).toFixed(2),
+              balanceSide: total >= 0 ? "Dr" : "Cr",
+            });
+          }
+        }
+      }
+
       // Optional date range filter for account balances
       const balStartDate = req.query.startDate as string | undefined;
       const balEndDate = req.query.endDate as string | undefined;
@@ -210,6 +293,28 @@ export function registerAccountRoutes(app: Express) {
           const custOb = customerObMap.get(account.id);
           const effectiveOB = custOb?.openingBalance ?? account.openingBalance ?? "0";
           const effectiveOBSide = custOb?.openingBalanceSide ?? account.openingBalanceSide;
+
+          // For factory companies, use the pre-computed combined balance override
+          // (sales + customerBalances + voucherEntries via both ledgerId and customerId)
+          const override = customerLedgerOverrides.get(account.id);
+          if (override) {
+            return {
+              id: `ledger-${account.id}`,
+              accountId: account.id,
+              type: "ledger",
+              code: account.code,
+              name: account.name,
+              accountType: account.accountType,
+              subType: account.subType,
+              balance: override.balance,
+              balanceSide: override.balanceSide,
+              openingBalance: parseFloat(effectiveOB),
+              openingBalanceSide: effectiveOBSide || "Dr",
+              active: account.active,
+              parentId: account.parentId,
+            };
+          }
+
           const { balance, balanceSide } = calculateBalance(
             effectiveOB,
             effectiveOBSide,
@@ -777,22 +882,61 @@ export function registerAccountRoutes(app: Express) {
         return res.status(404).json({ message: "Account not found" });
       }
 
+      // Check if this ledger account is linked to a customer
+      const [linkedCustomer] = await db
+        .select({ id: customers.id, ob: customers.openingBalance, side: customers.openingBalanceSide })
+        .from(customers)
+        .where(eq(customers.ledgerAccountId, ledgerAccountId))
+        .limit(1);
+
+      // For factory customer-linked ledger accounts, use the same combined formula
+      // as /api/factory/customers so the Accounts page balance matches the Customers page.
+      if (linkedCustomer) {
+        const currentCompany = await storage.getCompanyById(req.session?.currentCompanyId || 0);
+        if (currentCompany?.companyType === "factory") {
+          const custId = linkedCustomer.id;
+          const [salesRows, cbRows, lVoucherRows, cVoucherRows] = await Promise.all([
+            db.select({
+              total: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric)), 0)`,
+            }).from(customerOrders)
+              .where(and(eq(customerOrders.customerId, custId), eq(customerOrders.companyId, req.session?.currentCompanyId || 0), eq(customerOrders.status, "FINALIZED"))),
+
+            db.select({
+              net: sql<string>`COALESCE(SUM(CAST(${customerBalances.debitAmount} AS numeric) - CAST(${customerBalances.creditAmount} AS numeric)), 0)`,
+            }).from(customerBalances)
+              .where(and(eq(customerBalances.customerId, custId), eq(customerBalances.companyId, req.session?.currentCompanyId || 0), sql`${customerBalances.referenceType} IS DISTINCT FROM 'INVOICE'`)),
+
+            db.select({
+              net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
+            }).from(voucherEntries)
+              .innerJoin(vouchers, and(eq(voucherEntries.voucherId, vouchers.id), eq(vouchers.optional, false), isNull(vouchers.deletedAt), sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`))
+              .where(eq(voucherEntries.ledgerAccountId, ledgerAccountId)),
+
+            db.select({
+              net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
+            }).from(voucherEntries)
+              .innerJoin(vouchers, and(eq(voucherEntries.voucherId, vouchers.id), eq(vouchers.optional, false), isNull(vouchers.deletedAt), sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`))
+              .where(and(eq(voucherEntries.customerId, custId), isNull(voucherEntries.ledgerAccountId))),
+          ]);
+
+          const salesTotal = parseFloat(salesRows[0]?.total || "0");
+          const nonInvNet = parseFloat(cbRows[0]?.net || "0");
+          const vNet = parseFloat(lVoucherRows[0]?.net || "0") + parseFloat(cVoucherRows[0]?.net || "0");
+          const ob = parseFloat(linkedCustomer.ob || "0");
+          const obSide = linkedCustomer.side || "Dr";
+          const balance = (obSide === "Dr" ? ob : -ob) + salesTotal + nonInvNet + vNet;
+          return res.json({ balance });
+        }
+      }
+
       const transactions = await storage.getVoucherEntriesByLedger(ledgerAccountId);
-      
       let debits = 0;
       let credits = 0;
-      
       for (const tx of transactions) {
         debits += parseFloat(tx.debitAmount || "0");
         credits += parseFloat(tx.creditAmount || "0");
       }
 
-      // Use the customer's opening balance if this ledger account is linked to one
-      const [linkedCustomer] = await db
-        .select({ ob: customers.openingBalance, side: customers.openingBalanceSide })
-        .from(customers)
-        .where(eq(customers.ledgerAccountId, ledgerAccountId))
-        .limit(1);
       const rawOB = parseFloat((linkedCustomer?.ob ?? account.openingBalance) || "0");
       const rawSide = linkedCustomer?.side ?? account.openingBalanceSide;
       const balance = (rawOB * (rawSide === "Cr" ? -1 : 1)) + debits - credits;
@@ -1109,12 +1253,56 @@ export function registerAccountRoutes(app: Express) {
         // If this ledger account is linked to a customer, the customer's
         // opening balance is the authoritative source of truth.
         const [linkedCust] = await db
-          .select({ ob: customers.openingBalance, side: customers.openingBalanceSide })
+          .select({ id: customers.id, ob: customers.openingBalance, side: customers.openingBalanceSide })
           .from(customers)
           .where(eq(customers.ledgerAccountId, accountId))
           .limit(1);
         rawOB = parseFloat((linkedCust?.ob ?? acct?.ob) ?? "0") || 0;
         obSide = linkedCust?.side ?? acct?.side ?? "Dr";
+
+        // For factory customer-linked ledger accounts, use combined formula
+        // (sales + customerBalances non-INVOICE + voucherEntries via both paths, all before endDate)
+        if (linkedCust) {
+          const currentCompany = await storage.getCompanyById(companyId);
+          if (currentCompany?.companyType === "factory") {
+            const custId = linkedCust.id;
+            const dateFilter = endDate ? sql`${vouchers.voucherDate} < ${endDate}` : sql`1=1`;
+            const orderDateFilter = endDate ? sql`${customerOrders.orderDate} < ${endDate}` : sql`1=1`;
+            const cbDateFilter = endDate ? sql`${customerBalances.transactionDate} < ${endDate}` : sql`1=1`;
+
+            const [salesRows, cbRows, lVRows, cVRows] = await Promise.all([
+              db.select({
+                total: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric)), 0)`,
+              }).from(customerOrders)
+                .where(and(eq(customerOrders.customerId, custId), eq(customerOrders.companyId, companyId), eq(customerOrders.status, "FINALIZED"), orderDateFilter)),
+
+              db.select({
+                net: sql<string>`COALESCE(SUM(CAST(${customerBalances.debitAmount} AS numeric) - CAST(${customerBalances.creditAmount} AS numeric)), 0)`,
+              }).from(customerBalances)
+                .where(and(eq(customerBalances.customerId, custId), eq(customerBalances.companyId, companyId), sql`${customerBalances.referenceType} IS DISTINCT FROM 'INVOICE'`, cbDateFilter)),
+
+              db.select({
+                net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
+              }).from(voucherEntries)
+                .leftJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+                .where(and(eq(voucherEntries.ledgerAccountId, accountId), eq(vouchers.optional, false), isNull(vouchers.deletedAt), sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`, dateFilter)),
+
+              db.select({
+                net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
+              }).from(voucherEntries)
+                .leftJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+                .where(and(eq(voucherEntries.customerId, custId), isNull(voucherEntries.ledgerAccountId), eq(vouchers.optional, false), isNull(vouchers.deletedAt), sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`, dateFilter)),
+            ]);
+
+            const salesTotal = parseFloat(salesRows[0]?.total || "0");
+            const nonInvNet = parseFloat(cbRows[0]?.net || "0");
+            const vNet = parseFloat(lVRows[0]?.net || "0") + parseFloat(cVRows[0]?.net || "0");
+            const ob = parseFloat(linkedCust.ob || "0");
+            const side = linkedCust.side || "Dr";
+            const prePeriodBalance = (side === "Dr" ? ob : -ob) + salesTotal + nonInvNet + vNet;
+            return res.json({ balance: prePeriodBalance });
+          }
+        }
       } else if (accountType === "bank") {
         const [acct] = await db.select({ ob: bankAccounts.openingBalance, side: bankAccounts.openingBalanceSide })
           .from(bankAccounts).where(eq(bankAccounts.id, accountId));
