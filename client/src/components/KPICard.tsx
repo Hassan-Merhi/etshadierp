@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { LucideIcon } from "lucide-react";
+import { LucideIcon, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface KPICardProps {
@@ -15,19 +15,20 @@ interface KPICardProps {
 
 export function KPICard({ title, value, change, changeType, icon: Icon, onClick, "data-testid": testId }: KPICardProps) {
   const isClickable = !!onClick;
+  const ChangeIcon = changeType === "positive" ? ArrowUpRight : changeType === "negative" ? ArrowDownRight : null;
   return (
     <Card
-      className={cn("p-4 sm:p-6", isClickable && "hover-elevate cursor-pointer")}
+      className={cn("p-4 sm:p-5", isClickable && "hover-elevate cursor-pointer")}
       onClick={onClick}
       data-testid={testId ?? `card-kpi-${title.toLowerCase().replace(/\s+/g, '-')}`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-col gap-1 sm:gap-2 min-w-0">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground truncate">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
             {title}
           </span>
           <span
-            className="text-xl sm:text-3xl font-bold font-mono truncate"
+            className="text-2xl sm:text-3xl font-semibold tracking-tight tabular-nums leading-none truncate"
             data-testid={`text-kpi-value-${title.toLowerCase().replace(/\s+/g, '-')}`}
           >
             {value}
@@ -35,18 +36,19 @@ export function KPICard({ title, value, change, changeType, icon: Icon, onClick,
           {change && (
             <span
               className={cn(
-                "text-xs font-medium truncate",
-                changeType === "positive" ? "text-chart-2" :
+                "inline-flex items-center gap-0.5 text-xs font-medium tabular-nums truncate",
+                changeType === "positive" ? "text-success" :
                 changeType === "negative" ? "text-destructive" :
                 "text-muted-foreground"
               )}
             >
+              {ChangeIcon && <ChangeIcon className="h-3 w-3 shrink-0" />}
               {change}
             </span>
           )}
         </div>
-        <div className="flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-md bg-primary/10 shrink-0">
-          <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+        <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+          <Icon className="h-5 w-5" />
         </div>
       </div>
     </Card>

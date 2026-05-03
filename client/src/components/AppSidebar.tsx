@@ -290,15 +290,21 @@ export function AppSidebar({ user }: { user?: any }) {
       <Link
         href={item.url}
         data-testid={`link-${item.url}`}
-        className={`flex items-center gap-2.5 rounded-md py-1.5 text-sm transition-colors ${
+        className={`relative flex items-center gap-2.5 rounded-md py-1.5 pl-3 pr-2.5 text-sm transition-all duration-150 ${
           isActive
-            ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-            : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+            ? "bg-sidebar-accent/70 text-sidebar-accent-foreground font-medium shadow-xs"
+            : "text-muted-foreground hover:bg-sidebar-accent/40 hover:text-foreground"
         }`}
-        style={{ borderLeft: `2px solid ${isActive ? color : "transparent"}`, paddingLeft: "8px", paddingRight: "10px" }}
       >
+        {isActive && (
+          <span
+            aria-hidden
+            className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full"
+            style={{ backgroundColor: color }}
+          />
+        )}
         <item.icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color } : {}} />
-        <span className="flex-1 leading-tight">{item.title}</span>
+        <span className="flex-1 leading-tight truncate">{item.title}</span>
         {unread > 0 && (
           <Badge variant="default" className="text-xs min-w-5 justify-center" data-testid="badge-chat-unread">{unread}</Badge>
         )}
@@ -314,15 +320,21 @@ export function AppSidebar({ user }: { user?: any }) {
       <Link
         href={href}
         data-testid={testId}
-        className={`flex items-center gap-2.5 rounded-md py-1.5 text-sm transition-colors ${
+        className={`relative flex items-center gap-2.5 rounded-md py-1.5 pl-3 pr-2.5 text-sm transition-all duration-150 ${
           isActive
-            ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-            : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+            ? "bg-sidebar-accent/70 text-sidebar-accent-foreground font-medium shadow-xs"
+            : "text-muted-foreground hover:bg-sidebar-accent/40 hover:text-foreground"
         }`}
-        style={{ borderLeft: `2px solid ${isActive ? color : "transparent"}`, paddingLeft: "8px", paddingRight: "10px" }}
       >
+        {isActive && (
+          <span
+            aria-hidden
+            className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full"
+            style={{ backgroundColor: color }}
+          />
+        )}
         <Icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color } : {}} />
-        <span className="flex-1 leading-tight">{label}</span>
+        <span className="flex-1 leading-tight truncate">{label}</span>
         {badge != null && badge > 0 && (
           <Badge variant="default" className="text-xs min-w-5 justify-center">{badge}</Badge>
         )}
@@ -369,15 +381,20 @@ export function AppSidebar({ user }: { user?: any }) {
                   href={item.url}
                   draggable={false}
                   data-testid={`link-${item.url}`}
-                  className={`flex flex-1 items-center gap-2.5 rounded-md py-1.5 text-sm transition-colors ${
+                  className={`relative flex flex-1 items-center gap-2.5 rounded-md py-1.5 pl-3 pr-2.5 text-sm transition-all duration-150 ${
                     isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                      : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+                      ? "bg-sidebar-accent/70 text-sidebar-accent-foreground font-medium shadow-xs"
+                      : "text-muted-foreground hover:bg-sidebar-accent/40 hover:text-foreground"
                   }`}
-                  style={{ borderLeft: `2px solid ${isActive ? "#3b82f6" : "transparent"}`, paddingLeft: "8px", paddingRight: "10px" }}
                 >
-                  <item.icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color: "#3b82f6" } : {}} />
-                  <span className="flex-1 leading-tight">{item.title}</span>
+                  {isActive && (
+                    <span
+                      aria-hidden
+                      className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-primary"
+                    />
+                  )}
+                  <item.icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color: "hsl(var(--primary))" } : {}} />
+                  <span className="flex-1 leading-tight truncate">{item.title}</span>
                   {unread > 0 && (
                     <Badge variant="default" className="text-xs min-w-5 justify-center">{unread}</Badge>
                   )}

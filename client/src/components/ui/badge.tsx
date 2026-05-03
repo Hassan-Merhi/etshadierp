@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
   // Whitespace-nowrap: Badges should never wrap.
-  "whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" +
-  " hover-elevate " ,
+  "whitespace-nowrap inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" +
+  " hover-elevate ",
   {
     variants: {
       variant: {
@@ -15,8 +15,15 @@ const badgeVariants = cva(
         secondary: "border-transparent bg-secondary text-secondary-foreground",
         destructive:
           "border-transparent bg-destructive text-destructive-foreground shadow-xs",
-
         outline: " border [border-color:var(--badge-outline)] shadow-xs",
+
+        // Semantic status variants — soft fills with matching foreground.
+        // Use these instead of ad-hoc bg-green-100/text-green-700 etc. so
+        // dark-mode and theme tokens stay consistent.
+        success: "border-transparent bg-success-soft text-success-soft-foreground",
+        warning: "border-transparent bg-warning-soft text-warning-soft-foreground",
+        info:    "border-transparent bg-info-soft text-info-soft-foreground",
+        muted:   "border-transparent bg-muted text-muted-foreground",
       },
     },
     defaultVariants: {
