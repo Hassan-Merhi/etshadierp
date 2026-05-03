@@ -79,7 +79,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
-import { useAppMode } from "@/contexts/AppModeContext";
+import { useAppMode, useModePrefix } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useFormDraft } from "@/hooks/useFormDraft";
 import { DraftRestorePrompt } from "@/components/DraftRestorePrompt";
@@ -347,7 +347,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const isFactoryMode = appMode === "factory";
-  const modePrefix = appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : "";
+  const modePrefix = useModePrefix();
 
   // Handle opening voucher for editing
   const handleEditVoucher = async (voucherId: number) => {

@@ -53,7 +53,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
-import { useAppMode } from "@/contexts/AppModeContext";
+import { useAppMode, useModePrefix } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { CalendarIcon, ArrowLeft, Plus, Check, ChevronsUpDown, X, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -517,6 +517,7 @@ export default function VoucherEdit() {
   const { selectedCompany } = useCompany();
   const { selectedCurrency, formatAmount, exchangeRate } = useCurrencyContext();
   const appMode = useAppMode();
+  const modePrefix = useModePrefix();
   const modeApiRequest = getApiRequest(appMode);
   const [formInitialized, setFormInitialized] = useState(false);
 
@@ -1127,7 +1128,7 @@ export default function VoucherEdit() {
         title: "Success",
         description: "Sales voucher updated successfully",
       });
-      navigate(`${appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : ""}/daybook`);
+      navigate(`${modePrefix}/daybook`);
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
@@ -1169,7 +1170,7 @@ export default function VoucherEdit() {
         title: "Success",
         description: "Purchase voucher updated successfully",
       });
-      navigate(`${appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : ""}/daybook`);
+      navigate(`${modePrefix}/daybook`);
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
@@ -1211,7 +1212,7 @@ export default function VoucherEdit() {
         title: "Success",
         description: "Adjustment voucher updated successfully",
       });
-      navigate(`${appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : ""}/daybook`);
+      navigate(`${modePrefix}/daybook`);
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
@@ -1253,7 +1254,7 @@ export default function VoucherEdit() {
         title: "Success",
         description: "Stock transfer voucher updated successfully",
       });
-      navigate(`${appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : ""}/daybook`);
+      navigate(`${modePrefix}/daybook`);
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;

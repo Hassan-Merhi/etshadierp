@@ -21,6 +21,7 @@ import {
   userLocations,
   userPresence,
   users,
+  ledgerAccounts, userPreferences, vouchers, voucherEntries,
 } from "@shared/schema";
 import {
   eq, and, or, desc, lt, gt, ne, inArray, sql, isNull, not,

@@ -62,7 +62,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { useAppMode } from "@/contexts/AppModeContext";
+import { useAppMode, useModePrefix } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 
 type ProfitData = {
@@ -168,6 +168,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const { formatAmount, formatCashAmount } = useCurrencyContext();
   const appMode = useAppMode();
+  const modePrefix = useModePrefix();
   const modeApiRequest = getApiRequest(appMode);
   const [, setLocation] = useLocation();
   const isFactoryMode = appMode === "factory";
@@ -510,7 +511,7 @@ export default function Dashboard() {
           change={profitData?.netPositionLabel || "What we have minus what we owe"}
           changeType={(profitData?.netPosition ?? 0) >= 0 ? "positive" : "negative"}
           icon={TrendingUp}
-          onClick={() => setLocation(isFactoryMode ? "/factory/net-position" : appMode === "properties" ? "/properties/net-position" : "/net-position-details")}
+          onClick={() => setLocation(modePrefix === "" ? "/net-position-details" : `${modePrefix}/net-position`)}
           data-testid="kpi-net-position"
         />
         <KPICard
@@ -590,7 +591,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-base font-semibold">Net Position Breakdown</h3>
             <button
-              onClick={() => setLocation(isFactoryMode ? "/factory/net-position" : appMode === "properties" ? "/properties/net-position" : "/net-position-details")}
+              onClick={() => setLocation(modePrefix === "" ? "/net-position-details" : `${modePrefix}/net-position`)}
               className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
               data-testid="button-net-position-detail"
             >

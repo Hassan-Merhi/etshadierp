@@ -94,7 +94,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { drCrClass } from "@/lib/formatNumber";
-import { useAppMode } from "@/contexts/AppModeContext";
+import { useAppMode, useModePrefix } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -151,6 +151,7 @@ export default function Accounts() {
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hideBalances = (myErpPages?.hiddenErpCostFields ?? []).includes("accounts_balances");
   const appMode = useAppMode();
+  const modePrefix = useModePrefix();
   const modeApiRequest = getApiRequest(appMode);
   const [, navigate] = useLocation();
   const searchString = useSearch();
@@ -1011,7 +1012,7 @@ export default function Accounts() {
       "Credit Note": "credit-note",
       "Debit Note": "credit-note",
     };
-    const base = appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : "";
+    const base = modePrefix;
     const tabName = voucherTypeMap[voucher.voucherType];
     if (tabName) {
       navigate(`${base}/vouchers?edit=${voucher.voucherId}&tab=${tabName}`);
@@ -1574,7 +1575,7 @@ export default function Accounts() {
         <Button
           data-testid="button-create-account"
           disabled={!selectedCompany}
-          onClick={() => navigate(`${appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : ""}/create`)}
+          onClick={() => navigate(`${modePrefix}/create`)}
         >
           <Plus className="w-4 h-4 mr-2" />
           Create
@@ -3612,7 +3613,7 @@ export default function Accounts() {
                         "Credit Note": "credit-note",
                         "Debit Note": "credit-note",
                       };
-                      const base = appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : "";
+                      const base = modePrefix;
                       const tabName = voucherTypeMap[v.voucherType];
                       const handleOpen = () => {
                         if (tabName) {

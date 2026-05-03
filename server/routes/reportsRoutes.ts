@@ -35,6 +35,7 @@ import {
   insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
   chatMessages,
   exchangeRates,
+  factoryRawStock,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
