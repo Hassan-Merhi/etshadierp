@@ -1011,7 +1011,7 @@ export default function Accounts() {
       "Credit Note": "credit-note",
       "Debit Note": "credit-note",
     };
-    const base = appMode === "factory" ? "/factory" : "";
+    const base = appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : "";
     const tabName = voucherTypeMap[voucher.voucherType];
     if (tabName) {
       navigate(`${base}/vouchers?edit=${voucher.voucherId}&tab=${tabName}`);
@@ -1574,7 +1574,7 @@ export default function Accounts() {
         <Button
           data-testid="button-create-account"
           disabled={!selectedCompany}
-          onClick={() => navigate(appMode === "factory" ? "/factory/create" : appMode === "properties" ? "/properties/create" : "/create")}
+          onClick={() => navigate(`${appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : ""}/create`)}
         >
           <Plus className="w-4 h-4 mr-2" />
           Create
@@ -3612,7 +3612,7 @@ export default function Accounts() {
                         "Credit Note": "credit-note",
                         "Debit Note": "credit-note",
                       };
-                      const base = appMode === "factory" ? "/factory" : "";
+                      const base = appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : "";
                       const tabName = voucherTypeMap[v.voucherType];
                       const handleOpen = () => {
                         if (tabName) {

@@ -25,6 +25,7 @@ import {
   factoryBales, factoryBaleProducts, baleLabelPrints,
   factoryWorkers,
   factoryPressingBatches, factoryMixBatches, factoryMixBatchSources, factoryContainers, factorySuppliers,
+  productionRawStock, mixBatches, productionBales,
   customerOrders, customerOrderBales,
   insertBaleSchema, insertBaleTransferSchema,
   orphanedRecords, orphanedCharges,

@@ -347,11 +347,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const isFactoryMode = appMode === "factory";
+  const modePrefix = appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : "";
 
   // Handle opening voucher for editing
   const handleEditVoucher = async (voucherId: number) => {
-    const prefix = isFactoryMode ? "/factory" : "";
-    setLocation(`${prefix}/vouchers/${voucherId}/edit`);
+    setLocation(`${modePrefix}/vouchers/${voucherId}/edit`);
   };
 
   // Synchronize activeTab and editVoucherId with URL parameters
@@ -1080,7 +1080,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       
       // Clear edit mode and navigate back to daybook
       if (isEditMode) {
-        setLocation(isFactoryMode ? "/factory/daybook" : "/daybook");
+        setLocation(`${modePrefix}/daybook`);
       } else {
         form.reset({
           paymentAccountType: "ledger",
@@ -1785,7 +1785,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       
       // Clear edit mode and navigate back to daybook or reset form
       if (isEditMode) {
-        setLocation(isFactoryMode ? "/factory/daybook" : "/daybook");
+        setLocation(`${modePrefix}/daybook`);
       } else {
         journalForm.reset({
           voucherDate: new Date(),
@@ -2534,7 +2534,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       
       // Clear edit mode and navigate back to daybook or reset form
       if (isEditMode) {
-        setLocation(isFactoryMode ? "/factory/daybook" : "/daybook");
+        setLocation(`${modePrefix}/daybook`);
       } else {
         stockTransferForm.reset({
           voucherDate: new Date(),
@@ -3128,7 +3128,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       
       // Clear edit mode and navigate back to daybook or reset form
       if (isEditMode) {
-        setLocation(isFactoryMode ? "/factory/daybook" : "/daybook");
+        setLocation(`${modePrefix}/daybook`);
       } else {
         stockAdjustmentForm.reset({
           voucherDate: new Date(),

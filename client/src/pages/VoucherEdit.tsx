@@ -1127,7 +1127,7 @@ export default function VoucherEdit() {
         title: "Success",
         description: "Sales voucher updated successfully",
       });
-      navigate(appMode === "factory" ? "/factory/daybook" : "/daybook");
+      navigate(`${appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : ""}/daybook`);
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
@@ -1169,7 +1169,7 @@ export default function VoucherEdit() {
         title: "Success",
         description: "Purchase voucher updated successfully",
       });
-      navigate(appMode === "factory" ? "/factory/daybook" : "/daybook");
+      navigate(`${appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : ""}/daybook`);
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
@@ -1211,7 +1211,7 @@ export default function VoucherEdit() {
         title: "Success",
         description: "Adjustment voucher updated successfully",
       });
-      navigate(appMode === "factory" ? "/factory/daybook" : "/daybook");
+      navigate(`${appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : ""}/daybook`);
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
@@ -1253,7 +1253,7 @@ export default function VoucherEdit() {
         title: "Success",
         description: "Stock transfer voucher updated successfully",
       });
-      navigate(appMode === "factory" ? "/factory/daybook" : "/daybook");
+      navigate(`${appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : ""}/daybook`);
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
