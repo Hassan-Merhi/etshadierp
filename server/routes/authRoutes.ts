@@ -4,6 +4,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireLogin, requireRole, requireNonPOS, canDelete, checkPOSLocation } from "../auth";
 import { hashPassword, verifyPassword, logAudit } from "./_helpers";
+import { randomBytes } from "crypto";
 import {
   auditLog,
   companies,
@@ -61,6 +62,16 @@ export function registerAuthRoutes(app: Express) {
 
       req.session.userId = user.id;
       req.session.username = user.username;
+
+      // Phase 2 CSRF hardening: issue a synchronizer-token at login so the
+      // server-side CSRF middleware always has an `expected` token to compare
+      // against for an authenticated session. Without this, the very first
+      // POST after login would pass through (no `expected` set yet), creating
+      // a small soft-window. The frontend's window.fetch interceptor calls
+      // GET /api/csrf-token to retrieve this same token before its first
+      // state-changing request, so the value is shared between server check
+      // and client header.
+      (req.session as any).csrfToken = randomBytes(32).toString("hex");
 
       // Auto-select first company
       const userCompanies = await storage.getUserCompaniesWithRoles(user.id);

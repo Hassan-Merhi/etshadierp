@@ -50,6 +50,63 @@ export function resetCsrfToken() {
   _csrfFetchPromise = null;
 }
 
+/* ── Global fetch interceptor ────────────────────────────────────────────── */
+// Wraps window.fetch so that ALL state-changing requests to /api/* (including
+// raw fetch() calls in legacy pages, hooks, sync engines, dialogs, etc.) get
+// the X-CSRF-Token header automatically. This is the bridge between the new
+// CSRF middleware and the ~350 raw fetch sites scattered across the codebase
+// — without this, those sites would all need to be migrated to apiRequest()
+// before CSRF_ENFORCE=1 could be flipped on. With this, the migration becomes
+// invisible. The interceptor:
+//   • Only acts on /api/* URLs (relative or same-origin absolute)
+//   • Skips /api/csrf-token to avoid recursion
+//   • Skips GET/HEAD/OPTIONS
+//   • Never overrides an existing X-CSRF-Token header
+//   • Falls through cleanly if the token cannot be fetched
+if (typeof window !== "undefined" && !((window as any).__csrfFetchPatched)) {
+  (window as any).__csrfFetchPatched = true;
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    try {
+      // Resolve the URL pathname for /api/* matching
+      let pathname: string | null = null;
+      try {
+        if (typeof input === "string") {
+          pathname = input.startsWith("/")
+            ? input.split("?")[0]
+            : new URL(input, window.location.origin).pathname;
+        } else if (input instanceof URL) {
+          pathname = input.pathname;
+        } else if (input instanceof Request) {
+          pathname = new URL(input.url, window.location.origin).pathname;
+        }
+      } catch { /* opaque URL — skip */ }
+
+      const method = (init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
+      const isStateChanging = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
+      const isApi = !!pathname && pathname.startsWith("/api/") && pathname !== "/api/csrf-token";
+
+      if (isStateChanging && isApi) {
+        // Inspect existing headers (case-insensitive)
+        const existingHeaders = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+        if (!existingHeaders.has("x-csrf-token")) {
+          const token = await ensureCsrfToken();
+          if (token) {
+            existingHeaders.set("X-CSRF-Token", token);
+            const newInit: RequestInit = { ...init, headers: existingHeaders };
+            // credentials default to "include" for /api requests so the session cookie travels
+            if (newInit.credentials === undefined) newInit.credentials = "include";
+            return originalFetch(input, newInit);
+          }
+        }
+      }
+    } catch {
+      // Never block a legitimate request because of interceptor errors
+    }
+    return originalFetch(input, init);
+  };
+}
+
 /**
  * Returns today's date string (YYYY-MM-DD) in the configured company timezone.
  * Falls back to the browser's local timezone if no company timezone is set.

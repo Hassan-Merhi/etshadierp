@@ -201,6 +201,12 @@ const ORIGIN_GUARD_EXEMPT_PATHS = new Set<string>([
   "/api/health",
   "/api/health/db",
   "/api/build-info",
+  // /api/user-presence/leave is the only sendBeacon-driven write path (fired
+  // on tab close from use-presence.ts:53). sendBeacon cannot attach custom
+  // headers so it cannot send X-CSRF-Token. The endpoint only marks the user
+  // as offline — non-sensitive. The PATCH /api/user-presence heartbeat goes
+  // through window.fetch and IS subject to CSRF + Origin enforcement.
+  "/api/user-presence/leave",
 ]);
 app.use((req, res, next) => {
   const method = req.method.toUpperCase();
@@ -234,13 +240,14 @@ app.use((req, res, next) => {
   });
 });
 
-// ── Phase E: CSRF synchroniser-token middleware (WARN-ONLY mode) ───────────
+// ── Phase E: CSRF synchroniser-token middleware (ENFORCING by default) ─────
 // Generates a per-session CSRF token, exposes it via GET /api/csrf-token, and
-// inspects state-changing requests for a matching X-CSRF-Token header. Runs
-// in WARN-ONLY mode (logs mismatches without rejecting) until the frontend
-// has been verified to send the header on all paths. Flip CSRF_ENFORCE=1 to
-// enable hard rejection. Origin guard above provides defense-in-depth.
-const CSRF_ENFORCE = process.env.CSRF_ENFORCE === "1";
+// inspects state-changing requests for a matching X-CSRF-Token header. The
+// frontend's window.fetch interceptor (client/src/lib/queryClient.ts) auto-
+// attaches the token to every state-changing /api/* request — covering both
+// apiRequest() callers and the ~350 raw fetch sites in legacy pages. Set
+// CSRF_ENFORCE=0 to fall back to warn-only mode if a regression surfaces.
+const CSRF_ENFORCE = process.env.CSRF_ENFORCE !== "0";
 app.get("/api/csrf-token", (req, res) => {
   const sess: any = req.session as any;
   if (!sess.csrfToken) {
@@ -2458,6 +2465,23 @@ let migrationsDone = false;
       `DO $$ BEGIN ALTER TABLE stock_transfer_items VALIDATE CONSTRAINT stock_transfer_items_transfer_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
       `DO $$ BEGIN ALTER TABLE stock_transfer_vouchers VALIDATE CONSTRAINT stock_transfer_vouchers_destination_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
       `DO $$ BEGIN ALTER TABLE stock_transfer_vouchers VALIDATE CONSTRAINT stock_transfer_vouchers_source_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+
+      // ── Phase 4+5 perf indexes (May 2026) — hot-path scoping ────────────────
+      // 12 strategic indexes covering bale-pick, customer-order, voucher-entry,
+      // and inventory hot paths surfaced by the Customer-Ledger Phase 9 / factory
+      // override audit. All idempotent CREATE INDEX IF NOT EXISTS.
+      `CREATE INDEX IF NOT EXISTS factory_bales_company_idx ON factory_bales(company_id)`,
+      `CREATE INDEX IF NOT EXISTS factory_bales_status_idx ON factory_bales(status)`,
+      `CREATE INDEX IF NOT EXISTS factory_bales_product_idx ON factory_bales(product_id)`,
+      `CREATE INDEX IF NOT EXISTS factory_bales_company_status_idx ON factory_bales(company_id, status)`,
+      `CREATE INDEX IF NOT EXISTS customer_orders_company_idx ON customer_orders(company_id)`,
+      `CREATE INDEX IF NOT EXISTS customer_orders_customer_idx ON customer_orders(customer_id)`,
+      `CREATE INDEX IF NOT EXISTS customer_orders_status_idx ON customer_orders(status)`,
+      `CREATE INDEX IF NOT EXISTS customer_order_bales_order_idx ON customer_order_bales(order_id)`,
+      `CREATE INDEX IF NOT EXISTS customer_order_bales_bale_idx ON customer_order_bales(bale_id)`,
+      `CREATE INDEX IF NOT EXISTS voucher_entries_ledger_voucher_idx ON voucher_entries(ledger_account_id, voucher_id)`,
+      `CREATE INDEX IF NOT EXISTS vouchers_company_date_idx ON vouchers(company_id, voucher_date)`,
+      `CREATE INDEX IF NOT EXISTS inventory_location_idx ON inventory(location_id)`,
     ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
