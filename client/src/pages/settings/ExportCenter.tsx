@@ -265,7 +265,7 @@ function ExportProgressDialog({ jobId, mode, open, onClose }: {
     setDownloaded(false);
     const poll = async () => {
       try {
-        const data = await apiRequest("GET", `/api/export/job/${jobId}`) as JobStatus;
+        const data = await apiRequest("GET", `/api/export/job/${jobId}`) as unknown as JobStatus;
         setJob(data);
         if (data.status !== "running" && intervalRef.current) clearInterval(intervalRef.current);
       } catch { /* ignore */ }

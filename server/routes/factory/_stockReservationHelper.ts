@@ -77,7 +77,7 @@ export async function syncProformaReservations(
         GROUP BY fb.article_code`,
   );
   const loadedMap = new Map<string, number>(
-    ((loadedRaw as any).rows ?? (loadedRaw as any[])).map((r: any) => [
+    ((loadedRaw as any).rows ?? (loadedRaw as unknown as any[])).map((r: any) => [
       r.articleCode as string,
       Number(r.loaded),
     ]),

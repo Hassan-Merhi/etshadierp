@@ -62,7 +62,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
             GROUP BY article_code`,
       );
       const inStockMap = new Map<string, number>(
-        ((inStockRaw as any).rows ?? (inStockRaw as any[])).map((r: any) => [r.articleCode, Number(r.count)]),
+        ((inStockRaw as any).rows ?? (inStockRaw as unknown as any[])).map((r: any) => [r.articleCode, Number(r.count)]),
       );
 
       // 2. totalLoaded — bales physically scanned into LOADING orders ONLY.
@@ -80,7 +80,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
             GROUP BY fb.article_code`,
       );
       const inLoadingMap = new Map<string, number>(
-        ((inLoadingRaw as any).rows ?? (inLoadingRaw as any[])).map((r: any) => [r.articleCode, Number(r.count)]),
+        ((inLoadingRaw as any).rows ?? (inLoadingRaw as unknown as any[])).map((r: any) => [r.articleCode, Number(r.count)]),
       );
 
       // 3. Active proformas + lines (with optional date range filter on createdAt)
@@ -144,7 +144,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
                 AND status = ANY(${ACTIVE_ORDER_STATUSES as unknown as string[]})
               ORDER BY id`,
         );
-        ordersByProforma = ((ordersRaw as any).rows ?? (ordersRaw as any[])).map((r: any) => ({
+        ordersByProforma = ((ordersRaw as any).rows ?? (ordersRaw as unknown as any[])).map((r: any) => ({
           id: Number(r.id),
           proformaId: Number(r.proformaId),
           containerNumber: r.containerNumber ?? null,
@@ -165,7 +165,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               WHERE cob.order_id = ANY(${allOrderIds})
               GROUP BY cob.order_id, fb.article_code`,
         );
-        loadedBalesByOrder = ((balesRaw as any).rows ?? (balesRaw as any[])).map((r: any) => ({
+        loadedBalesByOrder = ((balesRaw as any).rows ?? (balesRaw as unknown as any[])).map((r: any) => ({
           orderId: Number(r.orderId),
           articleCode: r.articleCode,
           count: Number(r.count),
@@ -221,7 +221,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               FROM customer_order_expected_lines
               WHERE order_id = ANY(${allOrderIds})`,
         );
-        allExpectedLines = ((expRaw as any).rows ?? (expRaw as any[])).map((r: any) => ({
+        allExpectedLines = ((expRaw as any).rows ?? (expRaw as unknown as any[])).map((r: any) => ({
           orderId: Number(r.orderId),
           articleCode: r.articleCode,
           expectedQty: Number(r.expectedQty),
@@ -259,7 +259,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       );
       const allProductsMap = new Map<string, string>();
       const weightMap = new Map<string, number>();
-      ((allProductsRaw as any).rows ?? (allProductsRaw as any[])).forEach((r: any) => {
+      ((allProductsRaw as any).rows ?? (allProductsRaw as unknown as any[])).forEach((r: any) => {
         if (r.name) {
           // Map both the code and the article_code so bales stored under either key get a name
           if (r.code)        allProductsMap.set(r.code, r.name);
@@ -298,7 +298,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               WHERE matched_code IS NOT NULL
               ORDER BY matched_code`,
         );
-        ((prodRaw as any).rows ?? (prodRaw as any[])).forEach((r: any) => {
+        ((prodRaw as any).rows ?? (prodRaw as unknown as any[])).forEach((r: any) => {
           if (r.name) productNamesMap[r.articleCode] = r.name;
         });
       }

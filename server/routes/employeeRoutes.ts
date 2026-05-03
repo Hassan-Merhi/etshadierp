@@ -8,7 +8,7 @@ import {
 import { triggerAccountWhatsAppStatement } from "./factoryWhatsappRoutes";
 import {
   locations, inventory, stockItems, stockGroups, ledgerAccounts, employees,
-  employeeGroups, employeeGroupMembers, workerGroups,
+  employeeGroups, employeeGroupMembers,
   suppliers, customers, customerBalances, customerOrders,
   stockTransferVouchers, stockTransferItems, stockAdjustmentVouchers, stockAdjustmentItems,
   containers, containerOffloads, containerOffloadItems, vouchers, voucherEntries, salesItems,

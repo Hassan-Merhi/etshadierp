@@ -39,7 +39,7 @@ async function computeStockTruth(companyId: number) {
         GROUP BY article_code`,
   );
   const inStockMap = new Map<string, number>(
-    ((inStockRaw as any).rows ?? (inStockRaw as any[])).map((r: any) => [r.articleCode, Number(r.count)]),
+    ((inStockRaw as any).rows ?? (inStockRaw as unknown as any[])).map((r: any) => [r.articleCode, Number(r.count)]),
   );
 
   // RESERVED_FOR_ORDER = bales physically picked into an active loading order
@@ -53,7 +53,7 @@ async function computeStockTruth(companyId: number) {
         GROUP BY fb.article_code`,
   );
   const inLoadingMap = new Map<string, number>(
-    ((inLoadingRaw as any).rows ?? (inLoadingRaw as any[])).map((r: any) => [r.articleCode, Number(r.count)]),
+    ((inLoadingRaw as any).rows ?? (inLoadingRaw as unknown as any[])).map((r: any) => [r.articleCode, Number(r.count)]),
   );
 
   // ── proformaStockReservations is the backend SOT for reservedNotYetLoaded ──
@@ -67,7 +67,7 @@ async function computeStockTruth(companyId: number) {
         GROUP BY article_code`,
   );
   const reservedNotYetLoadedMap = new Map<string, number>(
-    ((reservedRaw as any).rows ?? (reservedRaw as any[])).map((r: any) => [r.articleCode, Number(r.reservedNotYetLoaded)]),
+    ((reservedRaw as any).rows ?? (reservedRaw as unknown as any[])).map((r: any) => [r.articleCode, Number(r.reservedNotYetLoaded)]),
   );
 
   // Union all known article codes from all three sources
@@ -124,7 +124,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             WHERE company_id = ${companyId} AND active = false`,
       );
       const inactiveArticleCodes = new Set<string>(
-        ((inactiveProductsRaw as any).rows ?? (inactiveProductsRaw as any[])).flatMap((r: any) => {
+        ((inactiveProductsRaw as any).rows ?? (inactiveProductsRaw as unknown as any[])).flatMap((r: any) => {
           const vals: string[] = [];
           if (r.code) vals.push(r.code as string);
           if (r.article_code) vals.push(r.article_code as string);
@@ -178,7 +178,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             GROUP BY co.proforma_id_used, fb.article_code`
       );
       type LoadedEntry = { proformaId: number; articleCode: string; loaded: number };
-      const loadedByProforma: LoadedEntry[] = (loadedByProformaRaw.rows || (loadedByProformaRaw as any[])).map((r: any) => ({
+      const loadedByProforma: LoadedEntry[] = (loadedByProformaRaw.rows || (loadedByProformaRaw as unknown as any[])).map((r: any) => ({
         proformaId:  Number(r.proformaId),
         articleCode: r.articleCode,
         loaded:      Number(r.loaded),
@@ -216,7 +216,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
               WHERE matched_code IS NOT NULL
               ORDER BY matched_code`
         );
-        (prodRaw.rows || (prodRaw as any[])).forEach((r: any) => {
+        (prodRaw.rows || (prodRaw as unknown as any[])).forEach((r: any) => {
           if (r.name) productNamesMap[r.articleCode] = r.name;
         });
       }
@@ -275,7 +275,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             GROUP BY article_code`
       );
       const freeStockCounts: { articleCode: string; count: number }[] =
-        (freeStockRaw.rows || (freeStockRaw as any[])).map((r: any) => ({
+        (freeStockRaw.rows || (freeStockRaw as unknown as any[])).map((r: any) => ({
           articleCode: r.articleCode, count: Number(r.count),
         }));
       const freeStockMap = new Map(freeStockCounts.map(s => [s.articleCode, s.count]));
@@ -287,7 +287,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             WHERE company_id = ${companyId} AND status IN ('LOADING','PENDING_VERIFICATION')
             ORDER BY id`
       );
-      const loadings: any[] = (loadingsRaw.rows || (loadingsRaw as any[])).map((r: any) => ({
+      const loadings: any[] = (loadingsRaw.rows || (loadingsRaw as unknown as any[])).map((r: any) => ({
         id: r.id, customerId: r.customerId, containerNumber: r.containerNumber || null,
         status: r.status, proformaIdUsed: r.proformaIdUsed || null,
       }));
@@ -302,7 +302,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
               WHERE cob.order_id = ANY(${ids})
               GROUP BY cob.order_id, fb.article_code`
         );
-        loadingBales = (balesRaw.rows || (balesRaw as any[])).map((r: any) => ({
+        loadingBales = (balesRaw.rows || (balesRaw as unknown as any[])).map((r: any) => ({
           orderId: r.orderId, articleCode: r.articleCode, count: Number(r.count),
         }));
       }
@@ -368,7 +368,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
               WHERE matched_code IS NOT NULL
               ORDER BY matched_code`
         );
-        (prodRaw.rows || (prodRaw as any[])).forEach((r: any) => { if (r.name) productNameByCode.set(r.articleCode, r.name); });
+        (prodRaw.rows || (prodRaw as unknown as any[])).forEach((r: any) => { if (r.name) productNameByCode.set(r.articleCode, r.name); });
       }
 
       res.json({
