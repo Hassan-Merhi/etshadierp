@@ -163,7 +163,7 @@ export default function CustomerInvoices() {
           ))}
         </div>
       ) : (
-        <Card className="overflow-x-auto">
+        <Card className="table-responsive">
           <Table>
             <TableHeader>
               <TableRow>

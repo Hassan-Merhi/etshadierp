@@ -324,7 +324,7 @@ function StockOTWContent() {
           <CardContent>
             <div className="border rounded-md hidden md:block">
               <Table>
-                <TableHeader className="sticky top-0 z-10 bg-background">
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead className="w-12"></TableHead>
                     <TableHead>Item Name</TableHead>

@@ -532,7 +532,7 @@ export function ERPWorkerDetail({ worker, onBack, onEdit }: Props) {
                       <p className="text-sm">No entries yet</p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
+                    <div className="table-responsive">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -619,7 +619,7 @@ export function ERPWorkerDetail({ worker, onBack, onEdit }: Props) {
                       <p className="text-sm">No advances recorded</p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
+                    <div className="table-responsive">
                       <Table>
                         <TableHeader>
                           <TableRow>

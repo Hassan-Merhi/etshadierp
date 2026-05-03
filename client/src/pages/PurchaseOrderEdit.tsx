@@ -387,7 +387,7 @@ export default function PurchaseOrderEdit() {
             
             <div className="border rounded-md overflow-x-auto">
               <Table>
-                <TableHeader className="sticky top-0 z-10 bg-background">
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead className="w-[40%]">Item</TableHead>
                     <TableHead className="text-right">Quantity</TableHead>

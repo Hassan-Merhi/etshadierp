@@ -224,7 +224,7 @@ export default function ChatbotSettings() {
               ) : users.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No users found.</p>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                 <Table>
                   <TableHeader>
                     <TableRow>

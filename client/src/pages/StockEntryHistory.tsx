@@ -865,7 +865,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       {viewMode === "condensed" && (
         <div className="rounded-md border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-muted/50">
+            <thead className="sticky top-0 z-30 bg-muted/50">
               <tr className="text-left">
                 <th className="px-3 py-2 w-6"></th>
                 <th className="px-3 py-2 text-right">No. Workers</th>
@@ -1034,7 +1034,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       {viewMode === "detailed" && (
         <div className="rounded-md border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-muted/50">
+            <thead className="sticky top-0 z-30 bg-muted/50">
               <tr className="text-left">
                 <th className="px-3 py-2">Reference</th>
                 <th className="px-3 py-2">Date</th>

@@ -2105,10 +2105,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       <div className="hidden md:flex flex-col lg:flex-row gap-4">
         {/* Main Spreadsheet Area */}
         <Card className="flex-1 overflow-hidden min-w-0">
-          <div className="overflow-x-auto">
+          <div className="table-responsive">
             <div className="min-w-[340px] sm:min-w-[500px]">
               {/* Header */}
-              <div className="flex bg-muted/30 border-b border-muted sticky top-0 z-10">
+              <div className="flex bg-muted/30 border-b border-muted sticky top-0 z-30">
                 <div className="w-8 sm:w-12 flex items-center justify-center border-r border-muted h-9 sm:h-10 text-xs text-muted-foreground">
                   #
                 </div>

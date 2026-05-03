@@ -522,9 +522,9 @@ export default function FactoryPayrollPage() {
               <p className="text-muted-foreground mt-2">Generate payroll or adjust the filters to see records</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="table-responsive">
               <Table>
-                <TableHeader className="sticky top-0 z-10 bg-background">
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>Employee Code</TableHead>
                     <TableHead>Worker Name</TableHead>
@@ -819,7 +819,7 @@ export default function FactoryPayrollPage() {
           <Card>
             <CardContent className="pt-0 overflow-x-auto">
               <Table>
-                <TableHeader className="sticky top-0 z-10 bg-background">
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead className="whitespace-nowrap">Code</TableHead>
                     <TableHead className="whitespace-nowrap">Full Name</TableHead>

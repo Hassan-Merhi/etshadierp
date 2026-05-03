@@ -154,7 +154,7 @@ export default function FactoryCashflow() {
                   <p className="text-muted-foreground" data-testid="text-no-freight">No upcoming freight payments</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -192,7 +192,7 @@ export default function FactoryCashflow() {
                   <p className="text-muted-foreground" data-testid="text-no-payroll">No payroll forecast data</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -228,7 +228,7 @@ export default function FactoryCashflow() {
                 <CardTitle>Expected Income</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                   <Table>
                     <TableHeader>
                       <TableRow>

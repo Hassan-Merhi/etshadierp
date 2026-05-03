@@ -306,7 +306,7 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
             ) : (
               <div className="rounded-md border overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 z-10 bg-muted/50">
+                  <thead className="sticky top-0 z-30 bg-muted/50">
                     <tr className="border-b bg-muted/40">
                       <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Account</th>
                       <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Debit</th>
@@ -1179,12 +1179,12 @@ export default function FactoryDaybook() {
             </div>
           ) : !isDetailed ? (
             /* ── CONDENSED VIEW ── */
-            <div className="overflow-x-auto">
+            <div className="table-responsive">
               {(() => {
                 const hasNonUsdC = condensedRows.some((r) => r.currencyCode !== "USD");
                 return (
                   <Table>
-                    <TableHeader className="sticky top-0 z-10 bg-background">
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead className="w-full">Date</TableHead>
                         {isAdminOrOwner && <TableHead className="text-right whitespace-nowrap">Amount</TableHead>}
@@ -1345,7 +1345,7 @@ export default function FactoryDaybook() {
               {/* Desktop table */}
               <div className="hidden md:block overflow-x-auto">
                 <Table>
-                  <TableHeader className="sticky top-0 z-10 bg-background">
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead className="whitespace-nowrap">Date</TableHead>
                       <TableHead className="w-full">Description</TableHead>

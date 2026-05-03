@@ -228,7 +228,7 @@ export default function FactoryProfitability() {
                       <p className="text-muted-foreground" data-testid="text-no-data">No bale cost data for selected range</p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
+                    <div className="table-responsive">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -332,7 +332,7 @@ export default function FactoryProfitability() {
                       <p className="text-muted-foreground" data-testid="text-no-data">No container profitability data for selected range</p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
+                    <div className="table-responsive">
                       <Table>
                         <TableHeader>
                           <TableRow>

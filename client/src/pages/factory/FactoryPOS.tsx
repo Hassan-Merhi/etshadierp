@@ -711,10 +711,10 @@ export default function FactoryPOS() {
       <div className="hidden md:flex flex-col lg:flex-row gap-4">
         {/* Main Table */}
         <Card className="flex-1 overflow-hidden min-w-0">
-          <div className="overflow-x-auto">
+          <div className="table-responsive">
             <div className="min-w-[400px]">
               {/* Header */}
-              <div className="flex bg-muted/30 border-b border-muted sticky top-0 z-10">
+              <div className="flex bg-muted/30 border-b border-muted sticky top-0 z-30">
                 <div className="w-10 flex items-center justify-center border-r border-muted h-10 text-xs text-muted-foreground">#</div>
                 {COLUMNS.map(col => (
                   <div key={col.key} className={`${col.width} flex items-center px-3 border-r border-muted h-10 text-xs text-muted-foreground`}>

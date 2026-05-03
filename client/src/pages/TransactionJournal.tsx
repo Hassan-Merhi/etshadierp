@@ -684,7 +684,7 @@ export default function TransactionJournal() {
           )}
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="table-responsive">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -912,7 +912,7 @@ export default function TransactionJournal() {
                         <h3 className="font-semibold mb-3">Entries</h3>
                         <div className="border rounded-md">
                           <Table>
-                            <TableHeader className="sticky top-0 z-10 bg-background">
+                            <TableHeader className="sticky top-0 z-30 bg-background">
                               <TableRow>
                                 <TableHead>Account</TableHead>
                                 <TableHead className="text-right">Amount</TableHead>
@@ -984,7 +984,7 @@ export default function TransactionJournal() {
                         <h3 className="font-semibold mb-3">Items Sold</h3>
                         <div className="border rounded-md overflow-x-auto">
                           <Table>
-                            <TableHeader className="sticky top-0 z-10 bg-background">
+                            <TableHeader className="sticky top-0 z-30 bg-background">
                               <TableRow>
                                 <TableHead>Item</TableHead>
                                 <TableHead className="text-right w-16">Qty</TableHead>
@@ -1086,7 +1086,7 @@ export default function TransactionJournal() {
                       <h3 className="font-semibold mb-3">Transfer Items</h3>
                       <div className="border rounded-md overflow-x-auto">
                         <Table>
-                          <TableHeader className="sticky top-0 z-10 bg-background">
+                          <TableHeader className="sticky top-0 z-30 bg-background">
                             <TableRow>
                               <TableHead>Item Name</TableHead>
                               <TableHead className="text-right">Qty</TableHead>
@@ -1135,7 +1135,7 @@ export default function TransactionJournal() {
                       <h3 className="font-semibold mb-3">Stock Items</h3>
                       <div className="border rounded-md overflow-x-auto">
                         <Table>
-                          <TableHeader className="sticky top-0 z-10 bg-background">
+                          <TableHeader className="sticky top-0 z-30 bg-background">
                             <TableRow>
                               <TableHead>Item Name</TableHead>
                               {vtype === "Mixed" && <TableHead>Type</TableHead>}
@@ -1225,7 +1225,7 @@ export default function TransactionJournal() {
                           <h3 className="font-semibold mb-3">Line Items</h3>
                           <div className="border rounded-md overflow-x-auto">
                             <Table>
-                              <TableHeader className="sticky top-0 z-10 bg-background">
+                              <TableHeader className="sticky top-0 z-30 bg-background">
                                 <TableRow>
                                   <TableHead>Item</TableHead>
                                   <TableHead className="text-right">Qty</TableHead>

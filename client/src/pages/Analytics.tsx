@@ -1135,7 +1135,7 @@ export default function Analytics() {
                   No asset accounts found
                 </p>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1179,7 +1179,7 @@ export default function Analytics() {
                   No liability accounts found
                 </p>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1223,7 +1223,7 @@ export default function Analytics() {
                   No cash accounts found
                 </p>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1267,7 +1267,7 @@ export default function Analytics() {
                   No loan or bank accounts found
                 </p>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1308,7 +1308,7 @@ export default function Analytics() {
                     ))}
                   </div>
                 ) : netProfitData ? (
-                  <div className="overflow-x-auto">
+                  <div className="table-responsive">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1329,7 +1329,7 @@ export default function Analytics() {
                     No expense accounts found
                   </p>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="table-responsive">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1369,7 +1369,7 @@ export default function Analytics() {
                     ))}
                   </div>
                 ) : netProfitData ? (
-                  <div className="overflow-x-auto">
+                  <div className="table-responsive">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1387,7 +1387,7 @@ export default function Analytics() {
                     No direct expense accounts found
                   </p>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="table-responsive">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1427,7 +1427,7 @@ export default function Analytics() {
                     ))}
                   </div>
                 ) : netProfitData ? (
-                  <div className="overflow-x-auto">
+                  <div className="table-responsive">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1445,7 +1445,7 @@ export default function Analytics() {
                     No indirect expense accounts found
                   </p>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="table-responsive">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1488,7 +1488,7 @@ export default function Analytics() {
               ) : factorySalesByCustomer.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">No factory OS sales data available</p>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1537,7 +1537,7 @@ export default function Analytics() {
               ) : !factoryPosSummary || (factoryPosSummary.byCustomer ?? []).length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">No factory POS sales data available</p>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                   <Table>
                     <TableHeader>
                       <TableRow>

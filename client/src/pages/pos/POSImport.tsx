@@ -844,7 +844,7 @@ export default function POSImport() {
 
               {/* Items Table */}
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11pt', marginBottom: '0', fontVariantNumeric: 'tabular-nums' }}>
-                <thead className="sticky top-0 z-10 bg-muted/50">
+                <thead className="sticky top-0 z-30 bg-muted/50">
                   <tr style={{ borderBottom: '2px solid black' }}>
                     <th style={{ textAlign: 'left', padding: '4px 3px', width: '48%', fontWeight: '900', borderRight: '2px solid black' }}>Description</th>
                     <th style={{ textAlign: 'center', padding: '4px 3px', width: '12%', fontWeight: '900' }}>Qty</th>

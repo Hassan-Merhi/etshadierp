@@ -711,7 +711,7 @@ function LedgerSection({ title, subtitle, icon, badgeColor, rows, total, default
                               <TableCell colSpan={colSpan} className="py-0 px-0">
                                 <div className="pl-8 pr-3 py-2">
                                   <table className="w-full text-xs">
-                                    <thead className="sticky top-0 z-10 bg-muted/50">
+                                    <thead className="sticky top-0 z-30 bg-muted/50">
                                       <tr className="border-b border-border/50">
                                         <th className="text-left py-1 pr-4 font-medium text-muted-foreground">Ref #</th>
                                         <th className="text-right py-1 pr-4 font-medium text-muted-foreground">Weight (kg)</th>
@@ -1232,7 +1232,7 @@ export default function DailyProductionReport() {
         ) : !data || data.rawMaterial.batches.length === 0 ? (
           <p className="text-center text-muted-foreground py-6 text-sm">No mix batches in this period</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="table-responsive">
             <Table>
               <TableHeader>
                 <TableRow>

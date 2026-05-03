@@ -187,7 +187,7 @@ export default function StockTransfers() {
               No stock transfers found for the selected period.
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="table-responsive">
               <Table>
                 <TableHeader>
                   <TableRow>

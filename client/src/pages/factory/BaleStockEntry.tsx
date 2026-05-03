@@ -831,7 +831,7 @@
                   </div>
                 ) : (
                   <Table>
-                    <TableHeader className="sticky top-0 z-10 bg-background">
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Product</TableHead>
                         <TableHead className="text-center w-40">Qty</TableHead>
@@ -1048,7 +1048,7 @@
                 </div>
               )}
               <Table>
-                <TableHeader className="sticky top-0 z-10 bg-background">
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>Product</TableHead>
                     <TableHead className="text-center">Qty</TableHead>
@@ -1729,9 +1729,9 @@
         ) : viewMode === "condensed" ? (
           <Card>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              <div className="table-responsive">
                 <Table>
-                  <TableHeader className="sticky top-0 z-10 bg-background">
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Article</TableHead>
@@ -1781,9 +1781,9 @@
         ) : (
           <Card>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              <div className="table-responsive">
                 <Table>
-                  <TableHeader className="sticky top-0 z-10 bg-background">
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Ref Number</TableHead>
@@ -2198,7 +2198,7 @@
             <CardContent>
               <div className="max-h-96 overflow-y-auto">
                 <Table>
-                  <TableHeader className="sticky top-0 z-10 bg-background">
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>#</TableHead>
                       <TableHead>Item Name</TableHead>

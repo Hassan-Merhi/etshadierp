@@ -97,7 +97,7 @@ export default function FactoryAlerts() {
               <p className="text-muted-foreground" data-testid="text-no-data">No alerts found</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="table-responsive">
               <Table>
                 <TableHeader>
                   <TableRow>

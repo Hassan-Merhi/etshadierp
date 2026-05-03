@@ -312,7 +312,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
         </CardHeader>
         <CardContent className="overflow-auto flex-1 p-0" ref={tableScrollContainer}>
           <table className="w-full text-sm border-collapse">
-            <thead className="sticky top-0 z-10 bg-muted">
+            <thead className="sticky top-0 z-30 bg-muted">
               <tr className="bg-muted border-b">
                 <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r w-[100px] bg-muted font-medium">Date</th>
                 <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r bg-muted font-medium">Particulars</th>

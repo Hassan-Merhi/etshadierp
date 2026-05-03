@@ -177,7 +177,7 @@ export default function FactoryPriceList() {
             </div>
           ) : filteredProducts.length > 0 ? (
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-background">
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Article Code</TableHead>
                   <TableHead>Product Name</TableHead>

@@ -415,7 +415,7 @@ export default function FactoryInvoiceLoadingScan() {
               <span className="font-medium text-sm">All lines fully loaded</span>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="table-responsive">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -726,7 +726,7 @@ export default function FactoryInvoiceLoadingScan() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <div className="table-responsive">
               <Table>
                 <TableHeader>
                   <TableRow>

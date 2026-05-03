@@ -399,9 +399,11 @@
     inset: -1px;
   }
 
-  /* Mobile-responsive table wrapper - makes tables horizontally scrollable */
+  /* Mobile-responsive table wrapper - makes tables horizontally scrollable
+     Safe to use on bordered Cards: no negative margins so the wrapper never
+     escapes its parent's horizontal padding. */
   .table-responsive {
-    @apply w-full overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0;
+    @apply w-full overflow-x-auto;
   }
 
   /* Touch-friendly tap targets */

@@ -287,7 +287,7 @@ export function EditLogTable({ companyId }: { companyId?: number }) {
   return (
     <>
       {selectedLog && <AuditLogDialog log={selectedLog} onClose={() => setSelectedLog(null)} />}
-      <div className="overflow-x-auto">
+      <div className="table-responsive">
         <Table>
           <TableHeader>
             <TableRow>

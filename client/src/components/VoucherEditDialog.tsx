@@ -465,9 +465,9 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                   </Button>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                   <table className="w-full text-sm">
-                    <thead className="border-b sticky top-0 z-10">
+                    <thead className="border-b sticky top-0 z-30">
                       <tr>
                         {(form.watch("voucherType") === "Consumption" || form.watch("voucherType") === "Production") ? (
                           <>

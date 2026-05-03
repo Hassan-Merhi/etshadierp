@@ -997,7 +997,7 @@ export default function FactorySheets() {
         <div className="flex-1 overflow-auto p-4">
           <div className="w-fit mx-auto">
             <table className="border-collapse text-sm" data-testid="grid-table">
-              <thead className="sticky top-0 z-10">
+              <thead className="sticky top-0 z-30">
                 <tr>
                   <th className="border border-border bg-muted px-2 py-1.5 text-left font-medium text-muted-foreground min-w-[180px]">
                     Label

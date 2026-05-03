@@ -137,7 +137,7 @@ export default function PendingInvoices() {
           ))}
         </div>
       ) : (
-        <Card className="overflow-x-auto">
+        <Card className="table-responsive">
           <Table>
             <TableHeader>
               <TableRow>

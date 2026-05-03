@@ -222,9 +222,9 @@ export default function FactorySupplierStatement() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
+                  <div className="table-responsive">
                     <Table>
-                      <TableHeader className="sticky top-0 z-10 bg-background">
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Container</TableHead>
                           <TableHead>Date</TableHead>
@@ -469,9 +469,9 @@ export default function FactorySupplierStatement() {
                 </p>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                   <Table>
-                    <TableHeader className="sticky top-0 z-10 bg-background">
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Container</TableHead>
                         <TableHead>Purchase Supplier</TableHead>

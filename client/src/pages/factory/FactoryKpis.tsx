@@ -145,7 +145,7 @@ export default function FactoryKpis() {
                   <p className="text-muted-foreground" data-testid="text-no-data">No daily production data for selected range</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -189,7 +189,7 @@ export default function FactoryKpis() {
                     <p className="text-muted-foreground" data-testid="text-no-data">No worker performance data for selected range</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="table-responsive">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -236,7 +236,7 @@ export default function FactoryKpis() {
                     <p className="text-muted-foreground" data-testid="text-no-data">No mix efficiency data for selected range</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="table-responsive">
                     <Table>
                       <TableHeader>
                         <TableRow>

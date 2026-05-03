@@ -286,14 +286,14 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
         {/* Main table */}
         <Card>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <div className="table-responsive">
               {isLoading ? (
                 <div className="p-8 text-center text-muted-foreground">Loading units…</div>
               ) : grouped.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground">No {unitType === "WAREHOUSE" ? "warehouses" : "shops"} yet. Add your first unit above.</div>
               ) : (
                 <table className="w-full text-sm">
-                  <thead className="bg-muted/50 border-b sticky top-0 z-10">
+                  <thead className="bg-muted/50 border-b sticky top-0 z-30">
                     <tr>
                       <th className="text-left px-3 py-2 font-semibold">Unit</th>
                       <th className="text-left px-3 py-2 font-semibold">Tenant</th>

@@ -151,7 +151,7 @@ export default function FactoryStockItemDetail() {
                     </div>
                   </div>
                   {data.currentStock.locations.length > 0 && (
-                    <div className="overflow-x-auto">
+                    <div className="table-responsive">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -196,7 +196,7 @@ export default function FactoryStockItemDetail() {
               {data.pressed.length === 0 ? (
                 <div className="py-6 text-center text-muted-foreground text-sm">No stock entries yet</div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -239,7 +239,7 @@ export default function FactoryStockItemDetail() {
               {data.sales.length === 0 ? (
                 <div className="py-6 text-center text-muted-foreground text-sm">No sales recorded</div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -289,7 +289,7 @@ export default function FactoryStockItemDetail() {
               {data.loaded.length === 0 ? (
                 <div className="py-6 text-center text-muted-foreground text-sm">No bales currently in loading</div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                   <Table>
                     <TableHeader>
                       <TableRow>

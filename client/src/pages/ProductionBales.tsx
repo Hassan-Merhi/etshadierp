@@ -366,7 +366,7 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
             )}
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="table-responsive">
             <Table>
               <TableHeader>
                 <TableRow>

@@ -440,7 +440,7 @@ export default function CustomerProformas() {
                       </div>
 
                       {proforma.lines && proforma.lines.length > 0 ? (
-                        <div className="overflow-x-auto">
+                        <div className="table-responsive">
                           <Table>
                             <TableHeader>
                               <TableRow>

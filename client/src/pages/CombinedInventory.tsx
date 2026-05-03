@@ -475,7 +475,7 @@ function GroupsView({
       <CardContent className="p-0">
         <div className="overflow-x-auto rounded-md">
           <Table>
-            <TableHeader className="sticky top-0 z-10 bg-background">
+            <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
                 <TableHead>Stock Group</TableHead>
                 <TableHead className="text-right hidden sm:table-cell">Items</TableHead>
@@ -585,7 +585,7 @@ function ItemsTable({
       <CardContent className="p-0">
         <div className="overflow-x-auto rounded-md">
           <Table>
-            <TableHeader className="sticky top-0 z-10 bg-background">
+            <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
                 <TableHead>Item Name</TableHead>
                 <TableHead className="text-right">OTW Qty</TableHead>

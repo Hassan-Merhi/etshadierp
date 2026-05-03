@@ -293,7 +293,7 @@ export default function FactoryWaste() {
               <p className="text-muted-foreground" data-testid="text-no-data">No waste entries for selected range</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="table-responsive">
               <Table>
                 <TableHeader>
                   <TableRow>

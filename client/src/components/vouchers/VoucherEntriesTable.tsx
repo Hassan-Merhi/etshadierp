@@ -180,7 +180,7 @@ export function VoucherEntriesTable({
       {/* ── Desktop / tablet: original table ── */}
       <div className="hidden sm:block border rounded-md overflow-hidden">
         <table className="w-full">
-          <thead className="bg-muted/50 sticky top-0 z-10">
+          <thead className="bg-muted/50 sticky top-0 z-30">
             <tr>
               <th className="text-center p-3 font-medium w-8 text-muted-foreground">#</th>
               <th className="text-left p-3 font-medium">Account</th>

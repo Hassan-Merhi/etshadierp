@@ -230,7 +230,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
         </CardHeader>
         <CardContent className="overflow-auto flex-1 p-0" ref={tableScrollContainer}>
           <table className="w-full text-sm border-collapse" style={{ minWidth: '900px' }}>
-            <thead className="sticky top-0 z-10">
+            <thead className="sticky top-0 z-30">
               <tr className="bg-muted border-b">
                 <th rowSpan={2} className="text-left align-bottom px-3 py-2 border-r font-semibold w-28">Month</th>
                 <th colSpan={posUser ? 1 : 3} className="text-center px-2 py-1.5 border-r font-semibold text-muted-foreground">Opening</th>

@@ -445,7 +445,7 @@ export default function WipersReEntry() {
 
             {/* Cart table */}
             {cart.length > 0 ? (
-              <div className="overflow-x-auto">
+              <div className="table-responsive">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -748,7 +748,7 @@ export default function WipersReEntry() {
                 {activeLocations.find(l => l.id.toString() === selectedLocationId)?.name || "-"}
               </span>
             </div>
-            <div className="overflow-x-auto">
+            <div className="table-responsive">
               <Table>
                 <TableHeader>
                   <TableRow>

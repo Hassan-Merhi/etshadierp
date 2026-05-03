@@ -322,7 +322,7 @@ export default function ImportStockItems() {
           <CardContent>
             <div className="border rounded-md overflow-auto max-h-96">
               <table className="w-full">
-                <thead className="sticky top-0 z-10 bg-muted/50">
+                <thead className="sticky top-0 z-30 bg-muted/50">
                   <tr className="border-b bg-muted/50">
                     <th className="text-left p-2 text-sm font-medium">Code</th>
                     <th className="text-left p-2 text-sm font-medium">Name</th>

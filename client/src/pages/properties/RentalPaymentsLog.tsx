@@ -142,7 +142,7 @@ export default function RentalPaymentsLog({
       {/* Payments table */}
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="table-responsive">
             {isLoading ? (
               <div className="p-8 text-center text-muted-foreground">Loading payments…</div>
             ) : filtered.length === 0 ? (

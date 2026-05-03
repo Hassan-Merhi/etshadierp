@@ -429,7 +429,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             <CardDescription>Your last 10 shifts at this location</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            <div className="table-responsive">
             <Table>
               <TableHeader>
                 <TableRow>

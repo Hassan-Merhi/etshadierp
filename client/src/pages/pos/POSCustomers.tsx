@@ -279,7 +279,7 @@ export default function POSCustomers() {
               <p className="text-sm mt-1">{searchQuery ? "Try a different search term" : "Create your first customer to get started"}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="table-responsive">
               <Table>
                 <TableHeader>
                   <TableRow>

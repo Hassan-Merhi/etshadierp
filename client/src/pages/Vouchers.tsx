@@ -4164,7 +4164,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   {/* ── Desktop/tablet journal table (hidden on mobile) ── */}
                   <div className="hidden sm:block border rounded-md overflow-hidden overflow-x-auto">
                     <table className="w-full min-w-[500px]">
-                      <thead className="bg-muted/50 sticky top-0 z-10">
+                      <thead className="bg-muted/50 sticky top-0 z-30">
                         <tr>
                           <th className="text-left p-3 font-medium w-[10%]">DR/CR</th>
                           <th className="text-left p-3 font-medium w-[50%]">Account</th>
@@ -4990,7 +4990,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   <div className="hidden sm:block overflow-x-auto">
                     <div className="min-w-[400px]">
                       {/* Header */}
-                      <div className="flex bg-muted/50 border-b sticky top-0 z-10">
+                      <div className="flex bg-muted/50 border-b sticky top-0 z-30">
                         <div className="w-10 sm:w-12 flex items-center justify-center border-r h-9 sm:h-10 font-medium text-xs">
                           #
                         </div>
@@ -5888,7 +5888,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                           </div>
                         </div>
                         {rev.items && rev.items.length > 0 && (
-                          <div className="overflow-x-auto">
+                          <div className="table-responsive">
                             <table className="w-full text-sm">
                               <thead className="bg-muted/30">
                                 <tr>
@@ -6145,7 +6145,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                       <div className="hidden sm:block overflow-x-auto">
                         <div className="min-w-[400px]">
                           {/* Header */}
-                          <div className="flex bg-muted/50 border-b sticky top-0 z-10">
+                          <div className="flex bg-muted/50 border-b sticky top-0 z-30">
                             <div className="w-10 sm:w-12 flex items-center justify-center border-r h-9 sm:h-10 font-medium text-xs">
                               #
                             </div>

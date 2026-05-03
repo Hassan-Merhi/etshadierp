@@ -411,7 +411,7 @@ export default function SalesReportDetail() {
             <CardContent className="p-0">
               <div className="hidden md:block overflow-x-auto">
                 <Table>
-                  <TableHeader className="sticky top-0 z-10 bg-background">
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead className="w-6"></TableHead>
                       <TableHead>Item / Location</TableHead>

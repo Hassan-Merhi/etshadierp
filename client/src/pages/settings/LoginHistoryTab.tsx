@@ -140,9 +140,9 @@ export function LoginHistoryTab() {
         </Card>
       ) : (
         <Card>
-          <div className="overflow-x-auto">
+          <div className="table-responsive">
             <table className="w-full text-sm" data-testid="table-login-history">
-              <thead className="sticky top-0 z-10 bg-muted/50">
+              <thead className="sticky top-0 z-30 bg-muted/50">
                 <tr className="border-b bg-muted/50">
                   <th className="text-left p-3 font-medium">User</th>
                   <th className="text-left p-3 font-medium">Company</th>

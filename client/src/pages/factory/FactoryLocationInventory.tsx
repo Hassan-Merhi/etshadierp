@@ -1098,7 +1098,7 @@ export default function FactoryLocationInventory() {
           ) : (
             <div className="rounded-md border overflow-hidden w-full">
               <table className="w-full text-sm">
-                <thead className="bg-muted/50 sticky top-0 z-10">
+                <thead className="bg-muted/50 sticky top-0 z-30">
                   <tr className="h-12">
                     <th className="text-left px-3 font-medium">Name</th>
                   </tr>
@@ -1622,7 +1622,7 @@ export default function FactoryLocationInventory() {
                   <col style={{ width: "100px" }} />
                   {!proformaMode && <col style={{ width: "100px" }} />}
                 </colgroup>
-                <thead className="bg-muted/50 sticky top-0 z-10">
+                <thead className="bg-muted/50 sticky top-0 z-30">
                   <tr className="h-12">
                     {proformaMode && <th className="px-2"></th>}
                     <th className="text-left px-3 font-medium">Category</th>
@@ -1691,7 +1691,7 @@ export default function FactoryLocationInventory() {
                       <col style={{ width: "100px" }} />
                       {!proformaMode && <col style={{ width: "100px" }} />}
                     </colgroup>
-                    <thead className="bg-muted/50 sticky top-0 z-10">
+                    <thead className="bg-muted/50 sticky top-0 z-30">
                       <tr className="h-12">
                         {proformaMode && <th className="px-2"></th>}
                         <th className="text-left px-3 font-medium">Category</th>

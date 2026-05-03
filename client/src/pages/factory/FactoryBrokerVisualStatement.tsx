@@ -229,7 +229,7 @@ export default function FactoryBrokerVisualStatement() {
                 <p className="text-sm text-muted-foreground">No containers found for this broker{from || to ? " in the selected date range" : ""}.</p>
               ) : (
                 <Table>
-                  <TableHeader className="sticky top-0 z-10 bg-background">
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow className="bg-muted/50 text-xs">
                       <TableHead className="h-8 whitespace-nowrap">Supplier</TableHead>
                       <TableHead className="h-8 whitespace-nowrap">Container</TableHead>
@@ -356,7 +356,7 @@ export default function FactoryBrokerVisualStatement() {
                 <p className="text-sm text-muted-foreground">No payments recorded.</p>
               ) : (
                 <Table>
-                  <TableHeader className="sticky top-0 z-10 bg-background">
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow className="bg-muted/50 text-xs">
                       <TableHead className="h-8">Date</TableHead>
                       <TableHead className="h-8">Type</TableHead>
@@ -443,9 +443,9 @@ export default function FactoryBrokerVisualStatement() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="overflow-x-auto">
+              <div className="table-responsive">
                 <Table>
-                  <TableHeader className="sticky top-0 z-10 bg-background">
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow className="bg-muted/50 text-xs">
                       <TableHead className="h-8">Item</TableHead>
                       {allCurrencies.map(cc => (

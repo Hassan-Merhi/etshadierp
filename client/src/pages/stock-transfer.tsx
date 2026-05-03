@@ -852,7 +852,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
               <p>No transfers yet</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="table-responsive">
               <Table>
                 <TableHeader>
                   <TableRow>

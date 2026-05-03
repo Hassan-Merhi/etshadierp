@@ -371,7 +371,7 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
         <div className="flex-1 overflow-auto">
           <table className="w-full text-sm border-collapse min-w-max">
             <thead>
-              <tr className="bg-muted sticky top-0 z-10">
+              <tr className="bg-muted sticky top-0 z-30">
                 <th className="text-left px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[200px] sticky left-0 bg-muted z-20">Product</th>
                 <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[72px]">On Hand</th>
                 <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[80px] text-amber-600 dark:text-amber-400">Reserved</th>

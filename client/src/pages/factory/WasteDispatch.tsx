@@ -142,7 +142,7 @@ export default function WasteDispatch() {
       </head><body>
       <h1>Waste Disposal Record</h1>
       <p class="sub">Dispatch No: ${d.dispatchNumber}&nbsp;|&nbsp;Date: ${d.dispatchDate}${d.notes ? `&nbsp;|&nbsp;Note: ${d.notes}` : ""}</p>
-      <table><thead className="sticky top-0 z-10 bg-muted/50"><tr>
+      <table><thead className="sticky top-0 z-30 bg-muted/50"><tr>
         <th>Reference</th><th>Product</th>
         <th style="text-align:right">Weight (kg)</th>
         <th style="text-align:right">Cost Written Off</th>
@@ -651,7 +651,7 @@ export default function WasteDispatch() {
                           )}
                           {dispatchBales.length > 0 ? (
                             <table className="w-full text-xs mt-1 border-collapse">
-                              <thead className="sticky top-0 z-10 bg-muted/50">
+                              <thead className="sticky top-0 z-30 bg-muted/50">
                                 <tr className="border-b">
                                   <th className="text-left py-1.5 font-semibold text-muted-foreground">Reference</th>
                                   <th className="text-left py-1.5 font-semibold text-muted-foreground">Product</th>
@@ -771,7 +771,7 @@ export default function WasteDispatch() {
                 </p>
               </div>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead className="sticky top-0 z-10 bg-muted/50">
+                <thead className="sticky top-0 z-30 bg-muted/50">
                   <tr>
                     {["Reference", "Weight (kg)", "Cost Written Off"].map((h, i) => (
                       <th key={h} style={{ border: "1px solid #ccc", padding: "6px 8px", background: "#f3f4f6", textAlign: i === 0 ? "left" : "right", fontWeight: "bold" }}>

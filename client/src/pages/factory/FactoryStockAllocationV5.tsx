@@ -390,7 +390,7 @@ export default function FactoryStockAllocationV5() {
         <div className="overflow-auto rounded-md border max-h-[calc(100vh-180px)]">
           <table className="w-full text-sm border-collapse min-w-max">
             <thead>
-              <tr className="bg-muted sticky top-0 z-10">
+              <tr className="bg-muted sticky top-0 z-30">
                 <th className="text-left px-3 py-2.5 font-medium border-b border-r whitespace-nowrap sticky left-0 bg-muted z-20 min-w-[200px]">Product</th>
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[120px]">Stock Available</th>
                 <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[130px] text-amber-600 dark:text-amber-400">Expected to Load</th>

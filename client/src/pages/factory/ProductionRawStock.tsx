@@ -1505,7 +1505,7 @@ export default function ProductionRawStock() {
             </div>
           ) : rawStock && rawStock.length > 0 ? (
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-background">
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Supplier</TableHead>
                   <TableHead>Source</TableHead>
@@ -2284,7 +2284,7 @@ export default function ProductionRawStock() {
       {offloadDialogOpen && (
         <div className="fixed inset-0 z-50 bg-background flex flex-col">
           {/* Full-page header */}
-          <div className="sticky top-0 z-10 border-b bg-background px-6 py-3 flex items-center justify-between shrink-0">
+          <div className="sticky top-0 z-30 border-b bg-background px-6 py-3 flex items-center justify-between shrink-0">
             <div>
               <h2 className="text-lg font-semibold">Offload Container to Production</h2>
               <p className="text-sm text-muted-foreground">Enter the actual received weight and verify cost details</p>

@@ -198,7 +198,7 @@ export default function FactoryDashboard() {
           {containersOtw.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">No containers currently in transit or pending</p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="table-responsive">
               <Table>
                 <TableHeader>
                   <TableRow>

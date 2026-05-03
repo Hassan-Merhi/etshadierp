@@ -344,7 +344,7 @@ export default function FactoryCustomerStatement() {
       </div>
 
       {/* Statement table */}
-      <Card className="overflow-x-auto">
+      <Card className="table-responsive">
         <Table>
           <TableHeader>
             <TableRow>

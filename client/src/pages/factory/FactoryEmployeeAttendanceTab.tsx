@@ -271,7 +271,7 @@ export default function FactoryEmployeeAttendanceTab() {
                 <>
                   <div className="hidden sm:block overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="sticky top-0 z-10">
+                      <thead className="sticky top-0 z-30">
                         <tr className="border-b bg-muted/40">
                           <th className="text-left px-4 py-2 font-medium text-muted-foreground w-8">#</th>
                           <th className="text-left px-4 py-2 font-medium text-muted-foreground">Employee</th>

@@ -198,7 +198,7 @@ export default function OptionalVouchers() {
               </div>
               <div className="overflow-x-auto rounded-md border">
                 <Table>
-                  <TableHeader className="sticky top-0 z-10 bg-background">
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Type</TableHead>

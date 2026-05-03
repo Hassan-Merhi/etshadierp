@@ -230,7 +230,7 @@ export default function FactoryCustomers() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="table-responsive">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -346,7 +346,7 @@ export default function FactoryCustomers() {
             {deletedCustomers.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8 px-4">No deleted customers found</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="table-responsive">
                 <Table>
                   <TableHeader>
                     <TableRow>

@@ -288,7 +288,7 @@ export default function ContainerVerification() {
           <CardContent>
             <div className="max-h-80 overflow-y-auto">
               <Table>
-                <TableHeader className="sticky top-0 z-10 bg-background">
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>Barcode</TableHead>
                     <TableHead>Item</TableHead>
@@ -441,7 +441,7 @@ export default function ContainerVerification() {
                   ) : (
                     <div className="max-h-[400px] overflow-y-auto">
                     <Table>
-                      <TableHeader className="sticky top-0 z-10 bg-background">
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Item</TableHead>
                           <TableHead className="text-right">Expected</TableHead>
@@ -488,7 +488,7 @@ export default function ContainerVerification() {
                   ) : (
                     <div className="max-h-[400px] overflow-y-auto">
                     <Table>
-                      <TableHeader className="sticky top-0 z-10 bg-background">
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Item</TableHead>
                           <TableHead className="text-right">Expected</TableHead>
@@ -535,7 +535,7 @@ export default function ContainerVerification() {
                   ) : (
                     <div className="max-h-[400px] overflow-y-auto">
                     <Table>
-                      <TableHeader className="sticky top-0 z-10 bg-background">
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Item</TableHead>
                           <TableHead className="text-right">Loaded Qty</TableHead>
@@ -582,7 +582,7 @@ export default function ContainerVerification() {
                   ) : (
                     <div className="max-h-[400px] overflow-y-auto">
                     <Table>
-                      <TableHeader className="sticky top-0 z-10 bg-background">
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Item</TableHead>
                           <TableHead className="text-right">Proforma</TableHead>
@@ -646,7 +646,7 @@ export default function ContainerVerification() {
                   ) : (
                     <div className="max-h-[300px] overflow-y-auto">
                       <Table>
-                        <TableHeader className="sticky top-0 z-10 bg-background">
+                        <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
                             <TableHead className="text-xs py-1.5 px-3">Name</TableHead>
                             <TableHead className="text-xs text-right py-1.5 px-3">Excess</TableHead>
@@ -686,7 +686,7 @@ export default function ContainerVerification() {
                   ) : (
                     <div className="max-h-[300px] overflow-y-auto">
                       <Table>
-                        <TableHeader className="sticky top-0 z-10 bg-background">
+                        <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
                             <TableHead className="text-xs py-1.5 px-3">Name</TableHead>
                             <TableHead className="text-xs text-right py-1.5 px-3">Short</TableHead>
@@ -726,7 +726,7 @@ export default function ContainerVerification() {
                   ) : (
                     <div className="max-h-[300px] overflow-y-auto">
                       <Table>
-                        <TableHeader className="sticky top-0 z-10 bg-background">
+                        <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
                             <TableHead className="text-xs py-1.5 px-3">Name</TableHead>
                             <TableHead className="text-xs text-right py-1.5 px-3">Qty</TableHead>
@@ -766,7 +766,7 @@ export default function ContainerVerification() {
                   ) : (
                     <div className="max-h-[300px] overflow-y-auto">
                       <Table>
-                        <TableHeader className="sticky top-0 z-10 bg-background">
+                        <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
                             <TableHead className="text-xs py-1.5 px-3">Name</TableHead>
                             <TableHead className="text-xs text-right py-1.5 px-3">Diff/Bale</TableHead>

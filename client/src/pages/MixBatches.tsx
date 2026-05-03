@@ -286,9 +286,9 @@ export default function MixBatches() {
               <Skeleton className="h-12 w-full" />
             </div>
           ) : filteredBatches && filteredBatches.length > 0 ? (
-            <div className="overflow-x-auto">
+            <div className="table-responsive">
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-background">
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead className="text-right">Total (kg)</TableHead>

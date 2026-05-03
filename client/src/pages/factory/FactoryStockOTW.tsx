@@ -237,7 +237,7 @@ export default function FactoryStockOTW() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                   <Table>
                     <TableHeader>
                       <TableRow>

@@ -235,7 +235,7 @@ export default function FactoryInvoices() {
           ))}
         </div>
       ) : (
-        <Card className="overflow-x-auto">
+        <Card className="table-responsive">
           <Table>
             <TableHeader>
               <TableRow>

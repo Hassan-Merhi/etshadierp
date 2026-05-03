@@ -474,7 +474,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
         <div className="flex-1 overflow-auto">
           <table className="w-full text-sm border-collapse min-w-max">
             <thead>
-              <tr className="bg-muted sticky top-0 z-10">
+              <tr className="bg-muted sticky top-0 z-30">
                 <th className="text-left px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[200px] sticky left-0 bg-muted z-20">Product</th>
                 <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[130px]">Available Balance</th>
                 <th className="text-center px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[110px]">Qty / Container</th>

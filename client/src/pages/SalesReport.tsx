@@ -800,7 +800,7 @@ export default function SalesReport() {
             <>
             <div className="hidden md:block overflow-x-auto">
               <Table>
-                <TableHeader className="sticky top-0 z-10 bg-background">
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead className="text-right">Items</TableHead>

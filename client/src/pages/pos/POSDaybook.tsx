@@ -631,7 +631,7 @@ export default function POSDaybook() {
               <p className="text-sm mt-1">Sales and transfers will appear here for the selected period</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="table-responsive">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1009,7 +1009,7 @@ export default function POSDaybook() {
                   </div>
                 )}
 
-                <div className="overflow-x-auto">
+                <div className="table-responsive">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium text-muted-foreground">Items Sold</p>
                     <p className="text-xs text-muted-foreground">Hover or use ↑↓ to select · Alt+S to view item</p>
@@ -1181,7 +1181,7 @@ export default function POSDaybook() {
                     )}
                     {/* Items table */}
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11pt', marginBottom: '0', fontVariantNumeric: 'tabular-nums', border: '1px solid #999' }}>
-                      <thead className="sticky top-0 z-10 bg-muted/50">
+                      <thead className="sticky top-0 z-30 bg-muted/50">
                         <tr>
                           <th style={{ textAlign: 'left', padding: '4px 7px', width: '30%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Description</th>
                           <th style={{ textAlign: 'center', padding: '4px 7px', width: '6%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Qty</th>

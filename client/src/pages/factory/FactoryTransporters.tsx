@@ -292,7 +292,7 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
             <h2 className="text-lg font-bold">Transporter Statement — {data.name}</h2>
             {data.phone && <p className="text-sm">{data.phone}</p>}
           </div>
-          <div className="overflow-x-auto">
+          <div className="table-responsive">
             {data.transactions.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">No transactions yet. Record a charge to get started.</div>
             ) : (

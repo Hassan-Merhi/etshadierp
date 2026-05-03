@@ -456,7 +456,7 @@ export default function Agents() {
 
                     <div className="rounded-md border overflow-x-auto print:border-0">
                       <Table>
-                        <TableHeader className="sticky top-0 z-10 bg-background">
+                        <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow className="bg-muted/30">
                             <TableHead className="w-[110px] py-2">Date</TableHead>
                             <TableHead className="w-[100px] py-2">Type</TableHead>

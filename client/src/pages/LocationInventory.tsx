@@ -1616,7 +1616,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             ) : (
               <div className="rounded-md border overflow-hidden w-full min-w-0">
                 <table className="w-full table-fixed text-sm">
-                  <thead className="bg-muted/50 sticky top-0 z-10">
+                  <thead className="bg-muted/50 sticky top-0 z-30">
                     <tr className="h-12">
                       <th className="text-left px-3 font-medium">Name</th>
                     </tr>
@@ -1822,9 +1822,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 description={allInventoryData.length === 0 ? "Stock has not been recorded across any location yet." : "Try adjusting your search to see other items."}
               />
             ) : (
-              <div className="overflow-x-auto">
+              <div className="table-responsive">
                 <table className="w-full text-sm border-collapse">
-                  <thead className="sticky top-0 z-10 bg-muted/50">
+                  <thead className="sticky top-0 z-30 bg-muted/50">
                     <tr className="bg-muted/60 border-b">
                       <th className="text-left px-4 py-2.5 font-medium text-muted-foreground whitespace-nowrap sticky left-0 bg-muted/60 z-10">
                         Item Name
@@ -2226,7 +2226,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                       </>
                     )}
                   </colgroup>
-                  <thead className="bg-muted/50 sticky top-0 z-10">
+                  <thead className="bg-muted/50 sticky top-0 z-30">
                     <tr className="h-12">
                       <th className="text-left px-3 font-medium">Name</th>
                       <th className="text-right px-3 font-medium">Items</th>
@@ -2517,7 +2517,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                     </>
                   )}
                 </colgroup>
-                <thead className="bg-muted/50 sticky top-0 z-10">
+                <thead className="bg-muted/50 sticky top-0 z-30">
                   <tr className="h-12">
                     <th className="text-left px-3 font-medium">Name</th>
                     {showMovement ? (
@@ -2945,7 +2945,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                   </>
                                 )}
                               </colgroup>
-                              <thead className="bg-muted/50 sticky top-0 z-10">
+                              <thead className="bg-muted/50 sticky top-0 z-30">
                                 <tr className="h-10">
                                   <th className="text-left px-3 font-medium">Name</th>
                                   <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>Quantity</th>
@@ -3022,7 +3022,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
                       {/* Print view - Proper table layout */}
                       <table className="print-inventory-table">
-                        <thead className="sticky top-0 z-10 bg-muted/50">
+                        <thead className="sticky top-0 z-30 bg-muted/50">
                           <tr>
                             <th>Particulars</th>
                             <th className="qty-col">Closing Balance<br/><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Quantity</span></th>

@@ -892,7 +892,7 @@ export default function FactoryWorkerDetail() {
                       <p className="font-medium">No payroll records</p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
+                    <div className="table-responsive">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -985,7 +985,7 @@ export default function FactoryWorkerDetail() {
                       <p className="text-sm">No advances given</p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
+                    <div className="table-responsive">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -1584,7 +1584,7 @@ export default function FactoryWorkerDetail() {
                   {balesLoading ? (
                     <Skeleton className="h-48 w-full" />
                   ) : bales?.length ? (
-                    <div className="overflow-x-auto">
+                    <div className="table-responsive">
                       <Table>
                         <TableHeader>
                           <TableRow>
