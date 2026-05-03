@@ -5,6 +5,7 @@ import { ArrowLeft, Calendar } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -125,9 +126,7 @@ export default function StockItemHistory() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-lg sm:text-2xl font-bold" data-testid="text-page-title">
-              Stock Item Monthly Summary
-            </h1>
+            <PageHeader title="Stock Item Monthly Summary" />
             {data?.stockItem && (
               <p className="text-sm text-muted-foreground" data-testid="text-item-name">
                 {data.stockItem.name} ({data.stockItem.code})

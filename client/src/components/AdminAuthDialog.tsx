@@ -1,9 +1,8 @@
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ShieldAlert } from "lucide-react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface AdminAuthDialogProps {
   open: boolean;
@@ -12,77 +11,69 @@ interface AdminAuthDialogProps {
   action?: string;
 }
 
-export function AdminAuthDialog({ open, onOpenChange, onAuthorized, action = "create this item" }: AdminAuthDialogProps) {
+/**
+ * AdminAuthDialog — admin credential prompt that simply hands the entered
+ * username/password back to the caller. Built on top of the canonical
+ * {@link ConfirmDialog} primitive for consistent layout and behavior.
+ */
+export function AdminAuthDialog({
+  open,
+  onOpenChange,
+  onAuthorized,
+  action = "create this item",
+}: AdminAuthDialogProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleSubmit = () => {
-    if (!username.trim() || !password) return;
-    onAuthorized({ username: username.trim(), password });
-    setUsername("");
-    setPassword("");
-  };
+  useEffect(() => {
+    if (!open) {
+      setUsername("");
+      setPassword("");
+    }
+  }, [open]);
 
-  const handleClose = () => {
-    setUsername("");
-    setPassword("");
-    onOpenChange(false);
-  };
+  const canSubmit = !!username.trim() && !!password;
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="h-5 w-5 text-amber-500" />
-            <DialogTitle>Admin Authorization Required</DialogTitle>
-          </div>
-          <DialogDescription>
-            You need an admin to authorize in order to {action}. Enter their credentials below.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 py-2">
-          <div className="space-y-2">
-            <Label htmlFor="admin-auth-username">Admin Username</Label>
-            <Input
-              id="admin-auth-username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter admin username"
-              autoComplete="off"
-              data-testid="input-admin-auth-username"
-              onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="admin-auth-password">Admin Password</Label>
-            <Input
-              id="admin-auth-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter admin password"
-              autoComplete="new-password"
-              data-testid="input-admin-auth-password"
-              onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
-            />
-          </div>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Admin Authorization Required"
+      description={`You need an admin to authorize in order to ${action}. Enter their credentials below.`}
+      icon={ShieldAlert}
+      tone="warning"
+      confirmText="Authorize"
+      confirmDisabled={!canSubmit}
+      onConfirm={() => {
+        onAuthorized({ username: username.trim(), password });
+      }}
+      data-testid="dialog-admin-auth"
+    >
+      <div className="space-y-3">
+        <div className="space-y-2">
+          <Label htmlFor="admin-auth-username">Admin Username</Label>
+          <Input
+            id="admin-auth-username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Enter admin username"
+            autoComplete="off"
+            data-testid="input-admin-auth-username"
+          />
         </div>
-
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={handleClose} data-testid="button-admin-auth-cancel">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={!username.trim() || !password}
-            data-testid="button-admin-auth-submit"
-          >
-            Authorize
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        <div className="space-y-2">
+          <Label htmlFor="admin-auth-password">Admin Password</Label>
+          <Input
+            id="admin-auth-password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter admin password"
+            autoComplete="new-password"
+            data-testid="input-admin-auth-password"
+          />
+        </div>
+      </div>
+    </ConfirmDialog>
   );
 }

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Ship, Package, Boxes, Building2 } from "lucide-react";
 import { useLocation } from "wouter";
+import { PageHeader } from "@/components/PageHeader";
 
 interface FactoryContainer {
   id: number;
@@ -206,10 +207,7 @@ export default function FactoryStockOTW() {
       <div className="flex items-center gap-3">
         <Ship className="h-6 w-6 text-muted-foreground" />
         <div>
-          <h1 className="text-xl font-bold">Stock On The Way</h1>
-          <p className="text-sm text-muted-foreground">
-            Containers currently in transit — grouped by supplier
-          </p>
+          <PageHeader title="Stock On The Way" subtitle="Containers currently in transit — grouped by supplier" />
         </div>
         <Badge variant="outline" className="ml-auto" data-testid="badge-total-containers">
           {otwContainers.length} container{otwContainers.length !== 1 ? "s" : ""} OTW

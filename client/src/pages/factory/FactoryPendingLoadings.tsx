@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { Clock, Package, Play, Trash2, Download, Link, X, Undo2, Pencil, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { PageHeader } from "@/components/PageHeader";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -219,8 +220,7 @@ export default function FactoryPendingLoadings() {
   return (
     <div className="flex flex-col h-full p-4 lg:p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold" data-testid="text-page-title">Pending Loadings</h1>
-        <p className="text-muted-foreground text-sm">In-progress container loads saved for later</p>
+        <PageHeader title="Pending Loadings" subtitle="In-progress container loads saved for later" />
       </div>
 
       {/* Undo banners */}

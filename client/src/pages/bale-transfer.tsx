@@ -12,6 +12,7 @@ import { formatNumber } from "@/lib/formatNumber";
 import { useState } from "react";
 import { format } from "date-fns";
 import { X, Plus } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 
 export default function BaleTransferPage() {
   const { toast } = useToast();
@@ -105,7 +106,7 @@ export default function BaleTransferPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-3xl font-bold" data-testid="heading-bale-transfer">Bale Transfers</h1>
+      <PageHeader title="Bale Transfers" />
 
       <Card className="p-6">
         <h2 className="text-2xl font-semibold mb-6" data-testid="heading-new-transfer">New Transfer</h2>

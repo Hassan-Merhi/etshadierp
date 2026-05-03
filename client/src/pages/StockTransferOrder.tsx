@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Dialog,
   DialogContent,
@@ -1206,12 +1207,7 @@ export default function StockTransferOrder() {
       )}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="heading-stock-transfer-order">
-            {editVoucherId ? "Edit Stock Transfer Order" : "Stock Transfer Order"}
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            {editVoucherId ? "Edit and update this stock transfer using the order view" : "Build orders by selecting items from multiple source locations"}
-          </p>
+          <PageHeader title={editVoucherId ? "Edit Stock Transfer Order" : "Stock Transfer Order"} subtitle={editVoucherId ? "Edit and update this stock transfer using the order view" : "Build orders by selecting items from multiple source locations"} />
         </div>
         
         <div className="flex flex-wrap items-center gap-3">

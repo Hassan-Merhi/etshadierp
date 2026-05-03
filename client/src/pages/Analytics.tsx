@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
+import { PageHeader } from "@/components/PageHeader";
 import { 
   TrendingUp,
   TrendingDown, 
@@ -1094,10 +1095,7 @@ export default function Analytics() {
       <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-4 md:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold">Analytics</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Comprehensive financial analysis and reporting
-            </p>
+            <PageHeader title="Analytics" subtitle="Comprehensive financial analysis and reporting" />
           </div>
           {activeSection !== "containers" && (
             <PeriodFilter

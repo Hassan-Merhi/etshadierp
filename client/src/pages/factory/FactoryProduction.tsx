@@ -1,6 +1,7 @@
 import { useState, lazy, Suspense } from "react";
 import { Factory, Package, Boxes, Layers, Tags, Search, Container, History, BarChart3, ArrowRightLeft, ScanLine, CheckCircle, Users, Upload, type LucideIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
 
 const ProductionRawStock = lazy(() => import("./ProductionRawStock"));
 const MixBatches = lazy(() => import("../MixBatches"));
@@ -95,10 +96,7 @@ export default function FactoryProduction() {
       <div className="flex items-center gap-3">
         <Factory className="h-8 w-8 text-primary" />
         <div>
-          <h1 className="text-2xl font-semibold">Factory Production</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage bales, batches, and production
-          </p>
+          <PageHeader title="Factory Production" subtitle="Manage bales, batches, and production" />
         </div>
       </div>
 

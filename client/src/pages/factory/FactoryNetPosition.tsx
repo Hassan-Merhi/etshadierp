@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { PageHeader } from "@/components/PageHeader";
 import {
   ChevronDown,
   ChevronRight,
@@ -573,12 +574,7 @@ export default function FactoryNetPosition() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">
-            Net Position
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            What we have vs what we owe — current standing
-          </p>
+          <PageHeader title="Net Position" subtitle="What we have vs what we owe — current standing" />
         </div>
         <Button
           variant="outline"

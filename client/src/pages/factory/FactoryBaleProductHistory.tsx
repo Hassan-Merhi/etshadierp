@@ -5,6 +5,7 @@ import { ArrowLeft, Calendar, Package } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -177,12 +178,7 @@ export default function FactoryBaleProductHistory() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1
-              className="text-lg sm:text-2xl font-bold"
-              data-testid="text-page-title"
-            >
-              Bale Stock History
-            </h1>
+            <PageHeader title="Bale Stock History" />
             {data?.product && data?.location && (
               <p
                 className="text-sm text-muted-foreground"

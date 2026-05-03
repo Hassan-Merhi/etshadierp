@@ -4,6 +4,7 @@ import { useLocation, useParams, useSearch } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Dialog,
   DialogContent,
@@ -148,10 +149,7 @@ export default function OpeningStockDetail() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Package className="h-6 w-6" />
-            Stock Group Summary
-          </h1>
+          <PageHeader title="Stock Group Summary" icon={<Package className="h-5 w-5" />} />
           <p className="text-muted-foreground text-sm">
             {data?.stockGroup?.name || groupName} - {selectedCompany?.name}
           </p>

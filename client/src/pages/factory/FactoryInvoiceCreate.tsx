@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useLocation } from "wouter";
 import { Trash2, ScanLine, Plus, PackageCheck, MapPin, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PageHeader } from "@/components/PageHeader";
 
 interface Customer {
   id: number;
@@ -315,8 +316,7 @@ export default function FactoryInvoiceCreate() {
     <div className="flex flex-col h-full p-4 lg:p-6">
       <div className="flex items-center justify-between gap-4 mb-4">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Create Invoice</h1>
-          <p className="text-muted-foreground text-sm">POS-style bale sales invoice</p>
+          <PageHeader title="Create Invoice" subtitle="POS-style bale sales invoice" />
         </div>
         {orderId && (
           <Badge variant="secondary" data-testid="badge-draft-order">

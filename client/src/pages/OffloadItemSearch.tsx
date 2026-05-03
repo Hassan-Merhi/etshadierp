@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Package, Container, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { PageHeader } from "@/components/PageHeader";
 
 interface OffloadResult {
   itemName: string;
@@ -60,8 +61,7 @@ export default function OffloadItemSearch() {
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Offload Item Search</h1>
-        <p className="text-muted-foreground mt-1">Search any item name to see every offloaded container it arrived in</p>
+        <PageHeader title="Offload Item Search" subtitle="Search any item name to see every offloaded container it arrived in" />
       </div>
 
       <div className="flex gap-2">

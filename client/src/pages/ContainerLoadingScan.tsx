@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useLocation } from "wouter";
 import { ScanLine, Trash2, Package, MapPin, Play, CheckCircle, Clock, Save, AlertTriangle, Rows3, AlignJustify, StickyNote } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PageHeader } from "@/components/PageHeader";
 
 interface Customer {
   id: number;
@@ -445,8 +446,7 @@ export default function ContainerLoadingScan() {
       )}
       <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Container Loading</h1>
-          <p className="text-muted-foreground text-sm">Floor loader bale scanning</p>
+          <PageHeader title="Container Loading" subtitle="Floor loader bale scanning" />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {isResuming && orderId && (

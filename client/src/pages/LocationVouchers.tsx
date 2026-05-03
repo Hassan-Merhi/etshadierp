@@ -14,6 +14,7 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCursorNav } from "@/contexts/CursorNavContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useState, useEffect, useRef, useMemo } from "react";
+import { PageHeader } from "@/components/PageHeader";
 
 interface Transaction {
   date: string;
@@ -264,7 +265,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">Location Vouchers</h1>
+            <PageHeader title="Location Vouchers" />
             {data?.stockItem && data?.location && (
               <div className="flex items-center gap-2 text-muted-foreground" data-testid="text-item-location">
                 <span>{data.stockItem.name} ({data.stockItem.code})</span>

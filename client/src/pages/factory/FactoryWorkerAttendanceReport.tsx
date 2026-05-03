@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Loader2, CalendarDays, Printer, ChevronLeft, ChevronRight,
   Pencil, EyeOff, Eye,
@@ -601,7 +602,7 @@ export default function FactoryWorkerAttendanceReport() {
         <>
           {/* ── Print header (hidden on screen) ─────────────────────────────── */}
           <div className="hidden print:block mb-4">
-            <h1 className="text-xl font-bold">Worker Attendance Report</h1>
+            <PageHeader title="Worker Attendance Report" />
             <p className="text-sm text-gray-600">{rangeLabel}</p>
             {salaryKpi && (
               <div className="mt-2 text-sm text-gray-700 flex gap-6">

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Select,
   SelectContent,
@@ -226,10 +227,7 @@ export default function CompanyTransfer() {
   return (
     <div className="flex flex-col h-full overflow-auto">
       <div className="border-b px-6 py-4 shrink-0">
-        <h1 className="text-2xl font-bold">Company Transfer</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Move a balance from one company to another. The amount is removed from the source and added to the destination.
-        </p>
+        <PageHeader title="Company Transfer" subtitle="Move a balance from one company to another. The amount is removed from the source and added to the destination." />
       </div>
 
       <div className="p-6 space-y-6">

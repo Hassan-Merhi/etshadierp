@@ -8,6 +8,7 @@ import { factoryApiRequest } from "@/lib/factoryApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -357,8 +358,7 @@ export default function FactoryPayrollPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Factory Worker Payroll</h1>
-          <p className="text-muted-foreground mt-1">Generate and manage factory worker payroll</p>
+          <PageHeader title="Factory Worker Payroll" subtitle="Generate and manage factory worker payroll" />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {companies.length > 1 && (

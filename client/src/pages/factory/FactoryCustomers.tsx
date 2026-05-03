@@ -14,8 +14,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Search, Phone, User, Trash2, FileText, RotateCcw, History, Clock } from "lucide-react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { PageHeader } from "@/components/PageHeader";
 
 interface Customer {
   id: number;
@@ -186,7 +187,7 @@ export default function FactoryCustomers() {
   if (isError) {
     return (
       <div className="flex flex-col h-full p-6 gap-4">
-        <h1 className="text-2xl font-bold">Customers</h1>
+        <PageHeader title="Customers" />
         <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
           Failed to load customers: {(error as any)?.message || "Unknown error"}
         </div>
@@ -575,26 +576,20 @@ export default function FactoryCustomers() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!deletingCustomer} onOpenChange={(open) => { if (!open) setDeletingCustomer(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Customer</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete <strong>{deletingCustomer?.legalName}</strong>? They will be hidden from the customers list. You can restore them later from the "Deleted Customers" section.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete-customer">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deletingCustomer && deleteMutation.mutate(deletingCustomer.id)}
-              disabled={deleteMutation.isPending}
-              data-testid="button-confirm-delete-customer"
-            >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deletingCustomer}
+        onOpenChange={(open) => { if (!open) setDeletingCustomer(null); }}
+        title="Delete Customer"
+        tone="destructive"
+        confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
+        loading={deleteMutation.isPending}
+        onConfirm={() => { if (deletingCustomer) deleteMutation.mutate(deletingCustomer.id); }}
+        description={
+          <span>
+            Are you sure you want to delete <strong>{deletingCustomer?.legalName}</strong>? They will be hidden from the customers list. You can restore them later from the "Deleted Customers" section.
+          </span>
+        }
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Tag, Search, Printer, CheckSquare, Square, MapPin, Package, X, ChevronDown, Filter
 } from "lucide-react";
@@ -210,10 +211,7 @@ export default function FactoryReprintLabels() {
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2" data-testid="text-page-title">
-            <Tag className="h-5 w-5 text-muted-foreground" />
-            Reprint Labels
-          </h1>
+          <PageHeader title="Reprint Labels" icon={<Tag className="h-5 w-5" />} />
           <p className="text-sm text-muted-foreground mt-0.5">
             Select a location, filter bales by name or reference, then print selected labels.
           </p>

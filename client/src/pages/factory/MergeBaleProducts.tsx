@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, ArrowLeftRight, Check, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/PageHeader";
 
 interface BaleProduct {
   id: number;
@@ -93,10 +94,7 @@ export default function MergeBaleProducts() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-xl font-semibold flex items-center gap-2">
-            <ArrowLeftRight className="h-5 w-5" />
-            Merge Bale Products
-          </h1>
+          <PageHeader title="Merge Bale Products" icon={<ArrowLeftRight className="h-5 w-5" />} />
           <p className="text-sm text-muted-foreground">
             Select products to combine, then choose which one to keep as the primary. All bales move to the primary and the others are deactivated.
           </p>

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Card,
   CardContent,
@@ -1725,10 +1726,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     <div className="flex flex-col gap-4 md:gap-6 p-3 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-            <Book className="w-6 h-6 md:w-8 md:h-8" />
-            Daybook
-          </h1>
+          <PageHeader title="Daybook" icon={<Book className="h-5 w-5" />} />
           <p className="text-muted-foreground mt-1 text-sm md:text-base">
             View all accounting transactions chronologically
           </p>

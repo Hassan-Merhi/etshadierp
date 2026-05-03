@@ -1,5 +1,6 @@
   import { useState, useRef, useEffect } from "react";
   import { useQuery, useMutation } from "@tanstack/react-query";
+import { PageHeader } from "@/components/PageHeader";
   import {
     Plus, Minus, Trash2, Printer, ScanLine, AlertCircle, Package, CheckCircle,
     XCircle, ShieldAlert, Lock, Upload, FileSpreadsheet, CalendarDays, List, LayoutList, Download, Palette, Square, Loader2, MessageCircle, ImagePlus
@@ -2368,7 +2369,7 @@
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">Bale Stock Entry</h1>
+          <PageHeader title="Bale Stock Entry" />
           <div className="flex items-center gap-2">
             <LabelPrintSettings />
             {productionAlreadyEnded ? (

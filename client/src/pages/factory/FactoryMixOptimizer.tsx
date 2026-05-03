@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, Trash2 } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 
 interface MaterialRow {
   supplierId: string;
@@ -80,12 +81,7 @@ export default function FactoryMixOptimizer() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">
-          Mix Optimizer
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          What-if calculator for optimizing bale mix ratios
-        </p>
+        <PageHeader title="Mix Optimizer" subtitle="What-if calculator for optimizing bale mix ratios" />
       </div>
 
       <Card>

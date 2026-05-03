@@ -10,6 +10,7 @@ import type { FactoryMixBatch } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -1406,8 +1407,7 @@ export default function ProductionRawStock() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Raw Production</h1>
-          <p className="text-muted-foreground mt-1">Raw stock inventory and daily mix batch management</p>
+          <PageHeader title="Raw Production" subtitle="Raw stock inventory and daily mix batch management" />
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button onClick={() => setOffloadDialogOpen(true)} data-testid="button-offload-container">

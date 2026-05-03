@@ -6,6 +6,7 @@ import { Plus, Package, CheckCircle, PlayCircle, Link2, AlertTriangle, Pencil, T
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -229,10 +230,7 @@ export default function MixBatches() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Mix Batches</h1>
-          <p className="text-muted-foreground mt-1">
-            Combine raw stock containers and existing batches for bale production
-          </p>
+          <PageHeader title="Mix Batches" subtitle="Combine raw stock containers and existing batches for bale production" />
         </div>
         <div className="flex items-center gap-2">
           <Button

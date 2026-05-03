@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -140,8 +141,7 @@ export default function FactoryBrokerVisualStatement() {
       <div className="flex items-center gap-3 flex-wrap">
         <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
         <div>
-          <h1 className="text-xl font-semibold">Broker Statement</h1>
-          <p className="text-sm text-muted-foreground">Container-level view of goods cost, freight, commission, and payments</p>
+          <PageHeader title="Broker Statement" subtitle="Container-level view of goods cost, freight, commission, and payments" />
         </div>
       </div>
 

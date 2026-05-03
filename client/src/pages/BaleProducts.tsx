@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -874,8 +875,7 @@ export default function BaleProducts() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Bale Products</h1>
-          <p className="text-muted-foreground mt-1">Manage product types for bale production</p>
+          <PageHeader title="Bale Products" subtitle="Manage product types for bale production" />
         </div>
         <div className="flex gap-2 flex-wrap">
           <input

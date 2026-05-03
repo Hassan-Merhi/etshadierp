@@ -16,6 +16,7 @@ import { ArrowLeft, Plus, Trash2, Upload, Download, FileText, Pencil, Save, X } 
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
+import { PageHeader } from "@/components/PageHeader";
 
 interface ProformaLine {
   id: number;
@@ -224,7 +225,7 @@ export default function SupplierProformas() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">Supplier Proformas</h1>
+            <PageHeader title="Supplier Proformas" />
             <p className="text-muted-foreground text-sm">Manage proformas for supplier #{supplierId}</p>
           </div>
         </div>

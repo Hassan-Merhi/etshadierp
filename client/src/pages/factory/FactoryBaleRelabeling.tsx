@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Upload, CheckCircle, AlertCircle, RefreshCw, Printer, Download, ChevronDown, ChevronUp, Tag, FileSpreadsheet, Eye
 } from "lucide-react";
@@ -360,8 +361,7 @@ export default function FactoryBaleRelabeling() {
     <div className="space-y-6 p-6 overflow-y-auto flex-1">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Bale Relabeling</h1>
-          <p className="text-muted-foreground mt-1">Import bales from Excel and generate new reference codes with printable labels</p>
+          <PageHeader title="Bale Relabeling" subtitle="Import bales from Excel and generate new reference codes with printable labels" />
         </div>
         {step !== "upload" && (
           <Button variant="outline" onClick={handleReset} data-testid="button-start-over">

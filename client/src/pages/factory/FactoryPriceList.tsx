@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check, X, Pencil, Search, Tag, RefreshCw, AlertCircle } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 
 interface FactoryBaleProduct {
   id: number;
@@ -118,10 +119,7 @@ export default function FactoryPriceList() {
     <div className="flex flex-col h-full p-6 space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-page-title">Factory Price List</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Set selling prices for all bale products. Changes apply immediately across all proformas.
-          </p>
+          <PageHeader title="Factory Price List" subtitle="Set selling prices for all bale products. Changes apply immediately across all proformas." />
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="secondary" data-testid="text-price-coverage">

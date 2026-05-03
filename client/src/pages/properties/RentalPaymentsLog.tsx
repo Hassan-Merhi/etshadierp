@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/PageHeader";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -103,8 +104,7 @@ export default function RentalPaymentsLog({
         <div className="flex items-center gap-3">
           {pageIcon ?? <ClipboardList className="h-7 w-7 text-indigo-600" />}
           <div>
-            <h1 className="text-xl font-bold">{pageTitle}</h1>
-            <p className="text-xs text-muted-foreground">All payment receipts recorded across all units, sorted by date.</p>
+            <PageHeader title={pageTitle} subtitle="All payment receipts recorded across all units, sorted by date." />
           </div>
         </div>
         <div className="relative w-64">

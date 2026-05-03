@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { KeyRound, CalendarDays } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { PageHeader } from "@/components/PageHeader";
 
 type DateFormatType = "MM/DD/YYYY" | "DD/MM/YYYY";
 
@@ -92,7 +93,7 @@ export default function MySettings() {
 
   return (
     <div className="p-6 max-w-md mx-auto space-y-6">
-      <h1 className="text-2xl font-semibold">My Settings</h1>
+      <PageHeader title="My Settings" />
 
       <Card>
         <CardHeader>

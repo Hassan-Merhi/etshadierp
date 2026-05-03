@@ -3,9 +3,11 @@ import { ArrowLeft, Home, ChevronUp, ChevronDown } from "lucide-react";
 import { Link } from "wouter";
 import { useCursorNav } from "@/contexts/CursorNavContext";
 
-interface PageHeaderProps {
-  title: string;
-  subtitle?: string;
+export interface PageHeaderProps {
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
+  /** Optional icon rendered inline next to the title. */
+  icon?: React.ReactNode;
   showBackButton?: boolean;
   showHomeButton?: boolean;
   showCursorNavButtons?: boolean;
@@ -15,6 +17,7 @@ interface PageHeaderProps {
 export function PageHeader({
   title,
   subtitle,
+  icon,
   showBackButton = true,
   showHomeButton = true,
   showCursorNavButtons = true,
@@ -84,10 +87,11 @@ export function PageHeader({
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
         <div className="min-w-0 flex-1">
           <h1
-            className="text-xl sm:text-2xl font-semibold tracking-tight truncate"
+            className="text-xl sm:text-2xl font-semibold tracking-tight truncate flex items-center gap-2"
             data-testid="text-page-title"
           >
-            {title}
+            {icon && <span className="shrink-0 text-muted-foreground inline-flex">{icon}</span>}
+            <span className="truncate">{title}</span>
           </h1>
           {subtitle && (
             <p

@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Workbook } from "@fortune-sheet/react";
+import { PageHeader } from "@/components/PageHeader";
 import "@fortune-sheet/react/dist/index.css";
 import type { Sheet as FortuneSheet } from "@fortune-sheet/core";
 import * as XLSX from "xlsx";
@@ -753,10 +754,7 @@ export default function SpreadsheetEditor() {
     <div>
       <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
         <div>
-          <h1 className="text-xl font-semibold">Spreadsheets</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Shared workbooks — all users can view and edit
-          </p>
+          <PageHeader title="Spreadsheets" subtitle="Shared workbooks — all users can view and edit" />
         </div>
         <div className="flex items-center gap-2">
           <input

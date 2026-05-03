@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Form,
   FormControl,
@@ -315,7 +316,7 @@ export default function AccountingCreate() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Create Master Data</h1>
+      <PageHeader title="Create Master Data" />
 
       {/* Mobile entity selector */}
       <div className="md:hidden">

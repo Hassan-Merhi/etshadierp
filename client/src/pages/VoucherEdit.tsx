@@ -8,6 +8,7 @@ import { z } from "zod";
 import { format, parseISO } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCompany } from "@/contexts/CompanyContext";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Card,
   CardContent,
@@ -1398,7 +1399,7 @@ export default function VoucherEdit() {
           <Button variant="ghost" size="icon" onClick={handleCancel} data-testid="button-back">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-xl md:text-3xl font-bold">Edit Voucher</h1>
+          <PageHeader title="Edit Voucher" />
         </div>
         <Card>
           <CardContent className="py-8">

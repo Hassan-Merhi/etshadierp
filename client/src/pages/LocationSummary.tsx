@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Dialog,
   DialogContent,
@@ -395,10 +396,7 @@ export default function LocationSummary() {
     <div className="w-full h-screen flex flex-col overflow-hidden" data-testid="location-summary-container">
       <div className="flex items-center justify-between gap-4 flex-wrap p-3 md:p-4 flex-shrink-0 border-b">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold" data-testid="text-page-title">Location Summary</h1>
-          <p className="text-sm text-muted-foreground">
-            Stock inventory across locations with expandable stock groups
-          </p>
+          <PageHeader title="Location Summary" subtitle="Stock inventory across locations with expandable stock groups" />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <PeriodFilter

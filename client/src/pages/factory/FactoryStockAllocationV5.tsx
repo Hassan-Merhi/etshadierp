@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import CreateProformaV5Drawer from "./CreateProformaV5Drawer";
+import { PageHeader } from "@/components/PageHeader";
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 interface ContainerDetail {
@@ -336,7 +337,7 @@ export default function FactoryStockAllocationV5() {
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-xl font-semibold">Stock Allocation</h1>
+          <PageHeader title="Stock Allocation" />
           <Badge variant="secondary" className="text-[11px] font-semibold tracking-wide">v5</Badge>
           {totals && totals.shortageCount > 0 && (
             <Badge variant="destructive" className="text-[11px] gap-1">

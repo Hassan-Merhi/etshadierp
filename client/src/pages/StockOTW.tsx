@@ -14,6 +14,7 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useLocation, useSearch } from "wouter";
 import CombinedInventory from "@/pages/CombinedInventory";
 import type { Container, Supplier } from "@shared/schema";
+import { PageHeader } from "@/components/PageHeader";
 
 interface ContainerDetailData {
   container: Container;
@@ -223,12 +224,7 @@ function StockOTWContent() {
   return (
     <div className="p-3 sm:p-0 space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-xl sm:text-2xl font-semibold" data-testid="heading-stock-otw">
-          Stock On The Way
-        </h1>
-        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-          View all stock items from containers currently in transit
-        </p>
+        <PageHeader title="Stock On The Way" subtitle="View all stock items from containers currently in transit" />
       </div>
 
       {hasErrors && (

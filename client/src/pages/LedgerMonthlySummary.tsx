@@ -8,6 +8,7 @@ import { formatNumber, drCrClass } from "@/lib/formatNumber";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { format, parseISO } from "date-fns";
+import { PageHeader } from "@/components/PageHeader";
 import {
   ArrowLeft,
   ChevronRight,
@@ -154,9 +155,7 @@ export default function LedgerMonthlySummary() {
             </Button>
             <div>
               <p className="text-sm opacity-80">Ledger Monthly Summary</p>
-              <h1 className="text-xl font-bold" data-testid="text-account-name">
-                {data?.account?.name || "Loading..."}
-              </h1>
+              <PageHeader title={data?.account?.name || "Loading..."} />
             </div>
           </div>
           <div className="text-right">

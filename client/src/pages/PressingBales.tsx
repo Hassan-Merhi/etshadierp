@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -296,8 +297,7 @@ export default function PressingBales() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3 flex-wrap">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight" data-testid="text-page-title">Pressing Bales</h1>
-            <p className="text-muted-foreground mt-1" data-testid="text-page-subtitle">Scan products to create PENDING bales for counting</p>
+            <PageHeader title="Pressing Bales" subtitle="Scan products to create PENDING bales for counting" />
           </div>
           <Badge variant="secondary" data-testid="text-pressing-badge">PRESSING</Badge>
         </div>

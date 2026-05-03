@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Loader2, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 
 interface WasteEntry {
   id: number;
@@ -141,8 +142,7 @@ export default function FactoryWaste() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Factory Waste</h1>
-          <p className="text-muted-foreground mt-1">Track and manage waste entries</p>
+          <PageHeader title="Factory Waste" subtitle="Track and manage waste entries" />
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="space-y-1">

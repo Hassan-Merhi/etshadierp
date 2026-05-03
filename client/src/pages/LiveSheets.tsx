@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Dialog,
   DialogContent,
@@ -204,8 +205,7 @@ export default function LiveSheets() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="heading-live-sheets">Live Sheets</h1>
-          <p className="text-muted-foreground text-sm mt-1">Shared Google Sheets — click Open to view or edit the live file</p>
+          <PageHeader title="Live Sheets" subtitle="Shared Google Sheets — click Open to view or edit the live file" />
         </div>
         {isAdmin && (
           <Button onClick={openAdd} data-testid="button-add-sheet">

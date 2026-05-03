@@ -10,6 +10,7 @@ import { useDateJump } from "@/hooks/use-date-jump";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useCursorNav } from "@/contexts/CursorNavContext";
+import { PageHeader } from "@/components/PageHeader";
 
 interface MonthlyData {
   month: number;
@@ -188,9 +189,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold" data-testid="text-page-title">
-              {isAllLocationsMode ? "Item Monthly Summary" : "Stock Movement"}
-            </h1>
+            <PageHeader title={isAllLocationsMode ? "Item Monthly Summary" : "Stock Movement"} />
             {data?.stockItem && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="text-item-location">
                 <span className="font-medium">{data.stockItem.name}</span>

@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Select,
   SelectContent,
@@ -265,10 +266,7 @@ export default function TestDataImport() {
         <div className="flex items-center gap-3">
           <FlaskConical className="h-8 w-8 text-muted-foreground" />
           <div>
-            <h1 className="text-2xl font-semibold">Test Data Import</h1>
-            <p className="text-sm text-muted-foreground">
-              Add historical data to test Net Profit calculations - easily removable
-            </p>
+            <PageHeader title="Test Data Import" subtitle="Add historical data to test Net Profit calculations - easily removable" />
           </div>
         </div>
       </div>

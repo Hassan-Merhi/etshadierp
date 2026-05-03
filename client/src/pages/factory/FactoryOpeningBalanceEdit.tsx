@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Select,
   SelectContent,
@@ -194,7 +195,7 @@ export default function FactoryOpeningBalanceEdit() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-xl font-bold">Factory Opening Balance</h1>
+          <PageHeader title="Factory Opening Balance" />
           <p className="text-sm text-muted-foreground">{record.containerNumber}</p>
         </div>
         <Badge variant="secondary" className="ml-auto">Opening Balance</Badge>

@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Search, Grid3X3 } from "lucide-react";
 import LocationSummary from "@/pages/LocationSummary";
+import { PageHeader } from "@/components/PageHeader";
 
 interface StockItem {
   id: number;
@@ -69,10 +70,7 @@ function StockQueryContent() {
   return (
     <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold">Stock Query</h1>
-        <p className="text-sm sm:text-base text-muted-foreground">
-          Click on any item to view purchase history, sales history, and current inventory locations
-        </p>
+        <PageHeader title="Stock Query" subtitle="Click on any item to view purchase history, sales history, and current inventory locations" />
       </div>
 
       <Card>

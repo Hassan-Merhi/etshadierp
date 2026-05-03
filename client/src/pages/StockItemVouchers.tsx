@@ -4,6 +4,7 @@ import { useParams, useLocation } from "wouter";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -162,9 +163,7 @@ export default function StockItemVouchers() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-lg sm:text-2xl font-bold" data-testid="text-page-title">
-              Stock Item Vouchers
-            </h1>
+            <PageHeader title="Stock Item Vouchers" />
             {data?.stockItem && (
               <p className="text-sm text-muted-foreground" data-testid="text-item-name">
                 {data.stockItem.name} ({data.stockItem.code}) - {data.monthName} {data.year}

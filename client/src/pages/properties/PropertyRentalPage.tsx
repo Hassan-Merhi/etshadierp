@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog, ChevronsUpDown, Trash2, ClipboardList } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
+import { PageHeader } from "@/components/PageHeader";
 
 // ── Types ──────────────────────────────────────────────────
 type Unit = {
@@ -232,8 +233,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
           <div className="flex items-center gap-3">
             {pageIcon}
             <div>
-              <h1 className="text-xl font-bold">{pageTitle}</h1>
-              <p className="text-xs text-muted-foreground">Click any unit to manage payments, modify rent, post guarantee, or end the contract.</p>
+              <PageHeader title={pageTitle} subtitle="Click any unit to manage payments, modify rent, post guarantee, or end the contract." />
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">

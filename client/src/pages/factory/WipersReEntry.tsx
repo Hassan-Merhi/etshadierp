@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { PageHeader } from "@/components/PageHeader";
 import {
   CalendarDays, Trash2, Plus, Minus, Printer, Download, Package,
   ChevronDown, ChevronUp, CheckSquare, Square, AlertTriangle, FileSpreadsheet, Tag
@@ -336,10 +337,7 @@ export default function WipersReEntry() {
       <div className="p-6 space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Wipers Re-Entry by Date</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Create new wipers / garbage bales under a chosen entry date and print labels
-          </p>
+          <PageHeader title="Wipers Re-Entry by Date" subtitle="Create new wipers / garbage bales under a chosen entry date and print labels" />
         </div>
 
         {/* Controls */}

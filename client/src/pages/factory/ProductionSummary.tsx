@@ -3,6 +3,7 @@ import { BarChart3, Package, Scale, Boxes, TrendingUp, Calendar } from "lucide-r
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -133,9 +134,7 @@ export default function ProductionSummary() {
     <div className="space-y-6">
       <div className="flex items-center gap-3 flex-wrap">
         <BarChart3 className="h-6 w-6 text-muted-foreground" />
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">
-          Production Summary
-        </h1>
+        <PageHeader title="Production Summary" />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

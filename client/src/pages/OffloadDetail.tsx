@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { PageHeader } from "@/components/PageHeader";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -215,7 +216,7 @@ export default function OffloadDetail() {
             {isLoading ? (
               <Skeleton className="h-7 w-40" />
             ) : (
-              <h1 className="text-xl font-semibold">{offload?.containerNumber}</h1>
+              <PageHeader title={offload?.containerNumber} />
             )}
             {offload?.optional && (
               <Badge variant="outline" className="text-red-600 border-red-500 bg-red-500/10 gap-1">

@@ -12,16 +12,8 @@ import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import type { Company, LedgerAccount } from "@shared/schema";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { PageHeader } from "@/components/PageHeader";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 export default function CompanyDataReset() {
   const { toast } = useToast();
@@ -129,10 +121,7 @@ export default function CompanyDataReset() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-2xl font-semibold">Company Data Reset</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Clear vouchers and opening balances for selected accounts. Supplier balances are preserved.
-        </p>
+        <PageHeader title="Company Data Reset" subtitle="Clear vouchers and opening balances for selected accounts. Supplier balances are preserved." />
       </div>
 
       <Card className="border-destructive/50">
@@ -280,47 +269,35 @@ export default function CompanyDataReset() {
         </CardContent>
       </Card>
 
-      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>This will:</p>
-              <ul className="list-disc pl-5 space-y-1">
-                <li>Delete ALL vouchers including offloaded container vouchers for this company</li>
-                <li>Clear opening balances for the {selectedAccountIds.length} selected account(s)</li>
-                {clearStockOpeningBalances && <li>Reset stock item opening balances to zero</li>}
-              </ul>
-              <p className="font-medium mt-2 text-green-600">Only OTW (On The Way) container Purchase vouchers will be preserved. Supplier balances will also be preserved.</p>
-              <p className="text-sm">You can use "Undo Last Reset" to restore deleted vouchers (but not opening balances).</p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmReset} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Yes, Reset Data
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={confirmDialogOpen}
+        onOpenChange={setConfirmDialogOpen}
+        title="Are you absolutely sure?"
+        tone="destructive"
+        confirmText="Yes, Reset Data"
+        onConfirm={confirmReset}
+        description={
+          <div className="space-y-2">
+            <p>This will:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Delete ALL vouchers including offloaded container vouchers for this company</li>
+              <li>Clear opening balances for the {selectedAccountIds.length} selected account(s)</li>
+              {clearStockOpeningBalances && <li>Reset stock item opening balances to zero</li>}
+            </ul>
+            <p className="font-medium mt-2 text-success">Only OTW (On The Way) container Purchase vouchers will be preserved. Supplier balances will also be preserved.</p>
+            <p className="text-sm">You can use "Undo Last Reset" to restore deleted vouchers (but not opening balances).</p>
+          </div>
+        }
+      />
 
-      <AlertDialog open={undoDialogOpen} onOpenChange={setUndoDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Restore Deleted Vouchers?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will restore all previously deleted vouchers for this company. 
-              Note: Opening balances that were cleared cannot be restored automatically.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmUndo}>
-              Yes, Restore Vouchers
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={undoDialogOpen}
+        onOpenChange={setUndoDialogOpen}
+        title="Restore Deleted Vouchers?"
+        confirmText="Yes, Restore Vouchers"
+        onConfirm={confirmUndo}
+        description="This will restore all previously deleted vouchers for this company. Note: Opening balances that were cleared cannot be restored automatically."
+      />
     </div>
   );
 }

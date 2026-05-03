@@ -13,17 +13,8 @@ import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Eye, Trash2 } from "lucide-react";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { PageHeader } from "@/components/PageHeader";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface Customer {
   id: number;
@@ -114,8 +105,7 @@ export default function CustomerInvoices() {
     <div className="flex flex-col h-full p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-page-title">Customer Invoices</h1>
-          <p className="text-muted-foreground text-sm sm:text-base">View and manage customer orders and invoices</p>
+          <PageHeader title="Customer Invoices" subtitle="View and manage customer orders and invoices" />
         </div>
       </div>
 
@@ -226,8 +216,8 @@ export default function CustomerInvoices() {
                           <Eye className="h-4 w-4" />
                         </Button>
                         {order.status !== "FINALIZED" && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
+                          <ConfirmDialog
+                            trigger={
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -235,26 +225,14 @@ export default function CustomerInvoices() {
                               >
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently delete invoice {order.invoiceNumber || `#${order.id}`} for {order.customerName}. 
-                                  Any bales assigned to this order will be returned to stock. This cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel data-testid={`button-cancel-delete-${order.id}`}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => deleteMutation.mutate(order.id)}
-                                  data-testid={`button-confirm-delete-${order.id}`}
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                            }
+                            title="Delete Invoice"
+                            description={`This will permanently delete invoice ${order.invoiceNumber || `#${order.id}`} for ${order.customerName}. Any bales assigned to this order will be returned to stock. This cannot be undone.`}
+                            tone="destructive"
+                            confirmText="Delete"
+                            onConfirm={() => deleteMutation.mutate(order.id)}
+                            data-testid={`dialog-delete-order-${order.id}`}
+                          />
                         )}
                       </div>
                     </TableCell>

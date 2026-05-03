@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import CreateProformaDrawer from "./CreateProformaDrawer";
+import { PageHeader } from "@/components/PageHeader";
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 interface StockTruthEntry {
@@ -136,7 +137,7 @@ export default function FactoryStockAllocationV2() {
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-xl font-semibold">Stock Allocation</h1>
+          <PageHeader title="Stock Allocation" />
           <Badge variant="secondary" className="text-[11px] font-semibold tracking-wide">v2</Badge>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

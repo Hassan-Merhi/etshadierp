@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -444,8 +445,7 @@ export default function FactoryTransporters() {
         <div className="flex items-center gap-3">
           <TruckIcon className="h-6 w-6 text-orange-500" />
           <div>
-            <h1 className="text-xl font-bold">Transporters</h1>
-            <p className="text-xs text-muted-foreground">Track charges and payments per transporter.</p>
+            <PageHeader title="Transporters" subtitle="Track charges and payments per transporter." />
           </div>
         </div>
         <Button onClick={() => setAddOpen(true)} size="sm" data-testid="button-add-transporter">

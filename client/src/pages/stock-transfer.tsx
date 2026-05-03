@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -578,7 +579,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold" data-testid="heading-stock-transfer">Stock Transfer</h1>
+          <PageHeader title="Stock Transfer" />
           <p className="text-muted-foreground">
             {isPOS ? `Transfer stock from your location to another` : `Transfer stock between locations`}
           </p>

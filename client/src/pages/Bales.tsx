@@ -7,6 +7,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -262,11 +263,7 @@ export default function Bales() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Package className="h-8 w-8" />
-            Factory Bales
-          </h1>
-          <p className="text-muted-foreground">Manage factory bale inventory with barcode scanning</p>
+          <PageHeader title="Factory Bales" subtitle="Manage factory bale inventory with barcode scanning" icon={<Package className="h-5 w-5" />} />
         </div>
         <Button onClick={() => setShowBaleDialog(true)} data-testid="button-add-bale">
           <Plus className="h-4 w-4 mr-2" />

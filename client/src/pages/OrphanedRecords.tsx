@@ -11,6 +11,7 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { AlertCircle, RefreshCw, AlertTriangle, Archive, RotateCcw, Trash2 } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -200,8 +201,7 @@ export default function OrphanedRecordsPage() {
       <div className="flex items-center gap-3">
         <AlertCircle className="h-8 w-8 text-orange-500" />
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold" data-testid="heading-orphaned-records">Orphaned Records</h1>
-          <p className="text-muted-foreground">Records with deleted locations or accounting imbalances</p>
+          <PageHeader title="Orphaned Records" subtitle="Records with deleted locations or accounting imbalances" />
         </div>
       </div>
 

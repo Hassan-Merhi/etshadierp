@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, DollarSign, TrendingDown, TrendingUp } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 
 interface FreightPayment {
   vendor: string;
@@ -63,7 +64,7 @@ export default function FactoryCashflow() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Cash Flow Forecast</h1>
+          <PageHeader title="Cash Flow Forecast" />
           <p className="text-muted-foreground mt-1">Projected cash flow for the next {days} days</p>
         </div>
         <div className="flex items-center gap-2" data-testid="period-selector">

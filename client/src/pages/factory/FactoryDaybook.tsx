@@ -4,6 +4,7 @@ import { addDays, format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { PageHeader } from "@/components/PageHeader";
 import {
   BookOpen, Eye, EyeOff, ExternalLink, List, AlignJustify, Package,
   Trash2, ChevronDown, ChevronRight, Filter, X, FileDown, Plus,
@@ -944,10 +945,7 @@ export default function FactoryDaybook() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight" data-testid="text-title">
-            Factory Daybook
-          </h1>
-          <p className="text-muted-foreground mt-1">All factory transactions in one view</p>
+          <PageHeader title="Factory Daybook" subtitle="All factory transactions in one view" />
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

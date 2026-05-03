@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
+import { PageHeader } from "@/components/PageHeader";
 import {
   ArrowLeft, Loader2, Save, CheckCircle2, Search, X, ArrowRight,
   Clock, Package2, Lock, Eye, Pencil, Filter, CalendarIcon,
@@ -868,8 +869,7 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
     <div className="p-4 space-y-4">
       {/* Page header */}
       <div>
-        <h1 className="text-xl font-bold" data-testid="text-page-title">Orders</h1>
-        <p className="text-sm text-muted-foreground">Review and adjust quantities for your location</p>
+        <PageHeader title="Orders" subtitle="Review and adjust quantities for your location" />
       </div>
 
       {/* Filters */}

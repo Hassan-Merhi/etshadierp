@@ -9,16 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { PageHeader } from "@/components/PageHeader";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download, ArrowRightLeft } from "lucide-react";
@@ -324,10 +316,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2" data-testid="heading-stock-transfer-import">
-            <ArrowRightLeft className="h-8 w-8" />
-            Stock Transfer Import
-          </h1>
+          <PageHeader title="Stock Transfer Import" icon={<ArrowRightLeft className="h-5 w-5" />} />
           <p className="text-muted-foreground mt-1">
             Import stock transfers from Excel (Barcode, Quantity)
           </p>
@@ -545,33 +534,25 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
       )}
 
       {/* Import Confirmation Dialog */}
-      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Import with Validation Errors?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {validItemsCount === 0 ? (
-                <>All {totalItemsCount} items have validation errors. Nothing will be imported.</>
-              ) : (
-                <>
-                  {totalItemsCount - validItemsCount} of {totalItemsCount} items have validation errors and will be skipped.
-                  <br /><br />
-                  <strong>{validItemsCount} valid item(s)</strong> will be transferred.
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-import-cancel">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmedImport}
-              data-testid="button-import-confirm"
-            >
-              {validItemsCount === 0 ? "OK" : `Import ${validItemsCount} Item(s)`}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={confirmDialogOpen}
+        onOpenChange={setConfirmDialogOpen}
+        title="Import with Validation Errors?"
+        tone="warning"
+        confirmText={validItemsCount === 0 ? "OK" : `Import ${validItemsCount} Item(s)`}
+        onConfirm={handleConfirmedImport}
+        description={
+          validItemsCount === 0
+            ? `All ${totalItemsCount} items have validation errors. Nothing will be imported.`
+            : (
+              <>
+                {totalItemsCount - validItemsCount} of {totalItemsCount} items have validation errors and will be skipped.
+                <br /><br />
+                <strong>{validItemsCount} valid item(s)</strong> will be transferred.
+              </>
+            )
+        }
+      />
     </div>
   );
 }

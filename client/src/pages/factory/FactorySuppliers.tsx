@@ -4,6 +4,7 @@ import { useEscapeBack } from "@/hooks/use-escape-back";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Plus, Pencil, Trash2, Users, Phone, Mail, MapPin,
   FileText, Package, Weight, Calendar, ArrowLeft,
@@ -2203,7 +2204,7 @@ export default function FactorySuppliers() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Brokers &amp; Suppliers</h1>
+          <PageHeader title="Brokers &amp; Suppliers" />
           <p className="text-muted-foreground mt-1">
             {brokerCount > 0 && `${brokerCount} broker${brokerCount !== 1 ? "s" : ""}`}
             {brokerCount > 0 && standaloneCount > 0 && " · "}

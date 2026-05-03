@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { Clock, Package, Play, StickyNote } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 
 interface PendingLoad {
   id: number;
@@ -35,8 +36,7 @@ export default function PendingLoadings() {
   return (
     <div className="flex flex-col h-full p-4 lg:p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold" data-testid="text-page-title">Pending Loadings</h1>
-        <p className="text-muted-foreground text-sm">In-progress container loads saved for later</p>
+        <PageHeader title="Pending Loadings" subtitle="In-progress container loads saved for later" />
       </div>
 
       {isLoading ? (

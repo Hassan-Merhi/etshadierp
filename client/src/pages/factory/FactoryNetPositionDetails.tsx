@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Card,
   CardContent,
@@ -473,12 +474,7 @@ export default function FactoryNetPositionDetails() {
     <div className="p-4 md:p-6 space-y-4 w-full">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">
-            Factory Net Position
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Current factory financial standing — what we have vs what we owe
-          </p>
+          <PageHeader title="Factory Net Position" subtitle="Current factory financial standing — what we have vs what we owe" />
         </div>
         <Button
           onClick={() => refetch()}

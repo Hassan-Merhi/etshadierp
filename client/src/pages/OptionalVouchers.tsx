@@ -8,16 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { PageHeader } from "@/components/PageHeader";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { FileText, Search, Pencil, Check, Trash2, X, Filter } from "lucide-react";
@@ -115,11 +107,7 @@ export default function OptionalVouchers() {
     <div className="flex flex-col gap-4 p-3 sm:p-6 w-full min-w-0">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2" data-testid="text-optional-vouchers-title">
-            <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
-            Optional Vouchers
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">Draft/unposted vouchers that can be edited or finalized</p>
+          <PageHeader title="Optional Vouchers" subtitle="Draft/unposted vouchers that can be edited or finalized" icon={<FileText className="h-5 w-5" />} />
         </div>
         {hasFilters && (
           <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters">
@@ -288,47 +276,26 @@ export default function OptionalVouchers() {
         </CardContent>
       </Card>
 
-      <AlertDialog open={finalizeVoucherId !== null} onOpenChange={(open) => !open && setFinalizeVoucherId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Finalize Voucher</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to finalize this voucher? Once posted, it will be included in all financial calculations and reports. This cannot be undone easily.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-finalize">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => finalizeVoucherId && finalizeMutation.mutate(finalizeVoucherId)}
-              disabled={finalizeMutation.isPending}
-              data-testid="button-confirm-finalize"
-            >
-              {finalizeMutation.isPending ? "Finalizing..." : "Finalize"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={finalizeVoucherId !== null}
+        onOpenChange={(open) => !open && setFinalizeVoucherId(null)}
+        title="Finalize Voucher"
+        description="Are you sure you want to finalize this voucher? Once posted, it will be included in all financial calculations and reports. This cannot be undone easily."
+        confirmText={finalizeMutation.isPending ? "Finalizing..." : "Finalize"}
+        loading={finalizeMutation.isPending}
+        onConfirm={() => { if (finalizeVoucherId) finalizeMutation.mutate(finalizeVoucherId); }}
+      />
 
-      <AlertDialog open={deleteVoucherId !== null} onOpenChange={(open) => !open && setDeleteVoucherId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Voucher</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this optional voucher? This action will remove it from the system.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteVoucherId && deleteMutation.mutate(deleteVoucherId)}
-              disabled={deleteMutation.isPending}
-              data-testid="button-confirm-delete"
-            >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={deleteVoucherId !== null}
+        onOpenChange={(open) => !open && setDeleteVoucherId(null)}
+        title="Delete Voucher"
+        description="Are you sure you want to delete this optional voucher? This action will remove it from the system."
+        tone="destructive"
+        confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
+        loading={deleteMutation.isPending}
+        onConfirm={() => { if (deleteVoucherId) deleteMutation.mutate(deleteVoucherId); }}
+      />
     </div>
   );
 }

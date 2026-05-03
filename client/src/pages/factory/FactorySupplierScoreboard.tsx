@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 
 interface SupplierScore {
   supplierName: string;
@@ -63,8 +64,7 @@ export default function FactorySupplierScoreboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Supplier Scoreboard</h1>
-          <p className="text-muted-foreground mt-1">Supplier performance ranking and scoring</p>
+          <PageHeader title="Supplier Scoreboard" subtitle="Supplier performance ranking and scoring" />
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="space-y-1">

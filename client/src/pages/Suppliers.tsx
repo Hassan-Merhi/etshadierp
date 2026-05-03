@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Card,
   CardContent,
@@ -243,12 +244,7 @@ export default function Suppliers() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">
-            Suppliers
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Manage supplier accounts and track container shipments
-          </p>
+          <PageHeader title="Suppliers" subtitle="Manage supplier accounts and track container shipments" />
         </div>
       </div>
 

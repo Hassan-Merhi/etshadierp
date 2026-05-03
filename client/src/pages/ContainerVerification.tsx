@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, Plus, Trash2, Upload, Download, FileCheck, Pencil, Save, X, AlertTriangle, CheckCircle2, ArrowUpRight, ArrowDownRight, MinusCircle, DollarSign, RefreshCw, List } from "lucide-react";
 import * as XLSX from "xlsx";
+import { PageHeader } from "@/components/PageHeader";
 
 interface LoadedItem {
   id: number;
@@ -256,7 +257,7 @@ export default function ContainerVerification() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">Container Verification</h1>
+            <PageHeader title="Container Verification" />
             <p className="text-muted-foreground text-sm">
               {container?.containerNumber || `Container #${containerId}`} - Proforma vs Loaded Items
             </p>

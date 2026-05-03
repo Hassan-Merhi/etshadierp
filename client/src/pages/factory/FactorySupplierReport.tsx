@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Select,
   SelectContent,
@@ -90,8 +91,7 @@ export default function FactorySupplierReport() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Supplier Usage Report</h1>
-          <p className="text-muted-foreground mt-1">Generate supplier-level usage and cost reports</p>
+          <PageHeader title="Supplier Usage Report" subtitle="Generate supplier-level usage and cost reports" />
         </div>
       </div>
 

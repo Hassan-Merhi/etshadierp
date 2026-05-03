@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Upload, Trash2, ImagePlus, Search, Images } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { FactoryBaleProductImage } from "@shared/schema";
+import { PageHeader } from "@/components/PageHeader";
 
 interface BaleProduct {
   id: number;
@@ -158,7 +159,7 @@ export default function BaleProductImages() {
             {/* Header */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
-                <h1 className="text-2xl font-bold tracking-tight" data-testid="text-product-name">{selectedProduct.name}</h1>
+                <PageHeader title={selectedProduct.name} />
                 <p className="text-muted-foreground text-sm mt-1">
                   Article code: <span className="font-mono font-medium">{selectedProduct.articleCode}</span>
                 </p>

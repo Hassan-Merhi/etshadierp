@@ -14,6 +14,7 @@ import { drCrClass } from "@/lib/formatNumber";
 import { useState, useEffect, useMemo } from "react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { PageHeader } from "@/components/PageHeader";
 
 interface CustomerInfo {
   id: number;
@@ -201,9 +202,7 @@ export default function FactoryCustomerStatement() {
         </Button>
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-customer-name">
-              {customer.legalName}
-            </h1>
+            <PageHeader title={customer.legalName} />
             <Badge variant={customer.active ? "default" : "secondary"} data-testid="badge-customer-status">
               {customer.active ? "Active" : "Inactive"}
             </Badge>

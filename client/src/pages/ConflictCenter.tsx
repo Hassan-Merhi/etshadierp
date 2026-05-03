@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { PageHeader } from "@/components/PageHeader";
 import {
   getUnresolvedConflicts,
   resolveConflict,
@@ -189,10 +190,7 @@ export default function ConflictCenter() {
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <AlertTriangle className="h-6 w-6 text-amber-500" />
-            Conflict Center
-          </h1>
+          <PageHeader title="Conflict Center" icon={<AlertTriangle className="h-5 w-5" />} />
           <p className="text-sm text-muted-foreground mt-1">
             Review and resolve sync conflicts between your offline changes and the server.
           </p>

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Select,
   SelectContent,
@@ -161,8 +162,7 @@ export default function FactoryContainerCreate() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-xl font-semibold">Add Factory Container</h1>
-          <p className="text-sm text-muted-foreground">Track a new incoming factory container</p>
+          <PageHeader title="Add Factory Container" subtitle="Track a new incoming factory container" />
         </div>
       </div>
 

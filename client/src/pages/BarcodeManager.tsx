@@ -4,6 +4,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -269,11 +270,7 @@ export default function BarcodeManager() {
     <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-            <Barcode className="h-8 w-8" />
-            Barcode Manager
-          </h1>
-          <p className="text-muted-foreground">Import, print, and manage barcode labels for bales</p>
+          <PageHeader title="Barcode Manager" subtitle="Import, print, and manage barcode labels for bales" icon={<Barcode className="h-5 w-5" />} />
         </div>
         <div className="flex flex-wrap gap-2">
           <input

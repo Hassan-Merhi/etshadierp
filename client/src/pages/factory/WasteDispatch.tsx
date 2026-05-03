@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -327,11 +328,7 @@ export default function WasteDispatch() {
       {/* Page Header */}
       <div className="flex items-center justify-between gap-3 px-6 py-3 border-b flex-wrap">
         <div>
-          <h1 className="text-lg font-bold flex items-center gap-2">
-            <Trash2 className="w-4 h-4 text-destructive" />
-            Waste Dispatch
-          </h1>
-          <p className="text-xs text-muted-foreground">Select Garbage or Wiper bales to write off as waste</p>
+          <PageHeader title="Waste Dispatch" subtitle="Select Garbage or Wiper bales to write off as waste" icon={<Trash2 className="h-5 w-5" />} />
         </div>
       </div>
 

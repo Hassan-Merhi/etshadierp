@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, MapPin, Tag, AlertCircle, Check, X, Pencil, Layers, EyeOff, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/PageHeader";
 
 const ALL_LOCATIONS_ID = -1;
 
@@ -374,7 +375,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0 flex-wrap">
           <Tag className="w-4 h-4 text-muted-foreground" />
-          <h1 className="text-base font-semibold">Price List</h1>
+          <PageHeader title="Price List" />
           {isAllMode ? (
             <Badge variant="secondary" className="gap-1">
               <Layers className="w-3 h-3" />

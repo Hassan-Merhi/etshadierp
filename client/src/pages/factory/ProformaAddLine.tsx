@@ -11,6 +11,7 @@ import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
+import { PageHeader } from "@/components/PageHeader";
 
 const AUTOSAVE_KEY = "proforma-autosave-enabled";
 const AUTOSAVE_DELAY_MS = 1500;
@@ -219,7 +220,7 @@ export default function ProformaAddLine() {
         </Button>
         <div className="flex-1 min-w-0">
           <p className="text-xs text-muted-foreground">Adding line to</p>
-          <h1 className="text-sm font-semibold truncate">{proformaName}</h1>
+          <PageHeader title={proformaName} />
         </div>
         {/* Autosave toggle */}
         <button

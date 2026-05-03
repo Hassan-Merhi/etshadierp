@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Dialog,
   DialogContent,
@@ -696,7 +697,7 @@ export default function FactoryStockAllocationV3() {
       {/* Page header */}
       <div className="px-6 pt-5 pb-3 border-b shrink-0">
         <div className="flex items-center gap-3 mb-4 flex-wrap">
-          <h1 className="text-xl font-semibold">Stock Allocation</h1>
+          <PageHeader title="Stock Allocation" />
           <Badge className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded">v3.0 TEST</Badge>
           <span className="text-xs text-muted-foreground hidden sm:inline">Factory 2.0 isolated module — not production</span>
         </div>

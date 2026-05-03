@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { PageHeader } from "@/components/PageHeader";
 
 // Format number to remove unnecessary .00 and add commas
 const formatCurrency = (num: number) => {
@@ -339,7 +340,7 @@ export default function POImport() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">PO Import (Excel)</h1>
+        <PageHeader title="PO Import (Excel)" />
         <Button
           variant="outline"
           onClick={handleDownloadTemplate}

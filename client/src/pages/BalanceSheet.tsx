@@ -7,6 +7,7 @@ import { DollarSign, Landmark, CreditCard, PiggyBank, type LucideIcon } from "lu
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { drCrClass } from "@/lib/formatNumber";
+import { PageHeader } from "@/components/PageHeader";
 
 interface Account {
   id: string;
@@ -147,10 +148,7 @@ export default function BalanceSheet() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl sm:text-2xl font-semibold">Balance Sheet</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Financial position showing assets, liabilities, and equity
-        </p>
+        <PageHeader title="Balance Sheet" subtitle="Financial position showing assets, liabilities, and equity" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

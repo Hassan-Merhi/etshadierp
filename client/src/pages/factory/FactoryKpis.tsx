@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 
 interface DailyProduction {
   date: string;
@@ -95,8 +96,7 @@ export default function FactoryKpis() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Factory KPIs</h1>
-          <p className="text-muted-foreground mt-1">Production metrics and performance analysis</p>
+          <PageHeader title="Factory KPIs" subtitle="Production metrics and performance analysis" />
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="space-y-1">

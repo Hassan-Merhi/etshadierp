@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Download,
   ChevronDown,
@@ -295,10 +296,7 @@ export default function NetProfitReport() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4 px-6 py-4 border-b flex-wrap">
         <div>
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-primary" />
-            Net Profit Report
-          </h1>
+          <PageHeader title="Net Profit Report" icon={<BarChart3 className="h-5 w-5" />} />
           <p className="text-sm text-muted-foreground mt-0.5">Income, expenses, and net profit — {periodLabel}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
 import { 
   Table, 
   TableBody, 
@@ -347,8 +348,7 @@ export default function ImportCycleDiagnostics() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">Import Cycle Balance Breakdown</h1>
-            <p className="text-muted-foreground">Understand what's causing your import cycle balance</p>
+            <PageHeader title="Import Cycle Balance Breakdown" subtitle="Understand what's causing your import cycle balance" />
           </div>
         </div>
         <div className="flex gap-2">

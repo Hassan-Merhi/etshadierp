@@ -7,6 +7,7 @@ import { Loader2, RefreshCw, Package, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/PageHeader";
 
 /* ─── Proforma Mode types ─────────────────────────────────────── */
 interface ProformaLine {
@@ -154,7 +155,7 @@ export default function FactoryStockAllocation() {
   return (
     <div className="p-4 flex flex-col gap-4 h-full">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h1 className="text-xl font-semibold">Stock Allocation</h1>
+        <PageHeader title="Stock Allocation" />
         <Button
           variant="outline"
           size="default"

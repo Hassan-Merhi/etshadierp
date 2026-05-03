@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/formatNumber";
+import { PageHeader } from "@/components/PageHeader";
 
 interface LineItem {
   id?: number;
@@ -320,7 +321,7 @@ export default function PurchaseOrderEdit() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold">Edit Purchase Order</h1>
+          <PageHeader title="Edit Purchase Order" />
           <p className="text-muted-foreground">
             {po.supplierName} ({po.supplierCode}) | Container: {po.containerNumber}
           </p>

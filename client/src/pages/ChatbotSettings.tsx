@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -134,8 +135,7 @@ export default function ChatbotSettings() {
         <div className="flex items-center gap-3">
           <Bot className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold" data-testid="text-page-title">AI Chatbot Settings</h1>
-            <p className="text-muted-foreground">Manage chatbot access and view conversations</p>
+            <PageHeader title="AI Chatbot Settings" subtitle="Manage chatbot access and view conversations" />
           </div>
         </div>
       </div>

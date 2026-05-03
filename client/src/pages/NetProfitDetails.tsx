@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Card,
   CardContent,
@@ -321,9 +322,7 @@ export default function NetProfitDetails() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">
-              Net Position Details
-            </h1>
+            <PageHeader title="Net Position Details" />
             <p className="text-muted-foreground text-sm">
               {fromDate && toDate
                 ? `${fromDate} — ${toDate} (balances as of ${toDate})`

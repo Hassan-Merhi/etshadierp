@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, Pencil, Trash2, Image } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 
 export default function CustomerLogosSettings() {
   const { toast } = useToast();
@@ -87,7 +88,7 @@ export default function CustomerLogosSettings() {
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <Image className="h-6 w-6 text-muted-foreground" />
-        <h1 className="text-2xl font-semibold">Customer Logos</h1>
+        <PageHeader title="Customer Logos" />
       </div>
       <p className="text-sm text-muted-foreground">
         Upload logos per customer. These replace the default HMD logo on bale labels when selected during stock entry.

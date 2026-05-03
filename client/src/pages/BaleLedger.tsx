@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -344,10 +345,7 @@ export default function BaleLedger() {
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex items-center justify-between gap-3 px-6 py-4 border-b flex-wrap">
         <div>
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <Layers className="w-5 h-5" />
-            Bale Production Ledger
-          </h1>
+          <PageHeader title="Bale Production Ledger" icon={<Layers className="h-5 w-5" />} />
           <p className="text-sm text-muted-foreground mt-0.5">
             Complete lifecycle view — stock in hand, wipers/garbages, sold, and waste
           </p>

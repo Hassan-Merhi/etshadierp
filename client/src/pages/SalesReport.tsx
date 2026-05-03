@@ -10,6 +10,7 @@ import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/compon
 import { useDateJump } from "@/hooks/use-date-jump";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Select,
   SelectContent,
@@ -494,7 +495,7 @@ export default function SalesReport() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-3xl font-bold">Sales Report</h1>
+          <PageHeader title="Sales Report" />
           <p className="text-muted-foreground">
             Analyze profit and loss from POS transactions
             {isMultiCompanyMode && " (All Companies)"}

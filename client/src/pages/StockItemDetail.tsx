@@ -10,6 +10,7 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEscapeBack } from "@/hooks/use-escape-back";
+import { PageHeader } from "@/components/PageHeader";
 
 interface StockItem {
   id: number;
@@ -133,10 +134,7 @@ export default function StockItemDetail() {
       </div>
 
       <div>
-        <h1 className="text-xl sm:text-3xl font-bold">{selectedItem?.name || "Loading..."}</h1>
-        <p className="text-sm text-muted-foreground">
-          Purchase history, sales history, and current inventory locations
-        </p>
+        <PageHeader title={selectedItem?.name || "Loading..."} subtitle="Purchase history, sales history, and current inventory locations" />
       </div>
 
       {detailsLoading ? (

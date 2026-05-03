@@ -168,6 +168,38 @@ The app has a layered offline-first foundation:
 - Safe patterns (POST/PATCH vouchers, POS sales) — unchanged
 - Used by `OfflineBanner` sheet UI and `syncEngine.processLegacyItem()`
 
+## Shared UI Primitives (May 2026 — Task 3 "Visual consistency")
+
+Canonical building blocks live in `client/src/components/` and are re-exported
+from `@/components/shared` for tidy imports. Pages should compose these
+instead of hand-rolling cards/headers/dialogs.
+
+| Primitive | Purpose |
+| --- | --- |
+| `PageHeader` | Title + subtitle + back/home/cursor nav + right-rail actions |
+| `KPICard` *(legacy alias)* / `StatCard` | Canonical KPI tile with tone presets, delta, optional skeleton |
+| `DashboardCard` | Drill-down tile combining icon + KPI + description + link |
+| `SectionCard` | Titled `Card` with right-rail actions slot and optional footer |
+| `DataTableToolbar` | Search + filters + actions bar above tables |
+| `EmptyState` *(in `ui/empty-state.tsx`)* | Empty-state placeholder |
+| `LoadingSkeleton` | Preset skeletons (`page` / `card` / `table` / `list` / `kpi-grid` / `form`) |
+| `StatusBadge` | Status pill with semantic color + icon mapping (active/draft/paid/overdue/etc.) |
+| `ConfirmDialog` | Single canonical confirmation primitive — supports controlled/trigger, double-confirm, type-to-confirm phrase, destructive/warning tones |
+| `ConfirmationDialog` / `DeleteConfirmDialog` | Back-compat shims → delegate to `ConfirmDialog` |
+| `QuickActionCard` | Compact action tile for "New Sale" / "Receive Stock" style launchers |
+| `ActivityTimeline` | Vertical recent-activity list with tone presets |
+| `AlertPanel` | Inline info / warning / destructive panel (replaces ad-hoc colored divs) |
+| `PropertyCard` | Property/unit summary card for the Properties module |
+| `FactoryKpiCard` | Factory-themed `StatCard` (`metric`: input/output/yield/downtime/scrap) |
+| `FinancialSummaryCard` | Accounting-themed `StatCard` (`flow`: revenue/expense/profit/loss/balance/receivable/payable) with currency formatting |
+
+Adoption progress: `Dashboard.tsx`, `ContainerDashboard.tsx`, `pos/POSDashboard.tsx`,
+`factory/FactoryDashboard.tsx`, `properties/PropertiesDashboard.tsx` use
+`PageHeader`. `FactoryDashboard.tsx` migrated to `FactoryKpiCard` + `SectionCard`
++ `LoadingSkeleton` + `StatusBadge` as the reference implementation. Remaining
+~200 ERP/POS/Factory/Properties/Inventory/Accounting/Reporting pages should
+adopt the same primitives incrementally.
+
 ## File Structure (Apr 2026 Refactor)
 
 ### Frontend Pages (`client/src/pages/`)

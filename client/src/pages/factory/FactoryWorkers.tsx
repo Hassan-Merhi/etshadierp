@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Plus, Pencil, Search, Users, UserX, UserCheck, Upload, Download, Calculator, X, FileDown, Layers, Trash2, ChevronDown,
 } from "lucide-react";
@@ -568,7 +569,7 @@ export default function FactoryWorkers() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-4 flex-wrap">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight" data-testid="text-title">Workers</h1>
+              <PageHeader title="Workers" />
               <p className="text-sm text-muted-foreground mt-0.5">
                 <span className="font-medium text-foreground">{activeCount}</span> active
                 {inactiveCount > 0 && <span className="ml-2"><span className="font-medium text-foreground">{inactiveCount}</span> inactive</span>}

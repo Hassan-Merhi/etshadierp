@@ -5,6 +5,7 @@ import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Select,
   SelectContent,
@@ -1568,10 +1569,7 @@ export default function Accounts() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-2xl font-semibold">Accounts Overview</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            View all accounts, balances, and transaction history
-          </p>
+          <PageHeader title="Accounts Overview" subtitle="View all accounts, balances, and transaction history" />
         </div>
         <Button
           data-testid="button-create-account"

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Select,
   SelectContent,
@@ -675,10 +676,7 @@ export default function FactoryContainers() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Factory Containers</h1>
-          <p className="text-muted-foreground mt-1">
-            Track incoming containers (separate from ERP containers)
-          </p>
+          <PageHeader title="Factory Containers" subtitle="Track incoming containers (separate from ERP containers)" />
         </div>
         <div className="flex gap-2 flex-wrap">
           {selectedIds.size > 0 && (

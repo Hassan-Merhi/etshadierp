@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -849,8 +850,7 @@ export default function DailyProductionReport() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b flex-shrink-0">
-        <h1 className="text-xl font-bold">Production Analytics</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">Manufacturing overview — output metrics &amp; bale lifecycle</p>
+        <PageHeader title="Production Analytics" subtitle="Manufacturing overview — output metrics &amp; bale lifecycle" />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 overflow-hidden">

@@ -2,6 +2,7 @@ import { useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import FactoryProformas from "@/pages/factory/FactoryProformas";
 import FactoryInvoices from "@/pages/factory/FactoryInvoices";
+import { PageHeader } from "@/components/PageHeader";
 
 type InvoicingTab = "proformas" | "invoices";
 
@@ -38,7 +39,7 @@ export default function FactoryInvoicing() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="border-b bg-background px-4 sm:px-6 pt-5 pb-0 shrink-0">
-        <h1 className="text-xl sm:text-2xl font-semibold mb-3" data-testid="text-invoicing-title">Invoicing</h1>
+        <PageHeader title="Invoicing" />
         <div className="flex flex-wrap gap-1" role="tablist">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.key;

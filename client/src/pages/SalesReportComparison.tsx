@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Select,
   SelectContent,
@@ -284,8 +285,7 @@ export default function SalesReportComparison() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">Company Comparison</h1>
-            <p className="text-sm text-muted-foreground">Compare sales performance across companies</p>
+            <PageHeader title="Company Comparison" subtitle="Compare sales performance across companies" />
           </div>
         </div>
 

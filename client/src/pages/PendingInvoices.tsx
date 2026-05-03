@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
+import { PageHeader } from "@/components/PageHeader";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -96,11 +97,7 @@ export default function PendingInvoices() {
     <div className="flex flex-col h-full p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2" data-testid="text-page-title">
-            <ClipboardCheck className="h-7 w-7" />
-            Pending Invoices
-          </h1>
-          <p className="text-muted-foreground text-sm sm:text-base">Orders awaiting verification</p>
+          <PageHeader title="Pending Invoices" subtitle="Orders awaiting verification" icon={<ClipboardCheck className="h-5 w-5" />} />
         </div>
         <div className="flex items-center gap-2" data-testid="filter-tabs">
           <Button

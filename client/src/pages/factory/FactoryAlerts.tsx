@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, Bell, RefreshCw } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 
 interface Alert {
   id: number;
@@ -60,7 +61,7 @@ export default function FactoryAlerts() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Factory Alerts</h1>
+          <PageHeader title="Factory Alerts" />
           <p className="text-muted-foreground mt-1">
             <span data-testid="text-unread-count">{unreadCount}</span> unread alert{unreadCount !== 1 ? "s" : ""}
           </p>

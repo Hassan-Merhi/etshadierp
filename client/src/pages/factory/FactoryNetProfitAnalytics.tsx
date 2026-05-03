@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { PageHeader } from "@/components/PageHeader";
 import {
   TrendingUp,
   TrendingDown,
@@ -245,10 +246,7 @@ export default function FactoryNetProfitAnalytics() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-page-title">
-            <BarChart3 className="h-6 w-6 text-primary" />
-            Net Profit Analytics
-          </h1>
+          <PageHeader title="Net Profit Analytics" icon={<BarChart3 className="h-5 w-5" />} />
           <p className="text-muted-foreground text-sm mt-1">
             Income, expenses and profitability — {periodLabel}
           </p>

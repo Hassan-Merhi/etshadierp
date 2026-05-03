@@ -43,6 +43,7 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { PageHeader } from "@/components/PageHeader";
 
 interface PosShift {
   id: number;
@@ -231,29 +232,23 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-semibold">POS Dashboard</h1>
-          <p className="text-muted-foreground">
-            {location?.name || "Loading..."} - {posUser.username}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isOnline ? (
-            <Badge variant="outline" className="gap-1">
-              <Wifi className="h-3 w-3" />
-              Online
-            </Badge>
-          ) : (
-            <Badge variant="destructive" className="gap-1">
-              <WifiOff className="h-3 w-3" />
-              Offline
-            </Badge>
-          )}
-        </div>
-      </div>
+    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-4 md:space-y-6">
+      <PageHeader
+        title="POS Dashboard"
+        subtitle={`${location?.name || "Loading..."} — ${posUser.username}`}
+      >
+        {isOnline ? (
+          <Badge variant="outline" className="gap-1">
+            <Wifi className="h-3 w-3" />
+            Online
+          </Badge>
+        ) : (
+          <Badge variant="destructive" className="gap-1">
+            <WifiOff className="h-3 w-3" />
+            Offline
+          </Badge>
+        )}
+      </PageHeader>
 
       {/* Shift Status Card */}
       <Card className={currentShift ? "border-green-500/50 bg-green-50/30 dark:bg-green-950/20" : ""}>

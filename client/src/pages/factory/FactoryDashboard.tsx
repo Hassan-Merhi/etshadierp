@@ -1,17 +1,21 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Loader2, Package, Users, Trash2,
-  ChevronDown, ChevronUp, Ship, TrendingUp, TrendingDown, Boxes, CalendarCheck,
-} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Trash2, Package, Users, ChevronDown, ChevronUp, Ship, TrendingUp,
+  TrendingDown, Boxes, CalendarCheck,
+} from "lucide-react";
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { PageHeader } from "@/components/PageHeader";
+import { SectionCard } from "@/components/SectionCard";
+import { FactoryKpiCard } from "@/components/FactoryKpiCard";
+import { LoadingSkeleton } from "@/components/LoadingSkeleton";
+import { StatusBadge } from "@/components/StatusBadge";
 
 interface DashboardData {
   waste: { totalKg: number; breakdown: Array<{ wasteType: string; kg: number }> };
@@ -96,224 +100,183 @@ export default function FactoryDashboard() {
     .filter(c => STATUS_ACTIVE.has(c.status))
     .sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-24" data-testid="loading-spinner">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <span className="ml-2 text-muted-foreground">Loading dashboard...</span>
-      </div>
-    );
-  }
+  const wasteHint = (data?.waste?.breakdown ?? [])
+    .map(b => `${WASTE_TYPE_LABEL[b.wasteType] ?? b.wasteType}: ${fmt(b.kg, 1)} kg`)
+    .join(" · ");
 
   return (
-    <div className="space-y-6">
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Factory Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Production overview and operations</p>
-        </div>
+    <div>
+      <PageHeader
+        title="Factory Dashboard"
+        subtitle="Production overview and operations"
+      >
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Date</Label>
-          <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-44" data-testid="input-date" />
+          <Input
+            type="date"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            className="w-44"
+            data-testid="input-date"
+          />
         </div>
-      </div>
+      </PageHeader>
 
-      {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Waste */}
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Trash2 className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Waste</p>
-            </div>
-            <p className="text-2xl font-bold font-mono" data-testid="text-waste-kg">
-              {fmt(data?.waste?.totalKg ?? 0, 1)} <span className="text-sm font-normal text-muted-foreground">kg</span>
-            </p>
-            {(data?.waste?.breakdown ?? []).length > 0 && (
-              <div className="mt-1 space-y-0.5">
-                {(data?.waste?.breakdown ?? []).map(b => (
-                  <p key={b.wasteType} className="text-xs text-muted-foreground">
-                    {WASTE_TYPE_LABEL[b.wasteType] ?? b.wasteType}: {fmt(b.kg, 1)} kg
-                  </p>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Loaded Containers */}
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Package className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Loaded Containers</p>
-            </div>
-            <p className="text-2xl font-bold font-mono" data-testid="text-containers-loaded">
-              {data?.containers?.loaded ?? 0}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">customer containers finalized</p>
-          </CardContent>
-        </Card>
-
-        {/* Active Workers */}
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Active Workers</p>
-            </div>
-            <p className="text-2xl font-bold font-mono" data-testid="text-active-workers">
-              {data?.workers?.active ?? 0}
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Worker Attendance Today */}
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <CalendarCheck className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Attendance Today</p>
-            </div>
-            <p className="text-2xl font-bold font-mono" data-testid="text-attendance-today">
-              {data?.workers?.attendanceToday ?? 0}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">workers present</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ── Container OTW ── */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Ship className="h-4 w-4" />
-            Container OTW
-            <Badge variant="outline" className="ml-1">{containersOtw.length} active</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {containersOtw.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">No containers currently in transit or pending</p>
-          ) : (
-            <div className="table-responsive">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Container</TableHead>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Origin</TableHead>
-                    <TableHead className="text-right">KG</TableHead>
-                    <TableHead>Arrival</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {containersOtw.map(c => (
-                    <TableRow key={c.id} data-testid={`row-container-otw-${c.id}`}>
-                      <TableCell className="font-mono text-sm font-medium">{c.containerNumber}</TableCell>
-                      <TableCell className="text-sm">{c.supplierName || "—"}</TableCell>
-                      <TableCell>
-                        <Badge variant={c.status === "IN_TRANSIT" ? "default" : "outline"} className="text-xs">
-                          {STATUS_LABEL[c.status] || c.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{c.origin || "—"}</TableCell>
-                      <TableCell className="text-right font-mono text-sm">{fmt(c.totalKg, 0)}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{c.arrivalDate || "—"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ── Total Bales Pressed ── */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Boxes className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">Total Bales Pressed</p>
-                <p className="text-3xl font-bold font-mono" data-testid="text-total-bales-pressed">
-                  {kpis?.balesPressedToday ?? 0}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {fmt(kpis?.totalBaleWeightToday ?? 0, 1)} kg total
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowBalesPane(v => !v)}
-              data-testid="button-toggle-bales-pane"
-            >
-              {showBalesPane ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-            </Button>
+      {isLoading ? (
+        <LoadingSkeleton variant="kpi-grid" rows={4} />
+      ) : (
+        <div className="space-y-6">
+          {/* KPI grid — unified factory grammar */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <FactoryKpiCard
+              metric="scrap"
+              icon={Trash2}
+              title="Waste"
+              value={`${fmt(data?.waste?.totalKg ?? 0, 1)} kg`}
+              hint={wasteHint || undefined}
+              data-testid="card-stat-waste"
+            />
+            <FactoryKpiCard
+              metric="output"
+              icon={Package}
+              title="Loaded Containers"
+              value={data?.containers?.loaded ?? 0}
+              hint="customer containers finalized"
+              data-testid="card-stat-loaded-containers"
+            />
+            <FactoryKpiCard
+              metric="neutral"
+              icon={Users}
+              title="Active Workers"
+              value={data?.workers?.active ?? 0}
+              data-testid="card-stat-active-workers"
+            />
+            <FactoryKpiCard
+              metric="input"
+              icon={CalendarCheck}
+              title="Attendance Today"
+              value={data?.workers?.attendanceToday ?? 0}
+              hint="workers present"
+              data-testid="card-stat-attendance"
+            />
           </div>
 
-          <CollapsiblePane open={showBalesPane}>
-            {(!kpis?.balesDetail || kpis.balesDetail.length === 0) ? (
-              <p className="text-sm text-muted-foreground">No bales pressed today</p>
+          {/* Container OTW */}
+          <SectionCard
+            icon={Ship}
+            title="Container OTW"
+            actions={<Badge variant="outline">{containersOtw.length} active</Badge>}
+            data-testid="section-container-otw"
+          >
+            {containersOtw.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                No containers currently in transit or pending
+              </p>
             ) : (
-              <div className="max-h-64 overflow-y-auto">
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Product</TableHead>
-                      <TableHead className="text-right">Bales</TableHead>
+                      <TableHead>Container</TableHead>
+                      <TableHead>Supplier</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Origin</TableHead>
                       <TableHead className="text-right">KG</TableHead>
+                      <TableHead>Arrival</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {kpis.balesDetail.map((b, i) => (
-                      <TableRow key={b.id ?? i} data-testid={`row-bale-${b.id ?? i}`}>
-                        <TableCell className="text-sm text-muted-foreground">{b.category || "—"}</TableCell>
-                        <TableCell className="text-sm">{b.productName || "—"}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">{b.quantity ?? 1}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">{fmt(b.weightKg, 2)}</TableCell>
+                    {containersOtw.map(c => (
+                      <TableRow key={c.id} data-testid={`row-container-otw-${c.id}`}>
+                        <TableCell className="font-mono text-sm font-medium">{c.containerNumber}</TableCell>
+                        <TableCell className="text-sm">{c.supplierName || "—"}</TableCell>
+                        <TableCell>
+                          <StatusBadge
+                            status={c.status.toLowerCase()}
+                            label={STATUS_LABEL[c.status] || c.status}
+                          />
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{c.origin || "—"}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">{fmt(c.totalKg, 0)}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{c.arrivalDate || "—"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
             )}
-          </CollapsiblePane>
-        </CardContent>
-      </Card>
+          </SectionCard>
 
-      {/* ── Stock Summary ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Opening Stock</p>
+          {/* Total Bales Pressed */}
+          <SectionCard
+            icon={Boxes}
+            title="Total Bales Pressed"
+            description={`${kpis?.balesPressedToday ?? 0} bales · ${fmt(kpis?.totalBaleWeightToday ?? 0, 1)} kg total`}
+            actions={
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowBalesPane(v => !v)}
+                data-testid="button-toggle-bales-pane"
+                aria-label={showBalesPane ? "Hide bale details" : "Show bale details"}
+              >
+                {showBalesPane ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+              </Button>
+            }
+            data-testid="section-bales-pressed"
+          >
+            <div className="text-3xl font-semibold tabular-nums" data-testid="text-total-bales-pressed">
+              {kpis?.balesPressedToday ?? 0}
             </div>
-            <p className="text-2xl font-bold font-mono" data-testid="text-opening-stock">
-              {fmt(kpis?.openingStockKg ?? 0, 1)} <span className="text-sm font-normal text-muted-foreground">kg</span>
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingDown className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Closing Stock</p>
-            </div>
-            <p className="text-2xl font-bold font-mono" data-testid="text-closing-stock">
-              {fmt(kpis?.closingStockKg ?? 0, 1)} <span className="text-sm font-normal text-muted-foreground">kg</span>
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+            <CollapsiblePane open={showBalesPane}>
+              {(!kpis?.balesDetail || kpis.balesDetail.length === 0) ? (
+                <p className="text-sm text-muted-foreground">No bales pressed today</p>
+              ) : (
+                <div className="max-h-64 overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Product</TableHead>
+                        <TableHead className="text-right">Bales</TableHead>
+                        <TableHead className="text-right">KG</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {kpis.balesDetail.map((b, i) => (
+                        <TableRow key={b.id ?? i} data-testid={`row-bale-${b.id ?? i}`}>
+                          <TableCell className="text-sm text-muted-foreground">{b.category || "—"}</TableCell>
+                          <TableCell className="text-sm">{b.productName || "—"}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{b.quantity ?? 1}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{fmt(b.weightKg, 2)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CollapsiblePane>
+          </SectionCard>
+
+          {/* Stock Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <FactoryKpiCard
+              metric="input"
+              icon={TrendingUp}
+              title="Opening Stock"
+              value={`${fmt(kpis?.openingStockKg ?? 0, 1)} kg`}
+              data-testid="card-stat-opening-stock"
+            />
+            <FactoryKpiCard
+              metric="output"
+              icon={TrendingDown}
+              title="Closing Stock"
+              value={`${fmt(kpis?.closingStockKg ?? 0, 1)} kg`}
+              data-testid="card-stat-closing-stock"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/components/ThemeProvider";
 import hmdLogo from "../assets/hmd-logo.jpeg";
+import { PageHeader } from "@/components/PageHeader";
 
 const features = [
   { icon: Boxes,        title: "Inventory Management",  description: "Real-time stock tracking across all locations" },
@@ -260,8 +261,7 @@ export default function Login() {
                 >
                   HMD International Group
                 </span>
-                <h1 className="text-2xl font-bold tracking-tight text-foreground">Welcome back</h1>
-                <p className="text-sm text-muted-foreground">Sign in to continue to your account</p>
+                <PageHeader title="Welcome back" subtitle="Sign in to continue to your account" showBackButton={false} showHomeButton={false} showCursorNavButtons={false} />
               </div>
 
               {/* Form */}

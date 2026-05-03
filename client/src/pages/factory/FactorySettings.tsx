@@ -13,6 +13,7 @@ import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Downloa
 import { useToast } from "@/hooks/use-toast";
 import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
 import { ImportBalesTab } from "./BaleStockEntry";
+import { PageHeader } from "@/components/PageHeader";
 
 interface Location {
   id: number;
@@ -506,8 +507,7 @@ export default function FactorySettings() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Factory Settings</h1>
-          <p className="text-muted-foreground mt-1">Toggle factory intelligence features on or off</p>
+          <PageHeader title="Factory Settings" subtitle="Toggle factory intelligence features on or off" />
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={handleEnableAll} disabled={mutation.isPending} data-testid="button-enable-all">

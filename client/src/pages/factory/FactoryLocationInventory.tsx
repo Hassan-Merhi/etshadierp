@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { PageHeader } from "@/components/PageHeader";
 import {
   MapPin, Layers, Package, Search, Printer, ArrowUpDown,
   FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2, Pencil, Tag, Zap, Eye,
@@ -1056,8 +1057,7 @@ export default function FactoryLocationInventory() {
       <div className="p-4 md:p-6 max-w-4xl mx-auto">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6 flex-wrap">
           <div>
-            <h1 className="text-xl md:text-3xl font-bold" data-testid="text-page-title">Location Inventory</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Physical bales on ground by location</p>
+            <PageHeader title="Location Inventory" subtitle="Physical bales on ground by location" />
           </div>
           <Button
             variant="outline"

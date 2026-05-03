@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Layers, Search, ChevronRight, ArrowLeft, List, FolderOpen, Download } from "lucide-react";
 import { formatNumber } from "@/lib/formatNumber";
+import { PageHeader } from "@/components/PageHeader";
 
 interface Container {
   id: number;
@@ -323,10 +324,7 @@ export default function CombinedInventory() {
               </>
             ) : (
               <>
-                <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-                  <Layers className="h-5 w-5 sm:h-6 sm:w-6" />
-                  Combined Inventory
-                </h1>
+                <PageHeader title="Combined Inventory" icon={<Layers className="h-5 w-5" />} />
                 <p className="text-sm text-muted-foreground mt-1">
                   In-transit (OTW) + in-hand stock combined per item
                 </p>

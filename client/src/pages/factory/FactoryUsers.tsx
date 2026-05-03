@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -268,10 +269,7 @@ export default function FactoryUsers() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-factory-users-title">Factory Users</h1>
-          <p className="text-muted-foreground mt-1">
-            Create users and control which pages they can access
-          </p>
+          <PageHeader title="Factory Users" subtitle="Create users and control which pages they can access" />
         </div>
         <Button
           onClick={() => { resetForm(); setCreateOpen(true); }}

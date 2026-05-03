@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -1666,7 +1667,7 @@ export default function Payroll() {
   if (employeesLoading) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">Payroll</h1>
+        <PageHeader title="Payroll" />
         <Card className="p-6">
           <Skeleton className="h-[400px] w-full" />
         </Card>

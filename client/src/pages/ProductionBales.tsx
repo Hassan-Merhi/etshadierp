@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { PageHeader } from "@/components/PageHeader";
 import {
   CheckCircle, Trash2, Package, ScanLine, AlertCircle,
   XCircle, AlertTriangle, Printer, ArrowLeft, Hash, Scale, Calendar, PlusCircle, Info
@@ -635,8 +636,7 @@ export default function ProductionBales() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">Finalize / Counting</h1>
-          <p className="text-muted-foreground text-sm mt-1">Select a batch to scan and finalize bales</p>
+          <PageHeader title="Finalize / Counting" subtitle="Select a batch to scan and finalize bales" />
         </div>
         <Badge variant="outline" className="text-sm" data-testid="badge-finalize-mode">
           <CheckCircle className="h-3 w-3 mr-1" />

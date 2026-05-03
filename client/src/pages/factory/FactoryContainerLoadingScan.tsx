@@ -10,6 +10,7 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { Badge } from "@/components/ui/badge";
 import { useState, useRef, useCallback, useEffect } from "react";
 import * as XLSX from "xlsx";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Select,
   SelectContent,
@@ -788,12 +789,7 @@ export default function FactoryContainerLoadingScan() {
       )}
       <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">
-            Container Loading
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Floor loader bale scanning
-          </p>
+          <PageHeader title="Container Loading" subtitle="Floor loader bale scanning" />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {isResuming && orderId && (

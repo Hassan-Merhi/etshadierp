@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Loader2, Info } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 
 interface BaleCost {
   baleRef: string;
@@ -142,8 +143,7 @@ export default function FactoryProfitability() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Profitability Analysis</h1>
-          <p className="text-muted-foreground mt-1">Bale costs and container profitability</p>
+          <PageHeader title="Profitability Analysis" subtitle="Bale costs and container profitability" />
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="space-y-1">

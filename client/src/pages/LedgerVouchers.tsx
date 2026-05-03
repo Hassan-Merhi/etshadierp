@@ -5,6 +5,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
+import { PageHeader } from "@/components/PageHeader";
 import {
   ArrowLeft,
   ChevronRight,
@@ -152,9 +153,7 @@ export default function LedgerVouchers() {
             </Button>
             <div>
               <p className="text-sm opacity-80">Ledger Vouchers</p>
-              <h1 className="text-lg sm:text-xl font-bold" data-testid="text-account-name">
-                {data?.account?.name || "Loading..."}
-              </h1>
+              <PageHeader title={data?.account?.name || "Loading..."} />
             </div>
           </div>
           <div className="text-right">

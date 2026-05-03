@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Dialog,
   DialogContent,
@@ -213,7 +214,7 @@ export default function AccountGroups() {
           </Button>
           <div className="flex items-center gap-2">
             <Layers className="h-5 w-5 text-primary" />
-            <h1 className="text-xl font-semibold">Account Groups</h1>
+            <PageHeader title="Account Groups" />
           </div>
           <p className="text-sm text-muted-foreground ml-2 hidden sm:block">
             Organise ledger accounts under parent groups for better reporting

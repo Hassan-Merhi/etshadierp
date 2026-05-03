@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -152,10 +153,7 @@ export default function InventoryRepair() {
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-page-title">Inventory Repair Tool</h1>
-        <p className="text-muted-foreground mt-1">
-          Recalculates expected inventory by replaying all voucher-backed operations and compares with current stock levels.
-        </p>
+        <PageHeader title="Inventory Repair Tool" subtitle="Recalculates expected inventory by replaying all voucher-backed operations and compares with current stock levels." />
       </div>
 
       <Alert>

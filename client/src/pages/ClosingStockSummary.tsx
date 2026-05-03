@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
+import { PageHeader } from "@/components/PageHeader";
 
 interface StockGroupSummary {
   id: number;
@@ -123,10 +124,7 @@ export default function ClosingStockSummary() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-              <Package className="h-6 w-6" />
-              Closing Stock Summary
-            </h1>
+            <PageHeader title="Closing Stock Summary" icon={<Package className="h-5 w-5" />} />
             <p className="text-muted-foreground text-sm">
               Current inventory values - {selectedCompany?.name}
             </p>

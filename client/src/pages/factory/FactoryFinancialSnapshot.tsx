@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Dialog,
   DialogContent,
@@ -425,7 +426,7 @@ export default function FactoryFinancialSnapshot() {
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
           <div className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-muted-foreground" />
-            <h1 className="text-lg font-semibold">Financial Snapshot</h1>
+            <PageHeader title="Financial Snapshot" />
           </div>
           <div className="flex items-center gap-2">
             {lastUpdated && (

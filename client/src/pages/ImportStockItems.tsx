@@ -10,6 +10,7 @@ import { ArrowLeft, Upload, Download, CheckCircle2, AlertCircle } from "lucide-r
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PageHeader } from "@/components/PageHeader";
 
 interface ImportRow {
   code: string;
@@ -232,12 +233,7 @@ export default function ImportStockItems() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">
-            Import Stock Items
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Bulk import stock items from Excel spreadsheet
-          </p>
+          <PageHeader title="Import Stock Items" subtitle="Bulk import stock items from Excel spreadsheet" />
         </div>
       </div>
 

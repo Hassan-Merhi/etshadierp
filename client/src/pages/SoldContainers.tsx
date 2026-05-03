@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { PageHeader } from "@/components/PageHeader";
 
 interface SoldContainer {
   containerId: number;
@@ -66,10 +67,7 @@ export default function SoldContainers() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold">Sold Containers</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            View all containers that have been sold to customers
-          </p>
+          <PageHeader title="Sold Containers" subtitle="View all containers that have been sold to customers" />
         </div>
         <HandCoins className="h-8 w-8 text-muted-foreground" />
       </div>

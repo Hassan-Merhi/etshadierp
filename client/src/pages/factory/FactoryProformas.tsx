@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { read as readExcel, utils as excelUtils, writeFile as writeExcel } from "@/lib/excelHelper";
+import { PageHeader } from "@/components/PageHeader";
 
 interface ProformaLine {
   id: number;
@@ -449,8 +450,7 @@ export default function FactoryProformas() {
     <div className="flex flex-col h-full p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-page-title">Customer Proformas</h1>
-          <p className="text-muted-foreground text-sm sm:text-base">Manage customer-specific price lists for bale sales</p>
+          <PageHeader title="Customer Proformas" subtitle="Manage customer-specific price lists for bale sales" />
         </div>
         {customerId && (
           <div className="flex items-center gap-2 flex-wrap">

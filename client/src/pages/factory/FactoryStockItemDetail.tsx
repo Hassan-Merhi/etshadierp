@@ -7,6 +7,7 @@ import { ArrowLeft, Printer, TrendingUp, Ship, Package } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEscapeBack } from "@/hooks/use-escape-back";
+import { PageHeader } from "@/components/PageHeader";
 
 interface PressedEntry {
   date: string;
@@ -107,7 +108,7 @@ export default function FactoryStockItemDetail() {
         </div>
       ) : (
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold">{data?.product.name ?? "Loading..."}</h1>
+          <PageHeader title={data?.product.name ?? "Loading..."} />
           {data?.product.articleCode && (
             <p className="text-sm text-muted-foreground">{data.product.articleCode}</p>
           )}
