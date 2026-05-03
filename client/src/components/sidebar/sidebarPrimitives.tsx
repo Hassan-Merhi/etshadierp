@@ -21,18 +21,23 @@ export interface NavSection {
 }
 
 const baseLinkClasses =
-  "flex items-center gap-2.5 rounded-md py-1.5 text-sm transition-colors";
+  "relative flex items-center gap-2.5 rounded-md py-1.5 pl-3 pr-2.5 text-sm transition-colors";
 const inactiveClasses =
-  "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground";
+  "text-muted-foreground hover:bg-sidebar-accent/40 hover:text-foreground";
 const activeClasses =
-  "bg-sidebar-accent text-sidebar-accent-foreground font-medium";
+  "bg-sidebar-accent/70 text-sidebar-accent-foreground font-medium shadow-xs";
 
-function linkStyle(isActive: boolean, color: string): React.CSSProperties {
-  return {
-    borderLeft: `2px solid ${isActive ? color : "transparent"}`,
-    paddingLeft: "8px",
-    paddingRight: "10px",
-  };
+interface ActiveRailProps {
+  color: string;
+}
+function ActiveRail({ color }: ActiveRailProps) {
+  return (
+    <span
+      aria-hidden
+      className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full"
+      style={{ backgroundColor: color }}
+    />
+  );
 }
 
 interface SidebarNavLinkProps {
@@ -53,8 +58,8 @@ export function SidebarNavLink({ item, color, testId, trailing, draggable }: Sid
       draggable={draggable === false ? false : undefined}
       data-testid={testId}
       className={`${baseLinkClasses} ${isActive ? activeClasses : inactiveClasses} flex-1`}
-      style={linkStyle(isActive, color)}
     >
+      {isActive && <ActiveRail color={color} />}
       <Icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color } : {}} />
       <span className="flex-1 leading-tight">{item.title}</span>
       {trailing}
@@ -88,8 +93,8 @@ export function SidebarFlatLink({
       href={href}
       data-testid={testId}
       className={`${baseLinkClasses} ${isActive ? activeClasses : inactiveClasses}`}
-      style={linkStyle(isActive, color)}
     >
+      {isActive && <ActiveRail color={color} />}
       <Icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color } : {}} />
       <span className="flex-1 leading-tight">{label}</span>
       {badge != null && badge > 0 && (
@@ -292,8 +297,8 @@ export function PinnedNavList({
               draggable={false}
               data-testid={testIdFor(item)}
               className={`${baseLinkClasses} flex-1 ${isActive ? activeClasses : inactiveClasses}`}
-              style={linkStyle(isActive, color)}
             >
+              {isActive && <ActiveRail color={color} />}
               <Icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color } : {}} />
               <span className="flex-1 leading-tight">{item.title}</span>
               {trailingFor?.(item)}

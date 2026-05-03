@@ -5846,8 +5846,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                       <div key={rev.id} className="border rounded-md overflow-hidden">
                         {/* Pending approval banner */}
                         {rev.optional && (
-                          <div className="flex items-center justify-between gap-3 px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border-b">
-                            <span className="text-xs font-medium text-amber-800 dark:text-amber-300">Pending POS adjustment — awaiting admin approval</span>
+                          <div className="flex items-center justify-between gap-3 px-3 py-2 status-warning border-b">
+                            <span className="text-xs font-medium">Pending POS adjustment — awaiting admin approval</span>
                             <Button
                               size="sm"
                               variant="default"
@@ -6654,7 +6654,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             {(() => {
               const items = computeTransferRevisionItems();
               return items.length === 0 ? (
-                <p className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-md px-3 py-2">
+                <p className="text-sm status-warning rounded-md px-3 py-2">
                   No differences detected compared to the saved transfer.
                 </p>
               ) : (

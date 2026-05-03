@@ -2618,7 +2618,7 @@ export default function Payroll() {
               {employeesLoading ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                   {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className="h-36 rounded-md bg-muted animate-pulse" />
+                    <Skeleton key={i} className="h-36" />
                   ))}
                 </div>
               ) : filteredWorkers.length === 0 ? (

@@ -368,7 +368,7 @@ export default function ContainerDashboard() {
 
         <Card>
           <CardHeader className="py-2 px-3">
-            <CardTitle className="text-sm font-medium text-green-700 dark:text-green-400">Offloaded Containers (Balance Owed)</CardTitle>
+            <CardTitle className="text-sm font-medium text-success">Offloaded Containers (Balance Owed)</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="hidden md:block overflow-x-auto">
@@ -402,7 +402,7 @@ export default function ContainerDashboard() {
                   )}
                 </tbody>
                 {agentData.offloadedContainers?.length > 0 && (
-                  <tfoot className="bg-green-100 dark:bg-green-900/30">
+                  <tfoot className="bg-success-soft text-success-soft-foreground">
                     <tr>
                       <td colSpan={6} className="py-1 px-2 font-bold">Total Balance Owed</td>
                       <td className="py-1 px-2 text-right font-bold">{formatAmount(agentData.offloadedContainers.reduce((sum: number, c: any) => sum + parseFloat(c.dutyFee || "0"), 0))}</td>
@@ -432,7 +432,7 @@ export default function ContainerDashboard() {
                 <p className="text-center text-muted-foreground text-xs py-2">No offloaded containers</p>
               )}
               {agentData.offloadedContainers?.length > 0 && (
-                <div className="bg-green-100 dark:bg-green-900/30 rounded-md p-2 flex justify-between text-xs font-bold">
+                <div className="bg-success-soft text-success-soft-foreground rounded-md p-2 flex justify-between text-xs font-bold">
                   <span>Total Balance Owed</span>
                   <span>{formatAmount(agentData.offloadedContainers.reduce((sum: number, c: any) => sum + parseFloat(c.dutyFee || "0"), 0))}</span>
                 </div>
@@ -443,7 +443,7 @@ export default function ContainerDashboard() {
 
         <Card>
           <CardHeader className="py-2 px-3">
-            <CardTitle className="text-sm font-medium text-yellow-700 dark:text-yellow-400">OTW Containers (Pending)</CardTitle>
+            <CardTitle className="text-sm font-medium text-warning">OTW Containers (Pending)</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="hidden md:block overflow-x-auto">
@@ -477,7 +477,7 @@ export default function ContainerDashboard() {
                   )}
                 </tbody>
                 {agentData.containers.length > 0 && (
-                  <tfoot className="bg-yellow-100 dark:bg-yellow-900/30">
+                  <tfoot className="bg-warning-soft text-warning-soft-foreground">
                     <tr>
                       <td colSpan={6} className="py-1 px-2 font-bold">Total OTW</td>
                       <td className="py-1 px-2 text-right font-bold">{formatAmount(agentData.containers.reduce((sum: number, c: any) => sum + parseFloat(c.dutyFee || "0"), 0))}</td>
@@ -507,7 +507,7 @@ export default function ContainerDashboard() {
                 <p className="text-center text-muted-foreground text-xs py-2">No OTW containers</p>
               )}
               {agentData.containers.length > 0 && (
-                <div className="bg-yellow-100 dark:bg-yellow-900/30 rounded-md p-2 flex justify-between text-xs font-bold">
+                <div className="bg-warning-soft text-warning-soft-foreground rounded-md p-2 flex justify-between text-xs font-bold">
                   <span>Total OTW</span>
                   <span>{formatAmount(agentData.containers.reduce((sum: number, c: any) => sum + parseFloat(c.dutyFee || "0"), 0))}</span>
                 </div>

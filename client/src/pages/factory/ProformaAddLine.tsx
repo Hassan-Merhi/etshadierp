@@ -5,6 +5,7 @@ import { ArrowLeft, Check, Plus, Search, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
@@ -293,7 +294,7 @@ export default function ProformaAddLine() {
         {itemsLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 mt-2">
             {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="h-24 rounded-md bg-muted animate-pulse" />
+              <Skeleton key={i} className="h-24" />
             ))}
           </div>
         ) : filtered.length === 0 ? (

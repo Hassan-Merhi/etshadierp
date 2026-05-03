@@ -2444,8 +2444,8 @@ import { UsersSection } from "./settings/UsersSection";
                       </div>
                     </div>
                     {selectedCompanyForFix && selectedParentCompanyForFix && (
-                      <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
-                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                      <div className="status-info p-3 rounded-md">
+                        <p className="text-sm">
                           This will create credit entries for <strong>{companies.find((c: any) => c.id.toString() === selectedCompanyForFix)?.name}</strong> towards <strong>{companies.find((c: any) => c.id.toString() === selectedParentCompanyForFix)?.name}</strong>.
                         </p>
                       </div>
@@ -2570,8 +2570,8 @@ import { UsersSection } from "./settings/UsersSection";
               <AlertDialogDescription asChild>
                 {!resetDataResult ? (
                   <div className="space-y-4">
-                    <div className="p-3 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-md">
-                      <p className="text-sm text-orange-800 dark:text-orange-200 font-medium">
+                    <div className="status-warning p-3 rounded-md">
+                      <p className="text-sm font-medium">
                         Warning: This action permanently deletes data. This cannot be undone.
                       </p>
                     </div>
