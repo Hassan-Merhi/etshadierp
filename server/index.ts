@@ -191,6 +191,92 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── Phase D: Origin / Referer guard (CSRF defense layer 1) ─────────────────
+// Rejects state-changing API requests whose Origin (or Referer fallback) host
+// does not match the request host. Blocks classic cross-site form-post CSRF
+// attacks regardless of cookie SameSite setting. GET/HEAD/OPTIONS pass through.
+// Allowlist: same-origin only. Replit dev URLs naturally satisfy this since
+// the browser sends them as Origin and Express sees the same Host.
+const ORIGIN_GUARD_EXEMPT_PATHS = new Set<string>([
+  "/api/health",
+  "/api/health/db",
+  "/api/build-info",
+]);
+app.use((req, res, next) => {
+  const method = req.method.toUpperCase();
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") return next();
+  if (!req.path.startsWith("/api")) return next();
+  if (ORIGIN_GUARD_EXEMPT_PATHS.has(req.path)) return next();
+
+  const host = req.headers.host;
+  if (!host) return next(); // pathological — let downstream handle
+
+  const originHeader = req.headers.origin;
+  const refererHeader = req.headers.referer;
+  let sourceHost: string | null = null;
+  try {
+    if (originHeader) sourceHost = new URL(originHeader).host;
+    else if (refererHeader) sourceHost = new URL(refererHeader).host;
+  } catch {
+    sourceHost = null;
+  }
+
+  // Native (non-browser) clients (curl, Postman, server-to-server, mobile)
+  // typically omit both headers — allow them since they cannot be CSRF'd.
+  if (!sourceHost) return next();
+
+  if (sourceHost === host) return next();
+
+  console.warn(`[OriginGuard] BLOCKED ${method} ${req.path} | host=${host} origin=${originHeader || "-"} referer=${refererHeader || "-"}`);
+  return res.status(403).json({
+    message: "Cross-origin state-changing request rejected by origin guard.",
+    code: "CSRF_ORIGIN_MISMATCH",
+  });
+});
+
+// ── Phase E: CSRF synchroniser-token middleware (WARN-ONLY mode) ───────────
+// Generates a per-session CSRF token, exposes it via GET /api/csrf-token, and
+// inspects state-changing requests for a matching X-CSRF-Token header. Runs
+// in WARN-ONLY mode (logs mismatches without rejecting) until the frontend
+// has been verified to send the header on all paths. Flip CSRF_ENFORCE=1 to
+// enable hard rejection. Origin guard above provides defense-in-depth.
+const CSRF_ENFORCE = process.env.CSRF_ENFORCE === "1";
+app.get("/api/csrf-token", (req, res) => {
+  const sess: any = req.session as any;
+  if (!sess.csrfToken) {
+    sess.csrfToken = randomBytes(32).toString("hex");
+  }
+  res.json({ csrfToken: sess.csrfToken });
+});
+app.use((req, res, next) => {
+  const method = req.method.toUpperCase();
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") return next();
+  if (!req.path.startsWith("/api")) return next();
+  if (ORIGIN_GUARD_EXEMPT_PATHS.has(req.path)) return next();
+  if (req.path === "/api/csrf-token") return next();
+
+  const sess: any = req.session as any;
+  const expected: string | undefined = sess?.csrfToken;
+  const got = req.headers["x-csrf-token"];
+
+  // No token in session yet means user is not authenticated / hasn't fetched one.
+  // Don't gate auth/login endpoints on CSRF — first-touch endpoints by design.
+  if (!expected) return next();
+
+  if (typeof got === "string" && got === expected) return next();
+
+  if (CSRF_ENFORCE) {
+    console.warn(`[CSRF] BLOCKED ${method} ${req.path} | expected=${expected.slice(0,8)}… got=${typeof got === "string" ? got.slice(0,8) + "…" : "<missing>"}`);
+    return res.status(403).json({
+      message: "CSRF token missing or invalid.",
+      code: "CSRF_TOKEN_MISMATCH",
+    });
+  } else {
+    console.warn(`[CSRF warn-only] ${method} ${req.path} | got=${typeof got === "string" ? "present" : "missing"}`);
+    next();
+  }
+});
+
 // Flag used by /api/health/db to signal readiness to Render's health check.
 // Port opens immediately; migrations run in background. Render holds traffic
 // on the old instance (via health check 503) until this flips to true.
@@ -2351,6 +2437,27 @@ let migrationsDone = false;
     `DO $$ BEGIN ALTER TABLE whatsapp_stock_settings ADD CONSTRAINT whatsapp_stock_settings_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
     `DO $$ BEGIN ALTER TABLE worker_bonuses ADD CONSTRAINT worker_bonuses_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
       `DO $$ BEGIN ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT NOT VALID; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
+
+      // ── NOT VALID promotion (Phases A, B, C — May 2026) ─────────────────────
+      // After archiving 16,272 orphan rows in dev to _orphan_archive_* tables,
+      // all 12 NOT VALID constraints were validated. These ALTER ... VALIDATE
+      // statements are idempotent: once a constraint is validated, re-running
+      // is a no-op. Only `undefined_object` (constraint name doesn't exist in
+      // an older schema) is swallowed — `foreign_key_violation` (orphans still
+      // present) intentionally propagates so production failures are loud and
+      // forced to be remediated before deploy completes.
+      `DO $$ BEGIN ALTER TABLE chat_messages VALIDATE CONSTRAINT chat_messages_company_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+      `DO $$ BEGIN ALTER TABLE container_offloads VALIDATE CONSTRAINT container_offloads_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+      `DO $$ BEGIN ALTER TABLE factory_container_commissions VALIDATE CONSTRAINT factory_container_commissions_container_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+      `DO $$ BEGIN ALTER TABLE factory_fx_allocations VALIDATE CONSTRAINT factory_fx_allocations_container_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+      `DO $$ BEGIN ALTER TABLE factory_raw_stock VALIDATE CONSTRAINT factory_raw_stock_container_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+      `DO $$ BEGIN ALTER TABLE import_logs VALIDATE CONSTRAINT import_logs_container_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+      `DO $$ BEGIN ALTER TABLE inventory VALIDATE CONSTRAINT inventory_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+      `DO $$ BEGIN ALTER TABLE stock_adjustment_vouchers VALIDATE CONSTRAINT stock_adjustment_vouchers_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+      `DO $$ BEGIN ALTER TABLE stock_transfer_items VALIDATE CONSTRAINT stock_transfer_items_source_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+      `DO $$ BEGIN ALTER TABLE stock_transfer_items VALIDATE CONSTRAINT stock_transfer_items_transfer_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+      `DO $$ BEGIN ALTER TABLE stock_transfer_vouchers VALIDATE CONSTRAINT stock_transfer_vouchers_destination_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+      `DO $$ BEGIN ALTER TABLE stock_transfer_vouchers VALIDATE CONSTRAINT stock_transfer_vouchers_source_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
     ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.

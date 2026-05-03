@@ -13,6 +13,43 @@ export function setAppTimezone(tz: string | null | undefined) {
   _appTimezone = tz || null;
 }
 
+/* ── CSRF token plumbing ─────────────────────────────────────────────────── */
+// Synchronizer-token CSRF protection. The token is fetched from the server
+// once per session and attached to every state-changing request as
+// X-CSRF-Token. Server is currently in WARN-ONLY mode and will start
+// enforcing once CSRF_ENFORCE=1 is set in production.
+let _csrfToken: string | null = null;
+let _csrfFetchPromise: Promise<string | null> | null = null;
+
+async function fetchCsrfToken(): Promise<string | null> {
+  try {
+    const res = await fetch("/api/csrf-token", { credentials: "include" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data?.csrfToken === "string" ? data.csrfToken : null;
+  } catch {
+    return null;
+  }
+}
+
+async function ensureCsrfToken(): Promise<string | null> {
+  if (_csrfToken) return _csrfToken;
+  if (!_csrfFetchPromise) {
+    _csrfFetchPromise = fetchCsrfToken().then((tok) => {
+      _csrfToken = tok;
+      _csrfFetchPromise = null;
+      return tok;
+    });
+  }
+  return _csrfFetchPromise;
+}
+
+/** Reset the cached CSRF token (call on logout or auth state change). */
+export function resetCsrfToken() {
+  _csrfToken = null;
+  _csrfFetchPromise = null;
+}
+
 /**
  * Returns today's date string (YYYY-MM-DD) in the configured company timezone.
  * Falls back to the browser's local timezone if no company timezone is set.
@@ -87,11 +124,17 @@ export async function apiRequest(
       body = JSON.stringify(data);
     }
     
+    // Attach CSRF token for state-changing methods (server is in warn-only mode).
+    const upMethod = method.toUpperCase();
+    const isStateChanging = upMethod !== "GET" && upMethod !== "HEAD" && upMethod !== "OPTIONS";
+    const csrfToken = isStateChanging ? await ensureCsrfToken() : null;
+
     const res = await fetch(url, {
       method,
       headers: {
         ...(data ? { "Content-Type": "application/json" } : {}),
         "X-Client-Date": getAppDate(),
+        ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
       },
       body,
       credentials: "include",
