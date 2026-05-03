@@ -2512,6 +2512,28 @@ let migrationsDone = false;
         value text,
         updated_at timestamp NOT NULL DEFAULT now()
       )`,
+
+      // ── Wave 1 soft-delete columns (Task #10) ──────────────────────────────
+      // All idempotent: ADD COLUMN IF NOT EXISTS is safe to run repeatedly.
+      `ALTER TABLE locations ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE ledger_accounts ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE employees ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE stock_groups ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE bank_accounts ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE customers ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE stock_group_location_archives ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE factory_categories ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE factory_bale_products ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE factory_raw_stock ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE factory_raw_material_adjustments ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE factory_mix_batches ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE factory_bales ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE customer_proformas ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
     ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
