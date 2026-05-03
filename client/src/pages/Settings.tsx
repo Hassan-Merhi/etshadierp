@@ -677,6 +677,7 @@ import { UsersSection } from "./settings/UsersSection";
           { key: "files", label: "File Storage", icon: Upload },
           { key: "export-accounts", label: "Export Accounts", icon: Download },
           { key: "export-center", label: "Export Center", icon: Zap },
+          { key: "whatsapp-export", label: "WhatsApp Export", icon: MessageCircle },
         ],
       },
       {
@@ -1181,6 +1182,10 @@ import { UsersSection } from "./settings/UsersSection";
 
           {activeSection === "export-center" && (
             <ExportCenter />
+          )}
+
+          {activeSection === "whatsapp-export" && (
+            <WhatsAppExportSection />
           )}
 
           {activeSection === "fiscal" && (
