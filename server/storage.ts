@@ -3446,7 +3446,13 @@ export class DbStorage implements IStorage {
       }
 
       if (voucher.voucherType === "Stock Transfer") {
-        // Reverse the stock transfer
+        // Reverse the stock transfer using the centralized adjustInventory helper.
+        // Previous inline math (Batch E follow-up): added back at source / subtracted
+        // at destination using a hand-rolled weighted-average that did not settle
+        // negative layers and silently no-op'd when destination inventory was missing.
+        // Now: per-item adjustInventory(+qty, source) and adjustInventory(-qty, dest)
+        // — same SELECT FOR UPDATE + negative-layer settlement path as every other
+        // inventory mutation. Source-missing-location guard preserved.
         const [transferVoucher] = await tx
           .select()
           .from(schema.stockTransferVouchers)
@@ -3458,68 +3464,45 @@ export class DbStorage implements IStorage {
             .from(schema.stockTransferItems)
             .where(eq(schema.stockTransferItems.transferId, transferVoucher.id));
 
+          const sourceLocationId = transferVoucher.sourceLocationId;
+          const destinationLocationId = transferVoucher.destinationLocationId;
+
           for (const item of transferItems) {
             const quantity = parseFloat(item.quantity);
             const rate = parseFloat(item.rate);
 
-            // Note: Each transfer item now has its own sourceLocationId
-            // We need to get it from the item if stored, or from the transfer voucher as fallback
-            const sourceLocationId = transferVoucher.sourceLocationId;
-            const destinationLocationId = transferVoucher.destinationLocationId;
-
-            // Add back to source location (with row lock)
-            const sourceInventoryRows = await (tx as any).execute(
-              sql`SELECT * FROM inventory WHERE location_id = ${sourceLocationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
-            );
-            const sourceInventory = sourceInventoryRows.rows?.[0] || sourceInventoryRows[0];
-
-            if (sourceInventory) {
-              const newQuantity = parseFloat(sourceInventory.quantity) + quantity;
-              const newTotalValue = parseFloat(sourceInventory.total_value) + (quantity * rate);
-              const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
-
-              await tx
-                .update(schema.inventory)
-                .set({
-                  quantity: newQuantity.toFixed(3),
-                  averageRate: newAverageRate.toFixed(2),
-                  totalValue: newTotalValue.toFixed(2),
-                })
-                .where(eq(schema.inventory.id, sourceInventory.id));
-            } else {
-              if (!sourceLocationId) {
-                throw new Error(`Cannot reverse stock transfer: source location ID is missing for transfer voucher ${id}`);
-              }
-              await tx.insert(schema.inventory).values({
-                companyId: voucher.companyId,
-                locationId: sourceLocationId,
-                stockItemId: item.stockItemId,
-                quantity: quantity.toFixed(3),
-                averageRate: rate.toFixed(2),
-                totalValue: (quantity * rate).toFixed(2),
-              });
+            if (!sourceLocationId) {
+              throw new Error(`Cannot reverse stock transfer: source location ID is missing for transfer voucher ${id}`);
+            }
+            if (!destinationLocationId) {
+              throw new Error(`Cannot reverse stock transfer: destination location ID is missing for transfer voucher ${id}`);
             }
 
-            // Subtract from destination location (with row lock)
-            const destInventoryRows = await (tx as any).execute(
-              sql`SELECT * FROM inventory WHERE location_id = ${destinationLocationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
+            // Restore to source (positive delta — settles any negative layers there first)
+            await adjustInventory(
+              tx,
+              sourceLocationId,
+              item.stockItemId,
+              quantity,
+              voucher.companyId,
+              rate,
+              "StockTransfer-Reversal",
+              id,
             );
-            const destInventory = destInventoryRows.rows?.[0] || destInventoryRows[0];
 
-            if (destInventory) {
-              const newQuantity = parseFloat(destInventory.quantity) - quantity;
-              const newTotalValue = parseFloat(destInventory.total_value) - (quantity * rate);
-              const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
-
-              await tx
-                .update(schema.inventory)
-                .set({
-                  quantity: newQuantity.toFixed(3),
-                  averageRate: newAverageRate.toFixed(2),
-                  totalValue: newTotalValue.toFixed(2),
-                })
-                .where(eq(schema.inventory.id, destInventory.id));
-            }
+            // Remove from destination (negative delta — creates negative layer if needed
+            // so a subsequent re-receipt settles correctly; previous code silently
+            // skipped this when destination row was missing, which left phantom inventory)
+            await adjustInventory(
+              tx,
+              destinationLocationId,
+              item.stockItemId,
+              -quantity,
+              voucher.companyId,
+              rate,
+              "StockTransfer-Reversal",
+              id,
+            );
           }
 
           // Delete transfer items and transfer voucher
@@ -3529,7 +3512,13 @@ export class DbStorage implements IStorage {
       }
 
       if (voucher.voucherType === "Production" || voucher.voucherType === "Consumption" || voucher.voucherType === "Mixed" || voucher.voucherType === "Stock Adjustment") {
-        // Reverse stock adjustments (Production/Consumption/Mixed/Stock Adjustment)
+        // Reverse stock adjustments using adjustInventory (Batch E follow-up).
+        // Previous inline math used a hand-rolled weighted-average that
+        // (a) skipped negative-layer settlement, and (b) silently no-op'd a
+        // production-removal when no inventory row existed. Now: a single
+        // adjustInventory call per item using the same reversed-direction
+        // logic as before — Consumption-reversal restores (+qty), Production-
+        // reversal removes (-qty), Mixed flips per-item by sign.
         const [adjustmentVoucher] = await tx
           .select()
           .from(schema.stockAdjustmentVouchers)
@@ -3541,70 +3530,33 @@ export class DbStorage implements IStorage {
             .from(schema.stockAdjustmentItems)
             .where(eq(schema.stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
 
+          const adjustmentType = adjustmentVoucher.adjustmentType;
+
           for (const item of adjustmentItems) {
             const rawQuantity = parseFloat(item.quantity);
             const quantity = Math.abs(rawQuantity);
             const rate = parseFloat(item.rate);
-            
-            // For consumption: we subtracted, so we need to ADD back
-            // For production: we added, so we need to SUBTRACT back
-            // For Mixed adjustments, check the item's quantity sign:
-            //   - Positive quantity = was production (added), need to subtract back
-            //   - Negative quantity = was consumption (subtracted), need to add back
-            const adjustmentType = adjustmentVoucher.adjustmentType;
-            const isConsumption = adjustmentType === "Consumption" || 
+
+            // Direction logic preserved from previous implementation:
+            //   Consumption: we subtracted → ADD back (+qty)
+            //   Production:  we added     → SUBTRACT back (-qty)
+            //   Mixed: per-item sign — positive was production (subtract back),
+            //          negative was consumption (add back)
+            //   Stock Adjustment: signed quantity, reverse the sign
+            const isConsumption = adjustmentType === "Consumption" ||
               (adjustmentType === "Mixed" && rawQuantity < 0);
             const reversedQuantity = isConsumption ? quantity : -quantity;
 
-            const currentInventoryRows = await (tx as any).execute(
-              sql`SELECT * FROM inventory WHERE location_id = ${adjustmentVoucher.locationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
+            await adjustInventory(
+              tx,
+              adjustmentVoucher.locationId,
+              item.stockItemId,
+              reversedQuantity,
+              voucher.companyId,
+              rate,
+              `${adjustmentType}-Reversal`,
+              id,
             );
-            const currentInventory = currentInventoryRows.rows?.[0] || currentInventoryRows[0];
-
-            if (currentInventory) {
-              const currentQty = parseFloat(currentInventory.quantity);
-              const currentRate = parseFloat(currentInventory.average_rate);
-              const newQuantity = currentQty + reversedQuantity;
-              
-              let newTotalValue: number;
-              let newAverageRate: number;
-              
-              if (isConsumption) {
-                // Restoring consumed items: use the rate they were consumed at
-                newTotalValue = (currentQty * currentRate) + (quantity * rate);
-                newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
-              } else {
-                // Removing produced items: just reduce value proportionally
-                newTotalValue = newQuantity * currentRate;
-                newAverageRate = currentRate;
-              }
-
-              await tx
-                .update(schema.inventory)
-                .set({
-                  quantity: newQuantity.toFixed(3),
-                  averageRate: newAverageRate.toFixed(2),
-                  totalValue: newTotalValue.toFixed(2),
-                })
-                .where(eq(schema.inventory.id, currentInventory.id));
-            } else if (isConsumption) {
-              // Restoring consumed items when no inventory exists - create new record
-              const [location] = await tx
-                .select()
-                .from(schema.locations)
-                .where(eq(schema.locations.id, adjustmentVoucher.locationId));
-              
-              if (location) {
-                await tx.insert(schema.inventory).values({
-                  companyId: location.companyId,
-                  locationId: adjustmentVoucher.locationId,
-                  stockItemId: item.stockItemId,
-                  quantity: quantity.toFixed(3),
-                  averageRate: rate.toFixed(2),
-                  totalValue: (quantity * rate).toFixed(2),
-                });
-              }
-            }
           }
 
           // Delete adjustment items and adjustment voucher
