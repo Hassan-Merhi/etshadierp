@@ -942,6 +942,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
       const dateFmt = "yyyy-MM-dd";
       // Back one day: Minus key (Mac: e.code="Minus", Windows: e.key="-")
+      if (hasAnyOpenDialog()) return;
+
       const isBack = e.key === "-" || e.code === "Minus";
       // Forward one day: Plus key via Shift+= (Mac/Windows: e.key="+") or just "=" key
       const isForward = (e.key === "+" && e.shiftKey) || (e.code === "Equal" && e.shiftKey) || e.key === "=";
@@ -962,8 +964,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
         }));
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, []);
 
   // Apply filters (date filtering is now done server-side via periodFilter)

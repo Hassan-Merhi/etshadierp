@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -317,8 +318,10 @@ export default function TransactionJournal() {
       if (tag === "select") return;
 
       const dateFmt = "yyyy-MM-dd";
+      if (hasAnyOpenDialog()) return;
+
       const isBack    = e.key === "-" || e.code === "Minus";
-      const isForward = (e.key === "+" && e.shiftKey) || (e.code === "Equal" && e.shiftKey);
+      const isForward = (e.key === "+" && e.shiftKey) || (e.code === "Equal" && e.shiftKey) || e.key === "=";
 
       if (isBack) {
         e.preventDefault();
@@ -338,8 +341,8 @@ export default function TransactionJournal() {
         setPage(1);
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, []);
 
   // ── Summary aggregation ──
