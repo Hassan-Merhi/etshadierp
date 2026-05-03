@@ -205,7 +205,7 @@ const SeverityBadge = ({ severity }: { severity: string }) => {
     case "critical":
       return <Badge variant="destructive">Critical</Badge>;
     case "warning":
-      return <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white">Warning</Badge>;
+      return <Badge variant="outline" className="status-warning">Warning</Badge>;
     default:
       return <Badge variant="secondary">Info</Badge>;
   }
@@ -295,9 +295,9 @@ export default function ImportCycleDiagnostics() {
 
   const getCategoryBadge = (category: string) => {
     switch (category) {
-      case "asset": return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Asset</Badge>;
-      case "expense": return <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">Expense</Badge>;
-      case "liability": return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Liability</Badge>;
+      case "asset": return <Badge variant="outline" className="status-success">Asset</Badge>;
+      case "expense": return <Badge variant="outline" className="status-warning">Expense</Badge>;
+      case "liability": return <Badge variant="outline" className="status-danger">Liability</Badge>;
       default: return <Badge variant="outline">{category}</Badge>;
     }
   };
@@ -372,7 +372,7 @@ export default function ImportCycleDiagnostics() {
           <CardTitle className="flex items-center gap-2">
             Import Cycle Balance
             {isBalanced ? (
-              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+              <Badge variant="outline" className="status-success">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
                 Balanced
               </Badge>
@@ -388,9 +388,9 @@ export default function ImportCycleDiagnostics() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className={`text-center p-6 rounded-lg ${isBalanced ? 'bg-green-50 dark:bg-green-950' : 'bg-destructive/10'}`}>
+          <div className={`text-center p-6 rounded-lg ${isBalanced ? 'status-success' : 'bg-destructive/10'}`}>
             <div className="text-sm text-muted-foreground mb-2">Net Import Cycle Balance</div>
-            <div className={`text-3xl font-bold ${isBalanced ? 'text-green-600' : 'text-destructive'}`}>
+            <div className={`text-3xl font-bold ${isBalanced ? 'text-success' : 'text-destructive'}`}>
               {formatAmount(netBalance)}
             </div>
           </div>
@@ -399,10 +399,10 @@ export default function ImportCycleDiagnostics() {
 
       {/* Precision Trace - Exact Discrepancy Source */}
       {data?.precisionTrace && (
-        <Card className="border-2 border-blue-500" data-testid="card-precision-trace">
-          <CardHeader className="bg-blue-50 dark:bg-blue-950">
+        <Card className="border-2 border-info" data-testid="card-precision-trace">
+          <CardHeader className="status-info">
             <CardTitle className="flex items-center gap-2">
-              <Database className="h-5 w-5 text-blue-600" />
+              <Database className="h-5 w-5 text-info" />
               Exact Calculation Breakdown
             </CardTitle>
             <CardDescription>
@@ -413,16 +413,16 @@ export default function ImportCycleDiagnostics() {
             {/* Formula visualization */}
             <div className="bg-muted p-4 rounded-lg font-mono text-sm">
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 items-center text-center">
-                <div className="p-3 bg-green-100 dark:bg-green-900 rounded">
-                  <div className="text-xs text-muted-foreground mb-1">Assets</div>
-                  <div className="font-bold text-green-700 dark:text-green-300">
+                <div className="status-success p-3 rounded">
+                  <div className="text-xs opacity-70 mb-1">Assets</div>
+                  <div className="font-bold">
                     {formatAmount(data.precisionTrace.calculation.assetTotal.value)}
                   </div>
                 </div>
                 <div className="text-lg font-bold">+</div>
-                <div className="p-3 bg-orange-100 dark:bg-orange-900 rounded">
-                  <div className="text-xs text-muted-foreground mb-1">Expenses</div>
-                  <div className="font-bold text-orange-700 dark:text-orange-300">
+                <div className="status-warning p-3 rounded">
+                  <div className="text-xs opacity-70 mb-1">Expenses</div>
+                  <div className="font-bold">
                     {formatAmount(data.precisionTrace.calculation.expenseTotal.value)}
                   </div>
                 </div>

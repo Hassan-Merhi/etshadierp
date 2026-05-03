@@ -65,6 +65,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getVoucherTypeBadge } from "@/lib/voucherTypeBadge";
 import {
   Dialog,
   DialogContent,
@@ -1719,37 +1720,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
     !!filters.maxAmount ||
     filters.statusFilter !== "all";
 
-  const getVoucherTypeBadge = (type: string): { variant: "default" | "secondary" | "destructive" | "outline"; className?: string } => {
-    switch (type) {
-      case "Sales":
-        return { variant: "outline", className: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/40" };
-      case "Purchase":
-        return { variant: "outline", className: "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/40" };
-      case "Payment":
-        return { variant: "outline", className: "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/40" };
-      case "Receipt":
-        return { variant: "outline", className: "bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/40" };
-      case "Journal":
-        return { variant: "outline", className: "bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/40" };
-      case "Contra":
-        return { variant: "outline", className: "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/40" };
-      case "Stock Transfer":
-      case "StockTransfer":
-        return { variant: "outline", className: "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/40" };
-      case "Consumption":
-        return { variant: "outline", className: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/40" };
-      case "Production":
-        return { variant: "outline", className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40" };
-      case "Mixed":
-        return { variant: "outline", className: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/40" };
-      case "Credit Note":
-        return { variant: "outline", className: "bg-pink-500/15 text-pink-700 dark:text-pink-300 border-pink-500/40" };
-      case "Debit Note":
-        return { variant: "outline", className: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/40" };
-      default:
-        return { variant: "outline" };
-    }
-  };
 
   return (
     <div className="flex flex-col gap-4 md:gap-6 p-3 md:p-6">

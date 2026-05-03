@@ -33,6 +33,7 @@ import {
   Landmark,
   type LucideIcon
 } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/hooks/use-toast";
 import { utils, writeFile, readFile, ExcelJS } from "@/lib/excelHelper";
 import { formatNumber, drCrClass } from "@/lib/formatNumber";
@@ -991,9 +992,11 @@ export default function Analytics() {
 
     if (accountList.length === 0) {
       return (
-        <div className="text-center py-8 text-muted-foreground">
-          <p>No accounts in this category</p>
-        </div>
+        <EmptyState
+          icon={FileText}
+          title="No accounts in this category"
+          description="Once you add accounts, they will appear here."
+        />
       );
     }
 

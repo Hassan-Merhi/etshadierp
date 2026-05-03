@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
 import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown, Globe, Eye, Pencil, FileSpreadsheet, MessageCircle, Check } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { format } from "date-fns";
@@ -1815,9 +1816,11 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 ))}
               </div>
             ) : filteredCombinedRows.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                {allInventoryData.length === 0 ? "No stock found across any location." : "No items match your search."}
-              </div>
+              <EmptyState
+                icon={Package}
+                title={allInventoryData.length === 0 ? "No stock found" : "No matching items"}
+                description={allInventoryData.length === 0 ? "Stock has not been recorded across any location yet." : "Try adjusting your search to see other items."}
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border-collapse">

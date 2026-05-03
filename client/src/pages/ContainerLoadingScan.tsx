@@ -450,7 +450,7 @@ export default function ContainerLoadingScan() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {isResuming && orderId && (
-            <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 no-default-hover-elevate no-default-active-elevate" data-testid="badge-resuming">
+            <Badge variant="outline" className="status-warning no-default-hover-elevate no-default-active-elevate" data-testid="badge-resuming">
               <Clock className="h-3 w-3 mr-1" />
               Resuming Loading #{orderId}
             </Badge>
@@ -507,11 +507,11 @@ export default function ContainerLoadingScan() {
             )}
 
             {viewMode === "detailed" && lastScannedRef && (
-              <div className="mb-3 flex items-center gap-3 rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 px-3 py-2" data-testid="banner-last-scanned">
-                <div className="text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wide shrink-0">Last Scanned</div>
+              <div className="mb-3 flex items-center gap-3 rounded-md status-success px-3 py-2" data-testid="banner-last-scanned">
+                <div className="text-xs font-medium uppercase tracking-wide shrink-0 opacity-80">Last Scanned</div>
                 <div className="min-w-0">
-                  <div className="font-mono font-bold text-sm text-green-900 dark:text-green-100 truncate">{lastScannedRef.baleReference}</div>
-                  {lastScannedRef.baleName && <div className="text-xs text-green-700 dark:text-green-400 truncate">{lastScannedRef.baleName}</div>}
+                  <div className="font-mono font-bold text-sm truncate">{lastScannedRef.baleReference}</div>
+                  {lastScannedRef.baleName && <div className="text-xs opacity-80 truncate">{lastScannedRef.baleName}</div>}
                 </div>
               </div>
             )}

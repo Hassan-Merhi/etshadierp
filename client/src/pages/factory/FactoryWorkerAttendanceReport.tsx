@@ -145,7 +145,7 @@ function StatusPill({
         onClick={onClick}
         onKeyDown={onKeyDown}
         className={cn(
-          "inline-flex items-center justify-center w-5 h-5 rounded-sm bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold select-none",
+          "inline-flex items-center justify-center w-5 h-5 rounded-sm status-success text-[10px] font-bold select-none",
           editable && "cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring",
         )}
       >
@@ -160,7 +160,7 @@ function StatusPill({
         onClick={onClick}
         onKeyDown={onKeyDown}
         className={cn(
-          "inline-flex items-center justify-center w-5 h-5 rounded-sm bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 text-[10px] font-bold select-none",
+          "inline-flex items-center justify-center w-5 h-5 rounded-sm status-danger text-[10px] font-bold select-none",
           editable && "cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring",
         )}
       >
@@ -175,7 +175,7 @@ function StatusPill({
         onClick={onClick}
         onKeyDown={onKeyDown}
         className={cn(
-          "inline-flex items-center justify-center w-5 h-5 rounded-sm bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-[10px] font-bold select-none",
+          "inline-flex items-center justify-center w-5 h-5 rounded-sm status-warning text-[10px] font-bold select-none",
           editable && "cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring",
         )}
       >
@@ -190,7 +190,7 @@ function StatusPill({
         onClick={onClick}
         onKeyDown={onKeyDown}
         className={cn(
-          "inline-flex items-center justify-center w-5 h-5 rounded-sm bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold select-none",
+          "inline-flex items-center justify-center w-5 h-5 rounded-sm status-info text-[10px] font-bold select-none",
           editable && "cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring",
         )}
       >
@@ -521,12 +521,12 @@ export default function FactoryWorkerAttendanceReport() {
             data-testid="filter-present"
             className={cn(
               "h-7 px-3 text-xs rounded-sm",
-              filter === "present" ? "bg-emerald-50 dark:bg-emerald-950/40 font-semibold text-emerald-700 dark:text-emerald-300" : "",
+              filter === "present" ? "status-success font-semibold" : "",
             )}
           >
             No Absences
             {data && (
-              <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0 h-4 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+              <Badge variant="outline" className="ml-1.5 text-[10px] px-1.5 py-0 h-4 status-success">
                 {presentCount}
               </Badge>
             )}
@@ -538,12 +538,12 @@ export default function FactoryWorkerAttendanceReport() {
             data-testid="filter-absent"
             className={cn(
               "h-7 px-3 text-xs rounded-sm",
-              filter === "absent" ? "bg-red-50 dark:bg-red-950/40 font-semibold text-red-600 dark:text-red-400" : "",
+              filter === "absent" ? "status-danger font-semibold" : "",
             )}
           >
             Has Absences
             {data && (
-              <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0 h-4 bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400">
+              <Badge variant="outline" className="ml-1.5 text-[10px] px-1.5 py-0 h-4 status-danger">
                 {absentCount}
               </Badge>
             )}

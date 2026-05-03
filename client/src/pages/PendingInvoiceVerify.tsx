@@ -336,11 +336,11 @@ export default function PendingInvoiceVerify() {
     switch (status) {
       case "LOADED_NOT_IN_PROFORMA":
       case "MISSING_FROM_LOADED":
-        return "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800";
+        return "status-danger";
       case "UNDER_LOADED":
-        return "bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800";
+        return "status-warning";
       case "OVER_LOADED":
-        return "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800";
+        return "status-success";
       case "MATCH":
       default:
         return "";
@@ -354,11 +354,11 @@ export default function PendingInvoiceVerify() {
       case "MISSING_FROM_LOADED":
         return <Badge variant="destructive" data-testid="badge-missing-from-loaded">Missing</Badge>;
       case "UNDER_LOADED":
-        return <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800" data-testid="badge-under-loaded">Under Loaded</Badge>;
+        return <Badge variant="outline" className="status-warning" data-testid="badge-under-loaded">Under Loaded</Badge>;
       case "OVER_LOADED":
-        return <Badge variant="outline" className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" data-testid="badge-over-loaded">Over Loaded</Badge>;
+        return <Badge variant="outline" className="status-success" data-testid="badge-over-loaded">Over Loaded</Badge>;
       case "MATCH":
-        return <Badge variant="outline" className="text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" data-testid="badge-match"><CheckCircle className="h-3 w-3 mr-1" />Match</Badge>;
+        return <Badge variant="outline" className="status-success" data-testid="badge-match"><CheckCircle className="h-3 w-3 mr-1" />Match</Badge>;
       default:
         return null;
     }
@@ -402,12 +402,12 @@ export default function PendingInvoiceVerify() {
         </div>
         <div>
           {isPending && (
-            <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800" data-testid="badge-order-status">
+            <Badge variant="outline" className="status-warning" data-testid="badge-order-status">
               Pending Verification
             </Badge>
           )}
           {isVerified && (
-            <Badge variant="outline" className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" data-testid="badge-order-status">
+            <Badge variant="outline" className="status-success" data-testid="badge-order-status">
               Verified
             </Badge>
           )}
@@ -455,9 +455,9 @@ export default function PendingInvoiceVerify() {
               const cmp = comparisonMap.get(articleCode);
               if (!cmp) return "";
               if (cmp.status === "UNDER_LOADED" || cmp.status === "MISSING_FROM_LOADED")
-                return "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800";
+                return "status-danger";
               if (cmp.status === "OVER_LOADED")
-                return "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800";
+                return "status-success";
               return "";
             };
 

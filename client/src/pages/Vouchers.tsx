@@ -83,7 +83,8 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useFormDraft } from "@/hooks/useFormDraft";
 import { DraftRestorePrompt } from "@/components/DraftRestorePrompt";
-import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, ChevronUp, FileDown, Loader2, ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight, SlidersHorizontal, FileText, LayoutGrid, ClipboardList, GitBranch } from "lucide-react";
+import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, ChevronUp, FileDown, Loader2, ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight, SlidersHorizontal, FileText, LayoutGrid, ClipboardList, GitBranch, History } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { utils, writeFile } from "@/lib/excelHelper";
 import {
   DropdownMenu,
@@ -5840,7 +5841,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               {transferRevisionsExpanded && (
                 <CardContent className="pt-0 space-y-4">
                   {transferRevisions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-6">No revisions yet. Use "Save as Revision" to record tracked changes.</p>
+                    <EmptyState
+                      icon={History}
+                      title="No revisions yet"
+                      description='Use "Save as Revision" to record tracked changes to this transfer.'
+                    />
                   ) : (
                     transferRevisions.map((rev: any) => (
                       <div key={rev.id} className="border rounded-md overflow-hidden">

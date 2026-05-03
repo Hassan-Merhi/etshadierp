@@ -499,6 +499,31 @@
 
 /* Print styles for account statements */
 @media print {
+  /* Universal print hygiene — applies to every printed view */
+  *,
+  *::before,
+  *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Status pills: render as monochrome outlined chips on paper */
+  .status-success,
+  .status-warning,
+  .status-info,
+  .status-danger,
+  .status-muted {
+    background: white !important;
+    color: #111 !important;
+    border: 1px solid #999 !important;
+  }
+
+  /* Hide non-essential interactive chrome from prints */
+  [data-print-hide],
+  .no-print {
+    display: none !important;
+  }
+
   body {
     background: white !important;
     color: #111 !important;
