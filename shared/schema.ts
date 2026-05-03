@@ -657,6 +657,10 @@ export const inventory = pgTable("inventory", {
 }, (t) => ({
   companyIdx: index("inventory_company_idx").on(t.companyId),
   uniqueLocationItem: uniqueIndex("inventory_location_item_unique").on(t.locationId, t.stockItemId),
+  // Phase 4+5 (May 2026): standalone location index for "all stock at this
+  // location" scans — the composite unique above is keyed on (location_id,
+  // stock_item_id) so cannot serve location-only filters.
+  locationIdx: index("inventory_location_idx").on(t.locationId),
 }));
 
 export const insertInventorySchema = createInsertSchema(inventory).omit({
@@ -757,6 +761,9 @@ export const vouchers = pgTable("vouchers", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   companyIdx: index("vouchers_company_idx").on(t.companyId),
+  // Phase 4+5 (May 2026): composite index for daybook range queries that
+  // filter by company + voucher_date.
+  companyDateIdx: index("vouchers_company_date_idx").on(t.companyId, t.voucherDate),
 }));
 
 export const insertVoucherSchema = createInsertSchema(vouchers).omit({
@@ -799,6 +806,10 @@ export const voucherEntries = pgTable("voucher_entries", {
   voucherIdx: index("voucher_entries_voucher_idx").on(t.voucherId),
   customerIdx: index("voucher_entries_customer_idx").on(t.customerId),
   ledgerAccountIdx: index("voucher_entries_ledger_account_idx").on(t.ledgerAccountId),
+  // Phase 4+5 (May 2026): composite for ledger-statement page-loads which
+  // join voucher_entries → vouchers on voucher_id and then filter by
+  // vouchers.voucher_date for the chosen account.
+  ledgerVoucherIdx: index("voucher_entries_ledger_voucher_idx").on(t.ledgerAccountId, t.voucherId),
 }));
 
 export const insertVoucherEntrySchema = createInsertSchema(voucherEntries).omit({
@@ -2889,6 +2900,9 @@ export const factoryBales = pgTable("factory_bales", {
   pressingBatchIdx: index("factory_bales_pressing_batch_idx").on(t.pressingBatchId),
   mixBatchIdx: index("factory_bales_mix_batch_idx").on(t.mixBatchId),
   companyIdx: index("factory_bales_company_idx").on(t.companyId),
+  // Phase 4+5 (May 2026): bale-pick hot paths.
+  productIdx: index("factory_bales_product_idx").on(t.productId),
+  companyStatusIdx: index("factory_bales_company_status_idx").on(t.companyId, t.status),
 }));
 
 export const insertFactoryBaleSchema = createInsertSchema(factoryBales).omit({
