@@ -18,3 +18,13 @@ export function AppModeProvider({
 export function useAppMode(): AppMode {
   return useContext(AppModeContext);
 }
+
+export function getModePrefix(mode: AppMode): string {
+  if (mode === "factory") return "/factory";
+  if ((mode as string) === "properties") return "/properties";
+  return "";
+}
+
+export function useModePrefix(): string {
+  return getModePrefix(useContext(AppModeContext));
+}

@@ -5,7 +5,7 @@ import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation, canModifyDate } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, runIntercompanyPosTransfer, recalculateIntercompanyForDate } from "./_helpers";
 import {
-  inventory, stockItems, stockGroups, stockGroupArchives,
+  inventory, stockItems, stockGroups,
   stockTransferVouchers, stockTransferItems,
   stockAdjustmentVouchers, stockAdjustmentItems,
   containers, containerOffloads, containerOffloadItems,

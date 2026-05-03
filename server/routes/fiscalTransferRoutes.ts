@@ -5,7 +5,7 @@ import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } 
 import { getClientDate } from "../lib/dateUtils";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries } from "./_helpers";
 import {
-  inventory, stockItems, stockGroups, stockGroupArchives, stockItemCodeAliases,
+  inventory, stockItems, stockGroups, stockItemCodeAliases,
   stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
   stockTransferRevisions, stockTransferRevisionItems,
   stockAdjustmentVouchers, stockAdjustmentItems,
@@ -16,7 +16,7 @@ import {
   insertContainerSchema, offloadRequestSchema,
   purchaseOrders, poLineItems, insertContainerSaleSchema,
   vouchers, voucherEntries, salesItems, insertVoucherSchema, insertVoucherEntrySchema,
-  updateVoucherEntrySchema, insertSalesItemSchema,
+  insertSalesItemSchema,
   suppliers, customers, customerBalances, locations, employees, userLocations,
   auditLog, interCompanyTransfers, insertInterCompanyTransferSchema,
   ledgerAccounts, insertLedgerAccountSchema, insertLedgerEntrySchema,
@@ -25,17 +25,17 @@ import {
   wasteDispatches, wasteDispatchItems, insertWasteDispatchSchema,
   bales, baleProducts, baleProductCategories, baleTransfers,
   insertBaleSchema, insertBaleTransferSchema,
-  orphanedRecords, orphanedCharges,
+  orphanedCharges,
   dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
   insertDashboardCashAccountSchema, insertDashboardPayableAccountSchema,
   insertDashboardAccountSelectionSchema,
-  creditNoteItems, creditNotes, insertCreditNoteSchema,
+  creditNoteItems, insertCreditNoteSchema,
   pendingBarcodes, insertPendingBarcodeSchema,
   storedFiles, spreadsheets, liveSpreadsheets,
   agentAccounts, insertAgentAccountSchema,
   salaryAdvances, salaryAdvanceDeductions,
   insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
-  chatSessions, chatMessages,
+  chatMessages,
   inventoryValueAdjustments,
   updateStockTransferSchema, updateStockAdjustmentSchema,
 } from "@shared/schema";

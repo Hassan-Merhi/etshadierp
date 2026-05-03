@@ -5,7 +5,7 @@ import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } 
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory } from "./_helpers";
 import { getClientDate } from "../lib/dateUtils";
 import {
-  inventory, stockItems, stockGroups, stockGroupArchives,
+  inventory, stockItems, stockGroups,
   stockTransferVouchers, stockTransferItems,
   stockAdjustmentVouchers, stockAdjustmentItems,
   containers, containerOffloads, containerOffloadItems,

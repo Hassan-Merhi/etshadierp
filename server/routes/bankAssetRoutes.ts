@@ -5,7 +5,7 @@ import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate } from "./_helpers";
 import {
-  inventory, stockItems, stockGroups, stockGroupArchives, stockItemCodeAliases,
+  inventory, stockItems, stockGroups, stockItemCodeAliases,
   stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
   stockAdjustmentVouchers, stockAdjustmentItems,
   containers, containerOffloads, containerOffloadItems, containerSales,
