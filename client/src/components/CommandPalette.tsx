@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import {
   CommandDialog,
@@ -11,38 +11,26 @@ import {
 } from "@/components/ui/command";
 import {
   LayoutDashboard,
-  Package,
   MapPin,
-  Truck,
-  Archive,
-  Search,
-  BookOpen,
-  Building2,
-  Users,
-  FileText,
   Calendar,
-  DollarSign,
   ShoppingCart,
-  TrendingUp,
-  BarChart2,
   MessageSquare,
   Settings,
   Bot,
   Trash2,
-  Link,
+  Link as LinkIcon,
   Wrench,
   PieChart,
   AlertTriangle,
-  Factory,
-  Layers,
+  Package,
   Box,
-  Receipt,
-  Target,
-  Activity,
-  BarChart,
-  Brain,
-  Package2,
+  Archive,
+  Users,
 } from "lucide-react";
+import { useErpVisibleSections } from "@/components/AppSidebar";
+import { useFactoryVisibleSections } from "@/components/FactorySidebar";
+import { PROPERTIES_NAV_SECTIONS } from "@/components/PropertiesSidebar";
+import type { NavItem, NavSection } from "@/components/sidebar/sidebarPrimitives";
 
 interface CommandPaletteProps {
   open?: boolean;
@@ -50,8 +38,10 @@ interface CommandPaletteProps {
   isPOS?: boolean;
   hasErpAccess?: boolean;
   hasFactoryAccess?: boolean;
+  hasPropertiesAccess?: boolean;
   isAdminOwner?: boolean;
   hasDashboardAccess?: boolean;
+  user?: any;
 }
 
 interface PageEntry {
@@ -61,61 +51,88 @@ interface PageEntry {
   icon: React.ElementType;
 }
 
-const erpPages: PageEntry[] = [
-  { label: "Container Dashboard", description: "Track containers and shipments", path: "/", icon: LayoutDashboard },
-  { label: "Financial Overview", description: "Dashboard with key financial metrics", path: "/financial-overview", icon: BarChart2 },
-  { label: "Containers", description: "Manage all containers", path: "/containers", icon: Package },
-  { label: "Location Inventory", description: "Stock levels by location", path: "/location-inventory", icon: MapPin },
-  { label: "Stock OTW", description: "On-the-way stock tracking", path: "/stock-otw", icon: Truck },
-  { label: "Stock Items", description: "Manage all stock items", path: "/stock-items", icon: Archive },
-  { label: "Stock Query", description: "Search and query stock", path: "/stock-query", icon: Search },
-  { label: "Accounts", description: "Chart of accounts and ledgers", path: "/accounts", icon: BookOpen },
-  { label: "Suppliers", description: "Supplier management", path: "/suppliers", icon: Building2 },
-  { label: "Customers", description: "Customer accounts", path: "/customers", icon: Users },
-  { label: "Vouchers", description: "Payment, receipt and journal vouchers", path: "/vouchers", icon: FileText },
-  { label: "Daybook", description: "Daily transaction log", path: "/daybook", icon: Calendar },
-  { label: "Payroll", description: "Employee payroll management", path: "/payroll", icon: DollarSign },
-  { label: "POS", description: "Point of sale", path: "/pos", icon: ShoppingCart },
-  { label: "POS Daybook", description: "Point of sale daily log", path: "/pos-daybook", icon: Calendar },
-  { label: "Sales Report", description: "Sales analytics and reports", path: "/sales-report", icon: TrendingUp },
-  { label: "Analytics", description: "Business analytics", path: "/analytics", icon: BarChart2 },
+/** Optional descriptions overlaid onto items derived from sidebar nav. */
+const DESCRIPTIONS: Record<string, string> = {
+  "/": "Track containers and shipments",
+  "/financial-overview": "Dashboard with key financial metrics",
+  "/containers": "Manage all containers",
+  "/location-inventory": "Stock levels by location",
+  "/stock-otw": "On-the-way stock tracking",
+  "/stock-items": "Manage all stock items",
+  "/stock-query": "Search and query stock",
+  "/accounts": "Chart of accounts and ledgers",
+  "/suppliers": "Supplier management",
+  "/customers": "Customer accounts",
+  "/vouchers": "Payment, receipt and journal vouchers",
+  "/daybook": "Daily transaction log",
+  "/payroll": "Employee payroll management",
+  "/pos": "Point of sale",
+  "/pos-daybook": "Point of sale daily log",
+  "/sales-report": "Sales analytics and reports",
+  "/analytics": "Business analytics",
+  "/chat": "Internal messaging",
+  "/factory/dashboard": "Intelligence overview",
+  "/factory/stock-entry": "Enter bale stock",
+  "/factory/bales-hub": "Manage all bales",
+  "/factory/raw-materials": "Raw material inventory",
+  "/factory/customers": "Customer accounts",
+  "/factory/sales/loadings": "Container loading management",
+  "/factory/invoicing": "Proformas, pending and finalized invoices",
+  "/factory/vouchers": "Accounting vouchers",
+  "/factory/accounts": "Chart of accounts",
+  "/factory/daybook": "Daily transaction log",
+  "/factory/location-inventory": "Stock levels by location",
+  "/factory/stock-otw": "Factory containers on the way",
+  "/factory/intelligence/dashboard": "KPIs and insights",
+  "/factory/intelligence/kpis": "Key performance indicators",
+  "/factory/intelligence/profitability": "Profitability analysis",
+  "/factory/intelligence/waste": "Production waste tracking",
+  "/factory/intelligence/cashflow": "Cashflow intelligence",
+  "/factory/bale-products": "Finished bale products",
+  "/factory/bale-relabeling": "Relabel and reassign bales",
+  "/factory/workers": "Worker and payroll management",
+  "/factory/employees": "Employee records and details",
+  "/properties/rental/warehouses": "Properties (warehouses) rented out",
+  "/properties/rental/shops": "Shops rented out",
+  "/properties/rental/payments": "Rental payments log",
+  "/properties/transfer": "Cash transfer between properties",
+  "/properties/accounts": "Chart of accounts",
+  "/properties/vouchers": "Accounting vouchers",
+};
+
+/** Extra entries that aren't part of any nav section but should appear in the palette. */
+const ERP_EXTRAS: PageEntry[] = [
+  { label: "Container Dashboard", description: DESCRIPTIONS["/"], path: "/", icon: LayoutDashboard },
+  { label: "Financial Overview", description: DESCRIPTIONS["/financial-overview"], path: "/financial-overview", icon: LayoutDashboard },
   { label: "Chat", description: "Internal messaging", path: "/chat", icon: MessageSquare },
 ];
 
-const factoryPages: PageEntry[] = [
-  { label: "Factory Dashboard", description: "Intelligence overview", path: "/factory/dashboard", icon: LayoutDashboard },
-  { label: "Stock Entry", description: "Enter bale stock", path: "/factory/stock-entry", icon: Package2 },
-  { label: "Bales Hub", description: "Manage all bales", path: "/factory/bales-hub", icon: Package },
-  { label: "Raw Materials", description: "Raw material inventory", path: "/factory/raw-materials", icon: Layers },
-  { label: "Bale Products", description: "Finished bale products", path: "/factory/bale-products", icon: Box },
-  { label: "Factory Customers", description: "Customer accounts", path: "/factory/customers", icon: Users },
-  { label: "Sales Loadings", description: "Container loading management", path: "/factory/sales/loadings", icon: Truck },
-  { label: "Invoicing", description: "Proformas, pending and finalized invoices", path: "/factory/invoicing", icon: FileText },
-  { label: "Factory Vouchers", description: "Accounting vouchers", path: "/factory/vouchers", icon: FileText },
-  { label: "Factory Accounts", description: "Chart of accounts", path: "/factory/accounts", icon: BookOpen },
-  { label: "Factory Daybook", description: "Daily transaction log", path: "/factory/daybook", icon: Calendar },
-  { label: "Location Inventory", description: "Stock levels by location", path: "/factory/location-inventory", icon: MapPin },
-  { label: "Factory Stock OTW", description: "Factory containers on the way", path: "/factory/stock-otw", icon: Truck },
-  { label: "Bale Relabeling", description: "Relabel and reassign bales", path: "/factory/bale-relabeling", icon: Archive },
-  { label: "Workers", description: "Worker and payroll management", path: "/factory/workers", icon: Users },
-  { label: "Employees", description: "Employee records and details", path: "/factory/employees", icon: Users },
-  { label: "Supplier Report", description: "Supplier performance report", path: "/factory/supplier-report", icon: BarChart },
-  { label: "Supplier Statement", description: "Supplier account statement", path: "/factory/supplier-statement", icon: FileText },
-  { label: "Production Summary", description: "Production output summary", path: "/factory/production-summary", icon: Factory },
-  { label: "Factory Analytics", description: "Factory analytics", path: "/factory/analytics", icon: BarChart2 },
-  { label: "Intelligence Dashboard", description: "KPIs and insights", path: "/factory/intelligence/dashboard", icon: Brain },
-  { label: "KPIs", description: "Key performance indicators", path: "/factory/intelligence/kpis", icon: Target },
-  { label: "Profitability", description: "Profitability analysis", path: "/factory/intelligence/profitability", icon: TrendingUp },
-  { label: "Waste Analysis", description: "Production waste tracking", path: "/factory/intelligence/waste", icon: Trash2 },
-  { label: "Cashflow", description: "Cashflow intelligence", path: "/factory/intelligence/cashflow", icon: Activity },
+/** Factory routes that aren't in FACTORY_NAV_SECTIONS but were historically in the palette. */
+const FACTORY_EXTRAS_ALWAYS: PageEntry[] = [
+  { label: "Factory Daybook", description: DESCRIPTIONS["/factory/daybook"], path: "/factory/daybook", icon: Calendar },
   { label: "Factory Chat", description: "Internal messaging", path: "/factory/chat", icon: MessageSquare },
+  { label: "Bale Products", description: DESCRIPTIONS["/factory/bale-products"], path: "/factory/bale-products", icon: Box },
+  { label: "Bale Relabeling", description: DESCRIPTIONS["/factory/bale-relabeling"], path: "/factory/bale-relabeling", icon: Archive },
+  { label: "Workers", description: DESCRIPTIONS["/factory/workers"], path: "/factory/workers", icon: Users },
+  { label: "Employees", description: DESCRIPTIONS["/factory/employees"], path: "/factory/employees", icon: Users },
+];
+
+const PROPERTIES_EXTRAS: PageEntry[] = [
+  { label: "Properties Daybook", description: "Daily transaction log", path: "/properties/daybook", icon: Calendar },
+  { label: "Properties Dashboard", description: "Properties overview", path: "/properties/dashboard", icon: LayoutDashboard },
+  { label: "Properties Analytics", description: "Properties analytics", path: "/properties/analytics", icon: PieChart },
+  { label: "My Settings", description: "Personal preferences", path: "/my-settings", icon: Settings },
+];
+
+const PROPERTIES_ADMIN_EXTRAS: PageEntry[] = [
+  { label: "Properties Settings", description: "Properties module configuration", path: "/properties/settings", icon: Settings },
 ];
 
 const adminPages: PageEntry[] = [
   { label: "Settings", description: "App configuration and system tools", path: "/settings", icon: Settings },
   { label: "Chatbot Settings", description: "AI assistant configuration", path: "/chatbot-settings", icon: Bot },
   { label: "Deleted Items", description: "View and restore deleted records", path: "/deleted-items", icon: Trash2 },
-  { label: "Orphaned Records", description: "Records with missing references", path: "/orphaned-records", icon: Link },
+  { label: "Orphaned Records", description: "Records with missing references", path: "/orphaned-records", icon: LinkIcon },
   { label: "Inventory Repair", description: "Fix inventory discrepancies", path: "/inventory-repair", icon: Wrench },
   { label: "Net Position Details", description: "Detailed net position breakdown (assets vs liabilities)", path: "/net-position-details", icon: PieChart },
   { label: "Import Cycle Diagnostics", description: "Diagnose import cycle issues", path: "/import-cycle-diagnostics", icon: AlertTriangle },
@@ -128,14 +145,66 @@ const posPages: PageEntry[] = [
   { label: "Chat", description: "Internal messaging", path: "/pos-chat", icon: MessageSquare },
 ];
 
+function navItemToEntry(item: NavItem): PageEntry {
+  return {
+    label: item.title,
+    description: DESCRIPTIONS[item.url],
+    path: item.url,
+    icon: item.icon,
+  };
+}
+
+function buildEntries(
+  sections: NavSection[],
+  extras: PageEntry[] = [],
+  extraNavItems: NavItem[] = [],
+): PageEntry[] {
+  const seen = new Set<string>();
+  const out: PageEntry[] = [];
+  for (const e of extras) {
+    if (!seen.has(e.path)) { seen.add(e.path); out.push(e); }
+  }
+  for (const item of extraNavItems) {
+    if (!seen.has(item.url)) { seen.add(item.url); out.push(navItemToEntry(item)); }
+  }
+  for (const section of sections) {
+    for (const item of section.items) {
+      if (!seen.has(item.url)) { seen.add(item.url); out.push(navItemToEntry(item)); }
+    }
+  }
+  return out;
+}
+
+function PaletteItem({ page, onSelect }: { page: PageEntry; onSelect: (path: string) => void }) {
+  const Icon = page.icon;
+  return (
+    <CommandItem
+      key={page.path}
+      value={`${page.label} ${page.description ?? ""}`}
+      onSelect={() => onSelect(page.path)}
+      data-testid={`command-item-${page.path.replace(/\//g, "-").replace(/^-/, "") || "home"}`}
+    >
+      <Icon className="mr-2 h-4 w-4 text-muted-foreground" />
+      <div className="flex flex-col">
+        <span>{page.label}</span>
+        {page.description && (
+          <span className="text-xs text-muted-foreground">{page.description}</span>
+        )}
+      </div>
+    </CommandItem>
+  );
+}
+
 export function CommandPalette({
   open: externalOpen,
   onOpenChange: externalOnOpenChange,
   isPOS = false,
   hasErpAccess = true,
   hasFactoryAccess = false,
+  hasPropertiesAccess = false,
   isAdminOwner = false,
   hasDashboardAccess = false,
+  user,
 }: CommandPaletteProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const [, setLocation] = useLocation();
@@ -169,6 +238,42 @@ export function CommandPalette({
     [setOpen, setLocation]
   );
 
+  const erpVis = useErpVisibleSections(hasErpAccess && !isPOS ? user : undefined);
+  const factoryVis = useFactoryVisibleSections(hasFactoryAccess && !isPOS ? user : undefined);
+
+  const erpPages = useMemo(
+    () => buildEntries(erpVis.sections, ERP_EXTRAS, [
+      ...erpVis.visiblePinnedItems,
+      ...erpVis.visibleUtilityItems,
+    ]),
+    [erpVis.sections, erpVis.visiblePinnedItems, erpVis.visibleUtilityItems],
+  );
+
+  const factoryPages = useMemo(() => {
+    const dashExtra = hasDashboardAccess
+      ? [{ label: "Factory Dashboard", description: DESCRIPTIONS["/factory/dashboard"], path: "/factory/dashboard", icon: LayoutDashboard }]
+      : [];
+    return buildEntries(factoryVis.sections, [...dashExtra, ...FACTORY_EXTRAS_ALWAYS]);
+  }, [factoryVis.sections, hasDashboardAccess]);
+
+  const propertiesPages = useMemo(
+    () => buildEntries(
+      PROPERTIES_NAV_SECTIONS,
+      [
+        ...PROPERTIES_EXTRAS,
+        ...(isAdminOwner ? PROPERTIES_ADMIN_EXTRAS : []),
+      ],
+    ),
+    [isAdminOwner],
+  );
+
+  const showErp = !isPOS && hasErpAccess;
+  const showFactory = !isPOS && hasFactoryAccess;
+  const showProperties = !isPOS && hasPropertiesAccess;
+  // Global admin routes (e.g. /settings, /deleted-items) only work in ERP/Factory shells.
+  // In properties-only mode, suppress them since the properties shell redirects away.
+  const showAdmin = !isPOS && isAdminOwner && (showErp || showFactory);
+
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput placeholder="Search pages..." data-testid="input-command-palette" />
@@ -177,91 +282,37 @@ export function CommandPalette({
 
         {isPOS && (
           <CommandGroup heading="POS">
-            {posPages.map((page) => (
-              <CommandItem
-                key={page.path}
-                value={`${page.label} ${page.description ?? ""}`}
-                onSelect={() => navigate(page.path)}
-                data-testid={`command-item-${page.path.replace(/\//g, "-").replace(/^-/, "")}`}
-              >
-                <page.icon className="mr-2 h-4 w-4 text-muted-foreground" />
-                <div className="flex flex-col">
-                  <span>{page.label}</span>
-                  {page.description && (
-                    <span className="text-xs text-muted-foreground">{page.description}</span>
-                  )}
-                </div>
-              </CommandItem>
-            ))}
+            {posPages.map((p) => <PaletteItem key={p.path} page={p} onSelect={navigate} />)}
           </CommandGroup>
         )}
 
-        {!isPOS && hasErpAccess && (
+        {showErp && (
           <CommandGroup heading="ERP">
-            {erpPages.map((page) => (
-              <CommandItem
-                key={page.path}
-                value={`${page.label} ${page.description ?? ""}`}
-                onSelect={() => navigate(page.path)}
-                data-testid={`command-item-${page.path.replace(/\//g, "-").replace(/^-/, "") || "home"}`}
-              >
-                <page.icon className="mr-2 h-4 w-4 text-muted-foreground" />
-                <div className="flex flex-col">
-                  <span>{page.label}</span>
-                  {page.description && (
-                    <span className="text-xs text-muted-foreground">{page.description}</span>
-                  )}
-                </div>
-              </CommandItem>
-            ))}
+            {erpPages.map((p) => <PaletteItem key={p.path} page={p} onSelect={navigate} />)}
           </CommandGroup>
         )}
 
-        {!isPOS && hasErpAccess && hasFactoryAccess && <CommandSeparator />}
+        {showErp && showFactory && <CommandSeparator />}
 
-        {!isPOS && hasFactoryAccess && (
+        {showFactory && (
           <CommandGroup heading="Factory">
-            {factoryPages
-              .filter((p) => p.path !== "/factory/dashboard" || hasDashboardAccess)
-              .map((page) => (
-                <CommandItem
-                  key={page.path}
-                  value={`${page.label} ${page.description ?? ""}`}
-                  onSelect={() => navigate(page.path)}
-                  data-testid={`command-item-${page.path.replace(/\//g, "-").replace(/^-/, "")}`}
-                >
-                  <page.icon className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <div className="flex flex-col">
-                    <span>{page.label}</span>
-                    {page.description && (
-                      <span className="text-xs text-muted-foreground">{page.description}</span>
-                    )}
-                  </div>
-                </CommandItem>
-              ))}
+            {factoryPages.map((p) => <PaletteItem key={p.path} page={p} onSelect={navigate} />)}
           </CommandGroup>
         )}
 
-        {!isPOS && isAdminOwner && <CommandSeparator />}
+        {(showErp || showFactory) && showProperties && <CommandSeparator />}
 
-        {!isPOS && isAdminOwner && (
+        {showProperties && (
+          <CommandGroup heading="Properties">
+            {propertiesPages.map((p) => <PaletteItem key={p.path} page={p} onSelect={navigate} />)}
+          </CommandGroup>
+        )}
+
+        {showAdmin && <CommandSeparator />}
+
+        {showAdmin && (
           <CommandGroup heading="Admin & Settings">
-            {adminPages.map((page) => (
-              <CommandItem
-                key={page.path}
-                value={`${page.label} ${page.description ?? ""}`}
-                onSelect={() => navigate(page.path)}
-                data-testid={`command-item-${page.path.replace(/\//g, "-").replace(/^-/, "")}`}
-              >
-                <page.icon className="mr-2 h-4 w-4 text-muted-foreground" />
-                <div className="flex flex-col">
-                  <span>{page.label}</span>
-                  {page.description && (
-                    <span className="text-xs text-muted-foreground">{page.description}</span>
-                  )}
-                </div>
-              </CommandItem>
-            ))}
+            {adminPages.map((p) => <PaletteItem key={p.path} page={p} onSelect={navigate} />)}
           </CommandGroup>
         )}
       </CommandList>

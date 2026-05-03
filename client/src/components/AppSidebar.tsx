@@ -23,8 +23,6 @@ import {
   AlertTriangle,
   Tag,
   UserRound,
-  ChevronDown,
-  GripVertical,
   ArrowLeftRight,
   ScrollText,
   Building2,
@@ -33,27 +31,26 @@ import {
   KeyRound,
 } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
-import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { useLocation, Link } from "wouter";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
 import { useQuery } from "@tanstack/react-query";
 import { ROUTE_TO_FEATURE } from "@shared/schema";
-import { useState, useRef, useEffect } from "react";
+import { useRef, useEffect } from "react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-
-interface NavItem {
-  title: string;
-  url: string;
-  icon: any;
-}
-
-interface NavSection {
-  label: string;
-  color: string;
-  items: NavItem[];
-}
+import {
+  ModuleHeader,
+  ModuleFooter,
+  PinnedNavList,
+  SidebarFlatLink,
+  SidebarSectionGroup,
+  usePinnedOrder,
+  useOpenSections,
+  MODULE_ACCENT,
+  NAV_COLOR,
+  type NavItem,
+  type NavSection,
+} from "@/components/sidebar/sidebarPrimitives";
 
 const defaultPinnedItems: NavItem[] = [
   { title: "Tracking",    url: "/",                    icon: Ship            },
@@ -64,61 +61,44 @@ const defaultPinnedItems: NavItem[] = [
   { title: "Vouchers",    url: "/vouchers",            icon: Receipt         },
 ];
 
-const PINNED_ORDER_KEY = "erp-pinned-order";
-
-function loadPinnedOrder(): string[] | null {
-  try {
-    const raw = localStorage.getItem(PINNED_ORDER_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function savePinnedOrder(urls: string[]) {
-  try {
-    localStorage.setItem(PINNED_ORDER_KEY, JSON.stringify(urls));
-  } catch {}
-}
-
-const navSections: NavSection[] = [
+export const ERP_NAV_SECTIONS: NavSection[] = [
   {
     label: "Inventory",
-    color: "#a855f7",
+    color: NAV_COLOR.inventory,
     items: [
-      { title: "Location Inventory", url: "/location-inventory", icon: MapPin    },
-      { title: "Stock OTW",          url: "/stock-otw",          icon: Ship      },
-      { title: "Containers",         url: "/containers",         icon: Container },
-      { title: "Stock Items",        url: "/stock-items",        icon: Package   },
-      { title: "Stock Query",        url: "/stock-query",        icon: Search    },
-      { title: "Offload Item Search", url: "/offload-item-search", icon: Package  },
-      { title: "Optional Vouchers",  url: "/optional-vouchers",  icon: FileText  },
+      { title: "Location Inventory",  url: "/location-inventory",  icon: MapPin    },
+      { title: "Stock OTW",           url: "/stock-otw",           icon: Ship      },
+      { title: "Containers",          url: "/containers",          icon: Container },
+      { title: "Stock Items",         url: "/stock-items",         icon: Package   },
+      { title: "Stock Query",         url: "/stock-query",         icon: Search    },
+      { title: "Offload Item Search", url: "/offload-item-search", icon: Package   },
+      { title: "Optional Vouchers",   url: "/optional-vouchers",   icon: FileText  },
     ],
   },
   {
     label: "Sales & POS",
-    color: "#22c55e",
+    color: NAV_COLOR.sales,
     items: [
-      { title: "POS",               url: "/pos",              icon: ShoppingCart },
-      { title: "POS Daybook",      url: "/pos-daybook",      icon: Book         },
+      { title: "POS",              url: "/pos",              icon: ShoppingCart   },
+      { title: "POS Daybook",      url: "/pos-daybook",      icon: Book           },
       { title: "Stock Transfers",  url: "/stock-transfers",  icon: ArrowLeftRight },
-      { title: "Price List",       url: "/price-list",       icon: Tag          },
+      { title: "Price List",       url: "/price-list",       icon: Tag            },
     ],
   },
   {
     label: "Accounting",
-    color: "#f59e0b",
+    color: NAV_COLOR.accounting,
     items: [
-      { title: "Accounts",              url: "/accounts",             icon: Wallet         },
-      { title: "Suppliers",             url: "/suppliers",            icon: Users          },
-      { title: "Customers",             url: "/customers",            icon: Users          },
-      { title: "Payroll",               url: "/payroll",              icon: UserCheck      },
-      { title: "Company Transfer",      url: "/company-transfer",     icon: ArrowLeftRight },
+      { title: "Accounts",         url: "/accounts",         icon: Wallet         },
+      { title: "Suppliers",        url: "/suppliers",        icon: Users          },
+      { title: "Customers",        url: "/customers",        icon: Users          },
+      { title: "Payroll",          url: "/payroll",          icon: UserCheck      },
+      { title: "Company Transfer", url: "/company-transfer", icon: ArrowLeftRight },
     ],
   },
   {
     label: "Analytics",
-    color: "#06b6d4",
+    color: NAV_COLOR.analytics,
     items: [
       { title: "Sales Report",      url: "/sales-report",      icon: PieChart   },
       { title: "Analytics",         url: "/analytics",         icon: BarChart3  },
@@ -127,7 +107,7 @@ const navSections: NavSection[] = [
   },
   {
     label: "Rentals",
-    color: "#8b5cf6",
+    color: NAV_COLOR.rentals,
     items: [
       { title: "Warehouses",    url: "/erp/rental/warehouses", icon: Building2      },
       { title: "Shops",         url: "/erp/rental/shops",      icon: Store          },
@@ -143,68 +123,16 @@ const utilityItems: NavItem[] = [
   { title: "Live Sheets", url: "/live-sheets", icon: ExternalLink    },
 ];
 
-export function AppSidebar({ user }: { user?: any }) {
-  const [location] = useLocation();
+export const ERP_PINNED_ITEMS = defaultPinnedItems;
+export const ERP_UTILITY_ITEMS = utilityItems;
+
+export function useErpVisibleSections(user?: any): {
+  sections: NavSection[];
+  isItemVisible: (item: NavItem) => boolean;
+  visibleUtilityItems: NavItem[];
+  visiblePinnedItems: NavItem[];
+} {
   const { selectedCompany } = useCompany();
-  const { toast } = useToast();
-  const { conflictCount } = useConnectivity();
-  const prevUnreadRef = useRef<number>(-1);
-
-  // Pinned items drag-and-drop order (persisted to localStorage)
-  const [pinnedOrder, setPinnedOrder] = useState<string[]>(() => {
-    const saved = loadPinnedOrder();
-    if (saved) {
-      const defaultUrls = defaultPinnedItems.map(i => i.url);
-      // If all defaults are already in saved, use saved (preserving user's custom order)
-      const allPresent = defaultUrls.every(u => saved.includes(u));
-      if (allPresent) return saved.filter(u => defaultUrls.includes(u));
-      // Otherwise reset to default (new items added to defaults)
-      return defaultUrls;
-    }
-    return defaultPinnedItems.map(i => i.url);
-  });
-  const dragPinnedRef = useRef<string | null>(null);
-  const dragOverPinnedRef = useRef<string | null>(null);
-
-  const pinnedItems = pinnedOrder
-    .map(url => defaultPinnedItems.find(i => i.url === url))
-    .filter(Boolean) as NavItem[];
-
-  const handlePinnedDragStart = (url: string) => {
-    dragPinnedRef.current = url;
-  };
-  const handlePinnedDragOver = (e: React.DragEvent, url: string) => {
-    e.preventDefault();
-    dragOverPinnedRef.current = url;
-  };
-  const handlePinnedDrop = (targetUrl: string) => {
-    const fromUrl = dragPinnedRef.current;
-    if (!fromUrl || fromUrl === targetUrl) return;
-    const fromIdx = pinnedOrder.indexOf(fromUrl);
-    const toIdx = pinnedOrder.indexOf(targetUrl);
-    if (fromIdx === -1 || toIdx === -1) return;
-    const next = [...pinnedOrder];
-    next.splice(fromIdx, 1);
-    next.splice(toIdx, 0, fromUrl);
-    setPinnedOrder(next);
-    savePinnedOrder(next);
-    dragPinnedRef.current = null;
-    dragOverPinnedRef.current = null;
-  };
-
-  const { data: chatUnread } = useQuery<{ count: number }>({
-    queryKey: ["/api/chat/unread-count"],
-    refetchInterval: 60000,
-    enabled: !!user,
-  });
-
-  useEffect(() => {
-    const count = chatUnread?.count || 0;
-    if (prevUnreadRef.current === -1) { prevUnreadRef.current = count; return; }
-    if (count > prevUnreadRef.current)
-      toast({ title: "New message", description: `You have ${count} unread message${count > 1 ? "s" : ""}.` });
-    prevUnreadRef.current = count;
-  }, [chatUnread?.count]);
 
   const { data: myErpPages } = useQuery<{ pageKeys: string[]; fullAccess: boolean }>({
     queryKey: ["/api/my-erp-pages"],
@@ -251,212 +179,120 @@ export function AppSidebar({ user }: { user?: any }) {
     return true;
   };
 
-  const visibleSections = navSections.map(s => ({
+  const sections = ERP_NAV_SECTIONS.map(s => ({
     ...s,
     items: s.items.filter(isItemVisible),
   })).filter(s => s.items.length > 0);
 
-  // Auto-open the section containing the active route
-  const activeSection = visibleSections.find(s => s.items.some(i => location === i.url));
-  const [openSections, setOpenSections] = useState<Set<string>>(
-    () => new Set(activeSection ? [activeSection.label] : [])
+  return {
+    sections,
+    isItemVisible,
+    visibleUtilityItems: utilityItems.filter(isItemVisible),
+    visiblePinnedItems: defaultPinnedItems.filter(isItemVisible),
+  };
+}
+
+export function AppSidebar({ user }: { user?: any }) {
+  const { toast } = useToast();
+  const { conflictCount } = useConnectivity();
+  const prevUnreadRef = useRef<number>(-1);
+
+  const { items: pinnedItems, reorder: reorderPinned } = usePinnedOrder(
+    "erp-pinned-order",
+    defaultPinnedItems,
   );
 
+  const { data: chatUnread } = useQuery<{ count: number }>({
+    queryKey: ["/api/chat/unread-count"],
+    refetchInterval: 60000,
+    enabled: !!user,
+  });
+
   useEffect(() => {
-    if (activeSection) {
-      setOpenSections(prev => {
-        if (prev.has(activeSection.label)) return prev;
-        const next = new Set(prev);
-        next.add(activeSection.label);
-        return next;
-      });
-    }
-  }, [location]);
+    const count = chatUnread?.count || 0;
+    if (prevUnreadRef.current === -1) { prevUnreadRef.current = count; return; }
+    if (count > prevUnreadRef.current)
+      toast({ title: "New message", description: `You have ${count} unread message${count > 1 ? "s" : ""}.` });
+    prevUnreadRef.current = count;
+  }, [chatUnread?.count]);
 
-  const toggleSection = (label: string) => {
-    setOpenSections(prev => {
-      const next = new Set(prev);
-      next.has(label) ? next.delete(label) : next.add(label);
-      return next;
-    });
-  };
+  const { sections: visibleSections, isItemVisible } = useErpVisibleSections(user);
 
-  const initials = user?.username ? user.username.substring(0, 2).toUpperCase() : "AD";
+  const { openSections, toggleSection } = useOpenSections(visibleSections);
 
-  const NavLink = ({ item, color }: { item: NavItem; color: string }) => {
-    const isActive = location === item.url;
-    const unread   = item.url === "/chat" ? (chatUnread?.count || 0) : 0;
+  const trailingFor = (item: NavItem) => {
+    if (item.url !== "/chat") return null;
+    const unread = chatUnread?.count || 0;
+    if (unread <= 0) return null;
     return (
-      <Link
-        href={item.url}
-        data-testid={`link-${item.url}`}
-        className={`relative flex items-center gap-2.5 rounded-md py-1.5 pl-3 pr-2.5 text-sm transition-all duration-150 ${
-          isActive
-            ? "bg-sidebar-accent/70 text-sidebar-accent-foreground font-medium shadow-xs"
-            : "text-muted-foreground hover:bg-sidebar-accent/40 hover:text-foreground"
-        }`}
-      >
-        {isActive && (
-          <span
-            aria-hidden
-            className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full"
-            style={{ backgroundColor: color }}
-          />
-        )}
-        <item.icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color } : {}} />
-        <span className="flex-1 leading-tight truncate">{item.title}</span>
-        {unread > 0 && (
-          <Badge variant="default" className="text-xs min-w-5 justify-center" data-testid="badge-chat-unread">{unread}</Badge>
-        )}
-      </Link>
-    );
-  };
-
-  const FlatLink = ({ href, icon: Icon, label, color = "#6b7280", badge, testId }: {
-    href: string; icon: any; label: string; color?: string; badge?: number; testId: string;
-  }) => {
-    const isActive = location === href;
-    return (
-      <Link
-        href={href}
-        data-testid={testId}
-        className={`relative flex items-center gap-2.5 rounded-md py-1.5 pl-3 pr-2.5 text-sm transition-all duration-150 ${
-          isActive
-            ? "bg-sidebar-accent/70 text-sidebar-accent-foreground font-medium shadow-xs"
-            : "text-muted-foreground hover:bg-sidebar-accent/40 hover:text-foreground"
-        }`}
-      >
-        {isActive && (
-          <span
-            aria-hidden
-            className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full"
-            style={{ backgroundColor: color }}
-          />
-        )}
-        <Icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color } : {}} />
-        <span className="flex-1 leading-tight truncate">{label}</span>
-        {badge != null && badge > 0 && (
-          <Badge variant="default" className="text-xs min-w-5 justify-center">{badge}</Badge>
-        )}
-      </Link>
+      <Badge variant="default" className="text-xs min-w-5 justify-center" data-testid="badge-chat-unread">
+        {unread}
+      </Badge>
     );
   };
 
   return (
     <Sidebar>
-      <SidebarHeader className="px-4 py-3 border-b border-sidebar-border">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <Package className="h-5 w-5" />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm font-semibold leading-tight">ERP POS</span>
-            <span className="text-xs text-muted-foreground leading-tight">Warehouse Management</span>
-          </div>
-        </div>
-      </SidebarHeader>
+      <ModuleHeader
+        icon={Package}
+        label="Business OS"
+        tagline="ERP / Warehouse"
+        accent={MODULE_ACCENT.erp}
+      />
 
       <SidebarContent className="px-3 py-2 overflow-y-auto">
-        {/* Pinned top items — draggable to reorder */}
-        <div className="space-y-0.5 mb-2">
-          {pinnedItems.filter(isItemVisible).map(item => {
-            const isActive = location === item.url;
-            const unread = item.url === "/chat" ? (chatUnread?.count || 0) : 0;
-            return (
-              <div
-                key={item.url}
-                onDragOver={(e) => handlePinnedDragOver(e, item.url)}
-                onDrop={() => handlePinnedDrop(item.url)}
-                className="flex items-center group"
-              >
-                <span
-                  draggable
-                  onDragStart={(e) => { e.stopPropagation(); handlePinnedDragStart(item.url); }}
-                  className="flex items-center justify-center w-5 py-1.5 cursor-grab opacity-0 group-hover:opacity-40 shrink-0"
-                  title="Drag to reorder"
-                >
-                  <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
-                </span>
-                <Link
-                  href={item.url}
-                  draggable={false}
-                  data-testid={`link-${item.url}`}
-                  className={`relative flex flex-1 items-center gap-2.5 rounded-md py-1.5 pl-3 pr-2.5 text-sm transition-all duration-150 ${
-                    isActive
-                      ? "bg-sidebar-accent/70 text-sidebar-accent-foreground font-medium shadow-xs"
-                      : "text-muted-foreground hover:bg-sidebar-accent/40 hover:text-foreground"
-                  }`}
-                >
-                  {isActive && (
-                    <span
-                      aria-hidden
-                      className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-primary"
-                    />
-                  )}
-                  <item.icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color: "hsl(var(--primary))" } : {}} />
-                  <span className="flex-1 leading-tight truncate">{item.title}</span>
-                  {unread > 0 && (
-                    <Badge variant="default" className="text-xs min-w-5 justify-center">{unread}</Badge>
-                  )}
-                </Link>
-              </div>
-            );
-          })}
-        </div>
+        <PinnedNavList
+          items={pinnedItems}
+          color={NAV_COLOR.pinned}
+          onReorder={reorderPinned}
+          isVisible={isItemVisible}
+          testIdFor={(i) => `link-${i.url}`}
+          trailingFor={trailingFor}
+        />
 
-        {/* Collapsible sections */}
         <div className="space-y-1">
-          {visibleSections.map(section => {
-            const isOpen   = openSections.has(section.label);
-            const hasActive = section.items.some(i => location === i.url);
-            return (
-              <div key={section.label}>
-                <button
-                  onClick={() => toggleSection(section.label)}
-                  data-testid={`button-section-${section.label.toLowerCase().replace(/\s+/g, "-")}`}
-                  className="flex w-full items-center gap-1.5 rounded-md px-2.5 py-1 text-left transition-colors hover:bg-sidebar-accent/30"
-                >
-                  <span
-                    className="flex-1 text-[10px] font-semibold uppercase tracking-widest"
-                    style={{ color: section.color, opacity: hasActive ? 1 : 0.65 }}
-                  >
-                    {section.label}
-                  </span>
-                  <ChevronDown
-                    className="h-3 w-3 shrink-0 transition-transform duration-200"
-                    style={{ color: section.color, opacity: 0.65, transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
-                  />
-                </button>
-                {isOpen && (
-                  <div className="mt-0.5 space-y-0.5">
-                    {section.items.map(item => (
-                      <NavLink key={item.url} item={item} color={section.color} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {visibleSections.map((section) => (
+            <SidebarSectionGroup
+              key={section.label}
+              section={section}
+              isOpen={openSections.has(section.label)}
+              onToggle={() => toggleSection(section.label)}
+              sectionTestId={`button-section-${section.label.toLowerCase().replace(/\s+/g, "-")}`}
+              testIdFor={(i) => `link-${i.url}`}
+              trailingFor={trailingFor}
+            />
+          ))}
         </div>
 
-        {/* Tools section */}
         {utilityItems.filter(isItemVisible).length > 0 && (
           <div className="mt-4">
             <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
               Tools
             </p>
             <div className="space-y-0.5">
-              {utilityItems.filter(isItemVisible).map(item => (
-                <FlatLink key={item.url} href={item.url} icon={item.icon} label={item.title} color="#6b7280" testId={`link-${item.url}`} />
+              {utilityItems.filter(isItemVisible).map((item) => (
+                <SidebarFlatLink
+                  key={item.url}
+                  href={item.url}
+                  icon={item.icon}
+                  label={item.title}
+                  testId={`link-${item.url}`}
+                />
               ))}
             </div>
           </div>
         )}
 
-        {/* Bottom strip */}
         <div className="mt-4 pt-3 border-t border-sidebar-border/60 space-y-0.5">
           {isItemVisible({ title: "Chat", url: "/chat", icon: MessageCircle }) && (
-            <FlatLink href="/chat" icon={MessageCircle} label="Chat" color="#3b82f6" badge={chatUnread?.count} testId="link-chat" />
+            <SidebarFlatLink
+              href="/chat"
+              icon={MessageCircle}
+              label="Chat"
+              color={NAV_COLOR.pinned}
+              badge={chatUnread?.count}
+              testId="link-chat"
+            />
           )}
           {conflictCount > 0 && (
             <a
@@ -472,24 +308,14 @@ export function AppSidebar({ user }: { user?: any }) {
               </Badge>
             </a>
           )}
-          <FlatLink href="/my-settings" icon={KeyRound} label="My Settings" color="#6b7280" testId="link-my-settings" />
+          <SidebarFlatLink href="/my-settings" icon={KeyRound} label="My Settings" testId="link-my-settings" />
           {isItemVisible({ title: "Settings", url: "/settings", icon: Settings }) && (
-            <FlatLink href="/settings" icon={Settings} label="Settings" color="#6b7280" testId="link-settings" />
+            <SidebarFlatLink href="/settings" icon={Settings} label="Settings" testId="link-settings" />
           )}
         </div>
       </SidebarContent>
 
-      <SidebarFooter className="px-4 py-3 border-t border-sidebar-border">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-8 w-8 shrink-0">
-            <AvatarFallback className="text-xs font-semibold bg-primary/10 text-primary">{initials}</AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col flex-1 min-w-0">
-            <span className="text-sm font-medium leading-tight truncate">{user?.username || "User"}</span>
-            <span className="text-xs text-muted-foreground leading-tight">{user?.role || "Role"}</span>
-          </div>
-        </div>
-      </SidebarFooter>
+      <ModuleFooter user={user} />
     </Sidebar>
   );
 }

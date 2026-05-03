@@ -649,6 +649,7 @@ function AuthenticatedApp() {
           open={paletteOpen}
           onOpenChange={setPaletteOpen}
           isPOS={true}
+          user={user}
         />
         {leaveConfirmDialog}
       </>
@@ -730,6 +731,15 @@ function AuthenticatedApp() {
             </div>
           </div>
         </SidebarProvider>
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          hasErpAccess={false}
+          hasFactoryAccess={false}
+          hasPropertiesAccess={true}
+          isAdminOwner={user?.role === "Admin" || user?.role === "Developer"}
+          user={user}
+        />
         {leaveConfirmDialog}
       </AppModeProvider>
     );
@@ -925,6 +935,7 @@ function AuthenticatedApp() {
           hasFactoryAccess={hasFactoryAccess}
           isAdminOwner={user?.role === "Admin" || user?.role === "Developer"}
           hasDashboardAccess={hasDashboardAccess}
+          user={user}
         />
         {leaveConfirmDialog}
       </AppModeProvider>
@@ -984,6 +995,7 @@ function AuthenticatedApp() {
         hasFactoryAccess={false}
         isAdminOwner={user?.role === "Admin" || user?.role === "Developer"}
         hasDashboardAccess={hasDashboardAccess}
+        user={user}
       />
       {leaveConfirmDialog}
     </AppModeProvider>

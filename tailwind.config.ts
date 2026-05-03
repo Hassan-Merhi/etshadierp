@@ -92,6 +92,26 @@ export default {
           foreground: "hsl(var(--sidebar-accent-foreground) / <alpha-value>)",
           border: "var(--sidebar-accent-border)"
         },
+        module: {
+          erp: "hsl(var(--module-erp) / <alpha-value>)",
+          factory: "hsl(var(--module-factory) / <alpha-value>)",
+          properties: "hsl(var(--module-properties) / <alpha-value>)",
+        },
+        nav: {
+          overview: "hsl(var(--nav-overview) / <alpha-value>)",
+          pinned: "hsl(var(--nav-pinned) / <alpha-value>)",
+          inventory: "hsl(var(--nav-inventory) / <alpha-value>)",
+          sales: "hsl(var(--nav-sales) / <alpha-value>)",
+          accounting: "hsl(var(--nav-accounting) / <alpha-value>)",
+          analytics: "hsl(var(--nav-analytics) / <alpha-value>)",
+          rentals: "hsl(var(--nav-rentals) / <alpha-value>)",
+          finance: "hsl(var(--nav-finance) / <alpha-value>)",
+          operations: "hsl(var(--nav-operations) / <alpha-value>)",
+          bales: "hsl(var(--nav-bales) / <alpha-value>)",
+          reports: "hsl(var(--nav-reports) / <alpha-value>)",
+          intelligence: "hsl(var(--nav-intelligence) / <alpha-value>)",
+          utility: "hsl(var(--nav-utility) / <alpha-value>)",
+        },
       },
       fontFamily: {
         sans: ["Inter", "var(--font-sans)"],
