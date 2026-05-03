@@ -164,7 +164,7 @@ export default function FactoryPendingInvoiceVerify() {
     queryKey: ["/api/auth/me"],
     retry: false,
   });
-  const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner";
+  const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
 
   const { data: ledgerAccounts = [] } = useQuery<{ id: number; name: string; code: string; accountType: string }[]>({
     queryKey: ["/api/ledger-accounts"],

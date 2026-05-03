@@ -136,7 +136,7 @@ export default function POSDaybook() {
   // Only allow editing if explicitly permitted - defaults to false for safety
   // Admin and Owner can always edit regardless of daybookEditDays setting
   const daybookEditDays = currentUser?.daybookEditDays || 0;
-  const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner";
+  const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
   const canEditDaybook = isAdminOrOwner || daybookEditDays > 0;
   
   // Check if user can see profit/cost (Admin or Owner only)

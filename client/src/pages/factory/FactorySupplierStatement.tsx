@@ -94,7 +94,7 @@ export default function FactorySupplierStatement() {
   const { data: me } = useQuery<any>({
     queryKey: ["/api/auth/me"],
   });
-  const isAdmin = me?.role === "Admin" || me?.role === "Owner";
+  const isAdmin = me?.role === "Admin" || me?.role === "Owner" || me?.role === "Developer";
 
   const { data: suppliers = [], isLoading: suppliersLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/suppliers", companyId],

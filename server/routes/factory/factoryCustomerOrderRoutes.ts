@@ -2203,7 +2203,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const role = (session.currentRole || session.role || "").toLowerCase();
-      if (role !== "admin" && role !== "owner") {
+      if (role !== "admin" && role !== "owner" && role !== "developer") {
         return res.status(403).json({ message: "Only admin/owner can force-sync bale statuses" });
       }
 
@@ -2640,7 +2640,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           if (!passwordValid) return res.status(403).json({ message: "Invalid supervisor password." });
           const [role] = await db.select().from(userCompanyRoles)
             .where(and(eq(userCompanyRoles.userId, supervisor.id), eq(userCompanyRoles.companyId, companyId)));
-          if (!role || !["Admin", "Owner", "Manager"].includes(role.role)) {
+          if (!role || !["Admin", "Owner", "Manager", "Developer"].includes(role.role)) {
             return res.status(403).json({ message: "Supervisor must have Admin, Owner, or Manager role." });
           }
 

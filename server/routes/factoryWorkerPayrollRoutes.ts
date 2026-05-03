@@ -1294,7 +1294,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   app.patch("/api/factory/advances/:id", requireAuth, async (req: any, res: any) => {
     try {
       const currentRole = (req.session as any).currentRole;
-      if (currentRole !== "Admin" && currentRole !== "Owner") {
+      if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
         return res.status(403).json({ message: "Only Admin or Owner can edit advances" });
       }
       const companyId = req.body.companyId || getFactoryCompanyId(req);
@@ -1416,7 +1416,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   app.delete("/api/factory/advances/:id", requireAuth, async (req: any, res: any) => {
     try {
       const currentRole = (req.session as any).currentRole;
-      if (currentRole !== "Admin" && currentRole !== "Owner") {
+      if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
         return res.status(403).json({ message: "Only Admin or Owner can delete advances" });
       }
       const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
@@ -1581,7 +1581,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   app.post("/api/factory/advances/post-accounting", requireAuth, async (req: any, res: any) => {
     try {
       const currentRole = (req.session as any).currentRole;
-      if (currentRole !== "Admin" && currentRole !== "Owner") {
+      if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
         return res.status(403).json({ message: "Only Admin or Owner can post accounting" });
       }
       const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
@@ -2029,7 +2029,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   app.delete("/api/factory/advance-repayments/:id", requireAuth, async (req: any, res: any) => {
     try {
       const currentRole = (req.session as any).currentRole;
-      if (currentRole !== "Admin" && currentRole !== "Owner") {
+      if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
         return res.status(403).json({ message: "Only Admin or Owner can delete repayments" });
       }
       const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
@@ -2084,7 +2084,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   app.post("/api/admin/backfill-payroll-vouchers", requireAuth, async (req: any, res: any) => {
     try {
       const currentRole = (req.session as any).currentRole;
-      if (currentRole !== "Admin" && currentRole !== "Owner") {
+      if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
         return res.status(403).json({ message: "Only Admin or Owner can run backfill" });
       }
 

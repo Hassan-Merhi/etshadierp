@@ -14,7 +14,7 @@ export async function getExportPriceVisibility(req: any): Promise<ExportPriceVis
 
     // Non-admin / non-owner users never see prices in exports
     const role: string = req.user?.role || "";
-    if (role !== "Admin" && role !== "Owner") {
+    if (role !== "Admin" && role !== "Owner" && role !== "Developer") {
       return { hideSelling: true, hideCost: true };
     }
 

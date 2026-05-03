@@ -178,7 +178,7 @@ export default function LiveSheets() {
   const [deleteTarget, setDeleteTarget] = useState<LiveSpreadsheet | null>(null);
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/auth/me"] });
-  const isAdmin = me?.role === "Admin" || me?.role === "Owner";
+  const isAdmin = me?.role === "Admin" || me?.role === "Owner" || me?.role === "Developer";
 
   const { data: sheets = [], isLoading } = useQuery<LiveSpreadsheet[]>({
     queryKey: ["/api/live-spreadsheets"],

@@ -423,7 +423,7 @@ export default function FactoryDaybook() {
   const routePrefix = appMode === "properties" ? "/properties" : "/factory";
 
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
-  const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner";
+  const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
 
   // ── Filter state ──────────────────────────────────────────────────────────
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("today"));

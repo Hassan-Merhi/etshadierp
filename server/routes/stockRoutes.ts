@@ -701,7 +701,7 @@ export function registerStockRoutes(app: Express) {
       }
 
       const isPOS = req.user?.role?.startsWith("POS");
-      const isPrivileged = ["Admin", "Owner", "Manager"].includes(req.user?.role || "");
+      const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(req.user?.role || "");
 
       if (showAll && isPOS) {
         return res.status(403).json({ message: "Forbidden" });
@@ -837,7 +837,7 @@ export function registerStockRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const isPrivileged = ["Admin", "Owner", "Manager"].includes((req.user as any)?.role || "");
+      const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes((req.user as any)?.role || "");
 
       // Get all configured master location IDs
       const groupRows = await db

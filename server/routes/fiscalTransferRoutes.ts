@@ -55,7 +55,7 @@ export function registerFiscalTransferRoutes(app: Express) {
     try {
       // Check role authorization - use currentRole from session
       const userRole = req.session.currentRole;
-      if (userRole !== "Admin" && userRole !== "Owner") {
+      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
         return res.status(403).json({ 
           message: "Only Admins and Owners can close fiscal periods" 
         });

@@ -148,7 +148,7 @@ export function registerAuthRoutes(app: Express) {
   app.get("/api/login-history", requireAuth, async (req, res) => {
     try {
       const userRole = req.session.currentRole;
-      if (!userRole || !["Admin", "Owner"].includes(userRole)) {
+      if (!userRole || !["Admin", "Owner", "Developer"].includes(userRole)) {
         return res.status(403).json({ message: "Access denied. Admin or Owner role required." });
       }
       
@@ -368,7 +368,7 @@ export function registerAuthRoutes(app: Express) {
       try {
         // Check if user has admin/owner role
         const userRole = req.session.currentRole;
-        if (!userRole || !["Admin", "Owner"].includes(userRole)) {
+        if (!userRole || !["Admin", "Owner", "Developer"].includes(userRole)) {
           return res.status(403).json({ message: "Access denied. Admin or Owner role required." });
         }
 

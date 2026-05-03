@@ -698,7 +698,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const session = req.session as any;
       const companyId = session.factoryCompanyId || session.currentCompanyId;
       const role = (session.currentRole || session.role || "").toLowerCase();
-      if (role !== "admin" && role !== "owner") {
+      if (role !== "admin" && role !== "owner" && role !== "developer") {
         return res.status(403).json({ message: "Only Admin or Owner can void vouchers" });
       }
 
@@ -1175,7 +1175,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       (req.session as any).factoryCompanyId = companyId;
 
       const role = (req.session as any).currentRole;
-      if (role === "Admin" || role === "Owner") {
+      if (role === "Admin" || role === "Owner" || role === "Developer") {
         return res.json({ fullAccess: true, pageKeys: [], hasErpAccess: true, hasFactoryAccess: true, hiddenCostFields: [], hideAllCosts: false, companyId, companyName });
       }
 

@@ -77,7 +77,7 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [pendingFormData, setPendingFormData] = useState<FiscalCloseFormData | null>(null);
 
-  const isAuthorized = userRole === "Admin" || userRole === "Owner";
+  const isAuthorized = userRole === "Admin" || userRole === "Owner" || userRole === "Developer";
 
   // Fetch Equity ledger accounts for the current company
   const { data: equityAccounts = [], isLoading: isLoadingAccounts } = useQuery<any[]>({

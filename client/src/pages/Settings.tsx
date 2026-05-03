@@ -184,7 +184,7 @@ import { UsersSection } from "./settings/UsersSection";
     // Get permission value for a role/feature
     const getPermission = (role: string, featureKey: string): boolean => {
       // Admin always has all permissions
-      if (role === "Admin") return true;
+      if (role === "Admin" || role === "Developer") return true;
       const key = `${role}:${featureKey}`;
       // Default to false if not explicitly set (disabled by default)
       return permissionMap.has(key) ? permissionMap.get(key)! : false;

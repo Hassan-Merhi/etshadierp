@@ -2,7 +2,7 @@
 set -e
 
 # Install any new dependencies pulled in by the merged task.
-npm install
+npm install --legacy-peer-deps
 
 # NOTE: We deliberately do NOT run `drizzle-kit push` here.
 #

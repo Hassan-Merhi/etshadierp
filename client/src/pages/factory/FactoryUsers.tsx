@@ -152,7 +152,7 @@ export default function FactoryUsers() {
 
   const isAdminOrOwner = (user: FactoryUser) => {
     const role = user.role?.toLowerCase();
-    return role === "admin" || role === "owner";
+    return role === "admin" || role === "owner" || role === "developer";
   };
 
   const toggleAccessMutation = useMutation({

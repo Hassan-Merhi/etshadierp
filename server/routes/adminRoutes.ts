@@ -2483,7 +2483,7 @@ export function registerAdminRoutes(app: Express) {
       try {
         // Only Admin can change parent company setting
         const userRole = req.session.currentRole;
-        if (userRole !== "Admin") {
+        if (userRole !== "Admin" && userRole !== "Developer") {
           return res.status(403).json({ message: "Only Admin users can change the parent company setting" });
         }
 
@@ -3546,7 +3546,7 @@ export function registerAdminRoutes(app: Express) {
   app.get("/api/live-spreadsheets", requireAuth, requireNonPOS, async (req: any, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
-      const isAdmin = req.session?.currentRole === "Admin" || req.session?.currentRole === "Owner";
+      const isAdmin = req.session?.currentRole === "Admin" || req.session?.currentRole === "Owner" || req.session?.currentRole === "Developer";
       const sheets = await storage.getLiveSpreadsheets(companyId, !isAdmin);
       res.json(sheets);
     } catch (error: any) {
@@ -3557,7 +3557,7 @@ export function registerAdminRoutes(app: Express) {
   app.post("/api/live-spreadsheets", requireAuth, requireNonPOS, async (req: any, res) => {
     try {
       const role = req.session?.currentRole;
-      if (role !== "Admin" && role !== "Owner") {
+      if (role !== "Admin" && role !== "Owner" && role !== "Developer") {
         return res.status(403).json({ message: "Admin or Owner role required" });
       }
       const companyId = req.session?.currentCompanyId;
@@ -3572,7 +3572,7 @@ export function registerAdminRoutes(app: Express) {
   app.patch("/api/live-spreadsheets/:id", requireAuth, requireNonPOS, async (req: any, res) => {
     try {
       const role = req.session?.currentRole;
-      if (role !== "Admin" && role !== "Owner") {
+      if (role !== "Admin" && role !== "Owner" && role !== "Developer") {
         return res.status(403).json({ message: "Admin or Owner role required" });
       }
       const companyId = req.session?.currentCompanyId;
@@ -3589,7 +3589,7 @@ export function registerAdminRoutes(app: Express) {
   app.delete("/api/live-spreadsheets/:id", requireAuth, requireNonPOS, async (req: any, res) => {
     try {
       const role = req.session?.currentRole;
-      if (role !== "Admin" && role !== "Owner") {
+      if (role !== "Admin" && role !== "Owner" && role !== "Developer") {
         return res.status(403).json({ message: "Admin or Owner role required" });
       }
       const companyId = req.session?.currentCompanyId;

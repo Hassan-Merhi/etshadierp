@@ -495,7 +495,7 @@ function AuthenticatedApp() {
 
   const hasErpAccess = !myAccess || myAccess.hasErpAccess;
   const hasFactoryAccess = !myAccess || myAccess.hasFactoryAccess;
-  const isAdminOwner = user?.role === "Admin" || user?.role === "Owner";
+  const isAdminOwner = user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer";
   const hasDashboardAccess = isAdminOwner || (myAccess && !myAccess.fullAccess && myAccess.pageKeys.includes("factory/dashboard"));
 
   const handleLogout = async () => {
@@ -921,7 +921,7 @@ function AuthenticatedApp() {
                     {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/chatbot-settings" component={ChatbotSettings} />}
                     {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/import-cycle-diagnostics" component={ImportCycleDiagnostics} />}
                     {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/inventory-repair" component={InventoryRepair} />}
-                    {user?.role === "Admin" && <Route path="/factory/company-data-reset" component={CompanyDataReset} />}
+                    {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/company-data-reset" component={CompanyDataReset} />}
                     <Route path="/factory/net-position-details" component={FactoryNetPositionDetails} />
                     <Route path="/factory/net-profit-analytics" component={FactoryNetProfitAnalytics} />
                     <Route path="/factory/net-position" component={FactoryNetPosition} />

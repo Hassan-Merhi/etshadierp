@@ -49,7 +49,7 @@ export function InlineRoleEditor({
   const [canSellNegativeStock, setCanSellNegativeStock] = useState(false);
 
   const isPOS = role.startsWith("POS");
-  const isPrivileged = ["Admin", "Owner"].includes(role);
+  const isPrivileged = ["Admin", "Owner", "Developer"].includes(role);
 
   useEffect(() => {
     if (editingRole) {

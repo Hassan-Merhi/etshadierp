@@ -20,7 +20,7 @@ export function RoleSummaryRow({
   onDelete,
 }: RoleSummaryRowProps) {
   const isPOS = role.role?.startsWith("POS");
-  const isPrivileged = ["Admin", "Owner"].includes(role.role);
+  const isPrivileged = ["Admin", "Owner", "Developer"].includes(role.role);
 
   return (
     <div

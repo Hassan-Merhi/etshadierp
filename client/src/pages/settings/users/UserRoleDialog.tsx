@@ -284,7 +284,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
               </>
             )}
 
-            {selectedRole !== "Admin" && selectedRole !== "Owner" && (
+            {selectedRole !== "Admin" && selectedRole !== "Owner" && selectedRole !== "Developer" && (
               <FormField
                 control={form.control}
                 name="daybookEditDays"

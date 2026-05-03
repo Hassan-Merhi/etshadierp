@@ -86,7 +86,7 @@ export function registerChatbotRoutes(app: Express) {
         providerName,
         selectedProvider,
         hasApiKey,
-        isAdminOrOwner: userRole === "Admin" || userRole === "Owner",
+        isAdminOrOwner: userRole === "Admin" || userRole === "Owner" || userRole === "Developer",
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -99,7 +99,7 @@ export function registerChatbotRoutes(app: Express) {
   app.patch("/api/chatbot/provider", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const userRole = req.session.currentRole;
-      if (userRole !== "Admin" && userRole !== "Owner") {
+      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
         return res.status(403).json({ message: "Only admins can change AI provider" });
       }
 
@@ -193,7 +193,7 @@ export function registerChatbotRoutes(app: Express) {
       }
 
       // Only Admin/Owner can view all chat history
-      if (userRole !== "Admin" && userRole !== "Owner") {
+      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -226,7 +226,7 @@ export function registerChatbotRoutes(app: Express) {
       const userRole = req.session.currentRole;
       
       // Only Admin/Owner can toggle chatbot
-      if (userRole !== "Admin" && userRole !== "Owner") {
+      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -248,7 +248,7 @@ export function registerChatbotRoutes(app: Express) {
     try {
       const userRole = req.session.currentRole;
       
-      if (userRole !== "Admin" && userRole !== "Owner") {
+      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
         return res.status(403).json({ message: "Access denied" });
       }
 

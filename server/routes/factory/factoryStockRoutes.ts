@@ -534,7 +534,7 @@ export function registerFactoryStockRoutes(app: Express) {
         .from(userCompanyRoles)
         .where(and(eq(userCompanyRoles.userId, supervisor.id), eq(userCompanyRoles.companyId, companyId)));
 
-      if (!role || !["Admin", "Owner", "Manager"].includes(role.role)) {
+      if (!role || !["Admin", "Owner", "Manager", "Developer"].includes(role.role)) {
         return res.status(403).json({ message: "Supervisor must have Admin, Owner, or Manager role" });
       }
 
@@ -654,7 +654,7 @@ export function registerFactoryStockRoutes(app: Express) {
         .from(userCompanyRoles)
         .where(and(eq(userCompanyRoles.userId, supervisor.id), eq(userCompanyRoles.companyId, companyId)));
 
-      if (!role || !["Admin", "Owner", "Manager"].includes(role.role)) {
+      if (!role || !["Admin", "Owner", "Manager", "Developer"].includes(role.role)) {
         return res.status(403).json({ message: "Supervisor must have Admin, Owner, or Manager role" });
       }
 

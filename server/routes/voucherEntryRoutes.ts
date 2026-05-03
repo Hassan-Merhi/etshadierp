@@ -432,7 +432,7 @@ export function registerVoucherEntryRoutes(app: Express) {
       }
 
       // Admin and Owner can create entries for all vouchers
-      if (userRole !== "Admin" && userRole !== "Owner") {
+      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
         // Manager can only create entries for today's vouchers
         if (userRole === "Manager") {
           const voucherDate = new Date(voucher.voucherDate);
@@ -506,7 +506,7 @@ export function registerVoucherEntryRoutes(app: Express) {
       }
 
       // Admin and Owner can edit all vouchers
-      if (userRole !== "Admin" && userRole !== "Owner") {
+      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
         // Manager can only edit today's vouchers
         if (userRole === "Manager") {
           const voucherDate = new Date(voucher.voucherDate);

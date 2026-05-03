@@ -152,7 +152,7 @@ export function useErpVisibleSections(user?: any): {
 
   const isItemVisible = (item: NavItem): boolean => {
     const isPOSUser   = user?.role?.startsWith("POS");
-    const isAdmin     = user?.role === "Admin";
+    const isAdmin     = user?.role === "Admin" || user?.role === "Developer";
     const isDeveloper = user?.role === "Developer";
     const isOwner     = user?.role === "Owner";
     const featureKey  = ROUTE_TO_FEATURE[item.url];

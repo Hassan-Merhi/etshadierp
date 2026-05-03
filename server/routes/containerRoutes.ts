@@ -1454,7 +1454,7 @@ export function registerContainerRoutes(app: Express) {
 
       // Check role permissions - only Admin and Owner can view purchase orders
       const userRole = req.session.currentRole;
-      if (!userRole || (userRole !== "Admin" && userRole !== "Owner")) {
+      if (!userRole || (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer")) {
         return res
           .status(403)
           .json({ message: "Only Admin and Owner can view purchase orders" });
@@ -1589,7 +1589,7 @@ export function registerContainerRoutes(app: Express) {
       }
 
       // Only Admin and Owner can edit purchase orders
-      if (userRole !== "Admin" && userRole !== "Owner") {
+      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
         return res
           .status(403)
           .json({ message: "Only Admin and Owner can edit purchase orders" });

@@ -202,7 +202,7 @@ export async function getUserHideAllCosts(req: any): Promise<boolean> {
     const userId = req.session?.userId;
     if (!userId) return false;
     const role = req.session?.currentRole?.toLowerCase?.();
-    if (role === "admin" || role === "owner") return false;
+    if (role === "admin" || role === "owner" || role === "developer") return false;
     const [profile] = await db
       .select({ hideAllCosts: factoryUserProfiles.hideAllCosts })
       .from(factoryUserProfiles)

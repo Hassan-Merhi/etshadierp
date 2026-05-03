@@ -229,7 +229,7 @@ export function registerEmployeeRoutes(app: Express) {
     try {
       // Only Admin can delete employees
       const userRole = req.session.currentRole;
-      if (userRole !== "Admin") {
+      if (userRole !== "Admin" && userRole !== "Developer") {
         return res.status(403).json({ 
           message: "Only Admin users can delete employees" 
         });

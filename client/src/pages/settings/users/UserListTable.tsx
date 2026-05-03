@@ -9,7 +9,7 @@ const FACTORY_PAGE_COUNT = FACTORY_NAV_PAGES.length;
 const ERP_PAGE_COUNT = FEATURE_KEYS.length;
 
 function accessSummary(user: any): { label: string; variant: "default" | "secondary" | "outline" } {
-  const privileged = ["admin", "owner"].includes(user.role?.toLowerCase());
+  const privileged = ["admin", "owner", "developer"].includes(user.role?.toLowerCase());
   const hasERP = privileged || (user.hasErpAccess ?? true);
   const hasFactory = privileged || (user.hasFactoryAccess ?? true);
   if (hasERP && hasFactory) return { label: "ERP + Factory", variant: "default" };
@@ -19,7 +19,7 @@ function accessSummary(user: any): { label: string; variant: "default" | "second
 }
 
 function pagesSummary(user: any): string {
-  const privileged = ["admin", "owner"].includes(user.role?.toLowerCase());
+  const privileged = ["admin", "owner", "developer"].includes(user.role?.toLowerCase());
   if (privileged || user.pageAccess.length === 0) return "Full access";
   const factoryKeys = new Set(FACTORY_NAV_PAGES.map((p: any) => p.key));
   const erpKeys = new Set(FEATURE_KEYS);
@@ -62,7 +62,7 @@ export function UserListTable({ users, isLoading, selectedUserId, onSelectUser }
   return (
     <div className="space-y-1.5">
       {users.map((user: any) => {
-        const privileged = ["admin", "owner"].includes(user.role?.toLowerCase());
+        const privileged = ["admin", "owner", "developer"].includes(user.role?.toLowerCase());
         const access = accessSummary(user);
         const pages = pagesSummary(user);
         const isSelected = selectedUserId === user.id;

@@ -75,7 +75,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
-  const isPrivileged = ["Admin", "Owner", "Manager"].includes(currentUser?.role || "");
+  const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(currentUser?.role || "");
 
   const { data: posAssignedLocations = [], isLoading: posLocationsLoading } = useQuery<Location[]>({
     queryKey: ["/api/my-locations"],

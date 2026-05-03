@@ -1840,7 +1840,7 @@ export function registerVoucherRoutes(app: Express) {
         }
 
         // Admin and Owner can edit all vouchers
-        if (userRole !== "Admin" && userRole !== "Owner") {
+        if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
           // Manager can only edit today's vouchers
           if (userRole === "Manager") {
             const voucherDate = new Date(existingVoucher.voucherDate);
@@ -2124,7 +2124,7 @@ export function registerVoucherRoutes(app: Express) {
 
         // Only Admin and Owner can toggle optional status
         const userRole = req.session.currentRole;
-        if (userRole !== "Admin" && userRole !== "Owner") {
+        if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
           return res
             .status(403)
             .json({
@@ -2384,7 +2384,7 @@ export function registerVoucherRoutes(app: Express) {
       }
 
       // Admin and Owner can edit all vouchers
-      if (userRole !== "Admin" && userRole !== "Owner") {
+      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
         // Manager can only edit today's vouchers
         if (userRole === "Manager") {
           const today = new Date();
@@ -2797,7 +2797,7 @@ export function registerVoucherRoutes(app: Express) {
         }
 
         // Admin and Owner can edit all vouchers
-        if (userRole !== "Admin" && userRole !== "Owner") {
+        if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
           // Manager can only edit today's vouchers
           if (userRole === "Manager") {
             const today = new Date();
@@ -2974,7 +2974,7 @@ export function registerVoucherRoutes(app: Express) {
           return res.status(403).json({ message: "User role not found" });
         }
 
-        if (userRole !== "Admin" && userRole !== "Owner") {
+        if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
           if (userRole === "Manager") {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -3179,7 +3179,7 @@ export function registerVoucherRoutes(app: Express) {
           return res.status(403).json({ message: "User role not found" });
         }
 
-        if (userRole !== "Admin" && userRole !== "Owner") {
+        if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
           if (userRole === "Manager") {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -3375,7 +3375,7 @@ export function registerVoucherRoutes(app: Express) {
       }
 
       // Admin and Owner can edit all vouchers
-      if (userRole !== "Admin" && userRole !== "Owner") {
+      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
         // Manager can only edit today's vouchers
         if (userRole === "Manager") {
           const voucherDate = new Date(existingVoucher.voucherDate);
@@ -3618,7 +3618,7 @@ export function registerVoucherRoutes(app: Express) {
   app.post("/api/admin/fix-sales-inventory", requireAuth, async (req, res) => {
     try {
       // Admin only
-      if (req.session.currentRole !== "Admin") {
+      if (req.session.currentRole !== "Admin" && req.session.currentRole !== "Developer") {
         return res.status(403).json({ message: "Admin access required" });
       }
 

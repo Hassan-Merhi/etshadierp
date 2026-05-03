@@ -1072,7 +1072,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     if (!user) return false;
 
     // Admin and Owner can edit all transactions
-    if (user.role === "Admin" || user.role === "Owner") {
+    if (user.role === "Admin" || user.role === "Owner" || user.role === "Developer") {
       return true;
     }
 
@@ -1086,7 +1086,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
   // Check if user can delete a voucher (only Admin)
   const canDelete = (): boolean => {
-    return user?.role === "Admin";
+    return user?.role === "Admin" || user?.role === "Developer";
   };
 
   // Edit voucher mutation

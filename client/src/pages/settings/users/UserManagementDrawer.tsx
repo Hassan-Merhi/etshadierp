@@ -111,7 +111,7 @@ export function UserManagementDrawer({
   onUserDeleted,
 }: UserManagementDrawerProps) {
   const { toast } = useToast();
-  const isPrivileged = ["admin", "owner"].includes(user?.role?.toLowerCase() ?? "");
+  const isPrivileged = ["admin", "owner", "developer"].includes(user?.role?.toLowerCase() ?? "");
 
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
