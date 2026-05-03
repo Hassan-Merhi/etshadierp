@@ -134,7 +134,7 @@ export default function FactorySupplierStatement() {
     : 0;
 
   const currenciesInStatement: string[] = statement?.currencyGroups
-    ? [...new Set(statement.currencyGroups.map((g: any) => g.currencyCode as string))].filter((c) => c !== "USD")
+    ? [...new Set<string>(statement.currencyGroups.map((g: any) => g.currencyCode as string))].filter((c) => c !== "USD")
     : [];
 
   return (

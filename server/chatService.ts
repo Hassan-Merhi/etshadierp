@@ -1070,7 +1070,9 @@ export async function getConversationHistory(
     .orderBy(desc(schema.chatMessages.createdAt))
     .limit(limit);
 
-  return messages.reverse();
+  return messages
+    .map((m) => ({ id: m.id, role: m.role ?? "", message: m.message ?? "", createdAt: m.createdAt }))
+    .reverse();
 }
 
 export async function getConversationHistoryForAI(

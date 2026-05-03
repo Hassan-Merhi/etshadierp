@@ -1212,7 +1212,7 @@ export default function DailyProductionReport() {
         ) : (
           <CategoryProductBreakdown
             categories={data.production.byCategory}
-            products={data.production.byProduct}
+            products={data.production.byProduct as any}
             totalBales={data.production.totalBales}
             totalWeightKg={data.production.totalWeightKg}
             totalValue={data.production.totalValue}

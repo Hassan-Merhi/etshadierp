@@ -433,8 +433,8 @@ export default function Chat() {
                           </span>
                           {isMine && (
                             msg.readAt
-                              ? <CheckCheck className="h-3 w-3 text-sky-300" title="Read" />
-                              : <CheckCheck className="h-3 w-3 text-primary-foreground/50" title="Delivered" />
+                              ? <span title="Read"><CheckCheck className="h-3 w-3 text-sky-300" /></span>
+                              : <span title="Delivered"><CheckCheck className="h-3 w-3 text-primary-foreground/50" /></span>
                           )}
                         </div>
                       </div>

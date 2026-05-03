@@ -355,10 +355,8 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
       <PaymentDialog transporterId={transporterId} open={paymentOpen} onClose={() => setPaymentOpen(false)} />
       <DeleteConfirmDialog
         open={!!pendingDelete}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
         onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
-        onCancel={() => setPendingDelete(null)}
-        title="Delete Entry"
-        description="This will delete the transaction and reverse its accounting entries. Are you sure?"
       />
       {AdminDialog}
     </div>
