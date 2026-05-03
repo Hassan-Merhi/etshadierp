@@ -18,17 +18,17 @@ import {
   insertSalesItemSchema,
   suppliers, customers, customerBalances, locations, employees, userLocations,
   auditLog, interCompanyTransfers, insertInterCompanyTransferSchema,
-  ledgerAccounts, insertLedgerAccountSchema, insertLedgerEntrySchema,
+  ledgerAccounts, insertLedgerAccountSchema, 
   companies, users, userCompanyRoles, companySettings,
   FEATURE_KEYS, fiscalPeriodClosures,
   wasteDispatches, wasteDispatchItems, insertWasteDispatchSchema,
   bales, baleProducts, baleProductCategories, baleTransfers,
   insertBaleSchema, insertBaleTransferSchema,
-  orphanedCharges,
+  
   dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
   insertDashboardCashAccountSchema, insertDashboardPayableAccountSchema,
   insertDashboardAccountSelectionSchema,
-  creditNoteItems, insertCreditNoteSchema,
+  creditNoteItems, 
   pendingBarcodes, insertPendingBarcodeSchema,
   storedFiles, fileFolders, spreadsheets, liveSpreadsheets,
   agentAccounts, insertAgentAccountSchema,
@@ -37,7 +37,7 @@ import {
   salaryAdvances, salaryAdvanceDeductions,
   insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
   chatMessages,
-  inventoryValueAdjustments,
+  
   systemSettings,
 } from "@shared/schema";
 import {

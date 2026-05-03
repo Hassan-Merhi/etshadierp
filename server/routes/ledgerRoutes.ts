@@ -7,7 +7,7 @@ import {
 } from "./_helpers";
 import {
   locations, inventory, stockItems, stockGroups, ledgerAccounts, employees,
-  employeeGroups, employeeGroupMembers, workerGroups,
+  employeeGroups, employeeGroupMembers, 
   suppliers, customers, customerBalances, customerOrders,
   stockTransferVouchers, stockTransferItems, stockAdjustmentVouchers, stockAdjustmentItems,
   containers, containerOffloads, containerOffloadItems, vouchers, voucherEntries, salesItems,
@@ -15,6 +15,7 @@ import {
   insertEmployeeSchema, insertEmployeeGroupSchema, insertSupplierSchema, insertCustomerSchema,
   userLocations, userCompanyRoles, companies, bankAccounts, fixedAssets,
   agentAccounts, auditLog, users, FEATURE_KEYS,
+  salaryAdvances,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,

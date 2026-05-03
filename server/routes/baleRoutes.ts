@@ -17,7 +17,7 @@ import {
   insertSalesItemSchema,
   suppliers, customers, customerBalances, locations, employees, userLocations,
   auditLog, interCompanyTransfers, insertInterCompanyTransferSchema,
-  ledgerAccounts, insertLedgerAccountSchema, insertLedgerEntrySchema,
+  ledgerAccounts, insertLedgerAccountSchema, 
   companies, users, userCompanyRoles, companySettings, insertCompanySettingsSchema,
   FEATURE_KEYS, fiscalPeriodClosures,
   wasteDispatches, wasteDispatchItems, insertWasteDispatchSchema,
@@ -30,18 +30,18 @@ import {
   factoryRawStock, erpPayrollRuns, referenceSequences, baleSequences,
   customerOrders, customerOrderBales,
   insertBaleSchema, insertBaleTransferSchema,
-  orphanedCharges,
+  
   dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
   insertDashboardCashAccountSchema, insertDashboardPayableAccountSchema,
   insertDashboardAccountSelectionSchema,
-  creditNoteItems, insertCreditNoteSchema,
+  creditNoteItems, 
   pendingBarcodes, insertPendingBarcodeSchema,
   storedFiles, spreadsheets, liveSpreadsheets,
   agentAccounts, insertAgentAccountSchema,
   salaryAdvances, salaryAdvanceDeductions,
   insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
   chatMessages,
-  inventoryValueAdjustments,
+  
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,

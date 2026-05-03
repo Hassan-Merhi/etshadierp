@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCompany } from "@/contexts/CompanyContext";
+import type { LedgerAccount, BankAccount, Supplier, Customer } from "@shared/schema";
 
 export function AccountCombobox({
   value,
