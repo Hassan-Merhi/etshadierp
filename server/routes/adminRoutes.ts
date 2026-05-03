@@ -48,7 +48,6 @@ import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
-import { generatePDF } from "../pdfHelper";
 import path from "path";
 import fs from "fs";
 
@@ -3201,7 +3200,7 @@ export function registerAdminRoutes(app: Express) {
       return res.status(403).json({ message: "Dev seed only available in development" });
     }
     try {
-      const { runDevSeed } = await import("./seedDev");
+      const { runDevSeed } = await import("../seedDev");
       const summary = await runDevSeed();
       console.log("\n=== SEED DATA SUMMARY ===");
       console.log(`Products: ${summary.products}`);

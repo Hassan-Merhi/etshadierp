@@ -546,6 +546,7 @@ export function registerStatsRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Cumulative "as of" date — same approach as /api/stats/net-profit
+      const fromDate = req.query.fromDate ? String(req.query.fromDate) : null;
       const toDate = req.query.toDate ? String(req.query.toDate) : null;
 
       const allCompanies = await storage.getAllCompanies();

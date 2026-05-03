@@ -45,7 +45,6 @@ import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeW
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 import { checkAccountWhatsAppRule } from "./factoryWhatsappRoutes";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
-import { generatePDF } from "../pdfHelper";
 import path from "path";
 import fs from "fs";
 

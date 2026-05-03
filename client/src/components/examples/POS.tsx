@@ -1,4 +1,4 @@
-import POS from "../../pages/POS";
+import POS from "../../pages/pos/POS";
 
 export default function POSExample() {
   return (

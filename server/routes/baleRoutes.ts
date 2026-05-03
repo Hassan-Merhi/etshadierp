@@ -44,6 +44,7 @@ import {
   
   factorySettings as fSettings,
   factoryDaybookEntries as fde,
+  factoryBaleSequences,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -53,7 +54,6 @@ import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
-import { generatePDF } from "../pdfHelper";
 import path from "path";
 import fs from "fs";
 
@@ -2337,7 +2337,6 @@ export function registerBaleRoutes(app: Express) {
       if (!validStatuses.includes(status)) {
         return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
       }
-      const { db } = await import("./db");
       const { eq, and } = await import("drizzle-orm");
 
       const [updated] = await db
@@ -2372,7 +2371,6 @@ export function registerBaleRoutes(app: Express) {
       if (!Array.isArray(ids) || ids.length === 0) {
         return res.status(400).json({ message: "No bale IDs provided" });
       }
-      const { db } = await import("./db");
       const { eq, and, inArray } = await import("drizzle-orm");
 
       const updated = await db
