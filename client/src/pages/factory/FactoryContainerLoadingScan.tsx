@@ -9,7 +9,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { Badge } from "@/components/ui/badge";
 import { useState, useRef, useCallback, useEffect } from "react";
-import * as XLSX from "xlsx";
+import * as XLSX from "@/lib/excelHelper";
 import { PageHeader } from "@/components/PageHeader";
 import {
   Select,
@@ -542,7 +542,7 @@ export default function FactoryContainerLoadingScan() {
     createOrderMutation,
   ]);
 
-  const downloadTemplate = useCallback((mode: "ref" | "articleCode") => {
+  const downloadTemplate = useCallback(async (mode: "ref" | "articleCode") => {
     const wb = XLSX.utils.book_new();
     let ws;
     if (mode === "ref") {
@@ -562,7 +562,7 @@ export default function FactoryContainerLoadingScan() {
       ws["!cols"] = [{ wch: 20 }, { wch: 10 }];
     }
     XLSX.utils.book_append_sheet(wb, ws, "Import");
-    XLSX.writeFile(
+    await XLSX.writeFile(
       wb,
       mode === "ref"
         ? "bale-import-ref-number-template.xlsx"
@@ -599,10 +599,10 @@ export default function FactoryContainerLoadingScan() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const data = new Uint8Array(evt.target?.result as ArrayBuffer);
-        const wb = XLSX.read(data, { type: "array" });
+        const wb = await XLSX.read(data, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows: any[] = XLSX.utils.sheet_to_json(ws);
 
@@ -870,7 +870,7 @@ export default function FactoryContainerLoadingScan() {
                   <input
                     ref={importFileRef}
                     type="file"
-                    accept=".xlsx,.xls"
+                    accept=".xlsx"
                     className="hidden"
                     onChange={handleImportFile}
                     data-testid="input-import-file"

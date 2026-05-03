@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import * as XLSX from "xlsx";
+import * as XLSX from "@/lib/excelHelper";
 import {
   generateCombinedLabelsHtml,
   generateA5LabelsHtml,
@@ -77,10 +77,10 @@ function findRefColumn(headers: string[]): string | null {
 function parseExcelFile(file: File): Promise<ParsedRow[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = e.target?.result;
-        const wb = XLSX.read(data, { type: "binary" });
+        const wb = await XLSX.read(data, { type: "binary" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
         if (rows.length === 0) { reject(new Error("No rows found in file")); return; }
@@ -117,7 +117,7 @@ function downloadCsv(items: ApplyItem[], filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function downloadExcelTemplate() {
+async function downloadExcelTemplate() {
   const wb = XLSX.utils.book_new();
   const data = [
     ["current_reference_code"],
@@ -128,7 +128,7 @@ function downloadExcelTemplate() {
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws["!cols"] = [{ wch: 30 }];
   XLSX.utils.book_append_sheet(wb, ws, "Bale References");
-  XLSX.writeFile(wb, "bale-relabeling-template.xlsx");
+  await XLSX.writeFile(wb, "bale-relabeling-template.xlsx");
 }
 
 interface LabelPreviewCardProps {
@@ -431,7 +431,7 @@ export default function FactoryBaleRelabeling() {
             <input
               ref={fileRef}
               type="file"
-              accept=".xlsx,.xls,.csv"
+              accept=".xlsx,.csv"
               className="hidden"
               onChange={handleFileSelect}
               data-testid="input-file-upload"

@@ -33,7 +33,7 @@ import {
   A4_DESIGN_OPTIONS, type LabelData, type A4DesignColor, formatLabelNum,
 } from "@/lib/labelHtml";
 import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
-import * as XLSX from "xlsx";
+import * as XLSX from "@/lib/excelHelper";
 
 interface CartItem {
   productId: number;
@@ -300,19 +300,27 @@ export default function WipersReEntry() {
     }
   };
 
-  const exportCsv = () => {
+  const exportCsv = async () => {
     if (!createdBales) return;
-    const rows = createdBales.map(b => ({
-      "Reference": b.referenceNumber,
-      "Product": b.productName || "",
-      "Article Code": b.articleCode || "",
-      "Weight (kg)": b.weightKg,
-      "Entry Date": b.stockEntryDate || entryDate,
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "WipersReEntry");
-    XLSX.writeFile(wb, `wipers-re-entry-${entryDate}.xlsx`);
+    try {
+      const rows = createdBales.map(b => ({
+        "Reference": b.referenceNumber,
+        "Product": b.productName || "",
+        "Article Code": b.articleCode || "",
+        "Weight (kg)": b.weightKg,
+        "Entry Date": b.stockEntryDate || entryDate,
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "WipersReEntry");
+      await XLSX.writeFile(wb, `wipers-re-entry-${entryDate}.xlsx`);
+    } catch (err: any) {
+      toast({
+        title: "Export failed",
+        description: err?.message || "Could not generate Excel file.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

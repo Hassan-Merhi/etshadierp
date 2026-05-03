@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from "react";
-import * as XLSX from "xlsx";
+import * as XLSX from "@/lib/excelHelper";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Package, CheckCircle, PlayCircle, Link2, AlertTriangle, Pencil, Trash2, BarChart2 } from "lucide-react";
@@ -161,7 +161,7 @@ export default function MixBatches() {
     }
   };
 
-  const handleExportReport = () => {
+  const handleExportReport = async () => {
     if (!batches || batches.length === 0) {
       toast({ title: "No data to export" });
       return;
@@ -211,7 +211,7 @@ export default function MixBatches() {
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Mix Batches");
-    XLSX.writeFile(wb, `mix-batches-${new Date().toLocaleDateString("en-CA")}.xlsx`);
+    await XLSX.writeFile(wb, `mix-batches-${new Date().toLocaleDateString("en-CA")}.xlsx`);
   };
 
   if (selectedBatchId !== null) {

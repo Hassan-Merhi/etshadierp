@@ -263,7 +263,7 @@ export default function CombinedInventory() {
   const isDrillMode = viewMode === "groups" && selectedGroupId !== undefined;
 
   const handleExport = async () => {
-    const XLSX = await import("xlsx");
+    const XLSX = await import("@/lib/excelHelper");
     const exportRows = isDrillMode ? groupItems : filteredAll;
     const wsData = [
       ["Item Name", "Stock Group", "OTW Qty", "In-Hand Qty", "Total Qty", "Avg Rate", "Total Value"],
@@ -284,7 +284,7 @@ export default function CombinedInventory() {
     const filename = isDrillMode
       ? `combined_inventory_${(drillGroup?.stockGroupName || "group").replace(/\s+/g, "_")}.xlsx`
       : "combined_inventory.xlsx";
-    XLSX.writeFile(wb, filename);
+    await XLSX.writeFile(wb, filename);
   };
 
   return (

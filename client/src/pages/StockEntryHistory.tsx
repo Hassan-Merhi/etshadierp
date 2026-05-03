@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import * as XLSX from "xlsx";
+import * as XLSX from "@/lib/excelHelper";
 import { ChevronDown, ChevronRight, Download, Search, RotateCcw, List, AlignJustify, FileDown, MoreVertical, CalendarRange, MessageCircle, Loader2 } from "lucide-react";
 import ProductionPlannerDialog from "./factory/ProductionPlannerDialog";
 import { Button } from "@/components/ui/button";
@@ -311,7 +311,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     } catch { return "—"; }
   }
 
-  function exportExcel() {
+  async function exportExcel() {
     const wb = XLSX.utils.book_new();
 
     const summaryRows = filteredGroups.map(g => ({
@@ -372,7 +372,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
 
     XLSX.utils.book_append_sheet(wb, ws3, "Worker Matrix");
 
-    XLSX.writeFile(wb, `stock-entry-history-${fromDate}-to-${toDate}.xlsx`);
+    await XLSX.writeFile(wb, `stock-entry-history-${fromDate}-to-${toDate}.xlsx`);
   }
 
   function handlePrintMatrix() {

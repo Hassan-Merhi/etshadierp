@@ -4,7 +4,7 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import {
   Play, CheckCircle2, Clock, DollarSign, ChevronDown, ChevronRight, X, Users, Trash2, CalendarDays, Printer, RotateCcw, Wrench, FileDown, ShieldCheck,
 } from "lucide-react";
-import * as XLSX from "xlsx";
+import * as XLSX from "@/lib/excelHelper";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -935,7 +935,7 @@ export default function FactoryPayrollTab() {
             <Button variant="outline" onClick={() => setPreviewOpen(false)}>Back</Button>
             <Button
               variant="outline"
-              onClick={() => {
+              onClick={async () => {
                 const rows = previewRows.map((r) => {
                   const mRate = parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2));
                   const rHasAtt = r.presentDates.length > 0 || r.absentDates.length > 0 || r.halfDayDates.length > 0;
@@ -986,7 +986,7 @@ export default function FactoryPayrollTab() {
                 ws["!cols"] = colWidths;
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, "Payroll");
-                XLSX.writeFile(wb, `Payroll_${runForm.periodStart}_${runForm.periodEnd}.xlsx`);
+                await XLSX.writeFile(wb, `Payroll_${runForm.periodStart}_${runForm.periodEnd}.xlsx`);
               }}
               data-testid="button-export-payroll-excel"
             >

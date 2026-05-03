@@ -406,9 +406,9 @@ export default function FactoryContainers() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const XLSX = await import("xlsx");
+    const XLSX = await import("@/lib/excelHelper");
     const data = await file.arrayBuffer();
-    const wb = XLSX.read(data, { type: "array" });
+    const wb = await XLSX.read(data, { type: "array" });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const jsonRows: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
 
@@ -468,7 +468,7 @@ export default function FactoryContainers() {
   });
 
   const exportContainers = async (rows: ContainerWithSupplier[]) => {
-    const XLSX = await import("xlsx");
+    const XLSX = await import("@/lib/excelHelper");
     const headers = [
       "Container Number", "Supplier", "Broker / Commission To", "Origin",
       "Total Kg", "Rate/Kg", "Currency", "FX Rate", "FX Source", "Arrival Date", "Status", "Notes",
@@ -505,11 +505,11 @@ export default function FactoryContainers() {
     ws["!cols"] = [20,20,20,12,10,10,8,8,8,12,12,30,12,10,30,12,10,12].map(w => ({ wch: w }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Containers");
-    XLSX.writeFile(wb, `factory_containers_export_${new Date().toLocaleDateString('en-CA')}.xlsx`);
+    await XLSX.writeFile(wb, `factory_containers_export_${new Date().toLocaleDateString('en-CA')}.xlsx`);
   };
 
   const downloadTemplate = async () => {
-    const XLSX = await import("xlsx");
+    const XLSX = await import("@/lib/excelHelper");
 
     // Sheet 1: Template with sample data
     const headers = [
@@ -563,7 +563,7 @@ export default function FactoryContainers() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Containers");
     XLSX.utils.book_append_sheet(wb, wsInstr, "Instructions");
-    XLSX.writeFile(wb, "factory_containers_template.xlsx");
+    await XLSX.writeFile(wb, "factory_containers_template.xlsx");
   };
 
   const resetForm = () => {
@@ -1531,7 +1531,7 @@ export default function FactoryContainers() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx"
                 onChange={handleFileSelect}
                 className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground cursor-pointer"
                 data-testid="input-import-file"

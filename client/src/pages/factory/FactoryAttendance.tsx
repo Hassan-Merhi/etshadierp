@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import * as XLSX from "xlsx";
+import * as XLSX from "@/lib/excelHelper";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -1431,7 +1431,7 @@ function buildWeeklySheet(
   return ws;
 }
 
-function exportWeeklyExcel(
+async function exportWeeklyExcel(
   workers: WorkerRow[],
   weekDays: WeekDay[],
   shift: string,
@@ -1453,7 +1453,7 @@ function exportWeeklyExcel(
   XLSX.utils.book_append_sheet(wb, inactiveSheet, lang === "ar" ? "غير نشط" : "Inactive Workers");
 
   const weekRange = weekLabel(weekDays).replace(/[^a-z0-9]/gi, "-");
-  XLSX.writeFile(wb, `attendance-${type}-${weekRange}.xlsx`);
+  await XLSX.writeFile(wb, `attendance-${type}-${weekRange}.xlsx`);
 }
 
 function buildRangeSheet(
@@ -1515,7 +1515,7 @@ function buildRangeSheet(
   return ws;
 }
 
-function exportRangeExcel(
+async function exportRangeExcel(
   workers: WorkerRow[],
   attendance: AttendanceRecord[],
   dates: string[],
@@ -1544,7 +1544,7 @@ function exportRangeExcel(
   XLSX.utils.book_append_sheet(wb, activeSheet,   lang === "ar" ? "نشط"      : "Active Workers");
   XLSX.utils.book_append_sheet(wb, inactiveSheet, lang === "ar" ? "غير نشط" : "Inactive Workers");
 
-  XLSX.writeFile(wb, `attendance-range-${startDate}-to-${endDate}.xlsx`);
+  await XLSX.writeFile(wb, `attendance-range-${startDate}-to-${endDate}.xlsx`);
 }
 
 function generateRangePrintHtml(

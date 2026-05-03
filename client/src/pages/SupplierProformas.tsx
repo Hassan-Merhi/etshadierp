@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, Plus, Trash2, Upload, Download, FileText, Pencil, Save, X } from "lucide-react";
 import { format } from "date-fns";
-import * as XLSX from "xlsx";
+import * as XLSX from "@/lib/excelHelper";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -159,10 +159,10 @@ export default function SupplierProformas() {
     const file = e.target.files?.[0];
     if (!file || !importTarget) return;
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const data = new Uint8Array(evt.target?.result as ArrayBuffer);
-        const wb = XLSX.read(data, { type: "array" });
+        const wb = await XLSX.read(data, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows: any[] = XLSX.utils.sheet_to_json(ws);
         const lines = rows.map((r) => ({
@@ -185,14 +185,14 @@ export default function SupplierProformas() {
     e.target.value = "";
   };
 
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
     const ws = XLSX.utils.aoa_to_sheet([
       ["Barcode", "Item Name", "Qty", "Weight per Bale", "Price per Bale"],
       ["SAMPLE001", "Sample Item", 10, 45, 25.50],
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Proforma");
-    XLSX.writeFile(wb, "proforma_template.xlsx");
+    await XLSX.writeFile(wb, "proforma_template.xlsx");
   };
 
   const startEdit = (line: ProformaLine) => {
@@ -219,7 +219,7 @@ export default function SupplierProformas() {
 
   return (
     <div className="flex flex-col h-full p-4 lg:p-6 overflow-y-auto">
-      <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileImport} />
+      <input ref={fileInputRef} type="file" accept=".xlsx,.csv" className="hidden" onChange={handleFileImport} />
 
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">

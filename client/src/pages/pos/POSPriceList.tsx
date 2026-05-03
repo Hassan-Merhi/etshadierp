@@ -265,7 +265,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     if (filteredItems.length === 0) return;
     setExporting(true);
     try {
-      const XLSX = await import("xlsx");
+      const XLSX = await import("@/lib/excelHelper");
 
       const rows = filteredItems.map((item: any) => {
         const row: Record<string, any> = {
@@ -312,7 +312,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       const filterPart = showUnpriced ? "_unpriced" : groupFilter !== "all" ? `_${groupFilter.replace(/\s+/g, "_")}` : "";
       const searchPart = search.trim() ? `_search-${search.trim().replace(/\s+/g, "_")}` : "";
 
-      XLSX.writeFile(wb, `price_list_${locationLabel}${filterPart}${searchPart}_${dateStr}.xlsx`);
+      await XLSX.writeFile(wb, `price_list_${locationLabel}${filterPart}${searchPart}_${dateStr}.xlsx`);
     } finally {
       setExporting(false);
     }

@@ -741,7 +741,7 @@ export default function BaleProducts() {
 
   const handleDownloadTemplate = async () => {
     try {
-      const XLSX = await import("xlsx");
+      const XLSX = await import("@/lib/excelHelper");
       const templateData = [
         {
           "Article Code": "HMD01000",
@@ -771,7 +771,7 @@ export default function BaleProducts() {
       ];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Bale Products");
-      XLSX.writeFile(wb, "bale_products_template.xlsx");
+      await XLSX.writeFile(wb, "bale_products_template.xlsx");
       toast({ title: "Template downloaded" });
     } catch (err: any) {
       toast({ title: "Error", description: "Failed to generate template", variant: "destructive" });
@@ -786,9 +786,9 @@ export default function BaleProducts() {
     setImportFile(file);
 
     try {
-      const XLSX = await import("xlsx");
+      const XLSX = await import("@/lib/excelHelper");
       const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
+      const workbook = await XLSX.read(buffer, { type: "array" });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const rows: any[] = XLSX.utils.sheet_to_json(worksheet);
@@ -881,7 +881,7 @@ export default function BaleProducts() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".xlsx,.xls,.csv"
+            accept=".xlsx,.csv"
             className="hidden"
             onChange={handleFileSelect}
             data-testid="input-import-file"

@@ -41,7 +41,7 @@ import { PageHeader } from "@/components/PageHeader";
   import { buildZplBatch } from "@/lib/zplBuilder";
   import { LabelPrintSettings, getPaperFormat } from "@/components/LabelPrintSettings";
   import { Label } from "@/components/ui/label";
-  import * as XLSX from "xlsx";
+  import * as XLSX from "@/lib/excelHelper";
   import StockEntryHistory from "../StockEntryHistory";
   import { AdminAuthDialog } from "@/components/AdminAuthDialog";
   import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
@@ -1997,7 +1997,7 @@ import { PageHeader } from "@/components/PageHeader";
       }
     }, [activeLocations, selectedLocationId]);
 
-    const downloadTemplate = () => {
+    const downloadTemplate = async () => {
       const headers = ["ITEM NAME", "WEIGHT", "ITEM BARCODE", "QUANTITY", "PRODUCTION DATE", "REF NUMBER"];
       const sampleRows = [
         ["Cotton Bale A1", 25, "ART001", 1, "2026-03-14", "MYREF-001"],
@@ -2007,7 +2007,7 @@ import { PageHeader } from "@/components/PageHeader";
       ws["!cols"] = headers.map(() => ({ wch: 20 }));
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Bale Import Template");
-      XLSX.writeFile(wb, "bale_import_template.xlsx");
+      await XLSX.writeFile(wb, "bale_import_template.xlsx");
     };
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2016,10 +2016,10 @@ import { PageHeader } from "@/components/PageHeader";
       setFileName(file.name);
 
       const reader = new FileReader();
-      reader.onload = (evt) => {
+      reader.onload = async (evt) => {
         try {
           const data = new Uint8Array(evt.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: "array" });
+          const workbook = await XLSX.read(data, { type: "array" });
           const sheet = workbook.Sheets[workbook.SheetNames[0]];
           const jsonData = XLSX.utils.sheet_to_json<any>(sheet, { header: 1 });
 
@@ -2151,7 +2151,7 @@ import { PageHeader } from "@/components/PageHeader";
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.csv"
                 onChange={handleFileUpload}
                 className="hidden"
                 data-testid="input-import-file"

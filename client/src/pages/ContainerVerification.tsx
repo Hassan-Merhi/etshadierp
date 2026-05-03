@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, Plus, Trash2, Upload, Download, FileCheck, Pencil, Save, X, AlertTriangle, CheckCircle2, ArrowUpRight, ArrowDownRight, MinusCircle, DollarSign, RefreshCw, List } from "lucide-react";
-import * as XLSX from "xlsx";
+import * as XLSX from "@/lib/excelHelper";
 import { PageHeader } from "@/components/PageHeader";
 
 interface LoadedItem {
@@ -163,10 +163,10 @@ export default function ContainerVerification() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const data = new Uint8Array(evt.target?.result as ArrayBuffer);
-        const wb = XLSX.read(data, { type: "array" });
+        const wb = await XLSX.read(data, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows: any[] = XLSX.utils.sheet_to_json(ws);
         const items = rows.map((r) => ({
@@ -251,7 +251,7 @@ export default function ContainerVerification() {
 
   return (
     <div className="flex flex-col h-full p-4 lg:p-6 overflow-y-auto">
-      <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileImport} />
+      <input ref={fileInputRef} type="file" accept=".xlsx,.csv" className="hidden" onChange={handleFileImport} />
 
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">

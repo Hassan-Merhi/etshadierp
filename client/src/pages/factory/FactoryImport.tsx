@@ -149,8 +149,8 @@ function SupplierImport() {
     } else if (ext === "xlsx" || ext === "xls") {
       const reader = new FileReader();
       reader.onload = async (evt) => {
-        const XLSX = await import("xlsx");
-        const wb = XLSX.read(evt.target?.result, { type: "binary" });
+        const XLSX = await import("@/lib/excelHelper");
+        const wb = await XLSX.read(evt.target?.result, { type: "binary" });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data = XLSX.utils.sheet_to_json(ws) as any[];
         const parsed: SupplierRow[] = data.map((row) => ({
@@ -302,8 +302,8 @@ function RawStockImport() {
     } else if (ext === "xlsx" || ext === "xls") {
       const reader = new FileReader();
       reader.onload = async (evt) => {
-        const XLSX = await import("xlsx");
-        const wb = XLSX.read(evt.target?.result, { type: "binary" });
+        const XLSX = await import("@/lib/excelHelper");
+        const wb = await XLSX.read(evt.target?.result, { type: "binary" });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data = XLSX.utils.sheet_to_json(ws) as any[];
         const parsed: RawStockRow[] = data.map((row) => ({
@@ -474,8 +474,8 @@ function BaleImport() {
     } else if (ext === "xlsx" || ext === "xls") {
       const reader = new FileReader();
       reader.onload = async (evt) => {
-        const XLSX = await import("xlsx");
-        const wb = XLSX.read(evt.target?.result, { type: "binary" });
+        const XLSX = await import("@/lib/excelHelper");
+        const wb = await XLSX.read(evt.target?.result, { type: "binary" });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data = XLSX.utils.sheet_to_json(ws) as any[];
         const parsed: BaleRow[] = data.map((row) => ({
@@ -642,7 +642,7 @@ function ImportModeChooser({
               </div>
               <input
                 type="file"
-                accept=".csv,.xlsx,.xls,.txt"
+                accept=".csv,.xlsx,.txt"
                 className="hidden"
                 onChange={onFileUpload}
                 data-testid={`input-file-${templateType}`}
@@ -793,8 +793,8 @@ function OpeningStockImport() {
     } else if (ext === "xlsx" || ext === "xls") {
       const reader = new FileReader();
       reader.onload = async (evt) => {
-        const XLSX = await import("xlsx");
-        const wb = XLSX.read(evt.target?.result, { type: "binary" });
+        const XLSX = await import("@/lib/excelHelper");
+        const wb = await XLSX.read(evt.target?.result, { type: "binary" });
         const ws = wb.Sheets[wb.SheetNames[0]];
         parse(XLSX.utils.sheet_to_json(ws) as any[]);
       };
