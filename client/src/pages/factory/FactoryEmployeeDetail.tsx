@@ -432,7 +432,7 @@ export default function FactoryEmployeeDetail() {
                 <p className="text-sm text-muted-foreground py-8 text-center">No transactions yet</p>
               ) : (
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Voucher</TableHead>

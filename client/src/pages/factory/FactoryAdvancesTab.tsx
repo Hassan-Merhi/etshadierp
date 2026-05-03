@@ -403,7 +403,7 @@ function AdvancesView() {
       <Card>
         <CardContent className="p-0">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
                 <TableHead>Worker</TableHead>
                 <TableHead>Date</TableHead>
@@ -575,7 +575,7 @@ function AdvancesView() {
               </div>
               <div className="border rounded-md overflow-hidden">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Worker</TableHead>
@@ -844,7 +844,7 @@ function AdvancesView() {
               ) : (
                 <div className="border rounded-md mt-2 max-h-64 overflow-y-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
@@ -1041,7 +1041,7 @@ function RepaymentsView() {
       <Card>
         <CardContent className="p-0">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
                 <TableHead>Worker</TableHead>
                 <TableHead>Loan Date</TableHead>

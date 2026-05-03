@@ -274,7 +274,7 @@ export default function InventoryRepair() {
               <CardContent>
                 <div className="overflow-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Location</TableHead>
                         <TableHead>Stock Item</TableHead>
@@ -410,7 +410,7 @@ export default function InventoryRepair() {
             </Alert>
             <div className="overflow-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>Location</TableHead>
                     <TableHead>Item</TableHead>

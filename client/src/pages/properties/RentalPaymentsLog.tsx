@@ -151,7 +151,7 @@ export default function RentalPaymentsLog({
               </div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="bg-muted/50 border-b">
+                <thead className="sticky top-0 z-30 bg-muted/50 border-b">
                   <tr>
                     <th className="text-left px-3 py-2 font-semibold">Date</th>
                     <th className="text-left px-3 py-2 font-semibold">Client Name</th>
@@ -195,7 +195,7 @@ export default function RentalPaymentsLog({
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="border-t-2 bg-muted/30">
+                <tfoot className="sticky bottom-0 z-20 border-t-2 bg-muted/30">
                   <tr>
                     <td className="px-3 py-2 font-semibold" colSpan={3}>TOTAL</td>
                     <td className="px-3 py-2 text-right tabular-nums font-bold text-green-700 dark:text-green-400">

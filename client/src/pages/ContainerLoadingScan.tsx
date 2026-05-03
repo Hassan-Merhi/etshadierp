@@ -704,7 +704,7 @@ export default function ContainerLoadingScan() {
 
               <div className="overflow-y-auto max-h-[340px]">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead className="text-xs">Article</TableHead>
                       <TableHead className="text-xs text-right">Exp</TableHead>
@@ -831,7 +831,7 @@ export default function ContainerLoadingScan() {
                 </p>
                 <div className="overflow-y-auto max-h-[340px] border rounded-md">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Article / Product</TableHead>
                         <TableHead className="text-right">Expected</TableHead>

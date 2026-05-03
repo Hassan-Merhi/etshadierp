@@ -230,7 +230,7 @@ export default function FactoryProfitability() {
                   ) : (
                     <div className="table-responsive">
                       <Table>
-                        <TableHeader>
+                        <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
                             <TableHead>Bale Ref</TableHead>
                             <TableHead>
@@ -334,7 +334,7 @@ export default function FactoryProfitability() {
                   ) : (
                     <div className="table-responsive">
                       <Table>
-                        <TableHeader>
+                        <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
                             <TableHead>Container Ref</TableHead>
                             <TableHead>

@@ -136,7 +136,7 @@ export default function PendingInvoices() {
       ) : (
         <Card className="table-responsive">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
                 <TableHead>Order #</TableHead>
                 <TableHead>Customer</TableHead>

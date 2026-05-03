@@ -108,7 +108,7 @@ export default function BalanceSheet() {
     return (
       <div className="rounded-md border table-responsive">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-30 bg-background">
             <TableRow>
               <TableHead>Account Name</TableHead>
               <TableHead className="text-right">Balance</TableHead>

@@ -230,7 +230,7 @@ export default function FactoryBaleProductHistory() {
         <CardContent>
           <div className="hidden md:block overflow-x-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Month</TableHead>
                   <TableHead className="text-right text-green-600 dark:text-green-400">Bales IN</TableHead>
@@ -555,7 +555,7 @@ export function FactoryBaleProductMonthDetail() {
         <CardContent>
           <div className="hidden md:block overflow-x-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Bale Code</TableHead>
                   <TableHead>Reference</TableHead>
@@ -803,7 +803,7 @@ export function FactoryBaleProductAllMonths() {
         <CardContent>
           <div className="hidden md:block overflow-x-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Bale Code</TableHead>
                   <TableHead>Reference</TableHead>

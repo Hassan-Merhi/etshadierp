@@ -298,7 +298,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
           ) : (
             <div className="border rounded-md overflow-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>Source</TableHead>
                     <TableHead className="text-right">Weight (kg)</TableHead>
@@ -354,7 +354,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
             <>
               <div className="border rounded-md overflow-auto">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Bale Code</TableHead>
                       <TableHead>Product Name</TableHead>

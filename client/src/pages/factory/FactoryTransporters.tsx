@@ -298,7 +298,7 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
               <div className="p-8 text-center text-muted-foreground">No transactions yet. Record a charge to get started.</div>
             ) : (
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-30 bg-muted/50">
                   <tr className="border-b text-left text-muted-foreground">
                     <th className="px-3 py-2 font-medium">Date</th>
                     <th className="px-3 py-2 font-medium">Type</th>
@@ -336,7 +336,7 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
                     </tr>
                   ))}
                 </tbody>
-                <tfoot>
+                <tfoot className="sticky bottom-0 z-20 bg-background">
                   <tr className="border-t font-semibold bg-muted/20">
                     <td className="px-3 py-2" colSpan={3}>TOTALS</td>
                     <td className="px-3 py-2 text-right tabular-nums">${fmt(data.totalCharged)}</td>
@@ -492,7 +492,7 @@ export default function FactoryTransporters() {
             </div>
           ) : (
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky top-0 z-30 bg-muted/50">
                 <tr className="border-b text-left text-muted-foreground">
                   <th className="px-4 py-3 font-medium">Transporter</th>
                   <th className="px-4 py-3 font-medium">Phone</th>

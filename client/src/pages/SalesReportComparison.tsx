@@ -418,7 +418,7 @@ export default function SalesReportComparison() {
             ) : (
               <div className="rounded-md border overflow-auto">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     {/* Row 1: Item | Group | [Company name spanning 3 cols each] | AI Result */}
                     <TableRow>
                       <TableHead className="min-w-[200px] sticky left-0 bg-background z-10">Item</TableHead>

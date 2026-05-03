@@ -417,7 +417,7 @@ export default function FactoryInvoiceLoadingScan() {
           ) : (
             <div className="table-responsive">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>Article Code</TableHead>
                     <TableHead>Product</TableHead>
@@ -617,7 +617,7 @@ export default function FactoryInvoiceLoadingScan() {
             {currentBales.length > 0 && (
               <div className="table-responsive rounded-md border">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead className="w-8">#</TableHead>
                       <TableHead>Reference</TableHead>
@@ -728,7 +728,7 @@ export default function FactoryInvoiceLoadingScan() {
           <CardContent className="p-0">
             <div className="table-responsive">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>Session</TableHead>
                     <TableHead>Status</TableHead>
@@ -895,7 +895,7 @@ export default function FactoryInvoiceLoadingScan() {
                     <p className="text-xs text-muted-foreground">{sessionBales.length} bale{sessionBales.length !== 1 ? "s" : ""}. Click the trash icon to remove a bale and return it to unloaded.</p>
                     <div className="table-responsive rounded-md border">
                       <Table>
-                        <TableHeader>
+                        <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
                             <TableHead>Reference</TableHead>
                             <TableHead>Article</TableHead>

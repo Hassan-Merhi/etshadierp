@@ -357,7 +357,7 @@ export default function CustomerInvoiceDetail() {
 
       <Card className="overflow-x-auto mb-6">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-30 bg-background">
             <TableRow>
               <TableHead className="w-[50px]">#</TableHead>
               <TableHead>Article Code</TableHead>
@@ -487,7 +487,7 @@ export default function CustomerInvoiceDetail() {
 
               <Card className="table-responsive">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Bale</TableHead>
                       <TableHead className="text-right">Qty</TableHead>

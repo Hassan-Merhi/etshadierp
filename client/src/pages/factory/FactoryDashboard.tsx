@@ -175,7 +175,7 @@ export default function FactoryDashboard() {
             ) : (
               <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Container</TableHead>
                       <TableHead>Supplier</TableHead>
@@ -234,7 +234,7 @@ export default function FactoryDashboard() {
               ) : (
                 <div className="max-h-64 overflow-y-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Category</TableHead>
                         <TableHead>Product</TableHead>

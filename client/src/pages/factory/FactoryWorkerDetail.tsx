@@ -175,7 +175,7 @@ function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, formatDa
               <p className="text-xs text-muted-foreground">No repayments recorded yet</p>
             ) : (
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead className="text-xs">Date</TableHead>
                     <TableHead className="text-xs text-right">Amount</TableHead>
@@ -894,7 +894,7 @@ export default function FactoryWorkerDetail() {
                   ) : (
                     <div className="table-responsive">
                       <Table>
-                        <TableHeader>
+                        <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
                             <TableHead>Period</TableHead>
                             <TableHead className="text-right">Base</TableHead>
@@ -987,7 +987,7 @@ export default function FactoryWorkerDetail() {
                   ) : (
                     <div className="table-responsive">
                       <Table>
-                        <TableHeader>
+                        <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
                             <TableHead>Date</TableHead>
                             <TableHead className="text-right">Amount</TableHead>
@@ -1213,7 +1213,7 @@ export default function FactoryWorkerDetail() {
                     </div>
                   )}
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead className="w-8"></TableHead>
                         <TableHead>Date</TableHead>
@@ -1586,7 +1586,7 @@ export default function FactoryWorkerDetail() {
                   ) : bales?.length ? (
                     <div className="table-responsive">
                       <Table>
-                        <TableHeader>
+                        <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
                             <TableHead>Bale Code</TableHead>
                             <TableHead>Product</TableHead>
@@ -1938,7 +1938,7 @@ export default function FactoryWorkerDetail() {
                 ) : (
                   <div className="rounded-md border overflow-hidden">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Date</TableHead>
                           <TableHead>Day</TableHead>

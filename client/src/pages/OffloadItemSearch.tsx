@@ -132,7 +132,7 @@ export default function OffloadItemSearch() {
             </CardHeader>
             <CardContent className="p-0">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>Item Name</TableHead>
                     <TableHead>Container</TableHead>

@@ -836,7 +836,7 @@ export default function FactoryContainers() {
             };
             return (
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead className="w-10">
                       <Checkbox
@@ -1552,7 +1552,7 @@ export default function FactoryContainers() {
                 </div>
                 <div className="border rounded-md overflow-auto max-h-64">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>#</TableHead>
                         <TableHead>Container #</TableHead>

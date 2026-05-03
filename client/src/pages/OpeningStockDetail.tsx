@@ -297,7 +297,7 @@ export default function OpeningStockDetail() {
                 </h3>
                 {debugData.inventoryRecords.length > 0 ? (
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>ID</TableHead>
                         <TableHead>Location</TableHead>

@@ -157,7 +157,7 @@ export default function FactoryCashflow() {
               ) : (
                 <div className="table-responsive">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Vendor</TableHead>
                         <TableHead>Amount</TableHead>
@@ -195,7 +195,7 @@ export default function FactoryCashflow() {
               ) : (
                 <div className="table-responsive">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Period</TableHead>
                         <TableHead>Estimated Amount</TableHead>
@@ -231,7 +231,7 @@ export default function FactoryCashflow() {
               <CardContent>
                 <div className="table-responsive">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Source</TableHead>
                         <TableHead>Amount</TableHead>

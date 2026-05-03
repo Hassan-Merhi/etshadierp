@@ -612,7 +612,7 @@ export default function ImportCycleDiagnostics() {
         </CardHeader>
         <CardContent>
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
                 <TableHead className="w-8">+/-</TableHead>
                 <TableHead>Component</TableHead>
@@ -665,7 +665,7 @@ export default function ImportCycleDiagnostics() {
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead className="w-8"></TableHead>
                   <TableHead>Component</TableHead>
@@ -713,7 +713,7 @@ export default function ImportCycleDiagnostics() {
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Bucket</TableHead>
                   <TableHead className="text-right">Computed</TableHead>
@@ -773,7 +773,7 @@ export default function ImportCycleDiagnostics() {
                   Component Audit (All {diagnosticsData.reconciliation.componentAudit.length} Balance Components)
                 </h4>
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Component</TableHead>
                       <TableHead className="text-right">Value</TableHead>
@@ -835,7 +835,7 @@ export default function ImportCycleDiagnostics() {
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Container</TableHead>
                   <TableHead>Supplier</TableHead>

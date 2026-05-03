@@ -686,7 +686,7 @@ export default function FactoryInvoiceDetail() {
 
       <Card className="overflow-x-auto mb-6">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-30 bg-background">
             <TableRow>
               <TableHead className="w-[50px]">#</TableHead>
               <TableHead>Article Code</TableHead>

@@ -316,7 +316,7 @@ export default function DeletedItems() {
             <>
             <div className="hidden md:block">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Type</TableHead>
                   <TableHead>Code</TableHead>
@@ -599,7 +599,7 @@ export default function DeletedItems() {
                     ) : (
                       <div className="rounded-md border overflow-hidden">
                         <table className="w-full text-sm">
-                          <thead>
+                          <thead className="sticky top-0 z-30 bg-muted/50">
                             <tr className="border-b bg-muted/40">
                               <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Account</th>
                               <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Debit</th>
@@ -628,7 +628,7 @@ export default function DeletedItems() {
                               </tr>
                             ))}
                           </tbody>
-                          <tfoot>
+                          <tfoot className="sticky bottom-0 z-20 bg-background">
                             <tr className="bg-muted/50 font-semibold">
                               <td className="px-3 py-2 text-xs">Total</td>
                               <td className="px-3 py-2 text-right font-mono text-xs">

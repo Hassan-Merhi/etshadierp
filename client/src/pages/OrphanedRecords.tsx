@@ -227,7 +227,7 @@ export default function OrphanedRecordsPage() {
           <>
           <div className="hidden md:block">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
                 <TableHead>Voucher #</TableHead>
                 <TableHead>Type</TableHead>
@@ -362,7 +362,7 @@ export default function OrphanedRecordsPage() {
           <>
           <div className="hidden md:block">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
                 <TableHead className="w-12">
                   <Checkbox 
@@ -468,7 +468,7 @@ export default function OrphanedRecordsPage() {
           <>
           <div className="hidden md:block">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
                 <TableHead>Stock Group</TableHead>
                 <TableHead>Location</TableHead>

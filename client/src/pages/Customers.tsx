@@ -25,6 +25,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -315,7 +316,7 @@ export default function Customers() {
 
       <Card className="hidden md:block overflow-x-auto">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-30 bg-background">
             <TableRow>
               <TableHead className="sticky left-0 bg-muted z-10">Legal Name</TableHead>
               <TableHead className="text-right">Current Balance</TableHead>
@@ -544,7 +545,7 @@ export default function Customers() {
                 <div className="text-center py-8 text-muted-foreground">No transactions found</div>
               ) : (
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Description</TableHead>
@@ -589,17 +590,17 @@ export default function Customers() {
                       );
                     })}
                   </TableBody>
-                  <TableHeader className="border-t-2">
+                  <TableFooter className="sticky bottom-0 z-30 bg-background border-t-2">
                     <TableRow className="font-semibold">
-                      <TableHead colSpan={2}>Total</TableHead>
-                      <TableHead className="text-right font-mono text-foreground">{formatAmount(totalDr)}</TableHead>
-                      <TableHead className="text-right font-mono text-foreground">{formatAmount(totalCr)}</TableHead>
-                      <TableHead className="text-right font-mono text-foreground">
+                      <TableCell colSpan={2}>Total</TableCell>
+                      <TableCell className="text-right font-mono text-foreground">{formatAmount(totalDr)}</TableCell>
+                      <TableCell className="text-right font-mono text-foreground">{formatAmount(totalCr)}</TableCell>
+                      <TableCell className="text-right font-mono text-foreground">
                         {formatAmount(Math.abs(closingBalance))}
                         <span className={`text-xs font-semibold ml-1 ${drCrClass(statementCustomer?.balanceSide || "Dr")}`}>{(statementCustomer?.balanceSide || "Dr")}</span>
-                      </TableHead>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
+                  </TableFooter>
                 </Table>
               );
             })()}

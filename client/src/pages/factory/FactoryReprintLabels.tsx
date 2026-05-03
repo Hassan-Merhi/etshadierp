@@ -442,7 +442,7 @@ export default function FactoryReprintLabels() {
               {/* Desktop table */}
               <div className="hidden md:block rounded-md border table-responsive">
                 <table className="text-sm w-full">
-                  <thead className="bg-muted/50">
+                  <thead className="sticky top-0 z-30 bg-muted/50">
                     <tr className="h-10">
                       <th className="w-10 px-3"></th>
                       <th className="text-left px-3 font-medium">Reference No.</th>

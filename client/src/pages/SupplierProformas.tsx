@@ -298,7 +298,7 @@ export default function SupplierProformas() {
               </CardHeader>
               <CardContent>
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Barcode</TableHead>
                       <TableHead>Item Name</TableHead>

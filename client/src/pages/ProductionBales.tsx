@@ -369,7 +369,7 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
 
           <div className="table-responsive">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead className="w-10">Verified</TableHead>
                   <TableHead>Ref Number</TableHead>
@@ -538,7 +538,7 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
               </div>
               <div className="max-h-40 overflow-y-auto border rounded-md">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Ref Number</TableHead>
                       <TableHead>Product</TableHead>

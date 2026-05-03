@@ -233,7 +233,7 @@ export default function FactoryCustomers() {
         <CardContent className="p-0">
           <div className="table-responsive">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Phone</TableHead>
@@ -349,7 +349,7 @@ export default function FactoryCustomers() {
             ) : (
               <div className="table-responsive">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Code</TableHead>

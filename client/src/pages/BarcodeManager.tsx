@@ -339,7 +339,7 @@ export default function BarcodeManager() {
           <>
           <div className="hidden md:block">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
                 <TableHead className="w-12">
                   <Checkbox
@@ -437,7 +437,7 @@ export default function BarcodeManager() {
             These barcodes have been scanned and added to inventory
           </p>
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
                 <TableHead>Barcode</TableHead>
                 <TableHead>Status</TableHead>

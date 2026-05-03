@@ -99,7 +99,7 @@ export default function SoldContainers() {
         <Card>
           <CardContent className="p-0 overflow-x-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Container Number</TableHead>
                   <TableHead>Customer</TableHead>

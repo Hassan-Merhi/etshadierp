@@ -336,7 +336,7 @@ export default function Suppliers() {
             <>
             <div className="hidden md:block overflow-x-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead className="sticky left-0 bg-muted z-10">Name</TableHead>
                     <TableHead className="text-right">Containers</TableHead>
@@ -546,7 +546,7 @@ export default function Suppliers() {
 
                       <div className="hidden md:block">
                         <Table>
-                          <TableHeader>
+                          <TableHeader className="sticky top-0 z-30 bg-background">
                             <TableRow>
                               <TableHead>Date</TableHead>
                               <TableHead>Company</TableHead>
@@ -710,7 +710,7 @@ export default function Suppliers() {
 
                       <div className="hidden md:block">
                         <Table>
-                          <TableHeader>
+                          <TableHeader className="sticky top-0 z-30 bg-background">
                             <TableRow>
                               <TableHead className="text-base">Container</TableHead>
                               <TableHead className="text-base">Import Date</TableHead>

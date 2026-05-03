@@ -292,7 +292,7 @@ export default function FactoryUsers() {
         <CardContent>
           {factoryUsers && factoryUsers.length > 0 ? (
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Username</TableHead>
                   <TableHead>Display Name</TableHead>

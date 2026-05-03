@@ -142,7 +142,7 @@ function AccountBreakdown({
             <p className="text-xs text-muted-foreground italic p-3">No transactions in this period.</p>
           ) : (
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky top-0 z-30 bg-muted/50">
                 <tr className="bg-muted/50">
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground">Account</th>
                   <th className="text-right px-3 py-2 font-medium text-muted-foreground">Debit</th>

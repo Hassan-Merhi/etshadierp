@@ -204,7 +204,7 @@ function SupplierImport() {
         <CardContent>
           <div className="border rounded-md overflow-auto max-h-96">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Opening Balance</TableHead>
@@ -358,7 +358,7 @@ function RawStockImport() {
         <CardContent>
           <div className="border rounded-md overflow-auto max-h-96">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Container #</TableHead>
                   <TableHead>Supplier</TableHead>
@@ -532,7 +532,7 @@ function BaleImport() {
         <CardContent>
           <div className="border rounded-md overflow-auto max-h-96">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Bale Code</TableHead>
                   <TableHead>Article Code</TableHead>
@@ -704,7 +704,7 @@ function ManualEntryCard<T>({
       <CardContent>
         <div className="border rounded-md overflow-auto">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
                 {columns.map((col) => (
                   <TableHead key={col}>{col}</TableHead>
@@ -880,7 +880,7 @@ function OpeningStockImport() {
       <CardContent>
         <div className="border rounded-md overflow-auto max-h-96">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
                 <TableHead>Supplier</TableHead>
                 <TableHead>KG</TableHead>

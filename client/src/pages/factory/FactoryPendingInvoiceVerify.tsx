@@ -484,7 +484,7 @@ export default function FactoryPendingInvoiceVerify() {
                   <h3 className="font-semibold text-sm mb-3" data-testid="text-proforma-header">Proforma Expected <span className="text-muted-foreground font-normal">(mismatches only)</span></h3>
                   {filteredProformaLines.length > 0 ? (
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Article</TableHead>
                           <TableHead>Product</TableHead>
@@ -519,7 +519,7 @@ export default function FactoryPendingInvoiceVerify() {
                   <h3 className="font-semibold text-sm mb-3" data-testid="text-loaded-header">Loaded Bales</h3>
                   {verification?.loadedItems && verification.loadedItems.length > 0 ? (
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Article</TableHead>
                           <TableHead>Product</TableHead>
@@ -574,7 +574,7 @@ export default function FactoryPendingInvoiceVerify() {
             <CardContent>
               {items.length > 0 ? (
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Item Name</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
@@ -915,7 +915,7 @@ export default function FactoryPendingInvoiceVerify() {
               {finalizePreview.baleCount > 0 && (
                 <div className="border rounded-md overflow-hidden">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Reference</TableHead>
                         <TableHead>Product</TableHead>

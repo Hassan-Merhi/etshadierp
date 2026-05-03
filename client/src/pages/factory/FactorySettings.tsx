@@ -735,7 +735,7 @@ export default function FactorySettings() {
               </div>
               <div className="max-h-80 overflow-y-auto border rounded-md">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Code</TableHead>
                       <TableHead>Current Name</TableHead>
@@ -904,7 +904,7 @@ export default function FactorySettings() {
               {baleValidationResult.validRows.length > 0 && (
                 <div className="border rounded-md overflow-auto max-h-64">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead className="w-12">Row</TableHead>
                         <TableHead>Article Code</TableHead>
@@ -1036,7 +1036,7 @@ export default function FactorySettings() {
               </div>
               <div className="border rounded-md overflow-hidden">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Container</TableHead>
                       <TableHead>Description</TableHead>

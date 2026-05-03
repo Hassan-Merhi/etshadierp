@@ -219,7 +219,7 @@ export default function LedgerMonthlySummary() {
               <CardContent className="pt-4">
                 <div className="border rounded-lg overflow-hidden">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow className="bg-muted/50">
                         <TableHead>Particulars</TableHead>
                         <TableHead className="text-right">Transactions</TableHead>

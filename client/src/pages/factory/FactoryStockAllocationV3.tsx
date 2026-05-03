@@ -381,7 +381,7 @@ function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => void })
             </CardHeader>
             <CardContent className="p-0">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead className="pl-4 text-xs">Item</TableHead>
                     <TableHead className="text-xs text-right">Expected</TableHead>
@@ -773,7 +773,7 @@ export default function FactoryStockAllocationV3() {
             {stockRows.length > 0 && (
               <div className="rounded-md border table-responsive">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead className="pl-4">Product</TableHead>
                       <TableHead className="text-right">Stock in Hand</TableHead>
@@ -829,7 +829,7 @@ export default function FactoryStockAllocationV3() {
             {expectedLoads.length > 0 && (
               <div className="rounded-md border table-responsive">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead className="pl-4">Load Name</TableHead>
                       <TableHead>Proforma</TableHead>
@@ -942,7 +942,7 @@ export default function FactoryStockAllocationV3() {
             {finalizedLoads.length > 0 && (
               <div className="rounded-md border table-responsive">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead className="pl-4">Load Name</TableHead>
                       <TableHead>Proforma</TableHead>
@@ -986,7 +986,7 @@ export default function FactoryStockAllocationV3() {
             {proformas.length > 0 && (
               <div className="rounded-md border table-responsive">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead className="pl-4">Proforma</TableHead>
                       <TableHead>Customer</TableHead>

@@ -795,7 +795,7 @@ export default function ContainerDetail() {
 
                   <div className="rounded-md border hidden md:block">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Item Name</TableHead>
                           <TableHead className="text-right">Quantity</TableHead>
@@ -877,7 +877,7 @@ export default function ContainerDetail() {
           <CardContent>
             <div className="rounded-md border hidden md:block">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>Charge Type</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
@@ -1456,7 +1456,7 @@ export default function ContainerDetail() {
             {priceImportPreview && priceImportPreview.length > 0 && (
               <div className="overflow-auto flex-1 border rounded-md">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Code / Barcode</TableHead>
                       <TableHead>Item Name</TableHead>

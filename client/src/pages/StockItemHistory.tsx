@@ -164,7 +164,7 @@ export default function StockItemHistory() {
         <CardContent>
           <div className="hidden md:block overflow-x-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead rowSpan={2} className="align-bottom border-r">Particulars</TableHead>
                   <TableHead colSpan={2} className="text-center border-r">Inwards</TableHead>

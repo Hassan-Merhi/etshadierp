@@ -189,7 +189,7 @@ export default function StockTransfers() {
           ) : (
             <div className="table-responsive">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead className="whitespace-nowrap">Voucher</TableHead>
                     <TableHead className="whitespace-nowrap">Date</TableHead>

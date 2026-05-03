@@ -442,7 +442,7 @@ export default function CustomerProformas() {
                       {proforma.lines && proforma.lines.length > 0 ? (
                         <div className="table-responsive">
                           <Table>
-                            <TableHeader>
+                            <TableHeader className="sticky top-0 z-30 bg-background">
                               <TableRow>
                                 <TableHead>Article Code</TableHead>
                                 <TableHead>Product Name</TableHead>

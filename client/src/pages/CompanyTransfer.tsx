@@ -432,7 +432,7 @@ export default function CompanyTransfer() {
               <p className="text-sm text-muted-foreground p-4">No transfers yet.</p>
             ) : (
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>From</TableHead>

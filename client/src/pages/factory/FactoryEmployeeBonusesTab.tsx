@@ -163,7 +163,7 @@ export default function FactoryEmployeeBonusesTab() {
         <>
           <div className="hidden sm:block rounded-md border">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Employee</TableHead>
                   <TableHead>Date</TableHead>

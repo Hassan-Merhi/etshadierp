@@ -345,7 +345,7 @@ export default function FactoryCustomerStatement() {
       {/* Statement table */}
       <Card className="table-responsive">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-30 bg-background">
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Type</TableHead>

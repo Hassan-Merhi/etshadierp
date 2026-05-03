@@ -100,7 +100,7 @@ export default function FactoryAlerts() {
           ) : (
             <div className="table-responsive">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>Severity</TableHead>
                     <TableHead>Title</TableHead>

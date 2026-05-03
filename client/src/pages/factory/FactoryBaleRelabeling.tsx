@@ -452,7 +452,7 @@ export default function FactoryBaleRelabeling() {
                 </div>
                 <div className="max-h-48 overflow-y-auto border rounded-md">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead className="w-16">Row</TableHead>
                         <TableHead>Current Reference Code</TableHead>
@@ -516,7 +516,7 @@ export default function FactoryBaleRelabeling() {
             <CardContent className="p-0">
               <div className="max-h-80 overflow-y-auto">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Current Reference</TableHead>
                       <TableHead>Product</TableHead>
@@ -740,7 +740,7 @@ export default function FactoryBaleRelabeling() {
             <CardContent className="p-0">
               <div className="max-h-80 overflow-y-auto">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Old Reference</TableHead>
                       <TableHead>New Reference</TableHead>
@@ -782,7 +782,7 @@ export default function FactoryBaleRelabeling() {
               <p className="text-sm text-muted-foreground py-2">No sessions yet</p>
             ) : (
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>File</TableHead>

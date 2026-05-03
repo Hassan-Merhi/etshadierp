@@ -296,7 +296,7 @@ export default function BaleTransfers() {
           ) : (
             <div className="border rounded-md overflow-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead></TableHead>
                     <TableHead>Transfer Date</TableHead>
@@ -381,7 +381,7 @@ export default function BaleTransfers() {
                               {transferDetail && transferDetail.id === transfer.id ? (
                                 transferDetail.items && transferDetail.items.length > 0 ? (
                                   <Table>
-                                    <TableHeader>
+                                    <TableHeader className="sticky top-0 z-30 bg-background">
                                       <TableRow>
                                         <TableHead>Bale Code</TableHead>
                                         <TableHead>Product</TableHead>
@@ -498,7 +498,7 @@ export default function BaleTransfers() {
               ) : (
                 <div className="border rounded-md max-h-60 overflow-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead className="w-10"></TableHead>
                         <TableHead>Bale Code</TableHead>

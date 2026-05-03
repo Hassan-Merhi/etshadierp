@@ -211,7 +211,7 @@ export default function LedgerVouchers() {
                   return (
                     <div className="border rounded-lg overflow-x-auto">
                       <Table>
-                        <TableHeader>
+                        <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow className="bg-muted/50">
                             <TableHead className="w-28">Date</TableHead>
                             <TableHead className="w-28 hidden sm:table-cell">Type</TableHead>
@@ -272,7 +272,7 @@ export default function LedgerVouchers() {
                             ))
                           )}
                         </TableBody>
-                        <tfoot>
+                        <tfoot className="sticky bottom-0 z-20 bg-background">
                           <TableRow className="border-t bg-muted/20 text-sm">
                             <TableCell colSpan={3} className="text-right text-muted-foreground font-medium">Opening Balance:</TableCell>
                             <TableCell className="text-right font-mono text-muted-foreground">—</TableCell>

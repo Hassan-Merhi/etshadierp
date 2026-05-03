@@ -695,7 +695,7 @@ export default function FactoryProformas() {
                       {proforma.lines && proforma.lines.length > 0 ? (
                         <div className="table-responsive">
                           <Table>
-                            <TableHeader>
+                            <TableHeader className="sticky top-0 z-30 bg-background">
                               <TableRow>
                                 <TableHead>Article Code</TableHead>
                                 <TableHead>Product Name</TableHead>
@@ -1351,7 +1351,7 @@ export default function FactoryProformas() {
                 <div className="border rounded-md overflow-hidden">
                   <div className="overflow-x-auto max-h-64 overflow-y-auto">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead className="text-xs">Article Code</TableHead>
                           <TableHead className="text-xs">Product Name</TableHead>

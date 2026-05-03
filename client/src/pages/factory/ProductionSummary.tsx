@@ -282,7 +282,7 @@ export default function ProductionSummary() {
         <CardContent>
           {activeBatches.length > 0 ? (
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Batch</TableHead>
                   <TableHead className="text-right">Total (kg)</TableHead>
@@ -342,7 +342,7 @@ export default function ProductionSummary() {
         <CardContent>
           {allRawStock.length > 0 ? (
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Container</TableHead>
                   <TableHead className="text-right">Received (kg)</TableHead>

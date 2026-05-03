@@ -199,7 +199,7 @@ export default function FactoryBaleImportHistory() {
               <div className="p-8 text-center text-muted-foreground text-sm">No bales found for this batch.</div>
             ) : (
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>Ref #</TableHead>
                     <TableHead>Bale Code</TableHead>

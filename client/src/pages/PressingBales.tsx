@@ -353,7 +353,7 @@ export default function PressingBales() {
                 </div>
               ) : (
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Product</TableHead>
                       <TableHead className="text-center w-40">Qty</TableHead>

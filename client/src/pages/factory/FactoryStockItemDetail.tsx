@@ -154,7 +154,7 @@ export default function FactoryStockItemDetail() {
                   {data.currentStock.locations.length > 0 && (
                     <div className="table-responsive">
                       <Table>
-                        <TableHeader>
+                        <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
                             <TableHead>Location</TableHead>
                             <TableHead className="text-right">Bales</TableHead>
@@ -170,7 +170,7 @@ export default function FactoryStockItemDetail() {
                             </TableRow>
                           ))}
                         </TableBody>
-                        <TableFooter>
+                        <TableFooter className="sticky bottom-0 z-20 bg-background">
                           <TableRow className="font-semibold text-sm">
                             <TableCell>Total</TableCell>
                             <TableCell className="text-right font-mono">{data.currentStock.totalQty}</TableCell>
@@ -199,7 +199,7 @@ export default function FactoryStockItemDetail() {
               ) : (
                 <div className="table-responsive">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead className="text-right">Qty</TableHead>
@@ -215,7 +215,7 @@ export default function FactoryStockItemDetail() {
                         </TableRow>
                       ))}
                     </TableBody>
-                    <TableFooter>
+                    <TableFooter className="sticky bottom-0 z-20 bg-background">
                       <TableRow className="font-semibold text-sm">
                         <TableCell>Total</TableCell>
                         <TableCell className="text-right font-mono">{data.pressed.reduce((s, r) => s + r.qty, 0)}</TableCell>
@@ -242,7 +242,7 @@ export default function FactoryStockItemDetail() {
               ) : (
                 <div className="table-responsive">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Customer</TableHead>
@@ -264,7 +264,7 @@ export default function FactoryStockItemDetail() {
                         </TableRow>
                       ))}
                     </TableBody>
-                    <TableFooter>
+                    <TableFooter className="sticky bottom-0 z-20 bg-background">
                       <TableRow className="font-semibold text-sm">
                         <TableCell colSpan={3}>Total</TableCell>
                         <TableCell className="text-right font-mono">{data.sales.reduce((s, r) => s + r.qty, 0)}</TableCell>
@@ -292,7 +292,7 @@ export default function FactoryStockItemDetail() {
               ) : (
                 <div className="table-responsive">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Invoice</TableHead>
                         <TableHead>Customer</TableHead>
@@ -312,7 +312,7 @@ export default function FactoryStockItemDetail() {
                         </TableRow>
                       ))}
                     </TableBody>
-                    <TableFooter>
+                    <TableFooter className="sticky bottom-0 z-20 bg-background">
                       <TableRow className="font-semibold text-sm">
                         <TableCell colSpan={3}>Total</TableCell>
                         <TableCell className="text-right font-mono">{data.loaded.reduce((s, r) => s + r.qty, 0)}</TableCell>

@@ -1006,7 +1006,7 @@ export default function Analytics() {
     return (
       <div className="rounded-md border table-responsive">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-30 bg-background">
             <TableRow>
               <TableHead>Account Name</TableHead>
               <TableHead className="text-right">Amount</TableHead>
@@ -1135,7 +1135,7 @@ export default function Analytics() {
               ) : (
                 <div className="table-responsive">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Account Name</TableHead>
                         <TableHead className="text-right">Balance</TableHead>
@@ -1179,7 +1179,7 @@ export default function Analytics() {
               ) : (
                 <div className="table-responsive">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Account Name</TableHead>
                         <TableHead className="text-right">Balance</TableHead>
@@ -1223,7 +1223,7 @@ export default function Analytics() {
               ) : (
                 <div className="table-responsive">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Account Name</TableHead>
                         <TableHead className="text-right">Balance</TableHead>
@@ -1267,7 +1267,7 @@ export default function Analytics() {
               ) : (
                 <div className="table-responsive">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Account Name</TableHead>
                         <TableHead className="text-right">Balance</TableHead>
@@ -1308,7 +1308,7 @@ export default function Analytics() {
                 ) : netProfitData ? (
                   <div className="table-responsive">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Account Name</TableHead>
                           <TableHead className="text-right">Balance</TableHead>
@@ -1329,7 +1329,7 @@ export default function Analytics() {
                 ) : (
                   <div className="table-responsive">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Account Name</TableHead>
                           <TableHead className="text-right">Balance</TableHead>
@@ -1369,7 +1369,7 @@ export default function Analytics() {
                 ) : netProfitData ? (
                   <div className="table-responsive">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Account Name</TableHead>
                           <TableHead className="text-right">Balance</TableHead>
@@ -1387,7 +1387,7 @@ export default function Analytics() {
                 ) : (
                   <div className="table-responsive">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Account Name</TableHead>
                           <TableHead className="text-right">Balance</TableHead>
@@ -1427,7 +1427,7 @@ export default function Analytics() {
                 ) : netProfitData ? (
                   <div className="table-responsive">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Account Name</TableHead>
                           <TableHead className="text-right">Balance</TableHead>
@@ -1445,7 +1445,7 @@ export default function Analytics() {
                 ) : (
                   <div className="table-responsive">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Account Name</TableHead>
                           <TableHead className="text-right">Balance</TableHead>
@@ -1488,7 +1488,7 @@ export default function Analytics() {
               ) : (
                 <div className="table-responsive">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Customer</TableHead>
                         <TableHead className="text-right">Containers</TableHead>
@@ -1537,7 +1537,7 @@ export default function Analytics() {
               ) : (
                 <div className="table-responsive">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Customer</TableHead>
                         <TableHead className="text-right">Transactions</TableHead>
@@ -1628,7 +1628,7 @@ export default function Analytics() {
               <>
               <div className="hidden md:block">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>Location</TableHead>
                     <TableHead className="text-right">Bales Sold</TableHead>
@@ -1753,7 +1753,7 @@ export default function Analytics() {
                     <div className="overflow-y-auto flex-1 min-h-0">
                     <div className="hidden md:block">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Date</TableHead>
                           {selectedLocationForDetails === -1 && <TableHead>Customer</TableHead>}
@@ -1939,7 +1939,7 @@ export default function Analytics() {
 
                 <div className="hidden md:block overflow-x-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Container #</TableHead>
                         <TableHead>Customer</TableHead>
@@ -2109,7 +2109,7 @@ export default function Analytics() {
               <div className="space-y-4">
                 <div className="hidden md:block overflow-x-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Container #</TableHead>
                         <TableHead>Supplier</TableHead>

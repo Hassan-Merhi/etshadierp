@@ -480,7 +480,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
           <CardContent>
             <div className="rounded-md border">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>Barcode</TableHead>
                     <TableHead>Item Name</TableHead>

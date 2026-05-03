@@ -414,7 +414,7 @@ export default function BarcodeLookup() {
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Reference No.</TableHead>
                       <TableHead>Approx. Weight (KG)</TableHead>

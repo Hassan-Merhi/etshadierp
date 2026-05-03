@@ -155,7 +155,7 @@ export default function CustomerInvoices() {
       ) : (
         <Card className="table-responsive">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
                 <TableHead>Invoice #</TableHead>
                 <TableHead>Customer</TableHead>

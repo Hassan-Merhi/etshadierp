@@ -1056,7 +1056,7 @@ export default function BaleProducts() {
                             <p className="text-xs text-muted-foreground px-4 py-2">No products in this category.</p>
                           ) : (
                             <table className="w-full text-sm">
-                              <thead>
+                              <thead className="sticky top-0 z-30 bg-muted/50">
                                 <tr className="border-b bg-muted/10">
                                   <th className="text-left px-4 py-1.5 text-xs font-medium text-muted-foreground">Code</th>
                                   <th className="text-left px-4 py-1.5 text-xs font-medium text-muted-foreground">Name</th>
@@ -1260,7 +1260,7 @@ export default function BaleProducts() {
           ) : condensedView ? (
             groupedProducts.length > 0 ? (
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead className="w-8"></TableHead>
                     <TableHead className="w-8"></TableHead>
@@ -1388,7 +1388,7 @@ export default function BaleProducts() {
             )
           ) : activeProducts && activeProducts.length > 0 ? (
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead className="w-8">
                     <Checkbox
@@ -1491,7 +1491,7 @@ export default function BaleProducts() {
                 Hidden Products ({hiddenProducts.length})
               </h3>
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead className="w-8">
                       <Checkbox
@@ -1748,7 +1748,7 @@ export default function BaleProducts() {
           )}
 
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
                 <TableHead>Article Code</TableHead>
                 <TableHead>Name</TableHead>

@@ -494,7 +494,7 @@ export default function POImport() {
 
                 <div className="rounded-md border">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>PO Number</TableHead>
                         <TableHead>Item Name</TableHead>

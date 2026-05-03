@@ -445,7 +445,7 @@ export default function WipersReEntry() {
             {cart.length > 0 ? (
               <div className="table-responsive">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead>Product</TableHead>
                       <TableHead>Article Code</TableHead>
@@ -583,7 +583,7 @@ export default function WipersReEntry() {
                   </div>
                   <div className="overflow-x-auto max-h-64 overflow-y-auto">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead className="w-10"></TableHead>
                           <TableHead>Reference</TableHead>
@@ -748,7 +748,7 @@ export default function WipersReEntry() {
             </div>
             <div className="table-responsive">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>Product</TableHead>
                     <TableHead className="text-right">Qty</TableHead>

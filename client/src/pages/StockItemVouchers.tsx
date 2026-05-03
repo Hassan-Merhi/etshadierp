@@ -189,7 +189,7 @@ export default function StockItemVouchers() {
         <CardContent>
           <div className="hidden md:block overflow-x-auto">
             <Table className="text-sm">
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead rowSpan={2} className="align-bottom border-r w-[80px]">Date</TableHead>
                   <TableHead rowSpan={2} className="align-bottom border-r">Particulars</TableHead>

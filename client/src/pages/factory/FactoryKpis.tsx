@@ -147,7 +147,7 @@ export default function FactoryKpis() {
               ) : (
                 <div className="table-responsive">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Bales Produced</TableHead>
@@ -191,7 +191,7 @@ export default function FactoryKpis() {
                 ) : (
                   <div className="table-responsive">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>#</TableHead>
                           <TableHead>Worker Name</TableHead>
@@ -238,7 +238,7 @@ export default function FactoryKpis() {
                 ) : (
                   <div className="table-responsive">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Mix Batch ID</TableHead>
                           <TableHead>Total Input KG</TableHead>

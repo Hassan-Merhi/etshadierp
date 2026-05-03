@@ -164,7 +164,7 @@ export default function FactoryEmployeePayrollTab() {
                 {isExpanded && (
                   <CardContent className="p-0 pb-2">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead className="pl-6">Employee</TableHead>
                           <TableHead>Code</TableHead>
