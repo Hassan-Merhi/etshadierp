@@ -265,7 +265,7 @@ function ExportProgressDialog({ jobId, mode, open, onClose }: {
     setDownloaded(false);
     const poll = async () => {
       try {
-        const data = await apiRequest("GET", `/api/export/job/${jobId}`) as unknown as JobStatus;
+        const data = (await (await apiRequest("GET", `/api/export/job/${jobId}`)).json()) as JobStatus;
         setJob(data);
         if (data.status !== "running" && intervalRef.current) clearInterval(intervalRef.current);
       } catch { /* ignore */ }
@@ -534,7 +534,7 @@ export function ExportCenter() {
       const body: any = { mode };
       if (fromDate) body.fromDate = fromDate;
       if (toDate) body.toDate = toDate;
-      const result = await apiRequest("POST", "/api/export/start", body) as any;
+      const result = (await (await apiRequest("POST", "/api/export/start", body)).json()) as any;
       setActiveJobId(result.jobId);
       setActiveMode(mode);
       setProgressOpen(true);
@@ -547,7 +547,7 @@ export function ExportCenter() {
       const body: any = {};
       if (fromDate) body.fromDate = fromDate;
       if (toDate) body.toDate = toDate;
-      const data = await apiRequest("POST", "/api/daily-export/trigger-whatsapp", body) as any;
+      const data = (await (await apiRequest("POST", "/api/daily-export/trigger-whatsapp", body)).json()) as any;
       toast({ title: "WhatsApp export started", description: data.message || "Building ZIP and sending…" });
       [5, 20, 45, 75, 120].forEach(s => setTimeout(() => refetchBackup(), s * 1000));
     } catch (e: any) { toast({ variant: "destructive", title: "WhatsApp send failed", description: e.message }); }
@@ -592,7 +592,7 @@ export function ExportCenter() {
   const dismissStuck = async () => {
     setDismissing(true);
     try {
-      const data = await apiRequest("POST", "/api/export/cleanup-stuck-runs") as any;
+      const data = (await (await apiRequest("POST", "/api/export/cleanup-stuck-runs")).json()) as any;
       toast({
         title: data.cleared > 0 ? `Dismissed ${data.cleared} stalled run${data.cleared === 1 ? "" : "s"}` : "No stalled runs found",
         description: data.cleared > 0 ? "They are now marked as failed." : undefined,
