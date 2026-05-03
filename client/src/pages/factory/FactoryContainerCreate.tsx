@@ -17,7 +17,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
-import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
 import type { FactorySupplier } from "@shared/schema";
@@ -26,7 +26,7 @@ type OtherChargeLine = { amount: string; currencyCode: string; ledgerAccountId: 
 
 export default function FactoryContainerCreate() {
   const [, navigate] = useLocation();
-  useEscapeBack(() => navigate("/factory/containers"));
+  useEscapeToParent("/factory/containers");
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({

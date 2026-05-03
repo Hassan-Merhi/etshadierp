@@ -34,7 +34,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 
 interface MonthlyBaleData {
   month: number;
@@ -106,7 +106,7 @@ export default function FactoryBaleProductHistory() {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear.toString());
 
-  useEscapeBack(() => navigate("/factory/location-inventory"));
+  useEscapeToParent("/factory/location-inventory");
 
   const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hiddenCostFields: string[] }>({
     queryKey: ["/api/factory/my-access"],
@@ -448,7 +448,7 @@ export function FactoryBaleProductMonthDetail() {
 
   const backPath = `/factory/bale-product-history/${productId}/${locationId}`;
 
-  useEscapeBack(() => navigate(backPath));
+  useEscapeToParent(backPath);
 
   const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hiddenCostFields: string[] }>({
     queryKey: ["/api/factory/my-access"],
@@ -729,7 +729,7 @@ export function FactoryBaleProductAllMonths() {
 
   const backPath = `/factory/bale-product-history/${productId}/${locationId}`;
 
-  useEscapeBack(() => navigate(backPath));
+  useEscapeToParent(backPath);
 
   const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hiddenCostFields: string[] }>({
     queryKey: ["/api/factory/my-access"],

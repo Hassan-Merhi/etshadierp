@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation, useRoute } from "wouter";
-import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw, Container, Pencil, RotateCcw, Hammer, ChevronDown, GitCompare, DollarSign, ScanLine, ArrowLeftRight } from "lucide-react";
 import {
   DropdownMenu,
@@ -105,7 +105,7 @@ export default function FactoryInvoiceDetail() {
   const [showProformaDialog, setShowProformaDialog] = useState(false);
   const [selectedProformaId, setSelectedProformaId] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
-  useEscapeBack(() => navigate("/factory/invoicing?tab=invoices"));
+  useEscapeToParent("/factory/invoicing?tab=invoices");
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const [, params] = useRoute("/factory/sales/invoices/:id");

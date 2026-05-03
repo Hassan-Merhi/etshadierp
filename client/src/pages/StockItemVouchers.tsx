@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,6 +74,7 @@ export default function StockItemVouchers() {
   const year = parseInt(params.year || "0");
   const month = parseInt(params.month || "0");
   const [_location, navigate] = useLocation();
+  useEscapeToParent();
   
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => 
     getDefaultPeriodValue("this_month")

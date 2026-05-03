@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation, useRoute } from "wouter";
-import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -121,7 +121,7 @@ export default function FactoryInvoiceLoadingScan() {
   const invoiceId = params?.id ? parseInt(params.id) : null;
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
-  useEscapeBack(() => navigate(`/factory/sales/invoices/${invoiceId}`));
+  useEscapeToParent(`/factory/sales/invoices/${invoiceId}`);
 
   // ── Active session state ──
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);

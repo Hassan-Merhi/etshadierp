@@ -3,7 +3,7 @@ import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import {
   ArrowLeft, Upload, Pencil, UserX, UserCheck, Package, DollarSign, Calculator,
   CheckCircle2, X, CreditCard, Building, Phone, Calendar,
@@ -207,7 +207,7 @@ function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, formatDa
 export default function FactoryWorkerDetail() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const [, navigate] = useLocation();
-  useEscapeBack(() => navigate("/factory/workers"));
+  useEscapeToParent("/factory/payroll-hub?tab=workers");
   const [, params] = useRoute("/factory/workers/:id");
   const workerId = params?.id ? parseInt(params.id) : null;
   const { toast } = useToast();
@@ -625,7 +625,7 @@ export default function FactoryWorkerDetail() {
   if (workerError || !worker) {
     return (
       <div className="space-y-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/factory/workers")} data-testid="button-back-error">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/factory/payroll-hub?tab=workers")} data-testid="button-back-error">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex items-center justify-center py-20 text-muted-foreground">Worker not found</div>
@@ -644,7 +644,7 @@ export default function FactoryWorkerDetail() {
 
   return (
     <div className="space-y-4">
-      <Button variant="ghost" size="icon" onClick={() => navigate("/factory/workers")} data-testid="button-back-workers">
+      <Button variant="ghost" size="icon" onClick={() => navigate("/factory/payroll-hub?tab=workers")} data-testid="button-back-workers">
         <ArrowLeft className="h-4 w-4" />
       </Button>
 

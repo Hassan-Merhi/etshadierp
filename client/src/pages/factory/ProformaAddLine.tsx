@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Check, Plus, Search, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,10 @@ export default function ProformaAddLine() {
   const params = new URLSearchParams(window.location.search);
   const customerId = params.get("customerId") || "";
   const proformaName = params.get("proformaName") || "Proforma";
+
+  useEscapeBack(() => {
+    navigate(`/factory/invoicing?tab=proformas${customerId ? `&customerId=${customerId}` : ""}`);
+  });
 
   const [search, setSearch] = useState("");
   const [groupFilter, setGroupFilter] = useState("all");

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams, useSearch } from "wouter";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -102,6 +103,7 @@ function formatQty(value: number, uom: string = "BL"): string {
 export default function OpeningStockDetail() {
   const [, navigate] = useLocation();
   const params = useParams<{ groupId: string }>();
+  useEscapeToParent();
   const searchString = useSearch();
   const { selectedCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();

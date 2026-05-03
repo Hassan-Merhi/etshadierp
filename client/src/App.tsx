@@ -1,6 +1,8 @@
 import { useEffect, useCallback, useState, useRef, lazy, Suspense } from "react";
 import { useButtonClickFeedback } from "@/hooks/use-button-click-feedback";
 import { Switch, Route, useLocation, Redirect } from "wouter";
+import { hasActiveEscapeHandler } from "@/hooks/use-escape-back";
+import { getParentRoute } from "@/lib/parent-routes";
 import { queryClient, getQueryFn, setAppTimezone } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -375,21 +377,26 @@ function AuthenticatedApp() {
     refetchOnMount: "always",
   });
 
+  const navigateToParent = useCallback(() => {
+    const parent = getParentRoute(window.location.pathname);
+    if (parent) setLocation(parent);
+  }, [setLocation]);
+
   const handleGoBack = useCallback(() => {
     if (window.__escBackGuard && window.__escBackGuard()) {
       setShowLeaveConfirm(true);
       return;
     }
-    window.history.back();
-  }, []);
+    navigateToParent();
+  }, [navigateToParent]);
 
   const handleConfirmLeave = useCallback(() => {
     setShowLeaveConfirm(false);
     if (window.__escBackConfirm) {
       window.__escBackConfirm();
     }
-    window.history.back();
-  }, []);
+    navigateToParent();
+  }, [navigateToParent]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -414,6 +421,11 @@ function AuthenticatedApp() {
       }
 
       if (e.key !== "Escape") return;
+
+      // If a page registered its own Esc handler (useEscapeBack), defer to it
+      // entirely — including its own input/overlay guards — so we don't
+      // accidentally blur an input or navigate before the page hook runs.
+      if (hasActiveEscapeHandler()) return;
 
       if (isInput) {
         (target as HTMLInputElement).blur();

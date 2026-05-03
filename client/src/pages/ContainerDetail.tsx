@@ -3,6 +3,7 @@ import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useParams, Link, useLocation } from "wouter";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -48,6 +49,7 @@ export default function ContainerDetail() {
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const { toast } = useToast();
   const [_location, setLocation] = useLocation();
+  useEscapeToParent();
   const { selectedCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
   const companyId = selectedCompany?.id;

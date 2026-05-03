@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -96,7 +96,7 @@ export default function SalesReportDetail() {
   const [plBasis, setPlBasis] = useState<PLBasis>("config");
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [expandedLocations, setExpandedLocations] = useState<Set<string>>(new Set());
-  useEscapeBack(() => window.history.back());
+  useEscapeToParent("/sales-report");
 
   const params = new URLSearchParams(window.location.search);
   const startDate = params.get("startDate") || "";

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
-import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { ArrowLeft, Calendar } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
@@ -76,7 +76,7 @@ export default function StockItemHistory() {
   const [selectedYear, setSelectedYear] = useState(currentYear.toString());
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_year"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
-  useEscapeBack(() => window.history.back());
+  useEscapeToParent("/stock-items");
   
   const { data, isLoading } = useQuery<StockItemSummary>({
     queryKey: [`/api/stock-items/${stockItemId}/monthly-summary`, { year: selectedYear, startDate: periodFilter.fromDate, endDate: periodFilter.toDate }],

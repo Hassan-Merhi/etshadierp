@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { utils, writeFile } from "@/lib/excelHelper";
 import { useParams, useLocation } from "wouter";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -520,6 +521,8 @@ export default function VoucherEdit() {
   const modePrefix = useModePrefix();
   const modeApiRequest = getApiRequest(appMode);
   const [formInitialized, setFormInitialized] = useState(false);
+
+  useEscapeBack(() => navigate(`${modePrefix}/vouchers`));
 
   // Reset form initialization when voucher ID changes
   useEffect(() => {

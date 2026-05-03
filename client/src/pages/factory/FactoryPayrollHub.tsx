@@ -9,7 +9,9 @@ type Section = "workers" | "employees";
 function getInitialSection(): Section {
   if (typeof window !== "undefined") {
     const hash = window.location.hash.replace("#", "");
-    if (hash === "employees") return "employees";
+    if (hash === "employees" || hash === "workers") return hash;
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab === "employees" || tab === "workers") return tab;
   }
   return "workers";
 }

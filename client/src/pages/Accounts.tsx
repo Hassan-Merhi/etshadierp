@@ -169,11 +169,9 @@ export default function Accounts() {
   const fromExternalNavRef = useRef(false);
 
   useEscapeBack(selectedAccount ? () => {
-    if (fromExternalNavRef.current) {
-      window.history.back();
-    } else {
-      setSelectedAccount(null);
-    }
+    fromExternalNavRef.current = false;
+    setSelectedAccount(null);
+    updateUrlParams({ accountId: null, accountType: null, startDate: null, endDate: null });
   } : null);
 
   // Force refresh of account data when component mounts

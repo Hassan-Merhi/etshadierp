@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -74,7 +74,7 @@ export default function FactoryCustomerStatement() {
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  useEscapeBack(() => navigate("/factory/customers"));
+  useEscapeToParent("/factory/customers");
   const params = useParams<{ id: string }>();
   const customerId = params.id;
 

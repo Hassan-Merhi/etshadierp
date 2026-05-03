@@ -36,7 +36,6 @@ import {
   X,
   Search,
 } from "lucide-react";
-import { useEscapeBack } from "@/hooks/use-escape-back";
 import { useToast } from "@/hooks/use-toast";
 
 interface SnapshotData {
@@ -150,7 +149,6 @@ type PinnedRow = { id: number; accountId: string; accountType: string; accountNa
 type CardKey = "agent" | "freight" | "advance" | "cashbank";
 
 export default function FactoryFinancialSnapshot() {
-  useEscapeBack();
   const [, navigate] = useLocation();
   const { toast } = useToast();
 

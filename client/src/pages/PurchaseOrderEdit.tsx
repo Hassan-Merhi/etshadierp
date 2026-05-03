@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -56,7 +56,7 @@ export default function PurchaseOrderEdit() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const poId = params?.id ? parseInt(params.id) : null;
-  useEscapeBack(() => window.history.back());
+  useEscapeToParent("/containers");
 
   const [poNumber, setPoNumber] = useState("");
   const [currency, setCurrency] = useState("USD");

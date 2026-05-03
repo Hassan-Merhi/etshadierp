@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useParams } from "wouter";
-import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Save, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -58,7 +58,7 @@ const CURRENCIES = ["USD", "EUR", "GBP", "AED", "KWD", "SAR", "OMR", "BHD", "QAR
 export default function FactoryOpeningBalanceEdit() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
-  useEscapeBack(() => navigate("/factory/raw-materials"));
+  useEscapeToParent("/factory/raw-materials");
   const { toast } = useToast();
 
   const [form, setForm] = useState({

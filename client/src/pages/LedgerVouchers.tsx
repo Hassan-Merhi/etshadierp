@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { useQuery } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -90,6 +91,8 @@ export default function LedgerVouchers() {
   const accountId = params?.accountId ? parseInt(params.accountId) : null;
   const year = params?.year ? parseInt(params.year) : null;
   const month = params?.month ? parseInt(params.month) : null;
+
+  useEscapeToParent();
 
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => 
     getInitialPeriodValue(year, month)

@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -45,7 +45,7 @@ export default function SupplierProformas() {
   const params = useParams<{ supplierId: string }>();
   const supplierId = parseInt(params.supplierId);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  useEscapeBack(() => window.history.back());
+  useEscapeToParent("/suppliers");
 
   const [selectedProformaId, setSelectedProformaId] = useState<number | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);

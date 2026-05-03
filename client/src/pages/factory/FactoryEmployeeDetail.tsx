@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useRoute, useLocation } from "wouter";
-import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import {
   ArrowLeft, DollarSign, Calendar, Phone, Plus, Loader2, Pencil,
   TrendingUp, TrendingDown, CheckCircle2, RefreshCw,
@@ -89,7 +89,7 @@ function fmt(val: string | number | null | undefined) {
 export default function FactoryEmployeeDetail() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const [, navigate] = useLocation();
-  useEscapeBack(() => navigate("/factory/workers?tab=employees"));
+  useEscapeToParent("/factory/payroll-hub?tab=employees");
   const [, params] = useRoute("/factory/employees/:id");
   const employeeId = params?.id ? parseInt(params.id) : null;
   const { toast } = useToast();
@@ -282,7 +282,7 @@ export default function FactoryEmployeeDetail() {
   if (empError || !employee) {
     return (
       <div className="space-y-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/factory/workers?tab=employees")}>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/factory/payroll-hub?tab=employees")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex items-center justify-center py-20 text-muted-foreground">Employee not found</div>
@@ -307,7 +307,7 @@ export default function FactoryEmployeeDetail() {
 
   return (
     <div className="space-y-4">
-      <Button variant="ghost" size="icon" onClick={() => navigate("/factory/workers?tab=employees")} data-testid="button-back">
+      <Button variant="ghost" size="icon" onClick={() => navigate("/factory/payroll-hub?tab=employees")} data-testid="button-back">
         <ArrowLeft className="h-4 w-4" />
       </Button>
 

@@ -1,4 +1,5 @@
 import { useLocation, useRoute } from "wouter";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 import { useQuery } from "@tanstack/react-query";
 import { formatNumber } from "@/lib/formatNumber";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -90,6 +91,12 @@ export default function VoucherDetail() {
   
   const voucherId = params?.voucherId ? parseInt(params.voucherId) : null;
   const fromDaybook = new URLSearchParams(window.location.search).get("from") === "daybook";
+
+  const modePrefix = appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : "";
+  useEscapeBack(() => {
+    if (fromDaybook) navigate(`${modePrefix}/daybook`);
+    else navigate(`${modePrefix}/vouchers`);
+  });
 
   const { data, isLoading, isError } = useQuery<VoucherDetailData>({
     queryKey: ["/api/voucher-detail", voucherId],

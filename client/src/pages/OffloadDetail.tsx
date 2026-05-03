@@ -1,4 +1,5 @@
 import { useParams, useLocation } from "wouter";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink, Package, Zap, PauseCircle, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -146,6 +147,7 @@ function ChargeRow({ label, original, live, isSubtotal = false, isNegative = fal
 export default function OffloadDetail() {
   const params = useParams<{ id: string }>();
   const [, navigate] = useLocation();
+  useEscapeToParent();
   const id = params.id;
   const { toast } = useToast();
 

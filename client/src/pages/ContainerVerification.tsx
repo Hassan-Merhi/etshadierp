@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -55,6 +56,7 @@ export default function ContainerVerification() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const params = useParams<{ containerId: string }>();
+  useEscapeToParent();
   const containerId = parseInt(params.containerId);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
