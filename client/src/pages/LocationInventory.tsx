@@ -1431,7 +1431,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 <div className="text-sm text-muted-foreground mb-2" data-testid="text-negative-stock-count">
                   Found {negativeStockData.length} item(s) with negative stock
                 </div>
-                <div className="overflow-x-auto rounded-md border">
+                <div className="table-responsive rounded-md border">
                   <Table>
                     <TableHeader>
                       <TableRow>

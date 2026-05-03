@@ -454,7 +454,7 @@ export default function Agents() {
                       </div>
                     </div>
 
-                    <div className="rounded-md border overflow-x-auto print:border-0">
+                    <div className="rounded-md border table-responsive print:border-0">
                       <Table>
                         <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow className="bg-muted/30">

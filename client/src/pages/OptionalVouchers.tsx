@@ -184,7 +184,7 @@ export default function OptionalVouchers() {
               <div className="text-sm text-muted-foreground mb-2" data-testid="text-voucher-count">
                 {vouchers.length} optional voucher(s)
               </div>
-              <div className="overflow-x-auto rounded-md border">
+              <div className="table-responsive rounded-md border">
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>

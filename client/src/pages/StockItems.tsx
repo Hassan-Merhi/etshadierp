@@ -472,7 +472,7 @@ export default function StockItems() {
           </div>
         ) : (
           <>
-          <div className="hidden md:block rounded-md border overflow-hidden overflow-x-auto">
+          <div className="hidden md:block rounded-md border overflow-hidden table-responsive">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 sticky top-0 z-30">
                 <tr className="h-12">

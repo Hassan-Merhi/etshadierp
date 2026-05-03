@@ -1004,7 +1004,7 @@ export default function Analytics() {
     const total = calculatePLTotal(accountList);
 
     return (
-      <div className="rounded-md border overflow-x-auto">
+      <div className="rounded-md border table-responsive">
         <Table>
           <TableHeader>
             <TableRow>

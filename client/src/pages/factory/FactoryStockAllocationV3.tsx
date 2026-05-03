@@ -771,7 +771,7 @@ export default function FactoryStockAllocationV3() {
               <p className="text-sm text-muted-foreground">No stock data available.</p>
             )}
             {stockRows.length > 0 && (
-              <div className="rounded-md border overflow-x-auto">
+              <div className="rounded-md border table-responsive">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -827,7 +827,7 @@ export default function FactoryStockAllocationV3() {
               </div>
             )}
             {expectedLoads.length > 0 && (
-              <div className="rounded-md border overflow-x-auto">
+              <div className="rounded-md border table-responsive">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -940,7 +940,7 @@ export default function FactoryStockAllocationV3() {
               </div>
             )}
             {finalizedLoads.length > 0 && (
-              <div className="rounded-md border overflow-x-auto">
+              <div className="rounded-md border table-responsive">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -984,7 +984,7 @@ export default function FactoryStockAllocationV3() {
               </div>
             )}
             {proformas.length > 0 && (
-              <div className="rounded-md border overflow-x-auto">
+              <div className="rounded-md border table-responsive">
                 <Table>
                   <TableHeader>
                     <TableRow>

@@ -1551,7 +1551,7 @@ export default function FactorySuppliers() {
                             )}
                             <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform flex-shrink-0 ${ledgerCollapsed ? "" : "rotate-180"}`} />
                           </button>
-                          {!ledgerCollapsed && <div className="overflow-x-auto rounded-md border">
+                          {!ledgerCollapsed && <div className="table-responsive rounded-md border">
                             <Table>
                               <TableHeader className="sticky top-0 z-30 bg-background">
                                 <TableRow className="bg-muted/50">

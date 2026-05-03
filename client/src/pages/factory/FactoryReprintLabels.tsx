@@ -440,7 +440,7 @@ export default function FactoryReprintLabels() {
               </div>
 
               {/* Desktop table */}
-              <div className="hidden md:block rounded-md border overflow-x-auto">
+              <div className="hidden md:block rounded-md border table-responsive">
                 <table className="text-sm w-full">
                   <thead className="bg-muted/50">
                     <tr className="h-10">

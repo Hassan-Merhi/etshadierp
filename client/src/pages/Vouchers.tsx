@@ -5778,7 +5778,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 </DialogDescription>
               </DialogHeader>
               {approveRevisionTarget && (
-                <div className="overflow-x-auto rounded-md border">
+                <div className="table-responsive rounded-md border">
                   <table className="w-full text-sm">
                     <thead className="bg-muted/40">
                       <tr>

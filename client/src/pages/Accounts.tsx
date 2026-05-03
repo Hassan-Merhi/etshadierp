@@ -2230,7 +2230,7 @@ export default function Accounts() {
                                     {section.totalContainers} container{section.totalContainers !== 1 ? "s" : ""}
                                   </span>
                                 </div>
-                                <div className="overflow-x-auto rounded-md border">
+                                <div className="table-responsive rounded-md border">
                                   <Table>
                                     <TableHeader>
                                       <TableRow className="bg-muted/50">
@@ -2477,7 +2477,7 @@ export default function Accounts() {
                           <div>Generated: {formatDisplayDate(new Date())}</div>
                         </div>
                       </div>
-                      <div className="rounded-md border overflow-x-auto print:border-0 hidden md:block print:!block">
+                      <div className="rounded-md border table-responsive print:border-0 hidden md:block print:!block">
                         <Table>
                           <TableHeader className="sticky top-0 z-30 bg-background">
                             <TableRow className="bg-muted/30">
@@ -2942,7 +2942,7 @@ export default function Accounts() {
                             No deleted vouchers found for this account.
                           </p>
                         ) : (
-                          <div className="rounded-md border overflow-x-auto">
+                          <div className="rounded-md border table-responsive">
                             <Table>
                               <TableHeader>
                                 <TableRow className="bg-muted/30">

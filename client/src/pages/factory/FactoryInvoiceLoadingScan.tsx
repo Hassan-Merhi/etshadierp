@@ -615,7 +615,7 @@ export default function FactoryInvoiceLoadingScan() {
 
             {/* Current session bales table */}
             {currentBales.length > 0 && (
-              <div className="overflow-x-auto rounded-md border">
+              <div className="table-responsive rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -893,7 +893,7 @@ export default function FactoryInvoiceLoadingScan() {
                 ) : (
                   <div className="space-y-2">
                     <p className="text-xs text-muted-foreground">{sessionBales.length} bale{sessionBales.length !== 1 ? "s" : ""}. Click the trash icon to remove a bale and return it to unloaded.</p>
-                    <div className="overflow-x-auto rounded-md border">
+                    <div className="table-responsive rounded-md border">
                       <Table>
                         <TableHeader>
                           <TableRow>
