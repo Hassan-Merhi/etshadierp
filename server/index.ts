@@ -2482,6 +2482,36 @@ let migrationsDone = false;
       `CREATE INDEX IF NOT EXISTS voucher_entries_ledger_voucher_idx ON voucher_entries(ledger_account_id, voucher_id)`,
       `CREATE INDEX IF NOT EXISTS vouchers_company_date_idx ON vouchers(company_id, voucher_date)`,
       `CREATE INDEX IF NOT EXISTS inventory_location_idx ON inventory(location_id)`,
+
+      // ── Tables flagged missing from runtime migrations by audit (May 2026) ────
+      // These exist in shared/schema.ts but had no CREATE TABLE in this array,
+      // so a fresh deploy on Render would fail. All idempotent.
+      `CREATE TABLE IF NOT EXISTS bale_transfer_items (
+        id serial PRIMARY KEY,
+        transfer_id integer NOT NULL,
+        production_bale_id integer NOT NULL,
+        quantity integer NOT NULL DEFAULT 1,
+        weight_kg numeric(15,3) NOT NULL,
+        cost_per_kg numeric(20,2) NOT NULL,
+        total_cost numeric(20,2) NOT NULL,
+        created_at timestamp NOT NULL DEFAULT now()
+      )`,
+      `CREATE TABLE IF NOT EXISTS factory_daybook_entry_edits (
+        id serial PRIMARY KEY,
+        daybook_entry_id integer NOT NULL,
+        edited_at timestamp NOT NULL DEFAULT now(),
+        edited_by varchar,
+        before_json text,
+        after_json text,
+        reason text NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS daybook_edits_entry_idx ON factory_daybook_entry_edits(daybook_entry_id)`,
+      `CREATE TABLE IF NOT EXISTS system_settings (
+        id serial PRIMARY KEY,
+        key varchar(100) NOT NULL UNIQUE,
+        value text,
+        updated_at timestamp NOT NULL DEFAULT now()
+      )`,
     ];
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
