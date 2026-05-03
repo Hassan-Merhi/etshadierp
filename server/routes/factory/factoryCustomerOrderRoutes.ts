@@ -297,7 +297,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const conditions: any[] = [eq(customerOrders.companyId, companyId)];
+      const conditions: any[] = [eq(customerOrders.companyId, companyId), isNull(customerOrders.deletedAt)];
       if (req.query.customerId) conditions.push(eq(customerOrders.customerId, parseInt(req.query.customerId)));
       if (req.query.status) conditions.push(eq(customerOrders.status, req.query.status));
       if (req.query.proformaId) conditions.push(eq(customerOrders.proformaIdUsed, parseInt(req.query.proformaId)));
@@ -1541,25 +1541,28 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       await db.transaction(async (tx: any) => {
         const [order] = await tx.select().from(customerOrders)
-          .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+          .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId), isNull(customerOrders.deletedAt)));
         if (!order) throw new Error("Order not found");
 
         if (order.status === "FINALIZED") {
           throw new Error("Cannot delete a finalized invoice. Cancel it first if needed.");
         }
 
+        // Soft-delete: release bales back to stock so they can be re-sold,
+        // but preserve order/lines/charges/bale links so the order can be
+        // restored from Settings → Deleted Items (note: bales currently in
+        // stock will need to be re-reserved manually after restore).
         const bales = await tx.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
         for (const b of bales) {
           await tx.update(factoryBales).set({ status: "IN_STOCK", updatedAt: new Date() }).where(eq(factoryBales.id, b.baleId));
         }
 
-        await tx.delete(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
-        await tx.delete(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
-        await tx.delete(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
-        await tx.delete(customerOrders).where(eq(customerOrders.id, orderId));
+        await tx.update(customerOrders)
+          .set({ deletedAt: new Date(), updatedAt: new Date() })
+          .where(eq(customerOrders.id, orderId));
       });
 
-      res.json({ success: true, message: "Invoice deleted successfully" });
+      res.json({ success: true, message: "Invoice moved to Deleted Items" });
     } catch (error: any) {
       console.error("Error deleting customer order:", error);
       res.status(500).json({ message: error.message });

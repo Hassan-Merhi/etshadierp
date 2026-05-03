@@ -144,7 +144,7 @@ export function registerFactoryContainersRoutes(app: Express) {
         })
         .from(factoryContainers)
         .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
-        .where(eq(factoryContainers.companyId, companyId))
+        .where(and(eq(factoryContainers.companyId, companyId), isNull(factoryContainers.deletedAt)))
         .orderBy(desc(factoryContainers.createdAt));
 
       res.json(results);
@@ -382,10 +382,21 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       // Verify all containers belong to this company
       const owned = await db.select({ id: factoryContainers.id }).from(factoryContainers)
-        .where(and(inArray(factoryContainers.id, ids), eq(factoryContainers.companyId, companyId)));
+        .where(and(inArray(factoryContainers.id, ids), eq(factoryContainers.companyId, companyId), isNull(factoryContainers.deletedAt)));
       const ownedIds = owned.map((c: any) => c.id);
       if (ownedIds.length === 0) return res.status(404).json({ message: "No containers found" });
 
+      // Soft-delete: hide containers from main listings while preserving all child rows
+      // (raw stock, vouchers, daybook, etc.) so they can be restored from Settings → Deleted Items.
+      // Permanent deletion (with the original cascade) is performed from the admin trash UI.
+      await db.update(factoryContainers)
+        .set({ deletedAt: new Date(), updatedAt: new Date() })
+        .where(and(inArray(factoryContainers.id, ownedIds), eq(factoryContainers.companyId, companyId)));
+
+      res.json({ deleted: ownedIds.length, ids: ownedIds });
+      return;
+
+      // eslint-disable-next-line no-unreachable
       await db.transaction(async (tx: any) => {
         // 1. Gather commission record IDs and raw stock IDs before deleting (needed for daybook cleanup)
         const commRows = await tx.select({ id: factoryContainerCommissions.id })
@@ -495,6 +506,18 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       const id = parseInt(req.params.id);
 
+      // Soft-delete: hide from listings; child rows preserved for restore.
+      // Permanent deletion happens from Settings → Deleted Items (admin route).
+      const [updated] = await db.update(factoryContainers)
+        .set({ deletedAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId), isNull(factoryContainers.deletedAt)))
+        .returning({ id: factoryContainers.id });
+
+      if (!updated) return res.status(404).json({ message: "Container not found" });
+      res.json({ id: updated.id, message: "Container moved to Deleted Items" });
+      return;
+
+      // eslint-disable-next-line no-unreachable
       let deleted: any;
       await db.transaction(async (tx: any) => {
         const [container] = await tx.select().from(factoryContainers)

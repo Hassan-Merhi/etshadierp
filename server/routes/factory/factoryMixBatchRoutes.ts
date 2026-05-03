@@ -60,7 +60,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       const results = await db
         .select()
         .from(factoryMixBatches)
-        .where(eq(factoryMixBatches.companyId, companyId))
+        .where(and(eq(factoryMixBatches.companyId, companyId), isNull(factoryMixBatches.deletedAt)))
         .orderBy(desc(factoryMixBatches.createdAt));
 
       const enriched = results.map((b: any) => {
@@ -363,6 +363,18 @@ export function registerFactoryMixBatchRoutes(app: Express) {
 
       const id = parseInt(req.params.id);
 
+      // Soft-delete: preserve sources / used_kg reversals for restore.
+      // Permanent deletion (with cascade) occurs from Settings → Deleted Items.
+      const [updated] = await db.update(factoryMixBatches)
+        .set({ deletedAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(factoryMixBatches.id, id), eq(factoryMixBatches.companyId, companyId), isNull(factoryMixBatches.deletedAt)))
+        .returning({ id: factoryMixBatches.id });
+
+      if (!updated) return res.status(404).json({ message: "Mix batch not found" });
+      res.json({ id: updated.id, message: "Mix batch moved to Deleted Items" });
+      return;
+
+      // eslint-disable-next-line no-unreachable
       await db.transaction(async (tx: any) => {
         const [batch] = await tx
           .select()

@@ -60,7 +60,7 @@ export function registerFactoryProductsRoutes(app: Express) {
       const results = await db
         .select()
         .from(factoryCategories)
-        .where(eq(factoryCategories.companyId, companyId))
+        .where(and(eq(factoryCategories.companyId, companyId), isNull(factoryCategories.deletedAt)))
         .orderBy(factoryCategories.name);
 
       res.json(results);
@@ -112,7 +112,7 @@ export function registerFactoryProductsRoutes(app: Express) {
       const id = parseInt(req.params.id);
       const [updated] = await db
         .update(factoryCategories)
-        .set({ isActive: false, updatedAt: new Date() })
+        .set({ isActive: false, deletedAt: new Date(), updatedAt: new Date() })
         .where(and(eq(factoryCategories.id, id), eq(factoryCategories.companyId, companyId)))
         .returning();
 
@@ -136,7 +136,7 @@ export function registerFactoryProductsRoutes(app: Express) {
       const results = await db
         .select()
         .from(factoryBaleProducts)
-        .where(eq(factoryBaleProducts.companyId, companyId))
+        .where(and(eq(factoryBaleProducts.companyId, companyId), isNull(factoryBaleProducts.deletedAt)))
         .orderBy(factoryBaleProducts.id);
 
       res.json(results);
@@ -929,7 +929,7 @@ export function registerFactoryProductsRoutes(app: Express) {
       const id = parseInt(req.params.id);
       const [updated] = await db
         .update(factoryBaleProducts)
-        .set({ active: false, updatedAt: new Date() })
+        .set({ active: false, deletedAt: new Date(), updatedAt: new Date() })
         .where(and(eq(factoryBaleProducts.id, id), eq(factoryBaleProducts.companyId, companyId)))
         .returning();
 

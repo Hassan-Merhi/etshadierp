@@ -1530,7 +1530,7 @@ export function registerFactoryBalesRoutes(app: Express) {
 
       const [updated] = await db
         .update(factoryBales)
-        .set({ status: "DELETED", updatedAt: new Date() })
+        .set({ status: "DELETED", deletedAt: new Date(), updatedAt: new Date() })
         .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)))
         .returning({ id: factoryBales.id });
 

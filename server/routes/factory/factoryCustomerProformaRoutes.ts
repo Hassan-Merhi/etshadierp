@@ -65,7 +65,11 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const proformas = await db
         .select()
         .from(customerProformas)
-        .where(and(eq(customerProformas.companyId, companyId), eq(customerProformas.customerId, customerId)))
+        .where(and(
+          eq(customerProformas.companyId, companyId),
+          eq(customerProformas.customerId, customerId),
+          isNull(customerProformas.deletedAt),
+        ))
         .orderBy(desc(customerProformas.createdAt));
 
       const proformaIds = proformas.map((p: any) => p.id);
@@ -188,14 +192,16 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         console.log(`[PROFORMA DELETE] Deleting proforma id=${id} name="${proformaBefore.name}" customerId=${proformaBefore.customerId} customerName="${custBefore?.legalName}" customerDeletedAt=${custBefore?.deletedAt}`);
       }
 
-      // Clear reservations before deleting — releases stock back to freeToPromise
+      // Soft-delete: release reservations so stock returns to freeToPromise,
+      // but keep proforma + lines intact for restore from Settings → Deleted Items.
+      await db.update(customerProformas)
+        .set({ isActive: false, deletedAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
       await syncProformaReservations(db, companyId, id);
       await db.delete(proformaStockReservations)
         .where(and(eq(proformaStockReservations.companyId, companyId), eq(proformaStockReservations.proformaId, id)));
-      await db.delete(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
-      const [deleted] = await db.delete(customerProformas)
-        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)))
-        .returning();
+      const [deleted] = await db.select().from(customerProformas)
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
 
       if (!deleted) return res.status(404).json({ message: "Proforma not found" });
 

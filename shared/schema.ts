@@ -2430,6 +2430,7 @@ export const factoryCategories = pgTable("factory_categories", {
   companyId: integer("company_id").notNull(),
   name: varchar("name", { length: 100 }).notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
@@ -2440,6 +2441,7 @@ export const insertFactoryCategorySchema = createInsertSchema(factoryCategories)
   id: true,
   createdAt: true,
   updatedAt: true,
+  deletedAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
   name: z.string().min(1, "Category name is required"),
@@ -2462,6 +2464,7 @@ export const factoryBaleProducts = pgTable("factory_bale_products", {
   productionPrice: decimal("production_price", { precision: 20, scale: 2 }).default("0"),
   labelDesignColor: varchar("label_design_color", { length: 20 }),
   active: boolean("active").notNull().default(true),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
@@ -2473,6 +2476,7 @@ export const insertFactoryBaleProductSchema = createInsertSchema(factoryBaleProd
   id: true,
   createdAt: true,
   updatedAt: true,
+  deletedAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
   code: z.string().optional(),
@@ -2539,6 +2543,7 @@ export const factoryContainers = pgTable("factory_containers", {
   preOffloadOtherCharges: decimal("pre_offload_other_charges", { precision: 20, scale: 2 }),
   preOffloadOtherChargesAccountId: integer("pre_offload_other_charges_account_id"),
   preOffloadOtherChargesSupplierId: integer("pre_offload_other_charges_supplier_id"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
@@ -2549,6 +2554,7 @@ export const insertFactoryContainerSchema = createInsertSchema(factoryContainers
   id: true,
   createdAt: true,
   updatedAt: true,
+  deletedAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
   containerNumber: z.string().min(1, "Container number is required"),
@@ -2637,6 +2643,7 @@ export const factoryRawStock = pgTable("factory_raw_stock", {
   commissionLedgerAccountId: integer("commission_ledger_account_id"),
   commissionSupplierId: integer("commission_supplier_id").references(() => factorySuppliers.id, { onDelete: "restrict" }),
   offloadedAt: timestamp("offloaded_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   uniqueCompanyContainer: uniqueIndex("factory_raw_stock_company_container_unique").on(t.companyId, t.containerId),
@@ -2645,6 +2652,7 @@ export const factoryRawStock = pgTable("factory_raw_stock", {
 export const insertFactoryRawStockSchema = createInsertSchema(factoryRawStock).omit({
   id: true,
   createdAt: true,
+  deletedAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
   containerId: z.number().min(1, "Container is required"),
@@ -2676,6 +2684,7 @@ export const factoryRawMaterialAdjustments = pgTable("factory_raw_material_adjus
   supplierId: integer("supplier_id").references(() => factorySuppliers.id, { onDelete: "restrict" }), // optional: link to a factory supplier row
   materialLabel: varchar("material_label", { length: 200 }), // for standalone manual materials
   notes: text("notes"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   companyIdx: index("factory_raw_material_adjustments_company_idx").on(t.companyId),
@@ -2765,6 +2774,7 @@ export const factoryMixBatches = pgTable("factory_mix_batches", {
   operatorUser: text("operator_user"),
   batchDate: date("batch_date"),
   carryForwardFromId: integer("carry_forward_from_id"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
@@ -2775,6 +2785,7 @@ export const insertFactoryMixBatchSchema = createInsertSchema(factoryMixBatches)
   id: true,
   createdAt: true,
   updatedAt: true,
+  deletedAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
   batchCode: z.string().optional(),
@@ -2892,6 +2903,7 @@ export const factoryBales = pgTable("factory_bales", {
   finalizedBy: integer("finalized_by"),
   stockEntryDate: date("stock_entry_date"),
   importBatchId: integer("import_batch_id"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
@@ -2909,6 +2921,7 @@ export const insertFactoryBaleSchema = createInsertSchema(factoryBales).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  deletedAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
   mixBatchId: z.number().optional().nullable(),
@@ -3013,6 +3026,7 @@ export const customerProformas = pgTable("customer_proformas", {
   customerId: integer("customer_id").notNull().references(() => customers.id, { onDelete: "restrict" }),
   name: text("name").notNull(),
   isActive: boolean("is_active").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
@@ -3024,6 +3038,7 @@ export const insertCustomerProformaSchema = createInsertSchema(customerProformas
   id: true,
   createdAt: true,
   updatedAt: true,
+  deletedAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
   customerId: z.number().min(1, "Customer is required"),
@@ -3084,6 +3099,7 @@ export const customerOrders = pgTable("customer_orders", {
   loadingStartedAt: timestamp("loading_started_at"),
   loadingFinalizedAt: timestamp("loading_finalized_at"),
   locationId: integer("location_id").references(() => locations.id, { onDelete: "restrict" }),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
@@ -3097,6 +3113,7 @@ export const insertCustomerOrderSchema = createInsertSchema(customerOrders).omit
   id: true,
   createdAt: true,
   updatedAt: true,
+  deletedAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
   customerId: z.number().min(1, "Customer is required"),

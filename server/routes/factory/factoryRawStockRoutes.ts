@@ -97,7 +97,12 @@ export function registerFactoryRawStockRoutes(app: Express) {
         .from(factoryRawStock)
         .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
         .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
-        .where(and(eq(factoryRawStock.companyId, companyId), sql`${factoryContainers.status} != 'DELETED'`));
+        .where(and(
+          eq(factoryRawStock.companyId, companyId),
+          sql`${factoryContainers.status} != 'DELETED'`,
+          isNull(factoryRawStock.deletedAt),
+          isNull(factoryContainers.deletedAt),
+        ));
 
       const supplierMap = new Map<string, any>();
       for (const r of results) {
@@ -148,7 +153,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
 
       // Fetch manual adjustments and merge into supplierMap
       const adjustments = await db.select().from(factoryRawMaterialAdjustments)
-        .where(eq(factoryRawMaterialAdjustments.companyId, companyId));
+        .where(and(eq(factoryRawMaterialAdjustments.companyId, companyId), isNull(factoryRawMaterialAdjustments.deletedAt)));
 
       for (const adj of adjustments) {
         const kg = parseFloat(adj.kg as string) || 0;
@@ -858,10 +863,20 @@ export function registerFactoryRawStockRoutes(app: Express) {
 
       // Fetch the adjustment to know whether it has linked accounting
       const [adj] = await db.select().from(factoryRawMaterialAdjustments)
-        .where(and(eq(factoryRawMaterialAdjustments.id, id), eq(factoryRawMaterialAdjustments.companyId, companyId)))
+        .where(and(eq(factoryRawMaterialAdjustments.id, id), eq(factoryRawMaterialAdjustments.companyId, companyId), isNull(factoryRawMaterialAdjustments.deletedAt)))
         .limit(1);
       if (!adj) return res.status(404).json({ message: "Adjustment not found" });
 
+      // Soft-delete: preserve linked vouchers/daybook for restore.
+      // Permanent deletion (with cascade) is from Settings → Deleted Items.
+      await db.update(factoryRawMaterialAdjustments)
+        .set({ deletedAt: new Date() })
+        .where(and(eq(factoryRawMaterialAdjustments.id, id), eq(factoryRawMaterialAdjustments.companyId, companyId)));
+
+      res.json({ success: true });
+      return;
+
+      // eslint-disable-next-line no-unreachable
       await db.transaction(async (tx) => {
         // Delete the raw stock adjustment record
         await tx.delete(factoryRawMaterialAdjustments)
@@ -992,7 +1007,9 @@ export function registerFactoryRawStockRoutes(app: Express) {
         });
       }
 
-      await db.delete(factoryRawStock)
+      // Soft-delete (recoverable from Settings → Deleted Items)
+      await db.update(factoryRawStock)
+        .set({ deletedAt: new Date() })
         .where(and(eq(factoryRawStock.id, rawStockId), eq(factoryRawStock.companyId, companyId)));
 
       res.json({ success: true });
@@ -1063,7 +1080,12 @@ export function registerFactoryRawStockRoutes(app: Express) {
         .from(factoryRawStock)
         .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
         .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
-        .where(and(eq(factoryRawStock.companyId, companyId), sql`${factoryContainers.status} != 'DELETED'`));
+        .where(and(
+          eq(factoryRawStock.companyId, companyId),
+          sql`${factoryContainers.status} != 'DELETED'`,
+          isNull(factoryRawStock.deletedAt),
+          isNull(factoryContainers.deletedAt),
+        ));
 
       const enriched = results.map((r: any) => {
         const received = parseFloat(r.receivedKg) || 0;

@@ -47,6 +47,7 @@ import {
   AlertTriangle,
   MapPin,
   Package,
+  Package2,
   FolderTree,
   BookOpen,
   Users,
@@ -56,6 +57,12 @@ import {
   Loader2,
   Receipt,
   FileText,
+  FlaskConical,
+  Layers,
+  Boxes,
+  Container,
+  ShoppingCart,
+  ClipboardList,
   Eye,
   X,
 } from "lucide-react";
@@ -92,6 +99,15 @@ interface DeletedItemsResponse {
   bankAccounts: DeletedItem[];
   vouchers: DeletedItem[];
   orphanedPosSales: DeletedItem[];
+  factoryCategories?: DeletedItem[];
+  factoryBaleProducts?: DeletedItem[];
+  factoryContainers?: DeletedItem[];
+  factoryRawStock?: DeletedItem[];
+  factoryRawMaterialAdjustments?: DeletedItem[];
+  factoryMixBatches?: DeletedItem[];
+  factoryBales?: DeletedItem[];
+  customerProformas?: DeletedItem[];
+  customerOrders?: DeletedItem[];
   totalCount: number;
 }
 
@@ -106,6 +122,15 @@ const typeLabels: Record<string, string> = {
   bankAccount: "Bank Account",
   voucher: "Voucher",
   orphanedPosSale: "Orphaned POS Sale",
+  factoryCategory: "Factory Category",
+  factoryBaleProduct: "Bale Product",
+  factoryContainer: "Container",
+  factoryRawStock: "Raw Stock Receipt",
+  factoryRawMaterialAdjustment: "Raw Material Adjustment",
+  factoryMixBatch: "Mix Batch",
+  factoryBale: "Bale",
+  customerProforma: "Proforma Invoice",
+  customerOrder: "Customer Invoice/Order",
 };
 
 const typeIcons: Record<string, any> = {
@@ -119,6 +144,15 @@ const typeIcons: Record<string, any> = {
   bankAccount: Building2,
   voucher: FileText,
   orphanedPosSale: Receipt,
+  factoryCategory: FolderTree,
+  factoryBaleProduct: Package2,
+  factoryContainer: Container,
+  factoryRawStock: Boxes,
+  factoryRawMaterialAdjustment: ClipboardList,
+  factoryMixBatch: FlaskConical,
+  factoryBale: Layers,
+  customerProforma: FileText,
+  customerOrder: ShoppingCart,
 };
 
 export default function DeletedItems() {
@@ -216,6 +250,15 @@ export default function DeletedItems() {
       ...data.bankAccounts,
       ...(data.vouchers || []),
       ...(data.orphanedPosSales || []),
+      ...(data.factoryCategories || []),
+      ...(data.factoryBaleProducts || []),
+      ...(data.factoryContainers || []),
+      ...(data.factoryRawStock || []),
+      ...(data.factoryRawMaterialAdjustments || []),
+      ...(data.factoryMixBatches || []),
+      ...(data.factoryBales || []),
+      ...(data.customerProformas || []),
+      ...(data.customerOrders || []),
     ];
     if (filterType === "all") return allItems;
     return allItems.filter((item) => item.type === filterType);
@@ -294,6 +337,15 @@ export default function DeletedItems() {
                   <SelectItem value="bankAccount">Bank Accounts ({data?.bankAccounts.length || 0})</SelectItem>
                   <SelectItem value="voucher">Vouchers ({data?.vouchers?.length || 0})</SelectItem>
                   <SelectItem value="orphanedPosSale">Orphaned POS Sales ({data?.orphanedPosSales?.length || 0})</SelectItem>
+                  <SelectItem value="factoryCategory">Factory Categories ({data?.factoryCategories?.length || 0})</SelectItem>
+                  <SelectItem value="factoryBaleProduct">Bale Products ({data?.factoryBaleProducts?.length || 0})</SelectItem>
+                  <SelectItem value="factoryContainer">Containers ({data?.factoryContainers?.length || 0})</SelectItem>
+                  <SelectItem value="factoryRawStock">Raw Stock Receipts ({data?.factoryRawStock?.length || 0})</SelectItem>
+                  <SelectItem value="factoryRawMaterialAdjustment">Raw Material Adjustments ({data?.factoryRawMaterialAdjustments?.length || 0})</SelectItem>
+                  <SelectItem value="factoryMixBatch">Mix Batches ({data?.factoryMixBatches?.length || 0})</SelectItem>
+                  <SelectItem value="factoryBale">Bales ({data?.factoryBales?.length || 0})</SelectItem>
+                  <SelectItem value="customerProforma">Proforma Invoices ({data?.customerProformas?.length || 0})</SelectItem>
+                  <SelectItem value="customerOrder">Customer Invoices/Orders ({data?.customerOrders?.length || 0})</SelectItem>
                 </SelectContent>
               </Select>
             </div>

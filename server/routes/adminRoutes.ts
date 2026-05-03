@@ -5,6 +5,10 @@ import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries } from "./_helpers";
 import {
+  factoryCategories, factoryBaleProducts, factoryContainers, factoryRawStock,
+  factoryRawMaterialAdjustments, factoryMixBatches, factoryBales,
+  customerProformas, customerProformaLines, customerOrders, customerOrderLines,
+  customerOrderBales, customerOrderCharges, proformaStockReservations,
   inventory, stockItems, stockGroups, stockItemCodeAliases,
   stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
   stockAdjustmentVouchers, stockAdjustmentItems,
@@ -629,6 +633,29 @@ export function registerAdminRoutes(app: Express) {
         ))
         .orderBy(desc(vouchers.deletedAt));
 
+      // === Wave 1: Factory + Customer Order soft-deleted records ===
+      const [
+        deletedFactoryCategories,
+        deletedFactoryBaleProducts,
+        deletedFactoryContainers,
+        deletedFactoryRawStock,
+        deletedFactoryRawMaterialAdjustments,
+        deletedFactoryMixBatches,
+        deletedFactoryBales,
+        deletedCustomerProformas,
+        deletedCustomerOrders,
+      ] = await Promise.all([
+        db.select().from(factoryCategories).where(and(eq(factoryCategories.companyId, companyId), isNotNull(factoryCategories.deletedAt))).orderBy(desc(factoryCategories.deletedAt)),
+        db.select().from(factoryBaleProducts).where(and(eq(factoryBaleProducts.companyId, companyId), isNotNull(factoryBaleProducts.deletedAt))).orderBy(desc(factoryBaleProducts.deletedAt)),
+        db.select().from(factoryContainers).where(and(eq(factoryContainers.companyId, companyId), isNotNull(factoryContainers.deletedAt))).orderBy(desc(factoryContainers.deletedAt)),
+        db.select().from(factoryRawStock).where(and(eq(factoryRawStock.companyId, companyId), isNotNull(factoryRawStock.deletedAt))).orderBy(desc(factoryRawStock.deletedAt)),
+        db.select().from(factoryRawMaterialAdjustments).where(and(eq(factoryRawMaterialAdjustments.companyId, companyId), isNotNull(factoryRawMaterialAdjustments.deletedAt))).orderBy(desc(factoryRawMaterialAdjustments.deletedAt)),
+        db.select().from(factoryMixBatches).where(and(eq(factoryMixBatches.companyId, companyId), isNotNull(factoryMixBatches.deletedAt))).orderBy(desc(factoryMixBatches.deletedAt)),
+        db.select().from(factoryBales).where(and(eq(factoryBales.companyId, companyId), isNotNull(factoryBales.deletedAt))).orderBy(desc(factoryBales.deletedAt)),
+        db.select().from(customerProformas).where(and(eq(customerProformas.companyId, companyId), isNotNull(customerProformas.deletedAt))).orderBy(desc(customerProformas.deletedAt)),
+        db.select().from(customerOrders).where(and(eq(customerOrders.companyId, companyId), isNotNull(customerOrders.deletedAt))).orderBy(desc(customerOrders.deletedAt)),
+      ]);
+
       // Get orphaned POS sales - vouchers with locationId pointing to deleted or non-existent locations
       // Wrap in try-catch to prevent breaking the entire endpoint if this query fails
       let orphanedPosSales: any[] = [];
@@ -742,9 +769,22 @@ export function registerAdminRoutes(app: Express) {
           locationName: v.locationName ? `${v.locationName} (Deleted)` : "(Location Missing)",
           deletedAt: v.locationDeletedAt != null ? v.locationDeletedAt : (v.date != null ? v.date : null),
         })),
+        // Wave 1
+        factoryCategories: deletedFactoryCategories.map(r => ({ id: r.id, type: "factoryCategory", name: r.name, code: r.id.toString(), deletedAt: r.deletedAt })),
+        factoryBaleProducts: deletedFactoryBaleProducts.map(r => ({ id: r.id, type: "factoryBaleProduct", name: r.name, code: r.articleCode || r.code || "-", deletedAt: r.deletedAt })),
+        factoryContainers: deletedFactoryContainers.map(r => ({ id: r.id, type: "factoryContainer", name: r.containerNumber || `Container #${r.id}`, code: r.containerNumber || "-", deletedAt: r.deletedAt })),
+        factoryRawStock: deletedFactoryRawStock.map(r => ({ id: r.id, type: "factoryRawStock", name: `Raw stock receipt #${r.id}`, code: String(r.id), deletedAt: r.deletedAt })),
+        factoryRawMaterialAdjustments: deletedFactoryRawMaterialAdjustments.map(r => ({ id: r.id, type: "factoryRawMaterialAdjustment", name: `${r.type || "Adj"} ${r.kg || 0} kg`, code: String(r.id), deletedAt: r.deletedAt })),
+        factoryMixBatches: deletedFactoryMixBatches.map(r => ({ id: r.id, type: "factoryMixBatch", name: r.batchCode || `Mix batch #${r.id}`, code: r.batchCode || "-", deletedAt: r.deletedAt })),
+        factoryBales: deletedFactoryBales.map(r => ({ id: r.id, type: "factoryBale", name: r.baleCode || r.referenceNumber || `Bale #${r.id}`, code: r.baleCode || "-", deletedAt: r.deletedAt })),
+        customerProformas: deletedCustomerProformas.map(r => ({ id: r.id, type: "customerProforma", name: r.name || `Proforma #${r.id}`, code: r.name || "-", deletedAt: r.deletedAt })),
+        customerOrders: deletedCustomerOrders.map(r => ({ id: r.id, type: "customerOrder", name: r.invoiceNumber || `Order #${r.id}`, code: r.invoiceNumber || "DRAFT", amount: r.grandTotal != null ? Number(r.grandTotal) : 0, deletedAt: r.deletedAt })),
         totalCount: deletedLocations.length + deletedStockItems.length + deletedStockGroups.length + deletedVouchers.length +
           deletedLedgerAccounts.length + deletedEmployees.length + deletedCustomers.length +
-          deletedSuppliers.length + deletedBankAccounts.length + (orphanedPosSales || []).length,
+          deletedSuppliers.length + deletedBankAccounts.length + (orphanedPosSales || []).length +
+          deletedFactoryCategories.length + deletedFactoryBaleProducts.length + deletedFactoryContainers.length +
+          deletedFactoryRawStock.length + deletedFactoryRawMaterialAdjustments.length + deletedFactoryMixBatches.length +
+          deletedFactoryBales.length + deletedCustomerProformas.length + deletedCustomerOrders.length,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -810,6 +850,53 @@ export function registerAdminRoutes(app: Express) {
           await db.update(vouchers)
             .set({ deletedAt: null })
             .where(and(eq(vouchers.id, itemId), eq(vouchers.companyId, companyId)));
+          break;
+        // === Wave 1 restores ===
+        case "factoryCategory":
+          await db.update(factoryCategories)
+            .set({ deletedAt: null, isActive: true, updatedAt: new Date() })
+            .where(and(eq(factoryCategories.id, itemId), eq(factoryCategories.companyId, companyId)));
+          break;
+        case "factoryBaleProduct":
+          await db.update(factoryBaleProducts)
+            .set({ deletedAt: null, active: true, updatedAt: new Date() })
+            .where(and(eq(factoryBaleProducts.id, itemId), eq(factoryBaleProducts.companyId, companyId)));
+          break;
+        case "factoryContainer":
+          await db.update(factoryContainers)
+            .set({ deletedAt: null, updatedAt: new Date() })
+            .where(and(eq(factoryContainers.id, itemId), eq(factoryContainers.companyId, companyId)));
+          break;
+        case "factoryRawStock":
+          await db.update(factoryRawStock)
+            .set({ deletedAt: null })
+            .where(and(eq(factoryRawStock.id, itemId), eq(factoryRawStock.companyId, companyId)));
+          break;
+        case "factoryRawMaterialAdjustment":
+          await db.update(factoryRawMaterialAdjustments)
+            .set({ deletedAt: null })
+            .where(and(eq(factoryRawMaterialAdjustments.id, itemId), eq(factoryRawMaterialAdjustments.companyId, companyId)));
+          break;
+        case "factoryMixBatch":
+          await db.update(factoryMixBatches)
+            .set({ deletedAt: null, updatedAt: new Date() })
+            .where(and(eq(factoryMixBatches.id, itemId), eq(factoryMixBatches.companyId, companyId)));
+          break;
+        case "factoryBale":
+          // Restore bale to IN_STOCK so it's usable again
+          await db.update(factoryBales)
+            .set({ deletedAt: null, status: "IN_STOCK", updatedAt: new Date() })
+            .where(and(eq(factoryBales.id, itemId), eq(factoryBales.companyId, companyId)));
+          break;
+        case "customerProforma":
+          await db.update(customerProformas)
+            .set({ deletedAt: null, isActive: true, updatedAt: new Date() })
+            .where(and(eq(customerProformas.id, itemId), eq(customerProformas.companyId, companyId)));
+          break;
+        case "customerOrder":
+          await db.update(customerOrders)
+            .set({ deletedAt: null, updatedAt: new Date() })
+            .where(and(eq(customerOrders.id, itemId), eq(customerOrders.companyId, companyId)));
           break;
         default:
           return res.status(400).json({ message: "Invalid item type" });
@@ -885,6 +972,52 @@ export function registerAdminRoutes(app: Express) {
               eq(vouchers.companyId, companyId)
             )
           );
+          break;
+        // === Wave 1 permanent deletes ===
+        // Note: these only remove the row + immediate dependent rows. They do NOT
+        // attempt to reverse historical financial vouchers/daybook entries — that
+        // would require running the original cascade logic and is left for a future
+        // wave. For full financial unwind, perform a manual reversal voucher.
+        case "factoryCategory":
+          await db.delete(factoryCategories)
+            .where(and(eq(factoryCategories.id, itemId), eq(factoryCategories.companyId, companyId)));
+          break;
+        case "factoryBaleProduct":
+          await db.delete(factoryBaleProducts)
+            .where(and(eq(factoryBaleProducts.id, itemId), eq(factoryBaleProducts.companyId, companyId)));
+          break;
+        case "factoryContainer":
+          await db.delete(factoryContainers)
+            .where(and(eq(factoryContainers.id, itemId), eq(factoryContainers.companyId, companyId)));
+          break;
+        case "factoryRawStock":
+          await db.delete(factoryRawStock)
+            .where(and(eq(factoryRawStock.id, itemId), eq(factoryRawStock.companyId, companyId)));
+          break;
+        case "factoryRawMaterialAdjustment":
+          await db.delete(factoryRawMaterialAdjustments)
+            .where(and(eq(factoryRawMaterialAdjustments.id, itemId), eq(factoryRawMaterialAdjustments.companyId, companyId)));
+          break;
+        case "factoryMixBatch":
+          await db.delete(factoryMixBatches)
+            .where(and(eq(factoryMixBatches.id, itemId), eq(factoryMixBatches.companyId, companyId)));
+          break;
+        case "factoryBale":
+          await db.delete(factoryBales)
+            .where(and(eq(factoryBales.id, itemId), eq(factoryBales.companyId, companyId)));
+          break;
+        case "customerProforma":
+          await db.delete(customerProformaLines).where(eq(customerProformaLines.proformaId, itemId));
+          await db.delete(proformaStockReservations).where(eq(proformaStockReservations.proformaId, itemId));
+          await db.delete(customerProformas)
+            .where(and(eq(customerProformas.id, itemId), eq(customerProformas.companyId, companyId)));
+          break;
+        case "customerOrder":
+          await db.delete(customerOrderBales).where(eq(customerOrderBales.orderId, itemId));
+          await db.delete(customerOrderLines).where(eq(customerOrderLines.orderId, itemId));
+          await db.delete(customerOrderCharges).where(eq(customerOrderCharges.orderId, itemId));
+          await db.delete(customerOrders)
+            .where(and(eq(customerOrders.id, itemId), eq(customerOrders.companyId, companyId)));
           break;
         default:
           return res.status(400).json({ message: "Invalid item type" });
