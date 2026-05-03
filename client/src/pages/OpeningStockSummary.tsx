@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -52,6 +53,7 @@ function formatValue(value: number): string {
 
 export default function OpeningStockSummary() {
   const [, navigate] = useLocation();
+  const handleBack = useBackToParent();
   const { selectedCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
 
@@ -78,7 +80,7 @@ export default function OpeningStockSummary() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => window.history.back()}
+          onClick={handleBack}
           data-testid="button-back"
         >
           <ArrowLeft className="h-5 w-5" />

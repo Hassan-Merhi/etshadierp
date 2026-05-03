@@ -1,4 +1,5 @@
 import { useLocation, useRoute } from "wouter";
+import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 import { useQuery } from "@tanstack/react-query";
 import { formatNumber } from "@/lib/formatNumber";
@@ -93,10 +94,9 @@ export default function VoucherDetail() {
   const fromDaybook = new URLSearchParams(window.location.search).get("from") === "daybook";
 
   const modePrefix = appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : "";
-  useEscapeBack(() => {
-    if (fromDaybook) navigate(`${modePrefix}/daybook`);
-    else navigate(`${modePrefix}/vouchers`);
-  });
+  const backTarget = fromDaybook ? `${modePrefix}/daybook` : `${modePrefix}/vouchers`;
+  const handleBack = useBackToParent(backTarget);
+  useEscapeBack(() => navigate(backTarget));
 
   const { data, isLoading, isError } = useQuery<VoucherDetailData>({
     queryKey: ["/api/voucher-detail", voucherId],
@@ -123,7 +123,7 @@ export default function VoucherDetail() {
     return (
       <div className="p-6 flex flex-col items-center gap-4 text-center">
         <p className="text-muted-foreground">Failed to load voucher details.</p>
-        <Button variant="outline" onClick={() => window.history.back()} data-testid="button-back-error">
+        <Button variant="outline" onClick={handleBack} data-testid="button-back-error">
           Go Back
         </Button>
       </div>
@@ -142,7 +142,7 @@ export default function VoucherDetail() {
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
-              onClick={() => window.history.back()}
+              onClick={handleBack}
               className="text-white hover:bg-white/20 gap-1"
               data-testid="button-back"
             >

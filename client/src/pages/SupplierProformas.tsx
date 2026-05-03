@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
+import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -42,6 +43,7 @@ interface Proforma {
 export default function SupplierProformas() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const handleBack = useBackToParent();
   const params = useParams<{ supplierId: string }>();
   const supplierId = parseInt(params.supplierId);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -221,7 +223,7 @@ export default function SupplierProformas() {
 
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => window.history.back()} data-testid="button-back">
+          <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>

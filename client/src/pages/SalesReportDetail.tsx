@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -91,6 +92,7 @@ const LOCATION_PALETTE = [
 
 export default function SalesReportDetail() {
   const [, navigate] = useLocation();
+  const handleBack = useBackToParent();
   const { formatAmount } = useCurrencyContext();
   const [plFilter, setPlFilter] = useState<PLFilter>("all");
   const [plBasis, setPlBasis] = useState<PLBasis>("config");
@@ -269,7 +271,7 @@ export default function SalesReportDetail() {
   return (
     <div className="flex flex-col gap-4 p-3 sm:p-6 w-full min-w-0">
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => window.history.back()} data-testid="button-back-to-sales-report">
+        <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back-to-sales-report">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1 min-w-0">

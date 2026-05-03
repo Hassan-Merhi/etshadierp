@@ -1,4 +1,5 @@
 import { useParams, useLocation } from "wouter";
+import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink, Package, Zap, PauseCircle, PlayCircle } from "lucide-react";
@@ -147,6 +148,7 @@ function ChargeRow({ label, original, live, isSubtotal = false, isNegative = fal
 export default function OffloadDetail() {
   const params = useParams<{ id: string }>();
   const [, navigate] = useLocation();
+  const handleBack = useBackToParent();
   useEscapeToParent();
   const id = params.id;
   const { toast } = useToast();
@@ -204,7 +206,7 @@ export default function OffloadDetail() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => window.history.back()}
+          onClick={handleBack}
           data-testid="button-back-offload"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -452,7 +454,7 @@ export default function OffloadDetail() {
         <div className="text-center py-12 space-y-2">
           <p className="text-muted-foreground font-medium">Could not load offload #{id}</p>
           <p className="text-sm text-muted-foreground">{(error as any)?.message || "Unknown error"}</p>
-          <Button variant="outline" className="mt-4" onClick={() => window.history.back()}>
+          <Button variant="outline" className="mt-4" onClick={handleBack}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Go Back
           </Button>
@@ -460,7 +462,7 @@ export default function OffloadDetail() {
       ) : (
         <div className="text-center py-12 space-y-2">
           <p className="text-muted-foreground font-medium">Offload #{id} not found.</p>
-          <Button variant="outline" className="mt-4" onClick={() => window.history.back()}>
+          <Button variant="outline" className="mt-4" onClick={handleBack}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Go Back
           </Button>

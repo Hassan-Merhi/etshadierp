@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { utils, writeFile } from "@/lib/excelHelper";
 import { useParams, useLocation } from "wouter";
+import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -514,6 +515,7 @@ export default function VoucherEdit() {
   const { formatDisplayDate } = useDateFormat();
   const { id } = useParams<{ id: string }>();
   const [_location, navigate] = useLocation();
+  const handleBack = useBackToParent();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const { selectedCurrency, formatAmount, exchangeRate } = useCurrencyContext();
@@ -1066,7 +1068,7 @@ export default function VoucherEdit() {
         description: "Voucher updated successfully",
       });
       // Navigate back to accounts page - balances will refresh automatically
-      window.history.back();
+      handleBack();
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
@@ -1370,7 +1372,7 @@ export default function VoucherEdit() {
 
   // Handle cancel - go back to previous page
   const handleCancel = async () => {
-    window.history.back();
+    handleBack();
   };
 
   // Loading state

@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
+import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -54,6 +55,7 @@ interface PurchaseOrder {
 export default function PurchaseOrderEdit() {
   const [, params] = useRoute("/purchase-orders/:id/edit");
   const [, navigate] = useLocation();
+  const handleBack = useBackToParent();
   const { toast } = useToast();
   const poId = params?.id ? parseInt(params.id) : null;
   useEscapeToParent("/containers");
@@ -317,7 +319,7 @@ export default function PurchaseOrderEdit() {
   return (
     <div className="p-3 sm:p-6 space-y-6">
       <div className="flex items-center gap-2 sm:gap-4">
-        <Button variant="ghost" size="icon" onClick={() => window.history.back()} data-testid="button-back">
+        <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>

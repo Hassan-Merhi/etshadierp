@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
+import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { useQuery } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
@@ -90,6 +91,7 @@ export default function LedgerMonthlySummary() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const [, navigate] = useLocation();
+  const handleBack = useBackToParent();
   const [, params] = useRoute("/ledger-monthly/:accountId");
   const [, factoryParams] = useRoute("/factory/ledger-monthly/:accountId");
   const accountId = (params?.accountId || factoryParams?.accountId)
@@ -147,7 +149,7 @@ export default function LedgerMonthlySummary() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => window.history.back()}
+              onClick={handleBack}
               className="text-primary-foreground hover:bg-primary/80"
               data-testid="button-back"
             >

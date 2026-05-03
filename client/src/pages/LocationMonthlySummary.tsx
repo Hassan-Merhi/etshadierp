@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
+import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { ArrowLeft, MapPin, Globe, Eye } from "lucide-react";
@@ -67,6 +68,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
   const locationId = parseInt(params.locationId || "0");
   const stockItemId = parseInt(params.stockItemId || "0");
   const [_location, navigate] = useLocation();
+  const handleBack = useBackToParent();
 
   const isAllLocationsMode = locationId === 0;
 
@@ -186,7 +188,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => window.history.back()} data-testid="button-back">
+          <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>

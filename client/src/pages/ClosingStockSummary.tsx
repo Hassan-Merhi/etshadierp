@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,7 @@ function formatValue(value: number): string {
 
 export default function ClosingStockSummary() {
   const [, navigate] = useLocation();
+  const handleBack = useBackToParent();
   const { selectedCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("today"));
@@ -118,7 +120,7 @@ export default function ClosingStockSummary() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => window.history.back()}
+            onClick={handleBack}
             data-testid="button-back"
           >
             <ArrowLeft className="h-5 w-5" />

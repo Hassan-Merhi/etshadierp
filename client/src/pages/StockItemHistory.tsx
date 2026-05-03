@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
+import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { ArrowLeft, Calendar } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -70,6 +71,7 @@ export default function StockItemHistory() {
   const params = useParams();
   const stockItemId = parseInt(params.id || "0");
   const [_location, navigate] = useLocation();
+  const handleBack = useBackToParent();
   const { formatAmount } = useCurrencyContext();
   
   const currentYear = new Date().getFullYear();
@@ -122,7 +124,7 @@ export default function StockItemHistory() {
     <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => window.history.back()} data-testid="button-back">
+          <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>

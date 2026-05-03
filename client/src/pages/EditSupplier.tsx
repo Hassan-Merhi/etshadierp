@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useLocation, useParams } from "wouter";
+import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,6 +27,7 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 export default function EditSupplier() {
   const params = useParams();
   const [_location, navigate] = useLocation();
+  const handleBack = useBackToParent();
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
   const supplierId = params.id ? parseInt(params.id) : null;
@@ -111,7 +113,7 @@ export default function EditSupplier() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => window.history.back()}
+            onClick={handleBack}
             data-testid="button-back"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -128,7 +130,7 @@ export default function EditSupplier() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => window.history.back()}
+          onClick={handleBack}
           data-testid="button-back"
         >
           <ArrowLeft className="h-4 w-4" />
