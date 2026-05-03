@@ -577,7 +577,7 @@ export function registerImportRoutes(app: Express) {
           discount: poDiscount.toString(),
           otherCharges: poOtherCharges.toString(),
           chargesEdited: hasAnyCharges,
-        });
+        }, getClientDate(req));
 
         for (const item of poItems) {
           // Re-lookup stock item by code/alias or name to get fresh ID (not stale preview data)

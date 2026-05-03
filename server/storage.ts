@@ -165,7 +165,7 @@ export interface IStorage {
   getPurchaseOrderById(id: number): Promise<PurchaseOrder | undefined>;
   getPurchaseOrdersByContainer(containerId: number): Promise<PurchaseOrder[]>;
   getPurchaseOrdersBySupplier(supplierId: number, companyId: number): Promise<any[]>;
-  createPurchaseOrder(po: InsertPurchaseOrder): Promise<PurchaseOrder>;
+  createPurchaseOrder(po: InsertPurchaseOrder, voucherDateOverride?: string): Promise<PurchaseOrder>;
   updatePurchaseOrder(id: number, updates: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder>;
   deletePurchaseOrder(id: number): Promise<void>;
 
@@ -1482,7 +1482,7 @@ export class DbStorage implements IStorage {
     return await query;
   }
 
-  async createPurchaseOrder(po: InsertPurchaseOrder): Promise<PurchaseOrder> {
+  async createPurchaseOrder(po: InsertPurchaseOrder, voucherDateOverride?: string): Promise<PurchaseOrder> {
     const [created] = await db.insert(schema.purchaseOrders).values(po).returning();
     
     // ============================================================
@@ -1543,8 +1543,10 @@ export class DbStorage implements IStorage {
         purchasesAccount = [newAccount];
       }
       
-      const voucherDate = new Date().toISOString().split('T')[0];
-      
+      // Phase 11: Prefer caller-supplied date (built from client timezone via getClientDate(req)).
+      // Fallback to server UTC only if caller didn't pass one (legacy / non-HTTP entry points).
+      const voucherDate = voucherDateOverride || new Date().toISOString().split('T')[0];
+
       if (parentCompany && po.companyId !== parentCompany.id) {
         // ============================================================
         // SUBSIDIARY COMPANY - Create TWO vouchers

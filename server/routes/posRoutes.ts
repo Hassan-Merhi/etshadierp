@@ -168,7 +168,7 @@ export function registerPosRoutes(app: Express) {
         });
       }
 
-      const dateStr  = new Date().toISOString().slice(0, 10);
+      const dateStr  = getClientDate(req);
       const safeName = `${locName} STK ${companyName} ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
       const stampStr = new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
       const caption  = `Stock Report — ${locName}\n${stampStr}`;
@@ -226,7 +226,7 @@ export function registerPosRoutes(app: Express) {
       const pdfBuffer = await generateInvoicePdf(parseInt(voucherId), companyId);
 
       const locName  = location.name;
-      const dateStr  = new Date().toISOString().slice(0, 10);
+      const dateStr  = getClientDate(req);
       const safeName = `${locName} Invoice ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
       const caption  = `${locName} — ${dateStr}`;
 
@@ -2162,7 +2162,7 @@ export function registerPosRoutes(app: Express) {
       const company   = await storage.getCompanyById(companyId);
       const safeLoc   = (location.name ?? "").replace(/[^a-zA-Z0-9 \-]/g, "").trim();
       const safeCo    = (company?.name ?? "").replace(/[^a-zA-Z0-9 \-]/g, "").trim();
-      const safeDate  = (voucher.voucherDate ?? format(new Date(), "yyyy-MM-dd")).replace(/[^0-9-]/g, "");
+      const safeDate  = (voucher.voucherDate ?? getClientDate(req)).replace(/[^0-9-]/g, "");
       const fileName  = `${safeLoc} ${safeCo} ${safeDate}.pdf`.replace(/\s+/g, " ").trim();
       const caption   = `📍 ${location.name} — ${voucher.voucherNumber}`;
 

@@ -1089,7 +1089,7 @@ export function registerContainerRoutes(app: Express) {
           transportFees,
           transportAccountId,
           additionalCharges,
-          offloadDate,
+          offloadDate || getClientDate(req),
           inventoryCostCorrections,
         );
 

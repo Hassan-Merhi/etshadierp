@@ -1540,7 +1540,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       const jsonStr = JSON.stringify(exportPayload, null, 2);
       res.setHeader("Content-Type", "application/json");
-      res.setHeader("Content-Disposition", `attachment; filename="company_${companyId}_export_${new Date().toISOString().slice(0, 10)}.json"`);
+      res.setHeader("Content-Disposition", `attachment; filename="company_${companyId}_export_${getClientDate(req)}.json"`);
       res.send(jsonStr);
     } catch (error: any) {
       console.error("Export company data error:", error);

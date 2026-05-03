@@ -3,6 +3,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory } from "./_helpers";
+import { getClientDate } from "../lib/dateUtils";
 import {
   inventory, stockItems, stockGroups, stockGroupArchives,
   stockTransferVouchers, stockTransferItems,
@@ -910,7 +911,7 @@ export function registerStatsRoutes(app: Express) {
       liabTotalRow.getCell("value").alignment = { horizontal: "right" };
 
       // ── Send file ─────────────────────────────────────────────────────────
-      const dateTag = new Date().toISOString().slice(0, 10);
+      const dateTag = getClientDate(req);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="Net_Position_${dateTag}.xlsx"`);
       await wb.xlsx.write(res);
