@@ -403,18 +403,18 @@ export default function Accounts() {
   });
 
   // In factory mode, append factory suppliers as accounts
-  const factorySupplierAccounts = (appMode === "factory"
-    ? factorySuppliersData.map((s: any) => ({
+  const factorySupplierAccounts: Account[] = appMode === "factory"
+    ? factorySuppliersData.map((s: any): Account => ({
         id: `factorySupplier-${s.id}`,
         accountId: s.id,
-        type: "factorySupplier" as const,
+        type: "factorySupplier",
         name: s.name,
         code: `FS-${s.id}`,
         balance: parseFloat(s.totalValue || "0"),
-        parentId: s.parentId || null,
-        currencyBalances: s.currencyBalances || [],
+        balanceSide: null,
+        active: true,
       }))
-    : []) as unknown as Account[];
+    : [];
 
   const { data: factoryWorkersData = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/workers/with-balances", selectedCompany?.id],
