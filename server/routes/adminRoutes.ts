@@ -1882,14 +1882,6 @@ export function registerAdminRoutes(app: Express) {
         
         let totalFixed = 0;
         let totalAmount = 0;
-
-      // First, group offloaded containers by agent
-      for (const container of offloadedContainers) {
-        const agent = container.agent || "Unassigned";
-        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
-        byAgent[agent].offloadedContainers.push(container);
-        byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
-      }
         const details: Array<{ company: string; poNumber: string; amount: number }> = [];
         
         // Process each company
@@ -2162,14 +2154,6 @@ export function registerAdminRoutes(app: Express) {
         let fixed = 0;
         let skipped = 0;
         let totalAmount = 0;
-
-      // First, group offloaded containers by agent
-      for (const container of offloadedContainers) {
-        const agent = container.agent || "Unassigned";
-        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
-        byAgent[agent].offloadedContainers.push(container);
-        byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
-      }
         const details: any[] = [];
         
         for (const po of allPOs) {

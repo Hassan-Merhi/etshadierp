@@ -53,6 +53,8 @@ import { registerVoucherEntryRoutes } from "./voucherEntryRoutes";
 import { recalculateOrderTotals } from "./factory/_helpers";
 import {
   customerOrderCharges, customerOrders, customerOrderBales, customerOrderLines,
+  factorySettings as fSettings,
+  factoryDaybookEntries as fde,
 } from "@shared/schema";
 
 /**
@@ -3527,11 +3529,11 @@ export function registerVoucherRoutes(app: Express) {
 
         // Resync factory daybook entry amounts for this voucher
         const newTotal = Math.max(totalDebits, totalCredits).toFixed(2);
-        await db.update(fdeAmt)
+        await db.update(fde)
           .set({ amountCurrency: newTotal, amountUsd: newTotal })
           .where(and(
-            eq(fdeAmt.referenceTable, "vouchers"),
-            eq(fdeAmt.referenceId, id)
+            eq(fde.referenceTable, "vouchers"),
+            eq(fde.referenceId, id)
           ));
       } catch (error: any) {
         // Cleanup: Restore old entries if update failed after deletion

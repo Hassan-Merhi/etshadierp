@@ -42,6 +42,8 @@ import {
   insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
   chatMessages,
   
+  factorySettings as fSettings,
+  factoryDaybookEntries as fde,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
