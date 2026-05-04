@@ -1436,14 +1436,6 @@ export default function ProductionRawStock() {
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Remaining Stock</p>
-            <p className="text-xl font-bold font-mono" data-testid="text-total-remaining">
-              {fmtKg(totalRemaining)} kg
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
             <p className="text-sm text-muted-foreground">Free Available</p>
             <p className="text-xl font-bold font-mono text-green-600 dark:text-green-400" data-testid="text-total-free">
               {fmtKg(totalFree)} kg
