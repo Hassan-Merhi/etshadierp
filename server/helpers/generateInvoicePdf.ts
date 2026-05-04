@@ -8,6 +8,15 @@
 
 import { pool } from "../db";
 
+// ── Date formatting — pg driver returns date columns as JS Date objects ────────
+function formatDbDate(d: unknown): string {
+  if (!d) return "";
+  if (d instanceof Date) return d.toISOString().slice(0, 10);
+  const s = String(d);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  try { return new Date(s).toISOString().slice(0, 10); } catch { return s; }
+}
+
 // ── Page geometry ─────────────────────────────────────────────────────────────
 const PAGE_W   = 595;
 const PAGE_H   = 842;
@@ -68,7 +77,7 @@ interface InvoiceData {
 }
 
 // ── DB query ──────────────────────────────────────────────────────────────────
-export async function generateInvoicePdf(voucherId: number, companyId: number): Promise<Buffer> {
+export async function generateInvoicePdf(voucherId: number, companyId: number, callerUserName?: string): Promise<Buffer> {
 
   // 1. Voucher header
   const vRes = await pool.query<{
@@ -116,18 +125,20 @@ export async function generateInvoicePdf(voucherId: number, companyId: number): 
     customerName = cRes.rows[0]?.customer_name || null;
   }
 
-  // 4. User from shift
-  let userName = "—";
-  if (v.shift_id) {
+  // 4. User — prefer the caller's logged-in username; fall back to shift lookup
+  let userName = callerUserName || "—";
+  if (!callerUserName && v.shift_id) {
     const uRes = await pool.query<{ username: string }>(
-      `SELECT username FROM pos_shifts WHERE id = $1 LIMIT 1`,
+      `SELECT u.username FROM pos_shifts ps
+       JOIN users u ON u.id = ps.user_id
+       WHERE ps.id = $1 LIMIT 1`,
       [v.shift_id],
     );
     userName = uRes.rows[0]?.username || "—";
   }
 
   return buildPdf({
-    voucherDate:  v.voucher_date,
+    voucherDate:  formatDbDate(v.voucher_date),
     description:  v.description,
     exchangeRate: v.exchange_rate ? parseFloat(v.exchange_rate) : null,
     isCreditSale: v.is_credit_sale,
@@ -216,6 +227,8 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   let totalAmt = 0;
   let totalPL  = 0;
 
+  const ROW_H = 14;
+
   for (const item of d.items) {
     const amtUSD = item.quantity * item.rateUSD;
     const plBale = item.rateUSD - item.configuredPrice;
@@ -225,10 +238,7 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     totalAmt += amtUSD;
     totalPL  += itemPL;
 
-    // Measure description height for wrapping rows
-    doc.font("Helvetica-Bold").fontSize(7.5);
-    const descH = doc.heightOfString(item.stockItemName, { width: COL_DESC_W - 8 });
-    const rowH  = Math.max(16, Math.ceil(descH) + 8);
+    const rowH = ROW_H;
 
     // Page break
     if (y + rowH > PAGE_H - MARGIN_Y) {

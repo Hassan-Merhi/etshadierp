@@ -223,7 +223,7 @@ export function registerPosRoutes(app: Express) {
       if (!location)                     return res.status(404).json({ message: "Location not found" });
       if (!location.whatsappGroupChatId) return res.status(400).json({ message: "No WhatsApp group configured for this location" });
 
-      const pdfBuffer = await generateInvoicePdf(parseInt(voucherId), companyId);
+      const pdfBuffer = await generateInvoicePdf(parseInt(voucherId), companyId, (req as any).user?.username);
 
       const locName  = location.name;
       const dateStr  = getClientDate(req);
