@@ -883,7 +883,7 @@ function AdvancesView() {
           <DialogHeader>
             <DialogTitle>Repay by Month</DialogTitle>
             <DialogDescription>
-              Bulk-repay all outstanding Loan advances grouped by the month they were given.
+              Bulk-repay all outstanding advances (Loans and Salary Deductions) grouped by the month they were given.
             </DialogDescription>
           </DialogHeader>
 
@@ -918,21 +918,19 @@ function AdvancesView() {
 
           {/* Month groups derived from advances data */}
           {(() => {
-            const loanOutstanding = (advances || []).filter(
-              (a) => !a.fullyPaid && a.repaymentType === "manual_repayment"
-            );
+            const allOutstanding = (advances || []).filter((a) => !a.fullyPaid);
 
-            if (loanOutstanding.length === 0) {
+            if (allOutstanding.length === 0) {
               return (
                 <div className="py-8 text-center text-muted-foreground text-sm">
-                  No outstanding Loan advances to repay.
+                  No outstanding advances to repay.
                 </div>
               );
             }
 
             // Group by YYYY-MM
             const groups = new Map<string, AdvanceRecord[]>();
-            for (const a of loanOutstanding) {
+            for (const a of allOutstanding) {
               const key = (a.advanceDate || "").substring(0, 7);
               if (!key) continue;
               const list = groups.get(key) || [];

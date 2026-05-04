@@ -1830,7 +1830,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
     }
   });
 
-  // POST /api/factory/advances/repay-by-month - Bulk repay all outstanding Loan advances for a given month
+  // POST /api/factory/advances/repay-by-month - Bulk repay all outstanding advances for a given month
   app.post("/api/factory/advances/repay-by-month", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
@@ -1850,17 +1850,16 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
         .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
       if (!acct) return res.status(400).json({ message: "Cash account not found" });
 
-      // Find all outstanding manual_repayment advances for this month
+      // Find all outstanding advances (both Loan and Salary Deduction) for this month
       const outstanding = await db.select().from(factoryWorkerAdvances)
         .where(and(
           eq(factoryWorkerAdvances.companyId, companyId),
-          eq(factoryWorkerAdvances.repaymentType, "manual_repayment"),
           eq(factoryWorkerAdvances.fullyPaid, false),
           sql`to_char(${factoryWorkerAdvances.advanceDate}, 'YYYY-MM') = ${month}`,
         ));
 
       if (outstanding.length === 0) {
-        return res.status(400).json({ message: "No outstanding Loan advances found for that month" });
+        return res.status(400).json({ message: "No outstanding advances found for that month" });
       }
 
       // Load worker names
