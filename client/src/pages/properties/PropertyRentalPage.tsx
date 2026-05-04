@@ -16,7 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog, ChevronsUpDown, Trash2, ClipboardList } from "lucide-react";
+import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog, ChevronsUpDown, Trash2, ClipboardList, CreditCard } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/PageHeader";
@@ -230,6 +231,34 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
   const openUnit = units.find(u => u.id === openUnitId) ?? null;
   const confirmDeleteUnit = confirmDeleteUnitId ? units.find(u => u.id === confirmDeleteUnitId) ?? null : null;
 
+  // ── Bulk payment selection state ──────────────────────────
+  const [selectedContractIds, setSelectedContractIds] = useState<Set<number>>(new Set());
+  const [bulkPayOpen, setBulkPayOpen] = useState(false);
+
+  const contractedUnits = useMemo(() => units.filter(u => u.contract), [units]);
+
+  const toggleSelect = (contractId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedContractIds(prev => {
+      const next = new Set(prev);
+      if (next.has(contractId)) next.delete(contractId); else next.add(contractId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedContractIds.size === contractedUnits.length) {
+      setSelectedContractIds(new Set());
+    } else {
+      setSelectedContractIds(new Set(contractedUnits.map(u => u.contract!.id)));
+    }
+  };
+
+  const selectedUnits = useMemo(
+    () => units.filter(u => u.contract && selectedContractIds.has(u.contract.id)),
+    [units, selectedContractIds]
+  );
+
   return (
     <ApiBaseCtx.Provider value={apiBase}>
       <div className="p-4 space-y-4" data-testid={`page-${testIdPrefix}`}>
@@ -241,6 +270,12 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {selectedContractIds.size > 0 && (
+              <Button size="sm" onClick={() => setBulkPayOpen(true)} data-testid={`button-${testIdPrefix}-bulk-pay`}>
+                <CreditCard className="h-4 w-4 mr-1" />
+                Pay Selected ({selectedContractIds.size})
+              </Button>
+            )}
             {paymentsLogUrl && (
               <Button variant="outline" size="sm" onClick={() => navigate(paymentsLogUrl)} data-testid={`button-${testIdPrefix}-payments-log`}>
                 <ClipboardList className="h-4 w-4 mr-1" />
@@ -299,6 +334,14 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50 border-b sticky top-0 z-30">
                     <tr>
+                      <th className="px-3 py-2 w-8" onClick={e => e.stopPropagation()}>
+                        <Checkbox
+                          checked={contractedUnits.length > 0 && selectedContractIds.size === contractedUnits.length}
+                          onCheckedChange={toggleSelectAll}
+                          data-testid={`checkbox-${testIdPrefix}-select-all`}
+                          aria-label="Select all"
+                        />
+                      </th>
                       <th className="text-left px-3 py-2 font-semibold">Unit</th>
                       <th className="text-left px-3 py-2 font-semibold">Tenant</th>
                       <th className="text-left px-3 py-2 font-semibold">Note</th>
@@ -329,7 +372,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                       return (
                       <>
                         <tr key={`grp-${group}`} className="border-t">
-                          <td colSpan={8} className="px-3 py-1.5 text-xs font-bold uppercase tracking-widest" style={{ backgroundColor: p.headerBg, color: p.headerText }}>{group}</td>
+                          <td colSpan={9} className="px-3 py-1.5 text-xs font-bold uppercase tracking-widest" style={{ backgroundColor: p.headerBg, color: p.headerText }}>{group}</td>
                         </tr>
                         {groupUnits.map((u, uIdx) => (
                           <tr
@@ -341,6 +384,17 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                             onClick={() => setOpenUnitId(u.id)}
                             data-testid={`row-unit-${u.id}`}
                           >
+                            <td className="px-3 py-2 w-8" onClick={e => e.stopPropagation()}>
+                              {u.contract && (
+                                <Checkbox
+                                  checked={selectedContractIds.has(u.contract.id)}
+                                  onCheckedChange={() => toggleSelect(u.contract!.id, { stopPropagation: () => {} } as any)}
+                                  onClick={e => e.stopPropagation()}
+                                  data-testid={`checkbox-unit-${u.id}`}
+                                  aria-label={`Select ${u.unitNumber}`}
+                                />
+                              )}
+                            </td>
                             <td className="px-3 py-2 font-mono text-xs font-bold" style={{ backgroundColor: unitNumBg, color: unitNumColor }}>{u.unitNumber}</td>
                             <td className="px-3 py-2">
                               {u.contract
@@ -398,6 +452,16 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
             </div>
           </CardContent>
         </Card>
+
+        {bulkPayOpen && selectedUnits.length > 0 && (
+          <BulkPaymentDialog
+            units={selectedUnits}
+            cashAccounts={cashAccounts}
+            testIdPrefix={testIdPrefix}
+            onClose={() => setBulkPayOpen(false)}
+            onSuccess={() => setSelectedContractIds(new Set())}
+          />
+        )}
 
         {openUnit && (
           <UnitActionDialog
@@ -691,6 +755,179 @@ function AccountSearchSelect({ accounts, value, onChange, placeholder, testId }:
         </Command>
       </PopoverContent>
     </Popover>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// BULK PAYMENT DIALOG
+// ──────────────────────────────────────────────────────────
+function BulkPaymentDialog({
+  units,
+  cashAccounts,
+  testIdPrefix,
+  onClose,
+  onSuccess,
+}: {
+  units: Unit[];
+  cashAccounts: CashAccount[];
+  testIdPrefix: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const apiBase = useApiBase();
+  const { toast } = useToast();
+
+  const today = new Date().toISOString().slice(0, 10);
+  const [paymentDate, setPaymentDate] = useState(today);
+  const [cashAccountId, setCashAccountId] = useState("");
+  const [notes, setNotes] = useState("");
+  // Per-unit amounts, defaulting to their outstanding (min 0)
+  const [amounts, setAmounts] = useState<Record<number, string>>(() => {
+    const init: Record<number, string> = {};
+    units.forEach(u => {
+      const outstanding = u.outstanding ?? 0;
+      init[u.contract!.id] = outstanding > 0 ? String(outstanding) : "";
+    });
+    return init;
+  });
+
+  const totalSelected = useMemo(() => {
+    return Object.values(amounts).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
+  }, [amounts]);
+
+  const bulkPay = useMutation({
+    mutationFn: () => {
+      const items = units
+        .filter(u => u.contract && parseFloat(amounts[u.contract.id] || "0") > 0)
+        .map(u => ({
+          contractId: u.contract!.id,
+          cashAccountId: cashAccountId ? parseInt(cashAccountId) : null,
+          amount: amounts[u.contract!.id],
+          paymentDate,
+          notes: notes || undefined,
+        }));
+      if (items.length === 0) throw new Error("No valid amounts entered");
+      return apiRequest("POST", apiBase + "/payments/bulk", items);
+    },
+    onSuccess: () => {
+      toast({ title: "Bulk payment recorded", description: `${units.length} tenant(s) paid` });
+      queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
+      onSuccess();
+      onClose();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const canSubmit = Object.values(amounts).some(v => parseFloat(v) > 0) && !bulkPay.isPending;
+
+  return (
+    <Dialog open onOpenChange={o => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col" data-testid={`dialog-${testIdPrefix}-bulk-pay`}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Bulk Payment — {units.length} Unit{units.length !== 1 ? "s" : ""}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          <div>
+            <Label>Account</Label>
+            <AccountSearchSelect
+              accounts={cashAccounts}
+              value={cashAccountId}
+              onChange={setCashAccountId}
+              placeholder="Choose account…"
+              testId={`select-${testIdPrefix}-bulk-cash`}
+            />
+          </div>
+          <div>
+            <Label>Payment Date</Label>
+            <Input
+              type="date"
+              value={paymentDate}
+              onChange={e => setPaymentDate(e.target.value)}
+              data-testid={`input-${testIdPrefix}-bulk-date`}
+            />
+          </div>
+          <div className="col-span-2">
+            <Label>Notes (optional)</Label>
+            <Input
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="e.g. May 2026 bulk rent collection"
+              data-testid={`input-${testIdPrefix}-bulk-notes`}
+            />
+          </div>
+        </div>
+
+        <div className="overflow-auto flex-1 mt-3 rounded-md border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 border-b sticky top-0">
+              <tr>
+                <th className="text-left px-3 py-2 font-semibold">Unit</th>
+                <th className="text-left px-3 py-2 font-semibold">Tenant</th>
+                <th className="text-right px-3 py-2 font-semibold">Monthly Rent</th>
+                <th className="text-right px-3 py-2 font-semibold">Outstanding</th>
+                <th className="text-right px-3 py-2 font-semibold">Amount to Pay</th>
+              </tr>
+            </thead>
+            <tbody>
+              {units.map((u, idx) => {
+                const cId = u.contract!.id;
+                const outstanding = u.outstanding ?? 0;
+                return (
+                  <tr key={u.id} className={`border-t ${idx % 2 === 0 ? "" : "bg-muted/30"}`}>
+                    <td className="px-3 py-2 font-mono text-xs font-bold">{u.unitNumber}</td>
+                    <td className="px-3 py-2">{u.contract!.tenantName}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                      ${fmtMoney(u.contract!.rentalAmount)}
+                    </td>
+                    <td className={`px-3 py-2 text-right tabular-nums font-semibold ${
+                      outstanding > 0 ? "text-red-600 dark:text-red-400" :
+                      outstanding < 0 ? "text-green-600 dark:text-green-400" :
+                      "text-muted-foreground"
+                    }`}>
+                      {outstanding !== null ? `$${fmtMoney(Math.abs(outstanding))}` : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="w-28 text-right ml-auto"
+                        value={amounts[cId] ?? ""}
+                        onChange={e => setAmounts(prev => ({ ...prev, [cId]: e.target.value }))}
+                        data-testid={`input-${testIdPrefix}-bulk-amount-${u.id}`}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot className="border-t bg-muted/50 sticky bottom-0">
+              <tr>
+                <td colSpan={4} className="px-3 py-2 font-semibold text-right">Total Payment</td>
+                <td className="px-3 py-2 text-right font-bold text-lg tabular-nums">
+                  ${fmtMoney(totalSelected)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <DialogFooter className="pt-3">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            onClick={() => bulkPay.mutate()}
+            disabled={!canSubmit}
+            data-testid={`button-${testIdPrefix}-bulk-pay-confirm`}
+          >
+            {bulkPay.isPending ? "Processing…" : `Confirm Bulk Payment`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
