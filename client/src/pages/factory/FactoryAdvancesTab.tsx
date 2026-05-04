@@ -1128,16 +1128,18 @@ function AdvancesView() {
       </Dialog>
 
       <Dialog open={postAccountingOpen} onOpenChange={(open) => { setPostAccountingOpen(open); if (!open) setPostCashAccountId(""); }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Post Accounting for Old Advances</DialogTitle>
+            <DialogTitle>Post Accounting for Old Advances — Preview</DialogTitle>
             <DialogDescription>
-              Create payment vouchers for advances that were recorded without a cash account deduction.
+              Creates a Payment voucher (DR Factory Worker Advances / CR Cash) for every advance that has no accounting entry yet. Review what will be posted before confirming.
             </DialogDescription>
           </DialogHeader>
+
           <div className="space-y-4 py-2">
+            {/* Cash account selector */}
             <div className="space-y-2">
-              <Label>Cash Account to Credit</Label>
+              <Label>Cash Account to Credit <span className="text-destructive">*</span></Label>
               <Select value={postCashAccountId} onValueChange={setPostCashAccountId}>
                 <SelectTrigger data-testid="select-post-cash-account">
                   <SelectValue placeholder="Select cash account" />
@@ -1149,72 +1151,97 @@ function AdvancesView() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label className="text-sm">Unvouchered Advances</Label>
-              {unvoucheredLoading ? (
-                <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading...
+
+            {/* Preview section */}
+            {unvoucheredLoading ? (
+              <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />Loading…
+              </div>
+            ) : !unvouchered?.length ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No unvouchered advances found</p>
+                <p className="text-xs mt-1">All advances already have accounting entries</p>
+              </div>
+            ) : (() => {
+              const selectedAcct = (cashAccounts || []).find((a) => String(a.id) === postCashAccountId);
+              const grandTotal = unvouchered.reduce((s, a) => s + parseFloat(a.amount || "0"), 0);
+              const grouped: Record<string, typeof unvouchered> = {};
+              for (const adv of unvouchered) {
+                const key = adv.workerName || `Worker #${adv.workerId}`;
+                if (!grouped[key]) grouped[key] = [];
+                grouped[key].push(adv);
+              }
+
+              return (
+                <div className="space-y-4">
+                  {/* Summary boxes */}
+                  <div className="grid grid-cols-3 gap-3 text-sm">
+                    <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
+                      <p className="text-xs text-muted-foreground mb-1">Advances to Post</p>
+                      <p className="font-bold">{unvouchered.length}</p>
+                    </div>
+                    <div className="rounded-md bg-blue-50 dark:bg-blue-900/20 px-3 py-2 text-center">
+                      <p className="text-xs text-muted-foreground mb-1">DR Factory Advances</p>
+                      <p className="font-bold font-mono text-blue-700 dark:text-blue-400">{fmt(grandTotal)}</p>
+                    </div>
+                    <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-center">
+                      <p className="text-xs text-muted-foreground mb-1">
+                        CR {selectedAcct ? selectedAcct.name : "Cash Account"}
+                      </p>
+                      <p className="font-bold font-mono text-amber-700 dark:text-amber-400">{fmt(grandTotal)}</p>
+                    </div>
+                  </div>
+
+                  {/* Per-advance breakdown */}
+                  <div className="border rounded-md overflow-hidden">
+                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20">
+                      <span>Worker / Date</span>
+                      <span className="text-right">Type</span>
+                      <span className="text-right text-blue-600 dark:text-blue-400">DR Advances</span>
+                      <span className="text-right text-amber-600 dark:text-amber-400">CR {selectedAcct?.name ?? "Cash"}</span>
+                    </div>
+                    <div className="divide-y max-h-56 overflow-y-auto">
+                      {Object.entries(grouped).map(([workerName, advs]) => (
+                        <Fragment key={workerName}>
+                          <div className="px-4 py-1.5 bg-muted/30 text-xs font-semibold text-muted-foreground flex justify-between">
+                            <span>{workerName}</span>
+                            <span className="font-mono">{fmt(advs.reduce((s, a) => s + parseFloat(a.amount || "0"), 0))}</span>
+                          </div>
+                          {advs.map((adv) => (
+                            <div
+                              key={adv.id}
+                              className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-4 py-2 text-sm items-center"
+                              data-testid={`row-unvouchered-${adv.id}`}
+                            >
+                              <span className="text-muted-foreground text-xs">{formatDate(adv.advanceDate)}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {adv.repaymentType === "manual_repayment" ? "Loan" : "Salary Ded."}
+                              </Badge>
+                              <span className="font-mono text-right text-blue-700 dark:text-blue-400">{fmt(adv.amount)}</span>
+                              <span className="font-mono text-right text-amber-700 dark:text-amber-400">{fmt(adv.amount)}</span>
+                            </div>
+                          ))}
+                        </Fragment>
+                      ))}
+                    </div>
+                    {/* Grand total row */}
+                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-4 py-2 text-sm font-bold bg-muted/20 border-t">
+                      <span>Total</span>
+                      <span></span>
+                      <span className="font-mono text-right text-blue-700 dark:text-blue-400">{fmt(grandTotal)}</span>
+                      <span className="font-mono text-right text-amber-700 dark:text-amber-400">{fmt(grandTotal)}</span>
+                    </div>
+                  </div>
+
+                  {!postCashAccountId && (
+                    <p className="text-xs text-muted-foreground text-center">Select a cash account above to enable posting.</p>
+                  )}
                 </div>
-              ) : !unvouchered?.length ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No unvouchered advances found</p>
-                  <p className="text-xs mt-1">All advances already have accounting entries</p>
-                </div>
-              ) : (
-                <div className="border rounded-md mt-2 max-h-64 overflow-y-auto">
-                  <Table>
-                    <TableHeader className="sticky top-0 z-30 bg-background">
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead>Type</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {(() => {
-                        const grouped: Record<string, typeof unvouchered> = {};
-                        for (const adv of unvouchered) {
-                          const key = adv.workerName || `Worker #${adv.workerId}`;
-                          if (!grouped[key]) grouped[key] = [];
-                          grouped[key].push(adv);
-                        }
-                        return Object.entries(grouped).map(([workerName, advs]) => (
-                          <Fragment key={workerName}>
-                            <TableRow>
-                              <TableCell colSpan={3} className="bg-muted/50 font-medium text-sm py-1.5">
-                                {workerName}
-                                <span className="text-xs text-muted-foreground ml-2">
-                                  ({advs.length} advance{advs.length !== 1 ? "s" : ""} — {fmt(advs.reduce((s, a) => s + parseFloat(a.amount || "0"), 0))})
-                                </span>
-                              </TableCell>
-                            </TableRow>
-                            {advs.map((adv) => (
-                              <TableRow key={adv.id} data-testid={`row-unvouchered-${adv.id}`}>
-                                <TableCell className="text-sm pl-6">{formatDate(adv.advanceDate)}</TableCell>
-                                <TableCell className="text-right font-mono text-sm">{fmt(adv.amount)}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className="text-xs">
-                                    {adv.repaymentType === "manual_repayment" ? "Loan" : "Salary Ded."}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </Fragment>
-                        ));
-                      })()}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-              {unvouchered && unvouchered.length > 0 && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  Total: {fmt(unvouchered.reduce((s, a) => s + parseFloat(a.amount || "0"), 0))} across {unvouchered.length} advance(s)
-                </p>
-              )}
-            </div>
+              );
+            })()}
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => { setPostAccountingOpen(false); setPostCashAccountId(""); }} data-testid="button-cancel-post-accounting">
               Cancel
@@ -1222,18 +1249,15 @@ function AdvancesView() {
             <Button
               onClick={() => {
                 if (!postCashAccountId || !unvouchered?.length) return;
-                postAccountingMutation.mutate({
-                  cashAccountId: parseInt(postCashAccountId),
-                });
+                postAccountingMutation.mutate({ cashAccountId: parseInt(postCashAccountId) });
               }}
               disabled={!postCashAccountId || !unvouchered?.length || postAccountingMutation.isPending}
               data-testid="button-confirm-post-accounting"
             >
-              {postAccountingMutation.isPending ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Posting...</>
-              ) : (
-                <>Post {unvouchered?.length || 0} Entries</>
-              )}
+              {postAccountingMutation.isPending
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Posting…</>
+                : `Confirm — Post ${fmt(unvouchered?.reduce((s, a) => s + parseFloat(a.amount || "0"), 0) ?? 0)} (${unvouchered?.length ?? 0} entries)`
+              }
             </Button>
           </DialogFooter>
         </DialogContent>
