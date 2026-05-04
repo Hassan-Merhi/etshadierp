@@ -391,6 +391,12 @@ function AdvancesView() {
         </Select>
 
         <div className="ml-auto flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setReconcileOpen(true)} data-testid="button-reconcile-advances">
+            <RotateCcw className="h-4 w-4 mr-2" />Reconcile Balances
+          </Button>
+          <Button variant="outline" onClick={() => setPostAccountingOpen(true)} data-testid="button-post-accounting">
+            <BookOpen className="h-4 w-4 mr-2" />Post Accounting
+          </Button>
           <Button variant="outline" onClick={() => setBulkOpen(true)} data-testid="button-bulk-advance">
             <Users className="h-4 w-4 mr-2" />Bulk Advance
           </Button>
