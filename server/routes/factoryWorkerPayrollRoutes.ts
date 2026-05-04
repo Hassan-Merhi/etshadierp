@@ -1961,6 +1961,37 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
     }
   });
 
+  // GET /api/factory/cash-account-balance/:id — current DR-CR balance for a ledger account
+  app.get("/api/factory/cash-account-balance/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const accountId = parseInt(req.params.id);
+
+      const [acct] = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+        .from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, companyId)));
+      if (!acct) return res.status(404).json({ message: "Account not found" });
+
+      const [totals] = await db.select({
+        totalDebit: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
+        totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
+      })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(and(
+          eq(voucherEntries.ledgerAccountId, accountId),
+          eq(vouchers.companyId, companyId),
+        ));
+
+      const balance = parseFloat(totals.totalDebit) - parseFloat(totals.totalCredit);
+      res.json({ accountId, name: acct.name, balance: balance.toFixed(2), totalDebit: totals.totalDebit, totalCredit: totals.totalCredit });
+    } catch (error: any) {
+      console.error("Error fetching account balance:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // POST /api/factory/advances/cash-adjustment — post a correcting journal entry on a cash account
   app.post("/api/factory/advances/cash-adjustment", requireAuth, async (req: any, res: any) => {
     try {

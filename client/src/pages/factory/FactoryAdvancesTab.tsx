@@ -273,6 +273,16 @@ function AdvancesView() {
     enabled: repayAuditOpen,
   });
 
+  const { data: auditCashBalance } = useQuery<{ balance: string; name: string }>({
+    queryKey: ["/api/factory/cash-account-balance", repayAuditForm.cashAccountId],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/cash-account-balance/${repayAuditForm.cashAccountId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch balance");
+      return res.json();
+    },
+    enabled: !!repayAuditForm.cashAccountId && repayAuditOpen,
+  });
+
   const repayAuditMutation = useMutation({
     mutationFn: async (form: typeof repayAuditForm) => {
       const res = await apiRequest("POST", "/api/factory/advances/post-repayment-vouchers", {
@@ -1033,6 +1043,33 @@ function AdvancesView() {
                       </div>
                     </div>
                     <p className="text-xs text-muted-foreground -mt-2">Used for entries that have no existing date/account on record (No Record cases). Case A entries use their original repayment data.</p>
+
+                    {/* Before / After balance impact */}
+                    {repayAuditForm.cashAccountId && (() => {
+                      const currentBal = parseFloat(auditCashBalance?.balance ?? "0");
+                      const newBal = currentBal + missingTotal;
+                      return (
+                        <div className="rounded-md border overflow-hidden text-sm">
+                          <div className="px-4 py-2 bg-muted/20 text-xs font-medium text-muted-foreground border-b">
+                            Cash Account Balance Impact — {auditCashBalance?.name ?? "…"}
+                          </div>
+                          <div className="grid grid-cols-3 divide-x">
+                            <div className="px-4 py-3 text-center">
+                              <p className="text-xs text-muted-foreground mb-1">Current Balance</p>
+                              <p className="font-mono font-bold">{fmt(currentBal)}</p>
+                            </div>
+                            <div className="px-4 py-3 text-center">
+                              <p className="text-xs text-muted-foreground mb-1">Will Increase By</p>
+                              <p className="font-mono font-bold text-blue-700 dark:text-blue-400">+{fmt(missingTotal)}</p>
+                            </div>
+                            <div className="px-4 py-3 text-center">
+                              <p className="text-xs text-muted-foreground mb-1">New Balance</p>
+                              <p className="font-mono font-bold text-green-700 dark:text-green-400">{fmt(newBal)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Per-worker breakdown */}
                     <div className="border rounded-md overflow-hidden">
