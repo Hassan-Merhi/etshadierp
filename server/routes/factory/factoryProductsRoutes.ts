@@ -4,6 +4,7 @@ import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
+import { sqlArray } from "../../lib/sqlArray";
 import {
   writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
   isLegacySHA256Hash, verifySupervisorPassword, checkFactoryAdmin,
@@ -1064,7 +1065,7 @@ export function registerFactoryProductsRoutes(app: Express) {
           SET product_id = ${targetId},
               article_code = ${target.articleCode || null},
               product_name = ${target.name}
-          WHERE product_id = ANY(${sourceIds})
+          WHERE product_id = ANY(${sqlArray(sourceIds)})
             AND company_id = ${companyId}
         `);
         movedBales = (updateResult as any).rowCount ?? 0;
@@ -1073,7 +1074,7 @@ export function registerFactoryProductsRoutes(app: Express) {
         await tx.execute(sql`
           UPDATE factory_pressing_batches
           SET product_id = ${targetId}
-          WHERE product_id = ANY(${sourceIds})
+          WHERE product_id = ANY(${sqlArray(sourceIds)})
             AND company_id = ${companyId}
         `);
 
@@ -1083,7 +1084,7 @@ export function registerFactoryProductsRoutes(app: Express) {
           SET product_id = ${targetId},
               product_name = ${target.name},
               article_code = ${target.articleCode || null}
-          WHERE product_id = ANY(${sourceIds})
+          WHERE product_id = ANY(${sqlArray(sourceIds)})
             AND company_id = ${companyId}
         `);
 
@@ -1091,7 +1092,7 @@ export function registerFactoryProductsRoutes(app: Express) {
         await tx.execute(sql`
           UPDATE factory_bale_products
           SET active = false, updated_at = NOW()
-          WHERE id = ANY(${sourceIds})
+          WHERE id = ANY(${sqlArray(sourceIds)})
             AND company_id = ${companyId}
         `);
       });

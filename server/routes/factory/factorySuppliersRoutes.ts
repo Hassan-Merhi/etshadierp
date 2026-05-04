@@ -4,6 +4,7 @@ import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
+import { sqlArray } from "../../lib/sqlArray";
 import {
   writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
   isLegacySHA256Hash, verifySupervisorPassword,
@@ -1899,7 +1900,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           .from(factoryContainers)
           .where(and(
             eq(factoryContainers.companyId, companyId),
-            sql`${factoryContainers.id} = ANY(${missingContainerIds})`
+            sql`${factoryContainers.id} = ANY(${sqlArray(missingContainerIds)})`
           ));
         for (const c of extraContainers) containerMap[c.id] = c;
       }
@@ -1913,7 +1914,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         const commSuppliers = await db
           .select({ id: factorySuppliers.id, name: factorySuppliers.name })
           .from(factorySuppliers)
-          .where(sql`${factorySuppliers.id} = ANY(${commSupplierIds})`);
+          .where(sql`${factorySuppliers.id} = ANY(${sqlArray(commSupplierIds)})`);
         for (const s of commSuppliers) commSupplierMap[s.id] = s.name;
       }
       const obCommissions = (obRawStockWithCommission as any[])
@@ -2248,7 +2249,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
       ? await db.select().from(factorySupplierFxTransfers)
           .where(and(
             eq(factorySupplierFxTransfers.companyId, companyId),
-            sql`(${factorySupplierFxTransfers.fromSupplierId} = ANY(${allSupplierIds}) OR ${factorySupplierFxTransfers.toSupplierId} = ANY(${allSupplierIds}))`
+            sql`(${factorySupplierFxTransfers.fromSupplierId} = ANY(${sqlArray(allSupplierIds)}) OR ${factorySupplierFxTransfers.toSupplierId} = ANY(${sqlArray(allSupplierIds)}))`
           ))
           .orderBy(factorySupplierFxTransfers.date)
       : [];
@@ -2268,7 +2269,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         .from(factoryOffloadAdditionalCharges)
         .where(and(
           eq(factoryOffloadAdditionalCharges.companyId, companyId),
-          sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${allSupplierIds})`
+          sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${sqlArray(allSupplierIds)})`
         ))
         .orderBy(factoryOffloadAdditionalCharges.createdAt)
       : [];
@@ -2520,7 +2521,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           .from(factoryContainers)
           .where(and(
             eq(factoryContainers.companyId, companyId),
-            sql`${factoryContainers.otherChargesSupplierId} = ANY(${allSupplierIds})`,
+            sql`${factoryContainers.otherChargesSupplierId} = ANY(${sqlArray(allSupplierIds)})`,
             sql`${factoryContainers.otherCharges}::numeric > 0`
           ))
       : [];
@@ -2837,7 +2838,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
       let fxQuery = db.select().from(factorySupplierFxTransfers)
         .where(and(
           eq(factorySupplierFxTransfers.companyId, companyId),
-          sql`(${factorySupplierFxTransfers.fromSupplierId} = ANY(${allSupplierIds}) OR ${factorySupplierFxTransfers.toSupplierId} = ANY(${allSupplierIds}))`
+          sql`(${factorySupplierFxTransfers.fromSupplierId} = ANY(${sqlArray(allSupplierIds)}) OR ${factorySupplierFxTransfers.toSupplierId} = ANY(${sqlArray(allSupplierIds)}))`
         ))
         .$dynamic();
       if (from) fxQuery = fxQuery.where(sql`${factorySupplierFxTransfers.date} >= ${from}`);

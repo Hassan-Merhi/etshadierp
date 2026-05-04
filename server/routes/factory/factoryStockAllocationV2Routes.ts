@@ -8,6 +8,7 @@ import {
 } from "@shared/schema";
 import { eq, inArray, sql } from "drizzle-orm";
 import { syncProformaReservations } from "./_stockReservationHelper";
+import { sqlArray } from "../../lib/sqlArray";
 
 // ─── Backend stock-truth helper ───────────────────────────────────────────────
 // Phases 1–4: compute per-article inventory state entirely on the backend.
@@ -206,12 +207,12 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
         const prodRaw = await db.execute(
           sql`SELECT DISTINCT ON (matched_code) matched_code as "articleCode", name FROM (
                 SELECT name,
-                  CASE WHEN code = ANY(${allCodes}) THEN code
-                       WHEN article_code = ANY(${allCodes}) THEN article_code
+                  CASE WHEN code = ANY(${sqlArray(allCodes)}) THEN code
+                       WHEN article_code = ANY(${sqlArray(allCodes)}) THEN article_code
                   END as matched_code
                 FROM factory_bale_products
                 WHERE company_id = ${companyId}
-                  AND (code = ANY(${allCodes}) OR article_code = ANY(${allCodes}))
+                  AND (code = ANY(${sqlArray(allCodes)}) OR article_code = ANY(${sqlArray(allCodes)}))
               ) sub
               WHERE matched_code IS NOT NULL
               ORDER BY matched_code`
@@ -299,7 +300,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
           sql`SELECT cob.order_id as "orderId", fb.article_code as "articleCode", COUNT(*)::int as count
               FROM customer_order_bales cob
               JOIN factory_bales fb ON fb.id = cob.bale_id
-              WHERE cob.order_id = ANY(${ids})
+              WHERE cob.order_id = ANY(${sqlArray(ids)})
               GROUP BY cob.order_id, fb.article_code`
         );
         loadingBales = (balesRaw.rows || (balesRaw as unknown as any[])).map((r: any) => ({
@@ -358,12 +359,12 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
         const prodRaw = await db.execute(
           sql`SELECT DISTINCT ON (matched_code) matched_code as "articleCode", name FROM (
                 SELECT name,
-                  CASE WHEN code = ANY(${codes}) THEN code
-                       WHEN article_code = ANY(${codes}) THEN article_code
+                  CASE WHEN code = ANY(${sqlArray(codes)}) THEN code
+                       WHEN article_code = ANY(${sqlArray(codes)}) THEN article_code
                   END as matched_code
                 FROM factory_bale_products
                 WHERE company_id = ${companyId}
-                  AND (code = ANY(${codes}) OR article_code = ANY(${codes}))
+                  AND (code = ANY(${sqlArray(codes)}) OR article_code = ANY(${sqlArray(codes)}))
               ) sub
               WHERE matched_code IS NOT NULL
               ORDER BY matched_code`

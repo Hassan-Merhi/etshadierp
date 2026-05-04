@@ -1,6 +1,7 @@
 import { getClientDate } from "../../lib/dateUtils";
 import { getExportPriceVisibility } from "../../helpers/exportVisibility";
 import { syncProformaReservations, isFactoryV2Company, computeFreeToPromise } from "./_stockReservationHelper";
+import { sqlArray } from "../../lib/sqlArray";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -747,7 +748,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       if (activeOrders.length > 0) {
         const orderIds = activeOrders.map((o: any) => o.id);
         const activeOrderBalesRaw = await db.execute(
-          sql`SELECT order_id as "orderId", article_code as "articleCode", COUNT(*)::int as count FROM customer_order_bales WHERE order_id = ANY(${orderIds}) GROUP BY order_id, article_code`
+          sql`SELECT order_id as "orderId", article_code as "articleCode", COUNT(*)::int as count FROM customer_order_bales WHERE order_id = ANY(${sqlArray(orderIds)}) GROUP BY order_id, article_code`
         );
         activeOrderBales = (activeOrderBalesRaw.rows || activeOrderBalesRaw as unknown as any[]).map((b: any) => ({
           orderId: b.orderId,
@@ -777,7 +778,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           sql`SELECT DISTINCT ON (article_code) article_code as "articleCode", name
               FROM factory_bale_products
               WHERE company_id = ${companyId}
-                AND article_code = ANY(${allArticleCodes})
+                AND article_code = ANY(${sqlArray(allArticleCodes)})
               ORDER BY article_code`
         );
         (prodRaw.rows || prodRaw as unknown as any[]).forEach((r: any) => {
@@ -858,7 +859,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           sql`SELECT cob.order_id as "orderId", fb.article_code as "articleCode", COUNT(*)::int as count
               FROM customer_order_bales cob
               JOIN factory_bales fb ON fb.id = cob.bale_id
-              WHERE cob.order_id = ANY(${ids})
+              WHERE cob.order_id = ANY(${sqlArray(ids)})
               GROUP BY cob.order_id, fb.article_code`
         );
         loadingBales = (balesRaw.rows || balesRaw as unknown as any[]).map((r: any) => ({
@@ -917,7 +918,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           sql`SELECT DISTINCT ON (fbp.article_code) fbp.article_code as "articleCode", fbp.name
               FROM factory_bale_products fbp
               WHERE fbp.company_id = ${companyId}
-                AND fbp.article_code = ANY(${codes})
+                AND fbp.article_code = ANY(${sqlArray(codes)})
               ORDER BY fbp.article_code`
         );
         (prodRaw.rows || prodRaw as unknown as any[]).forEach((r: any) => {

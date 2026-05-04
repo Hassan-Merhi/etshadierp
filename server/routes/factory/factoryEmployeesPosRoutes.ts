@@ -45,6 +45,7 @@ import {
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { sqlArray } from "../../lib/sqlArray";
 import CryptoJS from "crypto-js";
 import multer from "multer";
 import path from "path";
@@ -707,7 +708,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const existing = await db.execute(sql`
         SELECT * FROM employee_attendance
         WHERE company_id = ${companyId} AND attendance_date = ${date}
-        AND employee_id = ANY(${empIds})
+        AND employee_id = ANY(${sqlArray(empIds)})
       `);
       res.json({ employees: emps, attendance: existing.rows });
     } catch (err: any) { res.status(500).json({ message: err.message }); }
@@ -3409,7 +3410,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
             WHERE company_id = ${companyId}
               AND attendance_date::date >= ${startDate}::date
               AND attendance_date::date <= ${endDate}::date
-              AND worker_id = ANY(${workerIds})
+              AND worker_id = ANY(${sqlArray(workerIds)})
             ORDER BY attendance_date`
       );
       const attRecords: { workerId: number; date: string; status: string }[] =
@@ -3443,7 +3444,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
               AND status = 'PAID'
               AND period_start <= ${endDate}::date
               AND period_end   >= ${startDate}::date
-              AND worker_id = ANY(${workerIds})`
+              AND worker_id = ANY(${sqlArray(workerIds)})`
       );
       const paidPayrollList: { workerId: number; netSalary: string }[] =
         ((paidPayrollRows as any).rows ?? (paidPayrollRows as any[])).map((r: any) => ({

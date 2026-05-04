@@ -2,6 +2,7 @@ import { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { sql } from "drizzle-orm";
+import { sqlArray } from "../../lib/sqlArray";
 
 export function registerProductionPlannerRoutes(app: Express) {
   const getCompanyId = (req: any): number | null =>
@@ -54,7 +55,7 @@ export function registerProductionPlannerRoutes(app: Express) {
           const wcResult = await db.execute(sql`
             SELECT worker_ids FROM factory_worker_categories
             WHERE company_id = ${companyId}
-              AND id = ANY(${categoryIds})
+              AND id = ANY(${sqlArray(categoryIds)})
           `);
           const wcRows: any[] = Array.isArray(wcResult) ? wcResult : (wcResult as any).rows ?? [];
           const teamWorkerIds = wcRows.flatMap((r: any) => {
@@ -63,7 +64,7 @@ export function registerProductionPlannerRoutes(app: Express) {
             try { return JSON.parse(ids || "[]").map(Number); } catch { return []; }
           });
           if (teamWorkerIds.length > 0) {
-            teamWorkerFilter = sql`AND fb.finalized_by = ANY(${teamWorkerIds})`;
+            teamWorkerFilter = sql`AND fb.finalized_by = ANY(${sqlArray(teamWorkerIds)})`;
           } else {
             skipActuals = true;
           }
@@ -75,7 +76,7 @@ export function registerProductionPlannerRoutes(app: Express) {
             FROM factory_bales fb
             WHERE fb.company_id = ${companyId}
               AND fb.stock_entry_date = ${date}
-              AND fb.finalized_by = ANY(${workerIds})
+              AND fb.finalized_by = ANY(${sqlArray(workerIds)})
               AND fb.status IN ('IN_STOCK','SOLD','RESERVED_FOR_ORDER','DISPATCHED','FINALIZED')
               ${teamWorkerFilter}
             GROUP BY fb.finalized_by

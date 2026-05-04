@@ -3,6 +3,7 @@ import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
+import { sqlArray } from "../lib/sqlArray";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries } from "./_helpers";
 import {
   factoryCategories, factoryBaleProducts, factoryContainers, factoryRawStock,
@@ -219,12 +220,13 @@ export function registerAdminRoutes(app: Express) {
       // Use parameterized array binding (= ANY($1)) instead of string-interpolated IN list
       // to keep the query injection-safe even if the source of the IDs ever changes.
       await db.transaction(async (tx) => {
-        await tx.execute(sql`DELETE FROM voucher_entries WHERE voucher_id = ANY(${orphanedIds})`);
-        await tx.execute(sql`DELETE FROM stock_transfer_vouchers WHERE voucher_id = ANY(${orphanedIds})`);
-        await tx.execute(sql`DELETE FROM stock_adjustment_vouchers WHERE voucher_id = ANY(${orphanedIds})`);
-        await tx.execute(sql`DELETE FROM sales_items WHERE voucher_id = ANY(${orphanedIds})`);
-        await tx.execute(sql`DELETE FROM salary_advances WHERE voucher_id = ANY(${orphanedIds})`);
-        await tx.execute(sql`DELETE FROM vouchers WHERE id = ANY(${orphanedIds})`);
+        const oArr = sqlArray(orphanedIds);
+        await tx.execute(sql`DELETE FROM voucher_entries WHERE voucher_id = ANY(${oArr})`);
+        await tx.execute(sql`DELETE FROM stock_transfer_vouchers WHERE voucher_id = ANY(${oArr})`);
+        await tx.execute(sql`DELETE FROM stock_adjustment_vouchers WHERE voucher_id = ANY(${oArr})`);
+        await tx.execute(sql`DELETE FROM sales_items WHERE voucher_id = ANY(${oArr})`);
+        await tx.execute(sql`DELETE FROM salary_advances WHERE voucher_id = ANY(${oArr})`);
+        await tx.execute(sql`DELETE FROM vouchers WHERE id = ANY(${oArr})`);
       });
       
       res.json({ success: true, deleted: orphanedIds.length });

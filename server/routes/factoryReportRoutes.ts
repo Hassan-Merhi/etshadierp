@@ -3,6 +3,7 @@ import type { Express } from "express";
 import PDFDocument from "pdfkit";
 import ExcelJS from "exceljs";
 import path from "path";
+import { sqlArray } from "../lib/sqlArray";
 import fs from "fs";
 import { eq, and, sql, desc } from "drizzle-orm";
 import {
@@ -109,7 +110,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
           createdAt: factoryMixBatchSources.createdAt,
         })
         .from(factoryMixBatchSources)
-        .where(sql`${factoryMixBatchSources.containerId} = ANY(${containerIds})`);
+        .where(sql`${factoryMixBatchSources.containerId} = ANY(${sqlArray(containerIds)})`);
 
       const allMixBatches = await db
         .select()

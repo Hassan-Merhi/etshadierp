@@ -1,4 +1,5 @@
 import { and, eq, isNull, inArray, sql } from "drizzle-orm";
+import { sqlArray } from "../../lib/sqlArray";
 import { db } from "../../db";
 import {
   factoryV3Loads,
@@ -447,7 +448,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         await db.execute(sql`
           UPDATE factory_bales
           SET status = 'SOLD'
-          WHERE id = ANY(${baleIds})
+          WHERE id = ANY(${sqlArray(baleIds)})
             AND company_id = ${companyId}
         `);
       }
