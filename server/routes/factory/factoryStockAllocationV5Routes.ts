@@ -10,13 +10,7 @@ import {
   customers,
 } from "@shared/schema";
 import { eq, inArray, sql, and, gte, lte, isNull } from "drizzle-orm";
-
-// Helper: converts a JS array into a proper PostgreSQL ARRAY[...] expression
-// so that `= ANY(${sqlArray(ids)})` works correctly inside db.execute() calls.
-// Drizzle's sql`` tag renders bare JS arrays as tuple syntax ($1,$2,...) which
-// PostgreSQL rejects for = ANY(); this wrapper produces ARRAY[$1,$2,...] instead.
-const sqlArray = (arr: (string | number)[]) =>
-  sql`ARRAY[${sql.join(arr.map(v => sql`${v}`), sql`, `)}]`;
+import { sqlArray } from "../../lib/sqlArray";
 
 // ─── V5 Guard Convention ─────────────────────────────────────────────────────
 // V5 orders are identified by: customer_orders.proforma_id_used IS NOT NULL
