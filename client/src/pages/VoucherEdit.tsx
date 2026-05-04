@@ -316,7 +316,7 @@ const journalFormSchema = z.object({
   voucherDate: z.date(),
   currency: z.enum(["USD", "CFA"]).default("USD"),
   entries: z.array(journalEntrySchema).min(1, "Add at least one entry"),
-  notes: z.string().optional(),
+  notes: z.string().default(""),
 });
 
 const salesFormSchema = z.object({

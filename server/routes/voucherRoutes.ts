@@ -3471,7 +3471,7 @@ export function registerVoucherRoutes(app: Express) {
         const voucherUpdates: any = {
           voucherType: voucher.voucherType,
           voucherDate: voucher.voucherDate,
-          description: voucher.description || null,
+          description: voucher.description !== undefined ? (voucher.description || null) : existingVoucher.description,
           optional: voucher.optional ?? false,
 
           totalAmount: Math.max(totalDebits, totalCredits).toFixed(2),
