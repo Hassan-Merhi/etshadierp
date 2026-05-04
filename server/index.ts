@@ -2530,6 +2530,7 @@ let migrationsDone = false;
       `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
       `ALTER TABLE factory_raw_stock ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
       `ALTER TABLE factory_raw_material_adjustments ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE factory_raw_material_adjustments ADD COLUMN IF NOT EXISTS reference varchar(200)`,
       `ALTER TABLE factory_mix_batches ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
       `ALTER TABLE factory_bales ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
       `ALTER TABLE customer_proformas ADD COLUMN IF NOT EXISTS deleted_at timestamp`,

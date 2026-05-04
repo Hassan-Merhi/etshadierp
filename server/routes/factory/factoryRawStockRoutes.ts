@@ -463,7 +463,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { supplierId, kg, notes, costPerKg, currencyCode, txDate } = req.body;
+      const { supplierId, kg, notes, reference, costPerKg, currencyCode, txDate } = req.body;
       if (!supplierId) return res.status(400).json({ message: "supplierId is required" });
       if (!kg || parseFloat(kg) <= 0) return res.status(400).json({ message: "kg must be > 0" });
 
@@ -555,6 +555,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
             currencyCode: ccy,
             supplierId: Number(supplierId),
             notes: notes || null,
+            reference: reference || null,
           });
         }
 
@@ -570,6 +571,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
             currencyCode: ccy,
             supplierId: Number(supplierId),
             notes: notes ? `${notes} (auto-adj)` : "Deduct from received (auto-adj)",
+            reference: reference || null,
           }).returning();
         }
 
@@ -655,6 +657,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
         costPerKg: factoryRawMaterialAdjustments.costPerKg,
         currencyCode: factoryRawMaterialAdjustments.currencyCode,
         notes: factoryRawMaterialAdjustments.notes,
+        reference: factoryRawMaterialAdjustments.reference,
         materialLabel: factoryRawMaterialAdjustments.materialLabel,
         createdAt: factoryRawMaterialAdjustments.createdAt,
       })
@@ -756,8 +759,9 @@ export function registerFactoryRawStockRoutes(app: Express) {
         costPerKg: parseFloat(r.costPerKg as string) || 0,
         currencyCode: r.currencyCode || "USD",
         notes: r.notes,
+        reference: r.reference || null,
         label: r.type === "ADD" ? "Manual Addition" : r.type === "DEDUCT" ? "Deduct from Received" : "Manual Deduction",
-        ref: `ADJ-${r.id}`,
+        ref: r.reference ? r.reference : `ADJ-${r.id}`,
       }));
 
       const all = [...adjustmentsWithId, ...batches, ...receipts]
@@ -775,7 +779,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const { type, kg, costPerKg, currencyCode, supplierId, materialLabel, notes, date, createVoucher } = req.body;
+      const { type, kg, costPerKg, currencyCode, supplierId, materialLabel, notes, reference, date, createVoucher } = req.body;
       if (!type || !["ADD", "REMOVE"].includes(type)) return res.status(400).json({ message: "type must be ADD or REMOVE" });
       if (!kg || parseFloat(kg) <= 0) return res.status(400).json({ message: "kg must be > 0" });
       if (!date) return res.status(400).json({ message: "date is required" });
@@ -809,6 +813,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
           supplierId: resolvedSupplierId,
           materialLabel: materialLabel || null,
           notes: notes || null,
+          reference: reference || null,
         }).returning();
 
         // Accounting voucher: Dr Raw Material Stock / Cr Supplier Account

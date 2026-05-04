@@ -2684,6 +2684,7 @@ export const factoryRawMaterialAdjustments = pgTable("factory_raw_material_adjus
   supplierId: integer("supplier_id").references(() => factorySuppliers.id, { onDelete: "restrict" }), // optional: link to a factory supplier row
   materialLabel: varchar("material_label", { length: 200 }), // for standalone manual materials
   notes: text("notes"),
+  reference: varchar("reference", { length: 200 }),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({

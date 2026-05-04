@@ -626,6 +626,7 @@ export default function ProductionRawStock() {
   const [adjCostPerKg, setAdjCostPerKg] = useState("");
   const [adjCurrency, setAdjCurrency] = useState("USD");
   const [adjNotes, setAdjNotes] = useState("");
+  const [adjReference, setAdjReference] = useState("");
   const [adjDate, setAdjDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [adjMaterialLabel, setAdjMaterialLabel] = useState("");
   const [adjIsNewMaterial, setAdjIsNewMaterial] = useState(false);
@@ -640,6 +641,7 @@ export default function ProductionRawStock() {
   const inlineCostFiredRef = useRef(false); // prevent double-fire on Enter→blur
   const [deductKg, setDeductKg] = useState("");
   const [deductNotes, setDeductNotes] = useState("");
+  const [deductReference, setDeductReference] = useState("");
   // Add-to-batch quick dialog state
   const [addToBatchOpen, setAddToBatchOpen] = useState(false);
   const [addToBatchSource, setAddToBatchSource] = useState<{ supplierId: number; supplierName: string; costPerKg: string; remainingKg: string } | null>(null);
@@ -878,6 +880,7 @@ export default function ProductionRawStock() {
       supplierId?: number | null;
       materialLabel?: string;
       notes?: string;
+      reference?: string;
       date: string;
       createVoucher?: boolean;
     }) => {
@@ -896,6 +899,7 @@ export default function ProductionRawStock() {
       setAdjKg("");
       setAdjCostPerKg("");
       setAdjNotes("");
+      setAdjReference("");
       setAdjMaterialLabel("");
       setAdjSupplierId("");
       toast({ title: "Saved", description: "Stock adjustment recorded successfully." });
@@ -907,7 +911,7 @@ export default function ProductionRawStock() {
   });
 
   const deductReceivedMutation = useMutation({
-    mutationFn: async (payload: { supplierId: number; kg: string; notes?: string; costPerKg?: string; currencyCode?: string }) => {
+    mutationFn: async (payload: { supplierId: number; kg: string; notes?: string; reference?: string; costPerKg?: string; currencyCode?: string }) => {
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/deduct-received", payload);
       if (!res.ok) {
         const err = await res.json();
@@ -922,6 +926,7 @@ export default function ProductionRawStock() {
       setDeductDialogOpen(false);
       setDeductKg("");
       setDeductNotes("");
+      setDeductReference("");
       toast({ title: "Deducted", description: `${data.deducted} kg removed from received stock.` });
     },
     onError: (err: any) => {
@@ -3598,11 +3603,20 @@ export default function ProductionRawStock() {
                 )}
 
                 <div className="space-y-1">
+                  <Label>Reference (optional)</Label>
+                  <Input
+                    value={adjReference}
+                    onChange={(e) => setAdjReference(e.target.value)}
+                    placeholder="e.g. Invoice #, PO #, reason…"
+                    data-testid="input-adj-reference"
+                  />
+                </div>
+                <div className="space-y-1">
                   <Label>Notes (optional)</Label>
                   <Textarea
                     value={adjNotes}
                     onChange={(e) => setAdjNotes(e.target.value)}
-                    placeholder="Reason for adjustment..."
+                    placeholder="Additional notes..."
                     rows={2}
                     data-testid="input-adj-notes"
                   />
@@ -3654,6 +3668,7 @@ export default function ProductionRawStock() {
                   supplierId: resolvedSupplierId,
                   materialLabel: ((!adjSupplierId || adjSupplierId === "__none__") && adjIsNewMaterial) ? adjMaterialLabel.trim() : undefined,
                   notes: adjNotes || undefined,
+                  reference: adjReference || undefined,
                   date: adjDate,
                   createVoucher: adjIsNewMaterial && !!adjSupplierId && adjSupplierId !== "__none__" && adjType === "ADD" && parseFloat(adjCostPerKg || "0") > 0,
                 });
@@ -3669,7 +3684,7 @@ export default function ProductionRawStock() {
       </Dialog>
 
       {/* ── Deduct from Received Dialog ── */}
-      <Dialog open={deductDialogOpen} onOpenChange={(open) => { setDeductDialogOpen(open); if (!open) { setDeductingRow(null); setDeductKg(""); setDeductNotes(""); } }}>
+      <Dialog open={deductDialogOpen} onOpenChange={(open) => { setDeductDialogOpen(open); if (!open) { setDeductingRow(null); setDeductKg(""); setDeductNotes(""); setDeductReference(""); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -3701,9 +3716,18 @@ export default function ProductionRawStock() {
               )}
             </div>
             <div className="space-y-1">
+              <Label>Reference (optional)</Label>
+              <Input
+                placeholder="e.g. Invoice #, PO #, reason…"
+                value={deductReference}
+                onChange={(e) => setDeductReference(e.target.value)}
+                data-testid="input-deduct-reference"
+              />
+            </div>
+            <div className="space-y-1">
               <Label>Notes (optional)</Label>
               <Input
-                placeholder="Reason for deduction…"
+                placeholder="Additional notes…"
                 value={deductNotes}
                 onChange={(e) => setDeductNotes(e.target.value)}
                 data-testid="input-deduct-notes"
@@ -3728,6 +3752,7 @@ export default function ProductionRawStock() {
                   supplierId: deductingRow.supplierId,
                   kg: deductKg,
                   notes: deductNotes || undefined,
+                  reference: deductReference || undefined,
                 });
               }}
               data-testid="button-deduct-confirm"
@@ -3787,7 +3812,11 @@ export default function ProductionRawStock() {
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium truncate">{entry.label}</p>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs text-muted-foreground font-mono">{entry.ref}</span>
+                            {entry.reference ? (
+                              <span className="text-xs font-mono font-semibold text-foreground bg-muted px-1.5 py-0.5 rounded">{entry.reference}</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground font-mono">{entry.ref}</span>
+                            )}
                             <span className="text-xs text-muted-foreground">{dateStr}</span>
                             {entry.batchStatus && (
                               <Badge variant="outline" className="text-xs py-0">
