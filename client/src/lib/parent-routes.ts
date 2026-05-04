@@ -1,7 +1,7 @@
 export function getParentRoute(pathname: string): string | null {
   if (pathname.startsWith("/factory/")) {
-    if (/^\/factory\/employees\/\d+/.test(pathname)) return "/factory/payroll-hub?tab=employees";
-    if (/^\/factory\/workers\/\d+/.test(pathname)) return "/factory/payroll-hub?tab=workers";
+    if (/^\/factory\/employees\/\d+/.test(pathname)) return "/factory/finance?tab=payroll";
+    if (/^\/factory\/workers\/\d+/.test(pathname)) return "/factory/finance?tab=payroll";
     if (/^\/factory\/customers\/\d+/.test(pathname)) return "/factory/customers";
     if (pathname === "/factory/containers/new") return "/factory/containers";
     if (/^\/factory\/raw-stock\/opening-balance\/\d+\/edit/.test(pathname)) return "/factory/raw-materials";
@@ -16,14 +16,14 @@ export function getParentRoute(pathname: string): string | null {
       const m = pathname.match(/^\/factory\/ledger-vouchers\/([^/]+)\//);
       if (m) return `/factory/ledger-monthly/${m[1]}`;
     }
-    if (/^\/factory\/ledger-monthly\//.test(pathname)) return "/factory/accounts";
+    if (/^\/factory\/ledger-monthly\//.test(pathname)) return "/factory/finance?tab=accounts";
     {
       const m = pathname.match(/^\/factory\/bale-product-history\/(\d+)\/(\d+)\/\d+(?:\/(?:all|\d+))?/);
       if (m) return `/factory/bale-product-history/${m[1]}/${m[2]}`;
     }
     if (/^\/factory\/bale-product-history\/\d+\/\d+/.test(pathname)) return "/factory/location-inventory";
-    if (/^\/factory\/voucher-detail\//.test(pathname)) return "/factory/vouchers";
-    if (/^\/factory\/vouchers\/\d+\/edit/.test(pathname)) return "/factory/vouchers";
+    if (/^\/factory\/voucher-detail\//.test(pathname)) return "/factory/finance?tab=vouchers";
+    if (/^\/factory\/vouchers\/\d+\/edit/.test(pathname)) return "/factory/finance?tab=vouchers";
     return null;
   }
 

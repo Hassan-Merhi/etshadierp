@@ -153,6 +153,7 @@ const FactoryWorkerDetail = lazy(() => import("@/pages/factory/FactoryWorkerDeta
 const FactoryEmployeesHub = lazy(() => import("@/pages/factory/FactoryEmployeesHub"));
 const FactoryEmployeeDetail = lazy(() => import("@/pages/factory/FactoryEmployeeDetail"));
 const FactoryPayrollHub = lazy(() => import("@/pages/factory/FactoryPayrollHub"));
+const FactoryFinanceHub = lazy(() => import("@/pages/factory/FactoryFinanceHub"));
 const FactorySupplierReport = lazy(() => import("@/pages/factory/FactorySupplierReport"));
 const FactorySupplierStatement = lazy(() => import("@/pages/factory/FactorySupplierStatement"));
 const FactoryBrokerVisualStatement = lazy(() => import("@/pages/factory/FactoryBrokerVisualStatement"));
@@ -844,7 +845,8 @@ function AuthenticatedApp() {
                     {hasDashboardAccess && <Route path="/factory/dashboard" component={FactoryDashboardIntel} />}
                     <Route path="/factory/daybook" component={FactoryDaybook} />
                     <Route path="/factory/transporters" component={FactoryTransporters} />
-                    <Route path="/factory/suppliers" component={FactorySuppliers} />
+                    <Route path="/factory/finance" component={FactoryFinanceHub} />
+                    <Route path="/factory/suppliers"><Redirect to="/factory/finance?tab=suppliers" /></Route>
                     <Route path="/factory/containers/new" component={FactoryContainerCreate} />
                     <Route path="/factory/containers" component={FactoryContainers} />
                     <Route path="/factory/bale-products" component={BaleProducts} />
@@ -864,9 +866,9 @@ function AuthenticatedApp() {
                     <Route path="/factory/stock-otw" component={FactoryStockOTW} />
                     <Route path="/factory/stock-query/:id" component={FactoryStockItemDetail} />
                     <Route path="/factory/stock-query" component={StockQuery} />
-                    <Route path="/factory/accounts" component={FactoryAccounts} />
+                    <Route path="/factory/accounts"><Redirect to="/factory/finance?tab=accounts" /></Route>
                     <Route path="/factory/agents" component={Agents} />
-                    <Route path="/factory/vouchers">{() => <FactoryVouchers />}</Route>
+                    <Route path="/factory/vouchers"><Redirect to="/factory/finance?tab=vouchers" /></Route>
                     <Route path="/factory/vouchers/:id/edit" component={VoucherEdit} />
                     <Route path="/factory/voucher-detail/:voucherId" component={VoucherDetail} />
                     <Route path="/factory/create" component={AccountingCreate} />
@@ -888,7 +890,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/stock-allocation-v5" component={FactoryStockAllocationV5} />
                     <Route path="/factory/customers/:id" component={FactoryCustomerStatement} />
                     <Route path="/factory/customers" component={FactoryCustomers} />
-                    <Route path="/factory/payroll-hub" component={FactoryPayrollHub} />
+                    <Route path="/factory/payroll-hub"><Redirect to="/factory/finance?tab=payroll" /></Route>
                     <Route path="/factory/employees/:id" component={FactoryEmployeeDetail} />
                     <Route path="/factory/employees"><Redirect to="/factory/payroll-hub" /></Route>
                     <Route path="/factory/workers/:id" component={FactoryWorkerDetail} />

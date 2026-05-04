@@ -117,17 +117,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     label: "Finance",
     color: NAV_COLOR.finance,
     items: [
-      { title: "Payroll",   url: "/factory/payroll-hub", icon: HardHat   },
-      { title: "Suppliers", url: "/factory/suppliers",   icon: UserRound },
-      ...(import.meta.env.DEV ? [{ title: "Broker Statement", url: "/factory/broker-visual-statement", icon: Scale }] : []),
-    ],
-  },
-  {
-    label: "Accounting",
-    color: NAV_COLOR.accounting,
-    items: [
-      { title: "Vouchers", url: "/factory/vouchers", icon: FileText },
-      { title: "Accounts", url: "/factory/accounts", icon: Landmark },
+      { title: "Finance", url: "/factory/finance", icon: Landmark },
     ],
   },
   {
