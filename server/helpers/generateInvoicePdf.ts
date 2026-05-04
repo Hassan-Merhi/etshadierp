@@ -206,28 +206,32 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     y += boxH + 4;
   }
 
-  // ── Table header ──────────────────────────────────────────────────────────
-  const thH = 18;
-  doc.save();
-  doc.rect(MARGIN_X, y, USABLE_W, thH).fill("#e0e0e0");
-  doc.restore();
-  drawRowBorders(doc, y, thH, true);
-  doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#000000");
-  cellText(doc, "Description", X_DESC, COL_DESC_W, y, thH, "left");
-  cellText(doc, "Qty",         X_QTY,  COL_QTY_W,  y, thH, "center");
-  cellText(doc, "Rate",        X_RATE, COL_RATE_W,  y, thH, "center");
-  cellText(doc, "Amt",         X_AMT,  COL_AMT_W,   y, thH, "center");
-  cellText(doc, "Config",      X_CFG,  COL_CFG_W,   y, thH, "center");
-  cellText(doc, "P/L Bale",   X_PLB,  COL_PLB_W,   y, thH, "center");
-  cellText(doc, "Total P/L",  X_TPL,  COL_TPL_W,   y, thH, "center");
-  y += thH;
+  // ── Table header (also called after every page break) ─────────────────────
+  const THR_H = 16;
+  const ROW_H = 15;
+
+  function drawTableHeader(atY: number): number {
+    doc.save();
+    doc.rect(MARGIN_X, atY, USABLE_W, THR_H).fill("#d8d8d8");
+    doc.restore();
+    drawRowBorders(doc, atY, THR_H, true);
+    doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#000000");
+    cellText(doc, "Description", X_DESC, COL_DESC_W, atY, THR_H, "left");
+    cellText(doc, "Qty",         X_QTY,  COL_QTY_W,  atY, THR_H, "center");
+    cellText(doc, "Rate",        X_RATE, COL_RATE_W,  atY, THR_H, "center");
+    cellText(doc, "Amt",         X_AMT,  COL_AMT_W,   atY, THR_H, "center");
+    cellText(doc, "Config",      X_CFG,  COL_CFG_W,   atY, THR_H, "center");
+    cellText(doc, "P/L Bale",    X_PLB,  COL_PLB_W,   atY, THR_H, "center");
+    cellText(doc, "Total P/L",   X_TPL,  COL_TPL_W,   atY, THR_H, "center");
+    return atY + THR_H;
+  }
+
+  y = drawTableHeader(y);
 
   // ── Item rows ──────────────────────────────────────────────────────────────
   let totalQty = 0;
   let totalAmt = 0;
   let totalPL  = 0;
-
-  const ROW_H = 14;
 
   for (const item of d.items) {
     const amtUSD = item.quantity * item.rateUSD;
@@ -238,36 +242,32 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     totalAmt += amtUSD;
     totalPL  += itemPL;
 
-    const rowH = ROW_H;
-
-    // Page break
-    if (y + rowH > PAGE_H - MARGIN_Y) {
+    // Page break — re-draw column header on new page
+    if (y + ROW_H > PAGE_H - MARGIN_Y) {
       doc.addPage({ size: "A4" });
       y = MARGIN_Y;
+      y = drawTableHeader(y);
     }
 
     doc.save();
-    doc.rect(MARGIN_X, y, USABLE_W, rowH).fill("#ffffff");
+    doc.rect(MARGIN_X, y, USABLE_W, ROW_H).fill("#ffffff");
     doc.restore();
-    drawRowBorders(doc, y, rowH, false);
+    drawRowBorders(doc, y, ROW_H, false);
 
-    // Description — may wrap, left-aligned
+    // All cells vertically centred at the same baseline
+    const cy = y + Math.round((ROW_H - 7.5) / 2);
     doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#000000");
-    doc.text(item.stockItemName, X_DESC + 4, y + 4, { width: COL_DESC_W - 8, align: "left", lineBreak: false });
-
-    // All numeric cells vertically centred
-    const cy = y + Math.round((rowH - 8) / 2);
-    doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#000000");
-    doc.text(fmtQty(item.quantity),        X_QTY  + 1, cy, { width: COL_QTY_W  - 2, align: "center", lineBreak: false });
-    doc.text(fmtUSD(item.rateUSD),         X_RATE + 1, cy, { width: COL_RATE_W - 2, align: "center", lineBreak: false });
-    doc.text(fmtUSD(amtUSD),               X_AMT  + 1, cy, { width: COL_AMT_W  - 2, align: "center", lineBreak: false });
-    doc.text(fmtUSD(item.configuredPrice), X_CFG  + 1, cy, { width: COL_CFG_W  - 2, align: "center", lineBreak: false });
+    doc.text(item.stockItemName,           X_DESC + 4, cy, { width: COL_DESC_W - 8,  align: "left",   lineBreak: false });
+    doc.text(fmtQty(item.quantity),        X_QTY  + 1, cy, { width: COL_QTY_W  - 2,  align: "center", lineBreak: false });
+    doc.text(fmtUSD(item.rateUSD),         X_RATE + 1, cy, { width: COL_RATE_W - 2,  align: "center", lineBreak: false });
+    doc.text(fmtUSD(amtUSD),               X_AMT  + 1, cy, { width: COL_AMT_W  - 2,  align: "center", lineBreak: false });
+    doc.text(fmtUSD(item.configuredPrice), X_CFG  + 1, cy, { width: COL_CFG_W  - 2,  align: "center", lineBreak: false });
     doc.fillColor(plColor(plBale));
-    doc.text(fmtUSD(plBale), X_PLB + 1, cy, { width: COL_PLB_W - 2, align: "center", lineBreak: false });
+    doc.text(fmtUSD(plBale),               X_PLB  + 1, cy, { width: COL_PLB_W  - 2,  align: "center", lineBreak: false });
     doc.fillColor(plColor(itemPL));
-    doc.text(fmtUSD(itemPL), X_TPL + 1, cy, { width: COL_TPL_W - 2, align: "center", lineBreak: false });
+    doc.text(fmtUSD(itemPL),               X_TPL  + 1, cy, { width: COL_TPL_W  - 2,  align: "center", lineBreak: false });
 
-    y += rowH;
+    y += ROW_H;
   }
 
   // ── TOTAL footer row ───────────────────────────────────────────────────────
@@ -331,15 +331,19 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   return pdfReady;
 }
 
-// ── Draw a table row's borders (vertical column dividers + bottom edge) ───────
+// ── Draw a table row's borders (vertical column dividers + top/bottom edges) ──
 function drawRowBorders(doc: any, y: number, h: number, isHeader: boolean): void {
-  const colBorderColor = isHeader ? "#999999" : "#bbbbbb";
+  const colBorderColor = isHeader ? "#888888" : "#cccccc";
   const dividers = [X_DESC, X_QTY, X_RATE, X_AMT, X_CFG, X_PLB, X_TPL, X_TPL + COL_TPL_W];
   doc.save();
   doc.strokeColor(colBorderColor).lineWidth(0.5);
+  // Top edge (always on header, so the table has a clean top boundary)
+  if (isHeader) {
+    doc.moveTo(MARGIN_X, y).lineTo(MARGIN_X + USABLE_W, y).stroke();
+  }
   // Bottom edge
   doc.moveTo(MARGIN_X, y + h).lineTo(MARGIN_X + USABLE_W, y + h).stroke();
-  // Vertical dividers (every column boundary)
+  // Vertical dividers (every column boundary including outer left + right)
   for (const x of dividers) {
     doc.moveTo(x, y).lineTo(x, y + h).stroke();
   }
