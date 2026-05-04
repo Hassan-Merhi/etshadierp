@@ -368,9 +368,7 @@ export default function FactoryStockAllocationV5() {
           >
             {refreshFlash
               ? <><CheckCircle2 className="h-4 w-4 mr-2 text-primary" />Refreshed</>
-              : query.isFetching
-                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Refreshing…</>
-                : <><RefreshCw className="h-4 w-4 mr-2" />Refresh</>}
+              : <><RefreshCw className="h-4 w-4 mr-2" />Refresh</>}
           </Button>
         </div>
       </div>
