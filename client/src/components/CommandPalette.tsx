@@ -26,6 +26,11 @@ import {
   Box,
   Archive,
   Users,
+  ArrowLeftRight,
+  Tag,
+  Truck,
+  FileText,
+  Ship,
 } from "lucide-react";
 import { useErpVisibleSections } from "@/components/AppSidebar";
 import { useFactoryVisibleSections } from "@/components/FactorySidebar";
@@ -108,16 +113,35 @@ const ERP_EXTRAS: PageEntry[] = [
   { label: "Chat", description: "Internal messaging", path: "/chat", icon: MessageSquare },
 ];
 
+/** ERP hub tab entries — each tab inside a hub page gets its own searchable entry. */
+const ERP_HUB_TABS: PageEntry[] = [
+  { label: "Stock Transfers",  description: "Transfer stock between locations", path: "/sales-tools?tab=transfers", icon: ArrowLeftRight },
+  { label: "Price List",       description: "Product price list",               path: "/sales-tools?tab=pricelist", icon: Tag            },
+  { label: "Suppliers",        description: "Supplier management",              path: "/parties?tab=suppliers",     icon: Truck          },
+  { label: "Customers",        description: "Customer accounts",                path: "/parties?tab=customers",     icon: Users          },
+];
+
 /** Factory routes that aren't in FACTORY_NAV_SECTIONS but were historically in the palette. */
 const FACTORY_EXTRAS_ALWAYS: PageEntry[] = [
-  { label: "Factory Daybook", description: DESCRIPTIONS["/factory/daybook"], path: "/factory/daybook", icon: Calendar },
-  { label: "Factory Chat", description: "Internal messaging", path: "/factory/chat", icon: MessageSquare },
-  { label: "Bale Products", description: DESCRIPTIONS["/factory/bale-products"], path: "/factory/bale-products", icon: Box },
-  { label: "Bale Relabeling", description: DESCRIPTIONS["/factory/bale-relabeling"], path: "/factory/bale-relabeling", icon: Archive },
-  { label: "Payroll", description: "Workers, employees and salary runs", path: "/factory/finance?tab=payroll", icon: Users },
-  { label: "Suppliers", description: DESCRIPTIONS["/factory/suppliers"], path: "/factory/finance?tab=suppliers", icon: Package },
-  { label: "Vouchers", description: DESCRIPTIONS["/factory/vouchers"], path: "/factory/finance?tab=vouchers", icon: Archive },
-  { label: "Accounts", description: DESCRIPTIONS["/factory/accounts"], path: "/factory/finance?tab=accounts", icon: PieChart },
+  { label: "Factory Daybook",   description: DESCRIPTIONS["/factory/daybook"],        path: "/factory/daybook",   icon: Calendar    },
+  { label: "Factory Chat",      description: "Internal messaging",                    path: "/factory/chat",      icon: MessageSquare },
+  { label: "Bale Relabeling",   description: DESCRIPTIONS["/factory/bale-relabeling"],path: "/factory/bale-relabeling", icon: Archive },
+];
+
+/** Factory hub tab entries — each tab in a hub page gets its own searchable entry. */
+const FACTORY_HUB_TABS: PageEntry[] = [
+  { label: "Bales",               description: "All bale stock",                    path: "/factory/bales-hub?tab=history",             icon: Box           },
+  { label: "Barcode Lookup",      description: "Look up bales by barcode",          path: "/factory/bales-hub?tab=barcode",             icon: Archive       },
+  { label: "Bale Products",       description: DESCRIPTIONS["/factory/bale-products"], path: "/factory/bales-hub?tab=products",         icon: Box           },
+  { label: "Import History",      description: "Bale import history",               path: "/factory/bales-hub?tab=imports",             icon: Archive       },
+  { label: "Proformas",           description: "Proforma invoices",                 path: "/factory/invoicing?tab=proformas",           icon: FileText      },
+  { label: "Invoices",            description: "Finalized factory invoices",        path: "/factory/invoicing?tab=invoices",            icon: FileText      },
+  { label: "Container Loadings",  description: "Manage container loadings",         path: "/factory/sales/loadings?tab=loadings",       icon: Ship          },
+  { label: "Pending Loadings",    description: "Loadings pending confirmation",     path: "/factory/sales/loadings?tab=pending",        icon: Ship          },
+  { label: "Payroll",             description: "Workers, employees and salary runs",path: "/factory/finance?tab=payroll",               icon: Users         },
+  { label: "Factory Suppliers",   description: DESCRIPTIONS["/factory/suppliers"],  path: "/factory/finance?tab=suppliers",             icon: Truck         },
+  { label: "Factory Vouchers",    description: DESCRIPTIONS["/factory/vouchers"],   path: "/factory/finance?tab=vouchers",              icon: FileText      },
+  { label: "Factory Accounts",    description: DESCRIPTIONS["/factory/accounts"],   path: "/factory/finance?tab=accounts",              icon: PieChart      },
 ];
 
 const PROPERTIES_EXTRAS: PageEntry[] = [
@@ -245,7 +269,7 @@ export function CommandPalette({
   const factoryVis = useFactoryVisibleSections(hasFactoryAccess && !isPOS ? user : undefined);
 
   const erpPages = useMemo(
-    () => buildEntries(erpVis.sections, ERP_EXTRAS, [
+    () => buildEntries(erpVis.sections, [...ERP_EXTRAS, ...ERP_HUB_TABS], [
       ...erpVis.visiblePinnedItems,
       ...erpVis.visibleUtilityItems,
     ]),
@@ -256,7 +280,7 @@ export function CommandPalette({
     const dashExtra = hasDashboardAccess
       ? [{ label: "Factory Dashboard", description: DESCRIPTIONS["/factory/dashboard"], path: "/factory/dashboard", icon: LayoutDashboard }]
       : [];
-    return buildEntries(factoryVis.sections, [...dashExtra, ...FACTORY_EXTRAS_ALWAYS]);
+    return buildEntries(factoryVis.sections, [...dashExtra, ...FACTORY_EXTRAS_ALWAYS, ...FACTORY_HUB_TABS]);
   }, [factoryVis.sections, hasDashboardAccess]);
 
   const propertiesPages = useMemo(
