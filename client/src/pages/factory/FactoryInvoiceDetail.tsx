@@ -98,6 +98,11 @@ export default function FactoryInvoiceDetail() {
   const [editingChargeLedger, setEditingChargeLedger] = useState<number | null>(null);
   const [editingChargeAmount, setEditingChargeAmount] = useState<number | null>(null);
   const [chargeAmountInput, setChargeAmountInput] = useState("");
+  const [showAddCharge, setShowAddCharge] = useState(false);
+  const [newChargeName, setNewChargeName] = useState("");
+  const [newChargeAmount, setNewChargeAmount] = useState("");
+  const [newChargeType, setNewChargeType] = useState("FREIGHT");
+  const [newChargeLedgerId, setNewChargeLedgerId] = useState<string>("");
   const [editValue, setEditValue] = useState("");
   const [revertDialogOpen, setRevertDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -134,6 +139,24 @@ export default function FactoryInvoiceDetail() {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
       setEditingChargeLedger(null);
       toast({ title: "Ledger account updated" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const addChargeMutation = useMutation({
+    mutationFn: async ({ name, amount, chargeType, ledgerAccountId }: { name: string; amount: number; chargeType: string; ledgerAccountId: number | null }) => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/charges`, { name, amount, chargeType, ledgerAccountId });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to add charge");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
+      setShowAddCharge(false);
+      setNewChargeName("");
+      setNewChargeAmount("");
+      setNewChargeType("FREIGHT");
+      setNewChargeLedgerId("");
+      toast({ title: "Charge added", description: "Accounting voucher posted." });
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -806,7 +829,7 @@ export default function FactoryInvoiceDetail() {
         </Table>
       </Card>
 
-      {isAdmin && (freightCharges.length > 0 || otherCharges.length > 0) && (
+      {isAdmin && (freightCharges.length > 0 || otherCharges.length > 0 || isFinalized) && (
         <Card className={`p-4 mb-6${hideExportSelling ? " print:hidden" : ""}`}>
           <h3 className="font-semibold mb-3" data-testid="text-charges-header">Freight &amp; Charges</h3>
           <div className="space-y-3">
@@ -907,6 +930,91 @@ export default function FactoryInvoiceDetail() {
               );
             })}
           </div>
+
+          {isFinalized && (
+            <div className="mt-3 pt-3 border-t print:hidden">
+              {showAddCharge ? (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      placeholder="Charge name"
+                      value={newChargeName}
+                      onChange={e => setNewChargeName(e.target.value)}
+                      className="text-sm"
+                      data-testid="input-new-charge-name"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Amount"
+                      value={newChargeAmount}
+                      onChange={e => setNewChargeAmount(e.target.value)}
+                      className="text-sm font-mono"
+                      data-testid="input-new-charge-amount"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select value={newChargeType} onValueChange={setNewChargeType}>
+                      <SelectTrigger className="text-sm" data-testid="select-new-charge-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="FREIGHT">Freight</SelectItem>
+                        <SelectItem value="CLEARANCE">Clearance</SelectItem>
+                        <SelectItem value="OTHER">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={newChargeLedgerId} onValueChange={setNewChargeLedgerId}>
+                      <SelectTrigger className="text-sm" data-testid="select-new-charge-ledger">
+                        <SelectValue placeholder="Ledger account..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ledgerAccounts.map(acc => (
+                          <SelectItem key={acc.id} value={String(acc.id)}>{acc.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Saving will immediately post an accounting voucher.</p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="default"
+                      disabled={addChargeMutation.isPending || !newChargeName.trim() || !newChargeAmount || !newChargeLedgerId}
+                      onClick={() => {
+                        const amt = parseFloat(newChargeAmount);
+                        if (isNaN(amt) || amt <= 0) return;
+                        addChargeMutation.mutate({
+                          name: newChargeName.trim(),
+                          amount: amt,
+                          chargeType: newChargeType,
+                          ledgerAccountId: newChargeLedgerId ? parseInt(newChargeLedgerId) : null,
+                        });
+                      }}
+                      data-testid="button-save-new-charge"
+                    >
+                      {addChargeMutation.isPending ? "Saving..." : "Save Charge"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => { setShowAddCharge(false); setNewChargeName(""); setNewChargeAmount(""); setNewChargeType("FREIGHT"); setNewChargeLedgerId(""); }}
+                      data-testid="button-cancel-new-charge"
+                    >Cancel</Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs"
+                  onClick={() => setShowAddCharge(true)}
+                  data-testid="button-add-charge"
+                >
+                  <Pencil className="h-3 w-3 mr-1" />Add Charge
+                </Button>
+              )}
+            </div>
+          )}
         </Card>
       )}
 

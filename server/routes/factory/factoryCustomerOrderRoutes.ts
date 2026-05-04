@@ -1259,6 +1259,23 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         }
       }
 
+      // Sync daybook INVOICE row with new grand total (FINALIZED path)
+      if (updatedOrder.status === "FINALIZED") {
+        const newGrandTotal = parseFloat(updatedOrder.grandTotal || "0");
+        const [daybookEntry] = await db.select({ id: factoryDaybookEntries.id })
+          .from(factoryDaybookEntries)
+          .where(and(
+            eq(factoryDaybookEntries.companyId, companyId),
+            eq(factoryDaybookEntries.txType, "INVOICE"),
+            eq(factoryDaybookEntries.referenceId, orderId)
+          ));
+        if (daybookEntry) {
+          await db.update(factoryDaybookEntries)
+            .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
+            .where(eq(factoryDaybookEntries.id, daybookEntry.id));
+        }
+      }
+
       // Create PRE-voucher when order is PENDING or VERIFIED (before finalization)
       // Uses naming CHARGE-PRE-{orderId}-{chargeId} — finalization will rename it to the
       // invoice-based name, so it is never double-counted.
