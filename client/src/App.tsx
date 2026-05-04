@@ -309,7 +309,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/sales-report" component={SalesReport} />
       <Route path="/sales-report/detail" component={SalesReportDetail} />
       <Route path="/sales-report/comparison" component={SalesReportComparison} />
-      <Route path="/company-transfer" component={CompanyTransfer} />
+      {user?.role === "Developer" && <Route path="/company-transfer" component={CompanyTransfer} />}
       {user?.role === "Developer" && <Route path="/net-profit-report" component={NetProfitReport} />}
       <Route path="/combined-inventory"><Redirect to="/stock-otw?tab=combined" /></Route>
       <Route path="/bale-ledger" component={BaleLedger} />
@@ -733,7 +733,7 @@ function AuthenticatedApp() {
                         <Route path="/properties/rental/warehouses" component={PropertiesRentalWarehouses} />
                         <Route path="/properties/rental/shops" component={PropertiesRentalShops} />
                         <Route path="/properties/rental/payments" component={PropertiesRentalPayments} />
-                        <Route path="/properties/transfer" component={CompanyTransfer} />
+                        {user?.role === "Developer" && <Route path="/properties/transfer" component={CompanyTransfer} />}
                         <Route path="/properties/ledger-monthly/:accountId" component={PropertiesLedgerMonthly} />
                         <Route path="/properties/ledger-vouchers/:accountId/:year/:month" component={PropertiesLedgerVouchers} />
                         {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/settings" component={PropertiesSettings} />}
