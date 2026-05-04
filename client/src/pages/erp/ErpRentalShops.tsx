@@ -9,6 +9,7 @@ export default function ErpRentalShops() {
       pageIcon={<Store className="h-7 w-7 text-blue-600" />}
       testIdPrefix="erp-rental-shops"
       apiBase="/api/erp/rental"
+      paymentsLogUrl="/erp/rental/payments"
     />
   );
 }

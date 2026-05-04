@@ -108,7 +108,6 @@ export const ERP_NAV_SECTIONS: NavSection[] = [
       { title: "Warehouses",    url: "/erp/rental/warehouses", icon: Building2      },
       { title: "Shops",         url: "/erp/rental/shops",      icon: Store          },
       { title: "Payments Log",  url: "/erp/rental/payments",   icon: ClipboardList  },
-      { title: "Cash Transfer", url: "/company-transfer",      icon: ArrowLeftRight },
     ],
   },
 ];
@@ -154,10 +153,12 @@ export function useErpVisibleSections(user?: any): {
     const featureKey  = ROUTE_TO_FEATURE[item.url];
 
     if (item.url === "/factory/raw-stock" && selectedCompany?.companyType !== "factory" && selectedCompany?.companyType !== "factory_v2") return false;
-    if (item.url === "/net-profit-report") return isDeveloper;
-    if (item.url === "/company-transfer")  return isDeveloper;
-    if (item.url === "/spreadsheet")       return isDeveloper;
-    if (item.url === "/live-sheets")       return isDeveloper;
+    if (item.url === "/net-profit-report")       return isDeveloper;
+    if (item.url === "/company-transfer")        return isDeveloper;
+    if (item.url === "/spreadsheet")             return isDeveloper;
+    if (item.url === "/live-sheets")             return isDeveloper;
+    if (item.url === "/erp/rental/warehouses")   return false;
+    if (item.url === "/erp/rental/payments")     return false;
     if (item.url === "/chat")       return !isPOSUser;
     if (item.url === "/price-list") return !isPOSUser;
     if (item.url === "/settings" && isOwner) return false;
