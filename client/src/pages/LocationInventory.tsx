@@ -275,6 +275,21 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     enabled: !!selectedLocationLocal && !!fromDate,
   });
 
+  // Fetch closing inventory for selected location (only when asOfDate/To-date is set)
+  // This is the historical snapshot at the END of the movement period.
+  const { data: closingInventoryData = [], isLoading: closingInventoryLoading } = useQuery<InventoryItem[]>({
+    queryKey: selectedLocationLocal && asOfDate
+      ? [`/api/locations/${selectedLocationLocal.id}/inventory`, { asOfDate: asOfDate }]
+      : [],
+    queryFn: async () => {
+      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${asOfDate}`;
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch closing inventory');
+      return response.json();
+    },
+    enabled: !!selectedLocationLocal && !!asOfDate,
+  });
+
   const { data: negativeStockData = [], isLoading: negativeStockLoading } = useQuery<any[]>({
     queryKey: ["/api/inventory/negative", { search: negativeSearchTerm }],
     queryFn: async () => {
@@ -394,10 +409,14 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       });
   }, [combinedStockRows, allStockGroupFilter, allStockLocationFilter, allStockSearchTerm]);
 
+  // In movement mode use the historical closing snapshot (asOfDate = "To" date);
+  // otherwise use the live current inventory.
+  const activeInventoryData = showMovement ? closingInventoryData : inventoryData;
+
   // Filter out items with 0 quantity (unless showZeroStock is on)
   const inventory = showZeroStock
-    ? inventoryData
-    : inventoryData.filter(item => parseFloat(item.quantity || "0") !== 0);
+    ? activeInventoryData
+    : activeInventoryData.filter(item => parseFloat(item.quantity || "0") !== 0);
 
   // Separate unassigned items (no stock group) — show warning, not as a group
   const unassignedInventoryItems = inventory.filter(item => !item.stockGroupId);
@@ -1369,7 +1388,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </span>
           </>
         )}
-        {showMovement && (openingInventoryLoading || isFetching) && (
+        {showMovement && (openingInventoryLoading || closingInventoryLoading || isFetching) && (
           <span className="text-xs text-muted-foreground italic">Loading...</span>
         )}
       </div>
