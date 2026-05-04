@@ -309,7 +309,7 @@ export function FactorySidebar({ user }: { user?: any }) {
         </div>
 
         <div className="mt-4 pt-3 border-t border-sidebar-border/60 space-y-0.5">
-          <SidebarFlatLink href="/factory/spreadsheet" icon={TableProperties} label="Spreadsheet" testId="link-factory-spreadsheet" />
+          {isDeveloper && <SidebarFlatLink href="/factory/spreadsheet" icon={TableProperties} label="Spreadsheet" testId="link-factory-spreadsheet" />}
           <SidebarFlatLink href="/factory/chat" icon={MessageCircle} label="Chat" color={NAV_COLOR.pinned} badge={chatUnread?.count} testId="link-factory-chat" />
           {conflictCount > 0 && (
             <a

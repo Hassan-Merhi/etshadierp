@@ -328,8 +328,8 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/voucher-detail/:voucherId" component={VoucherDetail} />
       <Route path="/factory-production"><Redirect to="/factory/raw-stock" /></Route>
       <Route path="/barcode-manager" component={BarcodeManager} />
-      <Route path="/spreadsheet" component={SpreadsheetEditor} />
-      <Route path="/live-sheets" component={LiveSheets} />
+      {user?.role === "Developer" && <Route path="/spreadsheet" component={SpreadsheetEditor} />}
+      {user?.role === "Developer" && <Route path="/live-sheets" component={LiveSheets} />}
       <Route path="/chat" component={Chat} />
       <Route path="/bales"><Redirect to="/factory/raw-stock" /></Route>
       <Route path="/production-bales"><Redirect to="/factory/stock-entry" /></Route>
@@ -915,7 +915,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/pos" component={FactoryPOS} />
                     <Route path="/factory/bale-ledger">{() => <Redirect to="/factory/production-report" />}</Route>
                     <Route path="/factory/intelligence/settings" component={FactoryIntelSettings} />
-                    <Route path="/factory/spreadsheet" component={SpreadsheetEditor} />
+                    {user?.role === "Developer" && <Route path="/factory/spreadsheet" component={SpreadsheetEditor} />}
                     <Route path="/factory/chat" component={Chat} />
                     <Route path="/factory/conflicts" component={ConflictCenter} />
                     {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/settings" component={Settings} />}

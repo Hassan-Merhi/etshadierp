@@ -156,6 +156,8 @@ export function useErpVisibleSections(user?: any): {
     if (item.url === "/factory/raw-stock" && selectedCompany?.companyType !== "factory" && selectedCompany?.companyType !== "factory_v2") return false;
     if (item.url === "/net-profit-report") return isDeveloper;
     if (item.url === "/company-transfer")  return isDeveloper;
+    if (item.url === "/spreadsheet")       return isDeveloper;
+    if (item.url === "/live-sheets")       return isDeveloper;
     if (item.url === "/chat")       return !isPOSUser;
     if (item.url === "/price-list") return !isPOSUser;
     if (item.url === "/settings" && isOwner) return false;
