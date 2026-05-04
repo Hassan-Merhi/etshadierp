@@ -247,7 +247,7 @@ export function registerRentalRoutes(
         .orderBy(
           propertyUnits.locationGroup,
           propertyUnits.sortOrder,
-          sql`regexp_replace(${propertyUnits.unitNumber}, '[^0-9]', '', 'g')::bigint nulls last`,
+          sql`NULLIF(regexp_replace(${propertyUnits.unitNumber}, '[^0-9]', '', 'g'), '')::bigint nulls last`,
           propertyUnits.unitNumber,
         );
 

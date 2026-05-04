@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Home, ChevronUp, ChevronDown } from "lucide-react";
-import { Link } from "wouter";
+import { ArrowLeft, ChevronUp, ChevronDown } from "lucide-react";
 import { useCursorNav } from "@/contexts/CursorNavContext";
 
 export interface PageHeaderProps {
@@ -9,6 +8,7 @@ export interface PageHeaderProps {
   /** Optional icon rendered inline next to the title. */
   icon?: React.ReactNode;
   showBackButton?: boolean;
+  /** @deprecated — Dashboard button has been removed globally. This prop is kept for backward compatibility but has no effect. */
   showHomeButton?: boolean;
   showCursorNavButtons?: boolean;
   children?: React.ReactNode;
@@ -19,7 +19,6 @@ export function PageHeader({
   subtitle,
   icon,
   showBackButton = true,
-  showHomeButton = true,
   showCursorNavButtons = true,
   children,
 }: PageHeaderProps) {
@@ -29,7 +28,7 @@ export function PageHeader({
     window.history.back();
   };
 
-  const hasNav = showBackButton || showHomeButton || (showCursorNavButtons && !!config);
+  const hasNav = showBackButton || (showCursorNavButtons && !!config);
 
   return (
     <div className="flex flex-col gap-3 mb-5 pb-4 border-b border-border" data-testid="page-header">
@@ -47,19 +46,7 @@ export function PageHeader({
               <span className="hidden sm:inline">Back</span>
             </Button>
           )}
-          {showHomeButton && (
-            <Link href="/">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-1 text-muted-foreground hover:text-foreground"
-                data-testid="button-home"
-              >
-                <Home className="h-4 w-4" />
-                <span className="hidden sm:inline">Dashboard</span>
-              </Button>
-            </Link>
-          )}
+
           {showCursorNavButtons && config && (
             <>
               <Button
