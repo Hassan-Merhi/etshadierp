@@ -42,6 +42,8 @@ const ContainerDashboard = lazy(() => import("@/pages/ContainerDashboard"));
 const POS = lazy(() => import("@/pages/pos/POS"));
 const StockItems = lazy(() => import("@/pages/StockItems"));
 const Containers = lazy(() => import("@/pages/Containers"));
+const InventoryHub = lazy(() => import("@/pages/InventoryHub"));
+const StockHub = lazy(() => import("@/pages/StockHub"));
 const Accounts = lazy(() => import("@/pages/Accounts"));
 const Agents = lazy(() => import("@/pages/Agents"));
 const FactoryAccounts = lazy(() => import("@/pages/factory/FactoryAccounts"));
@@ -269,12 +271,14 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/financial-overview" component={Dashboard} />
       <Route path="/pos">{() => <POS />}</Route>
       <Route path="/pos/edit/:id">{(params) => <POS editVoucherId={params.id} />}</Route>
-      <Route path="/stock-items" component={StockItems} />
-      <Route path="/location-inventory">{() => <LocationInventory />}</Route>
-      <Route path="/containers" component={Containers} />
+      <Route path="/inventory" component={InventoryHub} />
+      <Route path="/stock" component={StockHub} />
+      <Route path="/location-inventory"><Redirect to="/inventory?tab=by-location" /></Route>
+      <Route path="/stock-items"><Redirect to="/stock?tab=items" /></Route>
+      <Route path="/stock-otw"><Redirect to="/inventory?tab=on-the-way" /></Route>
+      <Route path="/containers"><Redirect to="/inventory?tab=containers" /></Route>
       <Route path="/containers/:id" component={ContainerDetail} />
       <Route path="/offloads/:id" component={OffloadDetail} />
-      <Route path="/stock-otw" component={StockOTW} />
       <Route path="/po-import" component={POImport} />
       <Route path="/pos-import" component={POSImport} />
       <Route path="/analytics" component={Analytics} />
@@ -291,8 +295,8 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/create" component={AccountingCreate} />
       <Route path="/import-stock-items" component={ImportStockItems} />
       <Route path="/stock-query/:id" component={StockItemDetail} />
-      <Route path="/stock-query" component={StockQuery} />
-      <Route path="/offload-item-search" component={OffloadItemSearch} />
+      <Route path="/stock-query"><Redirect to="/stock?tab=query" /></Route>
+      <Route path="/offload-item-search"><Redirect to="/stock?tab=offload" /></Route>
       <Route path="/location-summary"><Redirect to="/stock-query?tab=summary" /></Route>
       <Route path="/stock-transfer-order" component={StockTransferOrder} />
       <Route path="/stock-transfers" component={StockTransfers} />
