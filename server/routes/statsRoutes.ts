@@ -29,6 +29,7 @@ import {
   creditNoteItems, pendingBarcodes, insertPendingBarcodeSchema,
   bales, baleProducts, baleProductCategories, storedFiles,
   stockItemLocationPrices, exchangeRates,
+  factoryWorkerAdvances,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -329,6 +330,27 @@ export function registerStatsRoutes(app: Express) {
         } else if (netBalance > 0) {
           workerAdvances += netBalance;
         }
+      }
+      // Remove the "Factory Worker Advances" ledger account from the asset list — it is
+      // replaced by the authoritative factory_worker_advances table sum below so that
+      // repayments tracked in the table always match what the Net Position shows.
+      const fwaLedgerIdx1 = forUsAccounts.findIndex(
+        (a: any) => (a.name || "").toLowerCase() === "factory worker advances",
+      );
+      if (fwaLedgerIdx1 !== -1) {
+        forUsTotal = round2(forUsTotal - forUsAccounts[fwaLedgerIdx1].value);
+        forUsAccounts.splice(fwaLedgerIdx1, 1);
+      }
+      // Add outstanding factory worker advances.  Factory workers live in the
+      // factory_workers table (not employees), so they are invisible to the
+      // employee-balance loop above.  This makes the Net Position consistent with
+      // the Worker Advances page.
+      {
+        const [fwAdvRow] = await db
+          .select({ total: sql<string>`COALESCE(SUM(CAST(remaining_balance AS numeric)), 0)` })
+          .from(factoryWorkerAdvances)
+          .where(and(eq(factoryWorkerAdvances.companyId, companyId), eq(factoryWorkerAdvances.fullyPaid, false)));
+        workerAdvances += parseFloat((fwAdvRow as any)?.total || "0");
       }
       // For CFA companies, worker balances are in CFA → convert to USD
       const workerLiabilitiesDisplay = currentCfaRate > 0 ? round2(workerLiabilities / currentCfaRate) : workerLiabilities;
@@ -652,6 +674,26 @@ export function registerStatsRoutes(app: Express) {
         } else if (netBalance > 0) {
           workerAdvances += netBalance;
         }
+      }
+      // Remove the "Factory Worker Advances" ledger account from the asset list — it is
+      // replaced by the authoritative factory_worker_advances table sum below so that
+      // repayments tracked in the table always match what the Net Position shows.
+      const fwaLedgerIdx2 = forUsAccounts.findIndex(
+        (a: any) => (a.name || "").toLowerCase() === "factory worker advances",
+      );
+      if (fwaLedgerIdx2 !== -1) {
+        forUsTotal = round2(forUsTotal - forUsAccounts[fwaLedgerIdx2].value);
+        forUsAccounts.splice(fwaLedgerIdx2, 1);
+      }
+      // Add outstanding factory worker advances.  Factory workers live in the
+      // factory_workers table (not employees), so they are invisible to the
+      // employee-balance loop above.
+      {
+        const [fwAdvRow2] = await db
+          .select({ total: sql<string>`COALESCE(SUM(CAST(remaining_balance AS numeric)), 0)` })
+          .from(factoryWorkerAdvances)
+          .where(and(eq(factoryWorkerAdvances.companyId, companyId), eq(factoryWorkerAdvances.fullyPaid, false)));
+        workerAdvances += parseFloat((fwAdvRow2 as any)?.total || "0");
       }
       if (workerLiabilities > 0) {
         onUsTotal += workerLiabilities;
