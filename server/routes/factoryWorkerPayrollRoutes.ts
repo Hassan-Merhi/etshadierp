@@ -3237,6 +3237,38 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
           await tx.delete(vouchers).where(inArray(vouchers.id, orphanedAdvVoucherIds));
           deletedAdvanceVouchers = orphanedAdvVoucherIds.length;
         }
+
+        // ── REPAY-SAL-{repaymentId}-{ts} and RECEIPT-REPAY-{repaymentId}-{ts} ──
+        // Orphaned when the repayment record was deleted (e.g. via Reverse Advance)
+        // but the voucher was not removed. Clean them up now.
+        let deletedRepayVouchers = 0;
+        const repayVouchers = await tx
+          .select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber })
+          .from(vouchers)
+          .where(and(
+            eq(vouchers.companyId, companyId),
+            sql`(${vouchers.voucherNumber} LIKE 'REPAY-SAL-%' OR ${vouchers.voucherNumber} LIKE 'RECEIPT-REPAY-%')`,
+          ));
+
+        const orphanedRepayVoucherIds: number[] = [];
+        for (const v of repayVouchers) {
+          const m = v.voucherNumber.match(/^(?:REPAY-SAL|RECEIPT-REPAY)-(\d+)-/);
+          if (!m) { orphanedRepayVoucherIds.push(v.id); continue; }
+          const repaymentId = parseInt(m[1]);
+          const [repayment] = await tx
+            .select({ id: factoryAdvanceRepayments.id })
+            .from(factoryAdvanceRepayments)
+            .where(eq(factoryAdvanceRepayments.id, repaymentId));
+          if (!repayment) {
+            orphanedRepayVoucherIds.push(v.id);
+          }
+        }
+
+        if (orphanedRepayVoucherIds.length > 0) {
+          await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, orphanedRepayVoucherIds));
+          await tx.delete(vouchers).where(inArray(vouchers.id, orphanedRepayVoucherIds));
+          deletedRepayVouchers = orphanedRepayVoucherIds.length;
+        }
       });
 
       res.json({
