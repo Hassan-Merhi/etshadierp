@@ -308,7 +308,9 @@ export function AppSidebar({ user }: { user?: any }) {
               </Badge>
             </a>
           )}
-          <SidebarFlatLink href="/my-settings" icon={KeyRound} label="My Settings" testId="link-my-settings" />
+          {!["Admin", "Owner", "Developer"].includes(user?.role) && (
+            <SidebarFlatLink href="/my-settings" icon={KeyRound} label="My Settings" testId="link-my-settings" />
+          )}
           {isItemVisible({ title: "Settings", url: "/settings", icon: Settings }) && (
             <SidebarFlatLink href="/settings" icon={Settings} label="Settings" testId="link-settings" />
           )}

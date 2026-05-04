@@ -325,7 +325,9 @@ export function FactorySidebar({ user }: { user?: any }) {
               </Badge>
             </a>
           )}
-          <SidebarFlatLink href="/my-settings" icon={KeyRound} label="My Settings" testId="link-factory-my-settings" />
+          {!["Admin", "Owner", "Developer"].includes(user?.role) && (
+            <SidebarFlatLink href="/my-settings" icon={KeyRound} label="My Settings" testId="link-factory-my-settings" />
+          )}
           {(isAdmin || isDeveloper) && (
             <SidebarFlatLink href="/factory/settings" icon={Settings} label="Settings" testId="link-factory-settings" />
           )}
