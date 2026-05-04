@@ -648,7 +648,7 @@ function AuthenticatedApp() {
                   >
                     <Search className="h-4 w-4" />
                     <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 text-[10px] font-mono">
-                      Ctrl K
+                      Ctrl /
                     </kbd>
                   </Button>
                 </div>
@@ -709,7 +709,7 @@ function AuthenticatedApp() {
                   >
                     <Search className="h-4 w-4" />
                     <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 text-[10px] font-mono">
-                      Ctrl K
+                      Ctrl /
                     </kbd>
                   </Button>
                   <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
@@ -823,7 +823,7 @@ function AuthenticatedApp() {
                   >
                     <Search className="h-4 w-4" />
                     <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 text-[10px] font-mono">
-                      Ctrl K
+                      Ctrl /
                     </kbd>
                   </Button>
                   <PendingSyncIndicator />
@@ -985,7 +985,7 @@ function AuthenticatedApp() {
                 >
                   <Search className="h-4 w-4" />
                   <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 text-[10px] font-mono">
-                    Ctrl K
+                    Ctrl /
                   </kbd>
                 </Button>
                 <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>

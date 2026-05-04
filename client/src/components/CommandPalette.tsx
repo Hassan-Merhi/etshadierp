@@ -78,6 +78,7 @@ const DESCRIPTIONS: Record<string, string> = {
   "/factory/customers": "Customer accounts",
   "/factory/sales/loadings": "Container loading management",
   "/factory/invoicing": "Proformas, pending and finalized invoices",
+  "/factory/finance": "Payroll, suppliers, vouchers and accounts",
   "/factory/vouchers": "Accounting vouchers",
   "/factory/accounts": "Chart of accounts",
   "/factory/daybook": "Daily transaction log",
@@ -113,8 +114,10 @@ const FACTORY_EXTRAS_ALWAYS: PageEntry[] = [
   { label: "Factory Chat", description: "Internal messaging", path: "/factory/chat", icon: MessageSquare },
   { label: "Bale Products", description: DESCRIPTIONS["/factory/bale-products"], path: "/factory/bale-products", icon: Box },
   { label: "Bale Relabeling", description: DESCRIPTIONS["/factory/bale-relabeling"], path: "/factory/bale-relabeling", icon: Archive },
-  { label: "Workers", description: DESCRIPTIONS["/factory/workers"], path: "/factory/workers", icon: Users },
-  { label: "Employees", description: DESCRIPTIONS["/factory/employees"], path: "/factory/employees", icon: Users },
+  { label: "Payroll", description: "Workers, employees and salary runs", path: "/factory/finance?tab=payroll", icon: Users },
+  { label: "Suppliers", description: DESCRIPTIONS["/factory/suppliers"], path: "/factory/finance?tab=suppliers", icon: Package },
+  { label: "Vouchers", description: DESCRIPTIONS["/factory/vouchers"], path: "/factory/finance?tab=vouchers", icon: Archive },
+  { label: "Accounts", description: DESCRIPTIONS["/factory/accounts"], path: "/factory/finance?tab=accounts", icon: PieChart },
 ];
 
 const PROPERTIES_EXTRAS: PageEntry[] = [
@@ -221,7 +224,7 @@ export function CommandPalette({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      if ((e.metaKey || e.ctrlKey) && e.key === "/") {
         e.preventDefault();
         setOpen(!open);
       }
