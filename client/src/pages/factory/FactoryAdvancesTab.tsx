@@ -271,6 +271,8 @@ function AdvancesView() {
       return res.json();
     },
     enabled: repayAuditOpen,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
   const { data: auditCashBalance } = useQuery<{ balance: string; name: string }>({

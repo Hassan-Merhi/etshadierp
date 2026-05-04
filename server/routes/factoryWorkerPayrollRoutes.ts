@@ -2126,17 +2126,17 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
             ))
         : [];
 
-      // 3. All RECEIPT-REPAY vouchers for this company
+      // 3. All repayment vouchers for this company (both old RECEIPT-REPAY and new REPAY-SAL patterns)
       const repayVouchers = await db.select({ voucherNumber: vouchers.voucherNumber })
         .from(vouchers)
         .where(and(
           eq(vouchers.companyId, companyId),
-          sql`${vouchers.voucherNumber} LIKE 'RECEIPT-REPAY-%'`,
+          sql`(${vouchers.voucherNumber} LIKE 'RECEIPT-REPAY-%' OR ${vouchers.voucherNumber} LIKE 'REPAY-SAL-%')`,
         ));
 
       const voucheredRepayIds = new Set<number>();
       for (const v of repayVouchers) {
-        const m = v.voucherNumber.match(/^RECEIPT-REPAY-(\d+)-/);
+        const m = v.voucherNumber.match(/^(?:RECEIPT-REPAY|REPAY-SAL)-(\d+)-/);
         if (m) voucheredRepayIds.add(parseInt(m[1]));
       }
 
@@ -2249,12 +2249,12 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
         .from(vouchers)
         .where(and(
           eq(vouchers.companyId, companyId),
-          sql`${vouchers.voucherNumber} LIKE 'RECEIPT-REPAY-%'`,
+          sql`(${vouchers.voucherNumber} LIKE 'RECEIPT-REPAY-%' OR ${vouchers.voucherNumber} LIKE 'REPAY-SAL-%')`,
         ));
 
       const voucheredRepayIds = new Set<number>();
       for (const v of repayVouchers) {
-        const m = v.voucherNumber.match(/^RECEIPT-REPAY-(\d+)-/);
+        const m = v.voucherNumber.match(/^(?:RECEIPT-REPAY|REPAY-SAL)-(\d+)-/);
         if (m) voucheredRepayIds.add(parseInt(m[1]));
       }
 
