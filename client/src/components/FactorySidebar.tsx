@@ -117,7 +117,11 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     label: "Finance",
     color: NAV_COLOR.finance,
     items: [
-      { title: "Finance", url: "/factory/finance", icon: Landmark },
+      { title: "Workers",   url: "/factory/workers",   icon: HardHat   },
+      { title: "Employees", url: "/factory/employees", icon: Users     },
+      { title: "Suppliers", url: "/factory/suppliers", icon: UserRound },
+      { title: "Vouchers",  url: "/factory/vouchers",  icon: FileText  },
+      { title: "Accounts",  url: "/factory/accounts",  icon: Landmark  },
     ],
   },
   {

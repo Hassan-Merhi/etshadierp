@@ -139,11 +139,11 @@ const FACTORY_HUB_TABS: PageEntry[] = [
   { label: "Invoices",            description: "Finalized factory invoices",        path: "/factory/invoicing?tab=invoices",            icon: FileText      },
   { label: "Container Loadings",  description: "Manage container loadings",         path: "/factory/sales/loadings?tab=loadings",       icon: Ship          },
   { label: "Pending Loadings",    description: "Loadings pending confirmation",     path: "/factory/sales/loadings?tab=pending",        icon: Ship          },
-  { label: "Workers",             description: "Worker payroll and attendance",      path: "/factory/finance?tab=workers",               icon: HardHat       },
-  { label: "Employees",           description: "Employee records and payroll",        path: "/factory/finance?tab=employees",             icon: Users         },
-  { label: "Factory Suppliers",   description: DESCRIPTIONS["/factory/suppliers"],   path: "/factory/finance?tab=suppliers",             icon: Truck         },
-  { label: "Factory Vouchers",    description: DESCRIPTIONS["/factory/vouchers"],   path: "/factory/finance?tab=vouchers",              icon: FileText      },
-  { label: "Factory Accounts",    description: DESCRIPTIONS["/factory/accounts"],   path: "/factory/finance?tab=accounts",              icon: PieChart      },
+  { label: "Workers",           description: "Worker payroll and attendance",   path: "/factory/workers",   icon: HardHat  },
+  { label: "Employees",         description: "Employee records and payroll",    path: "/factory/employees", icon: Users    },
+  { label: "Factory Suppliers", description: DESCRIPTIONS["/factory/suppliers"],path: "/factory/suppliers", icon: Truck    },
+  { label: "Factory Vouchers",  description: DESCRIPTIONS["/factory/vouchers"], path: "/factory/vouchers",  icon: FileText },
+  { label: "Factory Accounts",  description: DESCRIPTIONS["/factory/accounts"], path: "/factory/accounts",  icon: PieChart },
 ];
 
 const PROPERTIES_EXTRAS: PageEntry[] = [
