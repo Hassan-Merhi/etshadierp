@@ -156,6 +156,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
         .where(and(eq(factoryRawMaterialAdjustments.companyId, companyId), isNull(factoryRawMaterialAdjustments.deletedAt)));
 
       for (const adj of adjustments) {
+        if (adj.type === "DEDUCT") continue; // DEDUCT is history-only; receivedKg on rows already reduced
         const kg = parseFloat(adj.kg as string) || 0;
         const costPerKgAdj = parseFloat(adj.costPerKg as string) || 0;
         const isAdd = adj.type === "ADD";
@@ -502,6 +503,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
           eq(factoryRawMaterialAdjustments.supplierId, Number(supplierId))
         ));
       const adjFree = adjRows.reduce((sum, a) => {
+        if (a.type === "DEDUCT") return sum; // DEDUCT is history-only; receivedKg on rows already reduced
         const k = parseFloat(a.kg as string) || 0;
         return a.type === "ADD" ? sum + k : sum - k;
       }, 0);
@@ -538,6 +540,22 @@ export function registerFactoryRawStockRoutes(app: Express) {
           await tx.update(factoryRawStock)
             .set({ receivedKg: String(u.newReceived.toFixed(3)) })
             .where(eq(factoryRawStock.id, u.id));
+        }
+
+        // 1b. Record a DEDUCT history entry for the amount taken from container rows
+        // DEDUCT type is skipped in all balance calculations — it only exists for history visibility.
+        const rowDeductKg = deductKg - adjDeductKg;
+        if (rowDeductKg > 0.001) {
+          await tx.insert(factoryRawMaterialAdjustments).values({
+            companyId,
+            date: today,
+            type: "DEDUCT",
+            kg: rowDeductKg.toFixed(3),
+            costPerKg: costPerKgNum > 0 ? String(costPerKgNum) : "0",
+            currencyCode: ccy,
+            supplierId: Number(supplierId),
+            notes: notes || null,
+          });
         }
 
         // 2. REMOVE adjustment for any overflow (from adjustment-sourced free)
@@ -738,7 +756,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
         costPerKg: parseFloat(r.costPerKg as string) || 0,
         currencyCode: r.currencyCode || "USD",
         notes: r.notes,
-        label: r.type === "ADD" ? "Manual Addition" : "Manual Deduction",
+        label: r.type === "ADD" ? "Manual Addition" : r.type === "DEDUCT" ? "Deduct from Received" : "Manual Deduction",
         ref: `ADJ-${r.id}`,
       }));
 
