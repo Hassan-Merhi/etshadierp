@@ -1,7 +1,7 @@
 import { Fragment, useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import { Plus, Trash2, Banknote, RotateCcw, BookOpen, Loader2, Users } from "lucide-react";
+import { Plus, Trash2, Banknote, RotateCcw, BookOpen, Loader2, Users, CalendarDays, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -180,6 +180,41 @@ function AdvancesView() {
     },
     onError: (err: Error) => {
       if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const [repayByMonthOpen, setRepayByMonthOpen] = useState(false);
+  const [repayByMonthForm, setRepayByMonthForm] = useState({
+    repaymentDate: new Date().toLocaleDateString("en-CA"),
+    cashAccountId: "",
+  });
+  const [repayByMonthExpanded, setRepayByMonthExpanded] = useState<Set<string>>(new Set());
+  const [repayingMonth, setRepayingMonth] = useState<string | null>(null);
+
+  const repayByMonthMutation = useMutation({
+    mutationFn: async (month: string) => {
+      const res = await apiRequest("POST", "/api/factory/advances/repay-by-month", {
+        month,
+        repaymentDate: repayByMonthForm.repaymentDate,
+        cashAccountId: parseInt(repayByMonthForm.cashAccountId),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to repay");
+      return { ...data, month };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advance-repayments"] });
+      toast({
+        title: "Repayments recorded",
+        description: `${data.repaid} advance(s) repaid — total $${parseFloat(data.total).toFixed(2)}`,
+      });
+      setRepayingMonth(null);
+    },
+    onError: (err: Error) => {
+      setRepayingMonth(null);
+      if ((err as any)?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -396,6 +431,9 @@ function AdvancesView() {
           </Button>
           <Button variant="outline" onClick={() => setPostAccountingOpen(true)} data-testid="button-post-accounting">
             <BookOpen className="h-4 w-4 mr-2" />Post Accounting
+          </Button>
+          <Button variant="outline" onClick={() => setRepayByMonthOpen(true)} data-testid="button-repay-by-month">
+            <CalendarDays className="h-4 w-4 mr-2" />Repay by Month
           </Button>
           <Button variant="outline" onClick={() => setBulkOpen(true)} data-testid="button-bulk-advance">
             <Users className="h-4 w-4 mr-2" />Bulk Advance
@@ -807,6 +845,175 @@ function AdvancesView() {
               data-testid="button-confirm-reverse"
             >
               {reverseMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Reversing...</> : <><RotateCcw className="h-4 w-4 mr-2" />Reverse Advance</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Repay by Month Dialog ── */}
+      <Dialog
+        open={repayByMonthOpen}
+        onOpenChange={(open) => {
+          if (!open) { setRepayByMonthExpanded(new Set()); setRepayingMonth(null); }
+          setRepayByMonthOpen(open);
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Repay by Month</DialogTitle>
+            <DialogDescription>
+              Bulk-repay all outstanding Loan advances grouped by the month they were given.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Shared repayment fields */}
+          <div className="grid grid-cols-2 gap-4 py-2">
+            <div className="space-y-2">
+              <Label>Repayment Date</Label>
+              <Input
+                type="date"
+                value={repayByMonthForm.repaymentDate}
+                onChange={(e) => setRepayByMonthForm((p) => ({ ...p, repaymentDate: e.target.value }))}
+                data-testid="input-rbm-repayment-date"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Cash Account <span className="text-destructive">*</span></Label>
+              <Select
+                value={repayByMonthForm.cashAccountId}
+                onValueChange={(v) => setRepayByMonthForm((p) => ({ ...p, cashAccountId: v }))}
+              >
+                <SelectTrigger data-testid="select-rbm-cash-account">
+                  <SelectValue placeholder="Select cash account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(cashAccounts || []).map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>{a.name} ({a.code})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Month groups derived from advances data */}
+          {(() => {
+            const loanOutstanding = (advances || []).filter(
+              (a) => !a.fullyPaid && a.repaymentType === "manual_repayment"
+            );
+
+            if (loanOutstanding.length === 0) {
+              return (
+                <div className="py-8 text-center text-muted-foreground text-sm">
+                  No outstanding Loan advances to repay.
+                </div>
+              );
+            }
+
+            // Group by YYYY-MM
+            const groups = new Map<string, AdvanceRecord[]>();
+            for (const a of loanOutstanding) {
+              const key = (a.advanceDate || "").substring(0, 7);
+              if (!key) continue;
+              const list = groups.get(key) || [];
+              list.push(a);
+              groups.set(key, list);
+            }
+
+            const sortedKeys = [...groups.keys()].sort().reverse();
+
+            return (
+              <div className="space-y-3">
+                {sortedKeys.map((monthKey) => {
+                  const items = groups.get(monthKey)!;
+                  const total = items.reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
+                  const [year, mon] = monthKey.split("-");
+                  const monthLabel = new Date(parseInt(year), parseInt(mon) - 1, 1)
+                    .toLocaleString("default", { month: "long", year: "numeric" });
+                  const isExpanded = repayByMonthExpanded.has(monthKey);
+                  const isPending = repayingMonth === monthKey && repayByMonthMutation.isPending;
+
+                  return (
+                    <div key={monthKey} className="border rounded-md overflow-hidden">
+                      {/* Month header row */}
+                      <div
+                        className="flex items-center justify-between px-4 py-3 bg-muted/40 cursor-pointer hover-elevate"
+                        onClick={() => setRepayByMonthExpanded((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(monthKey)) next.delete(monthKey); else next.add(monthKey);
+                          return next;
+                        })}
+                        data-testid={`row-rbm-month-${monthKey}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {isExpanded
+                            ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          }
+                          <span className="font-semibold">{monthLabel}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {items.length} advance{items.length !== 1 ? "s" : ""}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono font-bold text-amber-700 dark:text-amber-400">
+                            {fmt(total)}
+                          </span>
+                          <Button
+                            size="sm"
+                            disabled={!repayByMonthForm.cashAccountId || isPending || repayByMonthMutation.isPending}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRepayingMonth(monthKey);
+                              repayByMonthMutation.mutate(monthKey);
+                            }}
+                            data-testid={`button-rbm-repay-${monthKey}`}
+                          >
+                            {isPending
+                              ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Repaying...</>
+                              : <>Repay All in {new Date(parseInt(year), parseInt(mon) - 1, 1).toLocaleString("default", { month: "long" })}</>
+                            }
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Expanded worker rows */}
+                      {isExpanded && (
+                        <div className="divide-y">
+                          <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
+                            <span>Worker</span>
+                            <span className="text-right">Original</span>
+                            <span className="text-right">Remaining</span>
+                          </div>
+                          {items.map((adv) => (
+                            <div
+                              key={adv.id}
+                              className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 text-sm"
+                              data-testid={`row-rbm-advance-${adv.id}`}
+                            >
+                              <span className="font-medium">{adv.workerName}</span>
+                              <span className="font-mono text-right text-muted-foreground">{fmt(adv.amount)}</span>
+                              <span className="font-mono text-right font-semibold text-amber-700 dark:text-amber-400">
+                                {fmt(adv.remainingBalance)}
+                              </span>
+                            </div>
+                          ))}
+                          <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 text-sm bg-muted/20">
+                            <span className="font-semibold text-muted-foreground">Total</span>
+                            <span></span>
+                            <span className="font-mono text-right font-bold">{fmt(total)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRepayByMonthOpen(false)} data-testid="button-rbm-close">
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
