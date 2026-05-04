@@ -409,56 +409,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       });
   }, [combinedStockRows, allStockGroupFilter, allStockLocationFilter, allStockSearchTerm]);
 
-  // In movement mode use the historical closing snapshot (asOfDate = "To" date);
-  // otherwise use the live current inventory.
-  const activeInventoryData = showMovement ? closingInventoryData : inventoryData;
-
-  // Filter out items with 0 quantity (unless showZeroStock is on)
-  const inventory = showZeroStock
-    ? activeInventoryData
-    : activeInventoryData.filter(item => parseFloat(item.quantity || "0") !== 0);
-
-  // Separate unassigned items (no stock group) — show warning, not as a group
-  const unassignedInventoryItems = inventory.filter(item => !item.stockGroupId);
-
-  // Group inventory by stock group — skip items with no stock group
-  const stockGroups: StockGroupSummary[] = inventory
-    .filter(item => !!item.stockGroupId)
-    .reduce((groups, item) => {
-      const groupKey = item.stockGroupId!;
-      let group = groups.find(g => g.groupId === groupKey);
-      
-      if (!group) {
-        group = {
-          groupId: item.stockGroupId,
-          groupCode: item.stockGroupCode,
-          groupName: item.stockGroupName || "Unknown Group",
-          totalQuantity: 0,
-          totalValue: 0,
-          averageRate: 0,
-          itemCount: 0,
-          items: [],
-        };
-        groups.push(group);
-      }
-
-      const qty = parseFloat(item.quantity || "0");
-      const value = parseFloat(item.totalValue || "0");
-      
-      group.totalQuantity += qty;
-      group.totalValue += value;
-      group.itemCount += 1;
-      group.items.push(item);
-
-      return groups;
-    }, [] as StockGroupSummary[]);
-
-  // Calculate average rate for each group
-  stockGroups.forEach(group => {
-    if (group.totalQuantity > 0) {
-      group.averageRate = group.totalValue / group.totalQuantity;
-    }
-  });
 
   // Opening inventory map: stockItemId -> opening quantity (when fromDate is set)
   const openingInventoryMap = useMemo(() => {
@@ -481,6 +431,53 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
   // Show movement mode: both dates must be set
   const showMovement = !!(fromDate && asOfDate);
+
+  // In movement mode use the historical closing snapshot (asOfDate = "To" date);
+  // otherwise use the live current inventory.
+  const activeInventoryData = showMovement ? closingInventoryData : inventoryData;
+
+  // Filter out items with 0 quantity (unless showZeroStock is on)
+  const inventory = showZeroStock
+    ? activeInventoryData
+    : activeInventoryData.filter(item => parseFloat(item.quantity || "0") !== 0);
+
+  // Separate unassigned items (no stock group) — show warning, not as a group
+  const unassignedInventoryItems = inventory.filter(item => !item.stockGroupId);
+
+  // Group inventory by stock group — skip items with no stock group
+  const stockGroups: StockGroupSummary[] = inventory
+    .filter(item => !!item.stockGroupId)
+    .reduce((groups, item) => {
+      const groupKey = item.stockGroupId!;
+      let group = groups.find(g => g.groupId === groupKey);
+      if (!group) {
+        group = {
+          groupId: item.stockGroupId,
+          groupCode: item.stockGroupCode,
+          groupName: item.stockGroupName || "Unknown Group",
+          totalQuantity: 0,
+          totalValue: 0,
+          averageRate: 0,
+          itemCount: 0,
+          items: [],
+        };
+        groups.push(group);
+      }
+      const qty = parseFloat(item.quantity || "0");
+      const value = parseFloat(item.totalValue || "0");
+      group.totalQuantity += qty;
+      group.totalValue += value;
+      group.itemCount += 1;
+      group.items.push(item);
+      return groups;
+    }, [] as StockGroupSummary[]);
+
+  // Calculate average rate for each group
+  stockGroups.forEach(group => {
+    if (group.totalQuantity > 0) {
+      group.averageRate = group.totalValue / group.totalQuantity;
+    }
+  });
 
   // Sort locations alphabetically (A-Z) by name
   const sortedLocations = [...locations].sort((a, b) => a.name.localeCompare(b.name));
