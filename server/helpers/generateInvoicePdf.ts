@@ -331,20 +331,25 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   return pdfReady;
 }
 
-// ── Draw a table row's borders (vertical column dividers + top/bottom edges) ──
+// ── Draw a table row as a fully bordered rectangle + inner column dividers ─────
+// Each row gets a complete 4-sided box; adjacent rows share the border stroke so
+// the result looks like a solid grid (matching the manual-print PDF style).
 function drawRowBorders(doc: any, y: number, h: number, isHeader: boolean): void {
-  const colBorderColor = isHeader ? "#888888" : "#cccccc";
-  const dividers = [X_DESC, X_QTY, X_RATE, X_AMT, X_CFG, X_PLB, X_TPL, X_TPL + COL_TPL_W];
+  const outerColor  = isHeader ? "#666666" : "#aaaaaa";
+  const innerColor  = isHeader ? "#888888" : "#cccccc";
+  const outerWidth  = isHeader ? 0.75 : 0.5;
+
+  // Full outer rectangle for this row
   doc.save();
-  doc.strokeColor(colBorderColor).lineWidth(0.5);
-  // Top edge (always on header, so the table has a clean top boundary)
-  if (isHeader) {
-    doc.moveTo(MARGIN_X, y).lineTo(MARGIN_X + USABLE_W, y).stroke();
-  }
-  // Bottom edge
-  doc.moveTo(MARGIN_X, y + h).lineTo(MARGIN_X + USABLE_W, y + h).stroke();
-  // Vertical dividers (every column boundary including outer left + right)
-  for (const x of dividers) {
+  doc.strokeColor(outerColor).lineWidth(outerWidth);
+  doc.rect(MARGIN_X, y, USABLE_W, h).stroke();
+  doc.restore();
+
+  // Inner column dividers only (left/right outer already covered by rect)
+  const innerDividers = [X_QTY, X_RATE, X_AMT, X_CFG, X_PLB, X_TPL];
+  doc.save();
+  doc.strokeColor(innerColor).lineWidth(0.5);
+  for (const x of innerDividers) {
     doc.moveTo(x, y).lineTo(x, y + h).stroke();
   }
   doc.restore();
