@@ -1334,11 +1334,79 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       if (Object.keys(updateData).length === 0) return res.status(400).json({ message: "Nothing to update" });
 
-      await db.update(customerOrderCharges)
-        .set(updateData)
+      // Read the charge BEFORE update so we have the voucherId
+      const [chargeBeforeUpdate] = await db.select()
+        .from(customerOrderCharges)
         .where(and(eq(customerOrderCharges.orderId, orderId), eq(customerOrderCharges.id, chargeId)));
+      if (!chargeBeforeUpdate) return res.status(404).json({ message: "Charge not found" });
 
-      await recalculateOrderTotals(db, orderId);
+      await db.transaction(async (tx: any) => {
+        await tx.update(customerOrderCharges)
+          .set(updateData)
+          .where(and(eq(customerOrderCharges.orderId, orderId), eq(customerOrderCharges.id, chargeId)));
+
+        await recalculateOrderTotals(tx, orderId);
+
+        // If amount is changing on a FINALIZED invoice with a linked voucher, sync the voucher entries
+        if (amount !== undefined && order.status === "FINALIZED" && chargeBeforeUpdate.voucherId) {
+          const newAmt = parseFloat(amount);
+          const linkedVoucherId = chargeBeforeUpdate.voucherId;
+
+          // Update voucher header total
+          await tx.update(vouchers)
+            .set({ totalAmount: String(newAmt) })
+            .where(eq(vouchers.id, linkedVoucherId));
+
+          // Update the debit-side entry (customer account)
+          await tx.update(voucherEntries)
+            .set({ debitAmount: String(newAmt) })
+            .where(and(
+              eq(voucherEntries.voucherId, linkedVoucherId),
+              sql`cast(${voucherEntries.debitAmount} as numeric) > 0`
+            ));
+
+          // Update the credit-side entry (charge ledger account)
+          await tx.update(voucherEntries)
+            .set({ creditAmount: String(newAmt) })
+            .where(and(
+              eq(voucherEntries.voucherId, linkedVoucherId),
+              sql`cast(${voucherEntries.creditAmount} as numeric) > 0`
+            ));
+        }
+
+        // If order is FINALIZED, sync customerBalances and daybook with new grand total
+        if (order.status === "FINALIZED" && amount !== undefined) {
+          const [recalcOrder] = await tx.select({ grandTotal: customerOrders.grandTotal })
+            .from(customerOrders).where(eq(customerOrders.id, orderId));
+          const newGrandTotal = parseFloat(recalcOrder?.grandTotal || "0");
+
+          const [existingLedgerEntry] = await tx.select({ id: customerBalances.id })
+            .from(customerBalances)
+            .where(and(
+              eq(customerBalances.companyId, companyId),
+              eq(customerBalances.referenceType, "INVOICE"),
+              eq(customerBalances.referenceId, orderId)
+            ));
+          if (existingLedgerEntry) {
+            await tx.update(customerBalances)
+              .set({ debitAmount: String(newGrandTotal), balance: String(newGrandTotal) })
+              .where(eq(customerBalances.id, existingLedgerEntry.id));
+          }
+
+          const [daybookEntry] = await tx.select({ id: factoryDaybookEntries.id })
+            .from(factoryDaybookEntries)
+            .where(and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              eq(factoryDaybookEntries.txType, "INVOICE"),
+              eq(factoryDaybookEntries.referenceId, orderId)
+            ));
+          if (daybookEntry) {
+            await tx.update(factoryDaybookEntries)
+              .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
+              .where(eq(factoryDaybookEntries.id, daybookEntry.id));
+          }
+        }
+      });
 
       const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
       const updatedCharges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));

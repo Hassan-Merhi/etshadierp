@@ -64,6 +64,7 @@ interface OrderCharge {
   amount: string;
   chargeType: string;
   ledgerAccountId?: number;
+  voucherId?: number;
 }
 
 interface OrderDetail {
@@ -95,6 +96,8 @@ export default function FactoryInvoiceDetail() {
   const [, navigate] = useLocation();
   const [editingArticleCode, setEditingArticleCode] = useState<string | null>(null);
   const [editingChargeLedger, setEditingChargeLedger] = useState<number | null>(null);
+  const [editingChargeAmount, setEditingChargeAmount] = useState<number | null>(null);
+  const [chargeAmountInput, setChargeAmountInput] = useState("");
   const [editValue, setEditValue] = useState("");
   const [revertDialogOpen, setRevertDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -131,6 +134,21 @@ export default function FactoryInvoiceDetail() {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
       setEditingChargeLedger(null);
       toast({ title: "Ledger account updated" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateChargeAmountMutation = useMutation({
+    mutationFn: async ({ chargeId, amount }: { chargeId: number; amount: number }) => {
+      const res = await modeApiRequest("PATCH", `/api/factory/customer-orders/${orderId}/charges/${chargeId}`, { amount });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to update charge amount");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
+      setEditingChargeAmount(null);
+      setChargeAmountInput("");
+      toast({ title: "Charge amount updated" });
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -794,16 +812,69 @@ export default function FactoryInvoiceDetail() {
           <div className="space-y-3">
             {[...freightCharges, ...otherCharges].map((charge, idx) => {
               const linkedAccount = ledgerAccounts.find(a => a.id === charge.ledgerAccountId);
-              const isEditing = editingChargeLedger === charge.id;
+              const isEditingLedger = editingChargeLedger === charge.id;
+              const isEditingAmount = editingChargeAmount === charge.id;
+              const canEditAmount = isFinalized && !!charge.voucherId;
               return (
                 <div key={charge.id} className="space-y-1" data-testid={`row-charge-${idx}`}>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm">{charge.name}</span>
-                    <span className="font-mono text-sm">
-                      {Number(charge.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                    </span>
+                    {isEditingAmount ? (
+                      <div className="flex items-center gap-1 print:hidden">
+                        <Input
+                          type="number"
+                          className="h-7 w-28 text-xs text-right font-mono"
+                          value={chargeAmountInput}
+                          onChange={e => setChargeAmountInput(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") {
+                              const val = parseFloat(chargeAmountInput);
+                              if (!isNaN(val) && val >= 0) updateChargeAmountMutation.mutate({ chargeId: charge.id, amount: val });
+                            }
+                            if (e.key === "Escape") { setEditingChargeAmount(null); setChargeAmountInput(""); }
+                          }}
+                          autoFocus
+                          data-testid={`input-charge-amount-${charge.id}`}
+                        />
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="h-7 text-xs px-2"
+                          disabled={updateChargeAmountMutation.isPending}
+                          onClick={() => {
+                            const val = parseFloat(chargeAmountInput);
+                            if (!isNaN(val) && val >= 0) updateChargeAmountMutation.mutate({ chargeId: charge.id, amount: val });
+                          }}
+                          data-testid={`button-save-charge-amount-${charge.id}`}
+                        >Save</Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs px-2"
+                          onClick={() => { setEditingChargeAmount(null); setChargeAmountInput(""); }}
+                          data-testid={`button-cancel-charge-amount-${charge.id}`}
+                        >Cancel</Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <span className="font-mono text-sm" data-testid={`text-charge-amount-${charge.id}`}>
+                          {Number(charge.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                        </span>
+                        {canEditAmount && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 print:hidden"
+                            onClick={() => { setEditingChargeAmount(charge.id); setChargeAmountInput(charge.amount); }}
+                            data-testid={`button-edit-charge-amount-${charge.id}`}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {isEditing ? (
+                  {isEditingLedger ? (
                     <div className="flex items-center gap-2 print:hidden">
                       <Select
                         value={String(charge.ledgerAccountId ?? "")}
