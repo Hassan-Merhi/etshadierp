@@ -553,6 +553,24 @@ export function registerFactoryProductsRoutes(app: Express) {
         }
       }
 
+      // Build explicit insert values (bypasses drizzle-zod coercion issues)
+      const buildInsertValues = (ac: string, c: string) => {
+        const v: Record<string, any> = {
+          companyId,
+          code: c,
+          articleCode: ac || null,
+          name: (req.body.name || "").trim(),
+          active: req.body.active !== undefined ? Boolean(req.body.active) : true,
+        };
+        if (req.body.description != null && req.body.description !== "") v.description = String(req.body.description);
+        if (req.body.weightPerBaleKg != null && req.body.weightPerBaleKg !== "") v.weightPerBaleKg = String(req.body.weightPerBaleKg);
+        if (req.body.categoryId != null) v.categoryId = parseInt(String(req.body.categoryId));
+        if (req.body.sellingPrice != null && req.body.sellingPrice !== "") v.sellingPrice = String(req.body.sellingPrice);
+        if (req.body.productionPrice != null && req.body.productionPrice !== "") v.productionPrice = String(req.body.productionPrice);
+        if (req.body.labelDesignColor != null && req.body.labelDesignColor !== "") v.labelDesignColor = String(req.body.labelDesignColor);
+        return v;
+      };
+
       // Try insert; if code/articleCode constraint fires (race condition),
       // keep incrementing the numeric suffix until we find a free slot.
       let product: any;
@@ -561,13 +579,18 @@ export function registerFactoryProductsRoutes(app: Express) {
       let retryAttempts = 0;
       while (true) {
         try {
-          const parsed = insertFactoryBaleProductSchema.parse({ ...req.body, companyId, code, articleCode });
-          [product] = await db.insert(factoryBaleProducts).values(parsed).returning();
+          [product] = await db.insert(factoryBaleProducts).values(buildInsertValues(articleCode, code)).returning();
           break;
         } catch (insertErr: any) {
+          // DrizzleQueryError wraps the real pg error in .cause
+          const causeMsg: string = insertErr?.cause?.message || "";
           const msg: string = insertErr?.message || "";
-          const isCodeDup = msg.includes("unique") && (msg.includes("company_code") || msg.includes("article_code") || msg.includes("_code"));
-          if (!isCodeDup || !retryPrefix || retryAttempts >= 100) throw insertErr;
+          const combined = causeMsg + msg;
+          const isCodeDup = combined.includes("unique") || combined.includes("duplicate");
+          if (!isCodeDup || !retryPrefix || retryAttempts >= 100) {
+            const realMsg = insertErr?.cause?.message || insertErr?.message || "Insert failed";
+            throw new Error(realMsg);
+          }
           retryAttempts++;
           const currentNum = parseInt(articleCode.slice(retryPrefix.length)) || 0;
           const nextCandidate = `${retryPrefix}${String(currentNum + 1).padStart(3, "0")}`;
@@ -578,7 +601,8 @@ export function registerFactoryProductsRoutes(app: Express) {
       res.json(product);
     } catch (error: any) {
       console.error("Error creating factory bale product:", error);
-      res.status(400).json({ message: error.message });
+      const realMsg = error?.cause?.message || error?.message || "Unknown error";
+      res.status(400).json({ message: realMsg });
     }
   });
 
