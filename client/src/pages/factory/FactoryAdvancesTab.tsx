@@ -281,6 +281,8 @@ function AdvancesView() {
       return res.json();
     },
     enabled: !!repayAuditForm.cashAccountId && repayAuditOpen,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
   const repayAuditMutation = useMutation({

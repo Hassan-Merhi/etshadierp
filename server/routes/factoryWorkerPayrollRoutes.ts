@@ -19,6 +19,7 @@ import {
   factoryAdvanceRepayments,
   factoryAttendance,
   ledgerAccounts,
+  bankAccounts,
   vouchers,
   voucherEntries,
   companies,
@@ -1977,21 +1978,46 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
         .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, companyId)));
       if (!acct) return res.status(404).json({ message: "Account not found" });
 
-      const [totals] = await db.select({
+      // Some cash entries are stored with bankAccountId (bank-linked), not ledgerAccountId.
+      // Find any bankAccounts record whose linkedLedgerId = this ledger account.
+      const linkedBanks = await db.select({ id: bankAccounts.id, openingBalance: bankAccounts.openingBalance, openingBalanceSide: bankAccounts.openingBalanceSide })
+        .from(bankAccounts)
+        .where(and(eq(bankAccounts.linkedLedgerId, accountId), eq(bankAccounts.companyId, companyId)));
+
+      // Sum entries via ledgerAccountId
+      const [ledgerTotals] = await db.select({
         totalDebit: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
         totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
       })
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-        .where(and(
-          eq(voucherEntries.ledgerAccountId, accountId),
-          eq(vouchers.companyId, companyId),
-        ));
+        .where(and(eq(voucherEntries.ledgerAccountId, accountId), eq(vouchers.companyId, companyId)));
 
-      const openingBal = parseFloat(acct.openingBalance || "0");
+      let totalDebit = parseFloat(ledgerTotals.totalDebit);
+      let totalCredit = parseFloat(ledgerTotals.totalCredit);
+      let openingBal = parseFloat(acct.openingBalance || "0");
       const openingSign = acct.openingBalanceSide === "Cr" ? -1 : 1;
-      const balance = (openingBal * openingSign) + parseFloat(totals.totalDebit) - parseFloat(totals.totalCredit);
-      res.json({ accountId, name: acct.name, balance: balance.toFixed(2), totalDebit: totals.totalDebit, totalCredit: totals.totalCredit });
+      openingBal = openingBal * openingSign;
+
+      // Also sum entries via bankAccountId for each linked bank account
+      for (const bank of linkedBanks) {
+        const [bankTotals] = await db.select({
+          totalDebit: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
+          totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
+        })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(and(eq(voucherEntries.bankAccountId, bank.id), eq(vouchers.companyId, companyId)));
+        totalDebit += parseFloat(bankTotals.totalDebit);
+        totalCredit += parseFloat(bankTotals.totalCredit);
+        // Add bank's own opening balance
+        const bOB = parseFloat(bank.openingBalance || "0");
+        const bSign = bank.openingBalanceSide === "Cr" ? -1 : 1;
+        openingBal += bOB * bSign;
+      }
+
+      const balance = openingBal + totalDebit - totalCredit;
+      res.json({ accountId, name: acct.name, balance: balance.toFixed(2) });
     } catch (error: any) {
       console.error("Error fetching account balance:", error);
       res.status(500).json({ message: error.message });
