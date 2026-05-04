@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X, AlertTriangle, FileSpreadsheet, EyeOff, Eye, AlertCircle, Palette } from "lucide-react";
+import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X, AlertTriangle, FileSpreadsheet, EyeOff, Eye, AlertCircle, Palette, Search } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -88,6 +88,7 @@ export default function BaleProducts() {
   const [showNoColor, setShowNoColor] = useState(false);
   const [filterCategoryId, setFilterCategoryId] = useState<number | null>(null);
   const [filterWeight, setFilterWeight] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const appMode = useAppMode();
@@ -139,11 +140,17 @@ export default function BaleProducts() {
   const distinctWeights = Array.from(
     new Set((allActiveProducts ?? []).map((p) => p.weightPerBaleKg).filter(Boolean) as string[])
   ).sort((a, b) => parseFloat(a) - parseFloat(b));
+  const searchLower = searchQuery.trim().toLowerCase();
   const activeProducts = allActiveProducts
     ?.filter((p) => !showZeroPrice || parseFloat(p.sellingPrice || "0") === 0)
     ?.filter((p) => !showNoColor || !p.labelDesignColor)
     ?.filter((p) => filterCategoryId === null || p.categoryId === filterCategoryId)
-    ?.filter((p) => filterWeight === null || String(p.weightPerBaleKg) === filterWeight);
+    ?.filter((p) => filterWeight === null || String(p.weightPerBaleKg) === filterWeight)
+    ?.filter((p) =>
+      !searchLower ||
+      (p.articleCode ?? "").toLowerCase().includes(searchLower) ||
+      (p.name ?? "").toLowerCase().includes(searchLower)
+    );
   const hiddenProducts = products?.filter((p) => p.active === false);
 
   const toggleSelectId = (id: number) => {
@@ -1143,6 +1150,25 @@ export default function BaleProducts() {
               )}
             </div>
             <div className="flex items-center gap-3 flex-wrap">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setSelectedIds(new Set()); }}
+                  placeholder="Search by name or code..."
+                  className="pl-8 w-56"
+                  data-testid="input-search-products"
+                />
+                {searchQuery && (
+                  <button
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => { setSearchQuery(""); setSelectedIds(new Set()); }}
+                    data-testid="button-clear-search"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
               {categories && categories.length > 0 && (
                 <Select
                   value={filterCategoryId === null ? "all" : String(filterCategoryId)}
