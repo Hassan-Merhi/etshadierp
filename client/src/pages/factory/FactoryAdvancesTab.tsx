@@ -186,11 +186,12 @@ function AdvancesView() {
 
   const [repayByMonthOpen, setRepayByMonthOpen] = useState(false);
   const [repayByMonthForm, setRepayByMonthForm] = useState({
-    repaymentDate: new Date().toLocaleDateString("en-CA"),
+    repaymentDate: "",
     cashAccountId: "",
   });
   const [repayByMonthExpanded, setRepayByMonthExpanded] = useState<Set<string>>(new Set());
   const [repayingMonth, setRepayingMonth] = useState<string | null>(null);
+  const [confirmRepay, setConfirmRepay] = useState<{ monthKey: string; monthLabel: string; items: AdvanceRecord[]; total: number } | null>(null);
 
   const repayByMonthMutation = useMutation({
     mutationFn: async (month: string) => {
@@ -960,11 +961,10 @@ function AdvancesView() {
                           </span>
                           <Button
                             size="sm"
-                            disabled={!repayByMonthForm.cashAccountId || isPending || repayByMonthMutation.isPending}
+                            disabled={!repayByMonthForm.cashAccountId || !repayByMonthForm.repaymentDate || isPending || repayByMonthMutation.isPending}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setRepayingMonth(monthKey);
-                              repayByMonthMutation.mutate(monthKey);
+                              setConfirmRepay({ monthKey, monthLabel, items, total });
                             }}
                             data-testid={`button-rbm-repay-${monthKey}`}
                           >
@@ -1011,9 +1011,97 @@ function AdvancesView() {
             );
           })()}
 
+          {/* Hint when date or account not set */}
+          {(!repayByMonthForm.repaymentDate || !repayByMonthForm.cashAccountId) && (
+            <p className="text-xs text-muted-foreground text-center pb-1">
+              {!repayByMonthForm.repaymentDate && !repayByMonthForm.cashAccountId
+                ? "Set a repayment date and cash account to enable repayment."
+                : !repayByMonthForm.repaymentDate
+                  ? "Set a repayment date to enable repayment."
+                  : "Select a cash account to enable repayment."
+              }
+            </p>
+          )}
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setRepayByMonthOpen(false)} data-testid="button-rbm-close">
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Confirm Repay Dialog ── */}
+      <Dialog open={!!confirmRepay} onOpenChange={(open) => { if (!open) setConfirmRepay(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Confirm Repayment — {confirmRepay?.monthLabel}</DialogTitle>
+            <DialogDescription>
+              Review the advances below. Clicking Confirm will mark all of them as fully paid
+              and post the accounting entries.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-1 text-sm">
+            {/* Summary line */}
+            <div className="flex justify-between items-center py-2 px-3 rounded-md bg-muted/40 font-medium">
+              <span>Repayment date</span>
+              <span className="font-mono">{repayByMonthForm.repaymentDate}</span>
+            </div>
+            <div className="flex justify-between items-center py-2 px-3 rounded-md bg-muted/40 font-medium">
+              <span>Cash account</span>
+              <span>{(cashAccounts || []).find((a) => String(a.id) === repayByMonthForm.cashAccountId)?.name ?? "—"}</span>
+            </div>
+          </div>
+
+          {/* Per-advance breakdown */}
+          <div className="border rounded-md overflow-hidden mt-2">
+            <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
+              <span>Worker</span>
+              <span className="text-right">Original</span>
+              <span className="text-right">Will repay</span>
+            </div>
+            <div className="divide-y">
+              {(confirmRepay?.items || []).map((adv) => (
+                <div key={adv.id} className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 text-sm">
+                  <span className="font-medium">{adv.workerName}</span>
+                  <span className="font-mono text-right text-muted-foreground">{fmt(adv.amount)}</span>
+                  <span className="font-mono text-right font-semibold text-amber-700 dark:text-amber-400">
+                    {fmt(adv.remainingBalance)}
+                  </span>
+                </div>
+              ))}
+              <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 text-sm font-bold bg-muted/20">
+                <span>Total</span>
+                <span></span>
+                <span className="font-mono text-right">{fmt(confirmRepay?.total ?? 0)}</span>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 mt-2">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmRepay(null)}
+              disabled={repayByMonthMutation.isPending}
+              data-testid="button-confirm-repay-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!confirmRepay) return;
+                setRepayingMonth(confirmRepay.monthKey);
+                setConfirmRepay(null);
+                repayByMonthMutation.mutate(confirmRepay.monthKey);
+              }}
+              disabled={repayByMonthMutation.isPending}
+              data-testid="button-confirm-repay-ok"
+            >
+              {repayByMonthMutation.isPending
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing...</>
+                : `Confirm — Pay ${fmt(confirmRepay?.total ?? 0)}`
+              }
             </Button>
           </DialogFooter>
         </DialogContent>
