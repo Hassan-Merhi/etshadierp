@@ -492,6 +492,19 @@ export function registerRentalRoutes(
           AND paid_amount::numeric > 0
       `);
 
+      // Restore expected_amount for any paid months AT or AFTER the new start date
+      // that were accidentally zeroed by a previous start-date change.
+      // We set expected_amount = paid_amount so the month shows outstanding = $0
+      // (the tenant paid what they owed; the zeroed expected was a data inconsistency).
+      await db.execute(sql`
+        UPDATE property_monthly_ledger
+        SET expected_amount = paid_amount
+        WHERE contract_id = ${id}
+          AND (year > ${newStartYear} OR (year = ${newStartYear} AND month >= ${newStartMonth}))
+          AND expected_amount::numeric = 0
+          AND paid_amount::numeric > 0
+      `);
+
       res.json({ ok: true });
     } catch (e: any) {
       if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
