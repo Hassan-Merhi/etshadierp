@@ -766,18 +766,12 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     }
   });
 
+  // Use memory storage so file bytes are always available in req.file.buffer —
+  // no disk dependency for the primary save path. Ephemeral disk environments
+  // (Replit/Render deployments) cannot reliably persist files across restarts,
+  // so base64 content is stored directly in the DB column.
   const docUpload = multer({
-    storage: multer.diskStorage({
-      destination: (req, file, cb) => {
-        const dir = path.join(process.cwd(), "uploads", "workers", "docs");
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        cb(null, dir);
-      },
-      filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname);
-        cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
-      },
-    }),
+    storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 },
   });
 
@@ -788,23 +782,30 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const workerId = parseInt(req.params.id);
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-      const fileUrl = `/api/factory/uploads/workers/docs/${req.file.filename}`;
 
-      // Read the uploaded file from disk and store its content in the DB so
-      // it survives server redeploys/restarts (Render and Replit have
-      // ephemeral disks). The disk copy is kept as a hot cache.
-      let fileData: string | null = null;
+      // Generate a stable filename (same format as before so existing URLs keep working)
+      const ext = path.extname(req.file.originalname);
+      const generatedFilename = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+      const fileUrl = `/api/factory/uploads/workers/docs/${generatedFilename}`;
+
+      // Store base64 content directly from the in-memory buffer — guaranteed
+      // to succeed regardless of disk availability.
+      const fileData = req.file.buffer.toString("base64");
+
+      // Optionally write to disk as a fast-path cache for subsequent serves.
       try {
-        const buf = fs.readFileSync(req.file.path);
-        fileData = buf.toString("base64");
-      } catch (readErr) {
-        console.error("Failed to read uploaded worker doc into DB:", readErr);
+        const dir = path.join(process.cwd(), "uploads", "workers", "docs");
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, generatedFilename), req.file.buffer);
+      } catch (cacheErr) {
+        // Non-fatal — DB is the source of truth; disk is just a cache.
+        console.warn("Worker doc disk cache write failed (non-fatal):", cacheErr);
       }
 
       const [doc] = await db.insert(factoryWorkerDocuments).values({
         companyId,
         workerId,
-        fileName: req.file.filename,
+        fileName: generatedFilename,
         originalName: req.file.originalname,
         fileUrl,
         fileType: req.file.mimetype,
