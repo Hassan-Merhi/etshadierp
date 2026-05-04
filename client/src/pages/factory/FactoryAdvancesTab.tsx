@@ -1044,32 +1044,33 @@ function AdvancesView() {
                     </div>
                     <p className="text-xs text-muted-foreground -mt-2">Used for entries that have no existing date/account on record (No Record cases). Case A entries use their original repayment data.</p>
 
-                    {/* Before / After balance impact */}
-                    {repayAuditForm.cashAccountId && (() => {
-                      const currentBal = parseFloat(auditCashBalance?.balance ?? "0");
-                      const newBal = currentBal + missingTotal;
-                      return (
-                        <div className="rounded-md border overflow-hidden text-sm">
-                          <div className="px-4 py-2 bg-muted/20 text-xs font-medium text-muted-foreground border-b">
-                            Cash Account Balance Impact — {auditCashBalance?.name ?? "…"}
+                    {/* Posting impact panel */}
+                    {repayAuditForm.cashAccountId && (
+                      <div className="rounded-md border overflow-hidden text-sm">
+                        <div className="px-4 py-2 bg-muted/20 text-xs font-medium text-muted-foreground border-b">
+                          Posting Impact — Journal: DR Factory Workers Salary Payable / CR Factory Worker Advances
+                        </div>
+                        <div className="grid grid-cols-3 divide-x">
+                          <div className="px-4 py-3 text-center">
+                            <p className="text-xs text-muted-foreground mb-1">Cash Account Balance</p>
+                            <p className="font-mono font-bold">
+                              {auditCashBalance ? fmt(parseFloat(auditCashBalance.balance)) : "…"}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">No change</p>
                           </div>
-                          <div className="grid grid-cols-3 divide-x">
-                            <div className="px-4 py-3 text-center">
-                              <p className="text-xs text-muted-foreground mb-1">Current Balance</p>
-                              <p className="font-mono font-bold">{fmt(currentBal)}</p>
-                            </div>
-                            <div className="px-4 py-3 text-center">
-                              <p className="text-xs text-muted-foreground mb-1">Will Increase By</p>
-                              <p className="font-mono font-bold text-blue-700 dark:text-blue-400">+{fmt(missingTotal)}</p>
-                            </div>
-                            <div className="px-4 py-3 text-center">
-                              <p className="text-xs text-muted-foreground mb-1">New Balance</p>
-                              <p className="font-mono font-bold text-green-700 dark:text-green-400">{fmt(newBal)}</p>
-                            </div>
+                          <div className="px-4 py-3 text-center">
+                            <p className="text-xs text-muted-foreground mb-1">Factory Worker Advances</p>
+                            <p className="font-mono font-bold text-green-700 dark:text-green-400">−{fmt(missingTotal)}</p>
+                            <p className="text-xs text-muted-foreground mt-1">Decreases (CR)</p>
+                          </div>
+                          <div className="px-4 py-3 text-center">
+                            <p className="text-xs text-muted-foreground mb-1">Workers Salary Payable</p>
+                            <p className="font-mono font-bold text-amber-700 dark:text-amber-400">−{fmt(missingTotal)}</p>
+                            <p className="text-xs text-muted-foreground mt-1">Decreases (DR)</p>
                           </div>
                         </div>
-                      );
-                    })()}
+                      </div>
+                    )}
 
                     {/* Per-worker breakdown */}
                     <div className="border rounded-md overflow-hidden">

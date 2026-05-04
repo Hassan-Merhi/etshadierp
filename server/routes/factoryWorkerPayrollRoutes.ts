@@ -1968,7 +1968,11 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const accountId = parseInt(req.params.id);
 
-      const [acct] = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+      const [acct] = await db.select({
+        id: ledgerAccounts.id, name: ledgerAccounts.name,
+        openingBalance: ledgerAccounts.openingBalance,
+        openingBalanceSide: ledgerAccounts.openingBalanceSide,
+      })
         .from(ledgerAccounts)
         .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, companyId)));
       if (!acct) return res.status(404).json({ message: "Account not found" });
@@ -1984,7 +1988,9 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
           eq(vouchers.companyId, companyId),
         ));
 
-      const balance = parseFloat(totals.totalDebit) - parseFloat(totals.totalCredit);
+      const openingBal = parseFloat(acct.openingBalance || "0");
+      const openingSign = acct.openingBalanceSide === "Cr" ? -1 : 1;
+      const balance = (openingBal * openingSign) + parseFloat(totals.totalDebit) - parseFloat(totals.totalCredit);
       res.json({ accountId, name: acct.name, balance: balance.toFixed(2), totalDebit: totals.totalDebit, totalCredit: totals.totalCredit });
     } catch (error: any) {
       console.error("Error fetching account balance:", error);
@@ -2181,6 +2187,21 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
         .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
       if (!cashAcct) return res.status(400).json({ message: "Cash account not found" });
 
+      // Resolve or auto-create "Factory Workers Salary Payable" as the contra for salary-deduction repayments
+      // (DR Salary Payable / CR Factory Worker Advances — salary deductions don't touch cash)
+      let [payableAcct] = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+        .from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Workers Salary Payable")));
+      if (!payableAcct) {
+        const [maxCodeRow] = await db.select({ maxCode: sql<string>`MAX(${ledgerAccounts.code})` })
+          .from(ledgerAccounts).where(eq(ledgerAccounts.companyId, companyId));
+        const nextCode = String((parseInt(maxCodeRow?.maxCode || "1000") || 1000) + 1);
+        [payableAcct] = await db.insert(ledgerAccounts).values({
+          companyId, code: nextCode, name: "Factory Workers Salary Payable",
+          accountType: "Accounts Payable", openingBalance: "0", openingBalanceSide: "Cr",
+        }).returning({ id: ledgerAccounts.id, name: ledgerAccounts.name });
+      }
+
       // Re-run audit to get fresh list
       const allAdvances = await db.select().from(factoryWorkerAdvances)
         .innerJoin(factoryWorkers, eq(factoryWorkerAdvances.workerId, factoryWorkers.id))
@@ -2254,16 +2275,18 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
               cashAccountId, notes: "Auto-created by Repayment Audit",
             }).returning();
 
-            const narration = `Advance repayment from ${workerName}: $${amount.toFixed(2)} (advance #${adv.id})`;
-            const voucherNumber = `RECEIPT-REPAY-${repayment.id}-${Date.now()}`;
+            const narration = `Salary deduction repayment — ${workerName}: $${amount.toFixed(2)} (advance #${adv.id})`;
+            const voucherNumber = `REPAY-SAL-${repayment.id}-${Date.now()}`;
             const [voucher] = await tx.insert(vouchers).values({
-              companyId, voucherNumber, voucherType: "Receipt",
+              companyId, voucherNumber, voucherType: "Journal",
               voucherDate: repaymentDate, description: narration,
               totalAmount: amount.toFixed(2), currency: "USD", sourceModule: "FACTORY",
             }).returning();
 
+            // DR Factory Workers Salary Payable / CR Factory Worker Advances
+            // Salary deductions reduce the company's wage obligation — no cash movement
             await tx.insert(voucherEntries).values([
-              { voucherId: voucher.id, ledgerAccountId: cashAccountId, debitAmount: amount.toFixed(2), creditAmount: "0", narration },
+              { voucherId: voucher.id, ledgerAccountId: payableAcct.id, debitAmount: amount.toFixed(2), creditAmount: "0", narration },
               { voucherId: voucher.id, ledgerAccountId: advancesAccount.id, debitAmount: "0", creditAmount: amount.toFixed(2), narration },
             ]);
             posted++;
@@ -2274,18 +2297,17 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
             for (const repay of missingRepays) {
               const amount = parseFloat(repay.amount || "0");
               if (amount <= 0) continue;
-              const effectiveCashId = repay.cashAccountId || cashAccountId;
               const rDate = repay.repaymentDate || repaymentDate;
-              const narration = `Advance repayment from ${workerName}: $${amount.toFixed(2)} (advance #${adv.id})`;
-              const voucherNumber = `RECEIPT-REPAY-${repay.id}-${Date.now()}`;
+              const narration = `Salary deduction repayment — ${workerName}: $${amount.toFixed(2)} (advance #${adv.id})`;
+              const voucherNumber = `REPAY-SAL-${repay.id}-${Date.now()}`;
               const [voucher] = await tx.insert(vouchers).values({
-                companyId, voucherNumber, voucherType: "Receipt",
+                companyId, voucherNumber, voucherType: "Journal",
                 voucherDate: rDate, description: narration,
                 totalAmount: amount.toFixed(2), currency: "USD", sourceModule: "FACTORY",
               }).returning();
 
               await tx.insert(voucherEntries).values([
-                { voucherId: voucher.id, ledgerAccountId: effectiveCashId, debitAmount: amount.toFixed(2), creditAmount: "0", narration },
+                { voucherId: voucher.id, ledgerAccountId: payableAcct.id, debitAmount: amount.toFixed(2), creditAmount: "0", narration },
                 { voucherId: voucher.id, ledgerAccountId: advancesAccount.id, debitAmount: "0", creditAmount: amount.toFixed(2), narration },
               ]);
               posted++;
