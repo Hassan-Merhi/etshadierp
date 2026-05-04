@@ -1317,6 +1317,102 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
     }
   });
 
+  // GET /api/factory/advances/reconcile/preview - Dry-run reconciliation, returns what would change
+  app.get("/api/factory/advances/reconcile/preview", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const allAdvances = await db.select().from(factoryWorkerAdvances)
+        .where(and(
+          eq(factoryWorkerAdvances.companyId, companyId),
+          eq(factoryWorkerAdvances.repaymentType, "salary_deduction"),
+        ))
+        .orderBy(factoryWorkerAdvances.workerId, factoryWorkerAdvances.advanceDate);
+
+      const allPayrolls = await db.select({
+        workerId: factoryPayrolls.workerId,
+        advances: factoryPayrolls.advances,
+        periodStart: factoryPayrolls.periodStart,
+      }).from(factoryPayrolls)
+        .where(eq(factoryPayrolls.companyId, companyId))
+        .orderBy(factoryPayrolls.workerId, factoryPayrolls.periodStart);
+
+      const allRepayments = await db.select().from(factoryAdvanceRepayments)
+        .where(eq(factoryAdvanceRepayments.companyId, companyId))
+        .orderBy(factoryAdvanceRepayments.advanceId, factoryAdvanceRepayments.repaymentDate);
+
+      // Worker names
+      const workerIds = [...new Set(allAdvances.map((a: any) => a.workerId))];
+      let workerMap: Record<number, string> = {};
+      if (workerIds.length > 0) {
+        const wRows = await db.select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
+          .from(factoryWorkers).where(inArray(factoryWorkers.id, workerIds));
+        workerMap = Object.fromEntries(wRows.map((w: any) => [w.id, w.fullName]));
+      }
+
+      const advancesByWorker = new Map<number, typeof allAdvances>();
+      for (const adv of allAdvances) {
+        const list = advancesByWorker.get(adv.workerId) || [];
+        list.push(adv);
+        advancesByWorker.set(adv.workerId, list);
+      }
+
+      const payrollDeductionByWorker = new Map<number, number>();
+      for (const pr of allPayrolls) {
+        const amt = parseFloat(pr.advances || "0");
+        if (amt > 0) payrollDeductionByWorker.set(pr.workerId, (payrollDeductionByWorker.get(pr.workerId) || 0) + amt);
+      }
+
+      const manualRepaymentByAdvance = new Map<number, number>();
+      for (const rep of allRepayments) {
+        manualRepaymentByAdvance.set(rep.advanceId, (manualRepaymentByAdvance.get(rep.advanceId) || 0) + parseFloat(rep.amount || "0"));
+      }
+
+      const changes: any[] = [];
+      for (const [workerId, advances] of advancesByWorker) {
+        const balances: { id: number; bal: number }[] = [];
+        for (const adv of advances) {
+          const original = parseFloat(adv.amount || "0");
+          const manualPaid = manualRepaymentByAdvance.get(adv.id) || 0;
+          balances.push({ id: adv.id, bal: Math.max(0, original - manualPaid) });
+        }
+        let remaining = payrollDeductionByWorker.get(workerId) || 0;
+        for (const entry of balances) {
+          if (remaining <= 0) break;
+          const deduct = Math.min(entry.bal, remaining);
+          entry.bal = entry.bal - deduct;
+          remaining -= deduct;
+        }
+        for (let i = 0; i < advances.length; i++) {
+          const adv = advances[i];
+          const newBal = Math.max(0, balances[i].bal);
+          const newBal2dp = newBal.toFixed(2);
+          const newFullyPaid = newBal <= 0.001;
+          const currentBal = parseFloat(adv.remainingBalance || "0");
+          const changed = adv.remainingBalance !== newBal2dp || adv.fullyPaid !== newFullyPaid;
+          changes.push({
+            advanceId: adv.id,
+            workerId,
+            workerName: workerMap[workerId] || `Worker #${workerId}`,
+            advanceDate: adv.advanceDate,
+            originalAmount: adv.amount,
+            currentBalance: currentBal.toFixed(2),
+            newBalance: newBal2dp,
+            currentFullyPaid: adv.fullyPaid,
+            newFullyPaid,
+            changed,
+          });
+        }
+      }
+
+      res.json({ changes, totalAdvances: allAdvances.length });
+    } catch (e: any) {
+      console.error("Advance reconcile preview error:", e);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // POST /api/factory/advances/reconcile - Recalculate all advance remaining balances from historical payrolls
   app.post("/api/factory/advances/reconcile", requireAuth, async (req: any, res: any) => {
     try {
