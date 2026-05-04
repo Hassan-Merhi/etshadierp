@@ -244,7 +244,12 @@ export function registerRentalRoutes(
           eq(propertyUnits.unitType, unitType),
           eq(propertyUnits.active, true),
         ))
-        .orderBy(propertyUnits.locationGroup, propertyUnits.sortOrder, propertyUnits.unitNumber);
+        .orderBy(
+          propertyUnits.locationGroup,
+          propertyUnits.sortOrder,
+          sql`regexp_replace(${propertyUnits.unitNumber}, '[^0-9]', '', 'g')::bigint nulls last`,
+          propertyUnits.unitNumber,
+        );
 
       // When viewing SHOP type, also pull in any WAREHOUSE units that are marked as
       // "internal lease" (the company occupies its own warehouse) so they appear in both views.

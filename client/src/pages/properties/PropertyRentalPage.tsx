@@ -187,7 +187,11 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
       if (!groups.has(u.locationGroup)) groups.set(u.locationGroup, []);
       groups.get(u.locationGroup)!.push(u);
     });
-    return Array.from(groups.entries());
+    const naturalCmp = (a: string, b: string) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => naturalCmp(a, b))
+      .map(([grp, us]) => [grp, [...us].sort((a, b) => naturalCmp(a.unitNumber, b.unitNumber))] as [string, Unit[]]);
   }, [units]);
 
   const totals = useMemo(() => {
