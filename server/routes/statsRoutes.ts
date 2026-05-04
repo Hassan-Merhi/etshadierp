@@ -331,9 +331,8 @@ export function registerStatsRoutes(app: Express) {
           workerAdvances += netBalance;
         }
       }
-      // Remove the "Factory Worker Advances" ledger account from the asset list — it is
-      // replaced by the authoritative factory_worker_advances table sum below so that
-      // repayments tracked in the table always match what the Net Position shows.
+      // ERP Net Position: exclude "Factory Worker Advances" ledger account entirely —
+      // factory advances belong in the Factory Net Position only, not here.
       const fwaLedgerIdx1 = forUsAccounts.findIndex(
         (a: any) => (a.name || "").toLowerCase() === "factory worker advances",
       );
@@ -341,17 +340,8 @@ export function registerStatsRoutes(app: Express) {
         forUsTotal = round2(forUsTotal - forUsAccounts[fwaLedgerIdx1].value);
         forUsAccounts.splice(fwaLedgerIdx1, 1);
       }
-      // Add outstanding factory worker advances.  Factory workers live in the
-      // factory_workers table (not employees), so they are invisible to the
-      // employee-balance loop above.  This makes the Net Position consistent with
-      // the Worker Advances page.
-      {
-        const [fwAdvRow] = await db
-          .select({ total: sql<string>`COALESCE(SUM(CAST(remaining_balance AS numeric)), 0)` })
-          .from(factoryWorkerAdvances)
-          .where(and(eq(factoryWorkerAdvances.companyId, companyId), eq(factoryWorkerAdvances.fullyPaid, false)));
-        workerAdvances += parseFloat((fwAdvRow as any)?.total || "0");
-      }
+      // ERP Net Position uses only ERP employee advances (the loop above).
+      // Factory worker advances are NOT included here — they appear in the Factory Net Position.
       // For CFA companies, worker balances are in CFA → convert to USD
       const workerLiabilitiesDisplay = currentCfaRate > 0 ? round2(workerLiabilities / currentCfaRate) : workerLiabilities;
       const workerAdvancesDisplay    = currentCfaRate > 0 ? round2(workerAdvances    / currentCfaRate) : workerAdvances;
@@ -601,7 +591,6 @@ export function registerStatsRoutes(app: Express) {
 
       const accountBalances = new Map<number, { debit: number; credit: number }>();
       const supplierBalances = new Map<number, { debit: number; credit: number }>();
-      const employeeBalances = new Map<number, { debit: number; credit: number }>();
       for (const e of companyEntries as any[]) {
         if (e.ledgerAccountId) {
           const cur = accountBalances.get(e.ledgerAccountId) || { debit: 0, credit: 0 };
@@ -610,10 +599,6 @@ export function registerStatsRoutes(app: Express) {
         if (e.supplierId) {
           const cur = supplierBalances.get(e.supplierId) || { debit: 0, credit: 0 };
           supplierBalances.set(e.supplierId, { debit: cur.debit + parseFloat(e.debitAmount || "0"), credit: cur.credit + parseFloat(e.creditAmount || "0") });
-        }
-        if (e.employeeId) {
-          const cur = employeeBalances.get(e.employeeId) || { debit: 0, credit: 0 };
-          employeeBalances.set(e.employeeId, { debit: cur.debit + parseFloat(e.debitAmount || "0"), credit: cur.credit + parseFloat(e.creditAmount || "0") });
         }
       }
 
@@ -655,29 +640,10 @@ export function registerStatsRoutes(app: Express) {
         forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: stockOnFloor, category: "Inventory" });
       }
 
-      // ── 4. Payroll / employee balances (matches /api/stats/net-profit exactly) ──
-      const companyEmployees = await db
-        .select()
-        .from(employees)
-        .where(and(eq(employees.companyId, companyId), eq(employees.active, true), isNull(employees.deletedAt)))
-        .execute();
-      let workerLiabilities = 0;
-      let workerAdvances = 0;
-      for (const emp of companyEmployees as any[]) {
-        const opening = parseFloat(emp.openingBalance || "0");
-        const openingSide = emp.openingBalanceSide === "Dr" ? 1 : -1;
-        const signedOpening = opening * openingSide;
-        const balance = employeeBalances.get(emp.id) || { debit: 0, credit: 0 };
-        const netBalance = signedOpening + balance.debit - balance.credit;
-        if (netBalance < 0) {
-          workerLiabilities += Math.abs(netBalance);
-        } else if (netBalance > 0) {
-          workerAdvances += netBalance;
-        }
-      }
-      // Remove the "Factory Worker Advances" ledger account from the asset list — it is
-      // replaced by the authoritative factory_worker_advances table sum below so that
-      // repayments tracked in the table always match what the Net Position shows.
+      // ── 4. Factory worker advances only (Factory Net Position is isolated from ERP) ──
+      // ERP employee advances are NOT included here — they belong in the ERP Net Position.
+      // Factory workers live in factory_workers / factory_worker_advances tables, not employees.
+      // Remove the "Factory Worker Advances" ledger account (replaced by table sum below).
       const fwaLedgerIdx2 = forUsAccounts.findIndex(
         (a: any) => (a.name || "").toLowerCase() === "factory worker advances",
       );
@@ -685,23 +651,17 @@ export function registerStatsRoutes(app: Express) {
         forUsTotal = round2(forUsTotal - forUsAccounts[fwaLedgerIdx2].value);
         forUsAccounts.splice(fwaLedgerIdx2, 1);
       }
-      // Add outstanding factory worker advances.  Factory workers live in the
-      // factory_workers table (not employees), so they are invisible to the
-      // employee-balance loop above.
+      // Use the authoritative factory_worker_advances table as the sole source.
       {
         const [fwAdvRow2] = await db
           .select({ total: sql<string>`COALESCE(SUM(CAST(remaining_balance AS numeric)), 0)` })
           .from(factoryWorkerAdvances)
           .where(and(eq(factoryWorkerAdvances.companyId, companyId), eq(factoryWorkerAdvances.fullyPaid, false)));
-        workerAdvances += parseFloat((fwAdvRow2 as any)?.total || "0");
-      }
-      if (workerLiabilities > 0) {
-        onUsTotal += workerLiabilities;
-        onUsAccounts.push({ name: "Workers/Employees Payable", code: "COMPUTED", value: workerLiabilities, category: "Workers" });
-      }
-      if (workerAdvances > 0) {
-        forUsTotal += workerAdvances;
-        forUsAccounts.push({ name: "Worker Advances (Prepaid)", code: "COMPUTED", value: workerAdvances, category: "Worker Advances" });
+        const workerAdvances = parseFloat((fwAdvRow2 as any)?.total || "0");
+        if (workerAdvances > 0) {
+          forUsTotal += workerAdvances;
+          forUsAccounts.push({ name: "Worker Advances (Prepaid)", code: "COMPUTED", value: workerAdvances, category: "Worker Advances" });
+        }
       }
 
       // ── 5. Supplier balances ──────────────────────────────────────────────
