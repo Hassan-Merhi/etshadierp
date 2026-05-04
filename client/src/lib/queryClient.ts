@@ -63,10 +63,17 @@ export function resetCsrfToken() {
 //   • Skips GET/HEAD/OPTIONS
 //   • Never overrides an existing X-CSRF-Token header
 //   • Falls through cleanly if the token cannot be fetched
+//   • Auto-retries once on CSRF_TOKEN_MISMATCH (stale cached token after
+//     server restart / session regeneration on Render)
 if (typeof window !== "undefined" && !((window as any).__csrfFetchPatched)) {
   (window as any).__csrfFetchPatched = true;
   const originalFetch = window.fetch.bind(window);
-  window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+
+  async function fetchWithCsrf(
+    input: RequestInfo | URL,
+    init?: RequestInit,
+    isRetry = false,
+  ): Promise<Response> {
     try {
       // Resolve the URL pathname for /api/* matching
       let pathname: string | null = null;
@@ -87,16 +94,28 @@ if (typeof window !== "undefined" && !((window as any).__csrfFetchPatched)) {
       const isApi = !!pathname && pathname.startsWith("/api/") && pathname !== "/api/csrf-token";
 
       if (isStateChanging && isApi) {
-        // Inspect existing headers (case-insensitive)
         const existingHeaders = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
         if (!existingHeaders.has("x-csrf-token")) {
           const token = await ensureCsrfToken();
           if (token) {
             existingHeaders.set("X-CSRF-Token", token);
             const newInit: RequestInit = { ...init, headers: existingHeaders };
-            // credentials default to "include" for /api requests so the session cookie travels
             if (newInit.credentials === undefined) newInit.credentials = "include";
-            return originalFetch(input, newInit);
+            const res = await originalFetch(input, newInit);
+
+            // If the server rejected our token (stale after restart/session regen),
+            // clear the cache, fetch a fresh token, and retry exactly once.
+            if (!isRetry && res.status === 403) {
+              try {
+                const clone = res.clone();
+                const body = await clone.json();
+                if (body?.code === "CSRF_TOKEN_MISMATCH") {
+                  resetCsrfToken();
+                  return fetchWithCsrf(input, init, true);
+                }
+              } catch { /* not JSON — not a CSRF error */ }
+            }
+            return res;
           }
         }
       }
@@ -104,7 +123,10 @@ if (typeof window !== "undefined" && !((window as any).__csrfFetchPatched)) {
       // Never block a legitimate request because of interceptor errors
     }
     return originalFetch(input, init);
-  };
+  }
+
+  window.fetch = (input: RequestInfo | URL, init?: RequestInit) =>
+    fetchWithCsrf(input, init);
 }
 
 /**
@@ -167,6 +189,7 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
+  _isRetry = false,
 ): Promise<Response> {
   const controller = new AbortController();
   let intentionalAbort = false;
@@ -181,7 +204,7 @@ export async function apiRequest(
       body = JSON.stringify(data);
     }
     
-    // Attach CSRF token for state-changing methods (server is in warn-only mode).
+    // Attach CSRF token for state-changing methods.
     const upMethod = method.toUpperCase();
     const isStateChanging = upMethod !== "GET" && upMethod !== "HEAD" && upMethod !== "OPTIONS";
     const csrfToken = isStateChanging ? await ensureCsrfToken() : null;
@@ -199,6 +222,20 @@ export async function apiRequest(
     });
 
     clearTimeout(timeoutId);
+
+    // If the server rejected our CSRF token (stale after server restart /
+    // session regeneration on Render), clear the cache and retry exactly once.
+    if (!_isRetry && res.status === 403) {
+      try {
+        const clone = res.clone();
+        const errBody = await clone.json();
+        if (errBody?.code === "CSRF_TOKEN_MISMATCH") {
+          resetCsrfToken();
+          return apiRequest(method, url, data, true);
+        }
+      } catch { /* not JSON — fall through to normal error handling */ }
+    }
+
     await throwIfResNotOk(res);
     return res;
   } catch (error: any) {
