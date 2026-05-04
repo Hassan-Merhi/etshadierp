@@ -890,11 +890,11 @@ function AuthenticatedApp() {
                     <Route path="/factory/stock-allocation-v5" component={FactoryStockAllocationV5} />
                     <Route path="/factory/customers/:id" component={FactoryCustomerStatement} />
                     <Route path="/factory/customers" component={FactoryCustomers} />
-                    <Route path="/factory/payroll-hub"><Redirect to="/factory/finance?tab=payroll" /></Route>
+                    <Route path="/factory/payroll-hub"><Redirect to="/factory/finance?tab=workers" /></Route>
                     <Route path="/factory/employees/:id" component={FactoryEmployeeDetail} />
-                    <Route path="/factory/employees"><Redirect to="/factory/payroll-hub" /></Route>
+                    <Route path="/factory/employees"><Redirect to="/factory/finance?tab=employees" /></Route>
                     <Route path="/factory/workers/:id" component={FactoryWorkerDetail} />
-                    <Route path="/factory/workers"><Redirect to="/factory/payroll-hub" /></Route>
+                    <Route path="/factory/workers"><Redirect to="/factory/finance?tab=workers" /></Route>
                     <Route path="/factory/worker-payroll"><Redirect to="/factory/workers?tab=payroll" /></Route>
                     <Route path="/factory/supplier-report" component={FactorySupplierReport} />
                     <Route path="/factory/supplier-statement" component={FactorySupplierStatement} />

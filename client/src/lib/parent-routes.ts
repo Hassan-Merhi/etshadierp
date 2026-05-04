@@ -1,7 +1,7 @@
 export function getParentRoute(pathname: string): string | null {
   if (pathname.startsWith("/factory/")) {
-    if (/^\/factory\/employees\/\d+/.test(pathname)) return "/factory/finance?tab=payroll";
-    if (/^\/factory\/workers\/\d+/.test(pathname)) return "/factory/finance?tab=payroll";
+    if (/^\/factory\/employees\/\d+/.test(pathname)) return "/factory/finance?tab=employees";
+    if (/^\/factory\/workers\/\d+/.test(pathname)) return "/factory/finance?tab=workers";
     if (/^\/factory\/customers\/\d+/.test(pathname)) return "/factory/customers";
     if (pathname === "/factory/containers/new") return "/factory/containers";
     if (/^\/factory\/raw-stock\/opening-balance\/\d+\/edit/.test(pathname)) return "/factory/raw-materials";
