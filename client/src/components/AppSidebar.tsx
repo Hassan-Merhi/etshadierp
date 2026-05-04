@@ -29,6 +29,8 @@ import {
   Store,
   ClipboardList,
   KeyRound,
+  LayoutGrid,
+  Handshake,
 } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
@@ -75,10 +77,8 @@ export const ERP_NAV_SECTIONS: NavSection[] = [
     label: "Sales & POS",
     color: NAV_COLOR.sales,
     items: [
-      { title: "POS",              url: "/pos",              icon: ShoppingCart   },
-      { title: "POS Daybook",      url: "/pos-daybook",      icon: Book           },
-      { title: "Stock Transfers",  url: "/stock-transfers",  icon: ArrowLeftRight },
-      { title: "Price List",       url: "/price-list",       icon: Tag            },
+      { title: "POS",          url: "/pos",          icon: ShoppingCart },
+      { title: "Sales Tools",  url: "/sales-tools",  icon: LayoutGrid   },
     ],
   },
   {
@@ -86,8 +86,7 @@ export const ERP_NAV_SECTIONS: NavSection[] = [
     color: NAV_COLOR.accounting,
     items: [
       { title: "Accounts",         url: "/accounts",         icon: Wallet         },
-      { title: "Suppliers",        url: "/suppliers",        icon: Users          },
-      { title: "Customers",        url: "/customers",        icon: Users          },
+      { title: "Parties",          url: "/parties",          icon: Handshake      },
       { title: "Payroll",          url: "/payroll",          icon: UserCheck      },
       { title: "Company Transfer", url: "/company-transfer", icon: ArrowLeftRight },
     ],
@@ -159,14 +158,13 @@ export function useErpVisibleSections(user?: any): {
     if (item.url === "/live-sheets")             return isDeveloper;
     if (item.url === "/erp/rental/warehouses")   return false;
     if (item.url === "/erp/rental/payments")     return false;
-    if (item.url === "/chat")       return !isPOSUser;
-    if (item.url === "/price-list") return !isPOSUser;
+    if (item.url === "/chat")        return !isPOSUser;
     if (item.url === "/settings" && isOwner) return false;
 
     if (isDeveloper || isAdmin || myErpPages?.fullAccess) return true;
 
     if (isPOSUser) {
-      const posRoutes = ["/pos", "/pos-dashboard", "/pos-daybook", "/location-inventory"];
+      const posRoutes = ["/pos", "/pos-dashboard", "/pos-daybook", "/sales-tools", "/location-inventory"];
       if (companySettings?.posExcelImportEnabled) posRoutes.push("/pos-import");
       return posRoutes.includes(item.url);
     }
@@ -174,7 +172,6 @@ export function useErpVisibleSections(user?: any): {
     if (featureKey && allowedPages.size > 0) return allowedPages.has(featureKey);
     if (allowedPages.size === 0 && myErpPages)  return false;
     if (item.url === "/settings")    return false;
-    if (item.url === "/pos-daybook") return isPOSUser;
 
     return true;
   };

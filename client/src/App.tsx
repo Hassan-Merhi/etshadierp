@@ -71,6 +71,8 @@ const FactoryStockItemDetail = lazy(() => import("@/pages/factory/FactoryStockIt
 const SalesReport = lazy(() => import("@/pages/SalesReport"));
 const CompanyTransfer = lazy(() => import("@/pages/CompanyTransfer"));
 const POSDaybook = lazy(() => import("@/pages/pos/POSDaybook"));
+const SalesToolsHub = lazy(() => import("@/pages/SalesToolsHub"));
+const PartiesHub = lazy(() => import("@/pages/PartiesHub"));
 const POSDashboard = lazy(() => import("@/pages/pos/POSDashboard"));
 const POSCustomers = lazy(() => import("@/pages/pos/POSCustomers"));
 const POSSettings = lazy(() => import("@/pages/pos/POSSettings"));
@@ -284,8 +286,9 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/analytics" component={Analytics} />
       <Route path="/accounts" component={Accounts} />
       <Route path="/agents" component={Agents} />
-      <Route path="/suppliers" component={Suppliers} />
-      <Route path="/customers" component={Customers} />
+      <Route path="/parties" component={PartiesHub} />
+      <Route path="/suppliers"><Redirect to="/parties?tab=suppliers" /></Route>
+      <Route path="/customers"><Redirect to="/parties?tab=customers" /></Route>
       <Route path="/vouchers">{() => <Vouchers />}</Route>
       <Route path="/vouchers/:id/edit" component={VoucherEdit} />
       <Route path="/purchase-orders/:id/edit" component={PurchaseOrderEdit} />
@@ -299,7 +302,8 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/offload-item-search"><Redirect to="/stock?tab=offload" /></Route>
       <Route path="/location-summary"><Redirect to="/stock-query?tab=summary" /></Route>
       <Route path="/stock-transfer-order" component={StockTransferOrder} />
-      <Route path="/stock-transfers" component={StockTransfers} />
+      <Route path="/sales-tools" component={SalesToolsHub} />
+      <Route path="/stock-transfers"><Redirect to="/sales-tools?tab=transfers" /></Route>
       <Route path="/optional-vouchers" component={OptionalVouchers} />
       <Route path="/stock-items/:id/history" component={StockItemHistory} />
       <Route path="/stock-items/:id/history/:year/:month" component={StockItemVouchers} />
@@ -313,9 +317,9 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       {user?.role === "Developer" && <Route path="/net-profit-report" component={NetProfitReport} />}
       <Route path="/combined-inventory"><Redirect to="/stock-otw?tab=combined" /></Route>
       <Route path="/bale-ledger" component={BaleLedger} />
-      <Route path="/pos-daybook" component={POSDaybook} />
-      <Route path="/pos-price-list">{() => <POSPriceList />}</Route>
-      <Route path="/price-list">{() => <POSPriceList />}</Route>
+      <Route path="/pos-daybook"><Redirect to="/sales-tools?tab=daybook" /></Route>
+      <Route path="/pos-price-list"><Redirect to="/sales-tools?tab=pricelist" /></Route>
+      <Route path="/price-list"><Redirect to="/sales-tools?tab=pricelist" /></Route>
       <Route path="/suppliers/:supplierId/proformas" component={SupplierProformas} />
       <Route path="/containers/:containerId/verification" component={ContainerVerification} />
       <Route path="/suppliers/:id/edit" component={EditSupplier} />

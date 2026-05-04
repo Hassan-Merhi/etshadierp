@@ -38,8 +38,8 @@ export function getParentRoute(pathname: string): string | null {
     return null;
   }
 
-  if (/^\/suppliers\/\d+\/edit/.test(pathname)) return "/suppliers";
-  if (/^\/suppliers\/\d+\/proformas/.test(pathname)) return "/suppliers";
+  if (/^\/suppliers\/\d+\/edit/.test(pathname)) return "/parties?tab=suppliers";
+  if (/^\/suppliers\/\d+\/proformas/.test(pathname)) return "/parties?tab=suppliers";
   if (/^\/purchase-orders\/\d+\/edit/.test(pathname)) return "/containers";
   if (/^\/containers\/\d+\/verification/.test(pathname)) {
     const m = pathname.match(/^\/containers\/(\d+)\//);
