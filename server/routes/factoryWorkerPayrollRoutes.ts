@@ -1961,6 +1961,82 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
     }
   });
 
+  // POST /api/factory/advances/cash-adjustment — post a correcting journal entry on a cash account
+  app.post("/api/factory/advances/cash-adjustment", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.body.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { cashAccountId: rawAcctId, amount: rawAmount, direction, date, narration } = req.body;
+      const cashAccountId = parseInt(rawAcctId);
+      if (!cashAccountId || isNaN(cashAccountId)) return res.status(400).json({ message: "cashAccountId is required" });
+      const amount = parseFloat(rawAmount);
+      if (!amount || amount <= 0) return res.status(400).json({ message: "amount must be a positive number" });
+      if (!date) return res.status(400).json({ message: "date is required" });
+      const isCredit = direction !== "debit"; // default credit (reduces cash)
+
+      const [cashAcct] = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+        .from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
+      if (!cashAcct) return res.status(400).json({ message: "Cash account not found" });
+
+      await db.transaction(async (tx: any) => {
+        // Resolve or auto-create the contra "Factory Advance Adjustments" account
+        let [adjAccount] = await tx.select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Advance Adjustments")));
+        if (!adjAccount) {
+          const maxCodeResult = await tx.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+            .from(ledgerAccounts)
+            .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
+          const nextCode = String((parseInt(maxCodeResult[0]?.maxCode || "0") || 0) + 1);
+          [adjAccount] = await tx.insert(ledgerAccounts).values({
+            companyId, code: nextCode, name: "Factory Advance Adjustments",
+            accountType: "Equity", active: true, isHidden: false,
+          }).returning();
+        }
+
+        const voucherNumber = `ADJ-CASH-${cashAccountId}-${Date.now()}`;
+        const desc = narration || "Cash balance adjustment";
+
+        const [voucher] = await tx.insert(vouchers).values({
+          companyId,
+          voucherNumber,
+          voucherType: "Journal",
+          voucherDate: date,
+          description: desc,
+          totalAmount: amount.toFixed(2),
+          currency: "USD",
+          sourceModule: "FACTORY",
+        }).returning();
+
+        // isCredit = true  → CR Cash / DR Adjustments  (reduces cash balance)
+        // isCredit = false → DR Cash / CR Adjustments  (increases cash balance)
+        await tx.insert(voucherEntries).values([
+          {
+            voucherId: voucher.id,
+            ledgerAccountId: adjAccount.id,
+            debitAmount: isCredit ? amount.toFixed(2) : "0",
+            creditAmount: isCredit ? "0" : amount.toFixed(2),
+            narration: desc,
+          },
+          {
+            voucherId: voucher.id,
+            ledgerAccountId: cashAccountId,
+            debitAmount: isCredit ? "0" : amount.toFixed(2),
+            creditAmount: isCredit ? amount.toFixed(2) : "0",
+            narration: desc,
+          },
+        ]);
+      });
+
+      res.json({ message: `Cash adjustment posted — ${isCredit ? "CR" : "DR"} ${cashAcct.name} $${amount.toFixed(2)}` });
+    } catch (error: any) {
+      console.error("Error posting cash adjustment:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ─── ADVANCE REPAYMENTS ─────────────────────────────────────────
 
   app.get("/api/factory/advances/:id/repayments", requireAuth, async (req: any, res: any) => {
