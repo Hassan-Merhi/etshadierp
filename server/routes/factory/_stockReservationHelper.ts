@@ -102,13 +102,17 @@ export async function syncProformaReservations(
   }
 
   // 5. Delete stale rows for article codes that no longer have a line
+  // NOTE: <> ALL(array) fails when Drizzle expands JS arrays to individual
+  // positional params.  Use NOT IN with sql.join so each code becomes its own
+  // bound parameter in a valid IN-list.
   if (currentCodes.size > 0) {
     const codeArr = Array.from(currentCodes);
+    const notInList = sql.join(codeArr.map((c) => sql`${c}`), sql`, `);
     await tx.execute(
       sql`DELETE FROM proforma_stock_reservations
           WHERE company_id  = ${companyId}
             AND proforma_id = ${proformaId}
-            AND article_code <> ALL(${codeArr})`,
+            AND article_code NOT IN (${notInList})`,
     );
   }
 }
