@@ -11,6 +11,13 @@ import {
 } from "@shared/schema";
 import { eq, inArray, sql, and, gte, lte, isNull } from "drizzle-orm";
 
+// Helper: converts a JS array into a proper PostgreSQL ARRAY[...] expression
+// so that `= ANY(${sqlArray(ids)})` works correctly inside db.execute() calls.
+// Drizzle's sql`` tag renders bare JS arrays as tuple syntax ($1,$2,...) which
+// PostgreSQL rejects for = ANY(); this wrapper produces ARRAY[$1,$2,...] instead.
+const sqlArray = (arr: (string | number)[]) =>
+  sql`ARRAY[${sql.join(arr.map(v => sql`${v}`), sql`, `)}]`;
+
 // ─── V5 Guard Convention ─────────────────────────────────────────────────────
 // V5 orders are identified by: customer_orders.proforma_id_used IS NOT NULL
 // V2/V3 orders have proforma_id_used = null and must follow legacy bale lifecycle.
@@ -140,8 +147,8 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
                      status, customer_id AS "customerId"
               FROM customer_orders
               WHERE company_id = ${companyId}
-                AND proforma_id_used = ANY(${proformaIds})
-                AND status = ANY(${ACTIVE_ORDER_STATUSES as unknown as string[]})
+                AND proforma_id_used = ANY(${sqlArray(proformaIds)})
+                AND status = ANY(${sqlArray(ACTIVE_ORDER_STATUSES as unknown as string[])})
               ORDER BY id`,
         );
         ordersByProforma = ((ordersRaw as any).rows ?? (ordersRaw as unknown as any[])).map((r: any) => ({
@@ -162,7 +169,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
           sql`SELECT cob.order_id AS "orderId", fb.article_code AS "articleCode", COUNT(*)::int AS count
               FROM customer_order_bales cob
               JOIN factory_bales fb ON fb.id = cob.bale_id
-              WHERE cob.order_id = ANY(${allOrderIds})
+              WHERE cob.order_id = ANY(${sqlArray(allOrderIds)})
               GROUP BY cob.order_id, fb.article_code`,
         );
         loadedBalesByOrder = ((balesRaw as any).rows ?? (balesRaw as unknown as any[])).map((r: any) => ({
@@ -196,7 +203,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
                 WHERE co.company_id = ${companyId}
                   AND co.status IN ('DRAFT', 'LOADING')
                   AND co.proforma_id_used IS NOT NULL
-                  AND co.proforma_id_used = ANY(${proformaIds})
+                  AND co.proforma_id_used = ANY(${sqlArray(proformaIds)})
                   AND NOT EXISTS (
                     SELECT 1 FROM customer_order_expected_lines cel
                     WHERE cel.order_id = co.id AND cel.article_code = cpl.article_code
@@ -219,7 +226,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
           sql`SELECT order_id AS "orderId", article_code AS "articleCode",
                      expected_qty AS "expectedQty"
               FROM customer_order_expected_lines
-              WHERE order_id = ANY(${allOrderIds})`,
+              WHERE order_id = ANY(${sqlArray(allOrderIds)})`,
         );
         allExpectedLines = ((expRaw as any).rows ?? (expRaw as unknown as any[])).map((r: any) => ({
           orderId: Number(r.orderId),
@@ -285,15 +292,16 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       const productNamesMap: Record<string, string> = {};
       if (allCodes.size > 0) {
         const codeArrArr = Array.from(allCodes);
+        const codeArr = sqlArray(codeArrArr);
         const prodRaw = await db.execute(
           sql`SELECT DISTINCT ON (matched_code) matched_code AS "articleCode", name FROM (
                 SELECT name,
-                  CASE WHEN code        = ANY(${codeArrArr}) THEN code
-                       WHEN article_code = ANY(${codeArrArr}) THEN article_code
+                  CASE WHEN code        = ANY(${codeArr}) THEN code
+                       WHEN article_code = ANY(${codeArr}) THEN article_code
                   END AS matched_code
                 FROM factory_bale_products
                 WHERE company_id = ${companyId}
-                  AND (code = ANY(${codeArrArr}) OR article_code = ANY(${codeArrArr}))
+                  AND (code = ANY(${codeArr}) OR article_code = ANY(${codeArr}))
               ) sub
               WHERE matched_code IS NOT NULL
               ORDER BY matched_code`,
@@ -843,15 +851,16 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       const weightMap = new Map<string, number>();
       if (allCodes.size > 0) {
         const codeArrArr = Array.from(allCodes);
+        const codeArr2 = sqlArray(codeArrArr);
         const nameRaw = await db.execute(
           sql`SELECT DISTINCT ON (matched_code) matched_code AS "articleCode", name, weight_per_bale_kg AS "weightPerBaleKg" FROM (
                 SELECT name, weight_per_bale_kg,
-                  CASE WHEN code        = ANY(${codeArrArr}) THEN code
-                       WHEN article_code = ANY(${codeArrArr}) THEN article_code
+                  CASE WHEN code        = ANY(${codeArr2}) THEN code
+                       WHEN article_code = ANY(${codeArr2}) THEN article_code
                   END AS matched_code
                 FROM factory_bale_products
                 WHERE company_id = ${companyId}
-                  AND (code = ANY(${codeArrArr}) OR article_code = ANY(${codeArrArr}))
+                  AND (code = ANY(${codeArr2}) OR article_code = ANY(${codeArr2}))
               ) sub
               WHERE matched_code IS NOT NULL
               ORDER BY matched_code`,
