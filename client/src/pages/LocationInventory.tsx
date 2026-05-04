@@ -501,15 +501,43 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   );
 
   // Filter and sort stock items alphabetically (A-Z) by name.
-  // Derive from the live `inventory` array (which respects showZeroStock) so the
-  // zero-stock toggle works when the user has drilled into a specific group.
-  const filteredStockItems = inventory
-    .filter((item) => selectedGroup && item.stockGroupId === selectedGroup.groupId)
-    .sort((a, b) => (a.stockItemName ?? "").localeCompare(b.stockItemName ?? ""))
-    .filter((item) =>
-      (item.stockItemName ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
-      (item.stockItemCode ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase())
-    );
+  // In movement mode: union of opening + closing items so that items sold out
+  // during the period still appear (with Closing=0, Movement=negative).
+  // In normal mode: derive from `inventory` (respects showZeroStock toggle).
+  const filteredStockItems: InventoryItem[] = (() => {
+    if (!selectedGroup) return [];
+
+    if (showMovement) {
+      // Build a map of closing items for the group
+      const closingMap = new Map<number, InventoryItem>();
+      closingInventoryData
+        .filter(item => item.stockGroupId === selectedGroup.groupId)
+        .forEach(item => closingMap.set(item.stockItemId, item));
+
+      // Start with all closing items
+      const result: InventoryItem[] = [...closingMap.values()];
+
+      // Add opening-only items (sold out by close date) with qty=0
+      openingInventoryData
+        .filter(item => item.stockGroupId === selectedGroup.groupId && !closingMap.has(item.stockItemId))
+        .forEach(item => result.push({ ...item, quantity: "0", totalValue: "0", averageRate: "0" }));
+
+      return result
+        .sort((a, b) => (a.stockItemName ?? "").localeCompare(b.stockItemName ?? ""))
+        .filter(item =>
+          (item.stockItemName ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
+          (item.stockItemCode ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase())
+        );
+    }
+
+    return inventory
+      .filter(item => item.stockGroupId === selectedGroup.groupId)
+      .sort((a, b) => (a.stockItemName ?? "").localeCompare(b.stockItemName ?? ""))
+      .filter(item =>
+        (item.stockItemName ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
+        (item.stockItemCode ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase())
+      );
+  })();
 
   // Handle location selection
   const handleLocationClick = async (location: Location) => {
