@@ -27,6 +27,7 @@ import {
   Archive,
   Users,
   ArrowLeftRight,
+  ArrowRight,
   Tag,
   Truck,
   FileText,
@@ -165,6 +166,7 @@ const adminPages: PageEntry[] = [
   { label: "Inventory Repair", description: "Fix inventory discrepancies", path: "/inventory-repair", icon: Wrench },
   { label: "Net Position Details", description: "Detailed net position breakdown (assets vs liabilities)", path: "/net-position-details", icon: PieChart },
   { label: "Import Cycle Diagnostics", description: "Diagnose import cycle issues", path: "/import-cycle-diagnostics", icon: AlertTriangle },
+  { label: "Account Migration", description: "Move a ledger account with its full statement to another company", path: "/account-migration", icon: ArrowRight },
 ];
 
 const posPages: PageEntry[] = [

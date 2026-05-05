@@ -135,6 +135,7 @@ const FactoryNetPositionDetails = lazy(() => import("@/pages/factory/FactoryNetP
 const FactoryFinancialSnapshot = lazy(() => import("@/pages/factory/FactoryFinancialSnapshot"));
 const DailyProductionReport = lazy(() => import("@/pages/factory/DailyProductionReport"));
 const CompanyDataReset = lazy(() => import("@/pages/CompanyDataReset"));
+const AccountMigration = lazy(() => import("@/pages/AccountMigration"));
 const StockTransferOrder = lazy(() => import("@/pages/StockTransferOrder"));
 const StockTransfers = lazy(() => import("@/pages/StockTransfers"));
 const OptionalVouchers = lazy(() => import("@/pages/OptionalVouchers"));
@@ -353,6 +354,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/inventory-repair" component={InventoryRepair} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/net-position-details" component={NetProfitDetails} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/company-data-reset" component={CompanyDataReset} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/account-migration" component={AccountMigration} />}
       <Route path="/my-settings" component={MySettings} />
       <Route component={NotFound} />
     </Switch>
