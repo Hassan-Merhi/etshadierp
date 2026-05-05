@@ -896,11 +896,12 @@ export function registerRentalRoutes(
             { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: "0",   creditAmount: amount, narration },
           ]);
         } else {
-          // Landlord perspective: releases deposit to tenant — Dr Tenant Deposits (Liability) / Cr Cash
+          // Landlord perspective: deposit moves into cash — Dr Cash / Cr Tenant Deposits (Liability)
+          // Auto-transfer then debits Transfer Clearing and credits Cash, netting the cashbox to zero.
           const depositAccountId = await findOrCreateLedgerAccount(tx, companyId, "Tenant Deposits", "Liability", "TENANT-DEP");
           await tx.insert(voucherEntries).values([
-            { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: amount, creditAmount: "0",   narration },
-            { voucherId: v.id, ledgerAccountId: cashAccountId,   debitAmount: "0",   creditAmount: amount, narration },
+            { voucherId: v.id, ledgerAccountId: cashAccountId,   debitAmount: amount, creditAmount: "0",   narration },
+            { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: "0",   creditAmount: amount, narration },
           ]);
         }
         // Mark guarantee as paid on the contract
