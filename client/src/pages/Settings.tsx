@@ -64,7 +64,7 @@
   import { useAppMode } from "@/contexts/AppModeContext";
   import { getApiRequest } from "@/lib/factoryApi";
   import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, Zap, Eraser } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, Zap, Eraser, ArrowLeft } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -101,6 +101,8 @@ import { POSReceiptSettings, IntercompanyPosTab } from "./settings/IntercompanyP
 import { OfflineSyncPanel, formatRelativeTime } from "./settings/OfflineSyncPanel";
 import { PriceGroupsTab } from "./settings/PriceGroupsTab";
 import { UsersSection } from "./settings/UsersSection";
+import { SettingsHubPage } from "./settings/SettingsHubPage";
+import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
 
   export default function Settings() {
     const { toast } = useToast();
@@ -679,7 +681,7 @@ import { UsersSection } from "./settings/UsersSection";
       }
     };
   
-    const [activeSection, setActiveSection] = useState("companies");
+    const [activeSection, setActiveSection] = useState("hub");
 
     const sidebarGroups = [
       {
@@ -694,7 +696,8 @@ import { UsersSection } from "./settings/UsersSection";
       {
         label: "Users & Access",
         items: [
-          { key: "users", label: "Users", icon: Users },
+          { key: "users-permissions", label: "Users & Permissions", icon: Users },
+          { key: "users", label: "Users (legacy)", icon: Users, devOnly: true },
           { key: "active-users", label: "Active Users", icon: Eye, devOnly: true },
           { key: "login-history", label: "Login History", icon: Clock, devOnly: true },
         ],
@@ -736,10 +739,19 @@ import { UsersSection } from "./settings/UsersSection";
 
     return (
       <div className="flex flex-col sm:flex-row sm:h-full">
-        {/* Mobile section selector — visible only on small screens */}
-        <div className="sm:hidden border-b p-3">
+        {/* Mobile section selector — visible only on small screens, hidden on hub */}
+        {activeSection !== "hub" && (
+        <div className="sm:hidden border-b p-3 flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setActiveSection("hub")}
+            data-testid="button-back-to-hub-mobile"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           <Select value={activeSection} onValueChange={setActiveSection}>
-            <SelectTrigger data-testid="select-settings-section">
+            <SelectTrigger data-testid="select-settings-section" className="flex-1">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -753,9 +765,20 @@ import { UsersSection } from "./settings/UsersSection";
             </SelectContent>
           </Select>
         </div>
+        )}
 
-        {/* Desktop sidebar nav — hidden on small screens */}
-        <nav className="hidden sm:block w-56 shrink-0 border-r bg-muted/30 p-3 space-y-4 overflow-y-auto" data-testid="tabs-settings">
+        {/* Desktop sidebar nav — hidden on small screens and when on hub */}
+        {activeSection !== "hub" && (
+        <nav className="hidden sm:flex sm:flex-col w-56 shrink-0 border-r bg-muted/30 p-3 gap-3 overflow-y-auto" data-testid="tabs-settings">
+          <button
+            onClick={() => setActiveSection("hub")}
+            className="flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-sm text-muted-foreground hover-elevate"
+            data-testid="button-back-to-hub"
+          >
+            <ArrowLeft className="h-4 w-4 shrink-0" />
+            <span className="truncate font-medium">Settings Hub</span>
+          </button>
+          <div className="border-t pt-2 space-y-4">
           {sidebarGroups.map((group) => (
             <div key={group.label}>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-1">{group.label}</p>
@@ -778,9 +801,20 @@ import { UsersSection } from "./settings/UsersSection";
               </div>
             </div>
           ))}
+          </div>
         </nav>
+        )}
 
-        <div className="flex-1 sm:overflow-y-auto p-4 sm:p-6">
+        <div className={`flex-1 sm:overflow-y-auto ${activeSection !== "hub" ? "p-4 sm:p-6" : ""}`}>
+
+          {/* Settings Hub landing page */}
+          {activeSection === "hub" && (
+            <SettingsHubPage
+              onNavigate={setActiveSection}
+              currentUser={currentUser}
+              appMode={appMode}
+            />
+          )}
 
           {activeSection === "companies" && (
             <div className="space-y-4">
@@ -1153,7 +1187,15 @@ import { UsersSection } from "./settings/UsersSection";
             </DialogContent>
           </Dialog>
   
-          {/* Users Tab */}
+          {/* Users & Permissions Hub */}
+          {activeSection === "users-permissions" && (
+            <UsersPermissionsHub
+              userRole={currentUser?.role}
+              appMode={appMode}
+            />
+          )}
+
+          {/* Users Tab (legacy - dev only) */}
           {activeSection === "users" && (
             <UsersSection />
           )}
