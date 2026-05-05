@@ -2880,7 +2880,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const ledgerForUsTotal = round2(ledgerForUs.reduce((s: number, a: any) => s + a.value, 0));
       const ledgerOnUsTotal = round2(ledgerOnUs.reduce((s: number, a: any) => s + a.value, 0));
 
-      const customerItems: { name: string; balanceUsd: number }[] = [];
+      const customerItems: { name: string; balanceUsd: number; ledgerAccountId?: number }[] = [];
 
       if ((allCustomersForNP as any[]).length > 0) {
         const cIds = (allCustomersForNP as any[]).map((c: any) => c.id);
@@ -2965,7 +2965,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           const openingSide = c.openingBalanceSide || "Dr";
           const totalBalance = (openingSide === "Dr" ? opening : -opening) + salesTotal + nonInvNet + voucherNet;
           if (Math.abs(totalBalance) > 0.01) {
-            customerItems.push({ name: c.legalName || c.name || `Customer #${c.id}`, balanceUsd: round2(totalBalance) });
+            customerItems.push({ name: c.legalName || c.name || `Customer #${c.id}`, balanceUsd: round2(totalBalance), ledgerAccountId: c.ledgerAccountId || undefined });
           }
         }
       }
@@ -3216,7 +3216,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         ...cleanLedgerForUs.sort((a, b) => b.value - a.value).map(a => ({ ...a, value: round2(a.value) })),
         ...customerDrItems
           .sort((a, b) => b.balanceUsd - a.balanceUsd)
-          .map(c => ({ name: c.name, code: "CUSTOMER_DR", value: round2(c.balanceUsd), category: "Customer" })),
+          .map(c => ({ ...(c.ledgerAccountId ? { id: c.ledgerAccountId } : {}), name: c.name, code: "CUSTOMER_DR", value: round2(c.balanceUsd), category: "Customer" })),
         ...(pendingTotal > 0 ? [{ name: "Pending Orders", code: "PENDING_ORDERS", value: pendingTotal, category: "Pending Orders" }] : []),
         ...(verifiedTotal > 0 ? [{ name: "Verified Orders", code: "VERIFIED_ORDERS", value: verifiedTotal, category: "Verified Orders" }] : []),
         ...(loadingTotal > 0 ? [{ name: "Loading Orders", code: "LOADING_ORDERS", value: loadingTotal, category: "Loading Orders" }] : []),
@@ -3237,7 +3237,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         { name: "Payroll Payable", code: "EMPLOYEE_PAYROLL_PAYABLE", value: employeeSalariesPayable, category: "Liability" },
         ...customerCrItems
           .sort((a, b) => Math.abs(b.balanceUsd) - Math.abs(a.balanceUsd))
-          .map(c => ({ name: c.name, code: "CUSTOMER_CR", value: round2(Math.abs(c.balanceUsd)), category: "Customer" })),
+          .map(c => ({ ...(c.ledgerAccountId ? { id: c.ledgerAccountId } : {}), name: c.name, code: "CUSTOMER_CR", value: round2(Math.abs(c.balanceUsd)), category: "Customer" })),
       ];
 
       const forUsBreakdown = Object.entries(
