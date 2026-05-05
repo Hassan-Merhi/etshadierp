@@ -81,15 +81,22 @@ interface OrderDetail {
 export default function FactoryInvoiceCreate() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
+
+  // Read ?orderId= from URL so "Continue Editing" on a reverted draft resumes correctly
+  const urlOrderId = (() => {
+    const qs = location.split("?")[1] ?? "";
+    const v = new URLSearchParams(qs).get("orderId");
+    return v ? parseInt(v) : null;
+  })();
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [orderDate, setOrderDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [chargeLedgerAccountId, setChargeLedgerAccountId] = useState<string>("");
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
-  const [orderId, setOrderId] = useState<number | null>(null);
+  const [orderId, setOrderId] = useState<number | null>(urlOrderId);
   const [scanCode, setScanCode] = useState("");
   const [scanFlash, setScanFlash] = useState<"success" | "error" | null>(null);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
@@ -99,6 +106,19 @@ export default function FactoryInvoiceCreate() {
   const scannerRef = useRef<HTMLInputElement>(null);
 
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId) : null;
+
+  // ── Sync state from loaded existing order (URL ?orderId=) ──────────────────
+  useEffect(() => {
+    if (!orderDetail) return;
+    // Populate customer selector
+    if (orderDetail.customerId && !selectedCustomerId) {
+      setSelectedCustomerId(String(orderDetail.customerId));
+    }
+    // Populate date from the stored order date (NOT today)
+    if (orderDetail.orderDate) {
+      setOrderDate(orderDetail.orderDate.substring(0, 10));
+    }
+  }, [orderDetail?.id]);
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/factory/customers"],
@@ -226,6 +246,29 @@ export default function FactoryInvoiceCreate() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  // PATCH the orderDate on the server when the user edits it for an existing order
+  const updateDateMutation = useMutation({
+    mutationFn: async (newDate: string) => {
+      const res = await modeApiRequest("PATCH", `/api/factory/customer-orders/${orderId}/date`, { orderDate: newDate });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to update date");
+      }
+      return res.json();
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error updating date", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleDateChange = useCallback((newDate: string) => {
+    setOrderDate(newDate);
+    if (orderId && newDate) {
+      updateDateMutation.mutate(newDate);
+    }
+  }, [orderId, updateDateMutation]);
 
   const repriceMutation = useMutation({
     mutationFn: async () => {
@@ -426,8 +469,7 @@ export default function FactoryInvoiceCreate() {
               <Input
                 type="date"
                 value={orderDate}
-                onChange={(e) => setOrderDate(e.target.value)}
-                disabled={!!orderId}
+                onChange={(e) => handleDateChange(e.target.value)}
                 data-testid="input-order-date"
               />
             </div>

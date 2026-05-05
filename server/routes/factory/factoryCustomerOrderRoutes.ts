@@ -1711,7 +1711,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         }).where(eq(customerOrders.id, orderId));
 
         const grandTotal = parseFloat(recalcOrder.grandTotal || "0");
-        const today = getClientDate(req);
+        // Use the order's stored date for the customer balance (not server "today"),
+        // so re-finalising a reverted draft keeps the user-chosen invoice date.
+        const today = recalcOrder.orderDate || getClientDate(req);
 
         await tx.insert(customerBalances).values({
           companyId,
@@ -3183,6 +3185,33 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       res.json(updated);
     } catch (error: any) {
       console.error("Error returning order to loading:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // ── Update order date (DRAFT only) ────────────────────────────────────────
+  app.patch("/api/factory/customer-orders/:id/date", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const { orderDate } = req.body;
+      if (!orderDate) return res.status(400).json({ message: "orderDate is required" });
+
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      if (order.status !== "DRAFT") return res.status(400).json({ message: "Only DRAFT orders can have their date changed" });
+
+      const [updated] = await db.update(customerOrders)
+        .set({ orderDate, updatedAt: new Date() })
+        .where(eq(customerOrders.id, orderId))
+        .returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating order date:", error);
       res.status(400).json({ message: error.message });
     }
   });

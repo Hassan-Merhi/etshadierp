@@ -99,8 +99,6 @@ const DESCRIPTIONS: Record<string, string> = {
   "/factory/intelligence/cashflow": "Cashflow intelligence",
   "/factory/bale-products": "Finished bale products",
   "/factory/bale-relabeling": "Relabel and reassign bales",
-  "/factory/workers": "Worker and payroll management",
-  "/factory/employees": "Employee records and details",
   "/properties/rental/warehouses": "Properties (warehouses) rented out",
   "/properties/rental/shops": "Shops rented out",
   "/properties/rental/payments": "Rental payments log",
