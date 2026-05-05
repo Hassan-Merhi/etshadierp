@@ -2616,6 +2616,20 @@ let migrationsDone = false;
     )`,
     `CREATE UNIQUE INDEX IF NOT EXISTS smvalue_unique  ON status_metric_values(run_id, metric_id)`,
     `CREATE        INDEX IF NOT EXISTS smvalue_run_idx ON status_metric_values(run_id)`,
+
+    // ── Status Builder Sheets (May 2026) ────────────────────────────────────
+    // Independent spreadsheet dataset for the Status Builder page.
+    // Same structure as factory_sheets but fully separate data.
+    `CREATE TABLE IF NOT EXISTS status_builder_sheets (
+      id          serial      PRIMARY KEY,
+      company_id  integer     NOT NULL,
+      name        text        NOT NULL,
+      order_index integer     NOT NULL DEFAULT 0,
+      columns     jsonb       NOT NULL DEFAULT '[]',
+      rows        jsonb       NOT NULL DEFAULT '[]',
+      updated_at  timestamp   NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS status_builder_sheets_company_idx ON status_builder_sheets(company_id)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

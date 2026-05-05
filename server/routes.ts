@@ -60,6 +60,7 @@ import { registerFactoryInvoiceLoadingRoutes } from "./routes/factory/factoryInv
 import { registerFactoryWhatsappRoutes } from "./routes/factoryWhatsappRoutes";
 import { registerEndProductionRoutes } from "./routes/factory/endProductionRoutes";
 import { registerFactoryStatusBuilderRoutes } from "./routes/factory/factoryStatusBuilderRoutes";
+import { registerFactoryStatusBuilderSheetsRoutes } from "./routes/factory/factoryStatusBuilderSheetsRoutes";
 import {
   requireAuth,
   requireRole,
@@ -1089,6 +1090,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerFactoryWhatsappRoutes(app, requireAuth);
   registerEndProductionRoutes(app, requireAuth);
   registerFactoryStatusBuilderRoutes(app);
+  registerFactoryStatusBuilderSheetsRoutes(app);
 
   // Lightweight health check for offline ping detection
   app.get("/api/health", (_req, res) => {

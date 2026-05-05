@@ -4751,6 +4751,28 @@ export const insertFactorySheetSchema = createInsertSchema(factorySheets).omit({
 export type FactorySheet = typeof factorySheets.$inferSelect;
 export type InsertFactorySheet = z.infer<typeof insertFactorySheetSchema>;
 
+// ── Status Builder Sheets ─────────────────────────────────────────────────────
+// Same structure as factorySheets but kept as a separate dataset so
+// Status Builder and Factory Sheets are fully independent.
+export const statusBuilderSheets = pgTable("status_builder_sheets", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  name: text("name").notNull(),
+  orderIndex: integer("order_index").notNull().default(0),
+  columns: jsonb("columns").notNull().default([]),
+  rows: jsonb("rows").notNull().default([]),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  companyIdx: index("status_builder_sheets_company_idx").on(t.companyId),
+}));
+
+export const insertStatusBuilderSheetSchema = createInsertSchema(statusBuilderSheets).omit({
+  id: true,
+  updatedAt: true,
+});
+export type StatusBuilderSheet = typeof statusBuilderSheets.$inferSelect;
+export type InsertStatusBuilderSheet = z.infer<typeof insertStatusBuilderSheetSchema>;
+
 // ── Stock Allocation v3.0 — isolated test module ──────────────────────────────
 // These tables are SEPARATE from customer_orders / customer_order_bales.
 // The existing production bale-scanning flow is NOT affected.
