@@ -153,7 +153,6 @@ const FactoryWorkerDetail = lazy(() => import("@/pages/factory/FactoryWorkerDeta
 const FactoryEmployeesHub = lazy(() => import("@/pages/factory/FactoryEmployeesHub"));
 const FactoryEmployeeDetail = lazy(() => import("@/pages/factory/FactoryEmployeeDetail"));
 const FactoryPayrollHub = lazy(() => import("@/pages/factory/FactoryPayrollHub"));
-const FactoryFinanceHub = lazy(() => import("@/pages/factory/FactoryFinanceHub"));
 const FactorySupplierReport = lazy(() => import("@/pages/factory/FactorySupplierReport"));
 const FactorySupplierStatement = lazy(() => import("@/pages/factory/FactorySupplierStatement"));
 const FactoryBrokerVisualStatement = lazy(() => import("@/pages/factory/FactoryBrokerVisualStatement"));
@@ -845,8 +844,8 @@ function AuthenticatedApp() {
                     {hasDashboardAccess && <Route path="/factory/dashboard" component={FactoryDashboardIntel} />}
                     <Route path="/factory/daybook" component={FactoryDaybook} />
                     <Route path="/factory/transporters" component={FactoryTransporters} />
-                    <Route path="/factory/finance" component={FactoryFinanceHub} />
-                    <Route path="/factory/suppliers"><Redirect to="/factory/finance?tab=suppliers" /></Route>
+                    <Route path="/factory/finance"><Redirect to="/factory/workers" /></Route>
+                    <Route path="/factory/suppliers" component={FactorySuppliers} />
                     <Route path="/factory/containers/new" component={FactoryContainerCreate} />
                     <Route path="/factory/containers" component={FactoryContainers} />
                     <Route path="/factory/bale-products" component={BaleProducts} />
@@ -895,7 +894,6 @@ function AuthenticatedApp() {
                     <Route path="/factory/employees" component={FactoryEmployeesHub} />
                     <Route path="/factory/workers/:id" component={FactoryWorkerDetail} />
                     <Route path="/factory/workers" component={FactoryWorkersHub} />
-                    <Route path="/factory/finance"><Redirect to="/factory/workers" /></Route>
                     <Route path="/factory/worker-payroll"><Redirect to="/factory/workers?tab=payroll" /></Route>
                     <Route path="/factory/supplier-report" component={FactorySupplierReport} />
                     <Route path="/factory/supplier-statement" component={FactorySupplierStatement} />
