@@ -581,7 +581,7 @@ export function registerPosRoutes(app: Express) {
             voucherNumber,
             voucherType: "Sales",
             voucherDate,
-            description: notes || `POS Sale at ${location.name}`,
+            description: notes || (isCreditSale ? `Credit Invoice Sale at ${location.name} - ${(customerAccount as any).name}` : `POS Sale at ${location.name}`),
             totalAmount: grandTotal.toFixed(2),
             shiftId: shiftId || null,
             currency: currency || "USD",
@@ -591,7 +591,7 @@ export function registerPosRoutes(app: Express) {
           .returning();
 
         const creditSaleNarration = isCreditSale
-          ? `POS - ${(customerAccount as any).name} - ${location.name}`
+          ? `Credit Invoice Sale at ${location.name} - ${(customerAccount as any).name}`
           : `POS Sale - ${voucherNumber}`;
 
         const debitEntry: any = {
