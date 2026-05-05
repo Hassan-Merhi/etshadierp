@@ -64,7 +64,7 @@
   import { useAppMode } from "@/contexts/AppModeContext";
   import { getApiRequest } from "@/lib/factoryApi";
   import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, Zap } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, Zap, Eraser } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -143,6 +143,9 @@ import { UsersSection } from "./settings/UsersSection";
     const [isImportingCompanyData, setIsImportingCompanyData] = useState(false);
     const [importCompanyResult, setImportCompanyResult] = useState<any>(null);
     const [isRecalcAllLoading, setIsRecalcAllLoading] = useState(false);
+    const [emptyAccountsOpen, setEmptyAccountsOpen] = useState(false);
+    const [emptyAccountsSelected, setEmptyAccountsSelected] = useState<number[]>([]);
+    const [emptyAccountsFilter, setEmptyAccountsFilter] = useState("");
 
     const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<any[]>({
       queryKey: ["/api/companies"],
@@ -173,6 +176,34 @@ import { UsersSection } from "./settings/UsersSection";
     const { data: containersForDiag = [] } = useQuery<any[]>({
       queryKey: ["/api/admin/containers-for-diagnostics"],
       enabled: !!selectedCompany && (currentUser?.role === "Admin" || currentUser?.role === "Developer"),
+    });
+
+    const { data: emptyAccounts = [], isLoading: isLoadingEmptyAccounts, refetch: refetchEmptyAccounts } = useQuery<any[]>({
+      queryKey: ["/api/ledger-accounts/empty"],
+      enabled: emptyAccountsOpen,
+    });
+
+    const bulkDeleteAccountsMutation = useMutation({
+      mutationFn: async (ids: number[]) => {
+        const res = await apiRequest("POST", "/api/ledger-accounts/bulk-delete", { accountIds: ids });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.message || "Failed to delete accounts");
+        }
+        return res.json();
+      },
+      onSuccess: (data) => {
+        queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts/empty"] });
+        setEmptyAccountsSelected([]);
+        toast({
+          title: "Accounts deleted",
+          description: `${data.deleted} account(s) deleted${data.skipped > 0 ? `, ${data.skipped} skipped (not empty)` : ""}`,
+        });
+      },
+      onError: (err: Error) => {
+        toast({ title: "Error", description: err.message, variant: "destructive" });
+      },
     });
 
     // Build a lookup map for role permissions: { "role:featureKey": enabled }
@@ -1424,6 +1455,31 @@ import { UsersSection } from "./settings/UsersSection";
                     </div>
                   </Card>
                 </Link>
+
+                <Card
+                  className="p-6 hover-elevate cursor-pointer"
+                  onClick={() => {
+                    setEmptyAccountsOpen(true);
+                    setEmptyAccountsSelected([]);
+                    setEmptyAccountsFilter("");
+                  }}
+                  data-testid="card-clean-empty-accounts"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-rose-500/10 rounded-lg">
+                        <Eraser className="h-6 w-6 text-rose-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">Clean Empty Accounts</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Find and delete ledger accounts with no entries or opening balance
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                </Card>
 
                 <Link href={`${pfx}/company-data-reset`}>
                   <Card className="p-6 hover-elevate cursor-pointer">
@@ -2811,7 +2867,141 @@ import { UsersSection } from "./settings/UsersSection";
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-  
+
+        {/* Clean Empty Accounts Dialog */}
+        <Dialog open={emptyAccountsOpen} onOpenChange={(open) => {
+          setEmptyAccountsOpen(open);
+          if (!open) { setEmptyAccountsSelected([]); setEmptyAccountsFilter(""); }
+        }}>
+          <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eraser className="h-5 w-5 text-rose-500" />
+                Clean Empty Accounts
+              </DialogTitle>
+              <DialogDescription>
+                Accounts listed here have no voucher entries, no opening balance, and no child accounts. Select any you want to permanently delete.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex items-center gap-2 mt-1">
+              <Input
+                placeholder="Filter by name or code..."
+                value={emptyAccountsFilter}
+                onChange={(e) => setEmptyAccountsFilter(e.target.value)}
+                data-testid="input-empty-accounts-filter"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetchEmptyAccounts()}
+                data-testid="button-refresh-empty-accounts"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {isLoadingEmptyAccounts ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  Loading...
+                </div>
+              ) : (() => {
+                const filtered = emptyAccounts.filter((a: any) => {
+                  if (!emptyAccountsFilter) return true;
+                  const q = emptyAccountsFilter.toLowerCase();
+                  return (a.name || "").toLowerCase().includes(q) || (a.code || "").toLowerCase().includes(q);
+                });
+                if (filtered.length === 0) {
+                  return (
+                    <div className="text-center py-10 text-muted-foreground">
+                      {emptyAccountsFilter ? "No accounts match your filter." : "No empty accounts found — everything is in use."}
+                    </div>
+                  );
+                }
+                const allSelected = filtered.length > 0 && filtered.every((a: any) => emptyAccountsSelected.includes(a.id));
+                return (
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background z-10">
+                      <TableRow>
+                        <TableHead className="w-10">
+                          <Checkbox
+                            checked={allSelected}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                const newIds = filtered.map((a: any) => a.id);
+                                setEmptyAccountsSelected(prev => [...new Set([...prev, ...newIds])]);
+                              } else {
+                                const filteredIds = new Set(filtered.map((a: any) => a.id));
+                                setEmptyAccountsSelected(prev => prev.filter(id => !filteredIds.has(id)));
+                              }
+                            }}
+                            data-testid="checkbox-select-all-empty"
+                          />
+                        </TableHead>
+                        <TableHead>Account Name</TableHead>
+                        <TableHead>Code</TableHead>
+                        <TableHead>Type</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.map((a: any) => (
+                        <TableRow
+                          key={a.id}
+                          className="cursor-pointer"
+                          onClick={() => setEmptyAccountsSelected(prev =>
+                            prev.includes(a.id) ? prev.filter(id => id !== a.id) : [...prev, a.id]
+                          )}
+                          data-testid={`row-empty-account-${a.id}`}
+                        >
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={emptyAccountsSelected.includes(a.id)}
+                              onCheckedChange={(checked) => {
+                                setEmptyAccountsSelected(prev =>
+                                  checked ? [...prev, a.id] : prev.filter(id => id !== a.id)
+                                );
+                              }}
+                              data-testid={`checkbox-empty-account-${a.id}`}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">{a.name}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{a.code || "—"}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">{a.accountType || "—"}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                );
+              })()}
+            </div>
+
+            <DialogFooter className="flex-shrink-0 gap-2 mt-2">
+              <span className="text-sm text-muted-foreground mr-auto self-center">
+                {emptyAccountsSelected.length > 0
+                  ? `${emptyAccountsSelected.length} account(s) selected`
+                  : `${emptyAccounts.length} empty account(s) found`}
+              </span>
+              <Button variant="outline" onClick={() => setEmptyAccountsOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={emptyAccountsSelected.length === 0 || bulkDeleteAccountsMutation.isPending}
+                onClick={() => bulkDeleteAccountsMutation.mutate(emptyAccountsSelected)}
+                data-testid="button-delete-empty-accounts"
+              >
+                {bulkDeleteAccountsMutation.isPending
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Deleting...</>
+                  : <><Trash2 className="h-4 w-4 mr-2" />Delete {emptyAccountsSelected.length} Account(s)</>}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </div>
     );
   }
