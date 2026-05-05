@@ -511,7 +511,7 @@ export default function Dashboard() {
           change={profitData?.netPositionLabel || "What we have minus what we owe"}
           changeType={(profitData?.netPosition ?? 0) >= 0 ? "positive" : "negative"}
           icon={TrendingUp}
-          onClick={() => setLocation(modePrefix === "" ? "/net-position-details" : `${modePrefix}/net-position`)}
+          onClick={() => setLocation(modePrefix === "" ? "/net-position-details" : appMode === "properties" ? "/properties/net-position-details" : `${modePrefix}/net-position`)}
           data-testid="kpi-net-position"
         />
         <KPICard
@@ -591,7 +591,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-base font-semibold">Net Position Breakdown</h3>
             <button
-              onClick={() => setLocation(modePrefix === "" ? "/net-position-details" : `${modePrefix}/net-position`)}
+              onClick={() => setLocation(modePrefix === "" ? "/net-position-details" : appMode === "properties" ? "/properties/net-position-details" : `${modePrefix}/net-position`)}
               className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
               data-testid="button-net-position-detail"
             >
