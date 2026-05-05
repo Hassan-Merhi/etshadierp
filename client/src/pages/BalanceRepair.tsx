@@ -41,9 +41,9 @@ interface OrphanedTransfer {
 }
 interface DepositFlagMismatch {
   contractId: number; tenantName: string; unitLabel: string;
-  module: string; guaranteeAmount: number;
+  module: string; guaranteeAmount: number; voucherAmount?: number;
   flagValue: boolean; voucherExists: boolean;
-  issue: "STALE_FLAG" | "MISSING_FLAG";
+  issue: "STALE_FLAG" | "MISSING_FLAG" | "AMOUNT_MISMATCH";
 }
 interface ScanResult {
   ledgerDrifts: LedgerDrift[];
@@ -62,8 +62,9 @@ function ModuleBadge({ module }: { module: string }) {
 
 function IssueBadge({ issue }: { issue: string }) {
   const labels: Record<string, string> = {
-    STALE_FLAG:          "Flag stale — no voucher",
-    MISSING_FLAG:        "Voucher exists — flag missing",
+    STALE_FLAG:          "No ledger entry",
+    MISSING_FLAG:        "Flag not set",
+    AMOUNT_MISMATCH:     "Amount mismatch",
     EMPTY_VOUCHER:       "Voucher has no entries",
     SOFT_DELETED_VOUCHER:"Voucher was deleted",
     SOFT_DELETED:        "Voucher soft-deleted",
@@ -354,11 +355,14 @@ export default function BalanceRepair() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5" />
-              Tenant Deposit Flag Mismatches
+              Guarantee / Deposit Mismatches
               <Badge variant="destructive" className="ml-1">{scan.depositFlagMismatches.length}</Badge>
             </CardTitle>
-            <CardDescription>
-              These contracts have a mismatch between the "deposit posted" flag and whether a guarantee voucher actually exists.
+            <CardDescription className="space-y-1">
+              <span className="block">Three types of issues are detected:</span>
+              <span className="block text-amber-600 dark:text-amber-400 font-medium">No ledger entry — guarantee shows green in the UI but no accounting voucher exists (posted without a cash account). Fix resets the flag so you can re-post it properly with a cash account.</span>
+              <span className="block">Flag not set — a GUAR voucher exists in the ledger but the contract flag is still false. Fix sets the flag.</span>
+              <span className="block">Amount mismatch — flag and voucher both exist but the recorded amount on the contract differs from the actual voucher. Fix syncs the contract to match the voucher.</span>
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -369,9 +373,9 @@ export default function BalanceRepair() {
                   <TableHead>Tenant</TableHead>
                   <TableHead>Unit</TableHead>
                   <TableHead>Issue</TableHead>
-                  <TableHead className="text-right">Deposit Amount</TableHead>
-                  <TableHead className="text-right">Current Flag</TableHead>
-                  <TableHead className="text-right">Will Become</TableHead>
+                  <TableHead className="text-right">Contract Amount</TableHead>
+                  <TableHead className="text-right">Voucher Amount</TableHead>
+                  <TableHead className="text-right">Fix Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -382,11 +386,13 @@ export default function BalanceRepair() {
                     <TableCell className="text-muted-foreground">{d.unitLabel}</TableCell>
                     <TableCell><IssueBadge issue={d.issue} /></TableCell>
                     <TableCell className="text-right font-mono">{fmt(d.guaranteeAmount)}</TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant={d.flagValue ? "default" : "secondary"}>{d.flagValue ? "Posted" : "Unposted"}</Badge>
+                    <TableCell className="text-right font-mono text-muted-foreground">
+                      {d.issue === "AMOUNT_MISMATCH" ? fmt(d.voucherAmount ?? 0) : d.issue === "STALE_FLAG" ? <span className="text-destructive">None</span> : fmt(d.guaranteeAmount)}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant={!d.flagValue ? "default" : "secondary"}>{!d.flagValue ? "Posted" : "Unposted"}</Badge>
+                    <TableCell className="text-right text-sm text-muted-foreground">
+                      {d.issue === "STALE_FLAG"      && <span className="text-amber-600 dark:text-amber-400 font-medium">Reset to Unposted — re-post required</span>}
+                      {d.issue === "MISSING_FLAG"    && <span className="text-green-600 dark:text-green-400">Set flag to Posted</span>}
+                      {d.issue === "AMOUNT_MISMATCH" && <span>Sync: {fmt(d.guaranteeAmount)} → {fmt(d.voucherAmount ?? 0)}</span>}
                     </TableCell>
                   </TableRow>
                 ))}

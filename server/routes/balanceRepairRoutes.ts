@@ -88,9 +88,10 @@ export interface DepositFlagMismatch {
   unitLabel: string;
   module: string;
   guaranteeAmount: number;
+  voucherAmount?: number;
   flagValue: boolean;
   voucherExists: boolean;
-  issue: "STALE_FLAG" | "MISSING_FLAG";
+  issue: "STALE_FLAG" | "MISSING_FLAG" | "AMOUNT_MISMATCH";
 }
 
 export interface ScanResult {
@@ -280,36 +281,52 @@ export function registerBalanceRepairRoutes(app: Express) {
 
         // ── 4. Deposit flag mismatches ────────────────────────────────────────
         const guarRows = await db.execute(sql`
-          SELECT voucher_number FROM vouchers
+          SELECT voucher_number, total_amount FROM vouchers
           WHERE company_id = ${companyId} AND deleted_at IS NULL AND voucher_number LIKE 'GUAR-%'
         `);
         const guarContractIds = new Set<number>();
+        const guarAmountMap   = new Map<number, number>(); // contractId → voucher total_amount
         for (const row of (guarRows as any).rows ?? guarRows) {
           const parts = String(row.voucher_number ?? "").split("-");
           const cid = parseInt(parts[parts.length - 1]);
-          if (!isNaN(cid)) guarContractIds.add(cid);
+          if (!isNaN(cid)) {
+            guarContractIds.add(cid);
+            guarAmountMap.set(cid, parseNum(row.total_amount));
+          }
         }
 
         const depositFlagMismatches: DepositFlagMismatch[] = [];
         for (const c of contracts) {
-          const gAmt   = parseNum(c.guaranteeAmount);
-          const flagOn = c.guaranteePostedToStatement;
-          const hasVouc = guarContractIds.has(c.id);
-          const unit   = unitMap.get(c.unitId);
+          const gAmt      = parseNum(c.guaranteeAmount);
+          const flagOn    = c.guaranteePostedToStatement;
+          const hasVouc   = guarContractIds.has(c.id);
+          const unit      = unitMap.get(c.unitId);
+          const postedAmt = parseNum(c.guaranteePostedAmount ?? String(gAmt));
+          const voucherAmt = guarAmountMap.get(c.id) ?? 0;
 
           if (flagOn && !hasVouc) {
+            // Flag says posted but no accounting entry exists — shows green in UI but missing from balance sheet
             depositFlagMismatches.push({
               contractId: c.id, tenantName: c.tenantName,
               unitLabel: unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${c.unitId}`,
-              module: c.module, guaranteeAmount: parseNum(c.guaranteePostedAmount ?? String(gAmt)),
+              module: c.module, guaranteeAmount: postedAmt,
               flagValue: true, voucherExists: false, issue: "STALE_FLAG",
             });
           } else if (!flagOn && hasVouc && gAmt > 0) {
+            // Voucher exists and has accounting entries, but flag is still false — UI shows unposted incorrectly
             depositFlagMismatches.push({
               contractId: c.id, tenantName: c.tenantName,
               unitLabel: unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${c.unitId}`,
               module: c.module, guaranteeAmount: gAmt,
               flagValue: false, voucherExists: true, issue: "MISSING_FLAG",
+            });
+          } else if (flagOn && hasVouc && Math.abs(voucherAmt - postedAmt) > 0.01) {
+            // Flag and voucher both exist, but recorded amount on contract differs from actual voucher amount
+            depositFlagMismatches.push({
+              contractId: c.id, tenantName: c.tenantName,
+              unitLabel: unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${c.unitId}`,
+              module: c.module, guaranteeAmount: postedAmt, voucherAmount: voucherAmt,
+              flagValue: true, voucherExists: true, issue: "AMOUNT_MISMATCH",
             });
           }
         }
@@ -519,26 +536,38 @@ export function registerBalanceRepairRoutes(app: Express) {
 
         // ── 4. Fix deposit flags ──────────────────────────────────────────────
         const guarRows2 = await db.execute(sql`
-          SELECT voucher_number FROM vouchers
+          SELECT voucher_number, total_amount FROM vouchers
           WHERE company_id = ${companyId} AND deleted_at IS NULL AND voucher_number LIKE 'GUAR-%'
         `);
-        const guarContractIds = new Set<number>();
+        const guarContractIds2  = new Set<number>();
+        const guarAmountMap2    = new Map<number, number>();
         for (const row of (guarRows2 as any).rows ?? guarRows2) {
           const parts = String(row.voucher_number ?? "").split("-");
           const cid = parseInt(parts[parts.length - 1]);
-          if (!isNaN(cid)) guarContractIds.add(cid);
+          if (!isNaN(cid)) {
+            guarContractIds2.add(cid);
+            guarAmountMap2.set(cid, parseNum(row.total_amount));
+          }
         }
         for (const c of contracts) {
-          const gAmt   = parseNum(c.guaranteeAmount);
-          const flagOn = c.guaranteePostedToStatement;
-          const hasVouc = guarContractIds.has(c.id);
+          const gAmt      = parseNum(c.guaranteeAmount);
+          const flagOn    = c.guaranteePostedToStatement;
+          const hasVouc   = guarContractIds2.has(c.id);
+          const postedAmt = parseNum(c.guaranteePostedAmount ?? String(gAmt));
+          const voucherAmt = guarAmountMap2.get(c.id) ?? 0;
 
           if (flagOn && !hasVouc) {
-            snapshot.depositSnapshots.push({ contractId: c.id, oldFlag: true, newFlag: false, oldPostedAmount: parseNum(c.guaranteePostedAmount), newPostedAmount: 0 });
+            // Reset flag — no voucher entry exists, UI was showing green incorrectly
+            snapshot.depositSnapshots.push({ contractId: c.id, oldFlag: true, newFlag: false, oldPostedAmount: postedAmt, newPostedAmount: 0 });
             await db.update(propertyContracts).set({ guaranteePostedToStatement: false, guaranteePostedAmount: "0" }).where(eq(propertyContracts.id, c.id));
           } else if (!flagOn && hasVouc && gAmt > 0) {
+            // Set flag — voucher exists, just the contract flag was stale
             snapshot.depositSnapshots.push({ contractId: c.id, oldFlag: false, newFlag: true, oldPostedAmount: 0, newPostedAmount: gAmt });
             await db.update(propertyContracts).set({ guaranteePostedToStatement: true, guaranteePostedAmount: String(gAmt) }).where(eq(propertyContracts.id, c.id));
+          } else if (flagOn && hasVouc && Math.abs(voucherAmt - postedAmt) > 0.01) {
+            // Sync amount on contract to match actual voucher amount
+            snapshot.depositSnapshots.push({ contractId: c.id, oldFlag: true, newFlag: true, oldPostedAmount: postedAmt, newPostedAmount: voucherAmt });
+            await db.update(propertyContracts).set({ guaranteePostedAmount: String(voucherAmt) }).where(eq(propertyContracts.id, c.id));
           }
         }
 
