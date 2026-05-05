@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/command";
 import {
   ArrowRight, Building2, BookOpen, AlertTriangle, CheckCircle, BarChart3, FileText,
-  ChevronsUpDown, Check, Wallet,
+  ChevronsUpDown, Check, Wallet, Undo2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Company, LedgerAccount } from "@shared/schema";
@@ -44,10 +44,13 @@ interface ExecuteResult {
   success: boolean;
   accountId: number;
   accountName: string;
+  originalCode: string;
+  finalCode: string;
   srcCompanyId: number;
   destCompanyId: number;
   entryCount: number;
   movedVoucherCount: number;
+  movedVoucherIds: number[];
   sharedVoucherCount: number;
 }
 
@@ -145,7 +148,9 @@ export default function AccountMigration() {
   const [accountId, setAccountId] = useState<string>("");
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [undoConfirmOpen, setUndoConfirmOpen] = useState(false);
   const [lastResult, setLastResult] = useState<ExecuteResult | null>(null);
+  const [undoDone, setUndoDone] = useState(false);
 
   const { data: companies = [], isLoading: loadingCompanies } = useQuery<Company[]>({
     queryKey: ["/api/admin/account-migration/companies"],
@@ -193,6 +198,7 @@ export default function AccountMigration() {
     },
     onSuccess: (data) => {
       setLastResult(data);
+      setUndoDone(false);
       setConfirmOpen(false);
       setPreview(null);
       setAccountId("");
@@ -207,6 +213,34 @@ export default function AccountMigration() {
       if ((err as any)?._handledGlobally) return;
       setConfirmOpen(false);
       toast({ title: "Migration failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const undoMutation = useMutation({
+    mutationFn: async () => {
+      if (!lastResult) throw new Error("Nothing to undo");
+      const res = await apiRequest("POST", "/api/admin/account-migration/undo", {
+        accountId: lastResult.accountId,
+        srcCompanyId: lastResult.srcCompanyId,
+        destCompanyId: lastResult.destCompanyId,
+        originalCode: lastResult.originalCode,
+        movedVoucherIds: lastResult.movedVoucherIds,
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.message || "Undo failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setUndoConfirmOpen(false);
+      setUndoDone(true);
+      toast({ title: "Migration undone", description: `"${lastResult?.accountName}" has been moved back to the original company.` });
+    },
+    onError: (err: Error) => {
+      if ((err as any)?._handledGlobally) return;
+      setUndoConfirmOpen(false);
+      toast({ title: "Undo failed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -227,19 +261,46 @@ export default function AccountMigration() {
 
       {/* Last result banner */}
       {lastResult && (
-        <Card className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20">
+        <Card className={undoDone
+          ? "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20"
+          : "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20"
+        }>
           <CardContent className="pt-4">
             <div className="flex items-start gap-3">
-              <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
-              <div className="space-y-0.5">
-                <p className="font-medium text-green-800 dark:text-green-300">Migration complete</p>
-                <p className="text-sm text-green-700 dark:text-green-400">
-                  <strong>{lastResult.accountName}</strong> moved with{" "}
-                  {lastResult.entryCount} entries and {lastResult.movedVoucherCount} exclusive vouchers.
-                  {lastResult.sharedVoucherCount > 0 && (
-                    <> {lastResult.sharedVoucherCount} shared vouchers remain in source (their entries still show in the account statement).</>
-                  )}
-                </p>
+              {undoDone
+                ? <Undo2 className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                : <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+              }
+              <div className="flex-1 space-y-1">
+                {undoDone ? (
+                  <>
+                    <p className="font-medium text-amber-800 dark:text-amber-300">Migration undone</p>
+                    <p className="text-sm text-amber-700 dark:text-amber-400">
+                      <strong>{lastResult.accountName}</strong> has been moved back to its original company.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium text-green-800 dark:text-green-300">Migration complete</p>
+                    <p className="text-sm text-green-700 dark:text-green-400">
+                      <strong>{lastResult.accountName}</strong> moved with{" "}
+                      {lastResult.entryCount} entries and {lastResult.movedVoucherCount} exclusive vouchers.
+                      {lastResult.sharedVoucherCount > 0 && (
+                        <> {lastResult.sharedVoucherCount} shared vouchers remain in source (their entries still show in the account statement).</>
+                      )}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      onClick={() => setUndoConfirmOpen(true)}
+                      data-testid="button-undo-migration"
+                    >
+                      <Undo2 className="h-3.5 w-3.5 mr-1.5" />
+                      Undo migration
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>
@@ -472,6 +533,45 @@ export default function AccountMigration() {
           </CardContent>
         </Card>
       )}
+
+      {/* Undo confirmation dialog */}
+      <Dialog open={undoConfirmOpen} onOpenChange={setUndoConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Undo2 className="h-5 w-5 text-amber-500" />
+              Undo migration
+            </DialogTitle>
+            <DialogDescription>
+              This will move the account back to its original company. Any transactions posted to this account after the migration will still be visible in the statement.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="p-3 rounded-md bg-muted/50 text-sm space-y-1">
+              <p><span className="text-muted-foreground">Account:</span> <strong>{lastResult?.accountName}</strong></p>
+              <p><span className="text-muted-foreground">Moving back from:</span> <strong>{companies.find(c => c.id === lastResult?.destCompanyId)?.name}</strong></p>
+              <p><span className="text-muted-foreground">Moving back to:</span> <strong>{companies.find(c => c.id === lastResult?.srcCompanyId)?.name}</strong></p>
+              <p><span className="text-muted-foreground">Vouchers to restore:</span> <strong>{lastResult?.movedVoucherCount}</strong></p>
+              {lastResult?.originalCode !== lastResult?.finalCode && (
+                <p><span className="text-muted-foreground">Code restored to:</span> <span className="font-mono font-medium">{lastResult?.originalCode}</span></p>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setUndoConfirmOpen(false)} data-testid="button-cancel-undo">
+              Cancel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => undoMutation.mutate()}
+              disabled={undoMutation.isPending}
+              data-testid="button-confirm-undo"
+            >
+              {undoMutation.isPending ? "Undoing…" : "Yes, move it back"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmation dialog */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>

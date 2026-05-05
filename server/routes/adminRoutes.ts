@@ -4200,14 +4200,67 @@ export function registerAdminRoutes(app: Express) {
         success: true,
         accountId,
         accountName: account.name,
+        originalCode: account.code,
+        finalCode,
         srcCompanyId,
         destCompanyId,
         entryCount: entryRows.length,
         movedVoucherCount,
+        movedVoucherIds: exclusiveVoucherIds,
         sharedVoucherCount,
       });
     } catch (error: any) {
       console.error("[AccountMigration] Error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Undo a migration — move the account back to the original company
+  app.post("/api/admin/account-migration/undo", requireAuth, requireRole("Admin", "Developer"), async (req: any, res: any) => {
+    try {
+      const { accountId, srcCompanyId, destCompanyId, originalCode, movedVoucherIds } = req.body;
+      if (!accountId || !srcCompanyId || !destCompanyId)
+        return res.status(400).json({ message: "accountId, srcCompanyId and destCompanyId are required" });
+
+      // Verify account currently lives in the destination company (sanity check)
+      const [account] = await db.select().from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, destCompanyId)));
+      if (!account)
+        return res.status(404).json({ message: "Account not found in destination company — it may have already been moved or re-migrated." });
+
+      await db.transaction(async (tx) => {
+        // 1. Move account back to source, restore original code
+        await tx.update(ledgerAccounts)
+          .set({
+            companyId: srcCompanyId,
+            code: originalCode ?? account.code,
+            parentId: null,
+          })
+          .where(eq(ledgerAccounts.id, accountId));
+
+        // 2. Move vouchers back to source company
+        if (Array.isArray(movedVoucherIds) && movedVoucherIds.length > 0) {
+          await tx.update(vouchers)
+            .set({ companyId: srcCompanyId })
+            .where(inArray(vouchers.id, movedVoucherIds));
+        }
+      });
+
+      console.log(
+        `[AccountMigration] UNDO: Account ${accountId} (${account.name}) moved back from company ${destCompanyId} → ${srcCompanyId}. ` +
+        `${(movedVoucherIds ?? []).length} vouchers restored.`
+      );
+
+      res.json({
+        success: true,
+        accountId,
+        accountName: account.name,
+        srcCompanyId,
+        destCompanyId,
+        restoredVoucherCount: (movedVoucherIds ?? []).length,
+      });
+    } catch (error: any) {
+      console.error("[AccountMigration] Undo error:", error);
       res.status(500).json({ message: error.message });
     }
   });
