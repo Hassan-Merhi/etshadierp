@@ -178,13 +178,22 @@ async function ensureMonthlyLedgerRows(contractId: number) {
   const start = new Date(contract.startDate as any);
   const startYear = start.getUTCFullYear();
   const startMonth = start.getUTCMonth() + 1;
+  const billingDay = start.getUTCDate(); // day-of-month the tenant started = monthly billing day
   const now = new Date();
   const curYear = now.getUTCFullYear();
   const curMonth = now.getUTCMonth() + 1;
+  const curDay = now.getUTCDate();
 
   const periods: Array<{ year: number; month: number }> = [];
   let y = startYear, m = startMonth;
-  while (y < curYear || (y === curYear && m <= curMonth)) {
+  // Include a period if it is a past month, OR if it is the current month AND today's
+  // day-of-month has reached the tenant's billing day (so a tenant starting on the 15th
+  // won't have the current month's charge appear until the 15th).
+  while (
+    y < curYear ||
+    (y === curYear && m < curMonth) ||
+    (y === curYear && m === curMonth && curDay >= billingDay)
+  ) {
     periods.push({ year: y, month: m });
     m++; if (m > 12) { m = 1; y++; }
     if (periods.length > 600) break;

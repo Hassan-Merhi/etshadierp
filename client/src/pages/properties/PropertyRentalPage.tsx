@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog, ChevronsUpDown, Trash2, ClipboardList, CreditCard } from "lucide-react";
+import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog, ChevronsUpDown, Trash2, ClipboardList, CreditCard, CalendarDays } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
@@ -53,6 +53,20 @@ type LedgerRow = { id: number; year: number; month: number; expectedAmount: stri
 type Payment = { id: number; amount: string; paymentDate: string; forYear: number; forMonth: number; cashAccountId: number | null; notes: string | null };
 
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+function billingDayLabel(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  try {
+    const d = new Date(dateStr);
+    const day = d.getUTCDate();
+    return `${ordinal(day)} of each month`;
+  } catch { return null; }
+}
 const fmtMoney = (v: string | number | null | undefined) => {
   if (v === null || v === undefined || v === "") return "—";
   const n = Number(v);
@@ -677,6 +691,12 @@ function StartContractForm({ unitId, testIdPrefix, onClose, unitType }: { unitId
         <div>
           <Label>Start Date *</Label>
           <Input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} data-testid={`input-${testIdPrefix}-start-date`} />
+          {form.startDate && (
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+              <CalendarDays className="h-3 w-3 shrink-0" />
+              Charges on the {billingDayLabel(form.startDate)}
+            </p>
+          )}
         </div>
         <div>
           <Label>Monthly Rental Amount *</Label>
@@ -1362,6 +1382,12 @@ function EditInfoForm({ contract, testIdPrefix, unitId, unit, unitType }: { cont
           <div>
             <Label>Start Date *</Label>
             <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} data-testid={`input-${testIdPrefix}-edit-start-date`} />
+            {startDate && (
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <CalendarDays className="h-3 w-3 shrink-0" />
+                Charges on the {billingDayLabel(startDate)}
+              </p>
+            )}
           </div>
           <div>
             <Label>Guarantee Amount</Label>
@@ -1517,9 +1543,16 @@ function LedgerView({ ledger, payments, contract, unitId, onNoteUpdated }: { led
   return (
     <div className="space-y-3 pt-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="grid grid-cols-3 gap-3 text-sm flex-1 min-w-0">
+        <div className="grid grid-cols-4 gap-3 text-sm flex-1 min-w-0">
           <div className="bg-muted/40 rounded p-2"><div className="text-xs text-muted-foreground">Tenant</div><div className="font-semibold truncate">{contract.tenantName}</div></div>
           <div className="bg-muted/40 rounded p-2"><div className="text-xs text-muted-foreground">Monthly Rent</div><div className="font-semibold">${fmtMoney(contract.rentalAmount)}</div></div>
+          <div className="bg-muted/40 rounded p-2">
+            <div className="text-xs text-muted-foreground">Billing Day</div>
+            <div className="font-semibold flex items-center gap-1">
+              <CalendarDays className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              {billingDayLabel(contract.startDate) ?? "—"}
+            </div>
+          </div>
           <div className="bg-muted/40 rounded p-2">
             <div className="text-xs text-muted-foreground">Balance</div>
             <div className={`font-bold ${balance > 0 ? "text-red-600 dark:text-red-400" : balance < 0 ? "text-green-600 dark:text-green-400" : ""}`}>
