@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
   Loader2, AlertTriangle, CheckCircle2,
-  ScanSearch, Wrench, Undo2, Users, Building2, ShieldCheck,
+  ScanSearch, Wrench, Undo2, Building2, ShieldCheck,
 } from "lucide-react";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -20,13 +20,6 @@ function fmt(n: number) {
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────
-interface EmpDiscrepancy {
-  id: number; name: string;
-  storedBalance: number; computedBalance: number;
-  storedDeposits: number; computedDeposits: number;
-  storedWithdrawals: number; computedWithdrawals: number;
-  diff: number;
-}
 interface LedgerDiscrepancy {
   id: number; contractId: number; year: number; month: number;
   module: string; storedPaid: number; computedPaid: number; diff: number;
@@ -38,15 +31,9 @@ interface DepositDiscrepancy {
   issue: "STALE_FLAG" | "MISSING_FLAG";
 }
 interface ScanResult {
-  employeeDiscrepancies: EmpDiscrepancy[];
   ledgerDiscrepancies:   LedgerDiscrepancy[];
   depositDiscrepancies:  DepositDiscrepancy[];
   totalDiscrepancies:    number;
-}
-interface EmpSnapshot {
-  id: number; name: string;
-  oldBalance: number; oldDeposits: number; oldWithdrawals: number;
-  newBalance: number; newDeposits: number; newWithdrawals: number;
 }
 interface LedgerSnapshot {
   id: number; contractId: number; year: number; month: number;
@@ -60,14 +47,13 @@ interface DepositSnapshot {
   issue: "STALE_FLAG" | "MISSING_FLAG";
 }
 interface ApplySnapshot {
-  employeeSnapshots: EmpSnapshot[];
   ledgerSnapshots:   LedgerSnapshot[];
   depositSnapshots:  DepositSnapshot[];
 }
 
 type Phase = "idle" | "scanning" | "scanned" | "applying" | "applied" | "undoing";
 
-// ── Module badge helper ────────────────────────────────────────────────────
+// ── Module badge ───────────────────────────────────────────────────────────
 function ModuleBadge({ module }: { module: string }) {
   const label = module === "ERP" ? "ERP Shops" : module === "FACTORY" ? "Factory" : "Properties";
   return <Badge variant="secondary">{label}</Badge>;
@@ -85,10 +71,10 @@ function IssueBadge({ issue }: { issue: "STALE_FLAG" | "MISSING_FLAG" }) {
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function BalanceRepair() {
   const { toast } = useToast();
-  const [phase, setPhase]           = useState<Phase>("idle");
-  const [scan, setScan]             = useState<ScanResult | null>(null);
-  const [snapshot, setSnapshot]     = useState<ApplySnapshot | null>(null);
-  const [applied, setApplied]       = useState<{ emps: number; rows: number; deps: number } | null>(null);
+  const [phase, setPhase]       = useState<Phase>("idle");
+  const [scan, setScan]         = useState<ScanResult | null>(null);
+  const [snapshot, setSnapshot] = useState<ApplySnapshot | null>(null);
+  const [applied, setApplied]   = useState<{ rows: number; deps: number } | null>(null);
 
   async function runScan() {
     setPhase("scanning"); setScan(null); setSnapshot(null); setApplied(null);
@@ -116,11 +102,11 @@ export default function BalanceRepair() {
       if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
       const data = await res.json();
       setSnapshot(data.snapshot);
-      setApplied({ emps: data.employeesFixed, rows: data.ledgerRowsFixed, deps: data.depositsFixed });
+      setApplied({ rows: data.ledgerRowsFixed, deps: data.depositsFixed });
       setScan(null); setPhase("applied");
       toast({
         title:       "Fixes applied",
-        description: `Fixed ${data.employeesFixed} employee balance(s), ${data.ledgerRowsFixed} rent ledger row(s), and ${data.depositsFixed} deposit flag(s).`,
+        description: `Fixed ${data.ledgerRowsFixed} rent ledger row(s) and ${data.depositsFixed} deposit flag(s).`,
       });
     } catch (e: any) {
       toast({ title: "Repair failed", description: e.message, variant: "destructive" });
@@ -138,7 +124,7 @@ export default function BalanceRepair() {
       setSnapshot(null); setApplied(null); setScan(null); setPhase("idle");
       toast({
         title:       "Undo complete",
-        description: `Restored ${data.employeesRestored} employee balance(s), ${data.ledgerRowsRestored} rent row(s), and ${data.depositsRestored} deposit flag(s).`,
+        description: `Restored ${data.ledgerRowsRestored} rent row(s) and ${data.depositsRestored} deposit flag(s).`,
       });
     } catch (e: any) {
       toast({ title: "Undo failed", description: e.message, variant: "destructive" });
@@ -146,23 +132,22 @@ export default function BalanceRepair() {
     }
   }
 
-  const busy = phase === "scanning" || phase === "applying" || phase === "undoing";
+  const busy  = phase === "scanning" || phase === "applying" || phase === "undoing";
   const total = scan?.totalDiscrepancies ?? 0;
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
       <PageHeader
         title="Balance Repair Tool"
-        subtitle="Scans stored balances and deposit flags against live voucher data. Corrects drift across all modules with one-click undo."
+        subtitle="Scans rent ledger paid amounts and tenant deposit flags against live voucher data. Corrects drift with one-click undo."
       />
 
       <Alert>
         <AlertTriangle className="h-4 w-4" />
         <AlertDescription>
-          This tool checks three areas for the current company:
-          {" "}<strong>employee advance balances</strong>,{" "}
-          <strong>property rent ledger paid amounts</strong>, and{" "}
-          <strong>tenant guarantee deposit flags</strong> across all shops (Properties, ERP, Factory).
+          This tool checks two areas for the current company:{" "}
+          <strong>property rent ledger paid amounts</strong> and{" "}
+          <strong>tenant guarantee deposit flags</strong> across all shops (Properties, ERP Shops, Factory).
           Scan first to preview, then apply to fix.
         </AlertDescription>
       </Alert>
@@ -212,43 +197,13 @@ export default function BalanceRepair() {
               Repair Applied
             </CardTitle>
             <CardDescription>
-              {applied.emps} employee balance{applied.emps !== 1 ? "s" : ""} &middot; {applied.rows} rent ledger row{applied.rows !== 1 ? "s" : ""} &middot; {applied.deps} deposit flag{applied.deps !== 1 ? "s" : ""} corrected.
+              {applied.rows} rent ledger row{applied.rows !== 1 ? "s" : ""} &middot; {applied.deps} deposit flag{applied.deps !== 1 ? "s" : ""} corrected.
               Click <strong>Undo Repair</strong> above to revert all changes.
             </CardDescription>
           </CardHeader>
 
-          {snapshot.employeeSnapshots.length > 0 && (
-            <CardContent className="space-y-3">
-              <p className="text-sm font-medium flex items-center gap-2"><Users className="h-4 w-4" />Employee Balances Fixed</p>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead className="text-right">Old Balance</TableHead>
-                    <TableHead className="text-right">New Balance</TableHead>
-                    <TableHead className="text-right">Difference</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {snapshot.employeeSnapshots.map(s => (
-                    <TableRow key={s.id} data-testid={`row-emp-repair-${s.id}`}>
-                      <TableCell className="font-medium">{s.name}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{fmt(s.oldBalance)}</TableCell>
-                      <TableCell className="text-right">{fmt(s.newBalance)}</TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant={s.newBalance >= s.oldBalance ? "default" : "secondary"}>
-                          {s.newBalance >= s.oldBalance ? "+" : ""}{fmt(s.newBalance - s.oldBalance)}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          )}
-
           {snapshot.ledgerSnapshots.length > 0 && (
-            <CardContent className="space-y-3 pt-0">
+            <CardContent className="space-y-3">
               <p className="text-sm font-medium flex items-center gap-2"><Building2 className="h-4 w-4" />Rent Ledger Rows Fixed</p>
               <Table>
                 <TableHeader>
@@ -325,54 +280,8 @@ export default function BalanceRepair() {
           <CardContent className="flex items-center gap-3 py-6">
             <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400 shrink-0" />
             <p className="text-sm">
-              All balances and deposit flags are in sync. No discrepancies detected.
+              All rent ledger amounts and deposit flags are in sync. No discrepancies detected.
             </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ── Scan: employee discrepancies ── */}
-      {phase === "scanned" && scan && scan.employeeDiscrepancies.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Employee Balance Discrepancies
-              <Badge variant="destructive" className="ml-1">{scan.employeeDiscrepancies.length}</Badge>
-            </CardTitle>
-            <CardDescription>
-              The stored balance on these employees differs from what their voucher entries compute.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead className="text-right">Stored Balance</TableHead>
-                  <TableHead className="text-right">Computed Balance</TableHead>
-                  <TableHead className="text-right">Stored Deposits</TableHead>
-                  <TableHead className="text-right">Computed Deposits</TableHead>
-                  <TableHead className="text-right">Stored Withdrawals</TableHead>
-                  <TableHead className="text-right">Computed Withdrawals</TableHead>
-                  <TableHead className="text-right">Drift</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {scan.employeeDiscrepancies.map(d => (
-                  <TableRow key={d.id} data-testid={`row-emp-scan-${d.id}`}>
-                    <TableCell className="font-medium">{d.name}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{fmt(d.storedBalance)}</TableCell>
-                    <TableCell className="text-right">{fmt(d.computedBalance)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{fmt(d.storedDeposits)}</TableCell>
-                    <TableCell className="text-right">{fmt(d.computedDeposits)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{fmt(d.storedWithdrawals)}</TableCell>
-                    <TableCell className="text-right">{fmt(d.computedWithdrawals)}</TableCell>
-                    <TableCell className="text-right"><Badge variant="destructive">{fmt(d.diff)}</Badge></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
           </CardContent>
         </Card>
       )}
