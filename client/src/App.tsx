@@ -946,6 +946,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/rental/warehouses" component={FactoryRentalWarehouses} />
                     <Route path="/factory/rental/shops" component={FactoryRentalShops} />
                     <Route path="/factory/rental/payments" component={FactoryRentalPayments} />
+                    {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/balance-repair" component={BalanceRepair} />}
                     <Route><Redirect to={factoryDefaultPage} /></Route>
                   </Switch>
                   </Suspense>
