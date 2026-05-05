@@ -1410,7 +1410,7 @@ export default function FactorySuppliers() {
                               ) : (
                                 <>{ccPrefix}{formatNum(group.netPayable)}</>
                               )}
-                              {!isAutoSettled && (group.currencyCode !== "USD" || isCommissionOnly || isCrossFreightPool) && (netPay > 0 || hasCommission) && statementData.supplier.parentId && (
+                              {!isAutoSettled && (group.currencyCode !== "USD" || isCommissionOnly || isCrossFreightPool) && (netPay > 0 || hasCommission) && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -1418,13 +1418,13 @@ export default function FactorySuppliers() {
                                   onClick={() => {
                                     const hasBalance = netPay > 0;
                                     const netPayStr = hasBalance ? group.netPayable : "0";
+                                    const toSupId = statementData.supplier.parentId || statementSupplierId!;
                                     let form: Record<string, any>;
                                     let sourceType: string;
                                     if (isCrossFreightPool) {
-                                      // Freight (± commission) pool: full netPayable is the available balance
                                       form = {
                                         fromSupplierId: statementSupplierId!,
-                                        toSupplierId: statementData.supplier.parentId!,
+                                        toSupplierId: toSupId,
                                         selectedCurrency: group.currencyCode,
                                         amount: netPayStr,
                                         availableBalance: netPayStr,
@@ -1438,17 +1438,17 @@ export default function FactorySuppliers() {
                                     } else {
                                       form = {
                                         fromSupplierId: statementSupplierId!,
-                                        toSupplierId: statementData.supplier.parentId!,
+                                        toSupplierId: toSupId,
                                         selectedCurrency: group.currencyCode,
-                                        amount: group.totalCommission,
-                                        availableBalance: group.totalCommission,
+                                        amount: hasBalance ? group.netPayable : group.totalCommission,
+                                        availableBalance: hasBalance ? group.netPayable : group.totalCommission,
                                         supplierBalance: hasBalance ? group.netPayable : "0",
                                         commissionBalance: group.totalCommission,
                                         fxRateToUsd: group.currencyCode === "USD" ? "1" : "",
                                         date: today,
                                         notes: "",
                                       };
-                                      sourceType = "commission";
+                                      sourceType = hasBalance ? "supplier" : "commission";
                                     }
                                     setFxConversionForm(form);
                                     setFxSourceType(sourceType);
@@ -1456,7 +1456,7 @@ export default function FactorySuppliers() {
                                   }}
                                   data-testid={`button-convert-${group.currencyCode}`}
                                 >
-                                  {isFreightOnly ? "Settle Freight" : isCommissionOnly ? "Settle Commission" : isCrossFreightPool ? "Settle" : "Settle"}
+                                  {isFreightOnly ? "Settle Freight" : isCommissionOnly ? "Settle Commission" : isCrossFreightPool ? "Settle" : "Settle FX"}
                                 </Button>
                               )}
                             </TableCell>
