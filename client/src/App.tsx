@@ -687,7 +687,7 @@ function AuthenticatedApp() {
     return <Redirect to="/properties/daybook" />;
   }
 
-  if (isPropertiesRoute && isPropertiesCompany) {
+  if (isPropertiesCompany && (isPropertiesRoute || currentLocation === "/balance-repair")) {
     return (
       <AppModeProvider mode="properties">
         <SidebarProvider style={style as React.CSSProperties}>
