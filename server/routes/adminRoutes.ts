@@ -4030,7 +4030,10 @@ export function registerAdminRoutes(app: Express) {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ACCOUNT MIGRATION — move a ledger account + its statement between companies
+  // ACCOUNT MIGRATION — move ledger accounts + their statements between companies
+  // Supports migrating multiple accounts at once in a single atomic transaction.
+  // Voucher exclusivity is evaluated against the whole batch: a voucher that
+  // touches only accounts within the migrating batch is moved entirely.
   // ═══════════════════════════════════════════════════════════════════════════
 
   // List all companies (for source/destination pickers)
@@ -4055,132 +4058,146 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
-  // Preview a migration — what will move and what stays
+  // Preview a batch migration — accepts accountIds array
   app.post("/api/admin/account-migration/preview", requireAuth, requireRole("Admin", "Developer"), async (req: any, res: any) => {
     try {
-      const { accountId, srcCompanyId, destCompanyId } = req.body;
-      if (!accountId || !srcCompanyId || !destCompanyId)
-        return res.status(400).json({ message: "accountId, srcCompanyId and destCompanyId are required" });
+      const { accountIds, srcCompanyId, destCompanyId } = req.body;
+      if (!Array.isArray(accountIds) || accountIds.length === 0 || !srcCompanyId || !destCompanyId)
+        return res.status(400).json({ message: "accountIds (array), srcCompanyId and destCompanyId are required" });
       if (srcCompanyId === destCompanyId)
         return res.status(400).json({ message: "Source and destination must be different companies" });
 
-      // Load account and verify it belongs to srcCompany
-      const [account] = await db.select().from(ledgerAccounts)
-        .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, srcCompanyId)));
-      if (!account) return res.status(404).json({ message: "Account not found in source company" });
+      const batchSet = new Set<number>(accountIds);
 
-      // Count all voucher entries for this account
-      const entryRows = await db
-        .select({
+      const accountPreviews = [];
+      let grandTotalDebit = 0;
+      let grandTotalCredit = 0;
+      let grandTotalEntries = 0;
+
+      for (const accountId of accountIds) {
+        // Verify account belongs to source company
+        const [account] = await db.select().from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, srcCompanyId)));
+        if (!account)
+          return res.status(404).json({ message: `Account ${accountId} not found in source company` });
+
+        // Get all voucher entries for this account
+        const entryRows = await db.select({
           voucherId: voucherEntries.voucherId,
           debit: voucherEntries.debitAmount,
           credit: voucherEntries.creditAmount,
-        })
-        .from(voucherEntries)
-        .where(eq(voucherEntries.ledgerAccountId, accountId));
+        }).from(voucherEntries).where(eq(voucherEntries.ledgerAccountId, accountId));
 
-      const totalDebit  = entryRows.reduce((s, r) => s + parseFloat(r.debit  || "0"), 0);
-      const totalCredit = entryRows.reduce((s, r) => s + parseFloat(r.credit || "0"), 0);
+        const totalDebit  = entryRows.reduce((s, r) => s + parseFloat(r.debit  || "0"), 0);
+        const totalCredit = entryRows.reduce((s, r) => s + parseFloat(r.credit || "0"), 0);
+        grandTotalDebit  += totalDebit;
+        grandTotalCredit += totalCredit;
+        grandTotalEntries += entryRows.length;
 
-      // Find voucher IDs touched by this account
-      const touchedVoucherIds = [...new Set(entryRows.map(r => r.voucherId))];
+        const touchedVoucherIds = [...new Set(entryRows.map(r => r.voucherId))];
 
-      // Find which of those vouchers have entries for OTHER accounts too
-      let exclusiveVoucherCount = 0;
-      let sharedVoucherCount = 0;
-      if (touchedVoucherIds.length > 0) {
+        // A voucher is exclusive to the batch if ALL its entry accounts are in the batch
+        let exclusiveVoucherCount = 0;
+        let sharedVoucherCount = 0;
         for (const vid of touchedVoucherIds) {
           const allEntries = await db.select({ la: voucherEntries.ledgerAccountId })
             .from(voucherEntries).where(eq(voucherEntries.voucherId, vid));
-          const otherAccounts = allEntries.filter(e => e.la !== accountId && e.la !== null);
-          if (otherAccounts.length === 0) exclusiveVoucherCount++;
+          const outsideAccounts = allEntries.filter(e => e.la !== null && !batchSet.has(e.la));
+          if (outsideAccounts.length === 0) exclusiveVoucherCount++;
           else sharedVoucherCount++;
         }
-      }
 
-      // Check if destination company has a conflicting code
-      const [codeConflict] = await db.select().from(ledgerAccounts)
-        .where(and(eq(ledgerAccounts.companyId, destCompanyId), eq(ledgerAccounts.code, account.code)));
+        // Check code conflict in destination
+        const [codeConflict] = await db.select().from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.companyId, destCompanyId), eq(ledgerAccounts.code, account.code)));
+
+        accountPreviews.push({
+          account,
+          entryCount: entryRows.length,
+          totalDebit,
+          totalCredit,
+          touchedVoucherCount: touchedVoucherIds.length,
+          exclusiveVoucherCount,
+          sharedVoucherCount,
+          codeConflict: codeConflict ? { id: codeConflict.id, name: codeConflict.name } : null,
+        });
+      }
 
       const srcCompany  = await storage.getCompanyById(srcCompanyId);
       const destCompany = await storage.getCompanyById(destCompanyId);
 
       res.json({
-        account,
+        accounts: accountPreviews,
         srcCompany,
         destCompany,
-        entryCount: entryRows.length,
-        totalDebit,
-        totalCredit,
-        touchedVoucherCount: touchedVoucherIds.length,
-        exclusiveVoucherCount,
-        sharedVoucherCount,
-        codeConflict: codeConflict ? { id: codeConflict.id, name: codeConflict.name } : null,
+        grandTotalEntries,
+        grandTotalDebit,
+        grandTotalCredit,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // Execute the migration
+  // Execute a batch migration — moves all accounts atomically in one transaction
   app.post("/api/admin/account-migration/execute", requireAuth, requireRole("Admin", "Developer"), async (req: any, res: any) => {
     try {
-      const { accountId, srcCompanyId, destCompanyId, resolveCodeConflict } = req.body;
-      if (!accountId || !srcCompanyId || !destCompanyId)
-        return res.status(400).json({ message: "accountId, srcCompanyId and destCompanyId are required" });
+      const { accountIds, srcCompanyId, destCompanyId } = req.body;
+      if (!Array.isArray(accountIds) || accountIds.length === 0 || !srcCompanyId || !destCompanyId)
+        return res.status(400).json({ message: "accountIds (array), srcCompanyId and destCompanyId are required" });
       if (srcCompanyId === destCompanyId)
         return res.status(400).json({ message: "Source and destination must be different companies" });
 
-      // Verify account belongs to source company
-      const [account] = await db.select().from(ledgerAccounts)
-        .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, srcCompanyId)));
-      if (!account) return res.status(404).json({ message: "Account not found in source company" });
+      const batchSet = new Set<number>(accountIds);
 
-      // Check for code conflict in destination
-      const [codeConflict] = await db.select().from(ledgerAccounts)
-        .where(and(eq(ledgerAccounts.companyId, destCompanyId), eq(ledgerAccounts.code, account.code)));
-      let finalCode = account.code;
-      if (codeConflict) {
-        if (resolveCodeConflict === "suffix") {
-          finalCode = `${account.code}-MIGRATED`;
-        } else {
-          return res.status(409).json({
-            message: `Account code "${account.code}" already exists in destination company. Pass resolveCodeConflict: "suffix" to auto-rename.`,
-            conflictAccount: { id: codeConflict.id, name: codeConflict.name },
-          });
-        }
+      // Build per-account plan (code conflict resolution + entry counts)
+      const accountPlans: Array<{
+        account: any;
+        originalCode: string;
+        finalCode: string;
+        entryCount: number;
+        touchedVoucherIds: number[];
+      }> = [];
+
+      // Track ALL voucher IDs touched by ANY account in the batch
+      const allTouchedVoucherIds = new Set<number>();
+
+      for (const accountId of accountIds) {
+        const [account] = await db.select().from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, srcCompanyId)));
+        if (!account)
+          return res.status(404).json({ message: `Account ${accountId} not found in source company` });
+
+        // Auto-resolve code conflict with -MIGRATED suffix
+        const [codeConflict] = await db.select().from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.companyId, destCompanyId), eq(ledgerAccounts.code, account.code)));
+        const finalCode = codeConflict ? `${account.code}-MIGRATED` : account.code;
+
+        const entryRows = await db.select({ voucherId: voucherEntries.voucherId })
+          .from(voucherEntries).where(eq(voucherEntries.ledgerAccountId, accountId));
+        const touchedVoucherIds = [...new Set(entryRows.map(r => r.voucherId))];
+        touchedVoucherIds.forEach(v => allTouchedVoucherIds.add(v));
+
+        accountPlans.push({ account, originalCode: account.code, finalCode, entryCount: entryRows.length, touchedVoucherIds });
       }
 
-      // Find all voucher entries for this account
-      const entryRows = await db
-        .select({ voucherId: voucherEntries.voucherId })
-        .from(voucherEntries)
-        .where(eq(voucherEntries.ledgerAccountId, accountId));
-
-      const touchedVoucherIds = [...new Set(entryRows.map(r => r.voucherId))];
-
-      // Determine which vouchers are "exclusive" (only contain entries for this account)
+      // Determine which vouchers are exclusive to this batch
+      // (all their entries belong to accounts in the batch)
       const exclusiveVoucherIds: number[] = [];
-      for (const vid of touchedVoucherIds) {
+      for (const vid of allTouchedVoucherIds) {
         const allEntries = await db.select({ la: voucherEntries.ledgerAccountId })
           .from(voucherEntries).where(eq(voucherEntries.voucherId, vid));
-        const otherAccounts = allEntries.filter(e => e.la !== accountId && e.la !== null);
-        if (otherAccounts.length === 0) exclusiveVoucherIds.push(vid);
+        const outsideAccounts = allEntries.filter(e => e.la !== null && !batchSet.has(e.la));
+        if (outsideAccounts.length === 0) exclusiveVoucherIds.push(vid);
       }
 
-      // ── Execute migration in a transaction ─────────────────────────────────
+      // ── Execute everything in one atomic transaction ────────────────────────
       await db.transaction(async (tx) => {
-        // 1. Move the ledger account to the destination company
-        //    Clear parentId since the parent hierarchy is company-specific
-        await tx.update(ledgerAccounts)
-          .set({
-            companyId: destCompanyId,
-            code: finalCode,
-            parentId: null,
-          })
-          .where(eq(ledgerAccounts.id, accountId));
-
-        // 2. Move exclusively-owned vouchers to the destination company
+        for (const plan of accountPlans) {
+          await tx.update(ledgerAccounts)
+            .set({ companyId: destCompanyId, code: plan.finalCode, parentId: null })
+            .where(eq(ledgerAccounts.id, plan.account.id));
+        }
         if (exclusiveVoucherIds.length > 0) {
           await tx.update(vouchers)
             .set({ companyId: destCompanyId })
@@ -4188,26 +4205,30 @@ export function registerAdminRoutes(app: Express) {
         }
       });
 
-      const movedVoucherCount = exclusiveVoucherIds.length;
-      const sharedVoucherCount = touchedVoucherIds.length - movedVoucherCount;
+      const sharedVoucherCount = allTouchedVoucherIds.size - exclusiveVoucherIds.length;
+      const totalEntries = accountPlans.reduce((s, p) => s + p.entryCount, 0);
 
       console.log(
-        `[AccountMigration] Account ${accountId} (${account.name}) moved from company ${srcCompanyId} → ${destCompanyId}. ` +
-        `${entryRows.length} entries, ${movedVoucherCount} vouchers moved, ${sharedVoucherCount} shared vouchers left in source.`
+        `[AccountMigration] Batch of ${accountIds.length} account(s) moved from company ${srcCompanyId} → ${destCompanyId}. ` +
+        `${totalEntries} entries, ${exclusiveVoucherIds.length} vouchers moved, ${sharedVoucherCount} shared vouchers left in source.`
       );
 
       res.json({
         success: true,
-        accountId,
-        accountName: account.name,
-        originalCode: account.code,
-        finalCode,
         srcCompanyId,
         destCompanyId,
-        entryCount: entryRows.length,
-        movedVoucherCount,
+        totalEntries,
         movedVoucherIds: exclusiveVoucherIds,
+        movedVoucherCount: exclusiveVoucherIds.length,
         sharedVoucherCount,
+        accounts: accountPlans.map(p => ({
+          accountId: p.account.id,
+          accountName: p.account.name,
+          originalCode: p.originalCode,
+          finalCode: p.finalCode,
+          entryCount: p.entryCount,
+          wasRenamed: p.originalCode !== p.finalCode,
+        })),
       });
     } catch (error: any) {
       console.error("[AccountMigration] Error:", error);
@@ -4215,30 +4236,30 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
-  // Undo a migration — move the account back to the original company
+  // Undo a batch migration — moves all accounts back atomically
   app.post("/api/admin/account-migration/undo", requireAuth, requireRole("Admin", "Developer"), async (req: any, res: any) => {
     try {
-      const { accountId, srcCompanyId, destCompanyId, originalCode, movedVoucherIds } = req.body;
-      if (!accountId || !srcCompanyId || !destCompanyId)
-        return res.status(400).json({ message: "accountId, srcCompanyId and destCompanyId are required" });
+      const { accounts, movedVoucherIds, srcCompanyId, destCompanyId } = req.body;
+      // accounts = [{ accountId, originalCode }]
+      if (!Array.isArray(accounts) || accounts.length === 0 || !srcCompanyId || !destCompanyId)
+        return res.status(400).json({ message: "accounts (array), srcCompanyId and destCompanyId are required" });
 
-      // Verify account currently lives in the destination company (sanity check)
-      const [account] = await db.select().from(ledgerAccounts)
-        .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, destCompanyId)));
-      if (!account)
-        return res.status(404).json({ message: "Account not found in destination company — it may have already been moved or re-migrated." });
+      // Sanity-check: all accounts should currently be in destCompany
+      for (const a of accounts) {
+        const [row] = await db.select({ id: ledgerAccounts.id }).from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.id, a.accountId), eq(ledgerAccounts.companyId, destCompanyId)));
+        if (!row)
+          return res.status(404).json({
+            message: `Account ${a.accountId} not found in destination company — it may have already been moved or re-migrated.`,
+          });
+      }
 
       await db.transaction(async (tx) => {
-        // 1. Move account back to source, restore original code
-        await tx.update(ledgerAccounts)
-          .set({
-            companyId: srcCompanyId,
-            code: originalCode ?? account.code,
-            parentId: null,
-          })
-          .where(eq(ledgerAccounts.id, accountId));
-
-        // 2. Move vouchers back to source company
+        for (const a of accounts) {
+          await tx.update(ledgerAccounts)
+            .set({ companyId: srcCompanyId, code: a.originalCode, parentId: null })
+            .where(eq(ledgerAccounts.id, a.accountId));
+        }
         if (Array.isArray(movedVoucherIds) && movedVoucherIds.length > 0) {
           await tx.update(vouchers)
             .set({ companyId: srcCompanyId })
@@ -4247,16 +4268,13 @@ export function registerAdminRoutes(app: Express) {
       });
 
       console.log(
-        `[AccountMigration] UNDO: Account ${accountId} (${account.name}) moved back from company ${destCompanyId} → ${srcCompanyId}. ` +
+        `[AccountMigration] UNDO: ${accounts.length} account(s) moved back from company ${destCompanyId} → ${srcCompanyId}. ` +
         `${(movedVoucherIds ?? []).length} vouchers restored.`
       );
 
       res.json({
         success: true,
-        accountId,
-        accountName: account.name,
-        srcCompanyId,
-        destCompanyId,
+        restoredAccountCount: accounts.length,
         restoredVoucherCount: (movedVoucherIds ?? []).length,
       });
     } catch (error: any) {

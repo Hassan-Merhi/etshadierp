@@ -8,7 +8,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
-import { Input } from "@/components/ui/input";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -20,15 +19,15 @@ import {
 } from "@/components/ui/command";
 import {
   ArrowRight, Building2, BookOpen, AlertTriangle, CheckCircle, BarChart3, FileText,
-  ChevronsUpDown, Check, Wallet, Undo2,
+  ChevronsUpDown, Check, Wallet, Undo2, X, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Company, LedgerAccount } from "@shared/schema";
 
-interface PreviewResult {
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface AccountPreviewItem {
   account: LedgerAccount;
-  srcCompany: Company;
-  destCompany: Company;
   entryCount: number;
   totalDebit: number;
   totalCredit: number;
@@ -36,23 +35,38 @@ interface PreviewResult {
   exclusiveVoucherCount: number;
   sharedVoucherCount: number;
   codeConflict: { id: number; name: string } | null;
-  openingBalance: string;
-  openingBalanceSide: string;
 }
 
-interface ExecuteResult {
-  success: boolean;
+interface PreviewResult {
+  accounts: AccountPreviewItem[];
+  srcCompany: Company;
+  destCompany: Company;
+  grandTotalEntries: number;
+  grandTotalDebit: number;
+  grandTotalCredit: number;
+}
+
+interface ExecuteAccountResult {
   accountId: number;
   accountName: string;
   originalCode: string;
   finalCode: string;
+  entryCount: number;
+  wasRenamed: boolean;
+}
+
+interface ExecuteResult {
+  success: boolean;
   srcCompanyId: number;
   destCompanyId: number;
-  entryCount: number;
-  movedVoucherCount: number;
+  totalEntries: number;
   movedVoucherIds: number[];
+  movedVoucherCount: number;
   sharedVoucherCount: number;
+  accounts: ExecuteAccountResult[];
 }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmt(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -76,76 +90,188 @@ function CompanyBadge({ company }: { company?: Company }) {
   );
 }
 
-interface AccountComboboxProps {
+// ── Multi-select account combobox ─────────────────────────────────────────────
+
+interface AccountMultiSelectProps {
   accounts: LedgerAccount[];
-  value: string;
-  onChange: (v: string) => void;
+  selectedIds: number[];
+  onChange: (ids: number[]) => void;
   disabled?: boolean;
 }
 
-function AccountCombobox({ accounts, value, onChange, disabled }: AccountComboboxProps) {
+function AccountMultiSelect({ accounts, selectedIds, onChange, disabled }: AccountMultiSelectProps) {
   const [open, setOpen] = useState(false);
-  const selected = accounts.find(a => String(a.id) === value);
+  const selectedSet = new Set(selectedIds);
+  const sorted = [...accounts].sort((a, b) => a.name.localeCompare(b.name));
+
+  function toggle(id: number) {
+    if (selectedSet.has(id)) onChange(selectedIds.filter(x => x !== id));
+    else onChange([...selectedIds, id]);
+  }
 
   return (
-    <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          disabled={disabled}
-          className="w-full justify-between font-normal"
-          data-testid="select-account"
-        >
-          {selected ? (
-            <span className="flex items-center gap-2 truncate">
-              <span className="font-mono text-xs text-muted-foreground shrink-0">{selected.code}</span>
-              <span className="truncate">{selected.name}</span>
-              <Badge variant="secondary" className="text-xs shrink-0">{selected.accountType}</Badge>
+    <div className="space-y-2">
+      <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            disabled={disabled}
+            className="w-full justify-between font-normal"
+            data-testid="select-accounts"
+          >
+            <span className="text-muted-foreground">
+              {selectedIds.length === 0
+                ? "Search and select accounts…"
+                : `${selectedIds.length} account${selectedIds.length === 1 ? "" : "s"} selected`}
             </span>
-          ) : (
-            <span className="text-muted-foreground">Search account…</span>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[560px] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Type account name or code…" />
+            <CommandList className="max-h-80">
+              <CommandEmpty>No accounts found.</CommandEmpty>
+              <CommandGroup>
+                {sorted.map(a => {
+                  const selected = selectedSet.has(a.id);
+                  return (
+                    <CommandItem
+                      key={a.id}
+                      value={`${a.code} ${a.name} ${a.accountType}`}
+                      onSelect={() => toggle(a.id)}
+                      className="flex items-center gap-2"
+                    >
+                      <div className={cn(
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+                        selected ? "bg-primary border-primary" : "border-muted-foreground/40"
+                      )}>
+                        {selected && <Check className="h-3 w-3 text-primary-foreground" />}
+                      </div>
+                      <span className="font-mono text-xs text-muted-foreground w-20 shrink-0">{a.code}</span>
+                      <span className="flex-1 truncate">{a.name}</span>
+                      <Badge variant="secondary" className="text-xs shrink-0">{a.accountType}</Badge>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+          {selectedIds.length > 0 && (
+            <div className="border-t p-2 flex justify-end">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-xs text-muted-foreground"
+                onClick={() => { onChange([]); setOpen(false); }}
+              >
+                Clear all
+              </Button>
+            </div>
           )}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[520px] p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Type account name or code…" />
-          <CommandList className="max-h-72">
-            <CommandEmpty>No accounts found.</CommandEmpty>
-            <CommandGroup>
-              {[...accounts].sort((a, b) => a.name.localeCompare(b.name)).map(a => (
-                <CommandItem
-                  key={a.id}
-                  value={`${a.code} ${a.name} ${a.accountType}`}
-                  onSelect={() => {
-                    onChange(String(a.id));
-                    setOpen(false);
-                  }}
-                  className="flex items-center gap-2"
+        </PopoverContent>
+      </Popover>
+
+      {/* Selected account chips */}
+      {selectedIds.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {selectedIds.map(id => {
+            const acc = accounts.find(a => a.id === id);
+            if (!acc) return null;
+            return (
+              <div
+                key={id}
+                className="flex items-center gap-1 px-2 py-1 rounded-md bg-muted text-sm max-w-[240px]"
+              >
+                <span className="font-mono text-xs text-muted-foreground shrink-0">{acc.code}</span>
+                <span className="truncate">{acc.name}</span>
+                <button
+                  onClick={() => toggle(id)}
+                  className="ml-0.5 shrink-0 text-muted-foreground hover:text-foreground"
+                  data-testid={`remove-account-${id}`}
                 >
-                  <Check className={cn("h-4 w-4 shrink-0", String(a.id) === value ? "opacity-100" : "opacity-0")} />
-                  <span className="font-mono text-xs text-muted-foreground w-20 shrink-0">{a.code}</span>
-                  <span className="flex-1 truncate">{a.name}</span>
-                  <Badge variant="secondary" className="text-xs shrink-0">{a.accountType}</Badge>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
+
+// ── Per-account preview row ───────────────────────────────────────────────────
+
+function AccountPreviewRow({ item }: { item: AccountPreviewItem }) {
+  const [expanded, setExpanded] = useState(false);
+  const ob = parseFloat(item.account.openingBalance || "0");
+  return (
+    <div className="rounded-md border">
+      <button
+        className="w-full flex items-center justify-between gap-2 p-3 text-left hover-elevate"
+        onClick={() => setExpanded(v => !v)}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="font-medium truncate">{item.account.name}</span>
+          <span className="font-mono text-xs text-muted-foreground shrink-0">{item.account.code}</span>
+          {item.codeConflict && (
+            <Badge variant="outline" className="text-xs text-amber-700 border-amber-300 dark:text-amber-300 dark:border-amber-700 shrink-0">
+              Renamed
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs text-muted-foreground">{item.entryCount} entries</span>
+          {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        </div>
+      </button>
+      {expanded && (
+        <div className="px-3 pb-3 space-y-2 border-t pt-3">
+          <div className="grid grid-cols-3 gap-2 text-sm">
+            <div>
+              <p className="text-xs text-muted-foreground">Debits</p>
+              <p className="font-mono font-medium">{fmt(item.totalDebit)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Credits</p>
+              <p className="font-mono font-medium">{fmt(item.totalCredit)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Opening balance</p>
+              <p className="font-mono font-medium">
+                {ob !== 0 ? `${fmt(ob)} ${item.account.openingBalanceSide}` : "—"}
+              </p>
+            </div>
+          </div>
+          {item.touchedVoucherCount > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {item.exclusiveVoucherCount} voucher{item.exclusiveVoucherCount !== 1 ? "s" : ""} will move
+              {item.sharedVoucherCount > 0 && `, ${item.sharedVoucherCount} shared (stay in source)`}
+            </p>
+          )}
+          {item.codeConflict && (
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              Code <span className="font-mono">{item.account.code}</span> conflicts with existing account "{item.codeConflict.name}" — will be renamed to <span className="font-mono">{item.account.code}-MIGRATED</span>
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function AccountMigration() {
   const { toast } = useToast();
 
   const [srcCompanyId, setSrcCompanyId] = useState<string>("");
   const [destCompanyId, setDestCompanyId] = useState<string>("");
-  const [accountId, setAccountId] = useState<string>("");
+  const [selectedAccountIds, setSelectedAccountIds] = useState<number[]>([]);
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [undoConfirmOpen, setUndoConfirmOpen] = useState(false);
@@ -165,7 +291,7 @@ export default function AccountMigration() {
   const previewMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/admin/account-migration/preview", {
-        accountId: parseInt(accountId),
+        accountIds: selectedAccountIds,
         srcCompanyId: parseInt(srcCompanyId),
         destCompanyId: parseInt(destCompanyId),
       });
@@ -185,10 +311,9 @@ export default function AccountMigration() {
   const executeMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/admin/account-migration/execute", {
-        accountId: parseInt(accountId),
+        accountIds: selectedAccountIds,
         srcCompanyId: parseInt(srcCompanyId),
         destCompanyId: parseInt(destCompanyId),
-        resolveCodeConflict: preview?.codeConflict ? "suffix" : undefined,
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -201,12 +326,13 @@ export default function AccountMigration() {
       setUndoDone(false);
       setConfirmOpen(false);
       setPreview(null);
-      setAccountId("");
+      setSelectedAccountIds([]);
       setSrcCompanyId("");
       setDestCompanyId("");
+      const count = data.accounts.length;
       toast({
-        title: "Account migrated",
-        description: `"${data.accountName}" moved with ${data.entryCount} entries and ${data.movedVoucherCount} vouchers.`,
+        title: "Migration complete",
+        description: `${count} account${count === 1 ? "" : "s"} moved with ${data.totalEntries} entries.`,
       });
     },
     onError: (err: Error) => {
@@ -220,11 +346,13 @@ export default function AccountMigration() {
     mutationFn: async () => {
       if (!lastResult) throw new Error("Nothing to undo");
       const res = await apiRequest("POST", "/api/admin/account-migration/undo", {
-        accountId: lastResult.accountId,
+        accounts: lastResult.accounts.map(a => ({
+          accountId: a.accountId,
+          originalCode: a.originalCode,
+        })),
+        movedVoucherIds: lastResult.movedVoucherIds,
         srcCompanyId: lastResult.srcCompanyId,
         destCompanyId: lastResult.destCompanyId,
-        originalCode: lastResult.originalCode,
-        movedVoucherIds: lastResult.movedVoucherIds,
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -235,7 +363,10 @@ export default function AccountMigration() {
     onSuccess: () => {
       setUndoConfirmOpen(false);
       setUndoDone(true);
-      toast({ title: "Migration undone", description: `"${lastResult?.accountName}" has been moved back to the original company.` });
+      toast({
+        title: "Migration undone",
+        description: `${lastResult?.accounts.length} account${lastResult?.accounts.length === 1 ? "" : "s"} moved back to the original company.`,
+      });
     },
     onError: (err: Error) => {
       if ((err as any)?._handledGlobally) return;
@@ -244,19 +375,16 @@ export default function AccountMigration() {
     },
   });
 
-  const srcCompany = companies.find(c => c.id === parseInt(srcCompanyId));
+  const srcCompany  = companies.find(c => c.id === parseInt(srcCompanyId));
   const destCompany = companies.find(c => c.id === parseInt(destCompanyId));
-
-  const canPreview = !!srcCompanyId && !!destCompanyId && !!accountId && srcCompanyId !== destCompanyId;
-
-  const obAmount = parseFloat(preview?.account.openingBalance || "0");
-  const hasOB = obAmount !== 0;
+  const canPreview  = !!srcCompanyId && !!destCompanyId && selectedAccountIds.length > 0 && srcCompanyId !== destCompanyId;
+  const hasConflicts = preview?.accounts.some(a => a.codeConflict) ?? false;
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <PageHeader
         title="Account Migration"
-        subtitle="Move a ledger account with its complete statement history to another company"
+        subtitle="Move one or more ledger accounts with their complete statement history to another company"
       />
 
       {/* Last result banner */}
@@ -276,19 +404,28 @@ export default function AccountMigration() {
                   <>
                     <p className="font-medium text-amber-800 dark:text-amber-300">Migration undone</p>
                     <p className="text-sm text-amber-700 dark:text-amber-400">
-                      <strong>{lastResult.accountName}</strong> has been moved back to its original company.
+                      {lastResult.accounts.length} account{lastResult.accounts.length === 1 ? "" : "s"} moved back to original company.
                     </p>
                   </>
                 ) : (
                   <>
                     <p className="font-medium text-green-800 dark:text-green-300">Migration complete</p>
                     <p className="text-sm text-green-700 dark:text-green-400">
-                      <strong>{lastResult.accountName}</strong> moved with{" "}
-                      {lastResult.entryCount} entries and {lastResult.movedVoucherCount} exclusive vouchers.
+                      {lastResult.accounts.length} account{lastResult.accounts.length === 1 ? "" : "s"} moved with {lastResult.totalEntries} entries
+                      and {lastResult.movedVoucherCount} exclusive vouchers.
                       {lastResult.sharedVoucherCount > 0 && (
-                        <> {lastResult.sharedVoucherCount} shared vouchers remain in source (their entries still show in the account statement).</>
+                        <> {lastResult.sharedVoucherCount} shared vouchers remain in source.</>
                       )}
                     </p>
+                    {lastResult.accounts.some(a => a.wasRenamed) && (
+                      <p className="text-xs text-green-700 dark:text-green-400">
+                        {lastResult.accounts.filter(a => a.wasRenamed).map(a => (
+                          <span key={a.accountId}>
+                            "{a.accountName}" code renamed to <span className="font-mono">{a.finalCode}</span>{" "}
+                          </span>
+                        ))}
+                      </p>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
@@ -307,12 +444,12 @@ export default function AccountMigration() {
         </Card>
       )}
 
-      {/* Step 1 — Source */}
+      {/* Step 1 */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <span className="flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold">1</span>
-            Source — pick company and account
+            Source — pick company and accounts
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -321,7 +458,7 @@ export default function AccountMigration() {
             {loadingCompanies ? <Skeleton className="h-9 w-full" /> : (
               <Select
                 value={srcCompanyId}
-                onValueChange={(v) => { setSrcCompanyId(v); setAccountId(""); setPreview(null); setLastResult(null); }}
+                onValueChange={(v) => { setSrcCompanyId(v); setSelectedAccountIds([]); setPreview(null); setLastResult(null); }}
                 data-testid="select-src-company"
               >
                 <SelectTrigger>
@@ -343,14 +480,14 @@ export default function AccountMigration() {
 
           {srcCompanyId && (
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Account to move</label>
+              <label className="text-sm font-medium mb-1.5 block">Accounts to move</label>
               {loadingSrcAccounts ? (
                 <Skeleton className="h-9 w-full" />
               ) : (
-                <AccountCombobox
+                <AccountMultiSelect
                   accounts={srcAccounts}
-                  value={accountId}
-                  onChange={(v) => { setAccountId(v); setPreview(null); setLastResult(null); }}
+                  selectedIds={selectedAccountIds}
+                  onChange={(ids) => { setSelectedAccountIds(ids); setPreview(null); }}
                 />
               )}
             </div>
@@ -358,7 +495,7 @@ export default function AccountMigration() {
         </CardContent>
       </Card>
 
-      {/* Step 2 — Destination */}
+      {/* Step 2 */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -400,7 +537,9 @@ export default function AccountMigration() {
         onClick={() => previewMutation.mutate()}
         data-testid="button-preview-migration"
       >
-        {previewMutation.isPending ? "Loading preview…" : "Preview migration"}
+        {previewMutation.isPending
+          ? "Loading preview…"
+          : `Preview migration${selectedAccountIds.length > 1 ? ` (${selectedAccountIds.length} accounts)` : ""}`}
       </Button>
 
       {/* Preview panel */}
@@ -411,9 +550,7 @@ export default function AccountMigration() {
               <FileText className="h-4 w-4" />
               Migration preview
             </CardTitle>
-            <CardDescription>
-              Review what will happen before executing
-            </CardDescription>
+            <CardDescription>Review what will happen before executing</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Route */}
@@ -431,95 +568,51 @@ export default function AccountMigration() {
               </div>
             </div>
 
-            {/* Account details */}
-            <div className="p-3 rounded-md border space-y-1">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">{preview.account.name}</span>
-                </div>
-                <Badge variant="secondary">{preview.account.accountType}</Badge>
-              </div>
-              <p className="text-xs text-muted-foreground font-mono">Code: {preview.account.code}</p>
-            </div>
-
-            {/* Stats grid */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Aggregate stats */}
+            <div className="grid grid-cols-3 gap-3">
               <div className="p-3 rounded-md bg-muted/40 space-y-0.5">
-                <p className="text-xs text-muted-foreground">Transaction entries</p>
-                <p className="text-lg font-semibold">{preview.entryCount.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Accounts</p>
+                <p className="text-lg font-semibold">{preview.accounts.length}</p>
               </div>
               <div className="p-3 rounded-md bg-muted/40 space-y-0.5">
-                <p className="text-xs text-muted-foreground">Vouchers touched</p>
-                <p className="text-lg font-semibold">{preview.touchedVoucherCount.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Total entries</p>
+                <p className="text-lg font-semibold">{preview.grandTotalEntries.toLocaleString()}</p>
               </div>
               <div className="p-3 rounded-md bg-muted/40 space-y-0.5">
-                <p className="text-xs text-muted-foreground">Total debits</p>
-                <p className="font-mono font-semibold text-sm">{fmt(preview.totalDebit)}</p>
-              </div>
-              <div className="p-3 rounded-md bg-muted/40 space-y-0.5">
-                <p className="text-xs text-muted-foreground">Total credits</p>
-                <p className="font-mono font-semibold text-sm">{fmt(preview.totalCredit)}</p>
+                <p className="text-xs text-muted-foreground">Net (Dr − Cr)</p>
+                <p className="font-mono font-semibold text-sm">{fmt(preview.grandTotalDebit - preview.grandTotalCredit)}</p>
               </div>
             </div>
 
-            {/* Opening balance */}
+            {/* Per-account breakdown */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium flex items-center gap-1.5">
+                <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
+                Per-account breakdown — click to expand
+              </p>
+              <div className="space-y-1.5">
+                {preview.accounts.map(item => (
+                  <AccountPreviewRow key={item.account.id} item={item} />
+                ))}
+              </div>
+            </div>
+
+            {/* Opening balance note */}
             <div className="flex items-start gap-2 p-3 rounded-md bg-muted/40">
               <Wallet className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-              <div className="text-sm space-y-0.5">
-                <p className="font-medium">Opening balance included</p>
-                {hasOB ? (
-                  <p className="text-muted-foreground">
-                    <span className="font-mono font-medium text-foreground">{fmt(obAmount)}</span>{" "}
-                    <span className="font-medium text-foreground">{preview.account.openingBalanceSide}</span>
-                    {" "}— will move to destination along with all transactions
-                  </p>
-                ) : (
-                  <p className="text-muted-foreground">No opening balance set — account starts at zero</p>
-                )}
-              </div>
+              <p className="text-sm text-muted-foreground">
+                Opening balances are included — they are stored on the account record and move automatically.
+              </p>
             </div>
 
-            {/* Voucher split */}
-            {preview.touchedVoucherCount > 0 && (
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium flex items-center gap-1.5">
-                  <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
-                  Voucher breakdown
-                </p>
-                <div className="text-sm text-muted-foreground space-y-1 pl-5">
-                  <p>
-                    <span className="font-medium text-foreground">{preview.exclusiveVoucherCount}</span>{" "}
-                    exclusive vouchers will move to destination company
-                  </p>
-                  {preview.sharedVoucherCount > 0 && (
-                    <p>
-                      <span className="font-medium text-foreground">{preview.sharedVoucherCount}</span>{" "}
-                      shared vouchers stay in source — entries still appear in account statement
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Code conflict warning */}
-            {preview.codeConflict && (
+            {/* Code conflict info */}
+            {hasConflicts && (
               <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
                 <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                 <div className="text-sm text-amber-800 dark:text-amber-300">
-                  <p className="font-medium">Account code conflict</p>
-                  <p>Code <span className="font-mono">{preview.account.code}</span> already exists in destination as <strong>"{preview.codeConflict.name}"</strong>. The migrated account will be renamed to <span className="font-mono">{preview.account.code}-MIGRATED</span>.</p>
+                  <p className="font-medium">Some account codes conflict</p>
+                  <p>Conflicting codes will be automatically renamed by adding <span className="font-mono">-MIGRATED</span> suffix. You can rename them manually afterwards.</p>
                 </div>
-              </div>
-            )}
-
-            {/* No entries info */}
-            {preview.entryCount === 0 && (
-              <div className="flex items-start gap-2 p-3 rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
-                <AlertTriangle className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
-                <p className="text-sm text-blue-800 dark:text-blue-300">
-                  This account has no transactions. Only the account record (including opening balance) will be moved.
-                </p>
               </div>
             )}
 
@@ -528,11 +621,58 @@ export default function AccountMigration() {
               onClick={() => setConfirmOpen(true)}
               data-testid="button-execute-migration"
             >
-              Move account to {preview.destCompany?.name}
+              Move {preview.accounts.length} account{preview.accounts.length === 1 ? "" : "s"} to {preview.destCompany?.name}
             </Button>
           </CardContent>
         </Card>
       )}
+
+      {/* Execute confirmation dialog */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Confirm account migration
+            </DialogTitle>
+            <DialogDescription>
+              This operation directly modifies the database. All {preview?.accounts.length} account{(preview?.accounts.length ?? 0) > 1 ? "s" : ""}, their opening balances, and full statement histories will be moved atomically.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="p-3 rounded-md bg-muted/50 text-sm space-y-1">
+              <p><span className="text-muted-foreground">From:</span> <strong>{preview?.srcCompany?.name}</strong></p>
+              <p><span className="text-muted-foreground">To:</span> <strong>{preview?.destCompany?.name}</strong></p>
+              <p><span className="text-muted-foreground">Accounts:</span> <strong>{preview?.accounts.length}</strong></p>
+              <p><span className="text-muted-foreground">Total entries:</span> <strong>{preview?.grandTotalEntries.toLocaleString()}</strong></p>
+              {hasConflicts && (
+                <p><span className="text-muted-foreground">Conflicts:</span> <strong>{preview?.accounts.filter(a => a.codeConflict).length} code{(preview?.accounts.filter(a => a.codeConflict).length ?? 0) > 1 ? "s" : ""} will be auto-renamed</strong></p>
+              )}
+            </div>
+            <div className="max-h-36 overflow-y-auto space-y-1">
+              {preview?.accounts.map(a => (
+                <div key={a.account.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-mono">{a.account.code}</span>
+                  <span className="truncate">{a.account.name}</span>
+                  <span className="shrink-0">({a.entryCount} entries)</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} data-testid="button-cancel-migration">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => executeMutation.mutate()}
+              disabled={executeMutation.isPending}
+              data-testid="button-confirm-migration"
+            >
+              {executeMutation.isPending ? "Migrating…" : "Yes, move accounts"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Undo confirmation dialog */}
       <Dialog open={undoConfirmOpen} onOpenChange={setUndoConfirmOpen}>
@@ -543,18 +683,26 @@ export default function AccountMigration() {
               Undo migration
             </DialogTitle>
             <DialogDescription>
-              This will move the account back to its original company. Any transactions posted to this account after the migration will still be visible in the statement.
+              This will move all {lastResult?.accounts.length} account{(lastResult?.accounts.length ?? 0) > 1 ? "s" : ""} back to the original company and restore their codes.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="p-3 rounded-md bg-muted/50 text-sm space-y-1">
-              <p><span className="text-muted-foreground">Account:</span> <strong>{lastResult?.accountName}</strong></p>
               <p><span className="text-muted-foreground">Moving back from:</span> <strong>{companies.find(c => c.id === lastResult?.destCompanyId)?.name}</strong></p>
               <p><span className="text-muted-foreground">Moving back to:</span> <strong>{companies.find(c => c.id === lastResult?.srcCompanyId)?.name}</strong></p>
+              <p><span className="text-muted-foreground">Accounts:</span> <strong>{lastResult?.accounts.length}</strong></p>
               <p><span className="text-muted-foreground">Vouchers to restore:</span> <strong>{lastResult?.movedVoucherCount}</strong></p>
-              {lastResult?.originalCode !== lastResult?.finalCode && (
-                <p><span className="text-muted-foreground">Code restored to:</span> <span className="font-mono font-medium">{lastResult?.originalCode}</span></p>
-              )}
+            </div>
+            <div className="max-h-36 overflow-y-auto space-y-1">
+              {lastResult?.accounts.map(a => (
+                <div key={a.accountId} className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {a.wasRenamed && (
+                    <span className="font-mono">{a.finalCode} → {a.originalCode}</span>
+                  )}
+                  {!a.wasRenamed && <span className="font-mono">{a.originalCode}</span>}
+                  <span className="truncate">{a.accountName}</span>
+                </div>
+              ))}
             </div>
           </div>
           <DialogFooter className="gap-2">
@@ -567,51 +715,7 @@ export default function AccountMigration() {
               disabled={undoMutation.isPending}
               data-testid="button-confirm-undo"
             >
-              {undoMutation.isPending ? "Undoing…" : "Yes, move it back"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Confirmation dialog */}
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Confirm account migration
-            </DialogTitle>
-            <DialogDescription>
-              This operation directly modifies the database and cannot be undone from this screen.
-              The account, its opening balance, and full statement history will be moved.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="p-3 rounded-md bg-muted/50 text-sm space-y-1">
-              <p><span className="text-muted-foreground">Account:</span> <strong>{preview?.account.name}</strong></p>
-              <p><span className="text-muted-foreground">From:</span> <strong>{preview?.srcCompany?.name}</strong></p>
-              <p><span className="text-muted-foreground">To:</span> <strong>{preview?.destCompany?.name}</strong></p>
-              <p><span className="text-muted-foreground">Opening balance:</span>{" "}
-                <strong>
-                  {hasOB
-                    ? `${fmt(obAmount)} ${preview?.account.openingBalanceSide}`
-                    : "None"}
-                </strong>
-              </p>
-              <p><span className="text-muted-foreground">Entries:</span> <strong>{preview?.entryCount.toLocaleString()}</strong></p>
-              <p><span className="text-muted-foreground">Vouchers moving:</span> <strong>{preview?.exclusiveVoucherCount.toLocaleString()}</strong></p>
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setConfirmOpen(false)} data-testid="button-cancel-migration">
-              Cancel
-            </Button>
-            <Button
-              onClick={() => executeMutation.mutate()}
-              disabled={executeMutation.isPending}
-              data-testid="button-confirm-migration"
-            >
-              {executeMutation.isPending ? "Migrating…" : "Yes, move account"}
+              {undoMutation.isPending ? "Undoing…" : "Yes, move back"}
             </Button>
           </DialogFooter>
         </DialogContent>
