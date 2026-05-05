@@ -1,4 +1,5 @@
   import { useState, useEffect, useRef } from "react";
+  import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
   import { useConnectivity } from "@/contexts/ConnectivityContext";
   import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
   import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
@@ -105,6 +106,7 @@ export function formatRelativeTime(ts: number): string {
   }
 
 export function OfflineSyncPanel() {
+  if (!OFFLINE_MODE_ENABLED) return null;
   const { isOnline, isSyncing, lastSyncedAt, pendingCount, failedCount, conflictCount, triggerSync, refreshCounts } = useConnectivity();
   const { toast } = useToast();
   const [logs, setLogs] = useState<any[]>([]);

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
 import {
   Download, CheckCircle2, XCircle, AlertCircle, Clock,
   WifiOff, RefreshCw, Shield, Package, ShoppingCart, Factory,
@@ -41,6 +42,7 @@ const PACK_ICONS: Record<string, React.ElementType> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function OfflinePrepPanel() {
+  if (!OFFLINE_MODE_ENABLED) return null;
   const { isOnline } = useConnectivity();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();

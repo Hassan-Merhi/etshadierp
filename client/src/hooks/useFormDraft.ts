@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
 import {
   saveDraft,
   loadDraft,
@@ -34,38 +35,39 @@ export function useFormDraft({
   debounceMs = 1500,
   enabled = true,
 }: UseFormDraftOptions): UseFormDraftReturn {
+  const effectiveEnabled = enabled && OFFLINE_MODE_ENABLED;
   const [draft, setDraft] = useState<DraftRecord | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestDataRef = useRef<unknown>(null);
 
   useEffect(() => {
-    if (!enabled || companyId === null) return;
+    if (!effectiveEnabled || companyId === null) return;
     let cancelled = false;
     loadDraft(entityType, mode, companyId, locationId).then((d) => {
       if (!cancelled) setDraft(d);
     });
     return () => { cancelled = true; };
-  }, [entityType, mode, companyId, locationId, enabled]);
+  }, [entityType, mode, companyId, locationId, effectiveEnabled]);
 
   const saveNow = useCallback(async (data: unknown) => {
-    if (!enabled || companyId === null) return;
+    if (!effectiveEnabled || companyId === null) return;
     setIsSaving(true);
     const label = `${entityType} draft`;
     await saveDraft(entityType, mode, data, label, companyId, locationId);
     const updated = await loadDraft(entityType, mode, companyId, locationId);
     setDraft(updated);
     setIsSaving(false);
-  }, [entityType, mode, companyId, locationId, enabled]);
+  }, [entityType, mode, companyId, locationId, effectiveEnabled]);
 
   const scheduleSave = useCallback((data: unknown) => {
-    if (!enabled || companyId === null) return;
+    if (!effectiveEnabled || companyId === null) return;
     latestDataRef.current = data;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       saveNow(latestDataRef.current);
     }, debounceMs);
-  }, [saveNow, debounceMs, enabled, companyId]);
+  }, [saveNow, debounceMs, effectiveEnabled, companyId]);
 
   const discardDraft = useCallback(async () => {
     if (draft?.id !== undefined) {
