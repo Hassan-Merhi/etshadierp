@@ -770,6 +770,46 @@ export function registerVoucherEntryRoutes(app: Express) {
             );
           }
 
+          // IMPORTANT: If this voucher is linked to a property payment entry,
+          // reverse the monthly ledger and delete the payment log row so the
+          // rent balance and payment history stay consistent.
+          const linkedPayments = await tx
+            .select()
+            .from(propertyPayments)
+            .where(eq(propertyPayments.voucherId, id));
+          for (const pmt of linkedPayments) {
+            if (pmt.ledgerRowId) {
+              await tx.execute(sql`
+                UPDATE property_monthly_ledger
+                SET paid_amount = GREATEST(0, paid_amount - ${pmt.amount}::numeric)
+                WHERE id = ${pmt.ledgerRowId}
+              `);
+            }
+            await tx.delete(propertyPayments).where(eq(propertyPayments.id, pmt.id));
+          }
+
+          // IMPORTANT: If this voucher is one side of an inter-company transfer,
+          // also delete the OTHER side's entries + voucher and the transfer record.
+          // Delete the transfer record FIRST to release the FK "restrict" constraints
+          // on fromVoucherId / toVoucherId before hard-deleting those voucher rows.
+          const linkedTransfersSingle = await tx
+            .select()
+            .from(interCompanyTransfers)
+            .where(or(
+              eq(interCompanyTransfers.fromVoucherId, id),
+              eq(interCompanyTransfers.toVoucherId, id),
+            ));
+          for (const transfer of linkedTransfersSingle) {
+            const otherVoucherId = transfer.fromVoucherId === id
+              ? transfer.toVoucherId
+              : transfer.fromVoucherId;
+            await tx.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, transfer.id));
+            if (otherVoucherId && otherVoucherId !== id) {
+              await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, otherVoucherId));
+              await tx.delete(vouchers).where(eq(vouchers.id, otherVoucherId));
+            }
+          }
+
           // Soft delete: Keep voucher entries but set deletedAt on voucher
           // This automatically excludes entries from balance calculations
           // (calculateAccountBalance filters by isNull(vouchers.deletedAt))
@@ -1020,11 +1060,13 @@ export function registerVoucherEntryRoutes(app: Express) {
               const otherVoucherId = transfer.fromVoucherId === id
                 ? transfer.toVoucherId
                 : transfer.fromVoucherId;
+              // Delete the transfer record FIRST to release FK "restrict" constraints
+              // on fromVoucherId / toVoucherId before hard-deleting those voucher rows.
+              await tx.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, transfer.id));
               if (otherVoucherId && otherVoucherId !== id) {
                 await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, otherVoucherId));
                 await tx.delete(vouchers).where(eq(vouchers.id, otherVoucherId));
               }
-              await tx.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, transfer.id));
             }
 
             // Soft delete: Set deletedAt instead of hard delete

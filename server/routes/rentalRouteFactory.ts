@@ -1251,15 +1251,19 @@ export function registerRentalRoutes(
           .where(eq(interCompanyTransfers.sourcePaymentId, paymentId));
 
         for (const transfer of linkedTransfers) {
-          if (transfer.fromVoucherId) {
-            await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, transfer.fromVoucherId));
-            await tx.delete(vouchers).where(eq(vouchers.id, transfer.fromVoucherId));
-          }
-          if (transfer.toVoucherId) {
-            await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, transfer.toVoucherId));
-            await tx.delete(vouchers).where(eq(vouchers.id, transfer.toVoucherId));
-          }
+          const fvid = transfer.fromVoucherId;
+          const tvid = transfer.toVoucherId;
+          // Delete the transfer record FIRST to release FK "restrict" constraints
+          // on fromVoucherId / toVoucherId before hard-deleting those voucher rows.
           await tx.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, transfer.id));
+          if (fvid) {
+            await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, fvid));
+            await tx.delete(vouchers).where(eq(vouchers.id, fvid));
+          }
+          if (tvid) {
+            await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, tvid));
+            await tx.delete(vouchers).where(eq(vouchers.id, tvid));
+          }
         }
 
         // 4. Delete the payment row itself
