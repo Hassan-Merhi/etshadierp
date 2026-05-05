@@ -8,12 +8,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
+import { Input } from "@/components/ui/input";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
+import {
   ArrowRight, Building2, BookOpen, AlertTriangle, CheckCircle, BarChart3, FileText,
+  ChevronsUpDown, Check, Wallet,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Company, LedgerAccount } from "@shared/schema";
 
 interface PreviewResult {
@@ -27,6 +36,8 @@ interface PreviewResult {
   exclusiveVoucherCount: number;
   sharedVoucherCount: number;
   codeConflict: { id: number; name: string } | null;
+  openingBalance: string;
+  openingBalanceSide: string;
 }
 
 interface ExecuteResult {
@@ -59,6 +70,70 @@ function CompanyBadge({ company }: { company?: Company }) {
     <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${typeColors[company.companyType] ?? typeColors.erp}`}>
       {label}
     </span>
+  );
+}
+
+interface AccountComboboxProps {
+  accounts: LedgerAccount[];
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}
+
+function AccountCombobox({ accounts, value, onChange, disabled }: AccountComboboxProps) {
+  const [open, setOpen] = useState(false);
+  const selected = accounts.find(a => String(a.id) === value);
+
+  return (
+    <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled}
+          className="w-full justify-between font-normal"
+          data-testid="select-account"
+        >
+          {selected ? (
+            <span className="flex items-center gap-2 truncate">
+              <span className="font-mono text-xs text-muted-foreground shrink-0">{selected.code}</span>
+              <span className="truncate">{selected.name}</span>
+              <Badge variant="secondary" className="text-xs shrink-0">{selected.accountType}</Badge>
+            </span>
+          ) : (
+            <span className="text-muted-foreground">Search account…</span>
+          )}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[520px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Type account name or code…" />
+          <CommandList className="max-h-72">
+            <CommandEmpty>No accounts found.</CommandEmpty>
+            <CommandGroup>
+              {[...accounts].sort((a, b) => a.name.localeCompare(b.name)).map(a => (
+                <CommandItem
+                  key={a.id}
+                  value={`${a.code} ${a.name} ${a.accountType}`}
+                  onSelect={() => {
+                    onChange(String(a.id));
+                    setOpen(false);
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Check className={cn("h-4 w-4 shrink-0", String(a.id) === value ? "opacity-100" : "opacity-0")} />
+                  <span className="font-mono text-xs text-muted-foreground w-20 shrink-0">{a.code}</span>
+                  <span className="flex-1 truncate">{a.name}</span>
+                  <Badge variant="secondary" className="text-xs shrink-0">{a.accountType}</Badge>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -95,9 +170,7 @@ export default function AccountMigration() {
       }
       return res.json() as Promise<PreviewResult>;
     },
-    onSuccess: (data) => {
-      setPreview(data);
-    },
+    onSuccess: (data) => setPreview(data),
     onError: (err: Error) => {
       if ((err as any)?._handledGlobally) return;
       toast({ title: "Preview failed", description: err.message, variant: "destructive" });
@@ -139,10 +212,11 @@ export default function AccountMigration() {
 
   const srcCompany = companies.find(c => c.id === parseInt(srcCompanyId));
   const destCompany = companies.find(c => c.id === parseInt(destCompanyId));
-  const selectedAccount = srcAccounts.find(a => a.id === parseInt(accountId));
 
   const canPreview = !!srcCompanyId && !!destCompanyId && !!accountId && srcCompanyId !== destCompanyId;
-  const sortedAccounts = [...srcAccounts].sort((a, b) => a.name.localeCompare(b.name));
+
+  const obAmount = parseFloat(preview?.account.openingBalance || "0");
+  const hasOB = obAmount !== 0;
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
@@ -209,27 +283,14 @@ export default function AccountMigration() {
           {srcCompanyId && (
             <div>
               <label className="text-sm font-medium mb-1.5 block">Account to move</label>
-              {loadingSrcAccounts ? <Skeleton className="h-9 w-full" /> : (
-                <Select
+              {loadingSrcAccounts ? (
+                <Skeleton className="h-9 w-full" />
+              ) : (
+                <AccountCombobox
+                  accounts={srcAccounts}
                   value={accountId}
-                  onValueChange={(v) => { setAccountId(v); setPreview(null); setLastResult(null); }}
-                  data-testid="select-account"
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select account…" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-72">
-                    {sortedAccounts.map(a => (
-                      <SelectItem key={a.id} value={String(a.id)}>
-                        <span className="flex items-center gap-2">
-                          <span className="font-mono text-xs text-muted-foreground">{a.code}</span>
-                          {a.name}
-                          <Badge variant="secondary" className="text-xs">{a.accountType}</Badge>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => { setAccountId(v); setPreview(null); setLastResult(null); }}
+                />
               )}
             </div>
           )}
@@ -341,6 +402,23 @@ export default function AccountMigration() {
               </div>
             </div>
 
+            {/* Opening balance */}
+            <div className="flex items-start gap-2 p-3 rounded-md bg-muted/40">
+              <Wallet className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="text-sm space-y-0.5">
+                <p className="font-medium">Opening balance included</p>
+                {hasOB ? (
+                  <p className="text-muted-foreground">
+                    <span className="font-mono font-medium text-foreground">{fmt(obAmount)}</span>{" "}
+                    <span className="font-medium text-foreground">{preview.account.openingBalanceSide}</span>
+                    {" "}— will move to destination along with all transactions
+                  </p>
+                ) : (
+                  <p className="text-muted-foreground">No opening balance set — account starts at zero</p>
+                )}
+              </div>
+            </div>
+
             {/* Voucher split */}
             {preview.touchedVoucherCount > 0 && (
               <div className="space-y-1.5">
@@ -379,7 +457,7 @@ export default function AccountMigration() {
               <div className="flex items-start gap-2 p-3 rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
                 <AlertTriangle className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
                 <p className="text-sm text-blue-800 dark:text-blue-300">
-                  This account has no transactions. Only the account record will be moved.
+                  This account has no transactions. Only the account record (including opening balance) will be moved.
                 </p>
               </div>
             )}
@@ -405,7 +483,7 @@ export default function AccountMigration() {
             </DialogTitle>
             <DialogDescription>
               This operation directly modifies the database and cannot be undone from this screen.
-              The account and its full statement history will be moved.
+              The account, its opening balance, and full statement history will be moved.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -413,6 +491,13 @@ export default function AccountMigration() {
               <p><span className="text-muted-foreground">Account:</span> <strong>{preview?.account.name}</strong></p>
               <p><span className="text-muted-foreground">From:</span> <strong>{preview?.srcCompany?.name}</strong></p>
               <p><span className="text-muted-foreground">To:</span> <strong>{preview?.destCompany?.name}</strong></p>
+              <p><span className="text-muted-foreground">Opening balance:</span>{" "}
+                <strong>
+                  {hasOB
+                    ? `${fmt(obAmount)} ${preview?.account.openingBalanceSide}`
+                    : "None"}
+                </strong>
+              </p>
               <p><span className="text-muted-foreground">Entries:</span> <strong>{preview?.entryCount.toLocaleString()}</strong></p>
               <p><span className="text-muted-foreground">Vouchers moving:</span> <strong>{preview?.exclusiveVoucherCount.toLocaleString()}</strong></p>
             </div>
