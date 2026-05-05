@@ -137,6 +137,7 @@ const FactoryFinancialSnapshot = lazy(() => import("@/pages/factory/FactoryFinan
 const DailyProductionReport = lazy(() => import("@/pages/factory/DailyProductionReport"));
 const CompanyDataReset = lazy(() => import("@/pages/CompanyDataReset"));
 const AccountMigration = lazy(() => import("@/pages/AccountMigration"));
+const AccountTransfer = lazy(() => import("@/pages/AccountTransfer"));
 const StockTransferOrder = lazy(() => import("@/pages/StockTransferOrder"));
 const StockTransfers = lazy(() => import("@/pages/StockTransfers"));
 const OptionalVouchers = lazy(() => import("@/pages/OptionalVouchers"));
@@ -357,6 +358,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/net-position-details" component={NetProfitDetails} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/company-data-reset" component={CompanyDataReset} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/account-migration" component={AccountMigration} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/account-transfer" component={AccountTransfer} />}
       <Route path="/my-settings" component={MySettings} />
       <Route component={NotFound} />
     </Switch>

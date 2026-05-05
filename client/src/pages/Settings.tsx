@@ -1406,6 +1406,25 @@ import { UsersSection } from "./settings/UsersSection";
                 </Link>
                 )}
 
+                <Link href="/account-transfer">
+                  <Card className="p-6 hover-elevate cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-indigo-500/10 rounded-lg">
+                          <ArrowLeftRight className="h-6 w-6 text-indigo-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="link-account-transfer">Account Transfer</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Move voucher entries from one ledger account to another in bulk
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </Card>
+                </Link>
+
                 <Link href={`${pfx}/company-data-reset`}>
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
