@@ -1264,7 +1264,7 @@ import { UsersSection } from "./settings/UsersSection";
               </div>
 
               {(() => {
-                const pfx = appMode === "factory" ? "/factory" : "";
+                const pfx = appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : "";
                 return (
               <div className="grid gap-4 md:grid-cols-2">
                 <Link href={`${pfx}/deleted-items`}>
@@ -1386,7 +1386,7 @@ import { UsersSection } from "./settings/UsersSection";
                 </Link>
 
                 {appMode !== "factory" && (
-                <Link href="/account-groups">
+                <Link href={`${pfx}/account-groups`}>
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
