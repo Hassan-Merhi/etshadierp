@@ -6,3 +6,9 @@ id = "ASSGPKgeprBnyyYRk5FZJ"
 uri = "file://properties_rental_mockup.xlsx"
 type = "table"
 title = "Properties Rental Page — Mockup & Plan"
+
+[[outputs]]
+id = "4INHHAaWJ9U-gyK0e2BNI"
+uri = "file://FACTORY_NAV_PERMISSION_AUDIT.md"
+type = "text"
+title = "Factory Nav & Permission Audit"
