@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Trash2, ScanLine, Plus, PackageCheck, MapPin, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/PageHeader";
@@ -81,14 +81,15 @@ interface OrderDetail {
 export default function FactoryInvoiceCreate() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
-  const [location, navigate] = useLocation();
+  const [, navigate] = useLocation();
+  const search = useSearch();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
 
   // Read ?orderId= from URL so "Continue Editing" on a reverted draft resumes correctly
+  // In wouter v3, useLocation() returns pathname only — query string comes from useSearch()
   const urlOrderId = (() => {
-    const qs = location.split("?")[1] ?? "";
-    const v = new URLSearchParams(qs).get("orderId");
+    const v = new URLSearchParams(search).get("orderId");
     return v ? parseInt(v) : null;
   })();
 
