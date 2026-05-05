@@ -179,8 +179,8 @@ import { UsersSection } from "./settings/UsersSection";
     });
 
     const { data: emptyAccounts = [], isLoading: isLoadingEmptyAccounts, refetch: refetchEmptyAccounts } = useQuery<any[]>({
-      queryKey: ["/api/ledger-accounts/empty"],
-      enabled: emptyAccountsOpen,
+      queryKey: ["/api/ledger-accounts/empty", selectedCompany?.id],
+      enabled: emptyAccountsOpen && !!selectedCompany?.id,
     });
 
     const bulkDeleteAccountsMutation = useMutation({
@@ -194,7 +194,7 @@ import { UsersSection } from "./settings/UsersSection";
       },
       onSuccess: (data) => {
         queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts/empty"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts/empty", selectedCompany?.id] });
         setEmptyAccountsSelected([]);
         toast({
           title: "Accounts deleted",
