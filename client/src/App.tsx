@@ -746,6 +746,7 @@ function AuthenticatedApp() {
                         <Route path="/properties/ledger-vouchers/:accountId/:year/:month" component={PropertiesLedgerVouchers} />
                         {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/settings" component={PropertiesSettings} />}
                         {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/net-position-details" component={NetProfitDetails} />}
+                        {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/balance-repair" component={BalanceRepair} />}
                         <Route path="/my-settings" component={MySettings} />
                         <Route><Redirect to="/properties/daybook" /></Route>
                       </Switch>
