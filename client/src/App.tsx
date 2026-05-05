@@ -127,6 +127,7 @@ const BarcodeManager = lazy(() => import("@/pages/BarcodeManager"));
 const TestDataImport = lazy(() => import("@/pages/TestDataImport"));
 const ImportCycleDiagnostics = lazy(() => import("@/pages/ImportCycleDiagnostics"));
 const InventoryRepair = lazy(() => import("@/pages/InventoryRepair"));
+const BalanceRepair = lazy(() => import("@/pages/BalanceRepair"));
 const NetProfitDetails = lazy(() => import("@/pages/NetProfitDetails"));
 const NetProfitReport = lazy(() => import("@/pages/NetProfitReport"));
 const FactoryNetProfitAnalytics = lazy(() => import("@/pages/factory/FactoryNetProfitAnalytics"));
@@ -352,6 +353,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/test-data-import" component={TestDataImport} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/import-cycle-diagnostics" component={ImportCycleDiagnostics} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/inventory-repair" component={InventoryRepair} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/balance-repair" component={BalanceRepair} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/net-position-details" component={NetProfitDetails} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/company-data-reset" component={CompanyDataReset} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/account-migration" component={AccountMigration} />}

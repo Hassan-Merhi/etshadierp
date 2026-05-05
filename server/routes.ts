@@ -39,6 +39,7 @@ import { registerFiscalTransferRoutes } from "./routes/fiscalTransferRoutes";
 import { registerReportsRoutes } from "./routes/reportsRoutes";
 import { registerBaleRoutes } from "./routes/baleRoutes";
 import { registerAdminRoutes } from "./routes/adminRoutes";
+import { registerBalanceRepairRoutes } from "./routes/balanceRepairRoutes";
 import { registerStockSummaryRoutes } from "./routes/stockSummaryRoutes";
 import { registerChatbotRoutes } from "./routes/chatbotRoutes";
 import { registerCreditNoteRoutes } from "./routes/creditNoteRoutes";
@@ -1645,6 +1646,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerReportsRoutes(app);
   registerBaleRoutes(app);
   registerAdminRoutes(app);
+  registerBalanceRepairRoutes(app);
   registerStockSummaryRoutes(app);
   registerChatbotRoutes(app);
   registerCreditNoteRoutes(app);

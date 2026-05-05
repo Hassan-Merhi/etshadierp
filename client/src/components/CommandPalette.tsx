@@ -164,6 +164,7 @@ const adminPages: PageEntry[] = [
   { label: "Deleted Items", description: "View and restore deleted records", path: "/deleted-items", icon: Trash2 },
   { label: "Orphaned Records", description: "Records with missing references", path: "/orphaned-records", icon: LinkIcon },
   { label: "Inventory Repair", description: "Fix inventory discrepancies", path: "/inventory-repair", icon: Wrench },
+  { label: "Balance Repair", description: "Repair drifted employee and rent ledger balances", path: "/balance-repair", icon: Wrench },
   { label: "Net Position Details", description: "Detailed net position breakdown (assets vs liabilities)", path: "/net-position-details", icon: PieChart },
   { label: "Import Cycle Diagnostics", description: "Diagnose import cycle issues", path: "/import-cycle-diagnostics", icon: AlertTriangle },
   { label: "Account Migration", description: "Move a ledger account with its full statement to another company", path: "/account-migration", icon: ArrowRight },
