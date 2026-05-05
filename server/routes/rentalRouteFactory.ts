@@ -184,6 +184,19 @@ async function ensureMonthlyLedgerRows(contractId: number) {
   const curMonth = now.getUTCMonth() + 1;
   const curDay = now.getUTCDate();
 
+  // If today is before the billing day, remove any unpaid current-month row that was
+  // created prematurely (e.g. by the old code or after a startDate edit).
+  if (curDay < billingDay) {
+    await db.delete(propertyMonthlyLedger).where(
+      and(
+        eq(propertyMonthlyLedger.contractId, contract.id),
+        eq(propertyMonthlyLedger.year, curYear),
+        eq(propertyMonthlyLedger.month, curMonth),
+        sql`${propertyMonthlyLedger.paidAmount} = '0'`,
+      )
+    );
+  }
+
   const periods: Array<{ year: number; month: number }> = [];
   let y = startYear, m = startMonth;
   // Include a period if it is a past month, OR if it is the current month AND today's
