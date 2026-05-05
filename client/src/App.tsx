@@ -683,7 +683,7 @@ function AuthenticatedApp() {
   const isPropertiesCompany = selectedCompany?.companyType === "properties";
   const isPropertiesRoute = currentLocation.startsWith("/properties/");
 
-  if (isPropertiesCompany && !isPropertiesRoute && currentLocation !== "/my-settings") {
+  if (isPropertiesCompany && !isPropertiesRoute && currentLocation !== "/my-settings" && currentLocation !== "/balance-repair") {
     return <Redirect to="/properties/daybook" />;
   }
 
