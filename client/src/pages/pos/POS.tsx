@@ -368,6 +368,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const printRef = useRef<HTMLDivElement>(null);
   const stockPrintRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const [lastAutosaved, setLastAutosaved] = useState<Date | null>(null);
+  const lastSavedFingerprintRef = useRef<string>("");
+  const autoSaveInProgressRef = useRef(false);
 
   // Callback ref so react-to-print gets notified when the invoice template mounts/unmounts
   const printCallbackRef = useCallback((el: HTMLDivElement | null) => {
@@ -930,6 +933,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     },
     onSuccess: (data) => {
       setCurrentDraftId(data.id);
+      setLastAutosaved(new Date());
+      const validItems = rows.filter(r => r.stockItemId && r.quantity > 0 && r.rate > 0);
+      lastSavedFingerprintRef.current = JSON.stringify({
+        items: validItems.map(r => ({ id: r.stockItemId, qty: r.quantity, rate: r.rate })),
+        notes, isCreditSale, paymentAccountType, paymentAccountId, selectedCustomerId,
+      });
       toast({
         title: "Draft Saved",
         description: "Your transaction has been saved as a draft",
@@ -945,6 +954,63 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       });
     },
   });
+
+  // Autosave effect — silently saves every 30 seconds when cart has items and has changed
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (!activeLocation) return;
+      if (autoSaveInProgressRef.current) return;
+      if (saveDraftMutation.isPending) return;
+
+      const validItems = rows.filter(r => r.stockItemId && r.quantity > 0 && r.rate > 0);
+      if (validItems.length === 0) return;
+
+      const fingerprint = JSON.stringify({
+        items: validItems.map(r => ({ id: r.stockItemId, qty: r.quantity, rate: r.rate })),
+        notes, isCreditSale, paymentAccountType, paymentAccountId, selectedCustomerId,
+      });
+      if (fingerprint === lastSavedFingerprintRef.current) return;
+
+      autoSaveInProgressRef.current = true;
+      try {
+        const draftData = {
+          locationId: activeLocation.id,
+          paymentAccountType: isCreditSale ? "credit" : paymentAccountType,
+          paymentAccountId: isCreditSale
+            ? (selectedCustomerId ? parseInt(selectedCustomerId) : null)
+            : (paymentAccountId ? parseInt(paymentAccountId) : null),
+          isCreditSale,
+          notes,
+          items: validItems.map(row => ({
+            stockItemId: row.stockItemId,
+            quantity: row.quantity.toString(),
+            rate: row.rate.toString(),
+            amount: row.amount.toString(),
+          })),
+        };
+
+        let data;
+        if (currentDraftId) {
+          const res = await apiRequest("PATCH", `/api/pos/drafts/${currentDraftId}`, draftData);
+          data = await res.json();
+        } else {
+          const res = await apiRequest("POST", "/api/pos/drafts", draftData);
+          data = await res.json();
+        }
+
+        if (data?.id) setCurrentDraftId(data.id);
+        lastSavedFingerprintRef.current = fingerprint;
+        setLastAutosaved(new Date());
+        refetchDrafts();
+      } catch {
+        // Silent — autosave failures don't show toasts
+      } finally {
+        autoSaveInProgressRef.current = false;
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [activeLocation, rows, notes, isCreditSale, paymentAccountType, paymentAccountId, selectedCustomerId, currentDraftId, saveDraftMutation.isPending]);
 
   // Load draft handler
   const handleLoadDraft = async (draftId: number) => {
@@ -1162,6 +1228,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     setShowPrintDialog(false);
     setStockWaStatus("idle");
     setPendingStockSend(false);
+    lastSavedFingerprintRef.current = "";
+    setLastAutosaved(null);
   };
 
   const getStockWarning = (row: SaleRow): string | null => {
@@ -1784,6 +1852,13 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 {saveDraftMutation.isPending ? "..." : currentDraftId ? <span className="hidden sm:inline">Update Draft</span> : <span className="hidden sm:inline">Save Draft</span>}
                 {!saveDraftMutation.isPending && <span className="sm:hidden">Draft</span>}
               </Button>
+              {lastAutosaved && (
+                <span className="text-xs text-muted-foreground hidden sm:inline whitespace-nowrap" data-testid="text-autosaved">
+                  Autosaved {Math.floor((Date.now() - lastAutosaved.getTime()) / 60000) < 1
+                    ? "just now"
+                    : `${Math.floor((Date.now() - lastAutosaved.getTime()) / 60000)}m ago`}
+                </span>
+              )}
             </>
           )}
           <DropdownMenu>
