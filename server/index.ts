@@ -2567,7 +2567,57 @@ let migrationsDone = false;
           WHERE voucher_id = ANY(bad_voucher_ids);
         END IF;
       END $$`,
+
+    // ── Factory Status Builder (experimental) ──────────────────────────────
+    `CREATE TABLE IF NOT EXISTS status_report_templates (
+      id         serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      name       text    NOT NULL DEFAULT 'Default Template',
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS srtemplate_company_idx ON status_report_templates(company_id)`,
+    `CREATE TABLE IF NOT EXISTS status_metrics (
+      id                 serial PRIMARY KEY,
+      template_id        integer NOT NULL,
+      name               text    NOT NULL,
+      before_source_type text    NOT NULL DEFAULT 'manual',
+      source_type        text    NOT NULL DEFAULT 'manual',
+      source_field       text    NOT NULL DEFAULT 'quantity',
+      operation          text    NOT NULL DEFAULT 'sum',
+      filters_json       jsonb            DEFAULT '{}',
+      sort_order         integer NOT NULL DEFAULT 0,
+      created_at         timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS smetric_template_idx ON status_metrics(template_id)`,
+    `CREATE TABLE IF NOT EXISTS status_report_runs (
+      id          serial PRIMARY KEY,
+      template_id integer     NOT NULL,
+      company_id  integer     NOT NULL,
+      run_date    varchar(10) NOT NULL,
+      created_at  timestamp NOT NULL DEFAULT now(),
+      updated_at  timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS srrun_unique    ON status_report_runs(template_id, run_date)`,
+    `CREATE        INDEX IF NOT EXISTS srrun_company_idx ON status_report_runs(company_id)`,
+    `CREATE TABLE IF NOT EXISTS status_metric_values (
+      id                serial PRIMARY KEY,
+      run_id            integer        NOT NULL,
+      metric_id         integer        NOT NULL,
+      before_value      numeric(20,4)  NOT NULL DEFAULT 0,
+      linked_value      numeric(20,4)  NOT NULL DEFAULT 0,
+      manual_adjustment numeric(20,4)  NOT NULL DEFAULT 0,
+      difference        numeric(20,4)  NOT NULL DEFAULT 0,
+      final_total       numeric(20,4)  NOT NULL DEFAULT 0,
+      warnings_json     jsonb          DEFAULT '[]',
+      last_refreshed    timestamp,
+      created_at        timestamp NOT NULL DEFAULT now(),
+      updated_at        timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS smvalue_unique  ON status_metric_values(run_id, metric_id)`,
+    `CREATE        INDEX IF NOT EXISTS smvalue_run_idx ON status_metric_values(run_id)`,
     ];
+
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
   app.get("/api/health/db", (_req, res) => {

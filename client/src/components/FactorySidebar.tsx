@@ -75,6 +75,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     items: [
       { title: "Production Analytics", url: "/factory/production-report", icon: BarChart3 },
       { title: "Factory Sheets",       url: "/factory/sheets",            icon: Table     },
+      { title: "New Status Builder",   url: "/factory/status-builder",    icon: Beaker, adminOnly: true },
     ],
   },
   {
