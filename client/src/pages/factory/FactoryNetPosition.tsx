@@ -20,6 +20,7 @@ import {
   EyeOff,
   Eye,
   RotateCcw,
+  ExternalLink,
 } from "lucide-react";
 
 interface BrokerBreakdownLine {
@@ -29,6 +30,7 @@ interface BrokerBreakdownLine {
 }
 
 interface AccountItem {
+  id?: number;
   name: string;
   code: string;
   value: number;
@@ -102,7 +104,18 @@ function SupplierRow({ acc, accentClass, index }: { acc: AccountItem; accentClas
                 {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
               </button>
             )}
-            <p className="font-medium truncate">{acc.name}</p>
+            {acc.id ? (
+              <button
+                type="button"
+                onClick={() => window.open(`/factory/ledger-monthly/${acc.id}`, "_blank")}
+                className="font-medium text-foreground hover:underline text-left flex items-center gap-1 min-w-0"
+              >
+                <span className="truncate">{acc.name}</span>
+                <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
+              </button>
+            ) : (
+              <p className="font-medium truncate">{acc.name}</p>
+            )}
           </div>
           {acc.code && acc.code !== "SUPPLIER" && acc.code !== "CUSTOMER_DR" && acc.code !== "CUSTOMER_CR" && (
             <p className="text-xs text-muted-foreground font-mono">{acc.code}</p>

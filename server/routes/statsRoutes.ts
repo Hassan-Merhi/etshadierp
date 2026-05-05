@@ -206,8 +206,8 @@ export function registerStatsRoutes(app: Express) {
       const expenseTypesArr = ["Expense", "Direct Expense", "Indirect Expense"];
       let expensesTotal = 0;
       let incomeTotal = 0;
-      const expensesAccounts: { name: string; code: string; value: number; category: string }[] = [];
-      const incomeAccounts: { name: string; code: string; value: number; category: string }[] = [];
+      const expensesAccounts: { id: number; name: string; code: string; value: number; category: string }[] = [];
+      const incomeAccounts: { id: number; name: string; code: string; value: number; category: string }[] = [];
 
       for (const acc of companyAccounts) {
         const netBalance = getAccountNetBalance(acc, accountBalances);
@@ -218,23 +218,23 @@ export function registerStatsRoutes(app: Express) {
           if (netBalance < 0) {
             incomeTotal += Math.abs(netBalance);
             categoryTotals["income_Sales/Revenue"] = (categoryTotals["income_Sales/Revenue"] || 0) + Math.abs(netBalance);
-            incomeAccounts.push({ name: acc.name, code: acc.code || "", value: Math.abs(netBalance), category: "Income" });
+            incomeAccounts.push({ id: acc.id, name: acc.name, code: acc.code || "", value: Math.abs(netBalance), category: "Income" });
           } else if (netBalance > 0) {
             incomeTotal -= netBalance;
             categoryTotals["income_Sales/Revenue"] = (categoryTotals["income_Sales/Revenue"] || 0) - netBalance;
-            incomeAccounts.push({ name: acc.name, code: acc.code || "", value: -netBalance, category: "Income (Refund)" });
+            incomeAccounts.push({ id: acc.id, name: acc.name, code: acc.code || "", value: -netBalance, category: "Income (Refund)" });
           }
         } else if (isAnyExpenseType && !excludedFromExpenses.has(acc.id)) {
           const category = acc.accountType || "Expense";
           if (netBalance > 0) {
             expensesTotal += netBalance;
             categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) + netBalance;
-            expensesAccounts.push({ name: acc.name, code: acc.code || "", value: netBalance, category });
+            expensesAccounts.push({ id: acc.id, name: acc.name, code: acc.code || "", value: netBalance, category });
           } else if (netBalance < 0) {
             const credit = Math.abs(netBalance);
             expensesTotal -= credit;
             categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) - credit;
-            expensesAccounts.push({ name: acc.name, code: acc.code || "", value: -credit, category: category + " (Refund)" });
+            expensesAccounts.push({ id: acc.id, name: acc.name, code: acc.code || "", value: -credit, category: category + " (Refund)" });
           }
         }
       }

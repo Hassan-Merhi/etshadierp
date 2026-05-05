@@ -22,10 +22,12 @@ import {
   Eye,
   EyeOff,
   RotateCcw,
+  ExternalLink,
 } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 interface AccountItem {
+  id?: number;
   name: string;
   code: string;
   value: number;
@@ -98,7 +100,18 @@ function CategoryGroup({
               className="flex items-center justify-between px-4 py-2 text-sm"
               data-testid={`row-account-${i}`}
             >
-              <span className="font-medium text-foreground">{acc.name}</span>
+              {acc.id ? (
+                <button
+                  type="button"
+                  onClick={() => window.open(`/factory/ledger-monthly/${acc.id}`, "_blank")}
+                  className="font-medium text-foreground hover:underline text-left flex items-center gap-1"
+                >
+                  {acc.name}
+                  <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
+                </button>
+              ) : (
+                <span className="font-medium text-foreground">{acc.name}</span>
+              )}
               <span className={`font-mono tabular-nums ${amountColor}`}>
                 {formatAmount(Math.abs(acc.value))}
               </span>
@@ -335,11 +348,20 @@ function CustomNetPositionView({ data, formatAmount }: { data: FactoryNetPositio
                   data-testid={`button-toggle-${key}`}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm hover-elevate transition-opacity ${hidden ? "opacity-40" : ""}`}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     {hidden
                       ? <EyeOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                       : <Eye className="h-3.5 w-3.5 text-green-500 shrink-0" />}
                     <span className={hidden ? "text-muted-foreground line-through" : "text-foreground"}>{a.name}</span>
+                    {a.id && (
+                      <span
+                        onClick={(e) => { e.stopPropagation(); window.open(`/factory/ledger-monthly/${a.id}`, "_blank"); }}
+                        className="text-muted-foreground hover:text-foreground shrink-0"
+                        data-testid={`link-ledger-forus-${a.id}`}
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </span>
+                    )}
                   </div>
                   <span className={`font-mono tabular-nums ${hidden ? "text-muted-foreground" : "text-green-600"}`}>
                     {formatAmount(Math.abs(a.value))}
@@ -372,11 +394,20 @@ function CustomNetPositionView({ data, formatAmount }: { data: FactoryNetPositio
                   data-testid={`button-toggle-${key}`}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm hover-elevate transition-opacity ${hidden ? "opacity-40" : ""}`}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     {hidden
                       ? <EyeOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                       : <Eye className="h-3.5 w-3.5 text-red-500 shrink-0" />}
                     <span className={hidden ? "text-muted-foreground line-through" : "text-foreground"}>{a.name}</span>
+                    {a.id && (
+                      <span
+                        onClick={(e) => { e.stopPropagation(); window.open(`/factory/ledger-monthly/${a.id}`, "_blank"); }}
+                        className="text-muted-foreground hover:text-foreground shrink-0"
+                        data-testid={`link-ledger-onus-${a.id}`}
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </span>
+                    )}
                   </div>
                   <span className={`font-mono tabular-nums ${hidden ? "text-muted-foreground" : "text-red-600"}`}>
                     {formatAmount(Math.abs(a.value))}

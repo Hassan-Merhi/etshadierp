@@ -27,11 +27,13 @@ import {
   X,
   Download,
   MessageSquare,
+  ExternalLink,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 interface AccountItem {
+  id?: number;
   name: string;
   code: string;
   value: number;
@@ -102,18 +104,34 @@ function CategoryGroup({
       </button>
       {open && (
         <div className="divide-y divide-border">
-          {accounts.map((acc, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between px-4 py-2 text-sm"
-              data-testid={`row-account-${i}`}
-            >
-              <span className="font-medium text-foreground">{acc.name}</span>
-              <span className={`font-mono tabular-nums ${amountColor(acc.value)}`}>
-                {amountPrefix(acc.value)}{formatAmount(Math.abs(acc.value))}
-              </span>
-            </div>
-          ))}
+          {accounts.map((acc, i) => {
+            const ledgerBase = window.location.pathname.startsWith("/properties")
+              ? "/properties/ledger-monthly"
+              : "/ledger-monthly";
+            return (
+              <div
+                key={i}
+                className="flex items-center justify-between px-4 py-2 text-sm"
+                data-testid={`row-account-${i}`}
+              >
+                {acc.id ? (
+                  <button
+                    type="button"
+                    onClick={() => window.open(`${ledgerBase}/${acc.id}`, "_blank")}
+                    className="font-medium text-foreground hover:underline text-left flex items-center gap-1"
+                  >
+                    {acc.name}
+                    <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
+                  </button>
+                ) : (
+                  <span className="font-medium text-foreground">{acc.name}</span>
+                )}
+                <span className={`font-mono tabular-nums ${amountColor(acc.value)}`}>
+                  {amountPrefix(acc.value)}{formatAmount(Math.abs(acc.value))}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
