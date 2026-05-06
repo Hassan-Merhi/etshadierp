@@ -1482,7 +1482,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       if (chargeVoucherIdsToDelete.length > 0) {
         await db.delete(voucherEntries).where(inArray(voucherEntries.voucherId, chargeVoucherIdsToDelete));
-        await db.delete(vouchers).where(inArray(vouchers.id, chargeVoucherIdsToDelete));
+        await db.update(vouchers).set({ deletedAt: new Date() }).where(inArray(vouchers.id, chargeVoucherIdsToDelete));
       }
 
       // Sync customerBalances ledger entry if the order is already finalized
@@ -2633,7 +2633,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
         if (linkedVoucherIds.length > 0) {
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, linkedVoucherIds));
-          await tx.delete(vouchers).where(inArray(vouchers.id, linkedVoucherIds));
+          await tx.update(vouchers).set({ deletedAt: new Date() }).where(inArray(vouchers.id, linkedVoucherIds));
           await tx.update(customerOrderCharges)
             .set({ voucherId: null })
             .where(and(eq(customerOrderCharges.orderId, orderId), sql`${customerOrderCharges.voucherId} IS NOT NULL`));
@@ -2650,7 +2650,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
             ));
           for (const cv of legacyChargeVouchers) {
             await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, cv.id));
-            await tx.delete(vouchers).where(eq(vouchers.id, cv.id));
+            await tx.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, cv.id));
           }
         }
 
