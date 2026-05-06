@@ -417,17 +417,18 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   // Keep autoSaveStateRef in sync so the interval can read latest values without
   // being in the dependency array (which would reset the 30-second timer on every keystroke).
-  autoSaveStateRef.current = {
-    activeLocation,
-    rows,
-    notes,
-    isCreditSale,
-    paymentAccountType,
-    paymentAccountId,
-    selectedCustomerId,
-    currentDraftId,
-    saveDraftIsPending: saveDraftMutation.isPending,
-  };
+  // NOTE: saveDraftIsPending is updated separately after saveDraftMutation is declared
+  // (further down) to avoid a Temporal Dead Zone crash that would prevent this
+  // entire assignment from running — which would keep currentDraftId stuck at null
+  // and cause every autosave to create a brand-new draft.
+  autoSaveStateRef.current.activeLocation = activeLocation;
+  autoSaveStateRef.current.rows = rows;
+  autoSaveStateRef.current.notes = notes;
+  autoSaveStateRef.current.isCreditSale = isCreditSale;
+  autoSaveStateRef.current.paymentAccountType = paymentAccountType;
+  autoSaveStateRef.current.paymentAccountId = paymentAccountId;
+  autoSaveStateRef.current.selectedCustomerId = selectedCustomerId;
+  autoSaveStateRef.current.currentDraftId = currentDraftId;
 
   // Reset sale state when POS user switches location
   const prevLocationRef = useRef<number | null>(null);
@@ -983,6 +984,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       });
     },
   });
+
+  // Update the remaining ref field now that saveDraftMutation is in scope.
+  autoSaveStateRef.current.saveDraftIsPending = saveDraftMutation.isPending;
 
   // Autosave effect — silently saves every 30 seconds when cart has items and has changed.
   // Reads all mutable state from autoSaveStateRef (updated every render) so this effect
