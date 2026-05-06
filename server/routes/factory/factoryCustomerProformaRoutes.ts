@@ -97,7 +97,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           eq(customerProformas.customerId, customerId),
           isNull(customerProformas.deletedAt),
         ))
-        .orderBy(desc(customerProformas.createdAt));
+        .orderBy(asc(customerProformas.name));
 
       const proformaIds = proformas.map((p: any) => p.id);
       let lines: any[] = [];

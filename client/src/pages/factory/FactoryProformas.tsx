@@ -550,7 +550,7 @@ export default function FactoryProformas() {
               </div>
             ) : null;
           })()}
-          {proformas.filter(p => p.isActive || showInactive).map((proforma) => {
+          {proformas.filter(p => p.isActive || showInactive).sort((a, b) => a.name.localeCompare(b.name)).map((proforma) => {
             const isExpanded = expandedProformaId === proforma.id;
             return (
               <Card key={proforma.id} data-testid={`card-proforma-${proforma.id}`}>
