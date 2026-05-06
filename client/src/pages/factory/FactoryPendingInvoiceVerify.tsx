@@ -478,11 +478,22 @@ export default function FactoryPendingInvoiceVerify() {
               return "";
             };
 
+            const statusSortOrder = (status: string | undefined) => {
+              if (status === "OVER_LOADED") return 0;
+              if (status === "UNDER_LOADED") return 1;
+              return 2; // MISSING_FROM_LOADED or unknown
+            };
+            const sortedProformaLines = [...filteredProformaLines].sort((a, b) => {
+              const sa = comparisonMap.get(a.articleCode)?.status;
+              const sb = comparisonMap.get(b.articleCode)?.status;
+              return statusSortOrder(sa) - statusSortOrder(sb);
+            });
+
             return (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div>
                   <h3 className="font-semibold text-sm mb-3" data-testid="text-proforma-header">Proforma Expected <span className="text-muted-foreground font-normal">(mismatches only)</span></h3>
-                  {filteredProformaLines.length > 0 ? (
+                  {sortedProformaLines.length > 0 ? (
                     <Table>
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
@@ -490,12 +501,15 @@ export default function FactoryPendingInvoiceVerify() {
                           <TableHead>Product</TableHead>
                           <TableHead className="text-right">Expected</TableHead>
                           <TableHead className="text-right">Loaded</TableHead>
+                          <TableHead className="text-right">Remaining</TableHead>
                           <TableHead>Status</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredProformaLines.map((line, i) => {
+                        {sortedProformaLines.map((line, i) => {
                           const cmp = comparisonMap.get(line.articleCode);
+                          const loaded = cmp?.loadedQty ?? 0;
+                          const remaining = line.expectedQty - loaded;
                           return (
                             <TableRow key={i} className={getProformaRowClass(line.articleCode)} data-testid={`row-proforma-${line.articleCode}`}>
                               <TableCell className="font-mono text-sm" data-testid={`text-proforma-article-${line.articleCode}`}>
@@ -503,7 +517,16 @@ export default function FactoryPendingInvoiceVerify() {
                               </TableCell>
                               <TableCell className="text-sm">{line.productName}</TableCell>
                               <TableCell className="text-right font-mono">{line.expectedQty}</TableCell>
-                              <TableCell className="text-right font-mono">{cmp?.loadedQty ?? 0}</TableCell>
+                              <TableCell className="text-right font-mono">{loaded}</TableCell>
+                              <TableCell className="text-right font-mono">
+                                {remaining > 0 ? (
+                                  <span className="text-red-600 dark:text-red-400 font-medium">{remaining}</span>
+                                ) : remaining < 0 ? (
+                                  <span className="text-green-600 dark:text-green-400 font-medium">+{Math.abs(remaining)}</span>
+                                ) : (
+                                  <span className="text-muted-foreground">0</span>
+                                )}
+                              </TableCell>
                               <TableCell>{cmp ? getStatusBadge(cmp.status) : null}</TableCell>
                             </TableRow>
                           );
