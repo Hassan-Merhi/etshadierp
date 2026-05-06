@@ -1036,27 +1036,35 @@ export function registerFactoryBaleExportRoutes(app: Express) {
 
       // ── Balance on table ──
       // "Balance on Table" is a CURRENT STATE metric: how much raw material has been mixed into
-      // active batches but not yet turned into finished bales.  We compute it directly from the
-      // active-batch remaining (totalWeightKg − usedKg for OPEN/ACTIVE/CARRY_FORWARD batches)
-      // so that it is immune to date-filter mismatches between mix-batch dates and bale
-      // stock-entry dates, and is never affected by carry-forward double counting.
-      const [activeBalRow] = await db
-        .select({
-          weightKg: sql<string>`COALESCE(SUM(${factoryMixBatches.totalWeightKg}::numeric - ${factoryMixBatches.usedKg}::numeric), 0)`,
-          valueCost: sql<string>`COALESCE(SUM(
-            ${factoryMixBatches.totalCost}::numeric
-            * (1 - ${factoryMixBatches.usedKg}::numeric / NULLIF(${factoryMixBatches.totalWeightKg}::numeric, 0))
-          ), 0)`,
-        })
-        .from(factoryMixBatches)
-        .where(and(
-          eq(factoryMixBatches.companyId, companyId),
-          sql`${factoryMixBatches.status} IN ('OPEN', 'ACTIVE', 'CARRY_FORWARD')`,
-        ));
+      // batches but not yet turned into finished bales.  We use the same formula as the Net
+      // Position page: allTimeMixKg − allTimeBaleKg.  This is more robust than tracking
+      // usedKg per-batch, which breaks when batches are marked COMPLETED prematurely.
+      const mixAllTimeResult = await db.execute(sql`
+        SELECT
+          COALESCE(SUM(total_weight_kg::numeric), 0) AS mix_kg,
+          COALESCE(SUM(total_cost::numeric),      0) AS mix_cost
+        FROM factory_mix_batches
+        WHERE company_id = ${companyId}
+      `);
+      const mixAllTimeRow = ((mixAllTimeResult as any).rows ?? (mixAllTimeResult as any))[0] ?? {};
+      const allTimeMixKg   = parseFloat(String(mixAllTimeRow.mix_kg   ?? "0")) || 0;
+      const allTimeMixCost = parseFloat(String(mixAllTimeRow.mix_cost  ?? "0")) || 0;
 
-      const blendedCostPerKg = totalMixWeightKg > 0 ? totalMixCost / totalMixWeightKg : 0;
-      const balanceWeightKg = parseFloat(activeBalRow?.weightKg || "0");
-      const balanceValue = parseFloat(activeBalRow?.valueCost || "0");
+      const baleAllTimeResult = await db.execute(sql`
+        SELECT COALESCE(SUM(b.weight_kg::numeric), 0) AS bale_kg
+        FROM   factory_bales        b
+        LEFT   JOIN factory_bale_products p ON p.id = b.product_id
+        LEFT   JOIN factory_categories    c ON c.id = p.category_id
+        WHERE  b.company_id = ${companyId}
+          AND  b.status NOT IN ('DELETED', 'REMOVED')
+      `);
+      const baleAllTimeRow = ((baleAllTimeResult as any).rows ?? (baleAllTimeResult as any))[0] ?? {};
+      const allTimeBaleKg  = parseFloat(String(baleAllTimeRow.bale_kg ?? "0")) || 0;
+
+      const allTimeBlendedCpk = allTimeMixKg > 0 ? allTimeMixCost / allTimeMixKg : 0;
+      const blendedCostPerKg  = totalMixWeightKg > 0 ? totalMixCost / totalMixWeightKg : 0;
+      const balanceWeightKg   = Math.max(0, allTimeMixKg - allTimeBaleKg);
+      const balanceValue      = Math.round(balanceWeightKg * allTimeBlendedCpk * 100) / 100;
 
       // ── STATUS = Production value − Batch cost ──
       const statusValue = totalProductionValue - totalMixCost;
