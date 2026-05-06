@@ -582,16 +582,6 @@ export default function FactoryProformas() {
                     </button>
                     <div className="flex items-center gap-1">
                       <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => { setCreateLoadingProforma(proforma); setCreateLoadingLocationId(""); }}
-                        data-testid={`button-create-loading-${proforma.id}`}
-                        title="Create pending loading from this proforma"
-                      >
-                        <Truck className="h-4 w-4 mr-1" />
-                        Create Loading
-                      </Button>
-                      <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => toggleActiveMutation.mutate({ id: proforma.id, isActive: !proforma.isActive })}
@@ -648,17 +638,6 @@ export default function FactoryProformas() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => {
-                              navigate(`/factory/location-inventory?editProformaId=${proforma.id}&editProformaName=${encodeURIComponent(proforma.name)}&editCustomerId=${proforma.customerId}`);
-                            }}
-                            data-testid={`button-edit-in-inventory-${proforma.id}`}
-                          >
-                            <LayoutGrid className="mr-1 h-3 w-3" />
-                            Edit in Inventory
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
                             onClick={() => navigate(`/factory/stock-allocation-v5?proformaId=${proforma.id}&openEdit=true`)}
                             data-testid={`button-open-stock-allocation-${proforma.id}`}
                           >
@@ -685,27 +664,6 @@ export default function FactoryProformas() {
                           >
                             <Download className="mr-1 h-3 w-3" />
                             PDF
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              navigate(`/factory/sales/proformas/${proforma.id}/add-line?customerId=${proforma.customerId}&proformaName=${encodeURIComponent(proforma.name)}`);
-                            }}
-                            data-testid={`button-add-line-${proforma.id}`}
-                          >
-                            <Plus className="mr-1 h-3 w-3" />
-                            Add Line
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => applyCatalogPricesMutation.mutate(proforma.id)}
-                            disabled={applyCatalogPricesMutation.isPending}
-                            data-testid={`button-apply-catalog-prices-${proforma.id}`}
-                          >
-                            <RefreshCw className="mr-1 h-3 w-3" />
-                            Apply Catalog Prices
                           </Button>
                         </div>
                       </div>
