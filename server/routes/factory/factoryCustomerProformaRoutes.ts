@@ -1017,7 +1017,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         prods.forEach((p: any) => { if (p.articleCode) { wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0")); nameMap.set(p.articleCode, p.name || ""); } });
       }
 
-      const { hideSelling: hideSellingExcel } = await getExportPriceVisibility(req);
+      const { hideProformaPrice: hideSellingExcel } = await getExportPriceVisibility(req);
 
       const baseCurrency = (company as any)?.baseCurrency || "USD";
       const currencySymbolMap: Record<string, string> = {
@@ -1163,7 +1163,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         prods.forEach((p: any) => { if (p.articleCode) { wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0")); nameMap.set(p.articleCode, p.name || ""); } });
       }
 
-      const { hideSelling: hideSellingPdf } = await getExportPriceVisibility(req);
+      const { hideProformaPrice: hideSellingPdf } = await getExportPriceVisibility(req);
 
       const baseCurrencyPdf = (company as any)?.baseCurrency || "USD";
       const currencySymbolMapPdf: Record<string, string> = {

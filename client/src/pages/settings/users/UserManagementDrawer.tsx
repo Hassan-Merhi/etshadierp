@@ -64,6 +64,7 @@ const FACTORY_COST_FIELDS = [
   { key: "bale_history_cost_per_kg", label: "Cost/KG Column" },
   { key: "bale_history_total_cost", label: "Total Cost Column" },
   { key: "bales_list_cost_per_kg", label: "Cost/kg Column" },
+  { key: "hide_proforma_price", label: "Price/Bale Column (Proformas)" },
 ];
 
 const FACTORY_TABS: { key: string; label: string; group: string }[] = [

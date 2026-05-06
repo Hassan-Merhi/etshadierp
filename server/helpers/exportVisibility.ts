@@ -5,17 +5,18 @@ import { eq } from "drizzle-orm";
 export interface ExportPriceVisibility {
   hideSelling: boolean;
   hideCost: boolean;
+  hideProformaPrice: boolean;
 }
 
 export async function getExportPriceVisibility(req: any): Promise<ExportPriceVisibility> {
   try {
     const userId = req.user?.id ? String(req.user.id) : null;
-    if (!userId) return { hideSelling: true, hideCost: true };
+    if (!userId) return { hideSelling: true, hideCost: true, hideProformaPrice: true };
 
     // Non-admin / non-owner users never see prices in exports
     const role: string = req.user?.role || "";
     if (role !== "Admin" && role !== "Owner" && role !== "Developer") {
-      return { hideSelling: true, hideCost: true };
+      return { hideSelling: true, hideCost: true, hideProformaPrice: true };
     }
 
     const [profile] = await db
@@ -28,8 +29,9 @@ export async function getExportPriceVisibility(req: any): Promise<ExportPriceVis
     return {
       hideSelling: fields.includes("hide_export_selling_price"),
       hideCost: fields.includes("hide_export_cost_price"),
+      hideProformaPrice: fields.includes("hide_proforma_price") || fields.includes("hide_export_selling_price"),
     };
   } catch {
-    return { hideSelling: false, hideCost: false };
+    return { hideSelling: false, hideCost: false, hideProformaPrice: false };
   }
 }

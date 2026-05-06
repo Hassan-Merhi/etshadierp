@@ -1195,6 +1195,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const ALL_COST_KEYS = [
         "inventory_avg_rate", "inventory_total_value", "inventory_sell_price", "inventory_sell_value",
         "bale_history_cost_per_kg", "bale_history_total_cost", "bales_list_cost_per_kg",
+        "hide_proforma_price",
       ];
       const hiddenCostFields = hideAllCosts ? ALL_COST_KEYS : (profile?.hiddenCostFields ?? []);
 

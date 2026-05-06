@@ -91,6 +91,11 @@ export default function FactoryProformas() {
 
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId) : null;
 
+  const { data: myAccess } = useQuery<{ fullAccess: boolean; hiddenCostFields: string[] }>({
+    queryKey: ["/api/factory/my-access"],
+  });
+  const hideProformaPrice = myAccess?.hiddenCostFields?.includes("hide_proforma_price") ?? false;
+
   const { data: customers = [], isLoading: customersLoading } = useQuery<Customer[]>({
     queryKey: ["/api/factory/customers"],
   });
@@ -702,7 +707,7 @@ export default function FactoryProformas() {
                                 <TableHead className="text-right">Qty</TableHead>
                                 <TableHead className="text-right">Kg/Bale</TableHead>
                                 <TableHead className="text-right">Total Kg</TableHead>
-                                <TableHead className="text-right">Price/Bale</TableHead>
+                                {!hideProformaPrice && <TableHead className="text-right">Price/Bale</TableHead>}
                                 <TableHead className="w-[80px]"></TableHead>
                               </TableRow>
                             </TableHeader>
@@ -753,9 +758,11 @@ export default function FactoryProformas() {
                                   <TableCell className="text-right font-mono text-sm text-muted-foreground" data-testid={`text-total-kg-${line.id}`}>
                                     {lineTotal > 0 ? (lineTotal % 1 === 0 ? lineTotal.toLocaleString() : lineTotal.toFixed(1)) : "—"}
                                   </TableCell>
-                                  <TableCell className="text-right font-mono" data-testid={`text-price-${line.id}`}>
-                                    {formatAmount(parseFloat(line.pricePerBale))}
-                                  </TableCell>
+                                  {!hideProformaPrice && (
+                                    <TableCell className="text-right font-mono" data-testid={`text-price-${line.id}`}>
+                                      {formatAmount(parseFloat(line.pricePerBale))}
+                                    </TableCell>
+                                  )}
                                   <TableCell>
                                     <div className="flex items-center gap-1">
                                       <Button
@@ -805,10 +812,12 @@ export default function FactoryProformas() {
                                   <span className="text-xs text-muted-foreground">Total Weight:</span>
                                   <span className="text-sm font-semibold" data-testid={`text-total-weight-${proforma.id}`}>{totalWeight.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg</span>
                                 </div>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-xs text-muted-foreground">Total Amount:</span>
-                                  <span className="text-sm font-semibold" data-testid={`text-total-amount-${proforma.id}`}>{formatAmount(totalAmount)}</span>
-                                </div>
+                                {!hideProformaPrice && (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-xs text-muted-foreground">Total Amount:</span>
+                                    <span className="text-sm font-semibold" data-testid={`text-total-amount-${proforma.id}`}>{formatAmount(totalAmount)}</span>
+                                  </div>
+                                )}
                               </div>
                             );
                           })()}
