@@ -1727,6 +1727,7 @@ export default function FactorySuppliers() {
                     status?: string; notes?: string | null; optional?: boolean; onDelete?: () => void; onEdit?: () => void;
                     nativeImpact: number;
                     rowCc: string; rowNativeAmt: number;
+                    conversionNote?: string | null;
                   }> = [
                     ...stmts.flatMap((e: any) => {
                       const rawVal = parseFloat(e.value || "0");
@@ -1795,6 +1796,19 @@ export default function FactorySuppliers() {
                       const amt = parseFloat(p.amount || "0");
                       const fxRate = parseFloat(p.fxRateToUsd || "1") || 1;
                       const dispAmt = cc !== "USD" ? `${cc} ${formatNum(String(amt.toFixed(2)))}` : `$${formatNum(String(amt.toFixed(2)))}`;
+                      const isCrossCurrency = cc !== primaryCc;
+                      const nativeAmt = toNative(amt, cc, fxRate);
+                      // For display: compute the conversion rate in a human-readable direction
+                      let conversionNote: string | null = null;
+                      if (isCrossCurrency && primaryCc !== "USD" && cc === "USD") {
+                        // USD payment → EUR supplier: 1 USD = (1/avgFxRate) EUR
+                        const rateDisplay = avgFxRate > 0 ? (1 / avgFxRate).toFixed(4) : "?";
+                        const nativeDisp = `${primaryCc} ${formatNum(String(nativeAmt.toFixed(2)))}`;
+                        conversionNote = `@ 1 USD = ${rateDisplay} ${primaryCc} → ${nativeDisp}`;
+                      } else if (isCrossCurrency) {
+                        const nativeDisp = primaryCc !== "USD" ? `${primaryCc} ${formatNum(String(nativeAmt.toFixed(2)))}` : `$${formatNum(String(nativeAmt.toFixed(2)))}`;
+                        conversionNote = `→ ${nativeDisp} in ${primaryCc}`;
+                      }
                       return {
                         key: `p-${p.id}`,
                         date: p.date,
@@ -1805,8 +1819,10 @@ export default function FactorySuppliers() {
                         amountIsNeg: false,
                         notes: p.notes,
                         onDelete: () => { wrapAdminAction(() => setPendingDelete(() => () => deletePaymentMutation.mutate(p.id)), "Delete Payment"); },
-                        nativeImpact: -toNative(amt, cc, fxRate),
-                        rowCc: cc, rowNativeAmt: -amt,
+                        nativeImpact: -nativeAmt,
+                        rowCc: isCrossCurrency ? primaryCc : cc,
+                        rowNativeAmt: isCrossCurrency ? -nativeAmt : -amt,
+                        conversionNote,
                       };
                     }),
                     ...(statementData.ledger || [])
@@ -1815,6 +1831,14 @@ export default function FactorySuppliers() {
                         const rawAmt = String(vp.amount || "0").replace(/[^0-9.]/g, "");
                         const usdAmt = parseFloat(rawAmt) || 0;
                         const isOptional = !!vp.optional;
+                        const vpNativeAmt = toNative(usdAmt, "USD");
+                        const vpIsCross = primaryCc !== "USD" && !isOptional;
+                        let vpConversionNote: string | null = null;
+                        if (vpIsCross) {
+                          const rateDisplay = avgFxRate > 0 ? (1 / avgFxRate).toFixed(4) : "?";
+                          const nativeDisp = `${primaryCc} ${formatNum(String(vpNativeAmt.toFixed(2)))}`;
+                          vpConversionNote = `@ 1 USD = ${rateDisplay} ${primaryCc} → ${nativeDisp}`;
+                        }
                         return {
                           key: vp.key,
                           date: vp.date,
@@ -1825,8 +1849,10 @@ export default function FactorySuppliers() {
                           amountIsNeg: !isOptional,
                           optional: isOptional,
                           notes: vp.notes || null,
-                          nativeImpact: isOptional ? 0 : -toNative(usdAmt, "USD"),
-                          rowCc: "USD", rowNativeAmt: isOptional ? 0 : -usdAmt,
+                          nativeImpact: isOptional ? 0 : -vpNativeAmt,
+                          rowCc: vpIsCross ? primaryCc : "USD",
+                          rowNativeAmt: isOptional ? 0 : (vpIsCross ? -vpNativeAmt : -usdAmt),
+                          conversionNote: vpConversionNote,
                         };
                       }),
                     ...(statementData.fxTransfers || []).map((t: any) => {
@@ -1945,8 +1971,18 @@ export default function FactorySuppliers() {
                               <TableCell className="whitespace-nowrap text-sm">{formatDate(row.date || "")}</TableCell>
                               <TableCell>{typeBadge(row.type)}</TableCell>
                               <TableCell className="text-sm font-medium">
-                                <span>{row.ref}</span>
-                                {row.status && <Badge variant={statusColor(row.status)} className="text-xs ml-1">{row.status}</Badge>}
+                                <div className="flex flex-col gap-0.5">
+                                  <div className="flex items-center gap-1 flex-wrap">
+                                    <span>{row.ref}</span>
+                                    {row.status && <Badge variant={statusColor(row.status)} className="text-xs ml-1">{row.status}</Badge>}
+                                  </div>
+                                  {row.conversionNote && (
+                                    <span className="text-xs text-blue-600 dark:text-blue-400 font-normal">{row.conversionNote}</span>
+                                  )}
+                                  {row.detail && (
+                                    <span className="text-xs text-muted-foreground font-normal">{row.detail}</span>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell className={`text-right text-sm tabular-nums font-medium ${row.optional ? "text-muted-foreground line-through" : row.type === "payment" ? "text-green-600 dark:text-green-400" : row.type === "purchase" || row.type === "freight" || row.type === "commission" ? "text-red-600 dark:text-red-400" : row.amountIsNeg ? "text-destructive" : ""}`}>
                                 {row.type !== "payment" && row.type !== "purchase" && row.type !== "freight" && row.type !== "commission" && row.amountIsNeg ? "−" : ""}{row.amount}
@@ -1977,7 +2013,7 @@ export default function FactorySuppliers() {
                           {Object.entries(currencyTotals).filter(([, v]) => v !== 0).map(([cc, total]) => (
                             <TableRow key={`total-${cc}`} className="border-t-2 bg-muted/30">
                               <TableCell colSpan={3} className="text-sm font-semibold text-muted-foreground">
-                                {cc} Total
+                                {cc} Net Balance
                               </TableCell>
                               <TableCell />
                               <TableCell className={`text-right text-sm tabular-nums font-bold ${total > 0 ? "text-red-600 dark:text-red-400" : total < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
@@ -1988,6 +2024,17 @@ export default function FactorySuppliers() {
                           ))}
                         </TableBody>
                       </Table>
+                      {/* Overpayment callout — shown when any currency bucket is negative (paid more than owed) */}
+                      {Object.entries(currencyTotals).some(([, v]) => v < -0.005) && (
+                        <div className="mt-3 rounded-md border border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 flex flex-col gap-1">
+                          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Overpayment detected</p>
+                          {Object.entries(currencyTotals).filter(([, v]) => v < -0.005).map(([cc, total]) => (
+                            <p key={cc} className="text-sm text-amber-700 dark:text-amber-300 tabular-nums">
+                              {fmtCcAmt(cc, Math.abs(total))} {cc} overpaid (excess credit on account)
+                            </p>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
