@@ -8,7 +8,7 @@ import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { Badge } from "@/components/ui/badge";
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import * as XLSX from "@/lib/excelHelper";
 import { PageHeader } from "@/components/PageHeader";
 import {
@@ -699,6 +699,30 @@ export default function FactoryContainerLoadingScan() {
     0,
   );
 
+  // Stock count query — fetches IN_STOCK bale counts per article code for proforma lines
+  const proformaArticleCodesForStock = useMemo(
+    () => {
+      if (!orderDetail?.proformaIdUsed) return [];
+      const pf = proformas.find((p) => p.id === orderDetail.proformaIdUsed) || proformas.find((p) => p.isActive);
+      return pf?.lines.map((l: any) => l.articleCode).filter(Boolean) || [];
+    },
+    [orderDetail?.proformaIdUsed, proformas],
+  );
+  const { data: stockCounts = {} } = useQuery<Record<string, number>>({
+    queryKey: ["/api/factory/bale-stock-count", proformaArticleCodesForStock.join(",")],
+    queryFn: async () => {
+      if (proformaArticleCodesForStock.length === 0) return {};
+      const res = await fetch(
+        `/api/factory/bale-stock-count?articleCodes=${proformaArticleCodesForStock.join(",")}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) return {};
+      return res.json();
+    },
+    enabled: proformaArticleCodesForStock.length > 0,
+    refetchInterval: 30000,
+  });
+
   // Linked proforma logic
   const linkedProforma = orderDetail?.proformaIdUsed
     ? proformas.find((p) => p.id === orderDetail.proformaIdUsed)
@@ -1217,6 +1241,7 @@ export default function FactoryContainerLoadingScan() {
                         Loaded
                       </TableHead>
                       <TableHead className="text-xs text-right">Rem</TableHead>
+                      <TableHead className="text-xs text-right">Stock</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1294,6 +1319,19 @@ export default function FactoryContainerLoadingScan() {
                             </span>
                           )}
                         </TableCell>
+                        <TableCell className="text-xs text-right font-mono py-1.5" data-testid={`text-stock-${line.articleCode}`}>
+                          {(() => {
+                            const inStock = stockCounts[line.articleCode] ?? null;
+                            if (inStock === null) return <span className="text-muted-foreground">—</span>;
+                            const needsMore = line.status === "short" || line.status === "none";
+                            const shortage = needsMore && inStock < line.remaining;
+                            return (
+                              <span className={shortage ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-muted-foreground"}>
+                                {inStock}
+                              </span>
+                            );
+                          })()}
+                        </TableCell>
                       </TableRow>
                     ))}
                     {extraArticles.map((code) => (
@@ -1324,6 +1362,7 @@ export default function FactoryContainerLoadingScan() {
                             !
                           </Badge>
                         </TableCell>
+                        <TableCell />
                       </TableRow>
                     ))}
                   </TableBody>

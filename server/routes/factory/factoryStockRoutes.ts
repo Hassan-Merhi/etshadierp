@@ -1609,6 +1609,39 @@ export function registerFactoryStockRoutes(app: Express) {
     }
   });
 
+  // GET /api/factory/bale-stock-count?articleCodes=HMD123,HMD456
+  // Returns { HMD123: 4, HMD456: 0, ... } — IN_STOCK bale counts per article code
+  app.get("/api/factory/bale-stock-count", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rawCodes = (req.query.articleCodes as string) || "";
+      const articleCodes = rawCodes.split(",").map((s) => s.trim()).filter(Boolean);
+      if (articleCodes.length === 0) return res.json({});
+
+      const rows = await db
+        .select({ articleCode: factoryBales.articleCode, count: sql<number>`COUNT(*)::int` })
+        .from(factoryBales)
+        .where(and(
+          eq(factoryBales.companyId, companyId),
+          eq(factoryBales.status, "IN_STOCK"),
+          isNull(factoryBales.deletedAt),
+          inArray(factoryBales.articleCode, articleCodes),
+        ))
+        .groupBy(factoryBales.articleCode);
+
+      const result: Record<string, number> = {};
+      articleCodes.forEach((c) => { result[c] = 0; });
+      rows.forEach((r) => { if (r.articleCode) result[r.articleCode] = r.count; });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching bale stock count:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ───────────────────────────────────────────────
   // 1. Factory Suppliers CRUD
   // ───────────────────────────────────────────────
