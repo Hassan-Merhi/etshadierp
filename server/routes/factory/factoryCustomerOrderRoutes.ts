@@ -54,6 +54,15 @@ import path from "path";
 import fs from "fs";
 
 
+function buildExportFilename(parts: (string | null | undefined)[], ext: string): string {
+  const safe = parts
+    .filter((p): p is string => Boolean(p && p.trim()))
+    .map((p) => p.replace(/[\\/*?:[\]<>|]/g, "").replace(/\s+/g, "_").trim())
+    .filter((p) => p.length > 0);
+  const base = safe.join("_") || "export";
+  return ext ? `${base}.${ext}` : base;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helper: build the Commercial Invoice Excel workbook for an order and
 // return it as a Buffer so it can be streamed to a browser download OR sent
@@ -75,6 +84,7 @@ async function buildOrderExcelBuffer(
       otherChargesTotal: customerOrders.otherChargesTotal,
       grandTotal: customerOrders.grandTotal,
       containerNumber: customerOrders.containerNumber,
+      destination: customerOrders.destination,
       customerName: customers.legalName,
     })
     .from(customerOrders)
@@ -287,7 +297,7 @@ async function buildOrderExcelBuffer(
   }
 
   const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
-  const fileName = `invoice_${invoiceNum.replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`;
+  const fileName = buildExportFilename([order.containerNumber, order.customerName, order.destination], "xlsx");
   return { buffer, fileName };
 }
 
@@ -2650,8 +2660,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         });
       }
 
-      const dateStr = getClientDate(req);
-      const fileName = `invoice_${invoiceNum.replace(/[^a-zA-Z0-9]/g, "_")}_${dateStr}.xlsx`;
+      const fileName = buildExportFilename([order.containerNumber, customer?.legalName, order.destination], "xlsx");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
       await workbook.xlsx.write(res);
@@ -3385,6 +3394,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           grandTotal: customerOrders.grandTotal,
           totalQtyBales: customerOrders.totalQtyBales,
           containerNumber: customerOrders.containerNumber,
+          destination: customerOrders.destination,
           customerName: customers.legalName,
           customerCode: customers.code,
         })
@@ -3612,8 +3622,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         });
       } // end if (!hideSellingXls2)
 
-      const dateStr = getClientDate(req);
-      const fileName = `invoice_${invoiceNum.replace(/[^a-zA-Z0-9]/g, "_")}_${dateStr}.xlsx`;
+      const fileName = buildExportFilename([order.containerNumber, order.customerName, order.destination], "xlsx");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
       await workbook.xlsx.write(res);
