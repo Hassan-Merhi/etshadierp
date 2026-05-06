@@ -62,6 +62,7 @@ interface StatusBuilderSheet {
   rows: SheetRow[];
   lockedColumns: number[];
   dirty: boolean;
+  footerMode: "diff" | "total";
 }
 
 interface ApiSheet {
@@ -124,6 +125,7 @@ function fromApiSheet(s: ApiSheet): StatusBuilderSheet {
     rows,
     lockedColumns: [],
     dirty: false,
+    footerMode: "diff",
   };
 }
 
@@ -218,6 +220,21 @@ function calcDiff(sheets: StatusBuilderSheet[], sheet: StatusBuilderSheet): (num
   for (let c = 0; c < colCount; c++) {
     if (isDiffColumn(colLabels[c])) {
       totals[c] = computeDiffValue(colLabels, totals, c);
+    }
+  }
+  return totals;
+}
+
+function calcTotal(sheets: StatusBuilderSheet[], sheet: StatusBuilderSheet): (number | null)[] {
+  const colLabels = sheet.columns.map((c) => c.label);
+  const colCount = sheet.columns.length;
+  const totals: (number | null)[] = Array(colCount).fill(null);
+  for (const row of sheet.rows) {
+    for (let c = 0; c < colCount; c++) {
+      if (isDiffColumn(colLabels[c])) continue;
+      const cell = row.cells[c] ?? { value: null };
+      const eff = getEffectiveValue(sheets, cell);
+      if (typeof eff === "number") totals[c] = (totals[c] ?? 0) + eff;
     }
   }
   return totals;
@@ -771,7 +788,18 @@ export default function FactoryStatusBuilder() {
     );
   }
 
-  const diffRow = activeSheet ? calcDiff(localSheets, activeSheet) : [];
+  const diffRow  = activeSheet ? calcDiff(localSheets, activeSheet) : [];
+  const totalRow = activeSheet ? calcTotal(localSheets, activeSheet) : [];
+  const footerMode = activeSheet?.footerMode ?? "diff";
+  const footerRow = footerMode === "total" ? totalRow : diffRow;
+
+  const toggleFooterMode = () => {
+    setLocalSheets((prev) => {
+      const next = [...prev];
+      next[activeIdx] = { ...next[activeIdx], footerMode: next[activeIdx].footerMode === "diff" ? "total" : "diff" };
+      return next;
+    });
+  };
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -1087,19 +1115,31 @@ export default function FactoryStatusBuilder() {
                   <td className="border border-border" />
                 </tr>
 
-                {/* Difference row */}
+                {/* Footer row — toggleable between DIFFERENCE and TOTAL */}
                 {activeSheet.rows.length > 0 && (
                   <tr className="bg-muted/40">
-                    <td className="border border-border px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                      DIFFERENCE
+                    <td className="border border-border px-2 py-1.5">
+                      <button
+                        onClick={toggleFooterMode}
+                        className="flex items-center gap-1.5 group w-full"
+                        title="Click to switch between Difference and Total"
+                        data-testid="sb-button-toggle-footer"
+                      >
+                        <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+                          {footerMode === "diff" ? "DIFFERENCE" : "TOTAL"}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground/50 group-hover:text-muted-foreground transition-colors">
+                          ↕
+                        </span>
+                      </button>
                     </td>
-                    {diffRow.map((val, ci) => {
+                    {footerRow.map((val, ci) => {
                       const isNeg = typeof val === "number" && val < 0;
                       return (
                         <td
                           key={ci}
                           className="border border-border px-2 py-1.5 text-xs font-semibold text-center tabular-nums"
-                          data-testid={`sb-diff-cell-${ci}`}
+                          data-testid={`sb-footer-cell-${ci}`}
                         >
                           <span className={isNeg ? "text-red-500" : "text-foreground"}>
                             {fmt(val)}
