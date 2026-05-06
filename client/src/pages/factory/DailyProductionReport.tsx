@@ -856,6 +856,7 @@ export default function DailyProductionReport() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 overflow-hidden">
         <TabsList className="mx-4 mt-3 mb-0 flex-shrink-0 w-fit" data-testid="tabs-production-analytics">
           <TabsTrigger value="production" data-testid="tab-production">Production</TabsTrigger>
+          <TabsTrigger value="balestock" data-testid="tab-balestock">Bale Stock</TabsTrigger>
           <TabsTrigger value="ledger" data-testid="tab-ledger">Bale Ledger</TabsTrigger>
         </TabsList>
 
@@ -1268,6 +1269,102 @@ export default function DailyProductionReport() {
           </div>
         )}
       </ExpandableCard>
+        </TabsContent>
+
+        {/* ── Bale Stock tab ── */}
+        <TabsContent value="balestock" className="flex-1 overflow-y-auto p-4 gap-3 flex flex-col mt-0 data-[state=inactive]:hidden">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-sm text-muted-foreground">Remaining stock in hand — bales currently available by product</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => ledgerRefetch()} disabled={ledgerFetching} data-testid="button-refresh-balestock" className="gap-2">
+              <RefreshCw className={`w-4 h-4 ${ledgerFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
+
+          {/* KPI summary row */}
+          {!ledgerLoading && ledger && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Card>
+                <CardContent className="p-4 flex items-start gap-3">
+                  <div className="p-2 rounded-md bg-muted shrink-0 text-green-600">
+                    <Package className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">In Hand (Regular)</p>
+                    <p className="text-xl font-bold font-mono mt-0.5">{fmtL(ledger.totals.currentStock.totalWeightKg)} kg</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{fmtNL(ledger.totals.currentStock.baleCount)} bales</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 flex items-start gap-3">
+                  <div className="p-2 rounded-md bg-muted shrink-0 text-amber-500">
+                    <AlertTriangle className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">In Hand (Wipers / Garbage)</p>
+                    <p className="text-xl font-bold font-mono mt-0.5">{fmtL(ledger.totals.wasteStock.totalWeightKg)} kg</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{fmtNL(ledger.totals.wasteStock.baleCount)} bales</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 flex items-start gap-3">
+                  <div className="p-2 rounded-md bg-muted shrink-0 text-purple-500">
+                    <Truck className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">Pending Loading / Verified</p>
+                    <p className="text-xl font-bold font-mono mt-0.5">{fmtL(ledger.totals.pendingLoading.totalWeightKg)} kg</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{fmtNL(ledger.totals.pendingLoading.baleCount)} bales</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {ledgerLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Card key={i}>
+                  <CardHeader className="py-3 px-4">
+                    <Skeleton className="h-5 w-64" />
+                    <Skeleton className="h-3 w-48 mt-1" />
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <>
+              <LedgerSection
+                title="In Hand — Regular"
+                subtitle="Bales in stock (IN_STOCK / FINALIZED), excluding wipers and garbages"
+                icon={<Package className="w-4 h-4 text-green-600" />}
+                badgeColor="text-green-700 border-green-200"
+                rows={ledger?.currentStock || []}
+                total={ledger?.totals.currentStock || { baleCount: 0, totalWeightKg: 0, totalCost: 0 }}
+                defaultOpen
+              />
+              <LedgerSection
+                title="In Hand — Wipers & Garbages"
+                subtitle="Waste-category bales currently in stock (IN_STOCK / FINALIZED)"
+                icon={<AlertTriangle className="w-4 h-4 text-amber-500" />}
+                badgeColor="text-amber-700 border-amber-200"
+                rows={ledger?.wasteStock || []}
+                total={ledger?.totals.wasteStock || { baleCount: 0, totalWeightKg: 0, totalCost: 0 }}
+              />
+              <LedgerSection
+                title="Pending Loading / Verified"
+                subtitle="Bales reserved for orders currently in Loading, Pending Verification, or Verified status"
+                icon={<Truck className="w-4 h-4 text-purple-500" />}
+                badgeColor="text-purple-700 border-purple-200"
+                rows={ledger?.pendingLoading || []}
+                total={ledger?.totals.pendingLoading || { baleCount: 0, totalWeightKg: 0, totalCost: 0 }}
+              />
+            </>
+          )}
         </TabsContent>
 
         {/* ── Bale Ledger tab ── */}
