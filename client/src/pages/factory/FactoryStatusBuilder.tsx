@@ -188,6 +188,11 @@ function isDiffColumn(label: string): boolean {
   return l === "DIFF" || l === "DIFFERENCE" || l === "فرق";
 }
 
+function isTotalColumn(label: string): boolean {
+  const l = label.trim().toUpperCase();
+  return l === "TOTAL" || l === "TOTALE" || l === "ИТОГО" || l === "مجموع";
+}
+
 function computeDiffValue(
   colLabels: string[],
   resolvedVals: (number | null)[],
@@ -204,21 +209,39 @@ function computeDiffValue(
   return a - b;
 }
 
+// Sum of all base (non-total, non-diff) columns in the same resolved-values array
+function computeTotalValue(
+  colLabels: string[],
+  resolvedVals: (number | null)[],
+): number | null {
+  let sum: number | null = null;
+  for (let i = 0; i < colLabels.length; i++) {
+    if (isDiffColumn(colLabels[i]) || isTotalColumn(colLabels[i])) continue;
+    const v = resolvedVals[i];
+    if (typeof v === "number") sum = (sum ?? 0) + v;
+  }
+  return sum;
+}
+
 function calcDiff(sheets: StatusBuilderSheet[], sheet: StatusBuilderSheet): (number | null)[] {
   const colLabels = sheet.columns.map((c) => c.label);
   const colCount = sheet.columns.length;
   const totals: (number | null)[] = Array(colCount).fill(null);
 
+  // First pass: sum base columns
   for (const row of sheet.rows) {
     for (let c = 0; c < colCount; c++) {
-      if (isDiffColumn(colLabels[c])) continue;
+      if (isDiffColumn(colLabels[c]) || isTotalColumn(colLabels[c])) continue;
       const cell = row.cells[c] ?? { value: null };
       const eff = getEffectiveValue(sheets, cell);
       if (typeof eff === "number") totals[c] = (totals[c] ?? 0) + eff;
     }
   }
+  // Second pass: compute derived columns
   for (let c = 0; c < colCount; c++) {
-    if (isDiffColumn(colLabels[c])) {
+    if (isTotalColumn(colLabels[c])) {
+      totals[c] = computeTotalValue(colLabels, totals);
+    } else if (isDiffColumn(colLabels[c])) {
       totals[c] = computeDiffValue(colLabels, totals, c);
     }
   }
@@ -231,10 +254,16 @@ function calcTotal(sheets: StatusBuilderSheet[], sheet: StatusBuilderSheet): (nu
   const totals: (number | null)[] = Array(colCount).fill(null);
   for (const row of sheet.rows) {
     for (let c = 0; c < colCount; c++) {
-      if (isDiffColumn(colLabels[c])) continue;
+      if (isDiffColumn(colLabels[c]) || isTotalColumn(colLabels[c])) continue;
       const cell = row.cells[c] ?? { value: null };
       const eff = getEffectiveValue(sheets, cell);
       if (typeof eff === "number") totals[c] = (totals[c] ?? 0) + eff;
+    }
+  }
+  // Compute derived columns for the total row
+  for (let c = 0; c < colCount; c++) {
+    if (isTotalColumn(colLabels[c])) {
+      totals[c] = computeTotalValue(colLabels, totals);
     }
   }
   return totals;
@@ -790,16 +819,6 @@ export default function FactoryStatusBuilder() {
 
   const diffRow  = activeSheet ? calcDiff(localSheets, activeSheet) : [];
   const totalRow = activeSheet ? calcTotal(localSheets, activeSheet) : [];
-  const footerMode = activeSheet?.footerMode ?? "diff";
-  const footerRow = footerMode === "total" ? totalRow : diffRow;
-
-  const toggleFooterMode = () => {
-    setLocalSheets((prev) => {
-      const next = [...prev];
-      next[activeIdx] = { ...next[activeIdx], footerMode: next[activeIdx].footerMode === "diff" ? "total" : "diff" };
-      return next;
-    });
-  };
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -956,18 +975,21 @@ export default function FactoryStatusBuilder() {
                       const cell = row.cells[ci] ?? { value: null };
                       const isLinked = !!cell.link;
 
+                      const isTotal = isTotalColumn(col.label);
                       let displayValue: CellValue | "#REF!" | "#CYCLE!";
                       let isBroken = false;
                       let isCyclic = false;
 
-                      if (isDiff) {
+                      if (isDiff || isTotal) {
                         const colLabels = activeSheet.columns.map((c) => c.label);
                         const rowResolvedVals: (number | null)[] = activeSheet.columns.map((_, idx) => {
                           const c = row.cells[idx] ?? { value: null };
                           const eff = getEffectiveValue(localSheets, c);
                           return typeof eff === "number" ? eff : null;
                         });
-                        displayValue = computeDiffValue(colLabels, rowResolvedVals, ci);
+                        displayValue = isDiff
+                          ? computeDiffValue(colLabels, rowResolvedVals, ci)
+                          : computeTotalValue(colLabels, rowResolvedVals);
                       } else if (isLinked) {
                         const res = resolveCellValue(localSheets, cell.link!.sourceSheetId, cell.link!.sourceRowId, cell.link!.sourceColumnId);
                         displayValue = res.value;
@@ -996,15 +1018,15 @@ export default function FactoryStatusBuilder() {
                         : -1;
 
                       return (
-                        <td key={ci} className={`border border-border px-0 py-0 ${isDiff ? "bg-muted/20" : ""}`}>
+                        <td key={ci} className={`border border-border px-0 py-0 ${isDiff ? "bg-muted/20" : isTotal ? "bg-blue-50/60 dark:bg-blue-950/30" : ""}`}>
                           <div className="relative group/cell">
-                            {isDiff || isLinked ? (
+                            {isDiff || isTotal || isLinked ? (
                               <div
-                                data-testid={isLinked ? `sb-linked-cell-${ri}-${ci}` : `sb-diff-cell-${ri}-${ci}`}
+                                data-testid={isLinked ? `sb-linked-cell-${ri}-${ci}` : isDiff ? `sb-diff-cell-${ri}-${ci}` : `sb-total-cell-${ri}-${ci}`}
                                 className={`h-7 px-2 flex items-center gap-1 text-xs tabular-nums select-none cursor-default
-                                  ${isErrorVal ? "text-red-500 font-mono" : isNeg ? "text-red-500" : isDiff ? "text-foreground font-medium" : "text-foreground"}
+                                  ${isErrorVal ? "text-red-500 font-mono" : isNeg ? "text-red-500" : isDiff ? "text-foreground font-medium" : isTotal ? "text-blue-700 dark:text-blue-300 font-semibold" : "text-foreground"}
                                   ${isTextVal ? "justify-start" : "justify-center"}`}
-                                title={isDiff ? "Auto-calculated" : isLinked && linkInfo ? `Linked from: ${linkInfo}` : ""}
+                                title={isDiff ? "Auto-calculated: DIFF" : isTotal ? "Auto-calculated: sum of all columns" : isLinked && linkInfo ? `Linked from: ${linkInfo}` : ""}
                               >
                                 {isLinked && !isBroken && !isCyclic && (
                                   <Link2 className="h-2.5 w-2.5 text-blue-400 shrink-0" />
@@ -1028,7 +1050,7 @@ export default function FactoryStatusBuilder() {
                             )}
 
                             {/* Link menu */}
-                            {!isDiff && (
+                            {!isDiff && !isTotal && (
                               <div className={`absolute top-0.5 right-0.5 z-10 transition-opacity ${isLinked ? "opacity-100" : "opacity-0 group-hover/cell:opacity-100"}`}>
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
@@ -1112,33 +1134,46 @@ export default function FactoryStatusBuilder() {
                   <td className="border border-border" />
                 </tr>
 
-                {/* Footer row — toggleable between DIFFERENCE and TOTAL */}
+                {/* Footer — TOTAL row (column sums) */}
                 {activeSheet.rows.length > 0 && (
                   <tr className="bg-muted/40">
                     <td className="border border-border px-2 py-1.5">
-                      <button
-                        onClick={toggleFooterMode}
-                        className="flex items-center gap-1.5 group w-full"
-                        title="Click to switch between Difference and Total"
-                        data-testid="sb-button-toggle-footer"
-                      >
-                        <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
-                          {footerMode === "diff" ? "DIFFERENCE" : "TOTAL"}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground/50 group-hover:text-muted-foreground transition-colors">
-                          ↕
-                        </span>
-                      </button>
+                      <span className="text-xs font-semibold text-muted-foreground">TOTAL</span>
                     </td>
-                    {footerRow.map((val, ci) => {
+                    {totalRow.map((val, ci) => {
+                      const isNeg = typeof val === "number" && val < 0;
+                      const colLabel = activeSheet.columns[ci]?.label ?? "";
+                      const isTotalCol = isTotalColumn(colLabel);
+                      return (
+                        <td
+                          key={ci}
+                          className={`border border-border px-2 py-1.5 text-xs font-semibold text-center tabular-nums ${isTotalCol ? "bg-blue-50/60 dark:bg-blue-950/30" : ""}`}
+                          data-testid={`sb-footer-total-${ci}`}
+                        >
+                          <span className={isNeg ? "text-red-500" : isTotalCol ? "text-blue-700 dark:text-blue-300" : "text-foreground"}>
+                            {fmt(val)}
+                          </span>
+                        </td>
+                      );
+                    })}
+                    <td className="border border-border" />
+                  </tr>
+                )}
+                {/* Footer — DIFFERENCE row (diff between neighbouring columns) */}
+                {activeSheet.rows.length > 0 && (
+                  <tr className="bg-amber-50/60 dark:bg-amber-950/20">
+                    <td className="border border-border px-2 py-1.5">
+                      <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">DIFFERENCE</span>
+                    </td>
+                    {diffRow.map((val, ci) => {
                       const isNeg = typeof val === "number" && val < 0;
                       return (
                         <td
                           key={ci}
                           className="border border-border px-2 py-1.5 text-xs font-semibold text-center tabular-nums"
-                          data-testid={`sb-footer-cell-${ci}`}
+                          data-testid={`sb-footer-diff-${ci}`}
                         >
-                          <span className={isNeg ? "text-red-500" : "text-foreground"}>
+                          <span className={isNeg ? "text-red-500" : "text-amber-700 dark:text-amber-400"}>
                             {fmt(val)}
                           </span>
                         </td>
