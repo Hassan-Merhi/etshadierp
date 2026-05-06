@@ -1,4 +1,5 @@
-import { useState, useMemo, Fragment, useCallback } from "react";
+import { useState, useMemo, Fragment, useCallback, useEffect, useRef } from "react";
+import { useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock, Pencil, X, Link2 } from "lucide-react";
@@ -64,6 +65,13 @@ const STATUS_LABELS: Record<string, string> = {
 /* ═══════════════════════════════════════════════════════════════════════════ */
 export default function FactoryStockAllocationV5() {
   const { toast } = useToast();
+  const searchString = useSearch();
+  const focusProformaId = useMemo(() => {
+    const p = new URLSearchParams(searchString).get("proformaId");
+    return p ? parseInt(p) : null;
+  }, [searchString]);
+
+  const firstMatchRef = useRef<HTMLTableRowElement | null>(null);
 
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
   const [expandedRows, setExpandedRows]         = useState<Set<string>>(new Set());
@@ -306,6 +314,24 @@ export default function FactoryStockAllocationV5() {
   const rows   = query.data?.rows ?? [];
   const totals = query.data?.totals;
 
+  // Auto-expand rows that contain the focused proforma, then scroll to first match
+  useEffect(() => {
+    if (!focusProformaId || rows.length === 0) return;
+    const toExpand = rows
+      .filter(r => r.proformaDetails.some(p => p.proformaId === focusProformaId))
+      .map(r => r.articleCode);
+    if (toExpand.length === 0) return;
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      toExpand.forEach(c => next.add(c));
+      return next;
+    });
+    // Scroll after a tick so the rows have rendered
+    setTimeout(() => {
+      firstMatchRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+  }, [focusProformaId, rows.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleRefresh = useCallback(() => {
     query.refetch().then(() => {
       setRefreshFlash(true);
@@ -489,12 +515,19 @@ export default function FactoryStockAllocationV5() {
                         proforma.containers.length > 0 &&
                         proforma.containers.every(c => c.status === "FINALIZED" || c.status === "CANCELLED");
 
+                      const isFocused = focusProformaId === proforma.proformaId;
+                      const isFirstFocused = isFocused && !firstMatchRef.current;
+
                       return (
-                      <tr key={`${row.articleCode}-p${proforma.proformaId}`} className="border-b bg-muted/30">
+                      <tr
+                        key={`${row.articleCode}-p${proforma.proformaId}`}
+                        ref={isFirstFocused ? (el) => { firstMatchRef.current = el; } : undefined}
+                        className={cn("border-b", isFocused ? "bg-primary/10 ring-1 ring-inset ring-primary/30" : "bg-muted/30")}
+                      >
                         <td colSpan={5} className="px-0 py-0">
                           <div className="px-8 py-2">
                             <div className="flex items-center gap-2 mb-1.5 text-xs flex-wrap">
-                              <span className="font-semibold">{proforma.proformaName}</span>
+                              <span className={cn("font-semibold", isFocused && "text-primary")}>{proforma.proformaName}</span>
                               <span className="text-muted-foreground">—</span>
                               <span className="text-muted-foreground">{proforma.customerName}</span>
                               <Badge variant="outline" className="text-[10px] h-4 px-1">

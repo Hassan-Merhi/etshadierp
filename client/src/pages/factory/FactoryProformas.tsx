@@ -13,7 +13,7 @@ import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Star, Pencil, FileText, LayoutGrid, Download, RefreshCw, Search, BookOpen, PenLine, Truck, ArrowRightLeft, Upload, AlertCircle } from "lucide-react";
+import { Plus, Trash2, Star, Pencil, FileText, LayoutGrid, Download, RefreshCw, Search, BookOpen, PenLine, Truck, ArrowRightLeft, Upload, AlertCircle, Layers } from "lucide-react";
 import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -651,6 +651,15 @@ export default function FactoryProformas() {
                           >
                             <LayoutGrid className="mr-1 h-3 w-3" />
                             Edit in Inventory
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => navigate(`/factory/stock-allocation-v5?proformaId=${proforma.id}`)}
+                            data-testid={`button-open-stock-allocation-${proforma.id}`}
+                          >
+                            <Layers className="mr-1 h-3 w-3" />
+                            Stock Allocation
                           </Button>
                           <Button
                             size="sm"
