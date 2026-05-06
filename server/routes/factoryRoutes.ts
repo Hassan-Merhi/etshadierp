@@ -76,6 +76,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     if (req.method === "PATCH" && /^\/bales\/\d+\/assign-worker$/.test(req.path)) return next();
     if (req.method === "PATCH" && req.path === "/bales/bulk-assign-worker") return next();
 
+    // Loading note edits are open to all authenticated factory users (floor staff)
+    if (req.method === "PATCH" && /^\/customer-orders\/\d+\/loading-note$/.test(req.path)) return next();
+
     const role = req.session?.currentRole as string | undefined;
     if (["Admin", "Owner", "Developer"].includes(role || "")) return next();
 
