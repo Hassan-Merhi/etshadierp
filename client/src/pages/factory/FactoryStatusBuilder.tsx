@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import {
   LayoutGrid, Plus, Save, FileDown, Upload, Download,
-  Lock, X, Link2, Link2Off,
+  X, Link2, Link2Off,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ function fromApiSheet(s: ApiSheet): StatusBuilderSheet {
     name: s.name,
     columns,
     rows,
-    lockedColumns: columns.map((_, i) => i),
+    lockedColumns: [],
     dirty: false,
   };
 }
@@ -241,11 +241,10 @@ function parseCellValue(s: string): CellValue {
 // ── Tab component ─────────────────────────────────────────────────────────────
 
 function TabLabel({
-  name, active, onActivate, onRename, onDelete, canDelete, isAdmin, onLockClick,
+  name, active, onActivate, onRename, onDelete, canDelete,
 }: {
   name: string; active: boolean; onActivate: () => void;
   onRename: (v: string) => void; onDelete: () => void; canDelete: boolean;
-  isAdmin: boolean; onLockClick?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
@@ -289,7 +288,7 @@ function TabLabel({
       ) : (
         <span className="text-sm">{name}</span>
       )}
-      {active && isAdmin && canDelete && (
+      {active && canDelete && (
         <button
           data-testid={`sb-tab-delete-${name}`}
           onClick={e => { e.stopPropagation(); onDelete(); }}
@@ -297,17 +296,6 @@ function TabLabel({
           style={{ visibility: "visible" }}
         >
           <X className="h-3 w-3" />
-        </button>
-      )}
-      {active && !isAdmin && (
-        <button
-          data-testid={`sb-tab-locked-${name}`}
-          onClick={e => { e.stopPropagation(); onLockClick?.(); }}
-          className="ml-1 rounded-sm opacity-40 hover:opacity-70 text-muted-foreground transition-opacity"
-          title="Only admins can delete pages"
-          style={{ visibility: "visible" }}
-        >
-          <Lock className="h-3 w-3" />
         </button>
       )}
     </div>
@@ -452,14 +440,10 @@ export default function FactoryStatusBuilder() {
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const silentSaveRef = useRef(false);
 
-  const [unlockPending, setUnlockPending] = useState<{ colIdx: number } | null>(null);
   const [linkDialog, setLinkDialog] = useState<LinkDialogState>({
     open: false, targetRowIdx: 0, targetColIdx: 0,
     sourceSheetId: "", sourceRowId: "", sourceColId: "",
   });
-
-  const { data: me } = useQuery<any>({ queryKey: ["/api/auth/me"] });
-  const isAdmin = me?.role === "Admin" || me?.role === "Owner" || me?.role === "Developer";
 
   const fmtLabel = useCallback((label: string): string => {
     if (/^\d{4}-\d{2}-\d{2}$/.test(label)) return formatDisplayDate(label);
@@ -502,25 +486,6 @@ export default function FactoryStatusBuilder() {
       return next;
     });
   }, [activeIdx]);
-
-  const unlockColumn = useCallback((colIdx: number) => {
-    setLocalSheets((prev) => {
-      const next = [...prev];
-      const sheet = { ...next[activeIdx] };
-      sheet.lockedColumns = sheet.lockedColumns.filter((i) => i !== colIdx);
-      next[activeIdx] = sheet;
-      return next;
-    });
-  }, [activeIdx]);
-
-  const handleLockedClick = useCallback((colIdx: number) => {
-    if (isAdmin) setUnlockPending({ colIdx });
-    else toast({
-      title: "Column locked",
-      description: "This column is locked. Only an Admin can edit saved data.",
-      variant: "destructive",
-    });
-  }, [isAdmin, toast]);
 
   // ── Link operations ────────────────────────────────────────────────────────
   const openLinkDialog = useCallback((rowIdx: number, colIdx: number) => {
@@ -616,7 +581,7 @@ export default function FactoryStatusBuilder() {
     },
     onSuccess: () => {
       setLocalSheets((prev) =>
-        prev.map((s) => ({ ...s, dirty: false, lockedColumns: s.columns.map((_, i) => i) }))
+        prev.map((s) => ({ ...s, dirty: false }))
       );
       queryClient.invalidateQueries({ queryKey: ["/api/factory/status-builder/sheets"] });
       setSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
@@ -811,27 +776,6 @@ export default function FactoryStatusBuilder() {
   return (
     <div className="flex flex-col h-full bg-background">
 
-      {/* Admin unlock dialog */}
-      <AlertDialog open={!!unlockPending} onOpenChange={(open) => { if (!open) setUnlockPending(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Unlock saved column?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This column has already been saved and is locked. Editing saved data may affect
-              historical records. Are you sure you want to unlock it for editing?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              if (unlockPending) { unlockColumn(unlockPending.colIdx); setUnlockPending(null); }
-            }}>
-              Unlock &amp; Edit
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       {/* Link dialog */}
       <LinkDialog
         state={linkDialog}
@@ -896,11 +840,6 @@ export default function FactoryStatusBuilder() {
             onRename={(v) => renameTab(idx, v)}
             onDelete={() => deleteTab(idx)}
             canDelete={localSheets.length > 1}
-            isAdmin={isAdmin}
-            onLockClick={() => toast({
-              title: "Pages are locked",
-              description: "Only admins can delete pages.",
-            })}
           />
         ))}
         <button
@@ -931,21 +870,9 @@ export default function FactoryStatusBuilder() {
                     Label
                   </th>
                   {activeSheet.columns.map((col, ci) => {
-                    const isColLocked = activeSheet.lockedColumns.includes(ci);
                     return (
                       <th key={ci} className="border border-border bg-muted px-1 py-1 text-center font-medium min-w-[130px]">
-                        {isColLocked ? (
-                          <div
-                            className="flex items-center justify-center gap-1.5 px-2 py-0.5 cursor-pointer group"
-                            onClick={() => handleLockedClick(ci)}
-                            title={isAdmin ? "Click to unlock column for editing" : "Column is locked"}
-                            data-testid={`sb-locked-col-header-${ci}`}
-                          >
-                            <Lock className="h-3 w-3 text-muted-foreground/50 shrink-0 group-hover:text-muted-foreground transition-colors" />
-                            <span className="text-xs font-semibold truncate">{col.label}</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1">
                             <Input
                               value={col.label}
                               onChange={(e) => setColumnHeader(ci, e.target.value)}
@@ -960,7 +887,6 @@ export default function FactoryStatusBuilder() {
                               <X className="h-3 w-3" />
                             </button>
                           </div>
-                        )}
                       </th>
                     );
                   })}
