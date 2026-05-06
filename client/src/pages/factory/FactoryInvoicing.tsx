@@ -21,8 +21,8 @@ export default function FactoryInvoicing() {
   const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
   const isAdmin = myAccess?.fullAccess === true;
   const hidden: string[] = myAccess?.hiddenCostFields ?? [];
-  // Hide proformas tab for non-admins, or if manually restricted
-  const hideProformasTab = !isAdmin || hidden.includes("hide_invoicing_proformas_tab");
+  // Only hide proformas tab when explicitly restricted via user cost field settings
+  const hideProformasTab = hidden.includes("hide_invoicing_proformas_tab");
 
   const activeTab = getTab(search, hideProformasTab);
 
