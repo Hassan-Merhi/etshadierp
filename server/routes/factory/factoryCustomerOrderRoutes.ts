@@ -3762,6 +3762,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           grandTotal: customerOrders.grandTotal,
           totalQtyBales: customerOrders.totalQtyBales,
           containerNumber: customerOrders.containerNumber,
+          destination: customerOrders.destination,
           customerName: customers.legalName,
           customerCode: customers.code,
         })
@@ -3792,10 +3793,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       // ── PDFKit setup ──────────────────────────────────────────────────────────
       const PDFDocument = (await import("pdfkit")).default;
       const doc = new PDFDocument({ margin: 40, size: "A4" });
-      const invoiceLabel = order.invoiceNumber || `INV-${String(orderId).padStart(6, "0")}`;
-      const safeLabel = invoiceLabel.replace(/[^a-zA-Z0-9_-]/g, "_");
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename=${safeLabel}.pdf`);
+      res.setHeader("Content-Disposition", `attachment; filename="${buildExportFilename([order.containerNumber, order.customerName, order.destination], "pdf")}"`);
       doc.pipe(res);
 
       const PAGE_W = doc.page.width;   // 595
@@ -3998,6 +3997,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           orderDate: customerOrders.orderDate,
           proformaIdUsed: customerOrders.proformaIdUsed,
           containerNumber: customerOrders.containerNumber,
+          destination: customerOrders.destination,
           totalQtyBales: customerOrders.totalQtyBales,
           customerName: customers.legalName,
         })
@@ -4312,9 +4312,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       });
 
       const fileDateStr = getClientDate(req);
-      const fileName = `loading_status_${invoiceNum.replace(/[^a-zA-Z0-9]/g, "_")}_${fileDateStr}.xlsx`;
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      res.setHeader("Content-Disposition", `attachment; filename="${buildExportFilename([order.containerNumber, order.customerName, order.destination], "xlsx")}"`);
       await workbook.xlsx.write(res);
       res.end();
     } catch (error: any) {
