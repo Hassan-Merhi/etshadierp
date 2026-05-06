@@ -371,6 +371,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const [lastAutosaved, setLastAutosaved] = useState<Date | null>(null);
   const lastSavedFingerprintRef = useRef<string>("");
   const autoSaveInProgressRef = useRef(false);
+  // Holds the timeout that clears activeRow when the inline item cell loses
+  // focus — cancelled when focus moves into the search panel so activeRow stays
+  // intact while the user is editing via the search panel.
+  const clearActiveRowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Refs that mirror the latest state values — used by the autosave interval so
   // it doesn't need those values in its dependency array (which would reset the
@@ -2325,7 +2329,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                               }}
                               onBlur={() => {
                                 if (col.key === "itemName") {
-                                  setTimeout(() => {
+                                  clearActiveRowTimerRef.current = setTimeout(() => {
                                     setActiveRow(null);
                                   }, 200);
                                 }
@@ -2401,9 +2405,43 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               <Input
                 placeholder="Scan barcode or search..."
                 value={searchTerm}
+                onMouseDown={() => {
+                  // Prevent the inline item cell's blur timer from clearing
+                  // activeRow while the user moves focus into the search panel.
+                  if (clearActiveRowTimerRef.current !== null) {
+                    clearTimeout(clearActiveRowTimerRef.current);
+                    clearActiveRowTimerRef.current = null;
+                  }
+                }}
                 onChange={(e) => {
-                  setSearchTerm(e.target.value);
+                  const val = e.target.value;
+                  setSearchTerm(val);
                   setHighlightedIndex(0);
+                  // Mirror the change into the active row so the inline cell
+                  // stays in sync (same behaviour as typing in the cell directly).
+                  if (activeRow !== null) {
+                    setRows(prev => prev.map((r, i) => {
+                      if (i !== activeRow) return r;
+                      return { ...r, itemName: val, ...(val === "" ? { stockItemId: undefined } : {}) };
+                    }));
+                  }
+                }}
+                onBlur={() => {
+                  // After a short delay (so item-click onMouseDown fires first),
+                  // clear the row completely if no valid item was confirmed.
+                  setTimeout(() => {
+                    setActiveRow(prev => {
+                      if (prev !== null) {
+                        setRows(rs => rs.map((r, i) => {
+                          if (i !== prev) return r;
+                          if (!r.stockItemId) return { ...r, itemName: "", stockItemId: undefined };
+                          return r;
+                        }));
+                        setSearchTerm("");
+                      }
+                      return null;
+                    });
+                  }, 150);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
