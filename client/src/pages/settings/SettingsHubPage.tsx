@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Users, Building2, Settings2, Wrench, ShoppingCart, Download,
-  MessageCircle, Database, Shield, Factory, ChevronRight, Search,
-  TrendingUp, AlertTriangle, Lock,
+  MessageCircle, Database, Shield, ChevronRight, Search,
+  TrendingUp, AlertTriangle, Zap, Factory,
 } from "lucide-react";
 
 interface HubCategory {
@@ -24,6 +24,7 @@ interface HubCategory {
   factoryOnly?: boolean;
   nonFactory?: boolean;
   badge?: string;
+  group: "core" | "operations" | "controls";
 }
 
 const HUB_CATEGORIES: HubCategory[] = [
@@ -37,6 +38,7 @@ const HUB_CATEGORIES: HubCategory[] = [
     adminOnly: true,
     keywords: ["users", "roles", "permissions", "access", "visibility", "password", "login", "factory access", "page"],
     firstSection: "users-permissions",
+    group: "core",
   },
   {
     key: "company",
@@ -47,6 +49,7 @@ const HUB_CATEGORIES: HubCategory[] = [
     iconColorClass: "text-indigo-500",
     keywords: ["company", "companies", "currency", "fiscal", "period", "preferences", "date format", "exchange rate"],
     firstSection: "companies",
+    group: "core",
   },
   {
     key: "accounting",
@@ -57,6 +60,7 @@ const HUB_CATEGORIES: HubCategory[] = [
     iconColorClass: "text-green-500",
     keywords: ["accounting", "exchange", "rates", "currency", "fiscal", "period", "accounts"],
     firstSection: "exchange-rates",
+    group: "core",
   },
   {
     key: "reports",
@@ -67,6 +71,7 @@ const HUB_CATEGORIES: HubCategory[] = [
     iconColorClass: "text-orange-500",
     keywords: ["reports", "exports", "daily", "stock", "net", "position", "export", "accounts"],
     firstSection: "export-center",
+    group: "operations",
   },
   {
     key: "notifications",
@@ -77,6 +82,7 @@ const HUB_CATEGORIES: HubCategory[] = [
     iconColorClass: "text-emerald-500",
     keywords: ["whatsapp", "notifications", "groups", "alerts", "auto send", "messaging"],
     firstSection: "whatsapp-export",
+    group: "operations",
   },
   {
     key: "pos",
@@ -88,6 +94,7 @@ const HUB_CATEGORIES: HubCategory[] = [
     nonFactory: true,
     keywords: ["pos", "point of sale", "price", "groups", "receipt", "intercompany", "transfer"],
     firstSection: "price-groups",
+    group: "operations",
   },
   {
     key: "data-tools",
@@ -98,6 +105,7 @@ const HUB_CATEGORIES: HubCategory[] = [
     iconColorClass: "text-purple-500",
     keywords: ["data", "files", "storage", "bulk", "rename", "offline", "sync", "backup"],
     firstSection: "files",
+    group: "controls",
   },
   {
     key: "security",
@@ -108,6 +116,7 @@ const HUB_CATEGORIES: HubCategory[] = [
     iconColorClass: "text-red-500",
     keywords: ["security", "audit", "log", "history", "login", "sessions", "changes", "edit log"],
     firstSection: "edit-log",
+    group: "controls",
   },
   {
     key: "system",
@@ -121,7 +130,16 @@ const HUB_CATEGORIES: HubCategory[] = [
     keywords: ["system", "tools", "repair", "diagnostics", "maintenance", "developer", "reset", "orphaned", "fix"],
     firstSection: "system",
     badge: "Admin",
+    group: "controls",
   },
+];
+
+const QUICK_ACCESS_KEYS = ["users-permissions", "company", "notifications", "security"];
+
+const GROUPS: { key: "core" | "operations" | "controls"; label: string; subtitle: string }[] = [
+  { key: "core", label: "Core", subtitle: "Users, companies, and accounting" },
+  { key: "operations", label: "Operations", subtitle: "Reports, POS, and messaging" },
+  { key: "controls", label: "Controls", subtitle: "Data, security, and system tools" },
 ];
 
 interface SettingsHubPageProps {
@@ -158,77 +176,257 @@ export function SettingsHubPage({ onNavigate, currentUser, appMode }: SettingsHu
     );
   }, [search, visibleCategories]);
 
+  const hiddenCount = HUB_CATEGORIES.length - visibleCategories.length;
+  const isSearching = search.trim().length > 0;
+
+  const quickAccessCards = useMemo(
+    () => visibleCategories.filter((c) => QUICK_ACCESS_KEYS.includes(c.key)),
+    [visibleCategories]
+  );
+
+  const groupedResults = useMemo(() => {
+    if (isSearching) return null;
+    return GROUPS.map((g) => ({
+      ...g,
+      items: visibleCategories.filter((c) => c.group === g.key),
+    })).filter((g) => g.items.length > 0);
+  }, [isSearching, visibleCategories]);
+
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-semibold flex items-center gap-2">
-            <Settings2 className="h-7 w-7" />
-            Settings
-          </h1>
-          <p className="text-muted-foreground">
-            Manage your system configuration, users, permissions, and tools.
-          </p>
-        </div>
+    <div className="flex-1 overflow-y-auto">
+      {/* ── Hero ── */}
+      <div className="relative bg-gradient-to-br from-primary/10 via-primary/5 to-background border-b">
+        <div className="max-w-5xl mx-auto px-4 md:px-8 py-8 md:py-12">
+          <div className="flex flex-col md:flex-row md:items-start gap-6">
+            {/* Left: heading + search */}
+            <div className="flex-1 space-y-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Settings2 className="h-6 w-6 text-primary" />
+                  <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Settings Hub</h1>
+                  <Badge className="text-xs">New</Badge>
+                  {isFactory && (
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <Factory className="h-3 w-3" />
+                      Factory Mode
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-muted-foreground text-sm md:text-base max-w-lg">
+                  Configure your system, manage users, permissions, and tools from one place.
+                </p>
+              </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <Input
-            placeholder="Search settings... (users, permissions, exports, POS, factory, audit)"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-            data-testid="input-settings-search"
-          />
-        </div>
+              {/* Search bar */}
+              <div className="relative max-w-xl">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="Search settings — users, permissions, exports, POS, audit…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10 h-11 rounded-xl bg-background/80 backdrop-blur-sm shadow-sm"
+                  data-testid="input-settings-search"
+                />
+              </div>
+            </div>
 
-        {filteredCategories.length === 0 ? (
-          <div className="text-center py-16 text-muted-foreground">
-            <Search className="h-10 w-10 mx-auto mb-3 opacity-30" />
-            <p className="font-medium">No settings found</p>
-            <p className="text-sm mt-1">Try a different search term</p>
-          </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredCategories.map((cat) => {
-              const Icon = cat.icon;
-              return (
-                <Card
-                  key={cat.key}
-                  className="p-5 hover-elevate cursor-pointer transition-colors group"
-                  onClick={() => onNavigate(cat.firstSection)}
-                  data-testid={`card-settings-${cat.key}`}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-2.5 rounded-lg shrink-0 ${cat.colorClass}`}>
-                      <Icon className={`h-5 w-5 ${cat.iconColorClass}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold text-sm leading-tight">{cat.title}</h3>
-                        {cat.dangerous && (
-                          <Badge variant="outline" className="text-xs text-destructive border-destructive/40 py-0">
-                            Dangerous
-                          </Badge>
-                        )}
-                        {cat.badge && !cat.dangerous && (
-                          <Badge variant="outline" className="text-xs py-0">
-                            {cat.badge}
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                        {cat.description}
-                      </p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            {/* Right: stats card */}
+            <Card className="shrink-0 p-4 md:min-w-[200px] space-y-3 bg-background/70 backdrop-blur-sm shadow-sm">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Overview</p>
+              <div className="space-y-2">
+                <StatRow label="Visible areas" value={visibleCategories.length} />
+                <StatRow label="Shown results" value={filteredCategories.length} highlight={isSearching} />
+                <StatRow label="Hidden areas" value={hiddenCount} muted />
+                <div className="pt-1 border-t">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-muted-foreground">Your role</span>
+                    <Badge variant="secondary" className="text-xs">
+                      {role ?? "Viewer"}
+                    </Badge>
                   </div>
-                </Card>
-              );
-            })}
+                </div>
+              </div>
+            </Card>
           </div>
+        </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto px-4 md:px-8 py-6 space-y-8">
+        {/* ── Search results ── */}
+        {isSearching ? (
+          filteredCategories.length === 0 ? (
+            <EmptyState onClear={() => setSearch("")} />
+          ) : (
+            <section className="space-y-3">
+              <SectionHeader
+                label={`${filteredCategories.length} result${filteredCategories.length !== 1 ? "s" : ""} for "${search}"`}
+                subtitle=""
+              />
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {filteredCategories.map((cat) => (
+                  <SettingsCard key={cat.key} cat={cat} onNavigate={onNavigate} />
+                ))}
+              </div>
+            </section>
+          )
+        ) : (
+          <>
+            {/* ── Quick access ── */}
+            {quickAccessCards.length > 0 && (
+              <section className="space-y-3">
+                <SectionHeader label="Quick Access" subtitle="Frequently used settings">
+                  <Zap className="h-4 w-4 text-primary" />
+                </SectionHeader>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {quickAccessCards.map((cat) => (
+                    <QuickCard key={cat.key} cat={cat} onNavigate={onNavigate} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* ── Grouped sections ── */}
+            {groupedResults?.map((group) => (
+              <section key={group.key} className="space-y-3">
+                <SectionHeader label={group.label} subtitle={group.subtitle} />
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {group.items.map((cat) => (
+                    <SettingsCard key={cat.key} cat={cat} onNavigate={onNavigate} />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </>
         )}
       </div>
     </div>
+  );
+}
+
+/* ─── Sub-components ─────────────────────────────────────────────────────── */
+
+function StatRow({
+  label,
+  value,
+  highlight,
+  muted,
+}: {
+  label: string;
+  value: number;
+  highlight?: boolean;
+  muted?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className={`text-xs ${muted ? "text-muted-foreground/60" : "text-muted-foreground"}`}>{label}</span>
+      <span className={`text-sm font-semibold tabular-nums ${highlight ? "text-primary" : muted ? "text-muted-foreground/60" : ""}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function SectionHeader({
+  label,
+  subtitle,
+  children,
+}: {
+  label: string;
+  subtitle: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      {children}
+      <div>
+        <h2 className="text-sm font-semibold leading-none">{label}</h2>
+        {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
+      </div>
+    </div>
+  );
+}
+
+function QuickCard({
+  cat,
+  onNavigate,
+}: {
+  cat: HubCategory;
+  onNavigate: (s: string) => void;
+}) {
+  const Icon = cat.icon;
+  return (
+    <Card
+      className="p-4 cursor-pointer hover-elevate transition-shadow group flex flex-col gap-3"
+      onClick={() => onNavigate(cat.firstSection)}
+      data-testid={`card-quick-${cat.key}`}
+    >
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${cat.colorClass}`}>
+        <Icon className={`h-5 w-5 ${cat.iconColorClass}`} />
+      </div>
+      <div className="flex items-center justify-between gap-1">
+        <span className="text-sm font-medium leading-tight">{cat.title}</span>
+        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 -translate-x-1 group-hover:translate-x-0 transition-transform" />
+      </div>
+    </Card>
+  );
+}
+
+function SettingsCard({
+  cat,
+  onNavigate,
+}: {
+  cat: HubCategory;
+  onNavigate: (s: string) => void;
+}) {
+  const Icon = cat.icon;
+  return (
+    <Card
+      className="p-5 cursor-pointer hover-elevate transition-shadow group"
+      onClick={() => onNavigate(cat.firstSection)}
+      data-testid={`card-settings-${cat.key}`}
+    >
+      <div className="flex items-start gap-4">
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${cat.colorClass}`}>
+          <Icon className={`h-5 w-5 ${cat.iconColorClass}`} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <h3 className="font-semibold text-sm leading-tight">{cat.title}</h3>
+            {cat.dangerous && (
+              <Badge variant="outline" className="text-xs text-destructive border-destructive/40 gap-1 py-0">
+                <AlertTriangle className="h-2.5 w-2.5" />
+                Dangerous
+              </Badge>
+            )}
+            {cat.badge && !cat.dangerous && (
+              <Badge variant="outline" className="text-xs py-0">
+                {cat.badge}
+              </Badge>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed line-clamp-2">
+            {cat.description}
+          </p>
+        </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5 -translate-x-1 group-hover:translate-x-0 transition-transform" />
+      </div>
+    </Card>
+  );
+}
+
+function EmptyState({ onClear }: { onClear: () => void }) {
+  return (
+    <Card className="py-16 flex flex-col items-center gap-4 text-center">
+      <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center">
+        <Search className="h-6 w-6 text-muted-foreground opacity-50" />
+      </div>
+      <div className="space-y-1">
+        <p className="font-semibold">No settings found</p>
+        <p className="text-sm text-muted-foreground">Try a different keyword or browse all sections below.</p>
+      </div>
+      <Button variant="outline" size="sm" onClick={onClear} data-testid="button-clear-search">
+        Clear search
+      </Button>
+    </Card>
   );
 }
