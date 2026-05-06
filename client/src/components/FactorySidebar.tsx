@@ -129,7 +129,6 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     color: NAV_COLOR.reports,
     items: [
       { title: "Analytics",          url: "/factory/analytics",          icon: TrendingUp, adminOnly: true },
-      { title: "Financial Snapshot", url: "/factory/financial-snapshot", icon: LayoutGrid, adminOnly: true },
     ],
   },
   {
