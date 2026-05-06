@@ -72,6 +72,10 @@ export default function FactoryStockAllocationV5() {
     return p ? parseInt(p) : null;
   }, [searchString]);
 
+  const openEditOnLoad = useMemo(() => {
+    return new URLSearchParams(searchString).get("openEdit") === "true";
+  }, [searchString]);
+
   const firstMatchRef = useRef<HTMLTableRowElement | null>(null);
 
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
@@ -333,6 +337,14 @@ export default function FactoryStockAllocationV5() {
       firstMatchRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 120);
   }, [focusProformaId, rows.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-open edit drawer when navigated here with openEdit=true
+  const editOpenedRef = useRef(false);
+  useEffect(() => {
+    if (!openEditOnLoad || !focusProformaId || rows.length === 0 || editOpenedRef.current) return;
+    editOpenedRef.current = true;
+    setEditDrawerProformaId(focusProformaId);
+  }, [openEditOnLoad, focusProformaId, rows.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRefresh = useCallback(() => {
     query.refetch().then(() => {

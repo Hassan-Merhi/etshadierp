@@ -659,7 +659,7 @@ export default function FactoryProformas() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => navigate(`/factory/stock-allocation-v5?proformaId=${proforma.id}`)}
+                            onClick={() => navigate(`/factory/stock-allocation-v5?proformaId=${proforma.id}&openEdit=true`)}
                             data-testid={`button-open-stock-allocation-${proforma.id}`}
                           >
                             <Layers className="mr-1 h-3 w-3" />
