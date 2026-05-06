@@ -2231,12 +2231,19 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         if (remaining > 0) mixBatchValue += remaining * cost;
       }
 
-      // ── 3. Bale total weight (all-time, all statuses) ─────────────────────
+      // ── 3. Bale stock weight — only physically-present bales ──────────────
+      // IN_STOCK = available, RESERVED_FOR_ORDER = allocated to a pending order
+      // but physically still in the warehouse. Excludes SOLD / DISPATCHED / etc.
       const baleAgg = await db.select({
         totalWeight: sql<string>`COALESCE(SUM(CAST(${factoryBales.weightKg} AS numeric)), 0)`,
         totalCount: sql<string>`COUNT(*)`,
         totalValue: sql<string>`COALESCE(SUM(CAST(${factoryBales.totalCost} AS numeric)), 0)`,
-      }).from(factoryBales).where(eq(factoryBales.companyId, companyId));
+      }).from(factoryBales).where(
+        and(
+          eq(factoryBales.companyId, companyId),
+          inArray(factoryBales.status, ["IN_STOCK", "RESERVED_FOR_ORDER"]),
+        )
+      );
 
       const baleWeightTotal = parseFloat((baleAgg[0] as any)?.totalWeight || "0");
       const baleCount = parseInt((baleAgg[0] as any)?.totalCount || "0");

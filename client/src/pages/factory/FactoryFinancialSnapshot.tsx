@@ -475,7 +475,7 @@ export default function FactoryFinancialSnapshot() {
               icon={Scale}
               title="Bale Stock Weight"
               value={snapshot ? kg(snapshot.baleWeightTotal) : "—"}
-              sub={snapshot ? `${snapshot.baleCount.toLocaleString()} bales (all-time)` : undefined}
+              sub={snapshot ? `${snapshot.baleCount.toLocaleString()} bales in stock` : undefined}
               color="purple"
               loading={loadingSnapshot}
             />
