@@ -100,6 +100,9 @@ export default function FactoryProformas() {
   });
   const hideProformaPrice = myAccess?.hiddenCostFields?.includes("hide_proforma_price") ?? false;
 
+  const { data: currentUser } = useQuery<{ role: string }>({ queryKey: ["/api/auth/me"] });
+  const canEdit = ["Admin", "Owner", "Developer"].includes(currentUser?.role || "");
+
   const { data: customers = [], isLoading: customersLoading } = useQuery<Customer[]>({
     queryKey: ["/api/factory/customers"],
   });
@@ -591,42 +594,46 @@ export default function FactoryProformas() {
                       >
                         <Star className={proforma.isActive ? "h-4 w-4 fill-yellow-400 text-yellow-500" : "h-4 w-4"} />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setRenamingProforma(proforma);
-                          setRenameValue(proforma.name);
-                        }}
-                        data-testid={`button-rename-proforma-${proforma.id}`}
-                        title="Rename proforma"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setTransferProforma(proforma);
-                          setTransferTargetCustomerId("");
-                        }}
-                        data-testid={`button-transfer-proforma-${proforma.id}`}
-                        title="Transfer to another customer"
-                      >
-                        <ArrowRightLeft className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setPendingDelete(() => () => deleteProformaMutation.mutate(proforma.id));
-                        }}
-                        disabled={deleteProformaMutation.isPending}
-                        data-testid={`button-delete-proforma-${proforma.id}`}
-                        title="Delete proforma"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canEdit && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setRenamingProforma(proforma);
+                              setRenameValue(proforma.name);
+                            }}
+                            data-testid={`button-rename-proforma-${proforma.id}`}
+                            title="Rename proforma"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setTransferProforma(proforma);
+                              setTransferTargetCustomerId("");
+                            }}
+                            data-testid={`button-transfer-proforma-${proforma.id}`}
+                            title="Transfer to another customer"
+                          >
+                            <ArrowRightLeft className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setPendingDelete(() => () => deleteProformaMutation.mutate(proforma.id));
+                            }}
+                            disabled={deleteProformaMutation.isPending}
+                            data-testid={`button-delete-proforma-${proforma.id}`}
+                            title="Delete proforma"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -679,7 +686,7 @@ export default function FactoryProformas() {
                                 <TableHead className="text-right">Kg/Bale</TableHead>
                                 <TableHead className="text-right">Total Kg</TableHead>
                                 {!hideProformaPrice && <TableHead className="text-right">Price/Bale</TableHead>}
-                                <TableHead className="w-[80px]"></TableHead>
+                                {canEdit && <TableHead className="w-[80px]"></TableHead>}
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -696,7 +703,7 @@ export default function FactoryProformas() {
                                     {line.productName}
                                   </TableCell>
                                   <TableCell className="text-right font-mono" data-testid={`text-quantity-${line.id}`}>
-                                    {isEditingQty ? (
+                                    {canEdit && isEditingQty ? (
                                       <Input
                                         type="number"
                                         min="1"
@@ -712,7 +719,7 @@ export default function FactoryProformas() {
                                         autoFocus
                                         data-testid={`input-inline-qty-${line.id}`}
                                       />
-                                    ) : (
+                                    ) : canEdit ? (
                                       <button
                                         className="font-mono hover:underline hover:text-primary cursor-pointer w-full text-right"
                                         title="Click to edit quantity"
@@ -721,6 +728,8 @@ export default function FactoryProformas() {
                                       >
                                         {line.quantity}
                                       </button>
+                                    ) : (
+                                      <span className="font-mono">{line.quantity}</span>
                                     )}
                                   </TableCell>
                                   <TableCell className="text-right font-mono text-sm" data-testid={`text-kg-bale-${line.id}`}>
@@ -734,36 +743,38 @@ export default function FactoryProformas() {
                                       {formatAmount(parseFloat(line.pricePerBale))}
                                     </TableCell>
                                   )}
-                                  <TableCell>
-                                    <div className="flex items-center gap-1">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => {
-                                          setEditingLine(line);
-                                          setEditLineValues({
-                                            productName: line.productName,
-                                            quantity: String(line.quantity),
-                                            pricePerBale: line.pricePerBale,
-                                          });
-                                        }}
-                                        data-testid={`button-edit-line-${line.id}`}
-                                      >
-                                        <Pencil className="h-3 w-3" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => {
-                                          setPendingDelete(() => () => deleteLineMutation.mutate(line.id));
-                                        }}
-                                        disabled={deleteLineMutation.isPending}
-                                        data-testid={`button-delete-line-${line.id}`}
-                                      >
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
+                                  {canEdit && (
+                                    <TableCell>
+                                      <div className="flex items-center gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => {
+                                            setEditingLine(line);
+                                            setEditLineValues({
+                                              productName: line.productName,
+                                              quantity: String(line.quantity),
+                                              pricePerBale: line.pricePerBale,
+                                            });
+                                          }}
+                                          data-testid={`button-edit-line-${line.id}`}
+                                        >
+                                          <Pencil className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => {
+                                            setPendingDelete(() => () => deleteLineMutation.mutate(line.id));
+                                          }}
+                                          disabled={deleteLineMutation.isPending}
+                                          data-testid={`button-delete-line-${line.id}`}
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  )}
                                 </TableRow>
                               );
                               })}
