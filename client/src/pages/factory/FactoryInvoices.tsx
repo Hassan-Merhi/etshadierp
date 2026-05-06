@@ -52,6 +52,8 @@ interface CustomerOrder {
   grandTotal: string;
   totalQtyBales: number;
   totalWeightKg: string;
+  proformaExpectedBales: string;
+  loadedNotInProformaBales: string;
   customerName: string;
   containerNumber?: string | null;
   proformaName?: string | null;
@@ -72,7 +74,6 @@ export default function FactoryInvoices() {
   const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
   const isAdmin = myAccess?.fullAccess === true;
   const hidden: string[] = myAccess?.hiddenCostFields ?? [];
-  // Non-admins never see the proforma column; admins only lose it if manually restricted
   const hideProformaCol = !isAdmin || hidden.includes("hide_invoicing_proforma_col");
   const hideTotalsUsd = hidden.includes("hide_invoicing_totals_usd");
 
@@ -174,6 +175,31 @@ export default function FactoryInvoices() {
     }
   };
 
+  // Per-order remaining: how many bales still needed to meet proforma target
+  const getRemainingBales = (order: CustomerOrder): number => {
+    const expected = parseFloat(order.proformaExpectedBales || "0");
+    if (expected <= 0) return 0;
+    return Math.max(0, expected - (order.totalQtyBales || 0));
+  };
+
+  // Estimate kg and price for remaining bales using the order's average
+  const getEstimatedKg = (order: CustomerOrder, bales: number): number => {
+    const loaded = order.totalQtyBales || 0;
+    if (loaded <= 0) return 0;
+    const avgWeight = parseFloat(order.totalWeightKg || "0") / loaded;
+    return bales * avgWeight;
+  };
+
+  const getEstimatedPrice = (order: CustomerOrder, bales: number): number => {
+    const loaded = order.totalQtyBales || 0;
+    if (loaded <= 0) return 0;
+    const avgPrice = parseFloat(order.grandTotal || "0") / loaded;
+    return bales * avgPrice;
+  };
+
+  // Column count for colspan calculations
+  const colCount = 7 - (hideProformaCol ? 1 : 0) - (hideTotalsUsd ? 1 : 0);
+
   return (
     <div className="flex flex-col h-full p-6">
       <div className="flex flex-col gap-2 mb-5">
@@ -226,7 +252,15 @@ export default function FactoryInvoices() {
         </div>
       )}
 
-      {!isLoading && filteredOrders.length > 0 && <InvoiceSummaryBar orders={filteredOrders} hideTotalsUsd={hideTotalsUsd} />}
+      {!isLoading && filteredOrders.length > 0 && (
+        <InvoiceSummaryBar
+          orders={filteredOrders}
+          hideTotalsUsd={hideTotalsUsd}
+          getRemainingBales={getRemainingBales}
+          getEstimatedKg={getEstimatedKg}
+          getEstimatedPrice={getEstimatedPrice}
+        />
+      )}
 
       {isLoading ? (
         <div className="space-y-3">
@@ -246,7 +280,7 @@ export default function FactoryInvoices() {
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Bales</TableHead>
-                <TableHead className="text-right">Weight (kg)</TableHead>
+                <TableHead className="text-right">Remaining</TableHead>
                 {!hideTotalsUsd && <TableHead className="text-right">Total</TableHead>}
                 <TableHead className="w-[120px]">Actions</TableHead>
               </TableRow>
@@ -254,7 +288,7 @@ export default function FactoryInvoices() {
             <TableBody>
               {filteredOrders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10 - (hideProformaCol ? 1 : 0) - (hideTotalsUsd ? 1 : 0)} className="text-center text-muted-foreground py-8" data-testid="text-no-orders">
+                  <TableCell colSpan={colCount} className="text-center text-muted-foreground py-8" data-testid="text-no-orders">
                     <div className="flex flex-col items-center gap-2">
                       <Package className="h-10 w-10 opacity-40" />
                       <p>No invoices found</p>
@@ -262,169 +296,180 @@ export default function FactoryInvoices() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredOrders.map((order) => (
-                  <TableRow
-                    key={order.id}
-                    className="cursor-pointer"
-                    onClick={() => handleRowClick(order)}
-                    data-testid={`row-order-${order.id}`}
-                  >
-                    <TableCell data-testid={`text-customer-name-${order.id}`}>
-                      {order.customerName}
-                    </TableCell>
-                    {!hideProformaCol && (
-                      <TableCell className="text-sm text-muted-foreground" data-testid={`text-proforma-${order.id}`}>
-                        {order.proformaName || <span className="text-muted-foreground/50">—</span>}
+                filteredOrders.map((order) => {
+                  const remaining = getRemainingBales(order);
+                  const expected = parseFloat(order.proformaExpectedBales || "0");
+                  const overloaded = expected > 0 ? Math.max(0, (order.totalQtyBales || 0) - expected) : 0;
+                  return (
+                    <TableRow
+                      key={order.id}
+                      className="cursor-pointer"
+                      onClick={() => handleRowClick(order)}
+                      data-testid={`row-order-${order.id}`}
+                    >
+                      <TableCell data-testid={`text-customer-name-${order.id}`}>
+                        {order.customerName}
                       </TableCell>
-                    )}
-                    <TableCell className="font-mono text-sm" data-testid={`text-container-${order.id}`}>
-                      {order.containerNumber || <span className="text-muted-foreground/50">—</span>}
-                    </TableCell>
-                    <TableCell className="text-sm" data-testid={`text-destination-${order.id}`}>
-                      {order.destination || <span className="text-muted-foreground/50">—</span>}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm" data-testid={`text-order-date-${order.id}`}>
-                      {order.orderDate ? formatDisplayDate(order.orderDate) : "-"}
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(order.status)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono" data-testid={`text-total-bales-${order.id}`}>
-                      {order.totalQtyBales ?? "-"}
-                    </TableCell>
-                    <TableCell className="text-right font-mono" data-testid={`text-total-weight-${order.id}`}>
-                      {parseFloat(order.totalWeightKg || "0") > 0
-                        ? parseFloat(order.totalWeightKg).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-                        : "-"}
-                    </TableCell>
-                    {!hideTotalsUsd && (
-                      <TableCell className="text-right font-mono font-semibold" data-testid={`text-grand-total-${order.id}`}>
-                        ${parseFloat(order.grandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      {!hideProformaCol && (
+                        <TableCell className="text-sm text-muted-foreground" data-testid={`text-proforma-${order.id}`}>
+                          {order.proformaName || <span className="text-muted-foreground/50">—</span>}
+                        </TableCell>
+                      )}
+                      <TableCell className="font-mono text-sm" data-testid={`text-container-${order.id}`}>
+                        {order.containerNumber || <span className="text-muted-foreground/50">—</span>}
                       </TableCell>
-                    )}
-                    <TableCell>
-                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              data-testid={`button-download-${order.id}`}
-                              title="Download Invoice"
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => window.open(`/api/factory/customer-orders/${order.id}/export/excel`, "_blank")}
-                              data-testid={`button-download-excel-${order.id}`}
-                            >
-                              <FileSpreadsheet className="h-4 w-4 mr-2" />
-                              Excel
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => window.open(`/api/factory/customer-orders/${order.id}/export-pdf`, "_blank")}
-                              data-testid={`button-download-pdf-${order.id}`}
-                            >
-                              <FileText className="h-4 w-4 mr-2" />
-                              PDF
-                            </DropdownMenuItem>
-                            {isAdmin && (
+                      <TableCell className="text-sm" data-testid={`text-destination-${order.id}`}>
+                        {order.destination || <span className="text-muted-foreground/50">—</span>}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm" data-testid={`text-order-date-${order.id}`}>
+                        {order.orderDate ? formatDisplayDate(order.orderDate) : "-"}
+                      </TableCell>
+                      <TableCell>
+                        {getStatusBadge(order.status)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono" data-testid={`text-total-bales-${order.id}`}>
+                        {order.totalQtyBales ?? "-"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono" data-testid={`text-remaining-${order.id}`}>
+                        {expected <= 0 ? (
+                          <span className="text-muted-foreground/40">—</span>
+                        ) : remaining > 0 ? (
+                          <span className="text-red-600 dark:text-red-400 font-medium">{remaining}</span>
+                        ) : overloaded > 0 ? (
+                          <span className="text-amber-600 dark:text-amber-400 font-medium">+{overloaded}</span>
+                        ) : (
+                          <span className="text-green-600 dark:text-green-400 font-medium">Done</span>
+                        )}
+                      </TableCell>
+                      {!hideTotalsUsd && (
+                        <TableCell className="text-right font-mono font-semibold" data-testid={`text-grand-total-${order.id}`}>
+                          ${parseFloat(order.grandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                data-testid={`button-download-${order.id}`}
+                                title="Download Invoice"
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
                               <DropdownMenuItem
-                                onClick={() => {
-                                  const a = document.createElement("a");
-                                  a.href = `/api/factory/customer-orders/${order.id}/loading-status-export`;
-                                  a.download = "";
-                                  a.click();
-                                }}
-                                data-testid={`button-download-loading-status-${order.id}`}
+                                onClick={() => window.open(`/api/factory/customer-orders/${order.id}/export/excel`, "_blank")}
+                                data-testid={`button-download-excel-${order.id}`}
                               >
-                                <Container className="h-4 w-4 mr-2" />
-                                Loading Status + Bale Refs
+                                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                                Excel
                               </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRowClick(order)}
-                          data-testid={`button-view-order-${order.id}`}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-
-                        {order.status === "FINALIZED" && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                disabled={unfinalizeMutation.isPending}
-                                data-testid={`button-revert-order-${order.id}`}
+                              <DropdownMenuItem
+                                onClick={() => window.open(`/api/factory/customer-orders/${order.id}/export-pdf`, "_blank")}
+                                data-testid={`button-download-pdf-${order.id}`}
                               >
-                                <RotateCcw className="h-4 w-4 text-muted-foreground" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Revert to Pending</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will revert invoice {order.invoiceNumber} for {order.customerName} back to Pending Verification status.
-                                  The invoice number will be voided, all bales will return to stock, and the customer balance entry will be removed.
-                                  This cannot be done if any payment has been recorded against this invoice.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel data-testid={`button-cancel-revert-${order.id}`}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => unfinalizeMutation.mutate(order.id)}
-                                  data-testid={`button-confirm-revert-${order.id}`}
+                                <FileText className="h-4 w-4 mr-2" />
+                                PDF
+                              </DropdownMenuItem>
+                              {isAdmin && (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    const a = document.createElement("a");
+                                    a.href = `/api/factory/customer-orders/${order.id}/loading-status-export`;
+                                    a.download = "";
+                                    a.click();
+                                  }}
+                                  data-testid={`button-download-loading-status-${order.id}`}
                                 >
-                                  Revert to Pending
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
+                                  <Container className="h-4 w-4 mr-2" />
+                                  Loading Status + Bale Refs
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
 
-                        {order.status !== "FINALIZED" && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                data-testid={`button-delete-order-${order.id}`}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently delete invoice {order.invoiceNumber || `#${order.id}`} for {order.customerName}.
-                                  Any bales assigned to this order will be returned to stock. This cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel data-testid={`button-cancel-delete-${order.id}`}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => deleteMutation.mutate(order.id)}
-                                  data-testid={`button-confirm-delete-${order.id}`}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRowClick(order)}
+                            data-testid={`button-view-order-${order.id}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+
+                          {order.status === "FINALIZED" && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled={unfinalizeMutation.isPending}
+                                  data-testid={`button-revert-order-${order.id}`}
                                 >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                                  <RotateCcw className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Revert to Pending</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will revert invoice {order.invoiceNumber} for {order.customerName} back to Pending Verification status.
+                                    The invoice number will be voided, all bales will return to stock, and the customer balance entry will be removed.
+                                    This cannot be done if any payment has been recorded against this invoice.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel data-testid={`button-cancel-revert-${order.id}`}>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => unfinalizeMutation.mutate(order.id)}
+                                    data-testid={`button-confirm-revert-${order.id}`}
+                                  >
+                                    Revert to Pending
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+
+                          {order.status !== "FINALIZED" && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  data-testid={`button-delete-order-${order.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently delete invoice {order.invoiceNumber || `#${order.id}`} for {order.customerName}.
+                                    Any bales assigned to this order will be returned to stock. This cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel data-testid={`button-cancel-delete-${order.id}`}>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteMutation.mutate(order.id)}
+                                    data-testid={`button-confirm-delete-${order.id}`}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
