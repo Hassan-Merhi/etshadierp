@@ -1391,6 +1391,60 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
             ));
         }
 
+        // If a ledger account is being assigned to a charge that has NO voucher yet,
+        // create the accounting voucher retroactively now (handles old/legacy charges).
+        const newLedgerAccountId = ledgerAccountId ? parseInt(ledgerAccountId) : null;
+        if (
+          newLedgerAccountId &&
+          !chargeBeforeUpdate.voucherId &&
+          ["PENDING_VERIFICATION", "VERIFIED", "FINALIZED"].includes(order.status)
+        ) {
+          const [updatedCharge] = await tx.select()
+            .from(customerOrderCharges)
+            .where(eq(customerOrderCharges.id, chargeId));
+          const chargeAmt = parseFloat(updatedCharge?.amount || String(amount) || "0");
+          if (chargeAmt > 0) {
+            const [customer] = await tx.select({ ledgerAccountId: customers.ledgerAccountId })
+              .from(customers).where(eq(customers.id, order.customerId));
+            if (customer?.ledgerAccountId) {
+              const isFinalized = order.status === "FINALIZED";
+              const voucherNum = isFinalized && order.invoiceNumber
+                ? `CHARGE-${order.invoiceNumber}-${chargeId}-${Date.now()}`
+                : `CHARGE-PRE-${orderId}-${chargeId}`;
+              const chargeDesc = order.containerNumber
+                ? `${updatedCharge?.name || "Charge"} for container - ${order.containerNumber}`
+                : `${updatedCharge?.name || "Charge"} - Order #${orderId}`;
+              const [chargeVoucher] = await tx.insert(vouchers).values({
+                companyId,
+                voucherType: "Journal",
+                voucherNumber: voucherNum,
+                voucherDate: order.orderDate || getClientDate(req),
+                description: chargeDesc,
+                totalAmount: String(chargeAmt),
+                sourceModule: "FACTORY",
+              }).returning();
+              await tx.insert(voucherEntries).values({
+                voucherId: chargeVoucher.id,
+                ledgerAccountId: customer.ledgerAccountId,
+                customerId: order.customerId,
+                debitAmount: String(chargeAmt),
+                creditAmount: "0",
+                narration: chargeDesc,
+              });
+              await tx.insert(voucherEntries).values({
+                voucherId: chargeVoucher.id,
+                ledgerAccountId: newLedgerAccountId,
+                debitAmount: "0",
+                creditAmount: String(chargeAmt),
+                narration: chargeDesc,
+              });
+              await tx.update(customerOrderCharges)
+                .set({ voucherId: chargeVoucher.id })
+                .where(eq(customerOrderCharges.id, chargeId));
+            }
+          }
+        }
+
         // If order is FINALIZED, sync customerBalances and daybook with new grand total
         if (order.status === "FINALIZED" && amount !== undefined) {
           const [recalcOrder] = await tx.select({ grandTotal: customerOrders.grandTotal })
