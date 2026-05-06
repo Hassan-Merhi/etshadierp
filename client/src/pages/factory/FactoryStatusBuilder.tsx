@@ -928,7 +928,7 @@ export default function FactoryStatusBuilder() {
 
               <tbody>
                 {activeSheet.rows.map((row, ri) => (
-                  <tr key={row.id} className="hover:bg-muted/30">
+                  <tr key={row.id} className="group hover:bg-muted/30">
                     {/* Row label */}
                     <td className="border border-border px-1 py-0.5 bg-muted/20">
                       <div className="flex items-center gap-1">
@@ -952,7 +952,6 @@ export default function FactoryStatusBuilder() {
 
                     {/* Data cells */}
                     {activeSheet.columns.map((col, ci) => {
-                      const isColLocked = activeSheet.lockedColumns.includes(ci);
                       const isDiff = isDiffColumn(col.label);
                       const cell = row.cells[ci] ?? { value: null };
                       const isLinked = !!cell.link;
@@ -999,15 +998,13 @@ export default function FactoryStatusBuilder() {
                       return (
                         <td key={ci} className={`border border-border px-0 py-0 ${isDiff ? "bg-muted/20" : ""}`}>
                           <div className="relative group/cell">
-                            {isColLocked || isDiff || isLinked ? (
+                            {isDiff || isLinked ? (
                               <div
-                                data-testid={isLinked ? `sb-linked-cell-${ri}-${ci}` : `sb-locked-cell-${ri}-${ci}`}
-                                onClick={() => { if (!isDiff && !isLinked) handleLockedClick(ci); }}
-                                className={`h-7 px-2 flex items-center gap-1 text-xs tabular-nums select-none
-                                  ${!isDiff && !isLinked ? "cursor-pointer" : "cursor-default"}
+                                data-testid={isLinked ? `sb-linked-cell-${ri}-${ci}` : `sb-diff-cell-${ri}-${ci}`}
+                                className={`h-7 px-2 flex items-center gap-1 text-xs tabular-nums select-none cursor-default
                                   ${isErrorVal ? "text-red-500 font-mono" : isNeg ? "text-red-500" : isDiff ? "text-foreground font-medium" : "text-foreground"}
                                   ${isTextVal ? "justify-start" : "justify-center"}`}
-                                title={isDiff ? "Auto-calculated" : isAdmin && !isLinked ? "Click to unlock column for editing" : isLinked && linkInfo ? `Linked from: ${linkInfo}` : ""}
+                                title={isDiff ? "Auto-calculated" : isLinked && linkInfo ? `Linked from: ${linkInfo}` : ""}
                               >
                                 {isLinked && !isBroken && !isCyclic && (
                                   <Link2 className="h-2.5 w-2.5 text-blue-400 shrink-0" />
