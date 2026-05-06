@@ -577,7 +577,7 @@ export default function FactoryInvoiceCreate() {
 
               <Select value={chargeLedgerAccountId} onValueChange={setChargeLedgerAccountId}>
                 <SelectTrigger data-testid="select-charge-ledger-account">
-                  <SelectValue placeholder="Ledger account (optional)" />
+                  <SelectValue placeholder={chargeType !== "FREIGHT" ? "Select account (required)..." : "Select account (optional)..."} />
                 </SelectTrigger>
                 <SelectContent>
                   {ledgerAccounts.map((acc) => (
@@ -585,6 +585,9 @@ export default function FactoryInvoiceCreate() {
                   ))}
                 </SelectContent>
               </Select>
+              {chargeType !== "FREIGHT" && !chargeLedgerAccountId && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">A ledger account is required so the charge posts to accounting.</p>
+              )}
 
               <div className="flex items-center gap-2">
                 <Input
@@ -599,7 +602,7 @@ export default function FactoryInvoiceCreate() {
                 <Button
                   variant="outline"
                   onClick={handleAddCharge}
-                  disabled={!orderId || !chargeAmount || addChargeMutation.isPending}
+                  disabled={!orderId || !chargeAmount || (chargeType !== "FREIGHT" && !chargeLedgerAccountId) || addChargeMutation.isPending}
                   data-testid="button-add-charge"
                 >
                   <Plus className="h-4 w-4" />
