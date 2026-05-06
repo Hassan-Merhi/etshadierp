@@ -139,6 +139,7 @@ export default function FactoryPendingInvoiceVerify() {
 
   const [showProformaDialog, setShowProformaDialog] = useState(false);
   const [selectedProformaId, setSelectedProformaId] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set());
 
   const { data: verification, isLoading: verificationLoading } = useQuery<VerificationSummary>({
     queryKey: ["/api/factory/customer-orders", orderId, "verification"],
@@ -458,7 +459,51 @@ export default function FactoryPendingInvoiceVerify() {
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="text-lg">Proforma vs Loaded</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle className="text-lg">Proforma vs Loaded</CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">Filter:</span>
+              {(["OVER_LOADED", "UNDER_LOADED", "MISSING_FROM_LOADED"] as const).map((s) => {
+                const labels: Record<string, string> = { OVER_LOADED: "Overloaded", UNDER_LOADED: "Under-loaded", MISSING_FROM_LOADED: "Missing" };
+                const colors: Record<string, string> = {
+                  OVER_LOADED: "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700",
+                  UNDER_LOADED: "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700",
+                  MISSING_FROM_LOADED: "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700",
+                };
+                const activeColors: Record<string, string> = {
+                  OVER_LOADED: "bg-green-600 text-white border-green-600",
+                  UNDER_LOADED: "bg-yellow-500 text-white border-yellow-500",
+                  MISSING_FROM_LOADED: "bg-red-600 text-white border-red-600",
+                };
+                const active = statusFilter.has(s);
+                return (
+                  <button
+                    key={s}
+                    onClick={() => {
+                      setStatusFilter((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(s)) next.delete(s); else next.add(s);
+                        return next;
+                      });
+                    }}
+                    className={`text-xs px-2 py-1 rounded-md border font-medium transition-colors ${active ? activeColors[s] : colors[s]}`}
+                    data-testid={`filter-status-${s.toLowerCase()}`}
+                  >
+                    {labels[s]}
+                  </button>
+                );
+              })}
+              {statusFilter.size > 0 && (
+                <button
+                  onClick={() => setStatusFilter(new Set())}
+                  className="text-xs px-2 py-1 rounded-md border border-border text-muted-foreground"
+                  data-testid="filter-clear"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {(() => {
@@ -483,11 +528,17 @@ export default function FactoryPendingInvoiceVerify() {
               if (status === "UNDER_LOADED") return 1;
               return 2; // MISSING_FROM_LOADED or unknown
             };
-            const sortedProformaLines = [...filteredProformaLines].sort((a, b) => {
-              const sa = comparisonMap.get(a.articleCode)?.status;
-              const sb = comparisonMap.get(b.articleCode)?.status;
-              return statusSortOrder(sa) - statusSortOrder(sb);
-            });
+            const sortedProformaLines = [...filteredProformaLines]
+              .sort((a, b) => {
+                const sa = comparisonMap.get(a.articleCode)?.status;
+                const sb = comparisonMap.get(b.articleCode)?.status;
+                return statusSortOrder(sa) - statusSortOrder(sb);
+              })
+              .filter((line) => {
+                if (statusFilter.size === 0) return true;
+                const status = comparisonMap.get(line.articleCode)?.status;
+                return status ? statusFilter.has(status) : false;
+              });
 
             return (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
