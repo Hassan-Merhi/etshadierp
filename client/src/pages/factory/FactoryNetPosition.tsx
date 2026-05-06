@@ -59,6 +59,7 @@ interface NetPositionData {
   forUs: { total: number; breakdown: BreakdownItem[]; accounts: AccountItem[] };
   onUs: { total: number; breakdown: BreakdownItem[]; accounts: AccountItem[] };
   supplierLiabilities: number;
+  supplierOverpayments?: number;
   inventoryValue: number;
   rawMaterialValue: number;
   ledgerAssets: number;
@@ -835,6 +836,13 @@ export default function FactoryNetPosition() {
                 <p className="font-mono font-semibold text-red-600 dark:text-red-400">{fmt(data.supplierLiabilities)}</p>
                 <p className="text-xs text-muted-foreground">Raw material suppliers owed</p>
               </div>
+              {(data.supplierOverpayments ?? 0) > 0 && (
+                <div className="space-y-1">
+                  <p className="text-muted-foreground text-xs uppercase tracking-wide">Supplier Overpayments</p>
+                  <p className="font-mono font-semibold text-green-600 dark:text-green-400">{fmt(data.supplierOverpayments ?? 0)}</p>
+                  <p className="text-xs text-muted-foreground">Overpaid — recoverable from suppliers</p>
+                </div>
+              )}
               <div className="space-y-1">
                 <p className="text-muted-foreground text-xs uppercase tracking-wide">Other Liabilities</p>
                 <p className="font-mono font-semibold text-red-600 dark:text-red-400">{fmt(data.ledgerLiabilities)}</p>

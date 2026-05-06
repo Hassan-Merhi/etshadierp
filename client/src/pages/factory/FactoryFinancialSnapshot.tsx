@@ -57,6 +57,7 @@ interface NetPositionData {
   rawMaterialValue: number;
   balanceOnTableValue: number;
   supplierLiabilities: number;
+  supplierOverpayments?: number;
   forUs: { total: number; accounts: NetPositionAccount[] };
   onUs: { total: number; accounts: NetPositionAccount[] };
 }
@@ -261,10 +262,12 @@ export default function FactoryFinancialSnapshot() {
 
     // ── Supplier Balances (auto: all suppliers from net position) ──
     const supplierAccounts = (netPosition.onUs?.accounts || []).filter(a => a.category === "Supplier");
+    const overpaidSupplierAccounts = (netPosition.forUs?.accounts || []).filter(a => a.category === "Supplier Overpayments");
     const supplierNet = netPosition.supplierLiabilities ?? 0;
-    const supplierList = supplierAccounts
-      .map(a => ({ name: a.name, value: a.value, breakdown: a.breakdown }))
-      .sort((x, y) => y.value - x.value);
+    const supplierList = [
+      ...supplierAccounts.map(a => ({ name: a.name, value: a.value, breakdown: a.breakdown, overpaid: false })),
+      ...overpaidSupplierAccounts.map(a => ({ name: a.name, value: -a.value, breakdown: a.breakdown, overpaid: true })),
+    ].sort((x, y) => Math.abs(y.value) - Math.abs(x.value));
 
     // ── Customer Credit (auto: all Dr customers from net position) ──
     const customerAccounts = (netPosition.forUs?.accounts || []).filter(a => a.category === "Customer");
@@ -507,7 +510,10 @@ export default function FactoryFinancialSnapshot() {
                           {usd(computed.supplierNet)}
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {computed.supplierCount} supplier{computed.supplierCount !== 1 ? "s" : ""} · Total owed to suppliers
+                          {computed.supplierCount} supplier{computed.supplierCount !== 1 ? "s" : ""} · Owed to suppliers
+                          {(netPosition.supplierOverpayments ?? 0) > 0 && (
+                            <span className="text-green-600 dark:text-green-400"> · {usd(netPosition.supplierOverpayments ?? 0)} overpaid (recoverable)</span>
+                          )}
                         </p>
                       </div>
                       <div className="mt-1 text-muted-foreground shrink-0">
@@ -520,8 +526,11 @@ export default function FactoryFinancialSnapshot() {
                       {computed.supplierList.map((s, i) => (
                         <div key={i} className="py-1.5 px-2 rounded-md">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm text-foreground truncate">{s.name}</span>
-                            <span className="text-sm font-mono font-medium text-red-600 dark:text-red-400 shrink-0">{usd(s.value)}</span>
+                            <span className="text-sm text-foreground truncate">
+                              {s.name}
+                              {s.overpaid && <span className="ml-1 text-xs text-green-600 dark:text-green-400">(overpaid)</span>}
+                            </span>
+                            <span className={`text-sm font-mono font-medium shrink-0 ${s.overpaid ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>{usd(Math.abs(s.value))}</span>
                           </div>
                           {s.breakdown && s.breakdown.length > 0 && (
                             <div className="mt-1 pl-2 space-y-0.5">

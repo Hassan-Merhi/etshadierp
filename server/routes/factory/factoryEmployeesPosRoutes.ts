@@ -2719,6 +2719,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
 
       const supplierItems: { name: string; balanceUsd: number; breakdown?: { label: string; native: string; usd: number }[] }[] = [];
       let totalSupplierLiabilities = 0;
+      let totalSupplierOverpayments = 0;
 
       // Track which broker entries have already been added (avoid duplicates)
       const processedBrokers = new Set<number>();
@@ -2735,6 +2736,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           if (Math.abs(rounded) > 0.01) {
             supplierItems.push({ name: s.name, balanceUsd: rounded, breakdown });
             if (rounded > 0) totalSupplierLiabilities += rounded;
+            else totalSupplierOverpayments += Math.abs(rounded);
           }
           continue;
         }
@@ -2788,6 +2790,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         if (Math.abs(balance) > 0.01) {
           supplierItems.push({ name: s.name, balanceUsd: balance });
           if (balance > 0) totalSupplierLiabilities += balance;
+          else totalSupplierOverpayments += Math.abs(balance);
         }
       }
 
@@ -3173,10 +3176,13 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
 
       // forUsTotal: ledger assets + inventory + raw material + balance on table + stock OTW
       //             + customer receivables (DR) + pending orders + verified orders + loading orders
+      //             + overpaid suppliers (they owe us the overpayment back)
       //             (bales are reserved/excluded from baleInventoryValue — no double-count)
+      const totalSupplierOverpaymentsRounded = round2(totalSupplierOverpayments);
       const forUsTotal = round2(
         cleanLedgerForUsTotal + baleInventoryValue + rawMaterialStockValue + balanceOnTableValue +
-        stockOtwValue + totalCustomerDr + pendingTotal + verifiedTotal + loadingTotal,
+        stockOtwValue + totalCustomerDr + pendingTotal + verifiedTotal + loadingTotal +
+        totalSupplierOverpaymentsRounded,
       );
       // ── Employee Salaries Payable — directly from employees.currentBalance ───────
       // Employee balances are tracked via employees.currentBalance (not through a
@@ -3217,6 +3223,11 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         ...customerDrItems
           .sort((a, b) => b.balanceUsd - a.balanceUsd)
           .map(c => ({ ...(c.ledgerAccountId ? { id: c.ledgerAccountId } : {}), name: c.name, code: "CUSTOMER_DR", value: round2(c.balanceUsd), category: "Customer" })),
+        // Overpaid suppliers: they owe us the excess back — show as an asset
+        ...supplierItems
+          .filter(s => s.balanceUsd < 0)
+          .sort((a, b) => a.balanceUsd - b.balanceUsd)
+          .map(s => ({ name: s.name, code: "SUPPLIER_OVERPAID", value: round2(Math.abs(s.balanceUsd)), category: "Supplier Overpayments", breakdown: s.breakdown })),
         ...(pendingTotal > 0 ? [{ name: "Pending Orders", code: "PENDING_ORDERS", value: pendingTotal, category: "Pending Orders" }] : []),
         ...(verifiedTotal > 0 ? [{ name: "Verified Orders", code: "VERIFIED_ORDERS", value: verifiedTotal, category: "Verified Orders" }] : []),
         ...(loadingTotal > 0 ? [{ name: "Loading Orders", code: "LOADING_ORDERS", value: loadingTotal, category: "Loading Orders" }] : []),
@@ -3267,6 +3278,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         forUs: { total: forUsTotal, breakdown: forUsBreakdown, accounts: forUsAccounts },
         onUs: { total: onUsTotal, breakdown: onUsBreakdown, accounts: onUsAccounts },
         supplierLiabilities: round2(totalSupplierLiabilities),
+        supplierOverpayments: round2(totalSupplierOverpayments),
         inventoryValue: baleInventoryValue,
         rawMaterialValue: rawMaterialStockValue,
         balanceOnTableValue: balanceOnTableValue,
