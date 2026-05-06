@@ -1798,7 +1798,13 @@ export function registerFactorySuppliersRoutes(app: Express) {
         const cc = p.currencyCode || "USD";
         paidByCurrency[cc] = (paidByCurrency[cc] || 0) + parseFloat(p.amount || "0");
       }
-      // FX transfers out of this supplier reduce its original currency balance
+      // Voucher-based payments also reduce the per-currency balance
+      for (const p of (voucherPaymentRows as any[])) {
+        if (p.optional) continue;
+        const cc = p.currency || "USD";
+        paidByCurrency[cc] = (paidByCurrency[cc] || 0) + parseFloat(p.debitAmount || "0");
+      }
+      // FX transfers: out reduces original currency balance; self-FX creates a USD obligation
       for (const t of enrichedFxTransfers) {
         if (t.fromSupplierId === supplierId) {
           const cc = t.fromCurrencyCode || "USD";
@@ -1808,11 +1814,16 @@ export function registerFactorySuppliersRoutes(app: Express) {
           } else if (t.sourceType === "both") {
             fxBothOut[cc] = (fxBothOut[cc] || 0) + parseFloat(t.fromAmount || "0");
           }
+          // Self-FX (same supplier, e.g. EUR → USD): the converted amount is a new USD
+          // obligation — it must appear in byCurrency["USD"] so the top KPI shows the balance.
+          if (t.fromSupplierId === t.toSupplierId && (t.fromCurrencyCode || "USD") !== "USD") {
+            if (!byCurrency["USD"]) byCurrency["USD"] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0, totalFreight: 0, totalOtherCharges: 0 };
+            byCurrency["USD"].totalValue += parseFloat(t.toAmountUsd || "0");
+          }
         }
-        // FX transfers INTO this supplier reduce what they're still owed.
-        // Only commission-type transfers (and "both") affect the USD commission pool;
-        // supplier goods settlements are irrelevant to the commission balance.
-        if (t.toSupplierId === supplierId && (t.sourceType === "commission" || t.sourceType === "both")) {
+        // Cross-supplier FX incoming (commission/both): reduces USD owed to this supplier
+        if (t.toSupplierId === supplierId && t.fromSupplierId !== supplierId &&
+            (t.sourceType === "commission" || t.sourceType === "both")) {
           paidByCurrency["USD"] = (paidByCurrency["USD"] || 0) + parseFloat(t.toAmountUsd || "0");
         }
       }
