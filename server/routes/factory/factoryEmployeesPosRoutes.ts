@@ -2907,8 +2907,10 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         const cIds = (allCustomersForNP as any[]).map((c: any) => c.id);
         const custLedgerIds = [...customerLedgerIds];
 
-        // Sales totals from FINALIZED orders (these include CHARGE-* freight amounts
-        // so CHARGE-* vouchers must NOT be added separately — they are already in grandTotal).
+        // Sales totals from FINALIZED and VERIFIED orders. CHARGE-* vouchers are still
+        // excluded from voucherNet below because the charge is already in grandTotal for
+        // both statuses. When an order moves VERIFIED → FINALIZED its status changes, so
+        // there is no double-counting.
         const cSalesRows = await db.select({
           customerId: customerOrders.customerId,
           total: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric)), 0)`,
@@ -2917,7 +2919,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           .where(and(
             inArray(customerOrders.customerId, cIds),
             eq(customerOrders.companyId, companyId),
-            eq(customerOrders.status, "FINALIZED"),
+            inArray(customerOrders.status, ["FINALIZED", "VERIFIED"]),
           ))
           .groupBy(customerOrders.customerId);
 

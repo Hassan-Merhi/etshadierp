@@ -72,7 +72,8 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       const customerIds = allCustomers.map((c) => c.id);
 
-      // Fetch all sales totals in one query
+      // Fetch all sales totals in one query — include VERIFIED orders so
+      // charges added before finalization are reflected immediately.
       const salesRows = await db.select({
         customerId: customerOrders.customerId,
         total: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric)), 0)`,
@@ -81,7 +82,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
         .where(and(
           inArray(customerOrders.customerId, customerIds),
           eq(customerOrders.companyId, companyId),
-          eq(customerOrders.status, "FINALIZED"),
+          inArray(customerOrders.status, ["FINALIZED", "VERIFIED"]),
         ))
         .groupBy(customerOrders.customerId);
 
