@@ -1277,7 +1277,41 @@ export default function FactoryContainerLoadingScan() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {proformaProgress.map((line) => (
+                    {extraArticles.map((code) => (
+                      <TableRow
+                        key={code}
+                        className="bg-red-50 dark:bg-red-950/30"
+                        data-testid={`row-extra-${code}`}
+                      >
+                        <TableCell className="text-xs font-mono py-1.5">
+                          <div className="text-red-700 dark:text-red-400">
+                            {code}
+                          </div>
+                          <div className="text-red-500 dark:text-red-500 text-[10px]">
+                            Not on proforma
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs text-right py-1.5 text-muted-foreground">
+                          —
+                        </TableCell>
+                        <TableCell className="text-xs text-right font-mono py-1.5 text-red-600 dark:text-red-400 font-semibold">
+                          {loadedByArticle[code]}
+                        </TableCell>
+                        <TableCell className="text-xs text-right py-1.5">
+                          <Badge
+                            variant="destructive"
+                            className="text-[10px] px-1 py-0 no-default-hover-elevate no-default-active-elevate"
+                          >
+                            !
+                          </Badge>
+                        </TableCell>
+                        <TableCell />
+                      </TableRow>
+                    ))}
+                    {[...proformaProgress].sort((a, b) => {
+                      const order = { overloaded: 0, short: 1, fulfilled: 2, none: 3 };
+                      return (order[a.status] ?? 3) - (order[b.status] ?? 3);
+                    }).map((line) => (
                       <TableRow
                         key={line.id}
                         className={
@@ -1364,37 +1398,6 @@ export default function FactoryContainerLoadingScan() {
                             );
                           })()}
                         </TableCell>
-                      </TableRow>
-                    ))}
-                    {extraArticles.map((code) => (
-                      <TableRow
-                        key={code}
-                        className="bg-red-50 dark:bg-red-950/30"
-                        data-testid={`row-extra-${code}`}
-                      >
-                        <TableCell className="text-xs font-mono py-1.5">
-                          <div className="text-red-700 dark:text-red-400">
-                            {code}
-                          </div>
-                          <div className="text-red-500 dark:text-red-500 text-[10px]">
-                            Not on proforma
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-xs text-right py-1.5 text-muted-foreground">
-                          —
-                        </TableCell>
-                        <TableCell className="text-xs text-right font-mono py-1.5 text-red-600 dark:text-red-400 font-semibold">
-                          {loadedByArticle[code]}
-                        </TableCell>
-                        <TableCell className="text-xs text-right py-1.5">
-                          <Badge
-                            variant="destructive"
-                            className="text-[10px] px-1 py-0 no-default-hover-elevate no-default-active-elevate"
-                          >
-                            !
-                          </Badge>
-                        </TableCell>
-                        <TableCell />
                       </TableRow>
                     ))}
                   </TableBody>
