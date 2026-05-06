@@ -160,6 +160,7 @@ export default function FactoryContainerLoadingScan() {
   const [pendingOrders, setPendingOrders] = useState<Array<{ id: number; invoiceNumber: string | null; status: string; totalQtyBales: number }>>([]);
   const [baleToDelete, setBaleToDelete] = useState<{ id: number; baleReference: string } | null>(null);
   const [showRemovalLog, setShowRemovalLog] = useState(false);
+  const [selectedProformaId, setSelectedProformaId] = useState<string>("");
   const scannerRef = useRef<HTMLInputElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -201,6 +202,19 @@ export default function FactoryContainerLoadingScan() {
     },
     enabled: !!customerId,
   });
+
+  // All starred (active) proformas for this customer
+  const activeProformas = useMemo(() => proformas.filter((p) => p.isActive), [proformas]);
+
+  // Auto-select when there's exactly one starred proforma; clear when customer changes
+  useEffect(() => {
+    if (orderId) return;
+    if (activeProformas.length === 1) {
+      setSelectedProformaId(String(activeProformas[0].id));
+    } else {
+      setSelectedProformaId("");
+    }
+  }, [activeProformas, orderId]);
 
   const { data: orderDetail } = useQuery<OrderDetail>({
     queryKey: ["/api/factory/customer-orders", orderId],
@@ -501,13 +515,16 @@ export default function FactoryContainerLoadingScan() {
 
   const handleStartLoading = useCallback(async () => {
     if (!customerId || !selectedLocationId) return;
-    const activeProforma = proformas.find((p) => p.isActive) || null;
+    const chosenProforma =
+      selectedProformaId && selectedProformaId !== "none"
+        ? proformas.find((p) => p.id === parseInt(selectedProformaId)) || null
+        : null;
 
     // Check if there are already pending loading orders for this proforma
-    if (activeProforma) {
+    if (chosenProforma) {
       try {
         const res = await fetch(
-          `/api/factory/customer-orders?customerId=${customerId}&proformaId=${activeProforma.id}`,
+          `/api/factory/customer-orders?customerId=${customerId}&proformaId=${chosenProforma.id}`,
           { credentials: "include" }
         );
         if (res.ok) {
@@ -528,7 +545,7 @@ export default function FactoryContainerLoadingScan() {
 
     createOrderMutation.mutate({
       customerId,
-      proformaIdUsed: activeProforma?.id || null,
+      proformaIdUsed: chosenProforma?.id || null,
       locationId: parseInt(selectedLocationId),
       orderDate,
       containerNotes: loadingNote.trim() || undefined,
@@ -536,6 +553,7 @@ export default function FactoryContainerLoadingScan() {
   }, [
     customerId,
     selectedLocationId,
+    selectedProformaId,
     proformas,
     orderDate,
     loadingNote,
@@ -775,7 +793,10 @@ export default function FactoryContainerLoadingScan() {
         ? "ring-2 ring-red-500 bg-red-50 dark:bg-red-950 transition-all"
         : "";
 
-  const activeProforma = proformas.find((p) => p.isActive) || null;
+  const activeProforma =
+    selectedProformaId && selectedProformaId !== "none"
+      ? proformas.find((p) => p.id === parseInt(selectedProformaId)) || null
+      : null;
 
   return (
     <div className="flex flex-col h-full p-4 lg:p-6">
@@ -1116,33 +1137,44 @@ export default function FactoryContainerLoadingScan() {
               </Select>
             </div>
 
-            {customerId && activeProforma && !orderId && (
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant="default"
-                  className="bg-green-600 text-white no-default-hover-elevate no-default-active-elevate"
-                  data-testid="badge-active-proforma"
+            {customerId && !orderId && activeProformas.length > 0 && (
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Proforma</label>
+                <Select
+                  value={selectedProformaId}
+                  onValueChange={setSelectedProformaId}
+                  disabled={!!orderId}
                 >
-                  {activeProforma.name}
-                </Badge>
-                <span className="text-sm text-muted-foreground">
-                  Active proforma
-                </span>
+                  <SelectTrigger data-testid="select-proforma">
+                    <SelectValue placeholder="Select a proforma..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" data-testid="select-proforma-none">
+                      No proforma
+                    </SelectItem>
+                    {activeProformas.map((p) => (
+                      <SelectItem
+                        key={p.id}
+                        value={String(p.id)}
+                        data-testid={`select-proforma-option-${p.id}`}
+                      >
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
 
-            {customerId &&
-              !activeProforma &&
-              proformas.length === 0 &&
-              !orderId && (
-                <p
-                  className="text-sm text-muted-foreground"
-                  data-testid="text-no-proforma"
-                >
-                  No active proforma found. Loading will proceed without price
-                  references.
-                </p>
-              )}
+            {customerId && !orderId && activeProformas.length === 0 && (
+              <p
+                className="text-sm text-muted-foreground"
+                data-testid="text-no-proforma"
+              >
+                No active proforma found. Loading will proceed without price
+                references.
+              </p>
+            )}
 
             {/* Note field — editable before and after loading starts */}
             <div>
@@ -1592,10 +1624,13 @@ export default function FactoryContainerLoadingScan() {
             <Button
               onClick={() => {
                 setShowPendingWarning(false);
-                const activeProforma = proformas.find((p) => p.isActive) || null;
+                const chosenProforma =
+                  selectedProformaId && selectedProformaId !== "none"
+                    ? proformas.find((p) => p.id === parseInt(selectedProformaId)) || null
+                    : null;
                 createOrderMutation.mutate({
                   customerId: customerId!,
-                  proformaIdUsed: activeProforma?.id || null,
+                  proformaIdUsed: chosenProforma?.id || null,
                   locationId: parseInt(selectedLocationId),
                   orderDate,
                 });
