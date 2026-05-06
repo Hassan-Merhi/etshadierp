@@ -725,7 +725,7 @@ export default function FactoryProformas() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {proforma.lines.map((line) => {
+                              {[...proforma.lines].sort((a, b) => (a.productName || a.articleCode || "").localeCompare(b.productName || b.articleCode || "")).map((line) => {
                                 const lineWt = parseFloat(line.weightPerBaleKg || "0");
                                 const lineTotal = line.quantity * lineWt;
                                 const isEditingQty = inlineQtyLineId === line.id;
