@@ -2405,13 +2405,26 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               <Input
                 placeholder="Scan barcode or search..."
                 value={searchTerm}
-                onMouseDown={() => {
-                  // Prevent the inline item cell's blur timer from clearing
-                  // activeRow while the user moves focus into the search panel.
+                onFocus={() => {
+                  // onFocus fires AFTER the inline cell's onBlur, so this is
+                  // the correct place to cancel the "clear activeRow" timer.
                   if (clearActiveRowTimerRef.current !== null) {
                     clearTimeout(clearActiveRowTimerRef.current);
                     clearActiveRowTimerRef.current = null;
                   }
+                  // Clear the search text and unset the confirmed item so the
+                  // user can immediately type a new search (same feel as the
+                  // inline cell when it's empty).
+                  setSearchTerm("");
+                  setHighlightedIndex(0);
+                  setActiveRow(prev => {
+                    if (prev !== null) {
+                      setRows(rs => rs.map((r, i) =>
+                        i === prev ? { ...r, stockItemId: undefined } : r
+                      ));
+                    }
+                    return prev;
+                  });
                 }}
                 onChange={(e) => {
                   const val = e.target.value;
