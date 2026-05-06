@@ -591,7 +591,7 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
   unit: Unit; cashAccounts: CashAccount[]; onClose: () => void; unitType: "WAREHOUSE" | "SHOP"; testIdPrefix: string;
 }) {
   const apiBase = useApiBase();
-  const { data: detail, isLoading } = useQuery<{ unit: Unit; contract: Contract | null; ledger: LedgerRow[]; payments: Payment[]; pastContracts: Contract[] }>({
+  const { data: detail, isLoading } = useQuery<{ unit: Unit; contract: Contract | null; ledger: LedgerRow[]; payments: Payment[]; guaranteePayments: Payment[]; pastContracts: Contract[] }>({
     queryKey: [apiBase + "/units", unit.id, "detail"],
     queryFn: async () => {
       const res = await fetch(`${apiBase}/units/${unit.id}/detail`, { credentials: "include" });
@@ -634,6 +634,7 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
               <LedgerView
                 ledger={detail?.ledger ?? []}
                 payments={detail?.payments ?? []}
+                guaranteePayments={detail?.guaranteePayments ?? []}
                 contract={contract}
                 unitId={unit.id}
                 onNoteUpdated={() => queryClient.invalidateQueries({ queryKey: [apiBase + "/units", unit.id, "detail"] })}
@@ -1429,7 +1430,7 @@ function EditInfoForm({ contract, testIdPrefix, unitId, unit, unitType }: { cont
 // ──────────────────────────────────────────────────────────
 // LEDGER VIEW / STATEMENT
 // ──────────────────────────────────────────────────────────
-function LedgerView({ ledger, payments, contract, unitId, onNoteUpdated }: { ledger: LedgerRow[]; payments: Payment[]; contract: Contract; unitId: number; onNoteUpdated?: () => void }) {
+function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onNoteUpdated }: { ledger: LedgerRow[]; payments: Payment[]; guaranteePayments: Payment[]; contract: Contract; unitId: number; onNoteUpdated?: () => void }) {
   const apiBase = useApiBase();
   const { toast } = useToast();
   const [draftNote, setDraftNote] = useState(contract.statementNote ?? "");
@@ -1471,12 +1472,14 @@ function LedgerView({ ledger, payments, contract, unitId, onNoteUpdated }: { led
       </tr>`;
     }).join("");
 
-    const payRows = payments.map(p => `<tr>
+    const buildPayRows = (rows: Payment[]) => rows.map(p => `<tr>
       <td>${format(new Date(p.paymentDate), "dd MMM yyyy")}</td>
       <td>${MONTH_NAMES[p.forMonth]} ${p.forYear}</td>
       <td class="num">$${fmtMoney(p.amount)}</td>
       <td class="note">${p.notes || ""}</td>
     </tr>`).join("");
+    const payRows = buildPayRows(payments);
+    const guarRows = buildPayRows(guaranteePayments);
 
     const balColor = balance > 0 ? "#cc0000" : balance < 0 ? "#006600" : "#000";
     const startStr = contract.startDate ? format(new Date(contract.startDate as any), "dd MMM yyyy") : "—";
@@ -1523,9 +1526,13 @@ function LedgerView({ ledger, payments, contract, unitId, onNoteUpdated }: { led
       <div style="font-weight:700;color:#555;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;">Note</div>
       <div style="white-space:pre-wrap;color:#111">${draftNote.trim().replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
     </div>` : ""}
-    ${payments.length > 0 ? `<h2>Payment History</h2>
+    ${payments.length > 0 ? `<h2>Rent Payment History</h2>
     <table><thead><tr><th>Date</th><th>For</th><th class="num">Amount</th><th>Notes</th></tr></thead>
     <tbody>${payRows}</tbody></table>` : ""}
+    ${guaranteePayments.length > 0 ? `<h2 style="color:#6b21a8">Guarantee / Deposit Activity</h2>
+    <p style="font-size:10px;color:#888;margin:-2px 0 8px 0">These entries reflect guarantee or deposit movements and do not affect rent balance.</p>
+    <table><thead><tr><th>Date</th><th>For</th><th class="num">Amount</th><th>Notes</th></tr></thead>
+    <tbody>${guarRows}</tbody></table>` : ""}
     </body></html>`;
 
     const w = window.open("", "_blank", "width=900,height=700");
@@ -1617,16 +1624,42 @@ function LedgerView({ ledger, payments, contract, unitId, onNoteUpdated }: { led
         </table>
       </div>
       {payments.length > 0 && (
-        <details className="bg-muted/30 rounded-md p-2">
-          <summary className="text-sm font-semibold cursor-pointer">Payment History ({payments.length})</summary>
+        <details className="bg-muted/30 rounded-md p-2" open>
+          <summary className="text-sm font-semibold cursor-pointer" data-testid="summary-rent-payment-history">
+            Rent Payment History ({payments.length})
+          </summary>
           <table className="w-full text-xs mt-2">
             <thead><tr className="text-muted-foreground"><th className="text-left px-2 py-1">Date</th><th className="text-left px-2 py-1">For</th><th className="text-right px-2 py-1">Amount</th><th className="text-left px-2 py-1">Notes</th></tr></thead>
             <tbody>
               {payments.map(p => (
-                <tr key={p.id} className="border-t">
+                <tr key={p.id} className="border-t" data-testid={`row-rent-payment-${p.id}`}>
                   <td className="px-2 py-1">{format(new Date(p.paymentDate), "dd MMM yyyy")}</td>
                   <td className="px-2 py-1">{MONTH_NAMES[p.forMonth]} {p.forYear}</td>
                   <td className="px-2 py-1 text-right tabular-nums">${fmtMoney(p.amount)}</td>
+                  <td className="px-2 py-1 text-muted-foreground">{p.notes || ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
+
+      {guaranteePayments.length > 0 && (
+        <details className="rounded-md border border-purple-200 dark:border-purple-900 bg-purple-50/50 dark:bg-purple-950/20 p-2" open>
+          <summary className="text-sm font-semibold cursor-pointer text-purple-800 dark:text-purple-300" data-testid="summary-guarantee-activity">
+            Guarantee / Deposit Activity ({guaranteePayments.length})
+          </summary>
+          <p className="text-xs text-muted-foreground mt-1 mb-2">
+            These entries reflect guarantee or deposit movements. They do <strong>not</strong> affect rent balance or the Paid column above.
+          </p>
+          <table className="w-full text-xs">
+            <thead><tr className="text-muted-foreground"><th className="text-left px-2 py-1">Date</th><th className="text-left px-2 py-1">For</th><th className="text-right px-2 py-1">Amount</th><th className="text-left px-2 py-1">Notes</th></tr></thead>
+            <tbody>
+              {guaranteePayments.map(p => (
+                <tr key={p.id} className="border-t border-purple-100 dark:border-purple-900" data-testid={`row-guarantee-payment-${p.id}`}>
+                  <td className="px-2 py-1">{format(new Date(p.paymentDate), "dd MMM yyyy")}</td>
+                  <td className="px-2 py-1">{MONTH_NAMES[p.forMonth]} {p.forYear}</td>
+                  <td className="px-2 py-1 text-right tabular-nums font-medium">${fmtMoney(p.amount)}</td>
                   <td className="px-2 py-1 text-muted-foreground">{p.notes || ""}</td>
                 </tr>
               ))}

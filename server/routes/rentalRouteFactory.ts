@@ -563,9 +563,15 @@ export function registerRentalRoutes(
       const ledger = await db.select().from(propertyMonthlyLedger)
         .where(eq(propertyMonthlyLedger.contractId, contract.id))
         .orderBy(propertyMonthlyLedger.year, propertyMonthlyLedger.month);
-      const payments = await db.select().from(propertyPayments)
+      const allPaymentsExport = await db.select().from(propertyPayments)
         .where(eq(propertyPayments.contractId, contract.id))
         .orderBy(desc(propertyPayments.paymentDate));
+      const payments = allPaymentsExport.filter(
+        p => p.ledgerRowId !== null && !(p.notes ?? "").includes("[Guarantee release]"),
+      );
+      const guaranteePaymentsExport = allPaymentsExport.filter(
+        p => p.ledgerRowId === null || (p.notes ?? "").includes("[Guarantee release]"),
+      );
 
       const monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       const fmtNum = (v: any) => Number(v || 0);
@@ -672,9 +678,10 @@ export function registerRentalRoutes(
         nr.height = Math.max(18, Math.ceil(contract.statementNote.length / 60) * 15);
       }
 
-      if (payments.length > 0) {
+      const addPaymentSection = (title: string, rows: typeof payments) => {
+        if (rows.length === 0) return;
         ws.addRow([]);
-        const ph = ws.addRow(["PAYMENT HISTORY", "", "", "", ""]);
+        const ph = ws.addRow([title, "", "", "", ""]);
         ws.mergeCells(`A${ph.number}:E${ph.number}`);
         ph.getCell(1).font = { bold: true, size: 10 };
         ph.getCell(1).fill = grayFill;
@@ -684,7 +691,7 @@ export function registerRentalRoutes(
         ph2.eachCell(c => { c.font = headerFont; c.fill = grayFill; });
         ph2.height = 15;
 
-        for (const p of payments) {
+        for (const p of rows) {
           const r = ws.addRow([
             new Date(p.paymentDate as any).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
             `${monthNames[p.forMonth]} ${p.forYear}`,
@@ -695,7 +702,10 @@ export function registerRentalRoutes(
           r.getCell(3).numFmt = "#,##0.00"; r.getCell(3).alignment = { horizontal: "right" };
           r.height = 15;
         }
-      }
+      };
+
+      addPaymentSection("RENT PAYMENT HISTORY", payments);
+      addPaymentSection("GUARANTEE / DEPOSIT ACTIVITY", guaranteePaymentsExport);
 
       const buf = await wb.xlsx.writeBuffer();
       const filename = `Rental_${unit.unitNumber.replace(/\s+/g, "_")}_${contract.tenantName.replace(/\s+/g, "_")}.xlsx`;
@@ -1326,15 +1336,24 @@ export function registerRentalRoutes(
         eq(propertyContracts.status, "ACTIVE"),
       ));
 
-      let ledger: any[] = [], payments: any[] = [];
+      let ledger: any[] = [], rentPayments: any[] = [], guaranteePayments: any[] = [];
       if (contract) {
         await ensureMonthlyLedgerRows(contract.id);
         ledger = await db.select().from(propertyMonthlyLedger)
           .where(eq(propertyMonthlyLedger.contractId, contract.id))
           .orderBy(propertyMonthlyLedger.year, propertyMonthlyLedger.month);
-        payments = await db.select().from(propertyPayments)
+        const allPayments = await db.select().from(propertyPayments)
           .where(eq(propertyPayments.contractId, contract.id))
           .orderBy(desc(propertyPayments.paymentDate));
+        // Separate guarantee/deposit activity from normal rent payments.
+        // A payment is a guarantee activity if its notes contain "[Guarantee release]"
+        // OR if ledgerRowId is null (guarantee-to-cash inserts with ledgerRowId: null).
+        guaranteePayments = allPayments.filter(
+          p => p.ledgerRowId === null || (p.notes ?? "").includes("[Guarantee release]"),
+        );
+        rentPayments = allPayments.filter(
+          p => p.ledgerRowId !== null && !(p.notes ?? "").includes("[Guarantee release]"),
+        );
       }
 
       const pastContracts = await db.select().from(propertyContracts)
@@ -1346,7 +1365,7 @@ export function registerRentalRoutes(
         ))
         .orderBy(desc(propertyContracts.endDate));
 
-      res.json({ unit, contract: contract ?? null, ledger, payments, pastContracts });
+      res.json({ unit, contract: contract ?? null, ledger, payments: rentPayments, guaranteePayments, pastContracts });
     } catch (e: any) {
       console.error(`${tag} detail:`, e);
       res.status(500).json({ message: e.message });
