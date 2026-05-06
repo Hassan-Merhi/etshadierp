@@ -19,6 +19,15 @@ function getCompanyId(req: any): number | null {
   return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId || null;
 }
 
+function buildExportFilename(parts: (string | null | undefined)[], ext: string): string {
+  const safe = parts
+    .filter((p): p is string => Boolean(p && p.trim()))
+    .map((p) => p.replace(/[\\/*?:[\]<>|]/g, "").replace(/\s+/g, "_").trim())
+    .filter((p) => p.length > 0);
+  const base = safe.join("_") || "export";
+  return ext ? `${base}.${ext}` : base;
+}
+
 /**
  * Build a full loading summary for an invoice.
  * "loaded" counts only OPEN and COMPLETED sessions — CANCELLED sessions are excluded.
@@ -36,6 +45,7 @@ async function buildLoadingSummary(invoiceId: number, companyId: number, activeS
       totalQtyBales: customerOrders.totalQtyBales,
       grandTotal: customerOrders.grandTotal,
       containerNumber: customerOrders.containerNumber,
+      destination: customerOrders.destination,
       customerName: customers.legalName,
       customerCode: customers.code,
     })
@@ -794,7 +804,7 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       }
 
       const buf = await wb.xlsx.writeBuffer();
-      const filename = `loading-report-${inv.invoiceNumber || invoiceId}.xlsx`;
+      const filename = buildExportFilename([inv.containerNumber, inv.customerName, inv.destination], "xlsx");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buf);
@@ -940,7 +950,7 @@ ${remainingBales.length === 0
         db.select().from(factoryInvoiceLoadingBales)
           .where(and(eq(factoryInvoiceLoadingBales.sessionId, sessionId), eq(factoryInvoiceLoadingBales.companyId, companyId)))
           .orderBy(factoryInvoiceLoadingBales.scannedAt),
-        db.select({ invoiceNumber: customerOrders.invoiceNumber, orderDate: customerOrders.orderDate, customerName: customers.legalName })
+        db.select({ invoiceNumber: customerOrders.invoiceNumber, orderDate: customerOrders.orderDate, customerName: customers.legalName, containerNumber: customerOrders.containerNumber, destination: customerOrders.destination })
           .from(customerOrders)
           .leftJoin(customers, eq(customerOrders.customerId, customers.id))
           .where(eq(customerOrders.id, session.invoiceId))
@@ -1051,7 +1061,7 @@ ${remainingBales.length === 0
       }
 
       const buf = await wb.xlsx.writeBuffer();
-      const filename = `loading-session-${session.id}.xlsx`;
+      const filename = buildExportFilename([invoice?.containerNumber, invoice?.customerName, invoice?.destination], "xlsx");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buf);
@@ -1083,7 +1093,7 @@ ${remainingBales.length === 0
         db.select().from(factoryInvoiceLoadingBales)
           .where(and(eq(factoryInvoiceLoadingBales.sessionId, sessionId), eq(factoryInvoiceLoadingBales.companyId, companyId)))
           .orderBy(factoryInvoiceLoadingBales.scannedAt),
-        db.select({ invoiceNumber: customerOrders.invoiceNumber, orderDate: customerOrders.orderDate, customerName: customers.legalName })
+        db.select({ invoiceNumber: customerOrders.invoiceNumber, orderDate: customerOrders.orderDate, customerName: customers.legalName, containerNumber: customerOrders.containerNumber, destination: customerOrders.destination })
           .from(customerOrders)
           .leftJoin(customers, eq(customerOrders.customerId, customers.id))
           .where(eq(customerOrders.id, session.invoiceId))
@@ -1093,8 +1103,9 @@ ${remainingBales.length === 0
 
       const remainingBales = invoiceSummary?.invoiceBales.filter((b) => !b.loaded) ?? [];
 
+      const pdfTitle = buildExportFilename([invoice?.containerNumber, invoice?.customerName, invoice?.destination], "");
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>Loading Session #${session.id}</title>
+<title>${pdfTitle || `Loading Session #${session.id}`}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Arial, sans-serif; font-size: 11px; padding: 20px 24px; color: #111827; }
