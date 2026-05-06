@@ -207,17 +207,25 @@ export default function FactoryPOS() {
     setEditLoaded(true);
   }, [editSaleData, editLoaded]);
 
-  const filteredInventory = (inventory || []).filter(item =>
-    !search ||
-    item.productName.toLowerCase().includes(search.toLowerCase()) ||
-    (item.articleCode || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const normSearch = (s: string) => (s || "").toLowerCase().replace(/[\s.\-_]/g, "");
 
-  const mobileFilteredInventory = (inventory || []).filter(item =>
-    !mobileBrowseSearch ||
-    item.productName.toLowerCase().includes(mobileBrowseSearch.toLowerCase()) ||
-    (item.articleCode || "").toLowerCase().includes(mobileBrowseSearch.toLowerCase())
-  );
+  const filteredInventory = (inventory || []).filter(item => {
+    if (!search) return true;
+    const s = normSearch(search);
+    return (
+      normSearch(item.productName).includes(s) ||
+      normSearch(item.articleCode).includes(s)
+    );
+  });
+
+  const mobileFilteredInventory = (inventory || []).filter(item => {
+    if (!mobileBrowseSearch) return true;
+    const s = normSearch(mobileBrowseSearch);
+    return (
+      normSearch(item.productName).includes(s) ||
+      normSearch(item.articleCode).includes(s)
+    );
+  });
 
   // Scroll the highlighted item into view when navigating with arrow keys
   useEffect(() => {
@@ -237,7 +245,10 @@ export default function FactoryPOS() {
       setHighlightedIndex(prev => Math.max(prev - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const item = filteredInventory[highlightedIndex] ?? filteredInventory[0];
+      const searchNorm = normSearch(search);
+      // Prefer an exact articleCode match (barcode scanner sends full code + Enter)
+      const exactMatch = filteredInventory.find(item => normSearch(item.articleCode) === searchNorm);
+      const item = exactMatch ?? filteredInventory[highlightedIndex] ?? filteredInventory[0];
       if (item) {
         addOrIncrementProduct(item);
         setSearch("");
@@ -1059,7 +1070,9 @@ export default function FactoryPOS() {
                 onKeyDown={e => {
                   if (e.key === "Enter" && mobileFilteredInventory.length > 0) {
                     e.preventDefault();
-                    addProductFromMobile(mobileFilteredInventory[0]);
+                    const searchNorm = normSearch(mobileBrowseSearch);
+                    const exactMatch = mobileFilteredInventory.find(item => normSearch(item.articleCode) === searchNorm);
+                    addProductFromMobile(exactMatch ?? mobileFilteredInventory[0]);
                   }
                 }}
                 className="pl-9"
