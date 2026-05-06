@@ -1720,10 +1720,12 @@ export function registerContainerRoutes(app: Express) {
               .where(eq(containers.id, existingPO.containerId));
           }
           
+          // Compute grand total outside the voucherId guard so the interco sync
+          // can run even for POs that have no local subsidiary voucher.
+          const poGrandTotal = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
+
           // Update the associated voucher with new total (items + all charges)
           if (existingPO.voucherId) {
-            const poGrandTotal = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
-            
             // Update voucher total amount
             await tx.update(vouchers)
               .set({ totalAmount: poGrandTotal.toFixed(2) })
@@ -1748,10 +1750,11 @@ export function registerContainerRoutes(app: Express) {
                   .where(eq(voucherEntries.id, entry.id));
               }
             }
-
-            // ── Inter-company sync: update the matching INTERCO-PARENT voucher in the parent company ──
-            await syncIntercoParentVoucher(tx, existingPO.poNumber, poGrandTotal);
           }
+
+          // ── Inter-company sync: always update the INTERCO-PARENT voucher in the parent
+          // company, regardless of whether the subsidiary PO has its own local voucherId.
+          await syncIntercoParentVoucher(tx, existingPO.poNumber, poGrandTotal);
           
           // Sync container_charges table when PO charges are edited
           if (chargesWereEdited && existingPO.containerId) {
@@ -1870,35 +1873,39 @@ export function registerContainerRoutes(app: Express) {
       // Update PO
       const updated = await storage.updatePurchaseOrder(id, allowedUpdates);
       
-      // If the grand total changed, update voucher entries to reflect new supplier balance
-      if (Math.abs(newGrandTotal - oldGrandTotal) > 0.001 && existingPO.voucherId) {
+      // If the grand total changed, update voucher entries and sync parent company
+      if (Math.abs(newGrandTotal - oldGrandTotal) > 0.001) {
         await db.transaction(async (tx) => {
-          // Update voucher total amount
-          await tx.update(vouchers)
-            .set({ totalAmount: newGrandTotal.toFixed(2) })
-            .where(eq(vouchers.id, existingPO.voucherId!));
-          
-          // Update voucher entries - both debit (purchases) and credit (supplier)
-          const existingEntries = await tx
-            .select()
-            .from(voucherEntries)
-            .where(eq(voucherEntries.voucherId, existingPO.voucherId!));
-          
-          for (const entry of existingEntries) {
-            if (parseFloat(entry.debitAmount || "0") > 0) {
-              // Update debit entry (Purchases expense)
-              await tx.update(voucherEntries)
-                .set({ debitAmount: newGrandTotal.toFixed(2) })
-                .where(eq(voucherEntries.id, entry.id));
-            } else if (parseFloat(entry.creditAmount || "0") > 0) {
-              // Update credit entry (Supplier payable)
-              await tx.update(voucherEntries)
-                .set({ creditAmount: newGrandTotal.toFixed(2) })
-                .where(eq(voucherEntries.id, entry.id));
+          // Update the subsidiary's own voucher only if it has one
+          if (existingPO.voucherId) {
+            // Update voucher total amount
+            await tx.update(vouchers)
+              .set({ totalAmount: newGrandTotal.toFixed(2) })
+              .where(eq(vouchers.id, existingPO.voucherId));
+            
+            // Update voucher entries - both debit (purchases) and credit (supplier)
+            const existingEntries = await tx
+              .select()
+              .from(voucherEntries)
+              .where(eq(voucherEntries.voucherId, existingPO.voucherId));
+            
+            for (const entry of existingEntries) {
+              if (parseFloat(entry.debitAmount || "0") > 0) {
+                // Update debit entry (Purchases expense)
+                await tx.update(voucherEntries)
+                  .set({ debitAmount: newGrandTotal.toFixed(2) })
+                  .where(eq(voucherEntries.id, entry.id));
+              } else if (parseFloat(entry.creditAmount || "0") > 0) {
+                // Update credit entry (Supplier payable)
+                await tx.update(voucherEntries)
+                  .set({ creditAmount: newGrandTotal.toFixed(2) })
+                  .where(eq(voucherEntries.id, entry.id));
+              }
             }
           }
 
-          // ── Inter-company sync: update the matching INTERCO-PARENT voucher in the parent company ──
+          // ── Inter-company sync: always update the INTERCO-PARENT voucher in the parent
+          // company, regardless of whether the subsidiary PO has its own local voucherId.
           await syncIntercoParentVoucher(tx, existingPO.poNumber, newGrandTotal);
           
           // Update container totals if applicable
