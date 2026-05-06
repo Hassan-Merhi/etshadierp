@@ -1,8 +1,8 @@
 import { useState, useMemo, Fragment, useCallback, useEffect, useRef } from "react";
-import { useSearch } from "wouter";
+import { useSearch, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock, Pencil, X, Link2 } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock, Pencil, X, Link2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -65,6 +65,7 @@ const STATUS_LABELS: Record<string, string> = {
 /* ═══════════════════════════════════════════════════════════════════════════ */
 export default function FactoryStockAllocationV5() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const searchString = useSearch();
   const focusProformaId = useMemo(() => {
     const p = new URLSearchParams(searchString).get("proformaId");
@@ -572,6 +573,18 @@ export default function FactoryStockAllocationV5() {
                                 }}
                               >
                                 <Link2 className="h-2.5 w-2.5 mr-1" />Link Existing
+                              </Button>
+                              {/* Edit Proforma — navigate to invoicing page with this proforma expanded */}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-5 px-2 text-[10px]"
+                                data-testid={`button-v5-edit-proforma-${proforma.proformaId}`}
+                                onClick={() => navigate(
+                                  `/factory/invoicing?tab=proformas&customerId=${proforma.customerId ?? ""}&expandProformaId=${proforma.proformaId}`
+                                )}
+                              >
+                                <ExternalLink className="h-2.5 w-2.5 mr-1" />Edit Proforma
                               </Button>
                               {/* Edit Draft Quantities — only when at least one DRAFT container has 0 loaded bales */}
                               {!isReadyToClose && proforma.containers.some(c => c.status === "DRAFT" && c.loadedQty === 0) && (

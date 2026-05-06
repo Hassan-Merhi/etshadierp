@@ -59,7 +59,11 @@ export default function FactoryProformas() {
     const params = new URLSearchParams(window.location.search);
     return params.get("customerId") || "";
   });
-  const [expandedProformaId, setExpandedProformaId] = useState<number | null>(null);
+  const [expandedProformaId, setExpandedProformaId] = useState<number | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ep = params.get("expandProformaId");
+    return ep ? parseInt(ep, 10) : null;
+  });
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newProformaName, setNewProformaName] = useState("");
   const [isAddLineOpen, setIsAddLineOpen] = useState(false);
