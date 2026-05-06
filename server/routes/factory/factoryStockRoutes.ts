@@ -779,6 +779,7 @@ export function registerFactoryStockRoutes(app: Express) {
         baleCount: number;
         sellingPrice: string;
         productionPrice: number;
+        referenceNumbers: string[];
       }>();
 
       for (const b of bales) {
@@ -791,11 +792,13 @@ export function registerFactoryStockRoutes(app: Express) {
         const sellingPrice = String(product?.sellingPrice || "0");
         const categoryName = product?.categoryId ? (categoryMap.get(product.categoryId) || b.category || null) : (b.category || null);
         const categoryId = product?.categoryId || null;
+        const refNum: string = (b as any).referenceNumber || "";
         if (existing) {
           existing.quantity += qty;
           existing.totalWeight += weight;
           existing.totalCost += productionPrice;
           existing.baleCount += 1;
+          if (refNum) existing.referenceNumbers.push(refNum);
         } else {
           grouped.set(groupKey, {
             productId: product?.id || b.productId || 0,
@@ -809,6 +812,7 @@ export function registerFactoryStockRoutes(app: Express) {
             baleCount: 1,
             sellingPrice,
             productionPrice,
+            referenceNumbers: refNum ? [refNum] : [],
           });
         }
       }

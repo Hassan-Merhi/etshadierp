@@ -60,6 +60,7 @@ interface InventoryItem {
   quantity: number;
   totalWeight: number;
   sellingPrice: string;
+  referenceNumbers?: string[];
 }
 
 interface ExpenseRow {
@@ -214,7 +215,8 @@ export default function FactoryPOS() {
     const s = normSearch(search);
     return (
       normSearch(item.productName).includes(s) ||
-      normSearch(item.articleCode).includes(s)
+      normSearch(item.articleCode).includes(s) ||
+      (item.referenceNumbers || []).some(r => normSearch(r).includes(s))
     );
   });
 
@@ -223,7 +225,8 @@ export default function FactoryPOS() {
     const s = normSearch(mobileBrowseSearch);
     return (
       normSearch(item.productName).includes(s) ||
-      normSearch(item.articleCode).includes(s)
+      normSearch(item.articleCode).includes(s) ||
+      (item.referenceNumbers || []).some(r => normSearch(r).includes(s))
     );
   });
 
@@ -246,8 +249,11 @@ export default function FactoryPOS() {
     } else if (e.key === "Enter") {
       e.preventDefault();
       const searchNorm = normSearch(search);
-      // Prefer an exact articleCode match (barcode scanner sends full code + Enter)
-      const exactMatch = filteredInventory.find(item => normSearch(item.articleCode) === searchNorm);
+      // Prefer an exact articleCode or reference-number match (barcode scanner sends full code + Enter)
+      const exactMatch = filteredInventory.find(item =>
+        normSearch(item.articleCode) === searchNorm ||
+        (item.referenceNumbers || []).some(r => normSearch(r) === searchNorm)
+      );
       const item = exactMatch ?? filteredInventory[highlightedIndex] ?? filteredInventory[0];
       if (item) {
         addOrIncrementProduct(item);
@@ -1071,7 +1077,10 @@ export default function FactoryPOS() {
                   if (e.key === "Enter" && mobileFilteredInventory.length > 0) {
                     e.preventDefault();
                     const searchNorm = normSearch(mobileBrowseSearch);
-                    const exactMatch = mobileFilteredInventory.find(item => normSearch(item.articleCode) === searchNorm);
+                    const exactMatch = mobileFilteredInventory.find(item =>
+                      normSearch(item.articleCode) === searchNorm ||
+                      (item.referenceNumbers || []).some(r => normSearch(r) === searchNorm)
+                    );
                     addProductFromMobile(exactMatch ?? mobileFilteredInventory[0]);
                   }
                 }}
