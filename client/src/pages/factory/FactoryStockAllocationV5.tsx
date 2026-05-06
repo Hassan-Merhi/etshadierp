@@ -1,8 +1,8 @@
 import { useState, useMemo, Fragment, useCallback, useEffect, useRef } from "react";
-import { useSearch, useLocation } from "wouter";
+import { useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock, Pencil, X, Link2, ExternalLink } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock, Pencil, X, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import CreateProformaV5Drawer from "./CreateProformaV5Drawer";
+import EditProformaV5Drawer from "./EditProformaV5Drawer";
 import { PageHeader } from "@/components/PageHeader";
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
@@ -65,7 +66,6 @@ const STATUS_LABELS: Record<string, string> = {
 /* ═══════════════════════════════════════════════════════════════════════════ */
 export default function FactoryStockAllocationV5() {
   const { toast } = useToast();
-  const [, navigate] = useLocation();
   const searchString = useSearch();
   const focusProformaId = useMemo(() => {
     const p = new URLSearchParams(searchString).get("proformaId");
@@ -75,6 +75,7 @@ export default function FactoryStockAllocationV5() {
   const firstMatchRef = useRef<HTMLTableRowElement | null>(null);
 
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
+  const [editDrawerProformaId, setEditDrawerProformaId] = useState<number | null>(null);
   const [expandedRows, setExpandedRows]         = useState<Set<string>>(new Set());
   const [hideZero, setHideZero]                 = useState(true);
   const [refreshFlash, setRefreshFlash]         = useState(false);
@@ -574,17 +575,15 @@ export default function FactoryStockAllocationV5() {
                               >
                                 <Link2 className="h-2.5 w-2.5 mr-1" />Link Existing
                               </Button>
-                              {/* Edit Proforma — navigate to invoicing page with this proforma expanded */}
+                              {/* Edit Proforma — opens in-page edit drawer */}
                               <Button
                                 size="sm"
                                 variant="outline"
                                 className="h-5 px-2 text-[10px]"
                                 data-testid={`button-v5-edit-proforma-${proforma.proformaId}`}
-                                onClick={() => navigate(
-                                  `/factory/invoicing?tab=proformas&customerId=${proforma.customerId ?? ""}&expandProformaId=${proforma.proformaId}`
-                                )}
+                                onClick={() => setEditDrawerProformaId(proforma.proformaId)}
                               >
-                                <ExternalLink className="h-2.5 w-2.5 mr-1" />Edit Proforma
+                                <Pencil className="h-2.5 w-2.5 mr-1" />Edit Proforma
                               </Button>
                               {/* Edit Draft Quantities — only when at least one DRAFT container has 0 loaded bales */}
                               {!isReadyToClose && proforma.containers.some(c => c.status === "DRAFT" && c.loadedQty === 0) && (
@@ -707,6 +706,17 @@ export default function FactoryStockAllocationV5() {
         articleRows={drawerRows}
         onSuccess={() => query.refetch()}
       />
+
+      {/* Edit Proforma drawer */}
+      {editDrawerProformaId !== null && (
+        <EditProformaV5Drawer
+          open={editDrawerProformaId !== null}
+          onClose={() => setEditDrawerProformaId(null)}
+          proformaId={editDrawerProformaId}
+          articleRows={drawerRows}
+          onSuccess={() => query.refetch()}
+        />
+      )}
 
       {/* Add Containers dialog */}
       <Dialog open={!!addCtDialog} onOpenChange={open => { if (!open) setAddCtDialog(null); }}>

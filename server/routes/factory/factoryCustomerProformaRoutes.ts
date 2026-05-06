@@ -55,6 +55,32 @@ import fs from "fs";
 
 
 export function registerFactoryCustomerProformaRoutes(app: Express) {
+  /* Single proforma by ID — used by EditProformaV5Drawer */
+  app.get("/api/factory/customer-proformas/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      const [proforma] = await db.select().from(customerProformas)
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
+      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+      const lines = await db.select().from(customerProformaLines)
+        .where(eq(customerProformaLines.proformaId, id));
+      const articleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
+      let weightMap = new Map<string, string>();
+      if (articleCodes.length > 0) {
+        const baleProds = await db.select({ articleCode: factoryBaleProducts.articleCode, weightPerBaleKg: factoryBaleProducts.weightPerBaleKg, name: factoryBaleProducts.name })
+          .from(factoryBaleProducts)
+          .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes as string[])));
+        baleProds.forEach((p: any) => { if (p.articleCode) weightMap.set(p.articleCode, p.weightPerBaleKg || "0"); });
+      }
+      const enrichedLines = lines.map((l: any) => ({ ...l, weightPerBaleKg: weightMap.get(l.articleCode) || "0" }));
+      res.json({ ...proforma, lines: enrichedLines });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/factory/customer-proformas", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
