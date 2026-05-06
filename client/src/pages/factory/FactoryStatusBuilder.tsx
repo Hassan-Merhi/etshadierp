@@ -1134,31 +1134,6 @@ export default function FactoryStatusBuilder() {
                   <td className="border border-border" />
                 </tr>
 
-                {/* Footer — TOTAL row (column sums) */}
-                {activeSheet.rows.length > 0 && (
-                  <tr className="bg-muted/40">
-                    <td className="border border-border px-2 py-1.5">
-                      <span className="text-xs font-semibold text-muted-foreground">TOTAL</span>
-                    </td>
-                    {totalRow.map((val, ci) => {
-                      const isNeg = typeof val === "number" && val < 0;
-                      const colLabel = activeSheet.columns[ci]?.label ?? "";
-                      const isTotalCol = isTotalColumn(colLabel);
-                      return (
-                        <td
-                          key={ci}
-                          className={`border border-border px-2 py-1.5 text-xs font-semibold text-center tabular-nums ${isTotalCol ? "bg-blue-50/60 dark:bg-blue-950/30" : ""}`}
-                          data-testid={`sb-footer-total-${ci}`}
-                        >
-                          <span className={isNeg ? "text-red-500" : isTotalCol ? "text-blue-700 dark:text-blue-300" : "text-foreground"}>
-                            {fmt(val)}
-                          </span>
-                        </td>
-                      );
-                    })}
-                    <td className="border border-border" />
-                  </tr>
-                )}
                 {/* Footer — DIFFERENCE row (diff between neighbouring columns) */}
                 {activeSheet.rows.length > 0 && (
                   <tr className="bg-amber-50/60 dark:bg-amber-950/20">
