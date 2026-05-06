@@ -1276,6 +1276,23 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         }
       }
 
+      // Sync daybook ORDER_VERIFIED row with new grand total (VERIFIED path)
+      if (updatedOrder.status === "VERIFIED") {
+        const newGrandTotal = parseFloat(updatedOrder.grandTotal || "0");
+        const [verifiedDaybookEntry] = await db.select({ id: factoryDaybookEntries.id })
+          .from(factoryDaybookEntries)
+          .where(and(
+            eq(factoryDaybookEntries.companyId, companyId),
+            eq(factoryDaybookEntries.txType, "ORDER_VERIFIED"),
+            eq(factoryDaybookEntries.referenceId, orderId)
+          ));
+        if (verifiedDaybookEntry) {
+          await db.update(factoryDaybookEntries)
+            .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
+            .where(eq(factoryDaybookEntries.id, verifiedDaybookEntry.id));
+        }
+      }
+
       // Create PRE-voucher when order is PENDING or VERIFIED (before finalization)
       // Uses naming CHARGE-PRE-{orderId}-{chargeId} — finalization will rename it to the
       // invoice-based name, so it is never double-counted.
@@ -3143,8 +3160,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           updatedAt: new Date(),
         }).where(eq(customerOrders.id, orderId)).returning();
         const [verifyCustomer] = await db.select({ legalName: customers.legalName }).from(customers).where(eq(customers.id, order.customerId));
-        const verifyBales = await db.select({ priceUsed: customerOrderBales.priceUsed }).from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
-        const verifyTotalValue = verifyBales.reduce((s: number, b: any) => s + parseFloat(b.priceUsed || "0"), 0);
+        // Use grandTotal (bales + all charges including surcharges), not just bale sum
+        const verifyTotalValue = parseFloat(updated?.grandTotal || order.grandTotal || "0");
         const verifyToday = getClientDate(req);
         await db.delete(factoryDaybookEntries).where(and(
           eq(factoryDaybookEntries.companyId, companyId),

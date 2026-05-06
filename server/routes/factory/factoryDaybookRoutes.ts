@@ -280,21 +280,21 @@ export function registerFactoryDaybookRoutes(app: Express) {
           }
         }
 
-        // LOADING_SUBMITTED / ORDER_VERIFIED: derive from customerOrderBales.priceUsed
+        // LOADING_SUBMITTED / ORDER_VERIFIED: derive from customerOrders.grandTotal
+        // (grandTotal includes bales + all charges/surcharges, not just bale prices)
         const loadingRows = zeroRows.filter((r: any) =>
           ["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(r.txType) && r.referenceId
         );
         if (loadingRows.length > 0) {
           const orderIds = [...new Set(loadingRows.map((r: any) => r.referenceId as number))];
-          const orderBaleValues = await db.select({
-            orderId: customerOrderBales.orderId,
-            priceUsed: customerOrderBales.priceUsed,
-          }).from(customerOrderBales).where(inArray(customerOrderBales.orderId, orderIds));
+          const orderGrandTotals = await db.select({
+            id: customerOrders.id,
+            grandTotal: customerOrders.grandTotal,
+          }).from(customerOrders).where(inArray(customerOrders.id, orderIds));
 
           const orderTotals = new Map<number, number>();
-          for (const b of orderBaleValues) {
-            const oid = b.orderId;
-            orderTotals.set(oid, (orderTotals.get(oid) || 0) + parseFloat(b.priceUsed || "0"));
+          for (const o of orderGrandTotals) {
+            orderTotals.set(o.id, parseFloat(o.grandTotal || "0"));
           }
 
           for (const row of filteredDaybookRows as any[]) {
