@@ -2772,6 +2772,23 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           return sum + oc * fx;
         }, 0);
 
+        // Offload additional charges for this supplier (brokers include this; add for standalone too)
+        const approxFxRate = (cc: string) => cc === "USD" ? 1 : cc === "EUR" ? 1.16 : cc === "AUD" ? 0.71 : 1;
+        const offloadChargesAmt = allOffloadChargesF
+          .filter((oc: any) => oc.supplierId === s.id)
+          .reduce((sum: number, oc: any) => {
+            const cc = oc.currencyCode || "USD";
+            return sum + parseFloat(oc.amount || "0") * approxFxRate(cc);
+          }, 0);
+
+        // Container other-charges table for this supplier (brokers include this; add for standalone too)
+        const containerOtherChargesAmt = allContainerOtherChargesF
+          .filter((oc: any) => oc.supplierId === s.id)
+          .reduce((sum: number, oc: any) => {
+            const cc = oc.currencyCode || oc.containerCurrencyCode || "USD";
+            return sum + parseFloat(oc.amount || "0") * approxFxRate(cc);
+          }, 0);
+
         let fxNet = 0;
         for (const t of allFxTransfersF as any[]) {
           if (t.toSupplierId === s.id) fxNet += parseFloat(t.toAmountUsd || "0");
@@ -2784,7 +2801,8 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
 
         const voucherPaid = voucherPaidBySupplier[s.id] || 0;
         const balance = round2(
-          parseFloat(s.openingBalance || "0") + containerValue + commission + otherCharges + fxNet - payments - voucherPaid
+          parseFloat(s.openingBalance || "0") + containerValue + commission + otherCharges +
+          offloadChargesAmt + containerOtherChargesAmt + fxNet - payments - voucherPaid
         );
 
         if (Math.abs(balance) > 0.01) {
@@ -2871,7 +2889,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       // (tracked directly via employeeId on voucher entries, not via a ledger account).
       // Any ledger account named/coded as "Payroll Payable" duplicates that and
       // must be excluded here — the single correct figure is injected below.
-      const ledgerOnUs = ledgerOnUsRaw.filter((a: any) => {
+      let ledgerOnUs = ledgerOnUsRaw.filter((a: any) => {
         const nameLower = (a.name || "").toLowerCase();
         const code = (a.code || "").toUpperCase();
         const isPayrollPayable =
@@ -2881,7 +2899,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         return !isPayrollPayable;
       });
       const ledgerForUsTotal = round2(ledgerForUs.reduce((s: number, a: any) => s + a.value, 0));
-      const ledgerOnUsTotal = round2(ledgerOnUs.reduce((s: number, a: any) => s + a.value, 0));
+      let ledgerOnUsTotal = round2(ledgerOnUs.reduce((s: number, a: any) => s + a.value, 0));
 
       const customerItems: { name: string; balanceUsd: number; ledgerAccountId?: number }[] = [];
 
@@ -3150,6 +3168,45 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const pendingTotal  = round2(pendingOrders.reduce((s, o) => s + o.grandTotal, 0));
       const verifiedTotal = round2(verifiedOrders.reduce((s, o) => s + o.grandTotal, 0));
       const loadingTotal  = round2(loadingOrders.reduce((s, o) => s + o.grandTotal, 0));
+
+      // ── Charge-offset: prevent double-counting charges on active (non-FINALIZED) orders ──
+      // PENDING/VERIFIED/LOADING orders already have their charges baked into grandTotal
+      // (via recalculateOrderTotals), so those charge amounts are already counted in
+      // "What We Have".  If the same charge ledger accounts also appear in "What We Owe"
+      // (because no CHARGE-* accounting voucher was created yet), we must subtract the
+      // order-level charge amounts from the corresponding ledger balances to avoid
+      // counting them twice.
+      const activeOrderIds = (pendingVerifiedRows as any[]).map((r: any) => r.id);
+      const verifiedChargeOffsets: Record<number, number> = {};
+      if (activeOrderIds.length > 0) {
+        const chargeOffsetRows = await db
+          .select({
+            ledgerAccountId: customerOrderCharges.ledgerAccountId,
+            amount: customerOrderCharges.amount,
+          })
+          .from(customerOrderCharges)
+          .where(and(
+            inArray(customerOrderCharges.orderId, activeOrderIds),
+            sql`${customerOrderCharges.ledgerAccountId} IS NOT NULL`,
+          ));
+        for (const ch of chargeOffsetRows as any[]) {
+          const lid = ch.ledgerAccountId as number;
+          const amt = parseFloat(ch.amount || "0");
+          if (lid && amt > 0) {
+            verifiedChargeOffsets[lid] = (verifiedChargeOffsets[lid] || 0) + amt;
+          }
+        }
+      }
+      // Apply offsets: reassign ledgerOnUs with adjusted values so all downstream
+      // references (onUsTotal, onUsAccounts, response) automatically use them.
+      if (Object.keys(verifiedChargeOffsets).length > 0) {
+        ledgerOnUs = ledgerOnUs.map((a: any) => {
+          const offset = verifiedChargeOffsets[a.id] || 0;
+          if (offset <= 0) return a;
+          return { ...a, value: Math.max(0, round2(a.value - offset)) };
+        });
+        ledgerOnUsTotal = round2(ledgerOnUs.reduce((s: number, a: any) => s + a.value, 0));
+      }
 
       // ── 5. Combine and return ────────────────────────────────────────────
       // Rename for clarity — these are the two factory-specific values.
