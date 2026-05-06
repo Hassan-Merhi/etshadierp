@@ -372,6 +372,21 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const lastSavedFingerprintRef = useRef<string>("");
   const autoSaveInProgressRef = useRef(false);
 
+  // Refs that mirror the latest state values — used by the autosave interval so
+  // it doesn't need those values in its dependency array (which would reset the
+  // 30-second timer on every keystroke, preventing autosave from ever firing).
+  const autoSaveStateRef = useRef({
+    activeLocation: null as any,
+    rows: [] as any[],
+    notes: "",
+    isCreditSale: false,
+    paymentAccountType: "",
+    paymentAccountId: null as string | null,
+    selectedCustomerId: null as string | null,
+    currentDraftId: null as number | null,
+    saveDraftIsPending: false,
+  });
+
   // Callback ref so react-to-print gets notified when the invoice template mounts/unmounts
   const printCallbackRef = useCallback((el: HTMLDivElement | null) => {
     printRef.current = el;
@@ -399,6 +414,20 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const [showStockPrompt, setShowStockPrompt] = useState(false);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [sendingInvoiceWhatsApp, setSendingInvoiceWhatsApp] = useState(false);
+
+  // Keep autoSaveStateRef in sync so the interval can read latest values without
+  // being in the dependency array (which would reset the 30-second timer on every keystroke).
+  autoSaveStateRef.current = {
+    activeLocation,
+    rows,
+    notes,
+    isCreditSale,
+    paymentAccountType,
+    paymentAccountId,
+    selectedCustomerId,
+    currentDraftId,
+    saveDraftIsPending: saveDraftMutation.isPending,
+  };
 
   // Reset sale state when POS user switches location
   const prevLocationRef = useRef<number | null>(null);
@@ -955,33 +984,40 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     },
   });
 
-  // Autosave effect — silently saves every 30 seconds when cart has items and has changed
+  // Autosave effect — silently saves every 30 seconds when cart has items and has changed.
+  // Reads all mutable state from autoSaveStateRef (updated every render) so this effect
+  // never needs to restart due to state changes — the 30-second timer is stable for the
+  // entire component lifetime and always fires on schedule, even during active typing.
   useEffect(() => {
     const interval = setInterval(async () => {
-      if (!activeLocation) return;
+      const s = autoSaveStateRef.current;
+      if (!s.activeLocation) return;
       if (autoSaveInProgressRef.current) return;
-      if (saveDraftMutation.isPending) return;
+      if (s.saveDraftIsPending) return;
 
-      const validItems = rows.filter(r => r.stockItemId && r.quantity > 0 && r.rate > 0);
+      const validItems = s.rows.filter((r: any) => r.stockItemId && r.quantity > 0 && r.rate > 0);
       if (validItems.length === 0) return;
 
       const fingerprint = JSON.stringify({
-        items: validItems.map(r => ({ id: r.stockItemId, qty: r.quantity, rate: r.rate })),
-        notes, isCreditSale, paymentAccountType, paymentAccountId, selectedCustomerId,
+        items: validItems.map((r: any) => ({ id: r.stockItemId, qty: r.quantity, rate: r.rate })),
+        notes: s.notes, isCreditSale: s.isCreditSale,
+        paymentAccountType: s.paymentAccountType,
+        paymentAccountId: s.paymentAccountId,
+        selectedCustomerId: s.selectedCustomerId,
       });
       if (fingerprint === lastSavedFingerprintRef.current) return;
 
       autoSaveInProgressRef.current = true;
       try {
         const draftData = {
-          locationId: activeLocation.id,
-          paymentAccountType: isCreditSale ? "credit" : paymentAccountType,
-          paymentAccountId: isCreditSale
-            ? (selectedCustomerId ? parseInt(selectedCustomerId) : null)
-            : (paymentAccountId ? parseInt(paymentAccountId) : null),
-          isCreditSale,
-          notes,
-          items: validItems.map(row => ({
+          locationId: s.activeLocation.id,
+          paymentAccountType: s.isCreditSale ? "credit" : s.paymentAccountType,
+          paymentAccountId: s.isCreditSale
+            ? (s.selectedCustomerId ? parseInt(s.selectedCustomerId) : null)
+            : (s.paymentAccountId ? parseInt(s.paymentAccountId) : null),
+          isCreditSale: s.isCreditSale,
+          notes: s.notes,
+          items: validItems.map((row: any) => ({
             stockItemId: row.stockItemId,
             quantity: row.quantity.toString(),
             rate: row.rate.toString(),
@@ -990,8 +1026,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         };
 
         let data;
-        if (currentDraftId) {
-          const res = await apiRequest("PATCH", `/api/pos/drafts/${currentDraftId}`, draftData);
+        if (s.currentDraftId) {
+          const res = await apiRequest("PATCH", `/api/pos/drafts/${s.currentDraftId}`, draftData);
           data = await res.json();
         } else {
           const res = await apiRequest("POST", "/api/pos/drafts", draftData);
@@ -1010,7 +1046,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [activeLocation, rows, notes, isCreditSale, paymentAccountType, paymentAccountId, selectedCustomerId, currentDraftId, saveDraftMutation.isPending]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps — state is read from autoSaveStateRef to avoid resetting the timer
 
   // Load draft handler
   const handleLoadDraft = async (draftId: number) => {
