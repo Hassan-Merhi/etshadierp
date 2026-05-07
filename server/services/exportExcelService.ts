@@ -306,7 +306,16 @@ function addSummarySheet(wb: ExcelJS.Workbook, data: CompanyExportData) {
   totalRow.getCell(2).numFmt = "#,##0";
 }
 
-export async function buildCompanyWorkbook(data: CompanyExportData): Promise<Buffer> {
+/**
+ * Write the company workbook directly to `outputStream` without buffering the
+ * entire file in RAM.  The caller is responsible for ending the stream after
+ * this resolves (or letting ExcelJS handle it via wb.xlsx.write which ends the
+ * stream internally).
+ */
+export async function buildCompanyWorkbook(
+  data: CompanyExportData,
+  outputStream: NodeJS.WritableStream,
+): Promise<void> {
   const wb = new ExcelJS.Workbook();
   wb.creator = "ERP System";
   wb.created = new Date();
@@ -507,6 +516,5 @@ export async function buildCompanyWorkbook(data: CompanyExportData): Promise<Buf
   addSheet(wb, "Employee Txn Detail", data.employeeTxnDetail);
   addSheet(wb, "Location Stock Detail", data.locationStockDetail);
 
-  const buf = await wb.xlsx.writeBuffer();
-  return buf as Buffer;
+  await wb.xlsx.write(outputStream);
 }

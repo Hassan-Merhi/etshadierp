@@ -1,4 +1,5 @@
 import archiver from "archiver";
+import { PassThrough } from "stream";
 import { fetchCompanyExportData } from "../services/exportDataService";
 import { buildCompanyWorkbook } from "../services/exportExcelService";
 
@@ -11,6 +12,11 @@ export interface ExportZipResult {
 /**
  * Builds the canonical full-company export ZIP.
  * Includes one Excel workbook per company (all accounts, ledger, vouchers, etc.)
+ *
+ * Memory-safe approach: each company's workbook is streamed directly into the
+ * archiver via a PassThrough — the full workbook buffer is never held in RAM.
+ * Only one company is in flight at a time, so peak RAM usage is bounded to
+ * roughly one workbook + the compressed ZIP output being accumulated.
  *
  * This is the single source of truth used by:
  *  - Manual "Export Now → Email / Download" (exportRoutes.ts)
@@ -27,9 +33,19 @@ export async function buildFullExportZip(
 
   const dateLabel = new Date().toISOString().substring(0, 10);
 
-  const xlsxBuffers: { name: string; buf: Buffer }[] = [];
   const names:   string[] = [];
   const skipped: string[] = [];
+
+  // Start the archiver up front so we can stream into it company-by-company.
+  const chunks: Buffer[] = [];
+  const arc = archiver("zip", { zlib: { level: 6 } });
+  arc.on("data",    (c: Buffer) => chunks.push(c));
+  arc.on("warning", (e: any)   => console.warn("[FullExport] archiver warning:", e?.message || e));
+
+  const zipPromise = new Promise<Buffer>((resolve, reject) => {
+    arc.on("end",   () => resolve(Buffer.concat(chunks)));
+    arc.on("error", reject);
+  });
 
   for (const company of companies) {
     try {
@@ -37,12 +53,23 @@ export async function buildFullExportZip(
       const data = await fetchCompanyExportData(company.id, fromDate, toDate);
 
       log(`[${company.name}] Building Excel workbook...`, "info");
-      const raw     = await buildCompanyWorkbook(data);
-      const buf     = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+
       const safeName = company.name.replace(/[^a-zA-Z0-9_\- ]/g, "").trim();
-      xlsxBuffers.push({ name: safeName, buf });
+      const entryName = `${safeName}_Export_${dateLabel}.xlsx`;
+
+      // Create a PassThrough that bridges ExcelJS → archiver.
+      // ExcelJS's wb.xlsx.write() ends the stream when it finishes writing.
+      // Archiver processes this entry fully before moving on (sequential), so
+      // at most one workbook's uncompressed data is in memory at once.
+      const pass = new PassThrough();
+      arc.append(pass, { name: entryName });
+
+      await buildCompanyWorkbook(data, pass);
+      // ExcelJS ends the stream internally; ensure it is closed in case it does not.
+      if (!pass.destroyed) pass.end();
+
       names.push(company.name);
-      log(`[${company.name}] workbook ready (${(buf.length / 1024).toFixed(0)} KB)`, "success");
+      log(`[${company.name}] workbook streamed into ZIP`, "success");
     } catch (err: any) {
       log(`[${company.name}] Failed: ${err?.message || err}`, "error");
       if (err?.stack) console.error(`[FullExport] Stack for ${company.name}:`, err.stack);
@@ -50,24 +77,16 @@ export async function buildFullExportZip(
     }
   }
 
-  if (xlsxBuffers.length === 0) {
+  if (names.length === 0) {
+    // Abort the archiver cleanly before rejecting
+    arc.abort();
     const msg = `Export aborted — all ${companies.length} company/companies failed to generate workbooks. ZIP would be empty. Check server logs for per-company errors.`;
     log(msg, "error");
     throw new Error(msg);
   }
 
-  const zip = await new Promise<Buffer>((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    const arc = archiver("zip", { zlib: { level: 6 } });
-    arc.on("data",  (c: Buffer) => chunks.push(c));
-    arc.on("end",   () => resolve(Buffer.concat(chunks)));
-    arc.on("error", reject);
-
-    for (const { name, buf } of xlsxBuffers) {
-      arc.append(buf, { name: `${name}_Export_${dateLabel}.xlsx` });
-    }
-    arc.finalize();
-  });
+  arc.finalize();
+  const zip = await zipPromise;
 
   log(`ZIP ready — ${(zip.length / 1024 / 1024).toFixed(1)} MB (${names.length} companies, ${skipped.length} skipped)`, "success");
   return { zip, names, skipped };
