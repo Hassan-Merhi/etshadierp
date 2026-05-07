@@ -547,7 +547,7 @@ export default function BarcodeLookup() {
                     )}
                   </div>
 
-                  {/* Row 2: Weight + Grade + Mark as Scanned */}
+                  {/* Row 2: Weight + Grade + Worker + Mark as Scanned */}
                   <div className="flex items-center gap-6 flex-wrap">
                     {referenceResult.baleInfo && (
                       <div>
@@ -559,6 +559,15 @@ export default function BarcodeLookup() {
                       <div>
                         <p className="text-sm text-muted-foreground">Grade</p>
                         <p className="font-medium">{referenceResult.baleInfo.grade}</p>
+                      </div>
+                    )}
+                    {referenceResult.baleInfo?.workerName && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Worker</p>
+                        <p className="font-medium flex items-center gap-1">
+                          <User className="h-3.5 w-3.5 text-muted-foreground" />
+                          {referenceResult.baleInfo.workerName}
+                        </p>
                       </div>
                     )}
                     {!referenceResult.labelPrint.scannedAt && (
