@@ -5033,3 +5033,28 @@ export const statusMetricValues = pgTable("status_metric_values", {
 export const insertStatusMetricValueSchema = createInsertSchema(statusMetricValues).omit({ id: true, createdAt: true, updatedAt: true });
 export type StatusMetricValue = typeof statusMetricValues.$inferSelect;
 export type InsertStatusMetricValue = z.infer<typeof insertStatusMetricValueSchema>;
+
+// ── Stock Item Merge Audit Log (May 2026) ─────────────────────────────────────
+// Records every stock-item merge operation for audit/traceability.
+// snapshotBefore/After are JSON maps of locationId → {qty, rate, value}.
+export const stockItemMergeLogs = pgTable("stock_item_merge_logs", {
+  id:               serial("id").primaryKey(),
+  companyId:        integer("company_id").notNull(),
+  keptItemId:       integer("kept_item_id").notNull(),
+  keptItemCode:     varchar("kept_item_code",   { length: 50 }).notNull(),
+  keptItemName:     text("kept_item_name").notNull(),
+  mergedItemId:     integer("merged_item_id").notNull(),
+  mergedItemCode:   varchar("merged_item_code", { length: 50 }).notNull(),
+  mergedItemName:   text("merged_item_name").notNull(),
+  snapshotBefore:   jsonb("snapshot_before").notNull().$type<Record<string, unknown>>(),
+  snapshotAfter:    jsonb("snapshot_after").notNull().$type<Record<string, unknown>>(),
+  mergedByUserId:   integer("merged_by_user_id").notNull(),
+  mergedAt:         timestamp("merged_at").notNull().defaultNow(),
+  notes:            text("notes"),
+}, (t) => ({
+  companyIdx: index("stock_item_merge_logs_company_idx").on(t.companyId),
+}));
+
+export const insertStockItemMergeLogSchema = createInsertSchema(stockItemMergeLogs).omit({ id: true, mergedAt: true });
+export type InsertStockItemMergeLog = z.infer<typeof insertStockItemMergeLogSchema>;
+export type StockItemMergeLog = typeof stockItemMergeLogs.$inferSelect;

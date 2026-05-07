@@ -2635,6 +2635,25 @@ let migrationsDone = false;
     // These columns were defined in the schema but never had a runtime migration.
     `ALTER TABLE factory_bale_products ADD COLUMN IF NOT EXISTS selling_price numeric(20,2) NOT NULL DEFAULT 0`,
     `ALTER TABLE factory_bale_products ADD COLUMN IF NOT EXISTS production_price numeric(20,2) NOT NULL DEFAULT 0`,
+
+    // ── Stock Item Merge Audit Log (May 2026) ─────────────────────────────
+    // Tracks every merge operation: who merged what, snapshots before/after.
+    `CREATE TABLE IF NOT EXISTS stock_item_merge_logs (
+      id                serial        PRIMARY KEY,
+      company_id        integer       NOT NULL,
+      kept_item_id      integer       NOT NULL,
+      kept_item_code    varchar(50)   NOT NULL,
+      kept_item_name    text          NOT NULL,
+      merged_item_id    integer       NOT NULL,
+      merged_item_code  varchar(50)   NOT NULL,
+      merged_item_name  text          NOT NULL,
+      snapshot_before   jsonb         NOT NULL DEFAULT '{}',
+      snapshot_after    jsonb         NOT NULL DEFAULT '{}',
+      merged_by_user_id integer       NOT NULL,
+      merged_at         timestamp     NOT NULL DEFAULT now(),
+      notes             text
+    )`,
+    `CREATE INDEX IF NOT EXISTS stock_item_merge_logs_company_idx ON stock_item_merge_logs(company_id)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
