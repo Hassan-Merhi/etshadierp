@@ -3178,45 +3178,6 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const verifiedTotal = round2(verifiedOrders.reduce((s, o) => s + o.grandTotal, 0));
       const loadingTotal  = round2(loadingOrders.reduce((s, o) => s + o.grandTotal, 0));
 
-      // ── Charge-offset: prevent double-counting charges on active (non-FINALIZED) orders ──
-      // PENDING/VERIFIED/LOADING orders already have their charges baked into grandTotal
-      // (via recalculateOrderTotals), so those charge amounts are already counted in
-      // "What We Have".  If the same charge ledger accounts also appear in "What We Owe"
-      // (because no CHARGE-* accounting voucher was created yet), we must subtract the
-      // order-level charge amounts from the corresponding ledger balances to avoid
-      // counting them twice.
-      const activeOrderIds = (pendingVerifiedRows as any[]).map((r: any) => r.id);
-      const verifiedChargeOffsets: Record<number, number> = {};
-      if (activeOrderIds.length > 0) {
-        const chargeOffsetRows = await db
-          .select({
-            ledgerAccountId: customerOrderCharges.ledgerAccountId,
-            amount: customerOrderCharges.amount,
-          })
-          .from(customerOrderCharges)
-          .where(and(
-            inArray(customerOrderCharges.orderId, activeOrderIds),
-            sql`${customerOrderCharges.ledgerAccountId} IS NOT NULL`,
-          ));
-        for (const ch of chargeOffsetRows as any[]) {
-          const lid = ch.ledgerAccountId as number;
-          const amt = parseFloat(ch.amount || "0");
-          if (lid && amt > 0) {
-            verifiedChargeOffsets[lid] = (verifiedChargeOffsets[lid] || 0) + amt;
-          }
-        }
-      }
-      // Apply offsets: reassign ledgerOnUs with adjusted values so all downstream
-      // references (onUsTotal, onUsAccounts, response) automatically use them.
-      if (Object.keys(verifiedChargeOffsets).length > 0) {
-        ledgerOnUs = ledgerOnUs.map((a: any) => {
-          const offset = verifiedChargeOffsets[a.id] || 0;
-          if (offset <= 0) return a;
-          return { ...a, value: Math.max(0, round2(a.value - offset)) };
-        });
-        ledgerOnUsTotal = round2(ledgerOnUs.reduce((s: number, a: any) => s + a.value, 0));
-      }
-
       // ── 5. Combine and return ────────────────────────────────────────────
       // Rename for clarity — these are the two factory-specific values.
       const baleInventoryValue = round2(inventorySellValue);
