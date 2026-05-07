@@ -197,8 +197,8 @@ export default function FactoryInvoices() {
     return bales * avgPrice;
   };
 
-  // Column count for colspan calculations
-  const colCount = 7 - (hideProformaCol ? 1 : 0) - (hideTotalsUsd ? 1 : 0);
+  // Column count for colspan calculations (base 8 = Customer + Loading# + Proforma + Container + Destination + Date + Status + Bales + Remaining + Total + Actions minus optional)
+  const colCount = 8 - (hideProformaCol ? 1 : 0) - (hideTotalsUsd ? 1 : 0);
 
   return (
     <div className="flex flex-col h-full p-6">
@@ -274,6 +274,7 @@ export default function FactoryInvoices() {
             <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
                 <TableHead>Customer</TableHead>
+                <TableHead>Loading #</TableHead>
                 {!hideProformaCol && <TableHead>Proforma</TableHead>}
                 <TableHead>Container</TableHead>
                 <TableHead>Destination</TableHead>
@@ -309,6 +310,9 @@ export default function FactoryInvoices() {
                     >
                       <TableCell data-testid={`text-customer-name-${order.id}`}>
                         {order.customerName}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm text-muted-foreground" data-testid={`text-loading-number-${order.id}`}>
+                        #{order.id}
                       </TableCell>
                       {!hideProformaCol && (
                         <TableCell className="text-sm text-muted-foreground" data-testid={`text-proforma-${order.id}`}>
@@ -376,12 +380,7 @@ export default function FactoryInvoices() {
                               </DropdownMenuItem>
                               {isAdmin && (
                                 <DropdownMenuItem
-                                  onClick={() => {
-                                    const a = document.createElement("a");
-                                    a.href = `/api/factory/customer-orders/${order.id}/loading-status-export`;
-                                    a.download = "";
-                                    a.click();
-                                  }}
+                                  onClick={() => window.open(`/api/factory/customer-orders/${order.id}/loading-status-export`, "_blank")}
                                   data-testid={`button-download-loading-status-${order.id}`}
                                 >
                                   <Container className="h-4 w-4 mr-2" />
