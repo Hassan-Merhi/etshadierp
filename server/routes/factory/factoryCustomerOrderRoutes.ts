@@ -1420,6 +1420,27 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
             ));
         }
 
+        // PENDING_VERIFICATION / VERIFIED — update existing PRE-voucher amount on edit
+        if (amount !== undefined && ["PENDING_VERIFICATION", "VERIFIED"].includes(order.status) && chargeBeforeUpdate.voucherId) {
+          const newAmt = parseFloat(amount);
+          const linkedVoucherId = chargeBeforeUpdate.voucherId;
+          await tx.update(vouchers)
+            .set({ totalAmount: String(newAmt) })
+            .where(eq(vouchers.id, linkedVoucherId));
+          await tx.update(voucherEntries)
+            .set({ debitAmount: String(newAmt) })
+            .where(and(
+              eq(voucherEntries.voucherId, linkedVoucherId),
+              sql`cast(${voucherEntries.debitAmount} as numeric) > 0`
+            ));
+          await tx.update(voucherEntries)
+            .set({ creditAmount: String(newAmt) })
+            .where(and(
+              eq(voucherEntries.voucherId, linkedVoucherId),
+              sql`cast(${voucherEntries.creditAmount} as numeric) > 0`
+            ));
+        }
+
         // If a ledger account is being assigned to a charge that has NO voucher yet,
         // create the accounting voucher retroactively now (handles old/legacy charges).
         const newLedgerAccountId = ledgerAccountId ? parseInt(ledgerAccountId) : null;
@@ -1506,6 +1527,25 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
               .where(eq(factoryDaybookEntries.id, daybookEntry.id));
           }
         }
+
+        // Sync daybook ORDER_VERIFIED entry when charge amount edited on a VERIFIED order
+        if (order.status === "VERIFIED" && amount !== undefined) {
+          const [recalcOrder] = await tx.select({ grandTotal: customerOrders.grandTotal })
+            .from(customerOrders).where(eq(customerOrders.id, orderId));
+          const newGrandTotal = parseFloat(recalcOrder?.grandTotal || "0");
+          const [verifiedDaybookEntry] = await tx.select({ id: factoryDaybookEntries.id })
+            .from(factoryDaybookEntries)
+            .where(and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              eq(factoryDaybookEntries.txType, "ORDER_VERIFIED"),
+              eq(factoryDaybookEntries.referenceId, orderId)
+            ));
+          if (verifiedDaybookEntry) {
+            await tx.update(factoryDaybookEntries)
+              .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
+              .where(eq(factoryDaybookEntries.id, verifiedDaybookEntry.id));
+          }
+        }
       });
 
       const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
@@ -1582,6 +1622,23 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           await db.update(customerBalances)
             .set({ debitAmount: String(newGrandTotal), balance: String(newGrandTotal) })
             .where(eq(customerBalances.id, existingLedgerEntry.id));
+        }
+      }
+
+      // Sync daybook ORDER_VERIFIED entry when a charge is deleted from a VERIFIED order
+      if (updatedOrder.status === "VERIFIED") {
+        const newGrandTotal = parseFloat(updatedOrder.grandTotal || "0");
+        const [verifiedDaybookEntry] = await db.select({ id: factoryDaybookEntries.id })
+          .from(factoryDaybookEntries)
+          .where(and(
+            eq(factoryDaybookEntries.companyId, companyId),
+            eq(factoryDaybookEntries.txType, "ORDER_VERIFIED"),
+            eq(factoryDaybookEntries.referenceId, orderId)
+          ));
+        if (verifiedDaybookEntry) {
+          await db.update(factoryDaybookEntries)
+            .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
+            .where(eq(factoryDaybookEntries.id, verifiedDaybookEntry.id));
         }
       }
 
