@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction, MutationCache } from "@tanstack/react-query";
 import { isSafeToQueue, enqueueRequest, getDescriptionForRequest } from "./offlineQueue";
+import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
 import { toast } from "@/hooks/use-toast";
 
 /* ── Timezone-aware date utility ───────────────────────────────────────────── */
@@ -246,7 +247,7 @@ export async function apiRequest(
     const networkFail = error.name === "AbortError"
       ? true
       : isNetworkError(error);
-    if (networkFail && isSafeToQueue(method, url)) {
+    if (OFFLINE_MODE_ENABLED && networkFail && isSafeToQueue(method, url)) {
       const description = getDescriptionForRequest(url);
       const body = data ? JSON.stringify(data) : "";
       enqueueRequest(url, method, body, description, getAppDate());

@@ -50,14 +50,17 @@ window.addEventListener("unhandledrejection", (event) => {
 });
 
 // Listen for service-worker messages (e.g. background sync trigger)
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.addEventListener("message", (event) => {
-    if (event?.data?.type === "TRIGGER_SYNC") {
-      import("./lib/syncEngine")
-        .then(({ runSync }) => runSync())
-        .catch(() => {});
-    }
-  });
-}
+// Only active when offline mode is enabled.
+import("./lib/featureFlags").then(({ OFFLINE_MODE_ENABLED }) => {
+  if (OFFLINE_MODE_ENABLED && "serviceWorker" in navigator) {
+    navigator.serviceWorker.addEventListener("message", (event) => {
+      if (event?.data?.type === "TRIGGER_SYNC") {
+        import("./lib/syncEngine")
+          .then(({ runSync }) => runSync())
+          .catch(() => {});
+      }
+    });
+  }
+});
 
 createRoot(document.getElementById("root")!).render(<App />);
