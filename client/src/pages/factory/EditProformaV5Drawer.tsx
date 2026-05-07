@@ -59,6 +59,7 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [prices, setPrices] = useState<Record<string, string>>({});
   const [showZeroItems, setShowZeroItems] = useState(false);
+  const [hideNonPositive, setHideNonPositive] = useState(false);
   const [appliedPrice, setAppliedPrice] = useState<"sell" | "prod" | null>(null);
   const [initialized, setInitialized] = useState(false);
   const qtyRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -111,8 +112,28 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
 
   // Reset when dialog closes/reopens
   useEffect(() => {
-    if (!open) { setInitialized(false); setQuantities({}); setPrices({}); setProformaName(""); setAppliedPrice(null); }
+    if (!open) {
+      setInitialized(false);
+      setQuantities({});
+      setPrices({});
+      setProformaName("");
+      setAppliedPrice(null);
+      setShowZeroItems(false);
+      setHideNonPositive(false);
+    }
   }, [open]);
+
+  // Ctrl+S to save
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (!saveMutation.isPending && proformaName.trim()) saveMutation.mutate();
+      }
+    };
+    if (open) window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  });
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -137,17 +158,14 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
 
         if (existing) {
           if (validQty === 0) {
-            // Delete line
             ops.push(apiRequest("DELETE", `/api/factory/customer-proforma-lines/${existing.id}`, undefined));
           } else if (validQty !== existing.quantity || price !== existing.pricePerBale) {
-            // Update line
             ops.push(apiRequest("PUT", `/api/factory/customer-proforma-lines/${existing.id}`, {
               quantity: validQty,
               pricePerBale: price,
             }));
           }
         } else if (validQty > 0) {
-          // Create new line
           ops.push(apiRequest("POST", "/api/factory/customer-proforma-lines", {
             proformaId,
             articleCode: row.articleCode,
@@ -203,11 +221,40 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
   }
 
   const map = productMap();
+
   const zeroItemCount = articleRows.filter(r => r.stockAvailable === 0).length;
-  const visibleRows = showZeroItems ? articleRows : articleRows.filter(r => r.stockAvailable > 0 || r.expectedToLoad > 0 || (quantities[r.articleCode] && parseInt(quantities[r.articleCode]) > 0));
+  const nonPositiveCount = articleRows.filter(r => r.freeToPromise <= 0).length;
+
+  // Keep rows that have existing/entered quantities even when hiding zeros
+  const visibleRows = (() => {
+    let base = showZeroItems
+      ? articleRows
+      : articleRows.filter(r => r.stockAvailable > 0 || r.expectedToLoad > 0 || (quantities[r.articleCode] && parseInt(quantities[r.articleCode]) > 0));
+    if (hideNonPositive) base = base.filter(r => r.freeToPromise > 0 || (quantities[r.articleCode] && parseInt(quantities[r.articleCode]) > 0));
+    return base;
+  })();
+
+  const visibleTotalBalance = visibleRows.reduce((s, r) => s + r.freeToPromise, 0);
 
   const filledLines = articleRows.filter(r => { const v = quantities[r.articleCode]; return v && parseInt(v) > 0; }).length;
   const totalQty = articleRows.reduce((s, r) => { const v = parseInt(quantities[r.articleCode] || "0"); return s + (isNaN(v) || v < 0 ? 0 : v); }, 0);
+  const totalKg = articleRows.reduce((s, r) => {
+    const qty = parseInt(quantities[r.articleCode] || "0");
+    if (isNaN(qty) || qty <= 0) return s;
+    const p = map.get(r.articleCode);
+    const w = parseFloat(p?.weightPerBaleKg || "0");
+    return s + qty * w;
+  }, 0);
+  const totalValue = articleRows.reduce((s, r) => {
+    const qty = parseInt(quantities[r.articleCode] || "0");
+    if (isNaN(qty) || qty <= 0) return s;
+    const price = parseFloat(prices[r.articleCode] || "0");
+    return s + qty * price;
+  }, 0);
+  const warningCount = articleRows.filter(r => {
+    const qty = parseInt(quantities[r.articleCode] || "0");
+    return !isNaN(qty) && qty > 0 && r.freeToPromise < 0;
+  }).length;
 
   const isLoading = proformaQuery.isLoading;
 
@@ -261,6 +308,19 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
                 </div>
               )}
 
+              {nonPositiveCount > 0 && (
+                <div className={zeroItemCount === 0 ? "border-l pl-4" : ""}>
+                  <Button
+                    size="default"
+                    variant={hideNonPositive ? "default" : "outline"}
+                    onClick={() => setHideNonPositive(v => !v)}
+                    data-testid="button-edit-v5-hide-non-positive"
+                  >
+                    {hideNonPositive ? `Show all (${nonPositiveCount} hidden)` : `Hide 0 & negative (${nonPositiveCount})`}
+                  </Button>
+                </div>
+              )}
+
               <div className="flex items-center gap-2 ml-auto flex-wrap">
                 <Button
                   size="sm"
@@ -305,11 +365,10 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
                     const rawVal = quantities[row.articleCode] ?? "";
                     const parsed = parseInt(rawVal);
                     const qty = isNaN(parsed) ? 0 : parsed;
-                    const balance = row.freeToPromise;
-                    const shortage = qty > 0 && balance < 0;
+                    const shortage = qty > 0 && row.freeToPromise < 0;
                     const p = map.get(row.articleCode);
                     const w = parseFloat(p?.weightPerBaleKg || "0");
-                    const totalKg = qty > 0 && w > 0 ? (qty * w).toLocaleString("en-US", { maximumFractionDigits: 1 }) : "–";
+                    const totalKgRow = qty > 0 && w > 0 ? qty * w : null;
                     const hasExistingLine = !!proformaQuery.data?.lines.find(l => l.articleCode === row.articleCode);
 
                     return (
@@ -347,26 +406,34 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
                         </td>
 
                         <td className="px-2 py-1 border-r">
-                          <Input
-                            ref={el => { qtyRefs.current[idx] = el; }}
-                            type="number"
-                            min={0}
-                            value={rawVal}
-                            onChange={e => setQuantities(prev => ({ ...prev, [row.articleCode]: e.target.value }))}
-                            onFocus={e => e.target.select()}
-                            onKeyDown={e => handleQtyKeyDown(e, idx)}
-                            placeholder="0"
-                            className={cn(
-                              "h-7 text-center text-xs tabular-nums w-full",
-                              shortage && "border-amber-400 bg-amber-50/30 dark:bg-amber-950/20",
+                          <div className="flex flex-col gap-0.5 items-center">
+                            <Input
+                              ref={el => { qtyRefs.current[idx] = el; }}
+                              type="number"
+                              min={0}
+                              value={rawVal}
+                              onChange={e => setQuantities(prev => ({ ...prev, [row.articleCode]: e.target.value }))}
+                              onFocus={e => e.target.select()}
+                              onKeyDown={e => handleQtyKeyDown(e, idx)}
+                              placeholder="0"
+                              className={cn(
+                                "h-7 text-center text-xs tabular-nums w-full",
+                                shortage && "border-amber-400 bg-amber-50/30 dark:bg-amber-950/20",
+                              )}
+                              data-testid={`input-edit-v5-qty-${row.articleCode}`}
+                            />
+                            {shortage && (
+                              <span className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-0.5 whitespace-nowrap">
+                                <AlertTriangle className="h-2.5 w-2.5" />Low stock
+                              </span>
                             )}
-                            data-testid={`input-edit-v5-qty-${row.articleCode}`}
-                          />
-                          {shortage && <p className="text-[10px] text-amber-600 dark:text-amber-400 text-center mt-0.5">Low stock</p>}
+                          </div>
                         </td>
 
                         <td className="px-3 py-1.5 border-r text-right text-xs text-muted-foreground tabular-nums">
-                          {totalKg}
+                          {totalKgRow != null
+                            ? <span className="text-foreground font-medium">{totalKgRow.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg</span>
+                            : <span className="text-muted-foreground/40">—</span>}
                         </td>
 
                         <td className="px-2 py-1">
@@ -398,16 +465,51 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
                     );
                   })}
                 </tbody>
+                <tfoot>
+                  <tr className="bg-muted border-t-2 sticky bottom-0 z-20 text-xs font-semibold">
+                    <td className="px-3 py-2 border-r sticky left-0 bg-muted z-10">
+                      <span className="text-foreground">Totals</span>
+                      <span className="font-normal text-muted-foreground ml-1.5">({visibleRows.length} products)</span>
+                    </td>
+                    <td className={cn(
+                      "px-3 py-2 border-r text-right font-mono tabular-nums",
+                      visibleTotalBalance < 0 ? "text-destructive" : visibleTotalBalance > 0 ? "text-green-700 dark:text-green-400" : "text-muted-foreground",
+                    )}>
+                      {visibleTotalBalance > 0 ? `+${visibleTotalBalance}` : visibleTotalBalance}
+                    </td>
+                    <td className="px-3 py-2 border-r text-center font-mono tabular-nums text-foreground">
+                      {totalQty > 0 ? totalQty : <span className="text-muted-foreground/40">—</span>}
+                    </td>
+                    <td className="px-3 py-2 border-r text-right font-mono tabular-nums text-muted-foreground">
+                      {totalKg > 0
+                        ? <span className="text-foreground">{totalKg.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg</span>
+                        : <span className="text-muted-foreground/40">—</span>}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono tabular-nums text-foreground" colSpan={2}>
+                      {totalValue > 0
+                        ? `$${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : <span className="text-muted-foreground/40">—</span>}
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
 
             {/* Footer */}
-            <div className="px-5 py-3 border-t shrink-0 flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <span data-testid="text-edit-v5-lines">{filledLines} line{filledLines !== 1 ? "s" : ""}</span>
-                <span>·</span>
-                <span data-testid="text-edit-v5-total-qty">{totalQty.toLocaleString()} bales/container</span>
-                <span className="text-[10px]">Ctrl+S to save</span>
+            <div className="px-5 py-3 border-t bg-muted/30 shrink-0 flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                <span><span className="font-semibold text-foreground">{filledLines}</span> line{filledLines !== 1 ? "s" : ""}</span>
+                <span><span className="font-semibold text-foreground">{totalQty}</span> bales/container</span>
+                {totalKg > 0 && (
+                  <span><span className="font-semibold text-foreground">{totalKg.toLocaleString(undefined, { maximumFractionDigits: 1 })}</span> kg</span>
+                )}
+                {warningCount > 0 && (
+                  <span className="flex items-center gap-1 text-destructive">
+                    <AlertTriangle className="h-3 w-3" />
+                    {warningCount} product{warningCount !== 1 ? "s" : ""} with shortage
+                  </span>
+                )}
+                <span className="text-[10px] text-muted-foreground/60">Ctrl+S to save</span>
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={onClose} data-testid="button-edit-v5-cancel">
