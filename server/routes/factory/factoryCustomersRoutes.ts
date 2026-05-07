@@ -72,22 +72,13 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       const customerIds = allCustomers.map((c) => c.id);
 
-      // Fetch all sales totals in one query — include VERIFIED orders so
-      // charges added before finalization are reflected immediately.
-      const salesRows = await db.select({
-        customerId: customerOrders.customerId,
-        total: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric)), 0)`,
-      })
-        .from(customerOrders)
-        .where(and(
-          inArray(customerOrders.customerId, customerIds),
-          eq(customerOrders.companyId, companyId),
-          inArray(customerOrders.status, ["FINALIZED", "VERIFIED"]),
-        ))
-        .groupBy(customerOrders.customerId);
+      // ── Balance calculation — mirrors the statement endpoint exactly ──────────
+      // The statement runs a ledger: opening + Σ(customerBalances debit-credit),
+      // with INVOICE rows for FINALIZED orders corrected to the live grandTotal.
+      // We replicate that here in two bulk queries so both pages always agree.
 
-      // Fetch all non-invoice balance adjustments in one query
-      const nonInvRows = await db.select({
+      // 1. Net of ALL customerBalances rows (includes INVOICE type as stored)
+      const cbNetRows = await db.select({
         customerId: customerBalances.customerId,
         net: sql<string>`COALESCE(SUM(CAST(${customerBalances.debitAmount} AS numeric) - CAST(${customerBalances.creditAmount} AS numeric)), 0)`,
       })
@@ -95,7 +86,25 @@ export function registerFactoryCustomersRoutes(app: Express) {
         .where(and(
           inArray(customerBalances.customerId, customerIds),
           eq(customerBalances.companyId, companyId),
-          sql`${customerBalances.referenceType} IS DISTINCT FROM 'INVOICE'`,
+        ))
+        .groupBy(customerBalances.customerId);
+
+      // 2. Correction for INVOICE rows: replace stored debitAmount with the live
+      //    grandTotal of FINALIZED orders (same correction the statement makes).
+      const invCorrRows = await db.select({
+        customerId: customerBalances.customerId,
+        correction: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric) - CAST(${customerBalances.debitAmount} AS numeric)), 0)`,
+      })
+        .from(customerBalances)
+        .innerJoin(customerOrders, and(
+          eq(customerOrders.id, customerBalances.referenceId as any),
+          eq(customerOrders.companyId, companyId),
+          eq(customerOrders.status, "FINALIZED"),
+        ))
+        .where(and(
+          inArray(customerBalances.customerId, customerIds),
+          eq(customerBalances.companyId, companyId),
+          sql`${customerBalances.referenceType} = 'INVOICE'`,
         ))
         .groupBy(customerBalances.customerId);
 
@@ -158,17 +167,17 @@ export function registerFactoryCustomersRoutes(app: Express) {
         }
       }
 
-      const salesMap = new Map(salesRows.map((r) => [r.customerId, parseFloat(r.total || "0")]));
-      const nonInvMap = new Map(nonInvRows.map((r) => [r.customerId, parseFloat(r.net || "0")]));
+      const cbNetMap   = new Map(cbNetRows.map((r) => [r.customerId, parseFloat(r.net || "0")]));
+      const invCorrMap = new Map(invCorrRows.map((r) => [r.customerId, parseFloat(r.correction || "0")]));
 
       const customersWithBalances = allCustomers.map((customer) => {
-        const salesTotal = salesMap.get(customer.id) ?? 0;
-        const nonInvNet = nonInvMap.get(customer.id) ?? 0;
+        const cbNet      = cbNetMap.get(customer.id) ?? 0;
+        const invCorr    = invCorrMap.get(customer.id) ?? 0;
         const voucherNet = (customer.ledgerAccountId ? (voucherNetByLedger.get(customer.ledgerAccountId) ?? 0) : 0)
           + (voucherNetByCustomerId.get(customer.id) ?? 0);
         const openingBalance = parseFloat(customer.openingBalance || "0");
-        const openingSide = customer.openingBalanceSide || "Dr";
-        const totalBalance = (openingSide === "Dr" ? openingBalance : -openingBalance) + salesTotal + nonInvNet + voucherNet;
+        const openingSide    = customer.openingBalanceSide || "Dr";
+        const totalBalance   = (openingSide === "Dr" ? openingBalance : -openingBalance) + cbNet + invCorr + voucherNet;
         return { ...customer, balance: Math.abs(totalBalance), balanceSide: totalBalance >= 0 ? "Dr" : "Cr" };
       });
 
