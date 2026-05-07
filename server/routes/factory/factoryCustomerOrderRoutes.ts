@@ -3144,36 +3144,65 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const orderId = parseId(req.params.id);
 
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
-      const [order] = await db.select().from(customerOrders)
-        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
-      if (!order) return res.status(404).json({ message: "Order not found" });
 
-      // Use SELECT * so the query succeeds even when newer columns (price_used,
-      // bale_reference, article_code, bale_name, location_id) are absent from the
-      // production table.  COALESCE(column, fallback) looks safe but PostgreSQL
-      // rejects the entire query at parse time when the column doesn't exist —
-      // before COALESCE ever runs — causing a 500 that renders the page as 0 bales.
-      // SELECT * returns whatever columns exist; we apply JS-side defaults below.
+      // ── Use SELECT * for ALL queries in this route so that schema drift between
+      // the Drizzle model and the live production table never causes a parse-time
+      // "column does not exist" crash.  JS-side defaults are applied after each query.
+      // (Drizzle's db.select() generates an explicit column list; if ANY column in
+      //  shared/schema.ts hasn't been added to production yet the whole query fails
+      //  before returning a single row — even COALESCE doesn't help because PostgreSQL
+      //  rejects the SQL at parse time, not execution time.)
+
+      const rawOrderResult = await db.execute(
+        sql`SELECT * FROM customer_orders WHERE id = ${orderId} AND company_id = ${companyId} LIMIT 1`,
+      );
+      const rawOrderRows: any[] = (rawOrderResult as any).rows ?? (rawOrderResult as unknown as any[]);
+      if (!rawOrderRows.length) return res.status(404).json({ message: "Order not found" });
+      const orderRow = rawOrderRows[0];
+      // Normalise the raw row into a typed object with JS-side defaults.
+      const order = {
+        id:                  orderRow.id,
+        companyId:           orderRow.company_id,
+        customerId:          orderRow.customer_id,
+        invoiceNumber:       orderRow.invoice_number       ?? null,
+        orderDate:           orderRow.order_date,
+        proformaIdUsed:      orderRow.proforma_id_used     ?? null,
+        status:              orderRow.status               ?? 'DRAFT',
+        subtotalBales:       orderRow.subtotal_bales       ?? '0',
+        freightAmount:       orderRow.freight_amount       ?? '0',
+        otherChargesTotal:   orderRow.other_charges_total  ?? '0',
+        grandTotal:          orderRow.grand_total          ?? '0',
+        totalQtyBales:       orderRow.total_qty_bales      ?? 0,
+        containerNumber:     orderRow.container_number     ?? null,
+        shippingCompany:     orderRow.shipping_company     ?? null,
+        containerNotes:      orderRow.container_notes      ?? null,
+        destination:         orderRow.destination          ?? null,
+        verifiedByUserId:    orderRow.verified_by_user_id  ?? null,
+        verifiedAt:          orderRow.verified_at          ?? null,
+        loadingStartedAt:    orderRow.loading_started_at   ?? null,
+        loadingFinalizedAt:  orderRow.loading_finalized_at ?? null,
+        locationId:          orderRow.location_id          ?? null,
+        deletedAt:           orderRow.deleted_at           ?? null,
+        createdAt:           orderRow.created_at,
+        updatedAt:           orderRow.updated_at           ?? orderRow.created_at,
+      };
+
       const rawBalesResult = await db.execute(
         sql`SELECT * FROM customer_order_bales WHERE order_id = ${orderId}`,
       );
       const rawBaleRows: any[] = (rawBalesResult as any).rows ?? (rawBalesResult as unknown as any[]);
-      const orderBales: Array<{
-        id: number; order_id: number; bale_id: number;
-        weight: string; article_code: string; bale_name: string;
-        price_used: string; bale_reference: string;
-      }> = rawBaleRows.map((r: any) => ({
-        id:            r.id,
-        order_id:      r.order_id,
-        bale_id:       r.bale_id,
-        weight:        String(r.weight        ?? '0'),
-        article_code:  String(r.article_code  ?? ''),
-        bale_name:     String(r.bale_name     ?? ''),
-        price_used:    String(r.price_used    ?? '0'),
-        bale_reference:String(r.bale_reference ?? ''),
+      const orderBales = rawBaleRows.map((r: any) => ({
+        id:             r.id,
+        order_id:       r.order_id,
+        bale_id:        r.bale_id,
+        weight:         String(r.weight         ?? '0'),
+        article_code:   String(r.article_code   ?? ''),
+        bale_name:      String(r.bale_name      ?? ''),
+        price_used:     String(r.price_used     ?? '0'),
+        bale_reference: String(r.bale_reference ?? ''),
       }));
 
-      // Diagnostic log — always emitted so the production logs can confirm the actual DB state.
+      // Diagnostic log so production logs can confirm the actual DB state.
       console.log(
         `[verify-summary] orderId=${orderId} companyId=${companyId}` +
         ` status=${order.status} proformaIdUsed=${order.proformaIdUsed ?? 'null'}` +
@@ -3181,14 +3210,12 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       );
 
       // Build preliminary article code set from loaded bales.
-      // Raw SQL returns snake_case keys; normalise them for the rest of the route.
       const loadedByArticle: Record<string, { articleCode: string; productName: string; qty: number; totalWeight: number; totalPrice: number }> = {};
       for (const b of orderBales) {
-        // Support both snake_case (raw SQL) and camelCase (legacy Drizzle rows)
-        const articleCode = (b as any).article_code ?? (b as any).articleCode ?? "";
-        const baleName   = (b as any).bale_name   ?? (b as any).baleName   ?? "";
-        const priceUsed  = (b as any).price_used  ?? (b as any).priceUsed  ?? "0";
-        const weight     = (b as any).weight ?? "0";
+        const articleCode = b.article_code;
+        const baleName    = b.bale_name;
+        const priceUsed   = b.price_used;
+        const weight      = b.weight;
 
         const code = articleCode || "UNKNOWN";
         if (!loadedByArticle[code]) {
@@ -3203,15 +3230,21 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const proformaByArticle: Record<string, { articleCode: string; productName: string; expectedQty: number; pricePerBale: string }> = {};
 
       if (order.proformaIdUsed) {
-        proformaLines = await db.select().from(customerProformaLines)
-          .where(eq(customerProformaLines.proformaId, order.proformaIdUsed));
+        // SELECT * to avoid explicit-column failures on production tables that may
+        // be missing price_fixed or production_price_per_bale columns.
+        const rawProformaResult = await db.execute(
+          sql`SELECT * FROM customer_proforma_lines WHERE proforma_id = ${order.proformaIdUsed}`,
+        );
+        proformaLines = (rawProformaResult as any).rows ?? (rawProformaResult as unknown as any[]);
 
         for (const pl of proformaLines) {
-          proformaByArticle[pl.articleCode] = {
-            articleCode: pl.articleCode,
-            productName: pl.productName,
-            expectedQty: pl.quantity,
-            pricePerBale: pl.pricePerBale,
+          const articleCode = pl.article_code ?? pl.articleCode ?? "";
+          if (!articleCode) continue;
+          proformaByArticle[articleCode] = {
+            articleCode,
+            productName:  pl.product_name  ?? pl.productName  ?? articleCode,
+            expectedQty:  pl.quantity       ?? 0,
+            pricePerBale: pl.price_per_bale ?? pl.pricePerBale ?? "0",
           };
         }
       }
