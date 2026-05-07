@@ -308,17 +308,16 @@ export function registerStatsRoutes(app: Express) {
         }
       }
 
-      // Add Workers/Payroll - employee balances (what we owe them)
+      // Add Workers/Payroll - employee balances (salary payable only)
       const companyEmployees = await db
         .select()
         .from(employees)
         .where(and(eq(employees.companyId, companyId), eq(employees.active, true), isNull(employees.deletedAt)))
         .execute();
-      // Compute each employee's balance from live voucher entries (respects asOfDate)
-      // Dr entry = payment/advance paid to them; Cr entry = salary/earnings owed to them
-      // netBalance > 0: we paid more than owed (advance/asset); < 0: we owe them (liability)
+      // Compute each employee's net voucher balance to find salary owed (liability only).
+      // Advances are NOT sourced from the ledger here — they are read directly from
+      // salaryAdvances.remainingBalance below to match the Payroll → Advances "Outstanding" card.
       let workerLiabilities = 0;
-      let workerAdvances = 0;
       for (const emp of companyEmployees) {
         const opening = parseFloat((emp as any).openingBalance || "0");
         const openingSide = (emp as any).openingBalanceSide === "Dr" ? 1 : -1; // default Cr = we owe them
@@ -327,24 +326,41 @@ export function registerStatsRoutes(app: Express) {
         const netBalance = signedOpening + balance.debit - balance.credit;
         if (netBalance < 0) {
           workerLiabilities += Math.abs(netBalance);
-        } else if (netBalance > 0) {
-          workerAdvances += netBalance;
+        }
+        // netBalance > 0 (advance) is intentionally NOT included here —
+        // the authoritative outstanding figure comes from salaryAdvances.remainingBalance below.
+      }
+
+      // Strip any "advance"-related ledger accounts that classifyNetPositionAccounts may have
+      // captured (e.g. "Worker Advances", "Salary Advances", "Employee Advances",
+      // "Factory Worker Advances"). The table-based query below is the single source of truth
+      // for advances outstanding, so we must remove them from the classifier output to prevent
+      // double-counting.
+      const advanceLedgerPattern = /(?:worker|salary|employee|factory)\s+advance/i;
+      {
+        let i = forUsAccounts.length - 1;
+        while (i >= 0) {
+          const acc = forUsAccounts[i] as any;
+          if (advanceLedgerPattern.test(acc.name || "")) {
+            forUsTotal = round2(forUsTotal - acc.value);
+            const catKey = `asset_${acc.category || acc.name}`;
+            if (categoryTotals[catKey] !== undefined) delete categoryTotals[catKey];
+            forUsAccounts.splice(i, 1);
+          }
+          i--;
         }
       }
-      // ERP Net Position: exclude "Factory Worker Advances" ledger account entirely —
-      // factory advances belong in the Factory Net Position only, not here.
-      const fwaLedgerIdx1 = forUsAccounts.findIndex(
-        (a: any) => (a.name || "").toLowerCase() === "factory worker advances",
-      );
-      if (fwaLedgerIdx1 !== -1) {
-        forUsTotal = round2(forUsTotal - forUsAccounts[fwaLedgerIdx1].value);
-        forUsAccounts.splice(fwaLedgerIdx1, 1);
-      }
-      // ERP Net Position uses only ERP employee advances (the loop above).
-      // Factory worker advances are NOT included here — they appear in the Factory Net Position.
-      // For CFA companies, worker balances are in CFA → convert to USD
+
+      // Authoritative ERP worker advances = SUM(salaryAdvances.remainingBalance)
+      // WHERE fullyPaid = false AND companyId = X — exactly what Payroll → Advances shows.
+      const [saRow] = await db
+        .select({ total: sql<string>`COALESCE(SUM(CAST(${salaryAdvances.remainingBalance} AS numeric)), 0)` })
+        .from(salaryAdvances)
+        .where(and(eq(salaryAdvances.companyId, companyId), eq(salaryAdvances.fullyPaid, false)));
+      const rawSalaryAdvances = round2(parseFloat((saRow as any)?.total || "0"));
+      // For CFA companies, worker balances are stored in CFA → convert to USD
       const workerLiabilitiesDisplay = currentCfaRate > 0 ? round2(workerLiabilities / currentCfaRate) : workerLiabilities;
-      const workerAdvancesDisplay    = currentCfaRate > 0 ? round2(workerAdvances    / currentCfaRate) : workerAdvances;
+      const workerAdvancesDisplay    = currentCfaRate > 0 ? round2(rawSalaryAdvances / currentCfaRate) : rawSalaryAdvances;
       if (workerLiabilitiesDisplay > 0) {
         onUsTotal += workerLiabilitiesDisplay;
         categoryTotals["liability_Workers"] = (categoryTotals["liability_Workers"] || 0) + workerLiabilitiesDisplay;
