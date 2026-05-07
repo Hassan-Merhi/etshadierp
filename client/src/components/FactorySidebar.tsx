@@ -67,6 +67,7 @@ import {
 
 interface FactoryNavItem extends NavItem {
   adminOnly?: boolean;
+  developerOnly?: boolean;
   featureFlag?: string;
   featureFlagDefaultOn?: boolean;
   hideKey?: string;
@@ -93,9 +94,9 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     items: [
       { title: "Stock Entry",    url: "/factory/stock-entry",    icon: ScanLine },
       { title: "Raw Materials",  url: "/factory/raw-materials",  icon: Package  },
-      { title: "Raw Stock",      url: "/factory/raw-stock",      icon: Boxes,  adminOnly: true },
+      { title: "Raw Stock",      url: "/factory/raw-stock",      icon: Boxes,  developerOnly: true },
       { title: "Waste Dispatch", url: "/factory/waste-dispatch", icon: Trash2   },
-      { title: "Import",         url: "/factory/import",         icon: Upload,  adminOnly: true },
+      { title: "Import",         url: "/factory/import",         icon: Upload,  developerOnly: true },
     ],
   },
   {
@@ -104,7 +105,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     items: [
       { title: "Bale Explorer",   url: "/factory/bales-hub",       icon: History },
       { title: "Bale Products",   url: "/factory/bale-products",   icon: Tag     },
-      { title: "Bale Relabeling", url: "/factory/bale-relabeling", icon: Repeat, adminOnly: true },
+      { title: "Bale Relabeling", url: "/factory/bale-relabeling", icon: Repeat, developerOnly: true },
     ],
   },
   {
@@ -116,7 +117,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
       { title: "Invoicing",        url: "/factory/invoicing",            icon: FileText     },
       { title: "Stock Allocation", url: "/factory/stock-allocation-v5",  icon: LayoutGrid   },
       { title: "Loadings",         url: "/factory/sales/loadings",       icon: Container    },
-      { title: "Price List",       url: "/factory/price-list",           icon: List,        adminOnly: true },
+      { title: "Price List",       url: "/factory/price-list",           icon: List,        developerOnly: true },
     ],
   },
   {
@@ -126,7 +127,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
       { title: "Location Inventory", url: "/factory/location-inventory", icon: MapPin    },
       { title: "Factory Stock OTW",  url: "/factory/stock-otw",          icon: Ship      },
       { title: "Containers",         url: "/factory/containers",         icon: Container },
-      { title: "Stock Query",        url: "/factory/stock-query",        icon: Search,   adminOnly: true },
+      { title: "Stock Query",        url: "/factory/stock-query",        icon: Search,   developerOnly: true },
     ],
   },
   {
@@ -136,10 +137,10 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
       { title: "Workers",          url: "/factory/workers",                 icon: HardHat        },
       { title: "Employees",        url: "/factory/employees",               icon: Users          },
       { title: "Suppliers",        url: "/factory/suppliers",               icon: UserRound      },
-      { title: "Transporters",     url: "/factory/transporters",            icon: Truck,         adminOnly: true },
+      { title: "Transporters",     url: "/factory/transporters",            icon: Truck,         developerOnly: true },
       { title: "Vouchers",         url: "/factory/vouchers",                icon: FileText       },
       { title: "Accounts",         url: "/factory/accounts",               icon: Landmark       },
-      { title: "Broker Statement", url: "/factory/broker-visual-statement", icon: ClipboardCheck, adminOnly: true },
+      { title: "Broker Statement", url: "/factory/broker-visual-statement", icon: ClipboardCheck, developerOnly: true },
     ],
   },
   {
@@ -154,8 +155,8 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     color: NAV_COLOR.rentals,
     items: [
       { title: "Shops",      url: "/factory/rental/shops",      icon: Store     },
-      { title: "Warehouses", url: "/factory/rental/warehouses", icon: Building2,  adminOnly: true },
-      { title: "Payments",   url: "/factory/rental/payments",   icon: CreditCard, adminOnly: true },
+      { title: "Warehouses", url: "/factory/rental/warehouses", icon: Building2,  developerOnly: true },
+      { title: "Payments",   url: "/factory/rental/payments",   icon: CreditCard, developerOnly: true },
     ],
   },
   {
@@ -238,6 +239,7 @@ export function useFactoryVisibleSections(user?: any): {
     .map(s => ({
       ...s,
       items: s.items.filter((item) => {
+        if (item.developerOnly && !isDeveloper) return false;
         if (item.adminOnly && !isAdmin) return false;
         if (item.featureFlag) {
           if (item.featureFlagDefaultOn) {
