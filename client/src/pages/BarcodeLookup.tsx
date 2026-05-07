@@ -679,7 +679,7 @@ export default function BarcodeLookup() {
                             {c.weightKgUsed && (
                               <InfoRow label="KG Used from This Container" value={`${smartNum(c.weightKgUsed)} KG`} />
                             )}
-                            {c.ratePerKg && (
+                            {isAdmin && c.ratePerKg && (
                               <InfoRow label="Rate / KG" value={`${c.currencyCode} ${smartNum(c.ratePerKg)}`} />
                             )}
                           </div>
@@ -712,7 +712,7 @@ export default function BarcodeLookup() {
                         <InfoRow label="Batch Date" value={formatDateOnly(referenceResult.mixBatch.batchDate)} />
                       )}
                       <InfoRow label="Total Weight" value={`${smartNum(referenceResult.mixBatch.totalWeightKg)} KG`} />
-                      <InfoRow label="Cost / KG" value={smartNum(referenceResult.mixBatch.costPerKg)} />
+                      {isAdmin && <InfoRow label="Cost / KG" value={smartNum(referenceResult.mixBatch.costPerKg)} />}
                       <div>
                         <p className="text-sm text-muted-foreground">Status</p>
                         <Badge variant="outline">{referenceResult.mixBatch.status}</Badge>

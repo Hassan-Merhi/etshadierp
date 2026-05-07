@@ -853,7 +853,7 @@ export function registerBaleRoutes(app: Express) {
   // Lookup by ARTICLE code
   app.get("/api/lookup/article/:articleCode", requireAuth, async (req, res) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -872,7 +872,7 @@ export function registerBaleRoutes(app: Express) {
   // Lookup by REFERENCE number
   app.get("/api/lookup/reference/:referenceNumber", requireAuth, async (req, res) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -1139,7 +1139,7 @@ export function registerBaleRoutes(app: Express) {
   // Mark a label as scanned
   app.post("/api/lookup/reference/:referenceNumber/scan", requireAuth, async (req, res) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -1175,7 +1175,7 @@ export function registerBaleRoutes(app: Express) {
   // Admin: Delete bale/reference everywhere (soft-delete the factory bale)
   app.delete("/api/lookup/reference/:referenceNumber/delete-everywhere", requireAuth, requireRole("Admin", "Owner", "Developer"), async (req, res) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const referenceNumber = decodeURIComponent(req.params.referenceNumber);
@@ -1221,7 +1221,7 @@ export function registerBaleRoutes(app: Express) {
   // Admin: Change the linked bale product (article code / product name) for a reference
   app.patch("/api/lookup/reference/:referenceNumber/change-product", requireAuth, requireRole("Admin", "Owner", "Developer"), async (req, res) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const referenceNumber = decodeURIComponent(req.params.referenceNumber);
