@@ -65,8 +65,11 @@ function styleHeaderRow(ws: ExcelJS.Worksheet, colCount: number) {
   hdr.height = 20;
 }
 
-// Auto-detect all columns from data rows and export every field
-// Empty sheets are created as hidden so they can be unhidden manually in Excel
+// Auto-detect all columns from data rows and export every field.
+// Empty sheets are created as hidden so they can be unhidden manually in Excel.
+// NOTE: Per-cell fill and numFmt are intentionally avoided — they create one cell
+// object per cell in the ExcelJS model, causing OOM crashes on large sheets.
+// numFmt is applied at the column level (one shared style object per column).
 function addSheet(wb: ExcelJS.Workbook, name: string, rows: any[]) {
   const sheetBase = name.substring(0, 31);
 
@@ -100,19 +103,22 @@ function addSheet(wb: ExcelJS.Workbook, name: string, rows: any[]) {
       : sheetBase;
 
     const ws = wb.addWorksheet(sheetName);
-    ws.columns = columns.map(c => ({ header: c.header, key: c.key, width: c.width }));
+
+    // Set numFmt at column level — one shared style per column instead of one
+    // cell object per row × column. Critical for keeping memory bounded.
+    ws.columns = columns.map(c => ({
+      header:  c.header,
+      key:     c.key,
+      width:   c.width,
+      style:   c.numFmt ? { numFmt: c.numFmt } : undefined,
+    }));
+
     styleHeaderRow(ws, columns.length);
 
-    chunk.forEach((row, ri) => {
-      const values = columns.map(c => formatValue(row[c.key]));
-      const r = ws.addRow(values);
-      if (ri % 2 === 1) {
-        r.eachCell(cell => { cell.fill = ALT_FILL; });
-      }
-      columns.forEach((c, ci) => {
-        if (c.numFmt) r.getCell(ci + 1).numFmt = c.numFmt;
-      });
-    });
+    // Plain row insertion — no per-cell styling to avoid O(rows × cols) objects.
+    for (const row of chunk) {
+      ws.addRow(columns.map(c => formatValue(row[c.key])));
+    }
 
     ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: columns.length } };
   });
