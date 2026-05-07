@@ -242,22 +242,29 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     totalAmt += amtUSD;
     totalPL  += itemPL;
 
+    // Dynamic row height — expand if the product name wraps in the description column
+    doc.font("Helvetica-Bold").fontSize(7.5);
+    const nameH  = doc.heightOfString(item.stockItemName, { width: COL_DESC_W - 8 });
+    const dynH   = Math.max(ROW_H, Math.ceil(nameH) + 4);
+
     // Page break — re-draw column header on new page
-    if (y + ROW_H > PAGE_H - MARGIN_Y) {
+    if (y + dynH > PAGE_H - MARGIN_Y) {
       doc.addPage({ size: "A4" });
       y = MARGIN_Y;
       y = drawTableHeader(y);
     }
 
     doc.save();
-    doc.rect(MARGIN_X, y, USABLE_W, ROW_H).fill("#ffffff");
+    doc.rect(MARGIN_X, y, USABLE_W, dynH).fill("#ffffff");
     doc.restore();
-    drawRowBorders(doc, y, ROW_H, false);
+    drawRowBorders(doc, y, dynH, false);
 
-    // All cells vertically centred at the same baseline
-    const cy = y + Math.round((ROW_H - 7.5) / 2);
+    // Description: top-aligned so wrapping text stays inside the cell border
     doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#000000");
-    doc.text(item.stockItemName,           X_DESC + 4, cy, { width: COL_DESC_W - 8,  align: "left",   lineBreak: false });
+    doc.text(item.stockItemName, X_DESC + 4, y + 3, { width: COL_DESC_W - 8, align: "left", lineBreak: true });
+
+    // All other cells: single-line, vertically centred
+    const cy = y + Math.round((dynH - 7.5) / 2);
     doc.text(fmtQty(item.quantity),        X_QTY  + 1, cy, { width: COL_QTY_W  - 2,  align: "center", lineBreak: false });
     doc.text(fmtUSD(item.rateUSD),         X_RATE + 1, cy, { width: COL_RATE_W - 2,  align: "center", lineBreak: false });
     doc.text(fmtUSD(amtUSD),               X_AMT  + 1, cy, { width: COL_AMT_W  - 2,  align: "center", lineBreak: false });
@@ -267,7 +274,7 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     doc.fillColor(plColor(itemPL));
     doc.text(fmtUSD(itemPL),               X_TPL  + 1, cy, { width: COL_TPL_W  - 2,  align: "center", lineBreak: false });
 
-    y += ROW_H;
+    y += dynH;
   }
 
   // ── TOTAL footer row ───────────────────────────────────────────────────────
@@ -293,13 +300,21 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   y += totH + 5;
 
   // ── TOTAL PAID bar ─────────────────────────────────────────────────────────
+  // Guard: ensure the bar + footer fit on this page
+  if (y + 40 > PAGE_H - MARGIN_Y) {
+    doc.addPage({ size: "A4" });
+    y = MARGIN_Y;
+  }
   doc.save();
   doc.moveTo(MARGIN_X, y).lineTo(MARGIN_X + USABLE_W, y).strokeColor("#333333").lineWidth(1.5).stroke();
   doc.restore();
   y += 4;
   doc.font("Helvetica-Bold").fontSize(11).fillColor("#000000");
-  doc.text("TOTAL PAID:",   MARGIN_X,  y, { lineBreak: false });
-  doc.text(fmtUSD(totalAmt), MARGIN_X, y, { width: USABLE_W, align: "right", lineBreak: false });
+  // Use explicit x for both label and amount — guarantees same y, no auto-page drift
+  doc.text("TOTAL PAID:", MARGIN_X, y, { lineBreak: false });
+  const paidStr = fmtUSD(totalAmt);
+  const paidW   = doc.widthOfString(paidStr);
+  doc.text(paidStr, MARGIN_X + USABLE_W - paidW, y, { lineBreak: false });
   y += 18;
 
   // ── Notes ──────────────────────────────────────────────────────────────────

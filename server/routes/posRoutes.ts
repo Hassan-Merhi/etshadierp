@@ -2094,11 +2094,15 @@ export function registerPosRoutes(app: Express) {
       for (const c of cols) { colX.push(cx); cx += c.w; }
       const tableRight = ML + USE;
 
-      const ROW_H    = 20;   // was 14 — more breathing room
-      const HDR_H    = 22;   // was 16
-      const CELL_PAD = 5;    // was 3
-      const FS_HDR   = 8.5;  // was 7
-      const FS_ROW   = 8.5;  // was 7
+      const ROW_H    = 20;   // minimum row height
+      const HDR_H    = 22;
+      const CELL_PAD = 5;
+      const FS_HDR   = 8.5;
+      const FS_ROW   = 8.5;
+
+      // A4 geometry — used for explicit page-break checks
+      const PH          = 841.89;
+      const PAGE_BOTTOM = PH - ML;   // 805.89 pt
 
       // Accent colour for header strip
       const ACCENT   = "#1a3a5c";
@@ -2112,24 +2116,40 @@ export function registerPosRoutes(app: Express) {
         pdoc.on("end", resolve);
         pdoc.on("error", reject);
 
+        // wrap:true → top-aligned, text may flow to multiple lines within the cell height.
+        // wrap:false (default) → single line, vertically centred.
         const drawCell = (
           text: string,
           x: number, y: number, w: number, h: number,
-          opts: { align?: "left"|"center"|"right"; bold?: boolean; color?: string; bg?: string; border?: string; fontSize?: number } = {}
+          opts: { align?: "left"|"center"|"right"; bold?: boolean; color?: string; bg?: string; border?: string; fontSize?: number; wrap?: boolean } = {}
         ) => {
           const bg     = opts.bg ?? null;
           const border = opts.border ?? "#bbbbbb";
           if (bg) { pdoc.rect(x, y, w, h).fillColor(bg).fill(); }
           pdoc.rect(x, y, w, h).strokeColor(border).lineWidth(0.5).stroke();
+          const fs = opts.fontSize ?? FS_ROW;
           pdoc.font(opts.bold ? "Helvetica-Bold" : "Helvetica")
-              .fontSize(opts.fontSize ?? FS_ROW)
+              .fontSize(fs)
               .fillColor(opts.color ?? "#000000");
-          const textY = y + (h - (opts.fontSize ?? FS_ROW)) / 2 - 0.5;
+          const textY = opts.wrap
+            ? y + CELL_PAD                         // top-aligned for wrapping text
+            : y + (h - fs) / 2 - 0.5;             // vertically centred for single-line
           pdoc.text(text, x + CELL_PAD, textY, {
             width: w - CELL_PAD * 2,
             align: opts.align ?? "left",
-            lineBreak: false,
+            lineBreak: opts.wrap ?? false,
           });
+        };
+
+        // Re-draws the column-header strip and returns the new rowY.
+        const drawHeader = (atY: number): number => {
+          for (let i = 0; i < cols.length; i++) {
+            drawCell(cols[i].label, colX[i], atY, cols[i].w, HDR_H, {
+              align: cols[i].align, bold: true,
+              bg: ACCENT_BG, border: "#8fa8c8", fontSize: FS_HDR, color: ACCENT,
+            });
+          }
+          return atY + HDR_H;
         };
 
         // ── Title block ────────────────────────────────────────────────────────
@@ -2163,15 +2183,7 @@ export function registerPosRoutes(app: Express) {
         }
 
         // ── Table header ───────────────────────────────────────────────────────
-        let hy = tableStartY;
-        for (let i = 0; i < cols.length; i++) {
-          drawCell(cols[i].label, colX[i], hy, cols[i].w, HDR_H, {
-            align: cols[i].align, bold: true,
-            bg: ACCENT_BG, border: "#8fa8c8", fontSize: FS_HDR,
-            color: ACCENT,
-          });
-        }
-        let rowY = hy + HDR_H;
+        let rowY = drawHeader(tableStartY);
 
         // ── Item rows ──────────────────────────────────────────────────────────
         let totalQty = 0, totalAmt = 0, totalPL = 0;
@@ -2184,23 +2196,42 @@ export function registerPosRoutes(app: Express) {
           const pl      = plBale * qty;
           totalQty += qty; totalAmt += amt; totalPL += pl;
 
+          // Dynamic row height: expand to fit the description if it wraps
+          const descW = cols[0].w - CELL_PAD * 2;
+          pdoc.font("Helvetica").fontSize(FS_ROW);
+          const nameH = pdoc.heightOfString(item.name, { width: descW });
+          const dynH  = Math.max(ROW_H, Math.ceil(nameH) + CELL_PAD * 2);
+
+          // Page break — re-print column header on new page
+          if (rowY + dynH > PAGE_BOTTOM) {
+            pdoc.addPage({ size: "A4" });
+            rowY = ML;
+            rowY = drawHeader(rowY);
+          }
+
           const bg = idx % 2 === 0 ? "#ffffff" : "#f8fafc";
           const plBaleColor  = plBale > 0 ? "#15803d" : plBale < 0 ? "#b91c1c" : "#000000";
           const plTotalColor = pl     > 0 ? "#15803d" : pl     < 0 ? "#b91c1c" : "#000000";
 
-          drawCell(item.name,    colX[0], rowY, cols[0].w, ROW_H, { align: "left",   bg, border: "#d8e0ea" });
-          drawCell(fmtN(qty),    colX[1], rowY, cols[1].w, ROW_H, { align: "center", bg, border: "#d8e0ea" });
-          drawCell(fmtC(rate),   colX[2], rowY, cols[2].w, ROW_H, { align: "right",  bg, border: "#d8e0ea" });
-          drawCell(fmtC(amt),    colX[3], rowY, cols[3].w, ROW_H, { align: "right",  bg, border: "#d8e0ea" });
-          drawCell(fmtC(config), colX[4], rowY, cols[4].w, ROW_H, { align: "right",  bg, border: "#d8e0ea" });
-          drawCell(fmtC(plBale), colX[5], rowY, cols[5].w, ROW_H, { align: "right",  bg, border: "#d8e0ea", color: plBaleColor });
-          drawCell(fmtC(pl),     colX[6], rowY, cols[6].w, ROW_H, { align: "right",  bg, border: "#d8e0ea", color: plTotalColor });
-          rowY += ROW_H;
+          // Description: wrap:true so long names flow within the taller cell
+          drawCell(item.name,    colX[0], rowY, cols[0].w, dynH, { align: "left",   bg, border: "#d8e0ea", wrap: true });
+          drawCell(fmtN(qty),    colX[1], rowY, cols[1].w, dynH, { align: "center", bg, border: "#d8e0ea" });
+          drawCell(fmtC(rate),   colX[2], rowY, cols[2].w, dynH, { align: "right",  bg, border: "#d8e0ea" });
+          drawCell(fmtC(amt),    colX[3], rowY, cols[3].w, dynH, { align: "right",  bg, border: "#d8e0ea" });
+          drawCell(fmtC(config), colX[4], rowY, cols[4].w, dynH, { align: "right",  bg, border: "#d8e0ea" });
+          drawCell(fmtC(plBale), colX[5], rowY, cols[5].w, dynH, { align: "right",  bg, border: "#d8e0ea", color: plBaleColor });
+          drawCell(fmtC(pl),     colX[6], rowY, cols[6].w, dynH, { align: "right",  bg, border: "#d8e0ea", color: plTotalColor });
+          rowY += dynH;
         });
 
         // ── Totals row ─────────────────────────────────────────────────────────
-        const plTotColor = totalPL > 0 ? "#15803d" : totalPL < 0 ? "#b91c1c" : "#000000";
+        // Ensure TOTAL + TOTAL PAID bar + footer all fit on the same page
         const TOT_H = ROW_H + 2;
+        if (rowY + TOT_H + 75 > PAGE_BOTTOM) {
+          pdoc.addPage({ size: "A4" });
+          rowY = ML;
+        }
+        const plTotColor = totalPL > 0 ? "#15803d" : totalPL < 0 ? "#b91c1c" : "#000000";
         drawCell("TOTAL",        colX[0], rowY, cols[0].w, TOT_H, { bold: true, bg: ACCENT_BG, border: "#8fa8c8", color: ACCENT });
         drawCell(fmtN(totalQty), colX[1], rowY, cols[1].w, TOT_H, { align: "center", bold: true, bg: ACCENT_BG, border: "#8fa8c8", color: ACCENT });
         drawCell("",             colX[2], rowY, cols[2].w, TOT_H, { bg: ACCENT_BG, border: "#8fa8c8" });
@@ -2211,11 +2242,21 @@ export function registerPosRoutes(app: Express) {
         rowY += TOT_H + 10;
 
         // ── Total Paid ─────────────────────────────────────────────────────────
+        // Guard: if not enough room for the bar + footer, start a fresh page
+        if (rowY + 55 > PAGE_BOTTOM) {
+          pdoc.addPage({ size: "A4" });
+          rowY = ML;
+        }
         pdoc.moveTo(ML, rowY).lineTo(tableRight, rowY).strokeColor(ACCENT).lineWidth(1).stroke();
         rowY += 7;
         pdoc.font("Helvetica-Bold").fontSize(12).fillColor(ACCENT);
+        // Render label and amount on the SAME line using explicit x positions
+        // (two separate text() calls at the same y with computed x is the only
+        //  reliable approach — avoids PDFKit's unpredictable auto-page logic)
         pdoc.text("TOTAL PAID:", ML, rowY, { lineBreak: false });
-        pdoc.text(fmtC(totalAmount), ML, rowY, { width: USE, align: "right", lineBreak: false });
+        const paidAmtStr = fmtC(totalAmount);
+        const paidAmtW   = pdoc.widthOfString(paidAmtStr);
+        pdoc.text(paidAmtStr, tableRight - paidAmtW, rowY, { lineBreak: false });
         rowY += 22;
 
         // ── Note ───────────────────────────────────────────────────────────────
