@@ -104,7 +104,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     color: NAV_COLOR.bales,
     items: [
       { title: "Bale Explorer",   url: "/factory/bales-hub",       icon: History },
-      { title: "Bale Products",   url: "/factory/bale-products",   icon: Tag     },
+      { title: "Bale Products",   url: "/factory/bale-products",   icon: Tag,    developerOnly: true },
       { title: "Bale Relabeling", url: "/factory/bale-relabeling", icon: Repeat, developerOnly: true },
     ],
   },
