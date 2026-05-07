@@ -1343,7 +1343,7 @@ export default function FactoryContainerLoadingScan() {
                               {line.articleCode}
                             </span>
                           </div>
-                          <div className="text-muted-foreground truncate max-w-[100px]">
+                          <div className="text-muted-foreground break-words">
                             {line.productName}
                           </div>
                         </TableCell>
