@@ -66,8 +66,22 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const [proforma] = await db.select().from(customerProformas)
         .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
       if (!proforma) return res.status(404).json({ message: "Proforma not found" });
-      const lines = await db.select().from(customerProformaLines)
-        .where(eq(customerProformaLines.proformaId, id));
+      // Raw SQL to avoid "column does not exist" when price_fixed / production_price_per_bale
+      // are absent from the production DB.
+      const rawLinesRes = await db.execute(
+        sql`SELECT * FROM customer_proforma_lines WHERE proforma_id = ${id}`,
+      );
+      const lines: any[] = ((rawLinesRes as any).rows ?? (rawLinesRes as unknown as any[])).map((l: any) => ({
+        id:                     l.id,
+        proformaId:             l.proforma_id,
+        articleCode:            l.article_code            ?? "",
+        productName:            l.product_name            ?? "",
+        quantity:               l.quantity                ?? 0,
+        pricePerBale:           l.price_per_bale          ?? "0",
+        productionPricePerBale: l.production_price_per_bale ?? "0",
+        priceFixed:             l.price_fixed             ?? false,
+        createdAt:              l.created_at,
+      }));
       const articleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
       let weightMap = new Map<string, string>();
       if (articleCodes.length > 0) {
@@ -104,7 +118,23 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const proformaIds = proformas.map((p: any) => p.id);
       let lines: any[] = [];
       if (proformaIds.length > 0) {
-        lines = await db.select().from(customerProformaLines).where(inArray(customerProformaLines.proformaId, proformaIds));
+        // Use raw SQL to avoid explicit-column failures when newer columns
+        // (price_fixed, production_price_per_bale) are absent from production.
+        const rawLines = await db.execute(
+          sql`SELECT * FROM customer_proforma_lines WHERE proforma_id = ANY(${proformaIds})`,
+        );
+        const rawRows: any[] = (rawLines as any).rows ?? (rawLines as unknown as any[]);
+        lines = rawRows.map((l: any) => ({
+          id:                     l.id,
+          proformaId:             l.proforma_id,
+          articleCode:            l.article_code            ?? "",
+          productName:            l.product_name            ?? "",
+          quantity:               l.quantity                ?? 0,
+          pricePerBale:           l.price_per_bale          ?? "0",
+          productionPricePerBale: l.production_price_per_bale ?? "0",
+          priceFixed:             l.price_fixed             ?? false,
+          createdAt:              l.created_at,
+        }));
       }
 
       // Enrich lines with weightPerBaleKg and correct productName from factoryBaleProducts

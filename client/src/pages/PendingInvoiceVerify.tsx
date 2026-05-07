@@ -138,7 +138,10 @@ export default function PendingInvoiceVerify() {
     queryKey: ["/api/factory/customer-orders", orderId, "verification"],
     queryFn: async () => {
       const res = await fetch(`/api/factory/customer-orders/${orderId}/verification-summary`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch verification summary");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.message || `Server error ${res.status} on verification-summary`);
+      }
       return res.json();
     },
     enabled: !!orderId,
@@ -148,7 +151,10 @@ export default function PendingInvoiceVerify() {
     queryKey: ["/api/factory/customer-orders", orderId],
     queryFn: async () => {
       const res = await fetch(`/api/factory/customer-orders/${orderId}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch order detail");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.message || `Server error ${res.status} on order detail`);
+      }
       return res.json();
     },
     enabled: !!orderId,
