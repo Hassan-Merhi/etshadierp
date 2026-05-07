@@ -760,6 +760,7 @@ export const vouchers = pgTable("vouchers", {
   exchangeRate: decimal("exchange_rate", { precision: 20, scale: 6 }),
   sourceModule: text("source_module").default("ERP"),
   isCreditSale: boolean("is_credit_sale").default(false),
+  clientSaleId: varchar("client_sale_id", { length: 36 }),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({

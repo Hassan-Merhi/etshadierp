@@ -195,7 +195,7 @@ export function registerVoucherRoutes(app: Express) {
       }
 
       // Strip totalAmount from Stock Transfer vouchers for POS users
-      const sanitizedVouchers = isPOS
+      let sanitizedVouchers = isPOS
         ? vouchers.map((v: any) => {
             // Check for all variants of Stock Transfer voucher type
             const isStockTransfer = v.voucherType === "Stock Transfer" || 
@@ -208,6 +208,23 @@ export function registerVoucherRoutes(app: Express) {
             return v;
           })
         : vouchers;
+
+      // Fix 6: For POS users, only return vouchers from their assigned locations
+      if (isPOS && req.user?.id) {
+        const assignedLocs = await db
+          .select({ locationId: userLocations.locationId })
+          .from(userLocations)
+          .where(and(
+            eq(userLocations.userId, req.user.id),
+            eq(userLocations.companyId, req.session.currentCompanyId!),
+          ));
+        const allowedLocIds = assignedLocs.map((l: any) => l.locationId);
+        if (allowedLocIds.length > 0) {
+          sanitizedVouchers = sanitizedVouchers.filter((v: any) =>
+            v.locationId === null || allowedLocIds.includes(v.locationId)
+          );
+        }
+      }
 
       res.json(sanitizedVouchers);
     } catch (error: any) {

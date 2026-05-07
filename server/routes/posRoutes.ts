@@ -254,6 +254,8 @@ export function registerPosRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
+      const isPOSUser = (req.user?.role || "").startsWith("POS");
+
       const {
         locationId,
         cashAccountId,
@@ -264,6 +266,7 @@ export function registerPosRoutes(app: Express) {
         isCreditSale,
         voucherDate: providedVoucherDate,
         shiftId,
+        clientSaleId,
         currency,
         exchangeRate,
       } = req.body;
@@ -397,12 +400,45 @@ export function registerPosRoutes(app: Express) {
         resolved: { accountType, accountId },
       });
 
+      // Fix 4: Idempotency — if this clientSaleId was already saved, return the existing sale
+      if (clientSaleId) {
+        const [existingVoucher] = await db
+          .select()
+          .from(vouchers)
+          .where(and(
+            eq(vouchers.companyId, req.session.currentCompanyId!),
+            eq(vouchers.clientSaleId, clientSaleId),
+            isNull(vouchers.deletedAt),
+          ))
+          .limit(1);
+        if (existingVoucher) {
+          const existingSalesItems = await db.select().from(salesItems).where(eq(salesItems.voucherId, existingVoucher.id));
+          const existingLocation = existingVoucher.locationId ? await storage.getLocationById(existingVoucher.locationId) : null;
+          return res.json({
+            voucher: existingVoucher,
+            location: existingLocation,
+            items: existingSalesItems,
+            grandTotal: existingVoucher.totalAmount,
+            voucherNumber: existingVoucher.voucherNumber,
+            saleDate: existingVoucher.voucherDate,
+            isCreditSale: existingVoucher.isCreditSale,
+            customer: null,
+            _idempotent: true,
+          });
+        }
+      }
+
       // Validate required fields
       if (!locationId) {
         return res.status(400).json({ message: "Location is required" });
       }
 
-      // Validate shiftId if provided - must be open, owned by user, and in same company
+      // Fix 1: POS users must have an open shift before making sales
+      if (isPOSUser && !shiftId) {
+        return res.status(400).json({ message: "No open cash shift found for this location." });
+      }
+
+      // Validate shiftId — must be open, belong to current user, company, and location
       if (shiftId) {
         const shift = await storage.getShiftById(shiftId);
         if (!shift) {
@@ -415,7 +451,7 @@ export function registerPosRoutes(app: Express) {
           return res.status(400).json({ message: "Shift location does not match sale location" });
         }
         if (shift.status !== "open") {
-          return res.status(400).json({ message: "Cannot add sale to closed shift" });
+          return res.status(400).json({ message: "No open cash shift found for this location." });
         }
         if (shift.userId !== req.user?.id) {
           return res.status(403).json({ message: "Cannot add sale to another user's shift" });
@@ -504,11 +540,55 @@ export function registerPosRoutes(app: Express) {
         return res.status(403).json({ message: "Location does not belong to the current company" });
       }
 
+      // Fix 2: POS users can only sell from their assigned locations
+      if (isPOSUser) {
+        const assignedLocs = await db
+          .select({ locationId: userLocations.locationId })
+          .from(userLocations)
+          .where(and(
+            eq(userLocations.userId, req.user!.id),
+            eq(userLocations.companyId, req.session.currentCompanyId!),
+          ));
+        const allowedIds = assignedLocs.map(l => l.locationId);
+        if (!allowedIds.includes(parsedLocationId)) {
+          return res.status(403).json({ message: "You are not allowed to sell from this location." });
+        }
+      }
+
       // STEP 1: Validate inventory availability
       const voucherNumber = `SALES-${Date.now()}`;
       const voucherDate = providedVoucherDate || getClientDate(req);
 
-      // STEP 1a: Validate inventory rows
+      // Check if user can sell negative stock (same for all items — compute once)
+      const canSellNegativeStock = req.user?.canSellNegativeStock || false;
+
+      // Fix 5: Verify each stockItemId exists, belongs to this company, and is not deleted/merged
+      for (const item of items) {
+        const [si] = await db
+          .select({ id: stockItems.id, name: stockItems.name, deletedAt: stockItems.deletedAt })
+          .from(stockItems)
+          .where(and(
+            eq(stockItems.id, item.stockItemId),
+            eq(stockItems.companyId, req.session.currentCompanyId!),
+          ))
+          .limit(1);
+        if (!si) {
+          return res.status(400).json({
+            message: `Item ID ${item.stockItemId} does not exist or does not belong to this company.`,
+            code: "ITEM_NOT_FOUND",
+            invalidItemId: item.stockItemId,
+          });
+        }
+        if (si.deletedAt) {
+          return res.status(400).json({
+            message: `This item was merged or deleted. Please select it again.`,
+            code: "ITEM_DELETED",
+            invalidItemId: item.stockItemId,
+          });
+        }
+      }
+
+      // STEP 1a: Validate inventory rows (best-effort pre-check; authoritative check is inside the transaction)
       const inventoryValidation: Array<{
         item: any;
         inventoryRecord: any;
@@ -547,12 +627,9 @@ export function registerPosRoutes(app: Express) {
         const saleQty = parseFloat(item.quantity);
         const itemDisplayName = inventoryRecord.itemName || `item ${item.stockItemId}`;
 
-        // Check if user can sell negative stock
-        const canSellNegativeStock = req.user?.canSellNegativeStock || false;
-
         if (currentQty < saleQty && !canSellNegativeStock) {
           throw new Error(
-            `"${itemDisplayName}" quantity requested (${saleQty}) is more than available stock (${currentQty})`,
+            `Not enough stock for "${itemDisplayName}". Available: ${currentQty}, requested: ${saleQty}.`,
           );
         }
 
@@ -584,6 +661,7 @@ export function registerPosRoutes(app: Express) {
             description: notes || (isCreditSale ? `Credit Invoice Sale at ${location.name} - ${(customerAccount as any).name}` : `POS Sale at ${location.name}`),
             totalAmount: grandTotal.toFixed(2),
             shiftId: shiftId || null,
+            clientSaleId: clientSaleId || null,
             currency: currency || "USD",
             exchangeRate: exchangeRate || null,
             isCreditSale: !!isCreditSale,
@@ -652,6 +730,23 @@ export function registerPosRoutes(app: Express) {
         for (const validatedItem of inventoryValidation) {
           const { item, newQty, currentRate, inventoryRecord, currentQty, saleQty } =
             validatedItem;
+
+          // Fix 3: Authoritative stock check inside the transaction with row lock.
+          // Catches race conditions where two cashiers sell the last unit concurrently.
+          const stockLockResult = await (tx as any).execute(sql`
+            SELECT i.quantity, si.name AS item_name
+            FROM inventory i
+            LEFT JOIN stock_items si ON si.id = i.stock_item_id
+            WHERE i.location_id = ${parsedLocationId} AND i.stock_item_id = ${item.stockItemId}
+            FOR UPDATE
+          `);
+          const lockedRow = stockLockResult.rows?.[0] ?? stockLockResult[0];
+          const lockedQty = lockedRow ? parseFloat(lockedRow.quantity ?? "0") : 0;
+          if (lockedQty < saleQty && !canSellNegativeStock) {
+            throw new Error(
+              `Not enough stock for "${lockedRow?.item_name || inventoryRecord?.itemName || item.stockItemId}". Available: ${lockedQty}, requested: ${saleQty}.`
+            );
+          }
 
           await adjustInventory(tx, locationId, item.stockItemId, -saleQty, req.session.currentCompanyId!);
 
@@ -747,7 +842,7 @@ export function registerPosRoutes(app: Express) {
       if (error.message.includes("Inventory not found")) {
         return res.status(404).json({ message: error.message });
       }
-      if (error.message.includes("Insufficient stock")) {
+      if (error.message.includes("Insufficient stock") || error.message.includes("Not enough stock")) {
         return res.status(400).json({ message: error.message });
       }
       res.status(500).json({ message: error.message });

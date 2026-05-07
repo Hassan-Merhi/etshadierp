@@ -2689,6 +2689,10 @@ let migrationsDone = false;
     `ALTER TABLE customer_order_bales ADD COLUMN IF NOT EXISTS price_used NUMERIC(20,2) NOT NULL DEFAULT 0`,
     `ALTER TABLE customer_order_bales ADD COLUMN IF NOT EXISTS bale_reference VARCHAR(100) NOT NULL DEFAULT ''`,
     `ALTER TABLE customer_order_bales ADD COLUMN IF NOT EXISTS location_id INTEGER`,
+
+    // ── POS idempotency: per-company unique client sale ID to prevent duplicate charges ──
+    `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS client_sale_id VARCHAR(36)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS vouchers_company_client_sale_unique ON vouchers (company_id, client_sale_id) WHERE client_sale_id IS NOT NULL`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

@@ -288,6 +288,16 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     enabled: !!activeLocation,
   });
 
+  // Fix 1: Fetch current open shift for POS users
+  const { data: currentShift } = useQuery<any>({
+    queryKey: posUser && activeLocation ? ["/api/pos/shifts/current", { locationId: activeLocation.id }] : [],
+    enabled: !!posUser && !!activeLocation,
+    retry: false,
+    refetchInterval: 60_000,
+  });
+  // Non-POS users never need a shift; POS users need one open to sell
+  const hasOpenShift = !posUser || (!!currentShift && currentShift.status === "open");
+
   // Fetch authenticated user for printing (fallback when posUser not available)
   const { data: authUser } = useQuery<any>({
     queryKey: ["/api/auth/me"],
@@ -375,6 +385,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   // focus — cancelled when focus moves into the search panel so activeRow stays
   // intact while the user is editing via the search panel.
   const clearActiveRowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clientSaleIdRef = useRef<string>(crypto.randomUUID());
 
   // Refs that mirror the latest state values — used by the autosave interval so
   // it doesn't need those values in its dependency array (which would reset the
@@ -688,6 +699,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       }
     },
     onSuccess: async (data: any) => {
+      clientSaleIdRef.current = crypto.randomUUID(); // Fresh ID for next sale (prevents duplicate on retry)
       setSavedSale(data);
 
       if (!editVoucherId) {
@@ -1829,6 +1841,16 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       return;
     }
 
+    // Fix 1: POS users must have an open shift before making sales
+    if (!hasOpenShift) {
+      toast({
+        title: "No open shift",
+        description: "Open a cash shift before making sales.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const invalidRow = rows.find(r => r.itemName?.trim() && !r.stockItemId);
     if (invalidRow) {
       const invalidIdx = rows.indexOf(invalidRow);
@@ -1855,6 +1877,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     // Prepare sale data - convert CFA amounts to USD if entering in CFA
     const saleData = {
       locationId: activeLocation?.id || editVoucher?.locationId,
+      shiftId: posUser && currentShift ? currentShift.id : undefined,
+      clientSaleId: !editVoucherId ? clientSaleIdRef.current : undefined,
       paymentAccountType: isCreditSale ? "credit" : paymentAccountType,
       paymentAccountId: isCreditSale ? parseInt(selectedCustomerId) : parseInt(paymentAccountId),
       isCreditSale,
@@ -1971,7 +1995,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             <Button
               onClick={handleSaveSale}
               size="sm"
-              disabled={saveMutation.isPending || !hasValidItems}
+              disabled={saveMutation.isPending || !hasValidItems || !hasOpenShift}
               className="gap-1 sm:gap-2"
               data-testid="button-complete-sale"
             >
@@ -1981,6 +2005,18 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           )}
         </div>
       </PageHeader>
+
+      {posUser && activeLocation && !hasOpenShift && (
+        <div
+          className="flex items-center gap-3 rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 px-4 py-3 text-sm"
+          data-testid="banner-no-shift"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <span className="text-amber-800 dark:text-amber-200">
+            Open a cash shift before making sales.
+          </span>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4">
         <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
@@ -2743,7 +2779,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         ) : (
           <Button
             onClick={handleSaveSale}
-            disabled={saveMutation.isPending || !hasValidItems}
+            disabled={saveMutation.isPending || !hasValidItems || !hasOpenShift}
             className="shrink-0 h-10 px-5"
             data-testid="button-mobile-sticky-save"
           >
