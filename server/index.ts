@@ -2659,6 +2659,33 @@ let migrationsDone = false;
     `CREATE INDEX IF NOT EXISTS inventory_company_location_idx ON inventory(company_id, location_id)`,
     `CREATE INDEX IF NOT EXISTS ledger_accounts_company_deleted_code_idx ON ledger_accounts(company_id, deleted_at, code)`,
     `CREATE INDEX IF NOT EXISTS ledger_accounts_company_type_idx ON ledger_accounts(company_id, account_type)`,
+
+    // ── customer_orders: columns added to schema but never back-ported to existing production tables ──
+    // These columns exist in shared/schema.ts but the CREATE TABLE for customer_orders predates
+    // the runtime migration system, so an ALTER TABLE is required for each addition.
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS proforma_id_used INTEGER`,
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS container_number VARCHAR(100)`,
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS shipping_company VARCHAR(200)`,
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS container_notes TEXT`,
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS verified_by_user_id INTEGER`,
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP`,
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS loading_started_at TIMESTAMP`,
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS loading_finalized_at TIMESTAMP`,
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS location_id INTEGER`,
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS invoice_number VARCHAR(50)`,
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS subtotal_bales NUMERIC(20,2) NOT NULL DEFAULT 0`,
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS freight_amount NUMERIC(20,2) NOT NULL DEFAULT 0`,
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS other_charges_total NUMERIC(20,2) NOT NULL DEFAULT 0`,
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS grand_total NUMERIC(20,2) NOT NULL DEFAULT 0`,
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS total_qty_bales INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT now()`,
+
+    // ── customer_order_bales: columns added to schema but never back-ported ──
+    `ALTER TABLE customer_order_bales ADD COLUMN IF NOT EXISTS article_code VARCHAR(50)`,
+    `ALTER TABLE customer_order_bales ADD COLUMN IF NOT EXISTS bale_name TEXT`,
+    `ALTER TABLE customer_order_bales ADD COLUMN IF NOT EXISTS price_used NUMERIC(20,2) NOT NULL DEFAULT 0`,
+    `ALTER TABLE customer_order_bales ADD COLUMN IF NOT EXISTS bale_reference VARCHAR(100) NOT NULL DEFAULT ''`,
+    `ALTER TABLE customer_order_bales ADD COLUMN IF NOT EXISTS location_id INTEGER`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
