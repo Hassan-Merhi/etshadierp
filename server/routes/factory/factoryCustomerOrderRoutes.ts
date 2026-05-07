@@ -3148,29 +3148,30 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
 
-      // Use raw SQL to read customer_order_bales with COALESCE fallbacks.
-      // This is resilient even if the newer columns (price_used, bale_reference,
-      // article_code, bale_name, location_id) are temporarily missing from the
-      // production table — a scenario that would cause a Drizzle-generated SELECT
-      // to throw "column X does not exist" and render the page as if 0 bales exist.
+      // Use SELECT * so the query succeeds even when newer columns (price_used,
+      // bale_reference, article_code, bale_name, location_id) are absent from the
+      // production table.  COALESCE(column, fallback) looks safe but PostgreSQL
+      // rejects the entire query at parse time when the column doesn't exist —
+      // before COALESCE ever runs — causing a 500 that renders the page as 0 bales.
+      // SELECT * returns whatever columns exist; we apply JS-side defaults below.
       const rawBalesResult = await db.execute(
-        sql`SELECT
-              id,
-              order_id,
-              bale_id,
-              COALESCE(weight::text, '0')        AS weight,
-              COALESCE(article_code, '')         AS article_code,
-              COALESCE(bale_name, '')            AS bale_name,
-              COALESCE(price_used::text, '0')    AS price_used,
-              COALESCE(bale_reference, '')       AS bale_reference
-            FROM customer_order_bales
-            WHERE order_id = ${orderId}`,
+        sql`SELECT * FROM customer_order_bales WHERE order_id = ${orderId}`,
       );
+      const rawBaleRows: any[] = (rawBalesResult as any).rows ?? (rawBalesResult as unknown as any[]);
       const orderBales: Array<{
         id: number; order_id: number; bale_id: number;
         weight: string; article_code: string; bale_name: string;
         price_used: string; bale_reference: string;
-      }> = (rawBalesResult as any).rows ?? (rawBalesResult as unknown as any[]);
+      }> = rawBaleRows.map((r: any) => ({
+        id:            r.id,
+        order_id:      r.order_id,
+        bale_id:       r.bale_id,
+        weight:        String(r.weight        ?? '0'),
+        article_code:  String(r.article_code  ?? ''),
+        bale_name:     String(r.bale_name     ?? ''),
+        price_used:    String(r.price_used    ?? '0'),
+        bale_reference:String(r.bale_reference ?? ''),
+      }));
 
       // Diagnostic log — always emitted so the production logs can confirm the actual DB state.
       console.log(

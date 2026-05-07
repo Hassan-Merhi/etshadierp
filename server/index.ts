@@ -2692,7 +2692,11 @@ let migrationsDone = false;
 
     // ── POS idempotency: per-company unique client sale ID to prevent duplicate charges ──
     `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS client_sale_id VARCHAR(36)`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS vouchers_company_client_sale_unique ON vouchers (company_id, client_sale_id) WHERE client_sale_id IS NOT NULL`,
+    // CONCURRENTLY avoids an ACCESS EXCLUSIVE table lock on vouchers during index build,
+    // which would otherwise block every read/write to that table until the index is ready.
+    // NOTE: CONCURRENTLY cannot run inside an explicit transaction; our migration runner
+    // issues each statement in auto-commit mode so this is safe.
+    `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS vouchers_company_client_sale_unique ON vouchers (company_id, client_sale_id) WHERE client_sale_id IS NOT NULL`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

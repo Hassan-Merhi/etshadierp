@@ -63,18 +63,24 @@ async function buildLoadingSummary(invoiceId: number, companyId: number, activeS
     .where(eq(customerOrderLines.orderId, invoiceId));
 
   // 3. Invoice bales (exact bale membership — the official list)
-  const invoiceBalesRaw = await db
-    .select({
-      id: customerOrderBales.id,
-      baleId: customerOrderBales.baleId,
-      baleReference: customerOrderBales.baleReference,
-      articleCode: customerOrderBales.articleCode,
-      baleName: customerOrderBales.baleName,
-      weight: customerOrderBales.weight,
-      priceUsed: customerOrderBales.priceUsed,
-    })
-    .from(customerOrderBales)
-    .where(eq(customerOrderBales.orderId, invoiceId));
+  // Use SELECT * so this query succeeds even when newer columns (bale_reference,
+  // article_code, bale_name, price_used, location_id) are temporarily absent from
+  // the production table.  A Drizzle-generated SELECT that names those columns
+  // fails at parse time with "column X does not exist", which would break the
+  // entire loading page.  SELECT * returns whatever exists; JS defaults fill gaps.
+  const _invoiceBalesRawResult = await db.execute(
+    sql`SELECT * FROM customer_order_bales WHERE order_id = ${invoiceId}`,
+  );
+  const _invoiceBalesRows: any[] = (_invoiceBalesRawResult as any).rows ?? (_invoiceBalesRawResult as unknown as any[]);
+  const invoiceBalesRaw = _invoiceBalesRows.map((r: any) => ({
+    id:          r.id          as number,
+    baleId:      r.bale_id    as number,
+    baleReference: String(r.bale_reference ?? ''),
+    articleCode: r.article_code  != null ? String(r.article_code) : null,
+    baleName:    r.bale_name     != null ? String(r.bale_name)    : null,
+    weight:      r.weight,
+    priceUsed:   String(r.price_used ?? '0'),
+  }));
 
   // 4. All loading sessions for this invoice
   const sessions = await db
@@ -394,14 +400,14 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
 
       const bale = baleMatches[0];
 
-      // Validate bale belongs to this exact invoice (via customer_order_bales)
-      const [invoiceBaleLink] = await db
-        .select({ baleId: customerOrderBales.baleId, baleReference: customerOrderBales.baleReference })
-        .from(customerOrderBales)
-        .where(and(
-          eq(customerOrderBales.orderId, invoiceId),
-          eq(customerOrderBales.baleId, bale.id),
-        ));
+      // Validate bale belongs to this exact invoice (via customer_order_bales).
+      // Only select the two core columns (order_id, bale_id) that have always
+      // existed — avoiding parse-time failures when newer columns are absent.
+      const _linkResult = await db.execute(
+        sql`SELECT bale_id FROM customer_order_bales WHERE order_id = ${invoiceId} AND bale_id = ${bale.id} LIMIT 1`,
+      );
+      const _linkRows: any[] = (_linkResult as any).rows ?? (_linkResult as unknown as any[]);
+      const invoiceBaleLink = _linkRows.length > 0 ? { baleId: _linkRows[0].bale_id as number } : undefined;
 
       if (!invoiceBaleLink) {
         // FALLBACK NOTE: If finalized invoices ever exist without exact customer_order_bales rows,
