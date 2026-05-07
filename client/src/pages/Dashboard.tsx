@@ -70,9 +70,9 @@ type ProfitData = {
   totalExpenses: number;
   netProfit: number;
   forUsTotal: number;
-  forUsBreakdown: { name: string; value: number }[];
+  forUs: { total: number; breakdown: { name: string; value: number }[]; accounts: any[] };
   onUsTotal: number;
-  onUsBreakdown: { name: string; value: number }[];
+  onUs: { total: number; breakdown: { name: string; value: number }[]; accounts: any[] };
   expensesTotal: number;
   expenses: {
     total: number;
@@ -613,7 +613,7 @@ export default function Dashboard() {
                   What We Have
                 </h4>
                 <div className="space-y-1.5 text-sm">
-                  {(profitData?.forUsBreakdown ?? []).map((item, idx) => (
+                  {(profitData?.forUs?.breakdown ?? []).map((item, idx) => (
                     <div key={idx} className="flex justify-between gap-2">
                       <span className="text-muted-foreground truncate">{item.name}</span>
                       <span className="font-mono shrink-0">{formatAmount(item.value)}</span>
@@ -633,7 +633,7 @@ export default function Dashboard() {
                   What We Owe
                 </h4>
                 <div className="space-y-1.5 text-sm">
-                  {(profitData?.onUsBreakdown ?? []).map((item, idx) => (
+                  {(profitData?.onUs?.breakdown ?? []).map((item, idx) => (
                     <div key={idx} className="flex justify-between gap-2">
                       <span className="text-muted-foreground truncate">{item.name}</span>
                       <span className="font-mono shrink-0 text-destructive">{formatAmount(item.value)}</span>
