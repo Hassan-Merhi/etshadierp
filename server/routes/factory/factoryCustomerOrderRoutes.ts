@@ -3148,18 +3148,54 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
 
-      const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+      // Use raw SQL to read customer_order_bales with COALESCE fallbacks.
+      // This is resilient even if the newer columns (price_used, bale_reference,
+      // article_code, bale_name, location_id) are temporarily missing from the
+      // production table — a scenario that would cause a Drizzle-generated SELECT
+      // to throw "column X does not exist" and render the page as if 0 bales exist.
+      const rawBalesResult = await db.execute(
+        sql`SELECT
+              id,
+              order_id,
+              bale_id,
+              COALESCE(weight::text, '0')        AS weight,
+              COALESCE(article_code, '')         AS article_code,
+              COALESCE(bale_name, '')            AS bale_name,
+              COALESCE(price_used::text, '0')    AS price_used,
+              COALESCE(bale_reference, '')       AS bale_reference
+            FROM customer_order_bales
+            WHERE order_id = ${orderId}`,
+      );
+      const orderBales: Array<{
+        id: number; order_id: number; bale_id: number;
+        weight: string; article_code: string; bale_name: string;
+        price_used: string; bale_reference: string;
+      }> = (rawBalesResult as any).rows ?? (rawBalesResult as unknown as any[]);
 
-      // Build preliminary article code set from loaded bales
+      // Diagnostic log — always emitted so the production logs can confirm the actual DB state.
+      console.log(
+        `[verify-summary] orderId=${orderId} companyId=${companyId}` +
+        ` status=${order.status} proformaIdUsed=${order.proformaIdUsed ?? 'null'}` +
+        ` customer_order_bales.count=${orderBales.length}`,
+      );
+
+      // Build preliminary article code set from loaded bales.
+      // Raw SQL returns snake_case keys; normalise them for the rest of the route.
       const loadedByArticle: Record<string, { articleCode: string; productName: string; qty: number; totalWeight: number; totalPrice: number }> = {};
       for (const b of orderBales) {
-        const code = b.articleCode || "UNKNOWN";
+        // Support both snake_case (raw SQL) and camelCase (legacy Drizzle rows)
+        const articleCode = (b as any).article_code ?? (b as any).articleCode ?? "";
+        const baleName   = (b as any).bale_name   ?? (b as any).baleName   ?? "";
+        const priceUsed  = (b as any).price_used  ?? (b as any).priceUsed  ?? "0";
+        const weight     = (b as any).weight ?? "0";
+
+        const code = articleCode || "UNKNOWN";
         if (!loadedByArticle[code]) {
-          loadedByArticle[code] = { articleCode: code, productName: b.baleName || code, qty: 0, totalWeight: 0, totalPrice: 0 };
+          loadedByArticle[code] = { articleCode: code, productName: baleName || code, qty: 0, totalWeight: 0, totalPrice: 0 };
         }
         loadedByArticle[code].qty += 1;
-        loadedByArticle[code].totalWeight += parseFloat(b.weight);
-        loadedByArticle[code].totalPrice += parseFloat(b.priceUsed);
+        loadedByArticle[code].totalWeight += parseFloat(weight) || 0;
+        loadedByArticle[code].totalPrice  += parseFloat(priceUsed) || 0;
       }
 
       let proformaLines: any[] = [];
@@ -3276,10 +3312,145 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         proformaLines: proformaLinesWithStock,
         comparison,
         totalLoadedBales: orderBales.length,
-        totalLoadedWeight: orderBales.reduce((s: number, b: any) => s + parseFloat(b.weight), 0),
+        // Use the already-normalised accumulator from loadedByArticle instead of re-iterating
+        totalLoadedWeight: Object.values(loadedByArticle).reduce((s, g) => s + g.totalWeight, 0),
       });
     } catch (error: any) {
       console.error("Error fetching verification summary:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Admin: recover missing customer_order_bales rows from factory_bales ──────
+  // This endpoint reconstructs the customer_order_bales link table for orders
+  // where bale scans were attempted but the inserts failed (e.g. because the
+  // newer columns didn't yet exist in the production DB). It finds factory_bales
+  // that are currently SOLD or RESERVED_FOR_ORDER and are NOT already linked to
+  // any active customer_order_bales row, then lets an admin link them to this
+  // order by providing a list of bale reference numbers.
+  // Only Admin / Owner / Developer roles may call this.
+  // SQL diagnostic to check state before calling:
+  //   SELECT fb.id, fb.reference_number, fb.article_code, fb.status, fb.weight_kg
+  //     FROM factory_bales fb
+  //    WHERE fb.company_id = <companyId>
+  //      AND fb.status IN ('SOLD', 'RESERVED_FOR_ORDER')
+  //      AND NOT EXISTS (
+  //            SELECT 1 FROM customer_order_bales cob WHERE cob.bale_id = fb.id
+  //          )
+  //    ORDER BY fb.updated_at DESC;
+  app.post("/api/factory/customer-orders/:id/recover-bales", requireAuth, async (req: any, res: any) => {
+    try {
+      const session = req.session as any;
+      const companyId = session.factoryCompanyId || session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const role = (session.currentRole || session.role || "").toLowerCase();
+      if (!["admin", "owner", "developer"].includes(role)) {
+        return res.status(403).json({ message: "Only Admin / Owner can recover bales" });
+      }
+
+      const orderId = parseId(req.params.id);
+      if (orderId === null) return res.status(400).json({ message: "Invalid order id" });
+
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+
+      // Only allow recovery for orders that are in a post-LOADING stage with 0 bales
+      if (!["PENDING_VERIFICATION", "VERIFIED", "FINALIZED"].includes(order.status)) {
+        return res.status(400).json({ message: "Recovery is only available for PENDING_VERIFICATION, VERIFIED, or FINALIZED orders" });
+      }
+
+      const existingBaleCount = await db.execute(
+        sql`SELECT COUNT(*)::int AS count FROM customer_order_bales WHERE order_id = ${orderId}`,
+      );
+      const existingCount = Number(((existingBaleCount as any).rows ?? [{ count: 0 }])[0]?.count ?? 0);
+      if (existingCount > 0) {
+        return res.status(400).json({
+          message: `Order already has ${existingCount} bale(s) linked. Recovery is only for orders with 0 linked bales.`,
+        });
+      }
+
+      const { baleReferences }: { baleReferences: string[] } = req.body;
+      if (!Array.isArray(baleReferences) || baleReferences.length === 0) {
+        return res.status(400).json({ message: "baleReferences array is required and must not be empty" });
+      }
+
+      // Look up proforma prices once
+      const proformaPriceMap: Record<string, string> = {};
+      if (order.proformaIdUsed) {
+        const pfLines = await db.select().from(customerProformaLines)
+          .where(eq(customerProformaLines.proformaId, order.proformaIdUsed));
+        for (const pl of pfLines) {
+          proformaPriceMap[pl.articleCode] = pl.pricePerBale;
+        }
+      }
+
+      let linked = 0;
+      const notFound: string[] = [];
+
+      for (const ref of baleReferences) {
+        const refClean = ref.trim();
+        if (!refClean) continue;
+
+        // Find the bale — accept SOLD, RESERVED_FOR_ORDER, or even IN_STOCK (admin override)
+        const [bale] = await db.select().from(factoryBales)
+          .where(and(
+            eq(factoryBales.companyId, companyId),
+            or(
+              sql`LOWER(${factoryBales.referenceNumber}) = ${refClean.toLowerCase()}`,
+              sql`LOWER(${factoryBales.baleCode}) = ${refClean.toLowerCase()}`,
+            ),
+          ))
+          .orderBy(factoryBales.id)
+          .limit(1);
+
+        if (!bale) { notFound.push(refClean); continue; }
+
+        // Skip if already in ANY customer_order_bales row
+        const [dup] = await db.select({ id: customerOrderBales.id })
+          .from(customerOrderBales)
+          .where(eq(customerOrderBales.baleId, bale.id));
+        if (dup) { notFound.push(`${refClean} (already linked to order)`); continue; }
+
+        const priceUsed = proformaPriceMap[bale.articleCode || ""] || bale.costPerKg || "0";
+
+        // Get or infer location
+        const locationId = bale.erpLocationId ?? null;
+
+        await db.insert(customerOrderBales).values({
+          orderId,
+          baleId: bale.id,
+          baleReference: bale.referenceNumber,
+          locationId: locationId ?? 1,
+          weight: bale.weightKg,
+          articleCode: bale.articleCode,
+          baleName: bale.productName || bale.articleCode || bale.baleCode,
+          priceUsed,
+        });
+
+        // Ensure bale status reflects the order stage
+        const targetStatus = ["VERIFIED", "FINALIZED"].includes(order.status) ? "SOLD" : "SOLD";
+        if (bale.status !== targetStatus) {
+          await db.update(factoryBales)
+            .set({ status: targetStatus, updatedAt: new Date() })
+            .where(eq(factoryBales.id, bale.id));
+        }
+
+        linked++;
+      }
+
+      await recalculateOrderTotals(db, orderId);
+
+      console.log(`[recover-bales] orderId=${orderId} linked=${linked} notFound=${notFound.length}`);
+
+      res.json({
+        message: `${linked} bale(s) linked successfully`,
+        linked,
+        notFound,
+      });
+    } catch (error: any) {
+      console.error("Error recovering bales:", error);
       res.status(500).json({ message: error.message });
     }
   });

@@ -2680,6 +2680,9 @@ let migrationsDone = false;
     `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS total_qty_bales INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT now()`,
 
+    // ── customer_orders: destination column (in schema since Phase C but never migrated) ──
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS destination TEXT`,
+
     // ── customer_order_bales: columns added to schema but never back-ported ──
     `ALTER TABLE customer_order_bales ADD COLUMN IF NOT EXISTS article_code VARCHAR(50)`,
     `ALTER TABLE customer_order_bales ADD COLUMN IF NOT EXISTS bale_name TEXT`,

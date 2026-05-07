@@ -14,7 +14,7 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation, useParams } from "wouter";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
-import { ArrowLeft, Check, RotateCcw, Ship, Truck, AlertTriangle, CheckCircle, Package, Trash2, Plus, Wrench, DollarSign } from "lucide-react";
+import { ArrowLeft, Check, RotateCcw, Ship, Truck, AlertTriangle, CheckCircle, Package, Trash2, Plus, Wrench, DollarSign, RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -141,6 +141,8 @@ export default function FactoryPendingInvoiceVerify() {
   const [showProformaDialog, setShowProformaDialog] = useState(false);
   const [selectedProformaId, setSelectedProformaId] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set());
+  const [showRecoverDialog, setShowRecoverDialog] = useState(false);
+  const [recoverInput, setRecoverInput] = useState("");
 
   const { data: verification, isLoading: verificationLoading } = useQuery<VerificationSummary>({
     queryKey: ["/api/factory/customer-orders", orderId, "verification"],
@@ -300,6 +302,29 @@ export default function FactoryPendingInvoiceVerify() {
     },
   });
 
+  const recoverBalesMutation = useMutation({
+    mutationFn: async (baleReferences: string[]) => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/recover-bales`, { baleReferences });
+      return res.json();
+    },
+    onSuccess: (data: { message: string; linked: number; notFound: string[] }) => {
+      toast({
+        title: `${data.linked} bale(s) recovered`,
+        description: data.notFound.length > 0
+          ? `Not found: ${data.notFound.slice(0, 5).join(", ")}${data.notFound.length > 5 ? ` (+${data.notFound.length - 5} more)` : ""}`
+          : data.message,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId, "verification"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
+      setShowRecoverDialog(false);
+      setRecoverInput("");
+    },
+    onError: (error: Error) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "Recovery failed", description: error.message, variant: "destructive" });
+    },
+  });
+
   const applyProformaMutation = useMutation({
     mutationFn: async (proformaId: number) => {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/apply-proforma-prices`, { proformaId });
@@ -442,6 +467,31 @@ export default function FactoryPendingInvoiceVerify() {
           )}
         </div>
       </div>
+
+      {/* Recovery banner — shown when the order has 0 linked bales and the user is admin */}
+      {!verificationLoading && (verification?.totalLoadedBales ?? 0) === 0 && isAdminOrOwner && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 p-4" data-testid="panel-zero-bales-warning">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">No bale records found for this order</p>
+              <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+                Bale scans may have failed while the database columns were missing. If you have the bale reference numbers,
+                use <strong>Recover Bales</strong> to re-link them. Otherwise use <strong>Return to Loading</strong> to re-scan.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => setShowRecoverDialog(true)}
+            className="border-amber-400 dark:border-amber-600 text-amber-800 dark:text-amber-200"
+            data-testid="button-recover-bales"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Recover Bales
+          </Button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <Card>
@@ -1118,6 +1168,53 @@ export default function FactoryPendingInvoiceVerify() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showRecoverDialog} onOpenChange={setShowRecoverDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Recover Bales (Admin)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Paste the bale reference numbers that should be linked to this order — one per line.
+              Each reference will be looked up in the factory bales catalogue and re-linked here.
+              Bales already linked to another active order will be skipped.
+            </p>
+            <Textarea
+              value={recoverInput}
+              onChange={(e) => setRecoverInput(e.target.value)}
+              placeholder={"BAL-001\nBAL-002\nBAL-003"}
+              rows={8}
+              className="font-mono text-sm"
+              data-testid="input-recover-bales"
+            />
+            <p className="text-xs text-muted-foreground">
+              Run this SQL in TablePlus first to see which bales are available for recovery:
+              <br />
+              <code className="block mt-1 p-2 bg-muted rounded text-xs whitespace-pre-wrap">
+                {`SELECT reference_number, article_code, weight_kg, status\nFROM factory_bales\nWHERE status IN ('SOLD','RESERVED_FOR_ORDER','IN_STOCK')\nAND NOT EXISTS (\n  SELECT 1 FROM customer_order_bales cob WHERE cob.bale_id = factory_bales.id\n)\nORDER BY updated_at DESC;`}
+              </code>
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowRecoverDialog(false)} data-testid="button-cancel-recover">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  const refs = recoverInput.split("\n").map((r) => r.trim()).filter(Boolean);
+                  if (refs.length === 0) return;
+                  recoverBalesMutation.mutate(refs);
+                }}
+                disabled={recoverBalesMutation.isPending || !recoverInput.trim()}
+                data-testid="button-confirm-recover"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Recover {recoverInput.split("\n").filter((r) => r.trim()).length} Bale(s)
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
