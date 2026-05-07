@@ -3212,6 +3212,23 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         entry.productName = resolveName(code, entry.productName);
       }
 
+      // Fetch IN_STOCK bale counts per article code for the relevant codes
+      const stockQtyMap: Record<string, number> = {};
+      if (allCodes.length > 0) {
+        const inStockRaw = await db.execute(
+          sql`SELECT article_code AS "articleCode", COUNT(*)::int AS count
+              FROM factory_bales
+              WHERE company_id = ${companyId}
+                AND status = 'IN_STOCK'
+                AND article_code = ANY(${allCodes})
+              GROUP BY article_code`,
+        );
+        const inStockRows = (inStockRaw as any).rows ?? (inStockRaw as unknown as any[]);
+        for (const r of inStockRows) {
+          if (r.articleCode) stockQtyMap[r.articleCode] = Number(r.count);
+        }
+      }
+
       const allArticles = new Set([...Object.keys(loadedByArticle), ...Object.keys(proformaByArticle)]);
       const comparison: any[] = [];
 
@@ -3248,10 +3265,15 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         });
       }
 
+      const proformaLinesWithStock = Object.values(proformaByArticle).map((pl) => ({
+        ...pl,
+        stockQty: stockQtyMap[pl.articleCode] ?? 0,
+      }));
+
       res.json({
         order,
         loadedItems: Object.values(loadedByArticle),
-        proformaLines: Object.values(proformaByArticle),
+        proformaLines: proformaLinesWithStock,
         comparison,
         totalLoadedBales: orderBales.length,
         totalLoadedWeight: orderBales.reduce((s: number, b: any) => s + parseFloat(b.weight), 0),

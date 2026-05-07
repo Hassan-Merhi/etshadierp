@@ -61,6 +61,7 @@ interface ProformaLine {
   productName: string;
   expectedQty: number;
   pricePerBale: string;
+  stockQty: number;
 }
 
 interface LoadedGroup {
@@ -585,6 +586,7 @@ export default function FactoryPendingInvoiceVerify() {
                           <TableHead className="text-right">Expected</TableHead>
                           <TableHead className="text-right">Loaded</TableHead>
                           <TableHead className="text-right">Remaining</TableHead>
+                          <TableHead className="text-right">Stock</TableHead>
                           <TableHead>Status</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -606,6 +608,13 @@ export default function FactoryPendingInvoiceVerify() {
                                   <span className="text-red-600 dark:text-red-400 font-medium">{remaining}</span>
                                 ) : remaining < 0 ? (
                                   <span className="text-green-600 dark:text-green-400 font-medium">+{Math.abs(remaining)}</span>
+                                ) : (
+                                  <span className="text-muted-foreground">0</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right font-mono" data-testid={`text-stock-${line.articleCode}`}>
+                                {(line.stockQty ?? 0) > 0 ? (
+                                  <span className="text-foreground font-medium">{line.stockQty}</span>
                                 ) : (
                                   <span className="text-muted-foreground">0</span>
                                 )}
