@@ -433,28 +433,12 @@ export function registerPosRoutes(app: Express) {
         return res.status(400).json({ message: "Location is required" });
       }
 
-      // Fix 1: POS users must have an open shift before making sales
-      if (isPOSUser && !shiftId) {
-        return res.status(400).json({ message: "No open cash shift found for this location." });
-      }
-
-      // Validate shiftId — must be open, belong to current user, company, and location
+      // Validate shiftId if one was provided — must be open, belong to current user, company, and location
       if (shiftId) {
         const shift = await storage.getShiftById(shiftId);
-        if (!shift) {
-          return res.status(400).json({ message: "Invalid shift ID" });
-        }
-        if (shift.companyId !== req.session.currentCompanyId) {
-          return res.status(403).json({ message: "Shift does not belong to current company" });
-        }
-        if (shift.locationId !== locationId) {
-          return res.status(400).json({ message: "Shift location does not match sale location" });
-        }
-        if (shift.status !== "open") {
-          return res.status(400).json({ message: "No open cash shift found for this location." });
-        }
-        if (shift.userId !== req.user?.id) {
-          return res.status(403).json({ message: "Cannot add sale to another user's shift" });
+        if (!shift || shift.companyId !== req.session.currentCompanyId || shift.locationId !== locationId || shift.status !== "open" || shift.userId !== req.user?.id) {
+          // Shift is invalid/closed — proceed without linking to a shift
+          shiftId = null;
         }
       }
       if (!accountId) {
