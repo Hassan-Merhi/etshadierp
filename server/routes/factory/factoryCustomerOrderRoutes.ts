@@ -364,43 +364,79 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const id = parseId(req.params.id);
 
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const [order] = await db
-        .select({
-          id: customerOrders.id,
-          companyId: customerOrders.companyId,
-          customerId: customerOrders.customerId,
-          invoiceNumber: customerOrders.invoiceNumber,
-          orderDate: customerOrders.orderDate,
-          proformaIdUsed: customerOrders.proformaIdUsed,
-          status: customerOrders.status,
-          subtotalBales: customerOrders.subtotalBales,
-          freightAmount: customerOrders.freightAmount,
-          otherChargesTotal: customerOrders.otherChargesTotal,
-          grandTotal: customerOrders.grandTotal,
-          totalQtyBales: customerOrders.totalQtyBales,
-          containerNumber: customerOrders.containerNumber,
-          shippingCompany: customerOrders.shippingCompany,
-          containerNotes: customerOrders.containerNotes,
-          destination: customerOrders.destination,
-          verifiedByUserId: customerOrders.verifiedByUserId,
-          verifiedAt: customerOrders.verifiedAt,
-          loadingStartedAt: customerOrders.loadingStartedAt,
-          loadingFinalizedAt: customerOrders.loadingFinalizedAt,
-          locationId: customerOrders.locationId,
-          createdAt: customerOrders.createdAt,
-          updatedAt: customerOrders.updatedAt,
-          customerName: customers.legalName,
-          customerCode: customers.code,
-        })
-        .from(customerOrders)
-        .leftJoin(customers, eq(customerOrders.customerId, customers.id))
-        .where(and(eq(customerOrders.id, id), eq(customerOrders.companyId, companyId)));
 
-      if (!order) return res.status(404).json({ message: "Order not found" });
+      // SELECT * so that schema drift (missing newer columns) never causes a
+      // parse-time "column does not exist" 500.  JS-side defaults applied below.
+      const rawOrderRes = await db.execute(
+        sql`SELECT co.*, c.legal_name AS customer_name, c.code AS customer_code
+            FROM customer_orders co
+            LEFT JOIN customers c ON c.id = co.customer_id
+            WHERE co.id = ${id} AND co.company_id = ${companyId}
+            LIMIT 1`,
+      );
+      const rawOrderRows: any[] = (rawOrderRes as any).rows ?? (rawOrderRes as unknown as any[]);
+      if (!rawOrderRows.length) return res.status(404).json({ message: "Order not found" });
+      const r = rawOrderRows[0];
+      const order = {
+        id:                 r.id,
+        companyId:          r.company_id,
+        customerId:         r.customer_id,
+        invoiceNumber:      r.invoice_number       ?? null,
+        orderDate:          r.order_date,
+        proformaIdUsed:     r.proforma_id_used     ?? null,
+        status:             r.status               ?? "DRAFT",
+        subtotalBales:      r.subtotal_bales       ?? "0",
+        freightAmount:      r.freight_amount       ?? "0",
+        otherChargesTotal:  r.other_charges_total  ?? "0",
+        grandTotal:         r.grand_total          ?? "0",
+        totalQtyBales:      r.total_qty_bales      ?? 0,
+        containerNumber:    r.container_number     ?? null,
+        shippingCompany:    r.shipping_company     ?? null,
+        containerNotes:     r.container_notes      ?? null,
+        destination:        r.destination          ?? null,
+        verifiedByUserId:   r.verified_by_user_id  ?? null,
+        verifiedAt:         r.verified_at          ?? null,
+        loadingStartedAt:   r.loading_started_at   ?? null,
+        loadingFinalizedAt: r.loading_finalized_at ?? null,
+        locationId:         r.location_id          ?? null,
+        createdAt:          r.created_at,
+        updatedAt:          r.updated_at           ?? r.created_at,
+        customerName:       r.customer_name        ?? null,
+        customerCode:       r.customer_code        ?? null,
+      };
 
+      // customer_order_lines has no known schema drift — Drizzle is fine here
       const lines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, id));
-      const bales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, id));
-      const charges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, id));
+
+      // customer_order_bales and customer_order_charges both have newer columns
+      // added via migrations that may be absent in production — use raw SQL.
+      const rawBalesRes = await db.execute(
+        sql`SELECT * FROM customer_order_bales WHERE order_id = ${id} ORDER BY id`,
+      );
+      const bales = ((rawBalesRes as any).rows ?? (rawBalesRes as unknown as any[])).map((b: any) => ({
+        id:            b.id,
+        orderId:       b.order_id,
+        baleId:        b.bale_id,
+        baleReference: b.bale_reference ?? "",
+        locationId:    b.location_id    ?? null,
+        weight:        b.weight         ?? "0",
+        articleCode:   b.article_code   ?? null,
+        baleName:      b.bale_name      ?? null,
+        priceUsed:     b.price_used     ?? "0",
+      }));
+
+      const rawChargesRes = await db.execute(
+        sql`SELECT * FROM customer_order_charges WHERE order_id = ${id} ORDER BY id`,
+      );
+      const charges = ((rawChargesRes as any).rows ?? (rawChargesRes as unknown as any[])).map((c: any) => ({
+        id:              c.id,
+        orderId:         c.order_id,
+        name:            c.name         ?? "",
+        amount:          c.amount       ?? "0",
+        chargeType:      c.charge_type  ?? "OTHER",
+        ledgerAccountId: c.ledger_account_id ?? null,
+        voucherId:       c.voucher_id   ?? null,
+      }));
 
       res.json({ ...order, lines, bales, charges });
     } catch (error: any) {
