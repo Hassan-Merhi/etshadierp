@@ -28,7 +28,8 @@ interface ClosingStockDetailData {
   };
 }
 
-function formatNumber(value: number, decimals: number = 2): string {
+function formatNumber(value: number | null | undefined, decimals: number = 2): string {
+  if (value == null || isNaN(value)) return "";
   return value.toLocaleString("en-US", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,

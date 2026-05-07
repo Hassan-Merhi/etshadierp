@@ -844,7 +844,10 @@ export default function FactoryLocationInventory() {
     c.legalName.toLowerCase().includes(customerSearch.toLowerCase())
   );
 
-  const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: n % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 });
+  const fmt = (n: number | null | undefined) => {
+    if (n == null || isNaN(n)) return "0";
+    return n.toLocaleString(undefined, { minimumFractionDigits: n % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 });
+  };
 
   const renderFinalizeDialog = () => (
     <Dialog open={finalizeOpen} onOpenChange={(open) => { if (!open) handleCloseFinalizeDialog(); }}>

@@ -114,8 +114,8 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
   const data = showAllMonths ? rangeData : monthData;
   const totals = data?.totals;
 
-  const formatNumber = (num: number, decimals = 2) => {
-    if (num === 0) return "";
+  const formatNumber = (num: number | null | undefined, decimals = 2) => {
+    if (num == null || isNaN(num) || num === 0) return "";
     return num.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   };
 

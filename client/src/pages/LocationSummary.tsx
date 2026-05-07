@@ -191,8 +191,8 @@ export default function LocationSummary() {
     );
   };
 
-  const formatNumber = (num: number, decimals: number = 2, suffix: string = "") => {
-    if (num === 0) return "";
+  const formatNumber = (num: number | null | undefined, decimals: number = 2, suffix: string = "") => {
+    if (num == null || isNaN(num) || num === 0) return "";
     const formatted = num.toLocaleString('en-US', { 
       minimumFractionDigits: decimals, 
       maximumFractionDigits: decimals 

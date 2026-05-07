@@ -43,7 +43,8 @@ const STATUS_COLORS: Record<string, string> = {
   PENDING_PRESSING: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
 };
 
-function fmt(n: number) {
+function fmt(n: number | null | undefined) {
+  if (n == null || isNaN(n)) return "0";
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 

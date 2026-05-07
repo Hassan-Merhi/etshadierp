@@ -57,7 +57,8 @@ interface StatementData {
   openingBalanceSide: string;
 }
 
-function fmtMoney(value: number): string {
+function fmtMoney(value: number | null | undefined): string {
+  if (value == null || isNaN(value)) return "$0";
   const abs = Math.abs(value);
   if (abs % 1 === 0) {
     return `$${Math.round(abs).toLocaleString()}`;
@@ -65,7 +66,8 @@ function fmtMoney(value: number): string {
   return `$${abs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function fmtNum(value: number): string {
+function fmtNum(value: number | null | undefined): string {
+  if (value == null || isNaN(value)) return "0";
   if (value % 1 === 0) return Math.round(value).toLocaleString();
   return value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }

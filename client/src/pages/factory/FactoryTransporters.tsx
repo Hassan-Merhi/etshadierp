@@ -25,7 +25,8 @@ import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 
 const API = "/api/factory/transporters";
 
-function fmt(n: number) {
+function fmt(n: number | null | undefined) {
+  if (n == null || isNaN(n)) return "0.00";
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 

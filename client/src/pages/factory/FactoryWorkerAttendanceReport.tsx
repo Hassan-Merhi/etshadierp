@@ -102,7 +102,8 @@ function computeWorkerExpectedSalary(
   return earned;
 }
 
-function fmtCurrency(n: number): string {
+function fmtCurrency(n: number | null | undefined): string {
+  if (n == null || isNaN(n)) return "0.00";
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 const MONTH_NAMES = [

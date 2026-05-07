@@ -65,7 +65,8 @@ function ccySymbol(code: string | null | undefined): string {
   return CCY_SYMBOLS[code] || code;
 }
 
-function fmtCcy(symbol: string, amount: number): string {
+function fmtCcy(symbol: string, amount: number | null | undefined): string {
+  if (amount == null || isNaN(amount)) return `${symbol} 0.00`;
   return `${symbol} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 

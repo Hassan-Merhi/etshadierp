@@ -104,7 +104,8 @@ interface ProfitabilityData {
   partialCostData: boolean;
 }
 
-function fmt(n: number) {
+function fmt(n: number | null | undefined) {
+  if (n == null || isNaN(n)) return "0";
   return n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 

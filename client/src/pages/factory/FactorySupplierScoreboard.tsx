@@ -174,7 +174,7 @@ export default function FactorySupplierScoreboard() {
                       <TableCell className="font-mono" data-testid={`text-total-kg-${idx}`}>{supplier.totalKg.toFixed(1)}</TableCell>
                       <TableCell className="font-mono" data-testid={`text-waste-kg-${idx}`}>{supplier.wasteKg.toFixed(1)}</TableCell>
                       <TableCell className="font-mono" data-testid={`text-waste-percent-${idx}`}>{supplier.wastePercent.toFixed(1)}%</TableCell>
-                      <TableCell className="font-mono" data-testid={`text-avg-cost-${idx}`}>${supplier.avgCostPerKg.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</TableCell>
+                      <TableCell className="font-mono" data-testid={`text-avg-cost-${idx}`}>${(supplier.avgCostPerKg ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</TableCell>
                       <TableCell className="font-mono" data-testid={`text-output-bales-${idx}`}>{supplier.outputBales}</TableCell>
                       <TableCell data-testid={`text-score-${idx}`}>
                         <Badge

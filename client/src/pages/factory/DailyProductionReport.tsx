@@ -53,16 +53,19 @@ function yearStart() {
   return `${new Date().getFullYear()}-01-01`;
 }
 
-function fmtMoney(n: number) {
+function fmtMoney(n: number | null | undefined) {
+  if (n == null || isNaN(n)) return "$0";
   if (n === 0) return "$0";
   const r = Math.round(n * 100) / 100;
   if (Math.abs(r - Math.round(r)) < 0.005) return `$${Math.round(r).toLocaleString("en-US")}`;
   return `$${r.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
-function fmtRate(n: number) {
+function fmtRate(n: number | null | undefined) {
+  if (n == null || isNaN(n)) return "$0.000";
   return `$${(Math.round(n * 1000) / 1000).toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
 }
-function fmtKg(n: number) {
+function fmtKg(n: number | null | undefined) {
+  if (n == null || isNaN(n)) return "0 kg";
   const r = Math.round(n * 10) / 10;
   return `${r.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} kg`;
 }

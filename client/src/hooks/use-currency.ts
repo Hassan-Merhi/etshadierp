@@ -7,7 +7,7 @@ interface CurrencyInfo {
   exchangeRate: number | null;
   isMultiCurrency: boolean;
   formatAmount: (amount: number | string, currency?: Currency) => string;
-  formatWithCurrency: (amount: number | string, currency: Currency) => string;
+  formatWithCurrency: (amount: number | string | null | undefined, currency: Currency) => string;
   convertToDisplay: (usdAmount: number) => number;
   convertToUSD: (displayAmount: number) => number;
 }
@@ -24,7 +24,8 @@ export function useCurrency(): CurrencyInfo {
     convertToUSD
   } = useCurrencyContext();
 
-  const formatWithCurrency = (amount: number | string, currency: Currency): string => {
+  const formatWithCurrency = (amount: number | string | null | undefined, currency: Currency): string => {
+    if (amount == null) return "";
     const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
     if (isNaN(numAmount)) return "";
     

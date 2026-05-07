@@ -102,7 +102,8 @@ const formatNumericValue = (value: string | number): string => {
 };
 
 // For backwards compatibility
-const formatSmartNumber = (value: string | number) => {
+const formatSmartNumber = (value: string | number | null | undefined) => {
+  if (value == null) return '0';
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(num)) return '0';
   return num % 1 === 0 ? num.toLocaleString('en-US') : num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
