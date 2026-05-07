@@ -371,6 +371,7 @@ export function OffloadDialog({
         const key = query.queryKey[0];
         return typeof key === 'string' && key.startsWith('/api/stock-items/');
       }});
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/net-profit"] });
       toast({
         title: "Container offloaded successfully",
         description: `Container ${containerNumber} has been offloaded to the selected location.`,

@@ -1077,6 +1077,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts", paymentAccountType, paymentAccountId, "balance"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/stats", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/net-profit"] });
       
       // Clear edit mode and navigate back to daybook
       if (isEditMode) {
@@ -1777,6 +1780,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts", paymentAccountType, paymentAccountId, "balance"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/stats", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/net-profit"] });
       // Invalidate customer statements and factory customer orders so journal entries
       // linked to a customer account are reflected immediately
       queryClient.invalidateQueries({ predicate: keyStartsWith('/api/factory/customers/') });

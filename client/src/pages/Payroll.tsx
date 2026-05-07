@@ -1061,6 +1061,7 @@ export default function Payroll() {
         description: "Salary advance created successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/salary-advances", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/net-profit"] });
       setAdvanceDialogOpen(false);
       advanceForm.reset();
     },
@@ -1081,6 +1082,7 @@ export default function Payroll() {
     onSuccess: () => {
       toast({ title: "Deleted", description: "Salary advance deleted" });
       queryClient.invalidateQueries({ queryKey: ["/api/salary-advances", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/net-profit"] });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -1099,6 +1101,7 @@ export default function Payroll() {
         description: "Deduction recorded successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/salary-advances", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/net-profit"] });
       setDeductionDialogOpen(false);
       deductionForm.reset();
       setSelectedAdvance(null);

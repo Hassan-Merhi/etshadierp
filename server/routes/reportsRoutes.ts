@@ -1625,6 +1625,7 @@ export function registerReportsRoutes(app: Express) {
       }
 
       const accountId = parseInt(req.params.accountId);
+      if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
       const { startDate, endDate } = req.query;
 
       // Get the ledger account
@@ -1762,6 +1763,7 @@ export function registerReportsRoutes(app: Express) {
       const accountId = parseInt(req.params.accountId);
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);
+      if (isNaN(accountId) || isNaN(year) || isNaN(month)) return res.status(400).json({ message: "Invalid parameters" });
 
       // Get the ledger account
       const account = await db
@@ -1927,6 +1929,7 @@ export function registerReportsRoutes(app: Express) {
       }
 
       const voucherId = parseInt(req.params.voucherId);
+      if (isNaN(voucherId)) return res.status(400).json({ message: "Invalid voucher ID" });
 
       // Get the voucher
       const voucher = await db
@@ -2449,6 +2452,7 @@ export function registerReportsRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
 
       await db
         .delete(dashboardCashAccounts)
@@ -2596,6 +2600,7 @@ export function registerReportsRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
       const accountId = parseInt(req.params.id);
+      if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
 
       await db
         .delete(dashboardPayableAccounts)

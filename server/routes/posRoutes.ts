@@ -1093,7 +1093,7 @@ export function registerPosRoutes(app: Express) {
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
-      if (!locationId) {
+      if (!locationId || isNaN(locationId)) {
         return res.status(400).json({ message: "Location ID is required" });
       }
 
@@ -1116,7 +1116,7 @@ export function registerPosRoutes(app: Express) {
       const locationId = parseInt(req.query.locationId as string);
       const limit = parseInt(req.query.limit as string) || 50;
       
-      if (!locationId) {
+      if (!locationId || isNaN(locationId)) {
         return res.status(400).json({ message: "Location ID is required" });
       }
 
@@ -1250,7 +1250,7 @@ export function registerPosRoutes(app: Express) {
   app.get("/api/pos/last-sold-prices", requireAuth, async (req, res) => {
     try {
       const locationId = parseInt(req.query.locationId as string);
-      if (!locationId) {
+      if (!locationId || isNaN(locationId)) {
         return res.status(400).json({ message: "Location ID is required" });
       }
       // Get the location to find its company
