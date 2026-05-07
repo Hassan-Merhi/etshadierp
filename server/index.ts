@@ -2873,7 +2873,9 @@ let migrationsDone = false;
         // ── Clean up orphaned export runs ──────────────────────────────────────
         // In-memory export jobs are lost on server restart.  Any run that has
         // been 'running' for >5 minutes is almost certainly stuck — mark it failed.
-        const cleanupStuckRuns = async () => {
+        // Startup cleanup: any run still 'running' when the server starts is from a
+        // previous (now-dead) process — safe to fail immediately (5-min grace period).
+        const cleanupOrphanedRuns = async () => {
           try {
             const r = await pool.query(`
               UPDATE daily_export_runs
@@ -2885,17 +2887,40 @@ let migrationsDone = false;
               RETURNING id, run_type
             `);
             if (r.rowCount && r.rowCount > 0) {
-              console.log(`[ExportRun] Cleaned up ${r.rowCount} stuck run(s):`,
+              console.log(`[ExportRun] Startup: marked ${r.rowCount} orphaned run(s) as failed:`,
                 r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", "));
             }
           } catch (e: any) {
-            console.warn("[ExportRun] Stuck-run cleanup failed:", e.message);
+            console.warn("[ExportRun] Startup orphan-cleanup failed:", e.message);
           }
         };
-        // Run once at startup (slight delay so pool is fully ready)
-        setTimeout(cleanupStuckRuns, 3000);
-        // Then check every 10 minutes to catch anything that stalls during a run
-        setInterval(cleanupStuckRuns, 10 * 60 * 1000);
+
+        // Periodic cleanup: only mark runs that have been 'running' for over 90 minutes
+        // as stuck. This avoids killing large exports that legitimately take 10-30 minutes.
+        const cleanupHungRuns = async () => {
+          try {
+            const r = await pool.query(`
+              UPDATE daily_export_runs
+                 SET status         = 'failed',
+                     finished_at    = NOW(),
+                     skipped_reason = 'Export timed out — exceeded 90-minute safety limit'
+               WHERE status         = 'running'
+                 AND started_at     < NOW() - INTERVAL '90 minutes'
+              RETURNING id, run_type
+            `);
+            if (r.rowCount && r.rowCount > 0) {
+              console.log(`[ExportRun] Periodic: timed out ${r.rowCount} hung run(s):`,
+                r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", "));
+            }
+          } catch (e: any) {
+            console.warn("[ExportRun] Periodic hung-run cleanup failed:", e.message);
+          }
+        };
+
+        // Run orphan cleanup once at startup (slight delay so pool is fully ready)
+        setTimeout(cleanupOrphanedRuns, 3000);
+        // Run the longer-threshold periodic check every 30 minutes
+        setInterval(cleanupHungRuns, 30 * 60 * 1000);
 
         // Startup recovery: if today's scheduled export failed mid-run (e.g. server restart),
         // re-trigger it automatically. We wait 90 s so the pool and crons are fully ready.
