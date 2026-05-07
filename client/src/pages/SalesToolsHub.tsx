@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Book, ArrowLeftRight, Tag } from "lucide-react";
@@ -9,8 +9,9 @@ const StockTransfers = lazy(() => import("@/pages/StockTransfers"));
 const POSPriceList  = lazy(() => import("@/pages/pos/POSPriceList"));
 
 export default function SalesToolsHub() {
-  const [location, setLocation] = useLocation();
-  const params = new URLSearchParams(location.split("?")[1] ?? "");
+  const [, setLocation] = useLocation();
+  const search = useSearch();
+  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const tabParam = params.get("tab") ?? "";
 
   const { data: user } = useQuery<any>({
