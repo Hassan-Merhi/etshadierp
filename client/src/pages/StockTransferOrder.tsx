@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/PageHeader";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -40,7 +41,7 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, ChevronRight, ChevronUp, MapPin, Package, Trash2, Check, AlertCircle, ArrowRight, Settings2, CalendarIcon, FileDown, List, GitBranch, Upload, FileSpreadsheet, TrendingUp, TrendingDown } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, MapPin, Package, Trash2, Check, AlertCircle, ArrowRight, Settings2, CalendarIcon, FileDown, List, GitBranch, Upload, FileSpreadsheet, TrendingUp, TrendingDown, ExternalLink } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
@@ -50,6 +51,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { writeFile, readFile, utils, ExcelJS } from "@/lib/excelHelper";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { PeriodFilter, getDefaultPeriodValue, PeriodFilterValue } from "@/components/ui/period-filter";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -203,8 +206,39 @@ export default function StockTransferOrder() {
   const [importLoading, setImportLoading] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
 
+  // History dialog state
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [historyItem, setHistoryItem] = useState<StockItemData | null>(null);
+  const [historyLocation, setHistoryLocation] = useState<Location | null>(null);
+  const [historyPeriod, setHistoryPeriod] = useState<PeriodFilterValue>(
+    () => getDefaultPeriodValue("this_year")
+  );
+
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
+  });
+
+  const { formatAmount } = useCurrencyContext();
+
+  // History dialog data query
+  const { data: historyData, isLoading: historyLoading } = useQuery<any>({
+    queryKey: [
+      "/api/locations",
+      historyLocation?.id,
+      "stock-items",
+      historyItem?.id,
+      "monthly-summary",
+      { startDate: historyPeriod.fromDate, endDate: historyPeriod.toDate },
+    ],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/locations/${historyLocation!.id}/stock-items/${historyItem!.id}/monthly-summary?startDate=${historyPeriod.fromDate}&endDate=${historyPeriod.toDate}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) throw new Error("Failed to fetch history");
+      return res.json();
+    },
+    enabled: historyDialogOpen && !!historyItem && !!historyLocation,
   });
 
   const { data: existingTransfer } = useQuery<any>({
@@ -460,13 +494,10 @@ export default function StockTransferOrder() {
       const item = flatItems[focusedCell.row];
       const loc = selectedLocations[focusedCell.col];
       if (item && loc) {
-        // Save current order state so it survives the navigation round-trip
-        sessionStorage.setItem(SESSION_STATE_KEY, JSON.stringify({
-          orderItems,
-          destinationLocationId,
-          expandedGroups: Array.from(expandedGroups),
-        }));
-        navigate(`/locations/${loc.id}/stock-items/${item.id}/history`);
+        setHistoryItem(item);
+        setHistoryLocation(loc);
+        setHistoryPeriod(getDefaultPeriodValue("this_year"));
+        setHistoryDialogOpen(true);
       }
       return;
     }
@@ -1991,6 +2022,141 @@ export default function StockTransferOrder() {
               data-testid="button-confirm-add"
             >
               {parseFloat(pickerQuantity) < 0 ? "Reduce Qty" : "Add to Order"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Stock Movement History Dialog */}
+      <Dialog
+        open={historyDialogOpen}
+        onOpenChange={(open) => {
+          setHistoryDialogOpen(open);
+          if (!open) {
+            setTimeout(() => matrixRef.current?.focus(), 50);
+          }
+        }}
+      >
+        <DialogContent className="max-w-4xl flex flex-col" style={{ maxHeight: "80vh" }}>
+          <DialogHeader>
+            <DialogTitle>Stock Movement — {historyItem?.name}</DialogTitle>
+            <DialogDescription className="flex items-center gap-1.5 text-sm">
+              <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+              {historyLocation?.name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex justify-end flex-shrink-0 pb-1">
+            <PeriodFilter value={historyPeriod} onChange={setHistoryPeriod} />
+          </div>
+
+          <div className="flex-1 overflow-auto min-h-0 border rounded-md">
+            {historyLoading ? (
+              <div className="space-y-2 p-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} className="h-9 w-full" />
+                ))}
+              </div>
+            ) : !historyData?.monthlyData?.some(
+                (m: any) => m.inwardQty > 0 || m.outwardQty > 0 || m.openingQty !== 0 || m.closingQty !== 0
+              ) ? (
+              <div className="text-center py-12 text-muted-foreground text-sm">
+                No stock movement for this period
+              </div>
+            ) : (
+              <table className="w-full text-sm border-collapse" style={{ minWidth: "700px" }}>
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-muted border-b">
+                    <th rowSpan={2} className="text-left align-bottom px-3 py-2 border-r font-semibold w-28">Month</th>
+                    <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-muted-foreground">Opening</th>
+                    <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-green-700 dark:text-green-400">Stock In</th>
+                    <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-red-700 dark:text-red-400">Stock Out</th>
+                    <th colSpan={3} className="text-center px-2 py-1.5 font-semibold text-primary">Closing</th>
+                  </tr>
+                  <tr className="bg-muted/70 border-b text-xs">
+                    <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Qty</th>
+                    <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Rate</th>
+                    <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Value</th>
+                    <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">Qty</th>
+                    <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">Rate</th>
+                    <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">Value</th>
+                    <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Qty</th>
+                    <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Rate</th>
+                    <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Value</th>
+                    <th className="text-right px-3 py-1.5 font-medium text-primary">Qty</th>
+                    <th className="text-right px-3 py-1.5 font-medium text-primary">Rate</th>
+                    <th className="text-right px-3 py-1.5 font-medium text-primary">Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(historyData?.monthlyData ?? []).map((month: any) => {
+                    const isActive = month.inwardQty > 0 || month.outwardQty > 0 || month.openingQty !== 0 || month.closingQty !== 0;
+                    const fmtQty = (n: number) => n === 0 ? "—" : n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                    const fmtRate = (n: number) => n === 0 ? "—" : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    const fmtVal = (n: number) => n === 0 ? "—" : formatAmount(n);
+                    return (
+                      <tr key={month.month} className={`border-b transition-colors ${isActive ? "" : "text-muted-foreground/50"}`}>
+                        <td className="font-medium px-3 py-2 border-r">{month.monthName}</td>
+                        <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{fmtQty(month.openingQty)}</td>
+                        <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{fmtRate(month.openingRate)}</td>
+                        <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{fmtVal(month.openingValue)}</td>
+                        <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400 font-medium">{fmtQty(month.inwardQty)}</td>
+                        <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{fmtRate(month.inwardRate)}</td>
+                        <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{fmtVal(month.inwardValue)}</td>
+                        <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400 font-medium">{fmtQty(month.outwardQty)}</td>
+                        <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{fmtRate(month.outwardRate)}</td>
+                        <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{fmtVal(month.outwardValue)}</td>
+                        <td className="text-right px-3 py-2 tabular-nums font-semibold text-foreground">{fmtQty(month.closingQty)}</td>
+                        <td className="text-right px-3 py-2 tabular-nums font-medium">{fmtRate(month.closingRate)}</td>
+                        <td className="text-right px-3 py-2 tabular-nums font-medium">{fmtVal(month.closingValue)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                {historyData?.grandTotal && (
+                  <tfoot className="sticky bottom-0 z-10">
+                    <tr className="bg-muted font-bold border-t-2">
+                      <td className="px-3 py-2 border-r">Total</td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{historyData.grandTotal.openingQty === 0 ? "—" : historyData.grandTotal.openingQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{historyData.grandTotal.openingRate === 0 ? "—" : historyData.grandTotal.openingRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{historyData.grandTotal.openingValue === 0 ? "—" : formatAmount(historyData.grandTotal.openingValue)}</td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{historyData.grandTotal.inwardQty === 0 ? "—" : historyData.grandTotal.inwardQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{historyData.grandTotal.inwardRate === 0 ? "—" : historyData.grandTotal.inwardRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{historyData.grandTotal.inwardValue === 0 ? "—" : formatAmount(historyData.grandTotal.inwardValue)}</td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{historyData.grandTotal.outwardQty === 0 ? "—" : historyData.grandTotal.outwardQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{historyData.grandTotal.outwardRate === 0 ? "—" : historyData.grandTotal.outwardRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{historyData.grandTotal.outwardValue === 0 ? "—" : formatAmount(historyData.grandTotal.outwardValue)}</td>
+                      <td className="text-right px-3 py-2 tabular-nums text-foreground">{historyData.grandTotal.closingQty === 0 ? "—" : historyData.grandTotal.closingQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                      <td className="text-right px-3 py-2 tabular-nums">{historyData.grandTotal.closingRate === 0 ? "—" : historyData.grandTotal.closingRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="text-right px-3 py-2 tabular-nums">{historyData.grandTotal.closingValue === 0 ? "—" : formatAmount(historyData.grandTotal.closingValue)}</td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            )}
+          </div>
+
+          <DialogFooter className="flex-shrink-0 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setHistoryDialogOpen(false)}
+              data-testid="button-history-close"
+            >
+              Close
+            </Button>
+            <Button
+              variant="default"
+              asChild
+              data-testid="button-history-open-full"
+            >
+              <a
+                href={`/locations/${historyLocation?.id}/stock-items/${historyItem?.id}/history`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ExternalLink className="h-4 w-4 mr-1.5" />
+                Open full history
+              </a>
             </Button>
           </DialogFooter>
         </DialogContent>
