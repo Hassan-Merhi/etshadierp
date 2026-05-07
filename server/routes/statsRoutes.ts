@@ -431,7 +431,10 @@ export function registerStatsRoutes(app: Express) {
 
       let stockOtwValue = 0;
       for (const container of otwContainers) {
-        const containerValue = parseFloat(container.grandTotal || container.itemsTotal || "0");
+        // Use numeric OR so that grandTotal="0" (DB default) falls through to itemsTotal.
+        // String OR ("0" || itemsTotal) would never reach itemsTotal because "0" is truthy.
+        const gTotal = parseFloat(container.grandTotal ?? "0");
+        const containerValue = gTotal || parseFloat(container.itemsTotal ?? "0");
         stockOtwValue += containerValue;
       }
 
@@ -719,7 +722,8 @@ export function registerStatsRoutes(app: Express) {
       const otwContainers = await db.select().from(containers).where(excelOtwQuery).execute();
       let stockOtwValue = 0;
       for (const container of otwContainers as any[]) {
-        stockOtwValue += parseFloat(container.grandTotal || container.itemsTotal || "0");
+        const gTotal = parseFloat(container.grandTotal ?? "0");
+        stockOtwValue += gTotal || parseFloat(container.itemsTotal ?? "0");
       }
       if (stockOtwValue > 0) {
         forUsTotal += stockOtwValue;

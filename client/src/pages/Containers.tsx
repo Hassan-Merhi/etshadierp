@@ -1069,7 +1069,7 @@ export default function Containers() {
             </Card>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-4">
+              <div className={`grid gap-4 ${hideContainerCosts ? "grid-cols-1 max-w-xs" : "grid-cols-2"}`}>
                 <Card>
                   <CardContent className="pt-6">
                     <div className="space-y-2">
@@ -1085,6 +1085,7 @@ export default function Containers() {
                     </div>
                   </CardContent>
                 </Card>
+                {!hideContainerCosts && (
                 <Card>
                   <CardContent className="pt-6">
                     <div className="space-y-2">
@@ -1096,15 +1097,16 @@ export default function Containers() {
                         data-testid="text-total-amount"
                       >
                         {formatAmount(
-                          containers.reduce(
-                            (sum, c) => sum + parseFloat(c.grandTotal || "0"),
-                            0,
-                          )
+                          containers.reduce((sum, c) => {
+                            const gTotal = parseFloat(c.grandTotal ?? "0");
+                            return sum + (gTotal || parseFloat(c.itemsTotal ?? "0") || 0);
+                          }, 0)
                         )}
                       </p>
                     </div>
                   </CardContent>
                 </Card>
+                )}
               </div>
 
               <Card>
