@@ -34,6 +34,16 @@ import {
   Table,
   TableProperties,
   KeyRound,
+  FileSpreadsheet,
+  Boxes,
+  Upload,
+  Tag,
+  Repeat,
+  Search,
+  List,
+  Truck,
+  Building2,
+  CreditCard,
 } from "lucide-react";
 import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
 import { useQuery } from "@tanstack/react-query";
@@ -73,8 +83,9 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     label: "Overview",
     color: NAV_COLOR.overview,
     items: [
-      { title: "Production Analytics", url: "/factory/production-report", icon: BarChart3 },
-      { title: "Factory Sheets",        url: "/factory/status-builder",    icon: Table, adminOnly: true },
+      { title: "Production Analytics", url: "/factory/production-report", icon: BarChart3       },
+      { title: "Factory Sheets",        url: "/factory/status-builder",    icon: Table,          adminOnly: true },
+      { title: "Sheets",                url: "/factory/sheets",            icon: FileSpreadsheet },
     ],
   },
   {
@@ -83,14 +94,18 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     items: [
       { title: "Stock Entry",    url: "/factory/stock-entry",    icon: ScanLine },
       { title: "Raw Materials",  url: "/factory/raw-materials",  icon: Package  },
+      { title: "Raw Stock",      url: "/factory/raw-stock",      icon: Boxes    },
       { title: "Waste Dispatch", url: "/factory/waste-dispatch", icon: Trash2   },
+      { title: "Import",         url: "/factory/import",         icon: Upload   },
     ],
   },
   {
     label: "Bales",
     color: NAV_COLOR.bales,
     items: [
-      { title: "Bale Explorer", url: "/factory/bales-hub", icon: History },
+      { title: "Bale Explorer",   url: "/factory/bales-hub",       icon: History },
+      { title: "Bale Products",   url: "/factory/bale-products",   icon: Tag     },
+      { title: "Bale Relabeling", url: "/factory/bale-relabeling", icon: Repeat  },
     ],
   },
   {
@@ -102,6 +117,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
       { title: "Invoicing",        url: "/factory/invoicing",            icon: FileText     },
       { title: "Stock Allocation", url: "/factory/stock-allocation-v5",  icon: LayoutGrid   },
       { title: "Loadings",         url: "/factory/sales/loadings",       icon: Container    },
+      { title: "Price List",       url: "/factory/price-list",           icon: List         },
     ],
   },
   {
@@ -111,31 +127,36 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
       { title: "Location Inventory", url: "/factory/location-inventory", icon: MapPin    },
       { title: "Factory Stock OTW",  url: "/factory/stock-otw",          icon: Ship      },
       { title: "Containers",         url: "/factory/containers",         icon: Container },
+      { title: "Stock Query",        url: "/factory/stock-query",        icon: Search    },
     ],
   },
   {
     label: "Finance",
     color: NAV_COLOR.finance,
     items: [
-      { title: "Workers",   url: "/factory/workers",   icon: HardHat   },
-      { title: "Employees", url: "/factory/employees", icon: Users     },
-      { title: "Suppliers", url: "/factory/suppliers", icon: UserRound },
-      { title: "Vouchers",  url: "/factory/vouchers",  icon: FileText  },
-      { title: "Accounts",  url: "/factory/accounts",  icon: Landmark  },
+      { title: "Workers",          url: "/factory/workers",                 icon: HardHat        },
+      { title: "Employees",        url: "/factory/employees",               icon: Users          },
+      { title: "Suppliers",        url: "/factory/suppliers",               icon: UserRound      },
+      { title: "Transporters",     url: "/factory/transporters",            icon: Truck          },
+      { title: "Vouchers",         url: "/factory/vouchers",                icon: FileText       },
+      { title: "Accounts",         url: "/factory/accounts",               icon: Landmark       },
+      { title: "Broker Statement", url: "/factory/broker-visual-statement", icon: ClipboardCheck },
     ],
   },
   {
     label: "Reports",
     color: NAV_COLOR.reports,
     items: [
-      { title: "Analytics",          url: "/factory/analytics",          icon: TrendingUp, adminOnly: true },
+      { title: "Analytics", url: "/factory/analytics", icon: TrendingUp, adminOnly: true },
     ],
   },
   {
     label: "Rentals",
     color: NAV_COLOR.rentals,
     items: [
-      { title: "Shops", url: "/factory/rental/shops", icon: Store },
+      { title: "Shops",      url: "/factory/rental/shops",      icon: Store     },
+      { title: "Warehouses", url: "/factory/rental/warehouses", icon: Building2 },
+      { title: "Payments",   url: "/factory/rental/payments",   icon: CreditCard },
     ],
   },
   {
