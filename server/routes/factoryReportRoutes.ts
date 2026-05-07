@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../lib/parseId";
 import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import PDFDocument from "pdfkit";

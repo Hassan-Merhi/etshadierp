@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
 import { getExportPriceVisibility } from "../../helpers/exportVisibility";
 import type { Express } from "express";
@@ -730,7 +731,9 @@ export function registerFactoryStockRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const locationId = parseInt(req.params.locationId);
+      const locationId = parseId(req.params.locationId);
+
+      if (locationId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(locationId)) return res.status(400).json({ message: "Invalid location ID" });
 
       const bales = await db
@@ -831,7 +834,9 @@ export function registerFactoryStockRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const locationId = parseInt(req.params.locationId);
+      const locationId = parseId(req.params.locationId);
+
+      if (locationId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(locationId)) return res.status(400).json({ message: "Invalid location ID" });
 
       // --- stock (same logic as base endpoint) ---
@@ -902,7 +907,9 @@ export function registerFactoryStockRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const locationId = parseInt(req.params.locationId);
+      const locationId = parseId(req.params.locationId);
+
+      if (locationId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(locationId)) return res.status(400).json({ message: "Invalid location ID" });
 
       const [fCfg] = await db.select({ hideAvgCost: factorySettings.hideAvgCost, hideSellingPrice: factorySettings.hideSellingPrice }).from(factorySettings).where(eq(factorySettings.companyId, companyId)).limit(1);

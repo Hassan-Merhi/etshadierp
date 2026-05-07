@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
 import { getExportPriceVisibility } from "../../helpers/exportVisibility";
 import { sendWhatsAppFileToChatIdPos } from "../../services/whatsappService";
@@ -308,9 +309,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const conditions: any[] = [eq(customerOrders.companyId, companyId), isNull(customerOrders.deletedAt)];
-      if (req.query.customerId) conditions.push(eq(customerOrders.customerId, parseInt(req.query.customerId)));
+      if (req.query.customerId) conditions.push(eq(customerOrders.customerId, parseOptionalId(req.query.customerId)));
       if (req.query.status) conditions.push(eq(customerOrders.status, req.query.status));
-      if (req.query.proformaId) conditions.push(eq(customerOrders.proformaIdUsed, parseInt(req.query.proformaId)));
+      if (req.query.proformaId) conditions.push(eq(customerOrders.proformaIdUsed, parseOptionalId(req.query.proformaId)));
 
       const orders = await db
         .select({
@@ -360,7 +361,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [order] = await db
         .select({
           id: customerOrders.id,
@@ -411,7 +414,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [order] = await db
         .select({ id: customerOrders.id, status: customerOrders.status, invoiceNumber: customerOrders.invoiceNumber, customerName: customers.legalName })
         .from(customerOrders)
@@ -514,7 +519,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { scanCode, locationId } = req.body;
       if (!scanCode || !locationId) return res.status(400).json({ message: "scanCode and locationId are required" });
 
@@ -724,7 +731,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { locationId, items, refNumbers: refNumbersRaw } = req.body;
       const hasRefNumbers = Array.isArray(refNumbersRaw) && refNumbersRaw.length > 0;
       const hasItems = Array.isArray(items) && items.length > 0;
@@ -1021,8 +1030,11 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
-      const baleId = parseInt(req.params.baleId);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
+      const baleId = parseId(req.params.baleId);
+      if (baleId === null) return res.status(400).json({ message: "Invalid id" });
 
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
@@ -1082,7 +1094,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { orderBaleId, newBaleReference } = req.body;
       if (!orderBaleId || !newBaleReference?.trim()) {
         return res.status(400).json({ message: "orderBaleId and newBaleReference are required" });
@@ -1169,7 +1183,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
@@ -1187,7 +1202,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { name, amount, chargeType, ledgerAccountId } = req.body;
       if (!name || !amount) return res.status(400).json({ message: "name and amount are required" });
 
@@ -1365,8 +1382,11 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
-      const chargeId = parseInt(req.params.chargeId);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
+      const chargeId = parseId(req.params.chargeId);
+      if (chargeId === null) return res.status(400).json({ message: "Invalid id" });
 
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
@@ -1563,8 +1583,11 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
-      const chargeId = parseInt(req.params.chargeId);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
+      const chargeId = parseId(req.params.chargeId);
+      if (chargeId === null) return res.status(400).json({ message: "Invalid id" });
 
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
@@ -1659,7 +1682,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(orderId)) return res.status(400).json({ message: "Invalid order ID" });
 
       const { proformaId } = req.body;
@@ -1738,7 +1763,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { note } = req.body;
 
       const [order] = await db.select().from(customerOrders)
@@ -1762,7 +1789,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
 
       await db.transaction(async (tx: any) => {
         const [order] = await tx.select().from(customerOrders)
@@ -1799,7 +1828,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
 
       const result = await db.transaction(async (tx: any) => {
         const [order] = await tx.select().from(customerOrders)
@@ -2004,7 +2035,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
@@ -2055,7 +2088,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
 
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
@@ -2189,7 +2224,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
 
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
@@ -2293,7 +2330,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { proformaId } = req.body;
       if (!proformaId) return res.status(400).json({ message: "proformaId is required" });
 
@@ -2376,7 +2415,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { articleCode, pricePerBale } = req.body;
 
       if (!articleCode || pricePerBale === undefined || pricePerBale === null) {
@@ -2437,7 +2478,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         return res.status(403).json({ message: "Only admin/owner can force-sync bale statuses" });
       }
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
@@ -2473,7 +2516,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(orderId)) return res.status(400).json({ message: "Invalid order ID" });
 
       const { hideSelling: hideSellingXls1 } = await getExportPriceVisibility(req);
@@ -2733,7 +2778,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
 
       await db.transaction(async (tx: any) => {
         const [order] = await tx.select().from(customerOrders)
@@ -2839,7 +2886,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
@@ -2952,7 +3001,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
@@ -3036,7 +3087,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
@@ -3088,7 +3141,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
@@ -3212,7 +3267,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { approved, notes } = req.body;
 
       const [order] = await db.select().from(customerOrders)
@@ -3302,7 +3359,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
@@ -3334,7 +3393,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { orderDate } = req.body;
       if (!orderDate) return res.status(400).json({ message: "orderDate is required" });
 
@@ -3360,7 +3421,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { containerNumber, shippingCompany, containerNotes, destination } = req.body;
 
       const [order] = await db.select().from(customerOrders)
@@ -3399,7 +3462,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const code = req.query.code as string;
-      const locationId = req.query.locationId ? parseInt(req.query.locationId as string) : null;
+      const locationId = req.query.locationId ? parseOptionalId(req.query.locationId) : null;
       if (!code) return res.status(400).json({ message: "code is required" });
 
       const conditions: any[] = [
@@ -3436,7 +3499,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { hideSelling: hideSellingXls2 } = await getExportPriceVisibility(req);
       const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
       const [order] = await db
@@ -3699,7 +3764,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(orderId)) return res.status(400).json({ message: "Invalid order ID" });
 
       const [order] = await db.select().from(customerOrders)
@@ -3787,8 +3854,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const safeName = customerName.replace(/[^a-zA-Z0-9_\-]/g, "_");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="loading_${orderId}_${safeName}.xlsx"`);
-      const buffer = await workbook.xlsx.writeBuffer();
-      res.send(buffer);
+      await workbook.xlsx.write(res);
+      res.end();
     } catch (error: any) {
       console.error("Error exporting pending loading:", error);
       res.status(500).json({ message: error.message });
@@ -3804,7 +3871,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { hideSelling: hideSellingPdf } = await getExportPriceVisibility(req);
 
       const [order] = await db
@@ -4046,7 +4115,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseInt(req.params.id);
+      const orderId = parseId(req.params.id);
+
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const [order] = await db
         .select({
           id: customerOrders.id,

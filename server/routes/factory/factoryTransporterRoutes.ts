@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../../lib/parseId";
 import type { Express, Request, Response } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -63,7 +64,8 @@ export function registerFactoryTransporterRoutes(app: Express) {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       const [transporter] = await db.select().from(factoryTransporters)
         .where(and(eq(factoryTransporters.id, id), eq(factoryTransporters.companyId, companyId)));
@@ -122,7 +124,8 @@ export function registerFactoryTransporterRoutes(app: Express) {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       const { name, phone, notes } = z.object({
         name: z.string().min(1).optional(),
@@ -146,7 +149,8 @@ export function registerFactoryTransporterRoutes(app: Express) {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const transporterId = parseInt(req.params.id);
+      const transporterId = parseId(req.params.id);
+      if (transporterId === null) return res.status(400).json({ message: "Invalid id" });
 
       const { amount, txDate, description, expenseAccountId } = z.object({
         amount: z.union([z.string(), z.number()]).transform(v => String(v)),
@@ -199,7 +203,8 @@ export function registerFactoryTransporterRoutes(app: Express) {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const transporterId = parseInt(req.params.id);
+      const transporterId = parseId(req.params.id);
+      if (transporterId === null) return res.status(400).json({ message: "Invalid id" });
 
       const { amount, txDate, description, cashAccountId } = z.object({
         amount: z.union([z.string(), z.number()]).transform(v => String(v)),
@@ -252,7 +257,8 @@ export function registerFactoryTransporterRoutes(app: Express) {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const txId = parseInt(req.params.txId);
+      const txId = parseId(req.params.txId);
+      if (txId === null) return res.status(400).json({ message: "Invalid id" });
 
       const [tx] = await db.select().from(factoryTransporterTransactions)
         .where(and(eq(factoryTransporterTransactions.id, txId), eq(factoryTransporterTransactions.companyId, companyId)));

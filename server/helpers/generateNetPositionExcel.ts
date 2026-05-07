@@ -112,6 +112,7 @@ export async function generateNetPositionExcel(
   companyName: string,
   startDate: string,
   endDate: string,
+  dest?: NodeJS.WritableStream,
 ): Promise<Buffer> {
   const monthEnds = generateMonthEnds(startDate, endDate);
   if (monthEnds.length === 0) throw new Error("No months in range");
@@ -574,6 +575,10 @@ export async function generateNetPositionExcel(
     ws.getColumn(4).width = 18;
   }
 
+  if (dest) {
+    await wb.xlsx.write(dest);
+    return Buffer.alloc(0); // caller must not use this when streaming
+  }
   const rawBuf = await wb.xlsx.writeBuffer();
   return Buffer.isBuffer(rawBuf) ? rawBuf : Buffer.from(rawBuf);
 }

@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../../lib/parseId";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -45,7 +46,7 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
   // Returns (or creates) the default template + seed metrics for a company.
   app.get("/api/factory/status-builder/template", requireAuth, async (req, res) => {
     try {
-      const companyId = parseInt(req.query.companyId as string);
+      const companyId = parseOptionalId(req.query.companyId);
       if (!companyId) return res.status(400).json({ error: "companyId required" });
 
       let [template] = await db
@@ -78,7 +79,8 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
   // ── PATCH /api/factory/status-builder/templates/:id ───────────────────────
   app.patch("/api/factory/status-builder/templates/:id", requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { name } = req.body;
       const [updated] = await db
         .update(statusReportTemplates)
@@ -94,7 +96,8 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
   // ── GET /api/factory/status-builder/templates/:id/metrics ─────────────────
   app.get("/api/factory/status-builder/templates/:id/metrics", requireAuth, async (req, res) => {
     try {
-      const templateId = parseInt(req.params.id);
+      const templateId = parseId(req.params.id);
+      if (templateId === null) return res.status(400).json({ message: "Invalid id" });
       const metrics = await db
         .select()
         .from(statusMetrics)
@@ -132,7 +135,8 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
   // ── PATCH /api/factory/status-builder/metrics/:id ─────────────────────────
   app.patch("/api/factory/status-builder/metrics/:id", requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { name, beforeSourceType, sourceType, sourceField, operation, filtersJson, sortOrder } = req.body;
       const [updated] = await db
         .update(statusMetrics)
@@ -148,7 +152,8 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
   // ── DELETE /api/factory/status-builder/metrics/:id ────────────────────────
   app.delete("/api/factory/status-builder/metrics/:id", requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       // Remove any stored values for this metric before deleting
       await db.delete(statusMetricValues).where(eq(statusMetricValues.metricId, id));
       await db.delete(statusMetrics).where(eq(statusMetrics.id, id));
@@ -162,7 +167,7 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
   // Returns (or creates) the run for a template+date, plus all metric values.
   app.get("/api/factory/status-builder/run", requireAuth, async (req, res) => {
     try {
-      const templateId = parseInt(req.query.templateId as string);
+      const templateId = parseOptionalId(req.query.templateId);
       const runDate    = req.query.date as string;
       if (!templateId || !runDate) return res.status(400).json({ error: "templateId and date required" });
 
@@ -219,7 +224,8 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
   // Re-fetches all linked source values; manual adjustments are preserved.
   app.post("/api/factory/status-builder/runs/:id/refresh", requireAuth, async (req, res) => {
     try {
-      const runId = parseInt(req.params.id);
+      const runId = parseId(req.params.id);
+      if (runId === null) return res.status(400).json({ message: "Invalid id" });
       const [run] = await db.select().from(statusReportRuns).where(eq(statusReportRuns.id, runId));
       if (!run) return res.status(404).json({ error: "Run not found" });
 
@@ -282,7 +288,8 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
   // Saves before values and manual adjustments; recalculates difference + finalTotal.
   app.patch("/api/factory/status-builder/runs/:runId/values", requireAuth, async (req, res) => {
     try {
-      const runId = parseInt(req.params.runId);
+      const runId = parseId(req.params.runId);
+      if (runId === null) return res.status(400).json({ message: "Invalid id" });
       const { entries } = req.body as {
         entries: { metricId: number; manualAdjustment: number; beforeValue: number }[];
       };

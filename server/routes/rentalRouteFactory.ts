@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../lib/parseId";
 import type { Express, Request, Response } from "express";
 import { db } from "../db";
 import { requireAuth } from "../auth";
@@ -372,7 +373,8 @@ export function registerRentalRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const allowed = ["unitNumber", "size", "dimensions", "locationGroup", "notes", "sortOrder", "active"];
       const updates: any = {};
       for (const k of allowed) if (k in req.body) updates[k] = req.body[k];
@@ -390,7 +392,8 @@ export function registerRentalRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [active] = await db.select().from(propertyContracts).where(and(
         eq(propertyContracts.companyId, companyId),
         eq(propertyContracts.module, module),
@@ -443,7 +446,8 @@ export function registerRentalRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { newAmount, effectiveFrom } = z.object({
         newAmount: z.union([z.string(), z.number()]).transform(v => String(v)),
         effectiveFrom: z.enum(["current", "next"]).default("current"),
@@ -478,7 +482,8 @@ export function registerRentalRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { tenantName, startDate, guaranteeAmount, guaranteePeriod, isInternal } = z.object({
         tenantName: z.string().min(1, "Tenant name required"),
         startDate: z.string().min(1, "Start date required"),
@@ -544,7 +549,8 @@ export function registerRentalRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const unitId = parseInt(req.params.id);
+      const unitId = parseId(req.params.id);
+      if (unitId === null) return res.status(400).json({ message: "Invalid id" });
 
       const [unit] = await db.select().from(propertyUnits).where(and(
         eq(propertyUnits.id, unitId), eq(propertyUnits.companyId, companyId), eq(propertyUnits.module, module),
@@ -707,11 +713,11 @@ export function registerRentalRoutes(
       addPaymentSection("RENT PAYMENT HISTORY", payments);
       addPaymentSection("GUARANTEE / DEPOSIT ACTIVITY", guaranteePaymentsExport);
 
-      const buf = await wb.xlsx.writeBuffer();
       const filename = `Rental_${unit.unitNumber.replace(/\s+/g, "_")}_${contract.tenantName.replace(/\s+/g, "_")}.xlsx`;
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-      res.send(buf);
+      await wb.xlsx.write(res);
+      res.end();
     } catch (e: any) {
       console.error(`${tag} statement export:`, e);
       res.status(500).json({ message: e.message });
@@ -723,7 +729,8 @@ export function registerRentalRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { notes } = z.object({ notes: z.string() }).parse(req.body);
       const [contract] = await db.select().from(propertyContracts).where(and(
         eq(propertyContracts.id, id), eq(propertyContracts.companyId, companyId), eq(propertyContracts.module, module),
@@ -742,7 +749,8 @@ export function registerRentalRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { statementNote } = z.object({ statementNote: z.string() }).parse(req.body);
       const [contract] = await db.select().from(propertyContracts).where(and(
         eq(propertyContracts.id, id), eq(propertyContracts.companyId, companyId), eq(propertyContracts.module, module),
@@ -761,7 +769,8 @@ export function registerRentalRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { endDate, notes } = z.object({
         endDate: z.string().min(1),
         notes: z.string().optional(),
@@ -796,7 +805,8 @@ export function registerRentalRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { amount, cashAccountId, paymentDate, notes } = z.object({
         amount: z.union([z.string(), z.number()]).transform(v => String(v)),
         cashAccountId: z.number().nullable().optional(),
@@ -869,7 +879,8 @@ export function registerRentalRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       const [contract] = await db.select().from(propertyContracts).where(and(
         eq(propertyContracts.id, id), eq(propertyContracts.companyId, companyId), eq(propertyContracts.module, module),
@@ -891,7 +902,8 @@ export function registerRentalRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { amount, cashAccountId, paymentDate, notes } = z.object({
         amount: z.union([z.string(), z.number()]).transform(v => String(v)),
         cashAccountId: z.number(),
@@ -1239,7 +1251,8 @@ export function registerRentalRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const paymentId = parseInt(req.params.id);
+      const paymentId = parseId(req.params.id);
+      if (paymentId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(paymentId)) return res.status(400).json({ message: "Invalid payment id" });
 
       const [payment] = await db.select().from(propertyPayments).where(and(
@@ -1322,7 +1335,8 @@ export function registerRentalRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const unitId = parseInt(req.params.id);
+      const unitId = parseId(req.params.id);
+      if (unitId === null) return res.status(400).json({ message: "Invalid id" });
 
       const [unit] = await db.select().from(propertyUnits).where(and(
         eq(propertyUnits.id, unitId), eq(propertyUnits.companyId, companyId), eq(propertyUnits.module, module),
@@ -1497,7 +1511,8 @@ export function registerRentalRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
       await db.delete(rentalAutoTransferConfigs).where(and(
         eq(rentalAutoTransferConfigs.id, id),

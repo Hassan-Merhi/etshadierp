@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../lib/parseId";
 /**
  * Factory Account WhatsApp Auto-Statement Routes
  *
@@ -19,7 +20,8 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
   // ── GET rule ──────────────────────────────────────────────────────────────
   app.get("/api/factory/accounts/:accountId/whatsapp-rule", requireAuth, async (req: any, res: any) => {
     try {
-      const accountId = parseInt(req.params.accountId);
+      const accountId = parseId(req.params.accountId);
+      if (accountId === null) return res.status(400).json({ message: "Invalid id" });
       const companyId = req.session?.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
@@ -52,7 +54,8 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
   // ── PUT (upsert) rule ─────────────────────────────────────────────────────
   app.put("/api/factory/accounts/:accountId/whatsapp-rule", requireAuth, async (req: any, res: any) => {
     try {
-      const accountId = parseInt(req.params.accountId);
+      const accountId = parseId(req.params.accountId);
+      if (accountId === null) return res.status(400).json({ message: "Invalid id" });
       const companyId = req.session?.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
@@ -100,7 +103,8 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
   // ── POST manual send ──────────────────────────────────────────────────────
   app.post("/api/factory/accounts/:accountId/send-statement-whatsapp", requireAuth, async (req: any, res: any) => {
     try {
-      const accountId = parseInt(req.params.accountId);
+      const accountId = parseId(req.params.accountId);
+      if (accountId === null) return res.status(400).json({ message: "Invalid id" });
       const companyId = req.session?.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });

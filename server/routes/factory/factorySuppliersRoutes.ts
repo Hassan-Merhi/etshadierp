@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
@@ -90,7 +91,9 @@ export function registerFactorySuppliersRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [updated] = await db
         .update(factorySuppliers)
         .set({ ...req.body, updatedAt: new Date() })
@@ -110,7 +113,9 @@ export function registerFactorySuppliersRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [updated] = await db
         .update(factorySuppliers)
         .set({ isActive: false, updatedAt: new Date() })
@@ -131,7 +136,9 @@ export function registerFactorySuppliersRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(id)) return res.status(400).json({ message: "Invalid supplier id" });
 
       const { openingBalance } = req.body;
@@ -170,7 +177,9 @@ export function registerFactorySuppliersRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [supplier] = await db
         .select()
         .from(factorySuppliers)
@@ -256,7 +265,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { name, displayOrder } = req.body;
       const [updated] = await db
         .update(factorySupplierCategories)
@@ -274,7 +284,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       // Unassign any suppliers that belong to this category
       await db
         .update(factorySuppliers)
@@ -299,7 +310,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const supplierId = req.query.supplierId ? parseInt(req.query.supplierId as string) : null;
+      const supplierId = req.query.supplierId ? parseOptionalId(req.query.supplierId) : null;
 
       // Also fetch all sub-accounts of the supplier to include their payments
       let supplierIds: number[] = supplierId ? [supplierId] : [];
@@ -407,7 +418,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [payment] = await db.select().from(factorySupplierPayments)
         .where(and(eq(factorySupplierPayments.id, id), eq(factorySupplierPayments.companyId, companyId)));
       const [spDelSupplier] = payment
@@ -672,7 +684,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [transfer] = await db.select().from(factorySupplierFxTransfers)
         .where(and(eq(factorySupplierFxTransfers.id, id), eq(factorySupplierFxTransfers.companyId, companyId)));
       if (!transfer) return res.status(404).json({ message: "Transfer not found" });
@@ -706,7 +719,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const brokerId = parseInt(req.params.brokerId);
+      const brokerId = parseId(req.params.brokerId);
+      if (brokerId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(brokerId)) return res.status(400).json({ message: "Invalid broker ID" });
       const currency = req.query.currency as string;
       if (!currency) return res.status(400).json({ message: "currency query param required" });
@@ -779,7 +793,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const brokerId = parseInt(req.params.brokerId);
+      const brokerId = parseId(req.params.brokerId);
+      if (brokerId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(brokerId)) return res.status(400).json({ message: "Invalid broker ID" });
 
       const { fromCurrencyCode, totalAmount, fxRateToUsd, date, notes, order = "oldest", dryRun = false } = req.body;
@@ -1039,7 +1054,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const supplierId = parseInt(req.params.id);
+      const supplierId = parseId(req.params.id);
+      if (supplierId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(supplierId)) return res.status(400).json({ message: "Invalid supplier ID" });
 
       // Load the supplier + any children (for broker aggregation)
@@ -1500,7 +1516,9 @@ export function registerFactorySuppliersRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const supplierId = parseInt(req.params.id);
+      const supplierId = parseId(req.params.id);
+
+      if (supplierId === null) return res.status(400).json({ message: "Invalid id" });
 
       const [supplier] = await db
         .select()
@@ -2623,7 +2641,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const brokerId = parseInt(req.params.id);
+      const brokerId = parseId(req.params.id);
+      if (brokerId === null) return res.status(400).json({ message: "Invalid id" });
       const data = await buildBrokerStatement(brokerId, companyId);
       if (!data) return res.status(404).json({ message: "Supplier not found" });
       return res.json(data);
@@ -2637,7 +2656,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const brokerId = parseInt(req.params.id);
+      const brokerId = parseId(req.params.id);
+      if (brokerId === null) return res.status(400).json({ message: "Invalid id" });
       const data = await buildBrokerStatement(brokerId, companyId);
       if (!data) return res.status(404).json({ message: "Supplier not found" });
 
@@ -2787,7 +2807,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const brokerId = parseInt(req.params.id);
+      const brokerId = parseId(req.params.id);
+      if (brokerId === null) return res.status(400).json({ message: "Invalid id" });
       const from: string | undefined = req.query.from as string | undefined;
       const to: string | undefined = req.query.to as string | undefined;
 

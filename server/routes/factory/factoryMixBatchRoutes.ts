@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
@@ -81,7 +82,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [batch] = await db
         .select()
         .from(factoryMixBatches)
@@ -103,7 +106,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { name, notes, batchDate, supplierSources, batchSources } = req.body;
 
       // If no source data provided → simple name/notes update only
@@ -326,7 +331,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       const [batch] = await db
         .select()
@@ -361,7 +368,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       // Soft-delete: preserve sources / used_kg reversals for restore.
       // Permanent deletion (with cascade) occurs from Settings → Deleted Items.
@@ -759,7 +768,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(id)) return res.status(400).json({ message: "Invalid batch ID" });
 
       const { supplierSources = [], sources = [], batchSources = [], txDate } = req.body;
@@ -960,7 +971,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const mixBatchId = parseInt(req.params.id);
+      const mixBatchId = parseId(req.params.id);
+
+      if (mixBatchId === null) return res.status(400).json({ message: "Invalid id" });
       const { baleIds } = req.body as { baleIds: number[] };
 
       if (!Array.isArray(baleIds) || baleIds.length === 0) {
@@ -1021,7 +1034,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       const results = await db
         .select({

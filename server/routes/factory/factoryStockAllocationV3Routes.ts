@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../../lib/parseId";
 import { and, eq, isNull, inArray, sql } from "drizzle-orm";
 import { sqlArray } from "../../lib/sqlArray";
 import { db } from "../../db";
@@ -152,7 +153,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       const loadResult = await db.execute(sql`
         SELECT
@@ -255,7 +257,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       const [load] = await db.select().from(factoryV3Loads)
         .where(and(eq(factoryV3Loads.id, id), eq(factoryV3Loads.companyId, companyId)));
@@ -282,7 +285,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const loadId = parseInt(req.params.id);
+      const loadId = parseId(req.params.id);
+      if (loadId === null) return res.status(400).json({ message: "Invalid id" });
       const { scanCode, bypass } = req.body;
       if (!scanCode) return res.status(400).json({ message: "scanCode is required" });
 
@@ -400,8 +404,10 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const loadId = parseInt(req.params.id);
-      const lbId = parseInt(req.params.baleId);
+      const loadId = parseId(req.params.id);
+      if (loadId === null) return res.status(400).json({ message: "Invalid id" });
+      const lbId = parseId(req.params.baleId);
+      if (lbId === null) return res.status(400).json({ message: "Invalid id" });
 
       const [load] = await db.select().from(factoryV3Loads)
         .where(and(eq(factoryV3Loads.id, loadId), eq(factoryV3Loads.companyId, companyId)));
@@ -428,7 +434,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       const [load] = await db.select().from(factoryV3Loads)
         .where(and(eq(factoryV3Loads.id, id), eq(factoryV3Loads.companyId, companyId)));
@@ -472,7 +479,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       const [load] = await db.select().from(factoryV3Loads)
         .where(and(eq(factoryV3Loads.id, id), eq(factoryV3Loads.companyId, companyId)));
@@ -548,7 +556,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const proformaId = parseInt(req.params.id);
+      const proformaId = parseId(req.params.id);
+      if (proformaId === null) return res.status(400).json({ message: "Invalid id" });
 
       const result = await db.execute(sql`
         SELECT l.id, l.load_name AS "loadName", l.status,

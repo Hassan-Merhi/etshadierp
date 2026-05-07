@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../lib/parseId";
 import type { Express } from "express";
 import { db } from "../db";
 import {
@@ -283,7 +284,8 @@ export function registerGlobalTransactionRoutes(
   // Returns full voucher + entries without session-company restriction (auth only).
   app.get("/api/global/transactions/:voucherId/detail", requireAuth, async (req, res) => {
     try {
-      const voucherId = parseInt(req.params.voucherId);
+      const voucherId = parseId(req.params.voucherId);
+      if (voucherId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(voucherId)) return res.status(400).json({ message: "Invalid voucher ID" });
 
       const [voucher] = await db
@@ -338,7 +340,8 @@ export function registerGlobalTransactionRoutes(
   // Returns rich entries (items for Sales/Purchase/StockTransfer/Mixed) — no company restriction.
   app.get("/api/global/transactions/:voucherId/view-entries", requireAuth, async (req, res) => {
     try {
-      const voucherId = parseInt(req.params.voucherId);
+      const voucherId = parseId(req.params.voucherId);
+      if (voucherId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(voucherId)) return res.status(400).json({ message: "Invalid voucher ID" });
 
       const [voucher] = await db

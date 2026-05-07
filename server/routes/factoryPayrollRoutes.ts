@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../lib/parseId";
 import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { checkFactoryAdmin } from "./factory/_helpers";
@@ -319,7 +320,8 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
   app.patch("/api/factory/payroll/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { bonuses, deductions, advances, overtimeHours, overtimePay, notes, status, paymentSource, paymentDate, paymentReference } = req.body;
 
       const [existing] = await db
@@ -405,10 +407,12 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
   app.post("/api/factory/payroll/:id/undo", requireAuth, async (req: any, res: any) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : ((req.session as any).factoryCompanyId || (req.session as any).currentCompanyId);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : ((req.session as any).factoryCompanyId || (req.session as any).currentCompanyId);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [existing] = await db
         .select()
         .from(factoryPayrolls)
@@ -496,10 +500,12 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
   app.delete("/api/factory/payroll/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : ((req.session as any).factoryCompanyId || (req.session as any).currentCompanyId);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : ((req.session as any).factoryCompanyId || (req.session as any).currentCompanyId);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [existing] = await db
         .select()
         .from(factoryPayrolls)

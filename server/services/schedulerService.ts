@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import archiver from "archiver";
+import { PassThrough } from "stream";
 import { fetchAllCompanies } from "./exportDataService";
 import { sendExportEmail } from "./emailService";
 import { pool } from "../db";
@@ -35,15 +36,16 @@ async function buildNetPositionZip(
     arc.on("error", reject);
 
     for (const company of companies) {
+      const safe = company.name.replace(/[^a-z0-9]/gi, "_");
+      const pass = new PassThrough();
+      arc.append(pass, { name: `NetPosition_${safe}_${endDate}.xlsx` });
       try {
-        const buf  = await generateNetPositionExcel(company.id, company.name, startDate, endDate);
-        const safe = company.name.replace(/[^a-z0-9]/gi, "_");
-        arc.append(Buffer.isBuffer(buf) ? buf : Buffer.from(buf), {
-          name: `NetPosition_${safe}_${endDate}.xlsx`,
-        });
+        await generateNetPositionExcel(company.id, company.name, startDate, endDate, pass);
+        if (!pass.destroyed) pass.end();
         console.log(`[NetPositionExport] Added ${company.name}`);
       } catch (e: any) {
         console.error(`[NetPositionExport] Failed for ${company.name}:`, e.message);
+        if (!pass.destroyed) pass.destroy(e);
       }
     }
 

@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../lib/parseId";
 import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { checkFactoryAdmin } from "./factory/_helpers";
@@ -143,7 +144,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
   // Balance = total advances (debit) minus total paid payroll net salary (credit), all-time
   app.get("/api/factory/workers/with-balances", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const workers = await db
@@ -192,7 +193,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
   // GET /api/factory/workers - List workers
   app.get("/api/factory/workers", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { active, search, position, department } = req.query;
@@ -231,7 +232,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
   // GET /api/factory/workers/document-counts - Document count per worker
   app.get("/api/factory/workers/document-counts", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const rows = await db
         .select({
@@ -471,10 +472,12 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
   // GET /api/factory/workers/:id - Get single worker with computed stats
   app.get("/api/factory/workers/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [worker] = await db
         .select()
         .from(factoryWorkers)
@@ -602,7 +605,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const updateData = { ...req.body };
       for (const f of ["dateOfBirth", "dateJoined", "contractStartDate", "contractEndDate", "visaExpiry", "workPermitExpiry", "residentialPermitExpiry"]) {
         if (updateData[f] === "" || updateData[f] === undefined) updateData[f] = null;
@@ -645,7 +650,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const today = getClientDate(req);
 
       const [updated] = await db
@@ -679,7 +686,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const today = getClientDate(req);
 
       const [updated] = await db
@@ -715,7 +724,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
 
       if (!req.file) return res.status(400).json({ message: "No photo uploaded" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const photoUrl = `/api/factory/uploads/workers/${req.file.filename}`;
 
       const [updated] = await db
@@ -780,7 +791,8 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const workerId = parseInt(req.params.id);
+      const workerId = parseId(req.params.id);
+      if (workerId === null) return res.status(400).json({ message: "Invalid id" });
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
       // Generate a stable filename (same format as before so existing URLs keep working)
@@ -827,7 +839,8 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const workerId = parseInt(req.params.id);
+      const workerId = parseId(req.params.id);
+      if (workerId === null) return res.status(400).json({ message: "Invalid id" });
       const docs = await db.select({
         id:           factoryWorkerDocuments.id,
         companyId:    factoryWorkerDocuments.companyId,
@@ -852,8 +865,10 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const workerId = parseInt(req.params.id);
-      const docId = parseInt(req.params.docId);
+      const workerId = parseId(req.params.id);
+      if (workerId === null) return res.status(400).json({ message: "Invalid id" });
+      const docId = parseId(req.params.docId);
+      if (docId === null) return res.status(400).json({ message: "Invalid id" });
       const [doc] = await db.select().from(factoryWorkerDocuments)
         .where(and(eq(factoryWorkerDocuments.id, docId), eq(factoryWorkerDocuments.workerId, workerId), eq(factoryWorkerDocuments.companyId, companyId)));
       if (!doc) return res.status(404).json({ message: "Document not found" });
@@ -918,10 +933,12 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
   // GET /api/factory/workers/:id/bales - Get bales associated with worker
   app.get("/api/factory/workers/:id/bales", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { startDate, endDate } = req.query;
 
       const conditions: any[] = [
@@ -956,7 +973,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { startDate, endDate, hoursWorked, dryRun, payNow, cashAccountId, skipSettlement } = req.body;
 
       const [worker] = await db.select().from(factoryWorkers).where(and(eq(factoryWorkers.id, id), eq(factoryWorkers.companyId, companyId)));

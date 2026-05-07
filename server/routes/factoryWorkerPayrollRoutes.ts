@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../lib/parseId";
 import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../db";
@@ -131,7 +132,7 @@ function computeMonthlyPayFromAttendance(baseSalary: number, periodStart: string
 export function registerFactoryWorkerPayrollRoutes(app: Express) {
   app.get("/api/factory/cash-accounts", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const accounts = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name, code: ledgerAccounts.code })
         .from(ledgerAccounts)
@@ -146,7 +147,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   // GET /api/factory/payrolls - All payroll records for company with worker info
   app.get("/api/factory/payrolls", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const payrolls = await db.select().from(factoryPayrolls)
         .where(eq(factoryPayrolls.companyId, companyId))
@@ -166,9 +167,10 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   // GET /api/factory/workers/:id/payrolls - Payroll history for one worker
   app.get("/api/factory/workers/:id/payrolls", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const payrolls = await db.select().from(factoryPayrolls)
         .where(and(eq(factoryPayrolls.workerId, id), eq(factoryPayrolls.companyId, companyId)))
         .orderBy(desc(factoryPayrolls.periodEnd));
@@ -508,9 +510,10 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   // GET /api/factory/payrolls/:id/detail - Full payroll detail with per-day attendance
   app.get("/api/factory/payrolls/:id/detail", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       const [payroll] = await db.select().from(factoryPayrolls)
         .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)));
@@ -536,7 +539,8 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
       const paymentDate = req.body.paymentDate || getClientDate(req);
 
@@ -618,7 +622,8 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
       if (!cashAccountId) return res.status(400).json({ message: "cashAccountId is required" });
 
@@ -934,10 +939,12 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   // GET /api/factory/workers/:id/stats - Get worker productivity stats
   app.get("/api/factory/workers/:id/stats", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       const [worker] = await db
         .select()
@@ -995,11 +1002,11 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   // GET /api/factory/advance-repayments - List all repayments company-wide
   app.get("/api/factory/advance-repayments", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const conditions: any[] = [eq(factoryAdvanceRepayments.companyId, companyId)];
-      if (req.query.workerId) conditions.push(eq(factoryAdvanceRepayments.workerId, parseInt(req.query.workerId as string)));
+      if (req.query.workerId) conditions.push(eq(factoryAdvanceRepayments.workerId, parseOptionalId(req.query.workerId)));
 
       const repayments = await db
         .select({
@@ -1034,11 +1041,11 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   // GET /api/factory/advances - List all advances for company
   app.get("/api/factory/advances", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const conditions: any[] = [eq(factoryWorkerAdvances.companyId, companyId)];
-      if (req.query.workerId) conditions.push(eq(factoryWorkerAdvances.workerId, parseInt(req.query.workerId)));
+      if (req.query.workerId) conditions.push(eq(factoryWorkerAdvances.workerId, parseOptionalId(req.query.workerId)));
       if (req.query.status === "outstanding") conditions.push(eq(factoryWorkerAdvances.fullyPaid, false));
       if (req.query.status === "paid") conditions.push(eq(factoryWorkerAdvances.fullyPaid, true));
 
@@ -1065,9 +1072,10 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   // GET /api/factory/workers/:id/advances - List advances for a specific worker
   app.get("/api/factory/workers/:id/advances", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const workerId = parseInt(req.params.id);
+      const workerId = parseId(req.params.id);
+      if (workerId === null) return res.status(400).json({ message: "Invalid id" });
 
       const advances = await db.select().from(factoryWorkerAdvances)
         .where(and(eq(factoryWorkerAdvances.companyId, companyId), eq(factoryWorkerAdvances.workerId, workerId)))
@@ -1085,7 +1093,8 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const workerId = parseInt(req.params.id);
+      const workerId = parseId(req.params.id);
+      if (workerId === null) return res.status(400).json({ message: "Invalid id" });
 
       const amount = parseFloat(req.body.amount);
       if (!amount || amount <= 0) return res.status(400).json({ message: "Amount must be positive" });
@@ -1300,7 +1309,8 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       }
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       const updates: any = {};
       if (req.body.notes !== undefined) updates.notes = req.body.notes;
@@ -1516,9 +1526,10 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
         return res.status(403).json({ message: "Only Admin or Owner can delete advances" });
       }
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       const [advance] = await db.select().from(factoryWorkerAdvances)
         .where(and(eq(factoryWorkerAdvances.id, id), eq(factoryWorkerAdvances.companyId, companyId)));
@@ -1588,7 +1599,8 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       }
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       const [advance] = await db.select().from(factoryWorkerAdvances)
         .where(and(eq(factoryWorkerAdvances.id, id), eq(factoryWorkerAdvances.companyId, companyId)));
@@ -1634,7 +1646,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
 
   app.get("/api/factory/advances/unvouchered", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const allAdvances = await db.select({
@@ -1681,7 +1693,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
         return res.status(403).json({ message: "Only Admin or Owner can post accounting" });
       }
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
@@ -1812,9 +1824,10 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   // GET /api/factory/workers/:id/advance-balance - Get total outstanding advance balance
   app.get("/api/factory/workers/:id/advance-balance", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const workerId = parseInt(req.params.id);
+      const workerId = parseId(req.params.id);
+      if (workerId === null) return res.status(400).json({ message: "Invalid id" });
 
       const outstanding = await db.select().from(factoryWorkerAdvances)
         .where(and(
@@ -1965,9 +1978,10 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   // GET /api/factory/cash-account-balance/:id — current DR-CR balance for a ledger account
   app.get("/api/factory/cash-account-balance/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const accountId = parseInt(req.params.id);
+      const accountId = parseId(req.params.id);
+      if (accountId === null) return res.status(400).json({ message: "Invalid id" });
 
       const [acct] = await db.select({
         id: ledgerAccounts.id, name: ledgerAccounts.name,
@@ -2103,7 +2117,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   // GET /api/factory/advances/repayment-audit — find salary deduction advances missing cash vouchers
   app.get("/api/factory/advances/repayment-audit", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // 1. All salary_deduction advances
@@ -2355,9 +2369,10 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
 
   app.get("/api/factory/advances/:id/repayments", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const advanceId = parseInt(req.params.id);
+      const advanceId = parseId(req.params.id);
+      if (advanceId === null) return res.status(400).json({ message: "Invalid id" });
 
       const [advance] = await db.select().from(factoryWorkerAdvances)
         .where(and(eq(factoryWorkerAdvances.id, advanceId), eq(factoryWorkerAdvances.companyId, companyId)));
@@ -2378,7 +2393,8 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const advanceId = parseInt(req.params.id);
+      const advanceId = parseId(req.params.id);
+      if (advanceId === null) return res.status(400).json({ message: "Invalid id" });
 
       const [advance] = await db.select().from(factoryWorkerAdvances)
         .where(and(eq(factoryWorkerAdvances.id, advanceId), eq(factoryWorkerAdvances.companyId, companyId)));
@@ -2508,7 +2524,8 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const workerId = parseInt(req.params.id);
+      const workerId = parseId(req.params.id);
+      if (workerId === null) return res.status(400).json({ message: "Invalid id" });
 
       const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
       const repaymentDate = req.body.repaymentDate || getClientDate(req);
@@ -2649,9 +2666,10 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
         return res.status(403).json({ message: "Only Admin or Owner can delete repayments" });
       }
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const repaymentId = parseInt(req.params.id);
+      const repaymentId = parseId(req.params.id);
+      if (repaymentId === null) return res.status(400).json({ message: "Invalid id" });
 
       const [repayment] = await db.select().from(factoryAdvanceRepayments)
         .where(and(eq(factoryAdvanceRepayments.id, repaymentId), eq(factoryAdvanceRepayments.companyId, companyId)));
@@ -2842,7 +2860,8 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
 
   app.get("/api/factory/workers/:id/statement", requireAuth, async (req: any, res: any) => {
     try {
-      const workerId = parseInt(req.params.id);
+      const workerId = parseId(req.params.id);
+      if (workerId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(workerId)) return res.status(400).json({ message: "Invalid worker ID" });
 
       const companyId = getFactoryCompanyId(req);
@@ -2930,7 +2949,8 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   // ── Factory Worker Statement PDF ──────────────────────────────────────────
   app.get("/api/factory/workers/:id/statement-pdf", requireAuth, async (req: any, res: any) => {
     try {
-      const workerId = parseInt(req.params.id);
+      const workerId = parseId(req.params.id);
+      if (workerId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(workerId)) return res.status(400).json({ message: "Invalid worker ID" });
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -3125,7 +3145,8 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(id)) return res.status(400).json({ message: "Invalid worker ID" });
 
       // Check if the worker has any bale entries

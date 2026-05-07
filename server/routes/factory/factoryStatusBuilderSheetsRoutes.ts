@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../../lib/parseId";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -78,7 +79,8 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
   app.put("/api/factory/status-builder/sheets/:id", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId!;
-      const id = parseInt(req.params.id, 10);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
 
       const { name, columns, rows } = req.body;
@@ -107,7 +109,8 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
   app.delete("/api/factory/status-builder/sheets/:id", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId!;
-      const id = parseInt(req.params.id, 10);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
 
       const [deleted] = await db

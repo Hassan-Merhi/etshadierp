@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../../lib/parseId";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -215,10 +216,12 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const invoiceId = parseInt(req.params.invoiceId);
+      const invoiceId = parseId(req.params.invoiceId);
+
+      if (invoiceId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(invoiceId)) return res.status(400).json({ message: "Invalid invoice ID" });
 
-      const activeSessionId = req.query.sessionId ? parseInt(req.query.sessionId as string) : undefined;
+      const activeSessionId = req.query.sessionId ? parseOptionalId(req.query.sessionId) : undefined;
 
       const summary = await buildLoadingSummary(invoiceId, companyId, activeSessionId);
       if (!summary) return res.status(404).json({ message: "Invoice not found" });
@@ -236,7 +239,9 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const invoiceId = parseInt(req.params.invoiceId);
+      const invoiceId = parseId(req.params.invoiceId);
+
+      if (invoiceId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(invoiceId)) return res.status(400).json({ message: "Invalid invoice ID" });
 
       // Validate invoice
@@ -325,7 +330,9 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const sessionId = parseInt(req.params.sessionId);
+      const sessionId = parseId(req.params.sessionId);
+
+      if (sessionId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(sessionId)) return res.status(400).json({ message: "Invalid session ID" });
 
       const { barcode } = req.body;
@@ -463,8 +470,11 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const sessionId = parseInt(req.params.sessionId);
-      const baleId = parseInt(req.params.baleId);
+      const sessionId = parseId(req.params.sessionId);
+
+      if (sessionId === null) return res.status(400).json({ message: "Invalid id" });
+      const baleId = parseId(req.params.baleId);
+      if (baleId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(sessionId) || isNaN(baleId)) return res.status(400).json({ message: "Invalid ID" });
 
       const [session] = await db
@@ -503,7 +513,9 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const sessionId = parseInt(req.params.sessionId);
+      const sessionId = parseId(req.params.sessionId);
+
+      if (sessionId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(sessionId)) return res.status(400).json({ message: "Invalid session ID" });
 
       const [session] = await db
@@ -547,7 +559,9 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const sessionId = parseInt(req.params.sessionId);
+      const sessionId = parseId(req.params.sessionId);
+
+      if (sessionId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(sessionId)) return res.status(400).json({ message: "Invalid session ID" });
 
       const [session] = await db
@@ -627,7 +641,9 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const invoiceId = parseInt(req.params.invoiceId);
+      const invoiceId = parseId(req.params.invoiceId);
+
+      if (invoiceId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(invoiceId)) return res.status(400).json({ message: "Invalid invoice ID" });
 
       const summary = await buildLoadingSummary(invoiceId, companyId);
@@ -803,11 +819,11 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
         tr.height = 16;
       }
 
-      const buf = await wb.xlsx.writeBuffer();
       const filename = buildExportFilename([inv.containerNumber, inv.customerName, inv.destination], "xlsx");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.send(buf);
+      await wb.xlsx.write(res);
+      res.end();
     } catch (error: any) {
       console.error("loading report excel error:", error);
       res.status(500).json({ message: error.message });
@@ -820,7 +836,9 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const invoiceId = parseInt(req.params.invoiceId);
+      const invoiceId = parseId(req.params.invoiceId);
+
+      if (invoiceId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(invoiceId)) return res.status(400).json({ message: "Invalid invoice ID" });
 
       const summary = await buildLoadingSummary(invoiceId, companyId);
@@ -933,7 +951,9 @@ ${remainingBales.length === 0
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const sessionId = parseInt(req.params.sessionId);
+      const sessionId = parseId(req.params.sessionId);
+
+      if (sessionId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(sessionId)) return res.status(400).json({ message: "Invalid session ID" });
 
       const [session] = await db
@@ -1060,11 +1080,11 @@ ${remainingBales.length === 0
         tr.height = 16;
       }
 
-      const buf = await wb.xlsx.writeBuffer();
       const filename = buildExportFilename([invoice?.containerNumber, invoice?.customerName, invoice?.destination], "xlsx");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.send(buf);
+      await wb.xlsx.write(res);
+      res.end();
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1076,7 +1096,9 @@ ${remainingBales.length === 0
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const sessionId = parseInt(req.params.sessionId);
+      const sessionId = parseId(req.params.sessionId);
+
+      if (sessionId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(sessionId)) return res.status(400).json({ message: "Invalid session ID" });
 
       const [session] = await db

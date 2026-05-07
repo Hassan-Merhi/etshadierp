@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
@@ -318,7 +319,9 @@ export function registerFactoryContainersRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const updateData = { ...req.body, updatedAt: new Date() };
 
       if (updateData.currencyCode || updateData.ratePerKg || updateData.fxRateSource) {
@@ -504,7 +507,9 @@ export function registerFactoryContainersRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       // Soft-delete: hide from listings; child rows preserved for restore.
       // Permanent deletion happens from Settings → Deleted Items (admin route).
@@ -692,7 +697,8 @@ export function registerFactoryContainersRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const containerId = parseInt(req.params.id);
+      const containerId = parseId(req.params.id);
+      if (containerId === null) return res.status(400).json({ message: "Invalid id" });
       const charges = await db
         .select()
         .from(factoryContainerOtherCharges)
@@ -711,7 +717,8 @@ export function registerFactoryContainersRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const containerId = parseInt(req.params.id);
+      const containerId = parseId(req.params.id);
+      if (containerId === null) return res.status(400).json({ message: "Invalid id" });
       const { charges, isCreate } = req.body as { charges: { description: string; amount: string; currencyCode?: string; ledgerAccountId?: number | null }[]; isCreate?: boolean };
 
       // Void any previously created other-charge vouchers for this container (to avoid duplicates on edit)

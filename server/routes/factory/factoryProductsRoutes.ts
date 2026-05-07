@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
@@ -90,7 +91,9 @@ export function registerFactoryProductsRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [updated] = await db
         .update(factoryCategories)
         .set({ ...req.body, updatedAt: new Date() })
@@ -110,7 +113,9 @@ export function registerFactoryProductsRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [updated] = await db
         .update(factoryCategories)
         .set({ isActive: false, deletedAt: new Date(), updatedAt: new Date() })
@@ -237,7 +242,9 @@ export function registerFactoryProductsRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(id)) return res.status(404).json({ message: "Product not found" });
       const [product] = await db
         .select()
@@ -256,7 +263,8 @@ export function registerFactoryProductsRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const productId = parseInt(req.params.productId);
+      const productId = parseId(req.params.productId);
+      if (productId === null) return res.status(400).json({ message: "Invalid id" });
       if (!productId) return res.status(400).json({ message: "Invalid product ID" });
 
       const [product] = await db.select().from(factoryBaleProducts)
@@ -611,7 +619,9 @@ export function registerFactoryProductsRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [updated] = await db
         .update(factoryBaleProducts)
         .set({ ...req.body, updatedAt: new Date() })
@@ -631,7 +641,9 @@ export function registerFactoryProductsRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { name, weightPerBaleKg, articleCode, description, categoryId, productionPrice, sellingPrice, labelDesignColor } = req.body;
 
       const [existing] = await db
@@ -722,9 +734,12 @@ export function registerFactoryProductsRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const productId = parseInt(req.params.productId);
-      const locationId = parseInt(req.params.locationId);
-      const year = parseInt(req.query.year as string) || new Date().getFullYear();
+      const productId = parseId(req.params.productId);
+
+      if (productId === null) return res.status(400).json({ message: "Invalid id" });
+      const locationId = parseId(req.params.locationId);
+      if (locationId === null) return res.status(400).json({ message: "Invalid id" });
+      const year = parseOptionalId(req.query.year) || new Date().getFullYear();
 
       const [product] = await db
         .select({
@@ -854,10 +869,15 @@ export function registerFactoryProductsRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const productId = parseInt(req.params.productId);
-      const locationId = parseInt(req.params.locationId);
-      const year = parseInt(req.params.year);
-      const month = parseInt(req.params.month);
+      const productId = parseId(req.params.productId);
+
+      if (productId === null) return res.status(400).json({ message: "Invalid id" });
+      const locationId = parseId(req.params.locationId);
+      if (locationId === null) return res.status(400).json({ message: "Invalid id" });
+      const year = parseId(req.params.year);
+      if (year === null) return res.status(400).json({ message: "Invalid id" });
+      const month = parseId(req.params.month);
+      if (month === null) return res.status(400).json({ message: "Invalid id" });
 
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 1);
@@ -901,9 +921,12 @@ export function registerFactoryProductsRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const productId = parseInt(req.params.productId);
-      const locationId = parseInt(req.params.locationId);
-      const year = req.query.year ? parseInt(req.query.year as string) : null;
+      const productId = parseId(req.params.productId);
+
+      if (productId === null) return res.status(400).json({ message: "Invalid id" });
+      const locationId = parseId(req.params.locationId);
+      if (locationId === null) return res.status(400).json({ message: "Invalid id" });
+      const year = req.query.year ? parseOptionalId(req.query.year) : null;
 
       const conditions = [
         eq(factoryBales.companyId, companyId),
@@ -951,7 +974,9 @@ export function registerFactoryProductsRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [updated] = await db
         .update(factoryBaleProducts)
         .set({ active: false, deletedAt: new Date(), updatedAt: new Date() })
@@ -1396,7 +1421,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
           if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
-          const locationId = req.body.locationId ? parseInt(req.body.locationId) : null;
+          const locationId = req.body.locationId ? parseId(req.body.locationId) ?? -1 : null;
 
           const XLSX = await import("xlsx");
           const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true });
@@ -1617,7 +1642,8 @@ export function registerFactoryProductsRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [img] = await db.select().from(factoryBaleProductImages)
         .where(and(eq(factoryBaleProductImages.id, id), eq(factoryBaleProductImages.companyId, companyId)));
       if (!img) return res.status(404).json({ message: "Image not found" });

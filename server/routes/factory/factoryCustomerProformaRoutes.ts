@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
 import { getExportPriceVisibility } from "../../helpers/exportVisibility";
 import { syncProformaReservations, isFactoryV2Company, computeFreeToPromise } from "./_stockReservationHelper";
@@ -60,7 +61,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [proforma] = await db.select().from(customerProformas)
         .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
       if (!proforma) return res.status(404).json({ message: "Proforma not found" });
@@ -86,7 +88,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const customerId = req.query.customerId ? parseInt(req.query.customerId) : null;
+      const customerId = req.query.customerId ? parseOptionalId(req.query.customerId) : null;
       if (!customerId) return res.status(400).json({ message: "customerId is required" });
 
       const proformas = await db
@@ -171,7 +173,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [existing] = await db.select().from(customerProformas)
         .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Proforma not found" });
@@ -208,7 +212,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       // Fetch proforma before deleting so we can log which customer it belongs to
       const [proformaBefore] = await db.select().from(customerProformas)
@@ -252,7 +258,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const proformaId = parseInt(req.params.id);
+      const proformaId = parseId(req.params.id);
+
+      if (proformaId === null) return res.status(400).json({ message: "Invalid id" });
       const { locationId, orderDate } = req.body;
       if (!locationId) return res.status(400).json({ message: "locationId is required" });
 
@@ -446,7 +454,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       // Fetch the line first to get its proformaId
       const [existingLine] = await db.select().from(customerProformaLines)
@@ -489,7 +498,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       // Fetch the line first to get its proformaId before deletion
       const [lineToDelete] = await db.select().from(customerProformaLines)
@@ -555,7 +565,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [proforma] = await db.select().from(customerProformas)
         .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
       if (!proforma) return res.status(404).json({ message: "Proforma not found" });
@@ -597,7 +609,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       const lines = await db.select().from(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
       if (!lines.length) return res.json({ updated: 0, skipped: 0 });
@@ -639,7 +653,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { targetCustomerId } = req.body;
       if (!targetCustomerId) return res.status(400).json({ message: "targetCustomerId is required" });
 
@@ -693,7 +709,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const lineId = parseInt(req.params.lineId);
+      const lineId = parseId(req.params.lineId);
+      if (lineId === null) return res.status(400).json({ message: "Invalid id" });
       const [line] = await db.select().from(customerProformaLines).where(eq(customerProformaLines.id, lineId)).limit(1);
       if (!line) return res.status(404).json({ message: "Line not found" });
       const [updated] = await db.update(customerProformaLines)
@@ -1020,7 +1037,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [proforma] = await db.select().from(customerProformas)
         .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
       if (!proforma) return res.status(404).json({ message: "Proforma not found" });
@@ -1166,7 +1185,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const [proforma] = await db.select().from(customerProformas)
         .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
       if (!proforma) return res.status(404).json({ message: "Proforma not found" });

@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../lib/parseId";
 import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../db";
@@ -135,7 +136,8 @@ export function registerContainerRoutes(app: Express) {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid container ID" });
       }
@@ -212,7 +214,8 @@ export function registerContainerRoutes(app: Express) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(id)) return res.status(400).json({ message: "Invalid container ID" });
       const { containerNumber } = req.body;
       if (!containerNumber || !String(containerNumber).trim()) {
@@ -423,7 +426,8 @@ export function registerContainerRoutes(app: Express) {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid container ID" });
       }
@@ -488,7 +492,9 @@ export function registerContainerRoutes(app: Express) {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
-      const containerId = parseInt(req.params.id);
+      const containerId = parseId(req.params.id);
+
+      if (containerId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(containerId)) {
         return res.status(400).json({ message: "Invalid container ID" });
       }
@@ -581,7 +587,9 @@ export function registerContainerRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const containerId = parseInt(req.params.id);
+      const containerId = parseId(req.params.id);
+
+      if (containerId === null) return res.status(400).json({ message: "Invalid id" });
       const container = await storage.getContainerById(containerId);
       
       if (!container) {
@@ -905,7 +913,8 @@ export function registerContainerRoutes(app: Express) {
     requireNonPOS,
     async (req, res) => {
       try {
-        const containerId = parseInt(req.params.id);
+        const containerId = parseId(req.params.id);
+        if (containerId === null) return res.status(400).json({ message: "Invalid id" });
         const container = await storage.getContainerById(containerId);
 
         if (!container) {
@@ -943,7 +952,8 @@ export function registerContainerRoutes(app: Express) {
     requireNonPOS,
     async (req, res) => {
       try {
-        const containerId = parseInt(req.params.id);
+        const containerId = parseId(req.params.id);
+        if (containerId === null) return res.status(400).json({ message: "Invalid id" });
 
         // Validate request body
         const validation = offloadRequestSchema.safeParse(req.body);
@@ -1108,7 +1118,8 @@ export function registerContainerRoutes(app: Express) {
     requireRole("Admin", "Owner", "Manager"),
     async (req, res) => {
       try {
-        const containerId = parseInt(req.params.id);
+        const containerId = parseId(req.params.id);
+        if (containerId === null) return res.status(400).json({ message: "Invalid id" });
         if (isNaN(containerId)) {
           return res.status(400).json({ message: "Invalid container ID" });
         }
@@ -1285,7 +1296,8 @@ export function registerContainerRoutes(app: Express) {
     requireRole("Admin"),
     async (req, res) => {
       try {
-        const containerId = parseInt(req.params.id);
+        const containerId = parseId(req.params.id);
+        if (containerId === null) return res.status(400).json({ message: "Invalid id" });
         if (isNaN(containerId)) {
           return res.status(400).json({ message: "Invalid container ID" });
         }
@@ -1447,7 +1459,8 @@ export function registerContainerRoutes(app: Express) {
   // Get a single purchase order by ID (Admin/Owner only)
   app.get("/api/purchase-orders/:id", requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid purchase order ID" });
       }
@@ -1562,7 +1575,8 @@ export function registerContainerRoutes(app: Express) {
   // Update a purchase order with line items
   app.patch("/api/purchase-orders/:id", requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid purchase order ID" });
       }
@@ -2042,7 +2056,8 @@ export function registerContainerRoutes(app: Express) {
     requireRole("Admin"),
     async (req, res) => {
       try {
-        const id = parseInt(req.params.id);
+        const id = parseId(req.params.id);
+        if (id === null) return res.status(400).json({ message: "Invalid id" });
         if (isNaN(id)) {
           return res.status(400).json({ message: "Invalid purchase order ID" });
         }
@@ -2077,7 +2092,8 @@ export function registerContainerRoutes(app: Express) {
     requireRole("Admin"),
     async (req, res) => {
       try {
-        const id = parseInt(req.params.id);
+        const id = parseId(req.params.id);
+        if (id === null) return res.status(400).json({ message: "Invalid id" });
         if (isNaN(id)) {
           return res.status(400).json({ message: "Invalid container ID" });
         }
@@ -2409,7 +2425,9 @@ export function registerContainerRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const containerId = parseInt(req.params.id);
+      const containerId = parseId(req.params.id);
+
+      if (containerId === null) return res.status(400).json({ message: "Invalid id" });
       const rows: { barcode: string; price: string }[] = req.body.rows || [];
       if (!Array.isArray(rows) || rows.length === 0) {
         return res.status(400).json({ message: "No rows provided" });
@@ -2480,7 +2498,9 @@ export function registerContainerRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const containerId = parseInt(req.params.id);
+      const containerId = parseId(req.params.id);
+
+      if (containerId === null) return res.status(400).json({ message: "Invalid id" });
       const rows: { lineItemIds: number[]; newRate: number }[] = req.body.rows || [];
       if (!Array.isArray(rows) || rows.length === 0) {
         return res.status(400).json({ message: "No rows provided" });

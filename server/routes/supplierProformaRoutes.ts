@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../lib/parseId";
 import { Express } from "express";
 import { db } from "../db";
 import { eq, and, inArray } from "drizzle-orm";
@@ -38,7 +39,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const supplierId = parseInt(req.params.supplierId);
+      const supplierId = parseId(req.params.supplierId);
+      if (supplierId === null) return res.status(400).json({ message: "Invalid id" });
       const proformas = await db
         .select()
         .from(supplierProformas)
@@ -53,7 +55,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const proformaId = parseInt(req.params.proformaId);
+      const proformaId = parseId(req.params.proformaId);
+      if (proformaId === null) return res.status(400).json({ message: "Invalid id" });
       const [proforma] = await db
         .select()
         .from(supplierProformas)
@@ -73,7 +76,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const supplierId = parseInt(req.params.supplierId);
+      const supplierId = parseId(req.params.supplierId);
+      if (supplierId === null) return res.status(400).json({ message: "Invalid id" });
       const { reference, notes, lines } = req.body;
       const [proforma] = await db.insert(supplierProformas).values({
         companyId, supplierId, reference: reference || "Untitled", notes: notes || null,
@@ -100,7 +104,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const proformaId = parseInt(req.params.proformaId);
+      const proformaId = parseId(req.params.proformaId);
+      if (proformaId === null) return res.status(400).json({ message: "Invalid id" });
       const { reference, notes } = req.body;
       const updates: any = { updatedAt: new Date() };
       if (reference !== undefined) updates.reference = reference;
@@ -119,7 +124,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const proformaId = parseInt(req.params.proformaId);
+      const proformaId = parseId(req.params.proformaId);
+      if (proformaId === null) return res.status(400).json({ message: "Invalid id" });
       await db.delete(supplierProformaLines).where(eq(supplierProformaLines.proformaId, proformaId));
       await db.delete(supplierProformas)
         .where(and(eq(supplierProformas.id, proformaId), eq(supplierProformas.companyId, companyId)));
@@ -133,7 +139,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const proformaId = parseInt(req.params.proformaId);
+      const proformaId = parseId(req.params.proformaId);
+      if (proformaId === null) return res.status(400).json({ message: "Invalid id" });
       const [proforma] = await db.select().from(supplierProformas)
         .where(and(eq(supplierProformas.id, proformaId), eq(supplierProformas.companyId, companyId)));
       if (!proforma) return res.status(403).json({ message: "Access denied" });
@@ -153,7 +160,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const lineId = parseInt(req.params.lineId);
+      const lineId = parseId(req.params.lineId);
+      if (lineId === null) return res.status(400).json({ message: "Invalid id" });
       const [line] = await db.select().from(supplierProformaLines).where(eq(supplierProformaLines.id, lineId));
       if (!line) return res.status(404).json({ message: "Line not found" });
       const [proforma] = await db.select().from(supplierProformas)
@@ -178,7 +186,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const lineId = parseInt(req.params.lineId);
+      const lineId = parseId(req.params.lineId);
+      if (lineId === null) return res.status(400).json({ message: "Invalid id" });
       const [line] = await db.select().from(supplierProformaLines).where(eq(supplierProformaLines.id, lineId));
       if (!line) return res.status(404).json({ message: "Line not found" });
       const [proforma] = await db.select().from(supplierProformas)
@@ -196,7 +205,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const proformaId = parseInt(req.params.proformaId);
+      const proformaId = parseId(req.params.proformaId);
+      if (proformaId === null) return res.status(400).json({ message: "Invalid id" });
       const [proforma] = await db.select().from(supplierProformas)
         .where(and(eq(supplierProformas.id, proformaId), eq(supplierProformas.companyId, companyId)));
       if (!proforma) return res.status(403).json({ message: "Access denied" });
@@ -230,7 +240,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const containerId = parseInt(req.params.containerId);
+      const containerId = parseId(req.params.containerId);
+      if (containerId === null) return res.status(400).json({ message: "Invalid id" });
       if (!await verifyContainerOwnership(containerId, companyId)) return res.status(403).json({ message: "Access denied" });
       const items = await db.select().from(supplierContainerLoadedItems)
         .where(eq(supplierContainerLoadedItems.containerId, containerId));
@@ -244,7 +255,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const containerId = parseInt(req.params.containerId);
+      const containerId = parseId(req.params.containerId);
+      if (containerId === null) return res.status(400).json({ message: "Invalid id" });
       if (!await verifyContainerOwnership(containerId, companyId)) return res.status(403).json({ message: "Access denied" });
       const { barcode, itemName, qty, weightPerBale, pricePerBale } = req.body;
       const [item] = await db.insert(supplierContainerLoadedItems).values({
@@ -261,7 +273,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const itemId = parseInt(req.params.itemId);
+      const itemId = parseId(req.params.itemId);
+      if (itemId === null) return res.status(400).json({ message: "Invalid id" });
       const [item] = await db.select().from(supplierContainerLoadedItems).where(eq(supplierContainerLoadedItems.id, itemId));
       if (!item) return res.status(404).json({ message: "Item not found" });
       if (!await verifyContainerOwnership(item.containerId, companyId)) return res.status(403).json({ message: "Access denied" });
@@ -283,7 +296,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const itemId = parseInt(req.params.itemId);
+      const itemId = parseId(req.params.itemId);
+      if (itemId === null) return res.status(400).json({ message: "Invalid id" });
       const [item] = await db.select().from(supplierContainerLoadedItems).where(eq(supplierContainerLoadedItems.id, itemId));
       if (!item) return res.status(404).json({ message: "Item not found" });
       if (!await verifyContainerOwnership(item.containerId, companyId)) return res.status(403).json({ message: "Access denied" });
@@ -298,7 +312,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const containerId = parseInt(req.params.containerId);
+      const containerId = parseId(req.params.containerId);
+      if (containerId === null) return res.status(400).json({ message: "Invalid id" });
       if (!await verifyContainerOwnership(containerId, companyId)) return res.status(403).json({ message: "Access denied" });
       const { items } = req.body;
       if (!items || !Array.isArray(items) || items.length === 0) {
@@ -325,7 +340,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const containerId = parseInt(req.params.containerId);
+      const containerId = parseId(req.params.containerId);
+      if (containerId === null) return res.status(400).json({ message: "Invalid id" });
       if (!await verifyContainerOwnership(containerId, companyId)) return res.status(403).json({ message: "Access denied" });
 
       const existingItems = await db.select().from(supplierContainerLoadedItems)
@@ -387,9 +403,11 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const supplierId = parseInt(req.params.supplierId);
-      const containerId = parseInt(req.params.containerId);
-      const proformaId = parseInt(req.query.proformaId as string);
+      const supplierId = parseId(req.params.supplierId);
+      if (supplierId === null) return res.status(400).json({ message: "Invalid id" });
+      const containerId = parseId(req.params.containerId);
+      if (containerId === null) return res.status(400).json({ message: "Invalid id" });
+      const proformaId = parseOptionalId(req.query.proformaId);
       if (!proformaId) return res.status(400).json({ message: "proformaId query param required" });
 
       const [proforma] = await db.select().from(supplierProformas)
@@ -510,9 +528,11 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const supplierId = parseInt(req.params.supplierId);
-      const containerId = parseInt(req.params.containerId);
-      const proformaId = parseInt(req.query.proformaId as string);
+      const supplierId = parseId(req.params.supplierId);
+      if (supplierId === null) return res.status(400).json({ message: "Invalid id" });
+      const containerId = parseId(req.params.containerId);
+      if (containerId === null) return res.status(400).json({ message: "Invalid id" });
+      const proformaId = parseOptionalId(req.query.proformaId);
       if (!proformaId) return res.status(400).json({ message: "proformaId required" });
 
       if (!await verifyContainerOwnership(containerId, companyId)) return res.status(403).json({ message: "Access denied" });
@@ -817,9 +837,11 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const supplierId = parseInt(req.params.supplierId);
-      const containerId = parseInt(req.params.containerId);
-      const proformaId = parseInt(req.query.proformaId as string);
+      const supplierId = parseId(req.params.supplierId);
+      if (supplierId === null) return res.status(400).json({ message: "Invalid id" });
+      const containerId = parseId(req.params.containerId);
+      if (containerId === null) return res.status(400).json({ message: "Invalid id" });
+      const proformaId = parseOptionalId(req.query.proformaId);
       if (!proformaId) return res.status(400).json({ message: "proformaId required" });
 
       if (!await verifyContainerOwnership(containerId, companyId)) return res.status(403).json({ message: "Access denied" });

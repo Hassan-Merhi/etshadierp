@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
@@ -383,7 +384,9 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       const [batch] = await db
         .select()
@@ -1498,7 +1501,9 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(id)) return res.status(400).json({ message: "Invalid bale ID" });
 
       const { status } = req.body;
@@ -1525,7 +1530,9 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(id)) return res.status(400).json({ message: "Invalid bale ID" });
 
       const [updated] = await db
@@ -1546,7 +1553,9 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { name } = req.body;
       if (!name || typeof name !== "string" || !name.trim()) {
         return res.status(400).json({ message: "Name is required" });
@@ -1582,7 +1591,8 @@ export function registerFactoryBalesRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { workerId } = req.body;
       if (!workerId) return res.status(400).json({ message: "workerId is required" });
       const [bale] = await db.select().from(factoryBales).where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
@@ -1620,7 +1630,9 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
+      const id = parseId(req.params.id);
+
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       const result = await db.transaction(async (tx: any) => {
         const [originalBale] = await tx
@@ -1957,7 +1969,7 @@ export function registerFactoryBalesRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const barcode = req.params.barcode;
-      const batchId = req.query.batchId ? parseInt(req.query.batchId as string) : null;
+      const batchId = req.query.batchId ? parseOptionalId(req.query.batchId) : null;
       const excludeIdsStr = req.query.excludeIds as string;
       const excludeIds = excludeIdsStr ? excludeIdsStr.split(",").map(Number).filter(n => !isNaN(n)) : [];
 
@@ -2449,7 +2461,9 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const batchId = parseInt(req.params.id);
+      const batchId = parseId(req.params.id);
+
+      if (batchId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(batchId)) return res.status(400).json({ message: "Invalid batch id" });
 
       const bales = await db.select()
@@ -2769,7 +2783,7 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const [deleted] = await db.delete(factoryFxRates)
-        .where(and(eq(factoryFxRates.id, parseInt(req.params.id)), eq(factoryFxRates.companyId, companyId)))
+        .where(and(eq(factoryFxRates.id, parseId(req.params.id) ?? -1), eq(factoryFxRates.companyId, companyId)))
         .returning();
       if (!deleted) return res.status(404).json({ message: "Rate not found" });
       res.json(deleted);

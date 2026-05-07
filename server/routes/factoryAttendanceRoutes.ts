@@ -1,3 +1,4 @@
+import { parseId, parseOptionalId } from "../lib/parseId";
 import type { Express } from "express";
 import { eq, and, inArray, gte, lte } from "drizzle-orm";
 import PDFDocument from "pdfkit";
@@ -120,7 +121,9 @@ export function registerFactoryAttendanceRoutes(
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company" });
 
-      const workerId = parseInt(req.params.workerId);
+      const workerId = parseId(req.params.workerId);
+
+      if (workerId === null) return res.status(400).json({ message: "Invalid id" });
       if (!workerId || isNaN(workerId)) return res.status(400).json({ message: "Invalid workerId" });
 
       const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
