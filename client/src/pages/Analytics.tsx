@@ -286,8 +286,10 @@ interface NetProfitStatementData {
   };
 }
 
-function formatSmartNumber(num: number | string): string {
+function formatSmartNumber(num: number | string | null | undefined): string {
+  if (num === null || num === undefined) return "";
   const value = typeof num === 'string' ? parseFloat(num) : num;
+  if (isNaN(value)) return "";
   const isWholeNumber = value % 1 === 0;
   if (isWholeNumber) {
     return value.toLocaleString('en-US', { maximumFractionDigits: 0 });

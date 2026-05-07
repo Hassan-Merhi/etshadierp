@@ -15,13 +15,13 @@ interface CurrencyContextType {
   displayCurrency: string | null;
   isMultiCurrency: boolean;
   /** Converts USD → display currency and formats with symbol */
-  formatAmount: (amount: number | string, currency?: Currency) => string;
+  formatAmount: (amount: number | string | null | undefined, currency?: Currency) => string;
   /** Formats amount as-is in the selected currency WITHOUT conversion.
    *  Use this for values already stored in the display currency (e.g. customer balances in CFA). */
-  formatAmountRaw: (amount: number | string) => string;
+  formatAmountRaw: (amount: number | string | null | undefined) => string;
   /** For amounts stored in CFA: shows CFA as-is, divides by rate to show USD.
    *  e.g. CFA 5,600,000 ÷ 551 = $10,162 when in USD mode. */
-  formatCashAmount: (amount: number | string) => string;
+  formatCashAmount: (amount: number | string | null | undefined) => string;
   convertToDisplay: (usdAmount: number) => number;
   convertToUSD: (displayAmount: number) => number;
 }
@@ -127,7 +127,8 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
   // Shows the raw number as-is with the correct currency symbol — no USD→CFA conversion.
   // Use for amounts already stored in the display currency (e.g. customer balances).
-  const formatAmountRaw = (amount: number | string): string => {
+  const formatAmountRaw = (amount: number | string | null | undefined): string => {
+    if (amount === null || amount === undefined) return "";
     const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
     if (isNaN(numAmount)) return "";
     if (selectedCurrency === "CFA") {
@@ -140,7 +141,8 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   // For cash/balance amounts. Behaviour depends on the company's base currency:
   //   baseCurrency=USD → amounts are in USD. USD mode: show as-is. CFA mode: multiply by rate.
   //   baseCurrency=CFA → amounts are in CFA. USD mode: divide by rate. CFA mode: show as-is.
-  const formatCashAmount = (amount: number | string): string => {
+  const formatCashAmount = (amount: number | string | null | undefined): string => {
+    if (amount === null || amount === undefined) return "";
     const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
     if (isNaN(numAmount)) return "";
 
@@ -164,7 +166,8 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     return `CFA ${Math.round(numAmount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   };
 
-  const formatAmount = (amount: number | string, currency?: Currency): string => {
+  const formatAmount = (amount: number | string | null | undefined, currency?: Currency): string => {
+    if (amount === null || amount === undefined) return "";
     const curr = currency || selectedCurrency;
     const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
     if (isNaN(numAmount)) return "";
