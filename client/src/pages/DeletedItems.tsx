@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -167,6 +168,8 @@ export default function DeletedItems() {
     item: DeletedItem | null;
   }>({ open: false, action: "restore", item: null });
   const [detailItem, setDetailItem] = useState<DeletedItem | null>(null);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
 
   const { data, isLoading, error } = useQuery<DeletedItemsResponse>({
     queryKey: ["/api/deleted-items"],
@@ -236,6 +239,64 @@ export default function DeletedItems() {
       });
     },
   });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (itemsToDelete: { type: string; id: number }[]) => {
+      await Promise.all(
+        itemsToDelete.map(({ type, id }) =>
+          modeApiRequest("DELETE", `/api/deleted-items/${type}/${id}/permanent`)
+        )
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deleted-items"] });
+      setSelectedItems(new Set());
+      setShowBulkDeleteDialog(false);
+      toast({
+        title: "Permanently Deleted",
+        description: "All selected items have been permanently removed.",
+        variant: "destructive",
+      });
+    },
+    onError: (error: any) => {
+      if (error?._handledGlobally) return;
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete some items",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const itemKey = (item: DeletedItem) => `${item.type}-${item.id}`;
+
+  const toggleItem = (item: DeletedItem) => {
+    setSelectedItems((prev) => {
+      const next = new Set(prev);
+      const key = itemKey(item);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleAll = (currentItems: DeletedItem[]) => {
+    const allKeys = currentItems.map(itemKey);
+    const allSelected = allKeys.every((k) => selectedItems.has(k));
+    if (allSelected) {
+      setSelectedItems((prev) => {
+        const next = new Set(prev);
+        allKeys.forEach((k) => next.delete(k));
+        return next;
+      });
+    } else {
+      setSelectedItems((prev) => {
+        const next = new Set(prev);
+        allKeys.forEach((k) => next.add(k));
+        return next;
+      });
+    }
+  };
 
   const getAllItems = (): DeletedItem[] => {
     if (!data) return [];
@@ -352,6 +413,33 @@ export default function DeletedItems() {
           </div>
         </CardHeader>
         <CardContent>
+          {selectedItems.size > 0 && (
+            <div className="flex items-center justify-between gap-3 mb-4 px-3 py-2 rounded-md bg-destructive/10 border border-destructive/20">
+              <span className="text-sm font-medium text-destructive">
+                {selectedItems.size} item{selectedItems.size !== 1 ? "s" : ""} selected
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedItems(new Set())}
+                  data-testid="button-clear-selection"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Clear
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setShowBulkDeleteDialog(true)}
+                  data-testid="button-bulk-delete"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete All Selected
+                </Button>
+              </div>
+            </div>
+          )}
           {items.length === 0 ? (
             <div className="text-center py-12">
               <Trash2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -370,6 +458,13 @@ export default function DeletedItems() {
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={items.length > 0 && items.every((item) => selectedItems.has(itemKey(item)))}
+                      onCheckedChange={() => toggleAll(items)}
+                      data-testid="checkbox-select-all"
+                    />
+                  </TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Code</TableHead>
                   <TableHead>Name</TableHead>
@@ -387,6 +482,13 @@ export default function DeletedItems() {
                       className="cursor-pointer hover-elevate"
                       onClick={() => setDetailItem(item)}
                     >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedItems.has(itemKey(item))}
+                          onCheckedChange={() => toggleItem(item)}
+                          data-testid={`checkbox-item-${item.type}-${item.id}`}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <IconComponent className="h-4 w-4 text-muted-foreground" />
@@ -473,6 +575,13 @@ export default function DeletedItems() {
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="flex items-center gap-2">
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedItems.has(itemKey(item))}
+                            onCheckedChange={() => toggleItem(item)}
+                            data-testid={`checkbox-card-${item.type}-${item.id}`}
+                          />
+                        </div>
                         <IconComponent className="h-4 w-4 text-muted-foreground" />
                         <Badge variant="outline">
                           {typeLabels[item.type] || item.type}
@@ -515,6 +624,39 @@ export default function DeletedItems() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Permanently Delete {selectedItems.size} Item{selectedItems.size !== 1 ? "s" : ""}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove all {selectedItems.size} selected item{selectedItems.size !== 1 ? "s" : ""}.
+              This action cannot be undone and all associated data will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-bulk-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const toDelete = items
+                  .filter((item) => selectedItems.has(itemKey(item)))
+                  .map(({ type, id }) => ({ type, id }));
+                bulkDeleteMutation.mutate(toDelete);
+              }}
+              data-testid="button-confirm-bulk-delete"
+            >
+              {bulkDeleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Delete Forever
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={confirmDialog.open}
