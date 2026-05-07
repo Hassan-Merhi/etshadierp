@@ -87,7 +87,7 @@ export default function FactoryStockAllocationV2() {
 
     const truthMap = new Map(data.stockTruth.map(t => [t.articleCode, t]));
 
-    const articleRows = Array.from(allCodes).sort().map(code => {
+    const articleRows = Array.from(allCodes).map(code => {
       const truth = truthMap.get(code) || {
         articleCode: code, onHand: 0, inStock: 0, inLoading: 0,
         proformaReserved: 0, reservedNotYetLoaded: 0, freeToPromise: 0,
@@ -109,7 +109,7 @@ export default function FactoryStockAllocationV2() {
       // isActive comes from the backend tag; default true if not yet in stockTruth
       const isActive = truth.isActive ?? true;
       return { ...truth, isActive, displayName };
-    });
+    }).sort((a, b) => a.displayName.localeCompare(b.displayName));
 
     // Determine which rows have "substance" (bales or proforma allocations)
     const hasSubstance = (r: typeof articleRows[number]) =>

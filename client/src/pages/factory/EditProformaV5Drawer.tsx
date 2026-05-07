@@ -231,7 +231,7 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
       ? articleRows
       : articleRows.filter(r => r.stockAvailable > 0 || r.expectedToLoad > 0 || (quantities[r.articleCode] && parseInt(quantities[r.articleCode]) > 0));
     if (hideNonPositive) base = base.filter(r => r.freeToPromise > 0 || (quantities[r.articleCode] && parseInt(quantities[r.articleCode]) > 0));
-    return base;
+    return base.slice().sort((a, b) => a.productName.localeCompare(b.productName));
   })();
 
   const visibleTotalBalance = visibleRows.reduce((s, r) => s + r.freeToPromise, 0);

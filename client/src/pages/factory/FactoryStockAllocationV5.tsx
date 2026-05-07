@@ -324,7 +324,7 @@ export default function FactoryStockAllocationV5() {
     retry: 1,
   });
 
-  const rows   = query.data?.rows ?? [];
+  const rows   = (query.data?.rows ?? []).slice().sort((a, b) => a.productName.localeCompare(b.productName));
   const totals = query.data?.totals;
 
   // Auto-expand rows that contain the focused proforma, then scroll to first match
