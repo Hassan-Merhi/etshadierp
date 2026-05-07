@@ -190,7 +190,6 @@ const FactoryIntelSettings = lazy(() => import("@/pages/factory/FactorySettings"
 const ConflictCenter = lazy(() => import("@/pages/ConflictCenter"));
 const Chat = lazy(() => import("@/pages/Chat"));
 const SpreadsheetEditor = lazy(() => import("@/pages/SpreadsheetEditor"));
-const FactorySheets = lazy(() => import("@/pages/factory/FactorySheets"));
 const FactoryStatusBuilder = lazy(() => import("@/pages/factory/FactoryStatusBuilder"));
 const LiveSheets = lazy(() => import("@/pages/LiveSheets"));
 const PropertiesDashboard = lazy(() => import("@/pages/properties/PropertiesDashboard"));
@@ -1038,7 +1037,6 @@ function AuthenticatedApp() {
                     <Route path="/factory/net-profit-analytics" component={FactoryNetProfitAnalytics} />
                     <Route path="/factory/net-position" component={FactoryNetPosition} />
                     <Route path="/factory/financial-snapshot" component={FactoryFinancialSnapshot} />
-                    <Route path="/factory/sheets" component={FactorySheets} />
                     <Route path="/factory/status-builder" component={FactoryStatusBuilder} />
                     <Route path="/factory/production-report" component={DailyProductionReport} />
                     <Route path="/factory/rental/warehouses" component={FactoryRentalWarehouses} />
