@@ -383,6 +383,16 @@ export default function FactoryPendingInvoiceVerify() {
   const isVerified = orderStatus === "VERIFIED";
   const isLoadingStatus = orderStatus === "LOADING";
 
+  const totalNotLoadedBales = (verification?.comparison ?? []).reduce((sum, item) => {
+    const remaining = item.expectedQty - item.loadedQty;
+    return sum + (remaining > 0 ? remaining : 0);
+  }, 0);
+  const avgWeightPerBale =
+    (verification?.totalLoadedBales ?? 0) > 0
+      ? (verification?.totalLoadedWeight ?? 0) / (verification?.totalLoadedBales ?? 1)
+      : 0;
+  const totalNotLoadedWeight = avgWeightPerBale * totalNotLoadedBales;
+
   if (isLoading) {
     return (
       <div className="flex flex-col h-full p-6">
@@ -432,7 +442,7 @@ export default function FactoryPendingInvoiceVerify() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Loaded Bales</CardTitle>
@@ -452,6 +462,28 @@ export default function FactoryPendingInvoiceVerify() {
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-weight">
               {(verification?.totalLoadedWeight ?? 0).toFixed(2)} kg
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Not Loaded</CardTitle>
+            <Package className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-600 dark:text-amber-400" data-testid="text-total-not-loaded-bales">
+              {totalNotLoadedBales} bales
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Not Loaded Weight</CardTitle>
+            <Truck className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-600 dark:text-amber-400" data-testid="text-total-not-loaded-weight">
+              {totalNotLoadedWeight.toFixed(2)} kg
             </div>
           </CardContent>
         </Card>
