@@ -55,6 +55,23 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
 
       const { productFilter, customerFilter, proformaFilter, containerFilter, statusFilter, fromDate, toDate, hideZero } = req.query;
 
+      // 0. Build set of excluded article codes — products whose category is Wiper or Garbage
+      const excludedCodesRaw = await db.execute(
+        sql`SELECT COALESCE(fbp.article_code, fbp.code) AS "articleCode"
+            FROM factory_bale_products fbp
+            LEFT JOIN factory_categories fc ON fc.id = fbp.category_id
+            WHERE fbp.company_id = ${companyId}
+              AND (
+                LOWER(fc.name) LIKE '%wiper%'
+                OR LOWER(fc.name) LIKE '%garbage%'
+              )`,
+      );
+      const excludedCodes = new Set<string>(
+        ((excludedCodesRaw as any).rows ?? (excludedCodesRaw as unknown as any[]))
+          .map((r: any) => r.articleCode)
+          .filter(Boolean),
+      );
+
       // 1. stockAvailable — IN_STOCK bales
       const inStockRaw = await db.execute(
         sql`SELECT article_code AS "articleCode", COUNT(*)::int AS count
@@ -63,7 +80,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
             GROUP BY article_code`,
       );
       const inStockMap = new Map<string, number>(
-        ((inStockRaw as any).rows ?? (inStockRaw as unknown as any[])).map((r: any) => [r.articleCode, Number(r.count)]),
+        ((inStockRaw as any).rows ?? (inStockRaw as unknown as any[]))
+          .filter((r: any) => !excludedCodes.has(r.articleCode))
+          .map((r: any) => [r.articleCode, Number(r.count)]),
       );
 
       // 2. totalLoaded — bales physically scanned into LOADING orders ONLY.
@@ -81,7 +100,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
             GROUP BY fb.article_code`,
       );
       const inLoadingMap = new Map<string, number>(
-        ((inLoadingRaw as any).rows ?? (inLoadingRaw as unknown as any[])).map((r: any) => [r.articleCode, Number(r.count)]),
+        ((inLoadingRaw as any).rows ?? (inLoadingRaw as unknown as any[]))
+          .filter((r: any) => !excludedCodes.has(r.articleCode))
+          .map((r: any) => [r.articleCode, Number(r.count)]),
       );
 
       // 3. Active proformas + lines (with optional date range filter on createdAt)
@@ -129,7 +150,8 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
           })
           .from(customerProformaLines)
           .where(inArray(customerProformaLines.proformaId, proformaIds))
-        ).map(l => ({ ...l, quantity: Number(l.quantity) }));
+        ).map(l => ({ ...l, quantity: Number(l.quantity) }))
+          .filter(l => !excludedCodes.has(l.articleCode));
       }
 
       // 4. Active orders per proforma (ACTIVE_ORDER_STATUSES, excludes CANCELLED)
@@ -261,6 +283,8 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       const allProductsMap = new Map<string, string>();
       const weightMap = new Map<string, number>();
       ((allProductsRaw as any).rows ?? (allProductsRaw as unknown as any[])).forEach((r: any) => {
+        // Skip products in excluded (wiper/garbage) categories
+        if (excludedCodes.has(r.code) || excludedCodes.has(r.articleCode)) return;
         if (r.name) {
           // Map both the code and the article_code so bales stored under either key get a name
           if (r.code)        allProductsMap.set(r.code, r.name);
@@ -394,13 +418,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       });
 
       // 11. Apply frontend filters
-      // Always exclude garbage and wiper products — they are not part of stock allocation
-      let filtered = rows.filter(r => {
-        const name = (r.productName || "").toLowerCase();
-        const code = (r.articleCode || "").toLowerCase();
-        return !name.includes("garbage") && !name.includes("wiper") &&
-               !code.includes("garbage") && !code.includes("wiper");
-      });
+      let filtered = rows;
       if (productFilter) {
         const q = String(productFilter).toLowerCase();
         filtered = filtered.filter(r => r.articleCode.toLowerCase().includes(q) || r.productName.toLowerCase().includes(q));
