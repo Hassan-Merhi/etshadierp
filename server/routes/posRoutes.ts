@@ -433,12 +433,12 @@ export function registerPosRoutes(app: Express) {
         return res.status(400).json({ message: "Location is required" });
       }
 
-      // Validate shiftId if one was provided — must be open, belong to current user, company, and location
-      if (shiftId) {
-        const shift = await storage.getShiftById(shiftId);
+      // Validate shiftId if one was provided — if invalid/closed, just ignore it and proceed without a shift
+      let effectiveShiftId: number | null = shiftId || null;
+      if (effectiveShiftId) {
+        const shift = await storage.getShiftById(effectiveShiftId);
         if (!shift || shift.companyId !== req.session.currentCompanyId || shift.locationId !== locationId || shift.status !== "open" || shift.userId !== req.user?.id) {
-          // Shift is invalid/closed — proceed without linking to a shift
-          shiftId = null;
+          effectiveShiftId = null;
         }
       }
       if (!accountId) {
@@ -644,7 +644,7 @@ export function registerPosRoutes(app: Express) {
             voucherDate,
             description: notes || (isCreditSale ? `Credit Invoice Sale at ${location.name} - ${(customerAccount as any).name}` : `POS Sale at ${location.name}`),
             totalAmount: grandTotal.toFixed(2),
-            shiftId: shiftId || null,
+            shiftId: effectiveShiftId,
             clientSaleId: clientSaleId || null,
             currency: currency || "USD",
             exchangeRate: exchangeRate || null,
