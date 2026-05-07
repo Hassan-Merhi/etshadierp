@@ -72,10 +72,11 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
   const [sendToLoading, setSendToLoading]   = useState(draft?.sendToLoading ?? false);
   const [containerCount, setContainerCount] = useState(draft?.containerCount ?? "1");
   const [containerNames, setContainerNames] = useState<string[]>(draft?.containerNames ?? ["Container 1"]);
-  const [draftStatus, setDraftStatus]       = useState<"idle" | "saved">("idle");
-  const [appliedPrice, setAppliedPrice]     = useState<"sell" | "prod" | null>(null);
-  const [errors, setErrors]                 = useState<Record<string, string>>({});
-  const [showZeroItems, setShowZeroItems]   = useState(false);
+  const [draftStatus, setDraftStatus]           = useState<"idle" | "saved">("idle");
+  const [appliedPrice, setAppliedPrice]         = useState<"sell" | "prod" | null>(null);
+  const [errors, setErrors]                     = useState<Record<string, string>>({});
+  const [showZeroItems, setShowZeroItems]       = useState(false);
+  const [hideNonPositive, setHideNonPositive]   = useState(false);
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const qtyRefs    = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -303,7 +304,22 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
   }).length;
 
   const zeroItemCount = articleRows.filter(r => r.stockAvailable === 0).length;
-  const visibleRows = showZeroItems ? articleRows : articleRows.filter(r => r.stockAvailable > 0 || r.expectedToLoad > 0);
+  const nonPositiveCount = articleRows.filter(r => r.freeToPromise <= 0).length;
+
+  const totalValue = articleRows.reduce((s, r) => {
+    const qty = parseInt(quantities[r.articleCode] || "0");
+    if (isNaN(qty) || qty <= 0) return s;
+    const price = parseFloat(sellingPrices[r.articleCode] || "0");
+    return s + qty * price;
+  }, 0);
+
+  const visibleRows = (() => {
+    let base = showZeroItems ? articleRows : articleRows.filter(r => r.stockAvailable > 0 || r.expectedToLoad > 0);
+    if (hideNonPositive) base = base.filter(r => r.freeToPromise > 0);
+    return base;
+  })();
+
+  const visibleTotalBalance = visibleRows.reduce((s, r) => s + r.freeToPromise, 0);
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
@@ -396,6 +412,19 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
             <div className="border-l pl-4">
               <Button size="default" variant={showZeroItems ? "secondary" : "outline"} onClick={() => setShowZeroItems(v => !v)} data-testid="button-v5-toggle-zero">
                 {showZeroItems ? `Hide 0-stock (${zeroItemCount})` : `Show 0-stock (${zeroItemCount})`}
+              </Button>
+            </div>
+          )}
+
+          {nonPositiveCount > 0 && (
+            <div className={zeroItemCount === 0 ? "border-l pl-4" : ""}>
+              <Button
+                size="default"
+                variant={hideNonPositive ? "default" : "outline"}
+                onClick={() => setHideNonPositive(v => !v)}
+                data-testid="button-v5-hide-non-positive"
+              >
+                {hideNonPositive ? `Show all (${nonPositiveCount} hidden)` : `Hide 0 & negative (${nonPositiveCount})`}
               </Button>
             </div>
           )}
@@ -595,6 +624,38 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
                 );
               })}
             </tbody>
+            <tfoot>
+              <tr className="bg-muted border-t-2 sticky bottom-0 z-20 text-xs font-semibold">
+                <td className="px-3 py-2 border-r sticky left-0 bg-muted z-10">
+                  <span className="text-foreground">Totals</span>
+                  <span className="font-normal text-muted-foreground ml-1.5">({visibleRows.length} products)</span>
+                </td>
+                <td className={cn(
+                  "px-3 py-2 border-r text-right font-mono tabular-nums",
+                  visibleTotalBalance < 0 ? "text-destructive" : visibleTotalBalance > 0 ? "text-green-700 dark:text-green-400" : "text-muted-foreground",
+                )}>
+                  {visibleTotalBalance > 0 ? `+${visibleTotalBalance}` : visibleTotalBalance}
+                </td>
+                <td className="px-3 py-2 border-r text-center font-mono tabular-nums text-foreground">
+                  {totalQty > 0 ? totalQty : <span className="text-muted-foreground/40">—</span>}
+                </td>
+                <td className="px-3 py-2 border-r text-right font-mono tabular-nums text-muted-foreground">
+                  {totalKg > 0
+                    ? <span className="text-foreground">{totalKg.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg</span>
+                    : <span className="text-muted-foreground/40">—</span>}
+                </td>
+                {sendToLoading && n > 0 && (
+                  <td className="px-3 py-2 border-r text-right font-mono tabular-nums text-amber-600 dark:text-amber-400">
+                    {totalExpected > 0 ? totalExpected : <span className="text-muted-foreground/40">—</span>}
+                  </td>
+                )}
+                <td className="px-3 py-2 text-right font-mono tabular-nums text-foreground">
+                  {totalValue > 0
+                    ? `$${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : <span className="text-muted-foreground/40">—</span>}
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
 
