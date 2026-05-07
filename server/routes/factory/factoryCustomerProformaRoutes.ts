@@ -430,20 +430,19 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         .where(and(eq(customerProformaLines.proformaId, parsed.proformaId), eq(customerProformaLines.articleCode, parsed.articleCode)));
       if (existingLine) return res.status(400).json({ message: "Article code already exists in this proforma" });
 
-      // factory_v2: block if requested quantity exceeds free-to-promise
+      // factory_v2: warn if requested quantity exceeds free-to-promise (non-blocking)
+      let stockWarning: string | undefined;
       if (await isFactoryV2Company(companyId)) {
         const ftp = await computeFreeToPromise(companyId, parsed.articleCode);
         if ((parsed.quantity ?? 0) > ftp) {
-          return res.status(400).json({
-            message: `Insufficient free stock for ${parsed.articleCode}: requested ${parsed.quantity}, available ${ftp}`,
-          });
+          stockWarning = `Insufficient free stock for ${parsed.articleCode}: requested ${parsed.quantity}, available ${ftp}`;
         }
       }
 
       const [line] = await db.insert(customerProformaLines).values(parsed).returning();
       // Sync — new line changes reservedNotYetLoaded for this proforma
       await syncProformaReservations(db, companyId, parsed.proformaId);
-      res.json(line);
+      res.json({ ...line, ...(stockWarning ? { stockWarning } : {}) });
     } catch (error: any) {
       console.error("Error creating proforma line:", error);
       res.status(400).json({ message: error.message });
@@ -467,16 +466,14 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       if (req.body.quantity !== undefined) updateData.quantity = parseInt(req.body.quantity);
       if (req.body.pricePerBale !== undefined) updateData.pricePerBale = req.body.pricePerBale;
 
-      // factory_v2: block quantity increases that exceed free-to-promise
-      // ftp is computed excluding the current line's own reservation, so we add it back
+      // factory_v2: warn if quantity increase exceeds free-to-promise (non-blocking)
+      let stockWarning: string | undefined;
       if (updateData.quantity !== undefined && await isFactoryV2Company(companyId)) {
         const delta = updateData.quantity - (Number(existingLine.quantity) ?? 0);
         if (delta > 0) {
           const ftp = await computeFreeToPromise(companyId, existingLine.articleCode);
           if (delta > ftp) {
-            return res.status(400).json({
-              message: `Insufficient free stock for ${existingLine.articleCode}: need ${delta} more, available ${ftp}`,
-            });
+            stockWarning = `Insufficient free stock for ${existingLine.articleCode}: need ${delta} more, available ${ftp}`;
           }
         }
       }
@@ -487,7 +484,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       if (!updated) return res.status(404).json({ message: "Proforma line not found" });
       // Sync — quantity change alters reservedNotYetLoaded
       await syncProformaReservations(db, companyId, existingLine.proformaId);
-      res.json(updated);
+      res.json({ ...updated, ...(stockWarning ? { stockWarning } : {}) });
     } catch (error: any) {
       console.error("Error updating proforma line:", error);
       res.status(400).json({ message: error.message });
