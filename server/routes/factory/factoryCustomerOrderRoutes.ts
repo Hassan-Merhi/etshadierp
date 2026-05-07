@@ -3916,6 +3916,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         return na.localeCompare(nb);
       });
 
+      const invoiceLabel = order.invoiceNumber || `INV-${String(orderId).padStart(6, "0")}`;
+
       // ── PDFKit setup ──────────────────────────────────────────────────────────
       const PDFDocument = (await import("pdfkit")).default;
       const doc = new PDFDocument({ margin: 40, size: "A4" });
