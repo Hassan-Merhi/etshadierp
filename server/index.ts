@@ -2630,6 +2630,11 @@ let migrationsDone = false;
       updated_at  timestamp   NOT NULL DEFAULT now()
     )`,
     `CREATE INDEX IF NOT EXISTS status_builder_sheets_company_idx ON status_builder_sheets(company_id)`,
+
+    // ── Factory Bale Products: selling/production price columns (May 2026) ────
+    // These columns were defined in the schema but never had a runtime migration.
+    `ALTER TABLE factory_bale_products ADD COLUMN IF NOT EXISTS selling_price numeric(20,2) NOT NULL DEFAULT 0`,
+    `ALTER TABLE factory_bale_products ADD COLUMN IF NOT EXISTS production_price numeric(20,2) NOT NULL DEFAULT 0`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
