@@ -88,8 +88,52 @@ export function registerStockRoutes(app: Express) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      const items = await storage.getAllStockItems(companyId);
-      res.json(items);
+
+      const { page, pageSize, search, stockGroupId, active } = req.query;
+
+      // No page param → flat array (backward-compat for dropdowns / offline sync)
+      if (!page) {
+        const items = await storage.getAllStockItems(companyId);
+        return res.json(items);
+      }
+
+      // Paginated path
+      const pageNum = Math.max(1, parseInt(page as string) || 1);
+      const pageSizeNum = Math.min(500, Math.max(1, parseInt(pageSize as string) || 50));
+      const offset = (pageNum - 1) * pageSizeNum;
+
+      const conditions: any[] = [
+        eq(stockItems.companyId, companyId),
+        isNull(stockItems.deletedAt),
+      ];
+      if (search && typeof search === "string" && search.trim()) {
+        const q = `%${search.trim()}%`;
+        conditions.push(or(ilike(stockItems.name, q), ilike(stockItems.code, q)));
+      }
+      if (stockGroupId && stockGroupId !== "all") {
+        conditions.push(eq(stockItems.stockGroupId, parseInt(stockGroupId as string)));
+      }
+      if (active === "true") {
+        conditions.push(eq(stockItems.active, true));
+      } else if (active === "false") {
+        conditions.push(eq(stockItems.active, false));
+      }
+      const where = and(...conditions);
+
+      const [{ total }] = await db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(stockItems)
+        .where(where);
+
+      const data = await db
+        .select()
+        .from(stockItems)
+        .where(where)
+        .orderBy(asc(stockItems.code))
+        .limit(pageSizeNum)
+        .offset(offset);
+
+      return res.json({ data, page: pageNum, pageSize: pageSizeNum, total, totalPages: Math.ceil(total / pageSizeNum) });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -207,27 +251,62 @@ export function registerStockRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid or empty prices array" });
       }
 
+      const companyId = req.session.currentCompanyId;
+
+      // Pre-fetch all items + aliases once to avoid N+1
+      const allItems = await storage.getAllStockItems(companyId);
+      const allAliases = await storage.getAllCompanyCodeAliases(companyId);
+      const itemsById = new Map(allItems.map(i => [i.id, i]));
+      const itemsByCode = new Map<string, typeof allItems[0]>();
+      for (const item of allItems) {
+        if (item.code) itemsByCode.set(item.code.toLowerCase(), item);
+      }
+      for (const alias of allAliases) {
+        if (alias.aliasCode && !itemsByCode.has(alias.aliasCode.toLowerCase())) {
+          const item = itemsById.get(alias.stockItemId);
+          if (item) itemsByCode.set(alias.aliasCode.toLowerCase(), item);
+        }
+      }
+
       let updated = 0;
       let notFound = 0;
+      type GlobalUpdate = { id: number; sellingPrice: string };
+      type LocationUpdate = { stockItemId: number; locationId: number; sellingPrice: string };
+      const globalUpdates: GlobalUpdate[] = [];
+      const locationUpdates: LocationUpdate[] = [];
 
       for (const priceEntry of prices) {
         const { barcode, sellingPrice, locationId } = priceEntry;
         if (!barcode || !sellingPrice) continue;
-
-        const companyId = req.session.currentCompanyId;
-        const item = await storage.getStockItemByBarcode(barcode, companyId);
+        const item = itemsByCode.get((barcode as string).toLowerCase());
         if (item) {
           if (locationId) {
-            // Update location-specific price
-            await storage.upsertLocationPrice(item.id, locationId, sellingPrice);
+            locationUpdates.push({ stockItemId: item.id, locationId, sellingPrice });
           } else {
-            // Update global price
-            await storage.updateStockItem(item.id, { sellingPrice });
+            globalUpdates.push({ id: item.id, sellingPrice });
           }
           updated++;
         } else {
           notFound++;
         }
+      }
+
+      if (globalUpdates.length > 0 || locationUpdates.length > 0) {
+        await db.transaction(async (tx) => {
+          for (const u of globalUpdates) {
+            await tx.update(stockItems).set({ sellingPrice: u.sellingPrice }).where(eq(stockItems.id, u.id));
+          }
+          for (const u of locationUpdates) {
+            await tx.insert(stockItemLocationPrices).values({
+              stockItemId: u.stockItemId,
+              locationId: u.locationId,
+              sellingPrice: u.sellingPrice,
+            }).onConflictDoUpdate({
+              target: [stockItemLocationPrices.stockItemId, stockItemLocationPrices.locationId],
+              set: { sellingPrice: u.sellingPrice, updatedAt: new Date() },
+            });
+          }
+        });
       }
 
       const message = `Updated ${updated} price(s)${notFound > 0 ? `. ${notFound} barcode(s) not found.` : "."}`;

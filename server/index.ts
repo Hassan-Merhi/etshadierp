@@ -183,9 +183,8 @@ app.use((req, res, next) => {
   const reqPath = req.path;
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (reqPath.startsWith("/api")) {
-      // Intentionally omit response body — it may contain vouchers, balances, passwords, or documents.
-      log(`${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`);
+    if (reqPath.startsWith("/api") && duration > 500) {
+      log(`[SLOW API] ${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`);
     }
   });
   next();
@@ -2654,6 +2653,12 @@ let migrationsDone = false;
       notes             text
     )`,
     `CREATE INDEX IF NOT EXISTS stock_item_merge_logs_company_idx ON stock_item_merge_logs(company_id)`,
+    `CREATE INDEX IF NOT EXISTS stock_items_company_deleted_code_idx ON stock_items(company_id, deleted_at, code)`,
+    `CREATE INDEX IF NOT EXISTS stock_items_company_group_idx ON stock_items(company_id, stock_group_id)`,
+    `CREATE INDEX IF NOT EXISTS inventory_stock_item_idx ON inventory(stock_item_id)`,
+    `CREATE INDEX IF NOT EXISTS inventory_company_location_idx ON inventory(company_id, location_id)`,
+    `CREATE INDEX IF NOT EXISTS ledger_accounts_company_deleted_code_idx ON ledger_accounts(company_id, deleted_at, code)`,
+    `CREATE INDEX IF NOT EXISTS ledger_accounts_company_type_idx ON ledger_accounts(company_id, account_type)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

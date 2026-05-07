@@ -1,13 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Plus, Package, Edit, FileSpreadsheet, Trash2, Download, PlusCircle, MinusCircle, ChevronDown, Settings } from "lucide-react";
+import { Search, Plus, Package, Edit, FileSpreadsheet, Trash2, Download, PlusCircle, MinusCircle, ChevronDown, Settings, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,7 +47,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { utils, writeFile, readFile, ExcelJS } from "@/lib/excelHelper";
+import { utils, writeFile } from "@/lib/excelHelper";
 
 interface Location {
   id: number;
@@ -74,11 +73,23 @@ interface StockGroup {
   name: string;
 }
 
+interface PagedStockItemsResponse {
+  data: StockItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+const PAGE_SIZE = 100;
+
 export default function StockItems() {
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hideStockRates = (myErpPages?.hiddenErpCostFields ?? []).includes("stock_rates");
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedStockItemId, setSelectedStockItemId] = useState<number | null>(null);
   const [selectedStockItemName, setSelectedStockItemName] = useState<string>("");
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
@@ -88,8 +99,7 @@ export default function StockItems() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  
-  // Manual stock adjustment dialog state
+
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [adjustStockItemId, setAdjustStockItemId] = useState<string>("");
   const [adjustLocationId, setAdjustLocationId] = useState<string>("");
@@ -99,14 +109,53 @@ export default function StockItems() {
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
 
-  const { data: stockItems = [], isLoading } = useQuery<StockItem[]>({
+  // Debounce search input by 300 ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Reset page when group filter changes
+  useEffect(() => { setCurrentPage(1); }, [selectedGroupFilter]);
+
+  // Paginated query — drives the main table
+  const pagedQueryKey = [
+    "/api/stock-items",
+    { page: currentPage, pageSize: PAGE_SIZE, search: debouncedSearch, stockGroupId: selectedGroupFilter },
+  ];
+  const { data: pagedData, isLoading } = useQuery<PagedStockItemsResponse>({
+    queryKey: pagedQueryKey,
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        pageSize: String(PAGE_SIZE),
+      });
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+      if (selectedGroupFilter !== null) params.set("stockGroupId", String(selectedGroupFilter));
+      const res = await fetch(`/api/stock-items?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch stock items");
+      return res.json();
+    },
+  });
+
+  const displayItems: StockItem[] = pagedData?.data ?? [];
+  const totalItems = pagedData?.total ?? 0;
+  const totalPages = pagedData?.totalPages ?? 1;
+
+  // Flat (all items) query — used only by adjust-stock dialog dropdown and export
+  const { data: allStockItems = [], refetch: refetchAllItems } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items"],
+    enabled: false,
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: stockGroups = [] } = useQuery<StockGroup[]>({
     queryKey: ["/api/stock-groups"],
   });
-  
+
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
   });
@@ -118,41 +167,14 @@ export default function StockItems() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
       setSelectedIds([]);
-      toast({
-        title: "Success",
-        description: data.message || "Stock items deleted successfully",
-      });
+      toast({ title: "Success", description: data.message || "Stock items deleted successfully" });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete stock items",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to delete stock items", variant: "destructive" });
     },
   });
 
-  const updateUOMMutation = useMutation({
-    mutationFn: async () => {
-      return await apiRequest("POST", "/api/stock-items/bulk-update-uom", {});
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      toast({
-        title: "Success",
-        description: data.message || "UOM updated successfully",
-      });
-    },
-    onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update UOM",
-        variant: "destructive",
-      });
-    },
-  });
 
   const adjustStockMutation = useMutation({
     mutationFn: async (data: { stockItemId: number; locationId: number; quantity: number; type: "add" | "subtract" }) => {
@@ -167,37 +189,22 @@ export default function StockItems() {
       setAdjustLocationId("");
       setAdjustQuantity("");
       setAdjustType("add");
-      toast({
-        title: "Success",
-        description: data.message || "Stock adjusted successfully",
-      });
+      toast({ title: "Success", description: data.message || "Stock adjusted successfully" });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
-      toast({
-        title: "Error",
-        description: error.message || "Failed to adjust stock",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to adjust stock", variant: "destructive" });
     },
   });
 
   const handleAdjustStock = async () => {
     if (!adjustStockItemId || !adjustLocationId || !adjustQuantity) {
-      toast({
-        title: "Error",
-        description: "Please fill in all fields",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Please fill in all fields", variant: "destructive" });
       return;
     }
     const qty = parseFloat(adjustQuantity);
     if (isNaN(qty) || qty <= 0) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid quantity greater than 0",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Please enter a valid quantity greater than 0", variant: "destructive" });
       return;
     }
     adjustStockMutation.mutate({
@@ -208,15 +215,20 @@ export default function StockItems() {
     });
   };
 
-  const handleSelectAll = async (checked: boolean) => {
+  const handleOpenAdjustDialog = () => {
+    refetchAllItems();
+    setAdjustDialogOpen(true);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedIds(filteredStockItems.map(item => item.id));
+      setSelectedIds(displayItems.map(item => item.id));
     } else {
       setSelectedIds([]);
     }
   };
 
-  const handleSelectItem = async (id: number, checked: boolean) => {
+  const handleSelectItem = (id: number, checked: boolean) => {
     if (checked) {
       setSelectedIds(prev => [...prev, id]);
     } else {
@@ -224,40 +236,22 @@ export default function StockItems() {
     }
   };
 
-  const handleDeleteClick = async () => {
-    setDeleteDialogOpen(true);
-  };
+  const handleDeleteClick = () => { setDeleteDialogOpen(true); };
+  const handleConfirmDelete = () => { deleteMutation.mutate(selectedIds); setDeleteDialogOpen(false); };
 
-  const handleConfirmDelete = async () => {
-    deleteMutation.mutate(selectedIds);
-    setDeleteDialogOpen(false);
-  };
-
-  const handleStockItemClick = async (stockItemId: number, stockItemName: string) => {
+  const handleStockItemClick = (stockItemId: number, stockItemName: string) => {
     setSelectedStockItemId(stockItemId);
     setSelectedStockItemName(stockItemName);
     setDetailsDialogOpen(true);
   };
 
-  const handleEditClick = async (stockItemId: number, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent row click from firing
+  const handleEditClick = (stockItemId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
     setEditStockItemId(stockItemId);
     setEditDialogOpen(true);
   };
 
-  const filteredStockItems = stockItems
-    .filter((item) => {
-      const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.barcode && item.barcode.toLowerCase().includes(searchTerm.toLowerCase()));
-      if (selectedGroupFilter !== null) {
-        return matchesSearch && item.stockGroupId === selectedGroupFilter;
-      }
-      return matchesSearch;
-    })
-    .sort((a, b) => a.id - b.id);
-
-  const unassignedItems = stockItems.filter(item => !item.stockGroupId);
+  const allPageSelected = displayItems.length > 0 && displayItems.every(item => selectedIds.includes(item.id));
 
   const getStockGroupName = (stockGroupId: number | null) => {
     if (!stockGroupId) return "— No Group —";
@@ -265,100 +259,69 @@ export default function StockItems() {
     return group ? group.name : "Unknown";
   };
 
-  const allFilteredSelected = filteredStockItems.length > 0 && 
-    filteredStockItems.every(item => selectedIds.includes(item.id));
-
   const exportSalesHistory = async () => {
     if (!navigator.onLine) { toast({ title: "Not available offline", description: "Exports require a connection", variant: "destructive" }); return; }
     try {
       const res = await fetch("/api/stock-items/last-sales-export", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch sales history");
       const rows: {
-        stockItemId: number;
-        itemCode: string;
-        itemName: string;
-        voucherNumber: string;
-        voucherDate: string;
-        locationName: string;
-        quantity: string;
-        rate: string;
-        amount: string;
-        rn: number;
+        stockItemId: number; itemCode: string; itemName: string; voucherNumber: string;
+        voucherDate: string; locationName: string; quantity: string; rate: string; amount: string; rn: number;
       }[] = await res.json();
-
-      if (rows.length === 0) {
-        toast({ title: "No sales data", description: "No sales history found for any item." });
-        return;
-      }
-
+      if (rows.length === 0) { toast({ title: "No sales data", description: "No sales history found for any item." }); return; }
       const data: Record<string, string>[] = [];
       let lastItemId: number | null = null;
       for (const row of rows) {
-        if (lastItemId !== null && row.stockItemId !== lastItemId) {
-          data.push({});
-        }
+        if (lastItemId !== null && row.stockItemId !== lastItemId) data.push({});
         lastItemId = row.stockItemId;
         data.push({
-          "Item Code": row.itemCode,
-          "Item Name": row.itemName,
-          "Sale #": String(row.rn),
-          "Voucher No.": row.voucherNumber || "",
-          "Date": row.voucherDate ? new Date(row.voucherDate).toLocaleDateString() : "",
+          "Item Code": row.itemCode, "Item Name": row.itemName, "Sale #": String(row.rn),
+          "Voucher No.": row.voucherNumber || "", "Date": row.voucherDate ? new Date(row.voucherDate).toLocaleDateString() : "",
           "Location": row.locationName || "",
           "Qty": row.quantity ? parseFloat(row.quantity).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "",
           "Rate": row.rate ? parseFloat(row.rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "",
           "Amount": row.amount ? parseFloat(row.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "",
         });
       }
-
       const worksheet = utils.json_to_sheet(data);
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Sales History");
       await writeFile(workbook, "stock-items-sales-history.xlsx");
-    } catch (error) {
-      toast({
-        title: "Export failed",
-        description: "Could not export sales history",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Export failed", description: "Could not export sales history", variant: "destructive" });
     }
   };
 
   const exportToExcel = async () => {
     try {
-      const res = await fetch("/api/stock-item-location-prices/all", { credentials: "include" });
-      const locationPrices: { stockItemId: number; locationId: number; locationName: string; sellingPrice: string }[] = res.ok ? await res.json() : [];
-
-      const costDubaiRes = await fetch("/api/stock-items/cost-dubai", { credentials: "include" });
+      // Fetch all items explicitly for export (not limited to current page)
+      const [allRes, pricesRes, costDubaiRes] = await Promise.all([
+        fetch("/api/stock-items", { credentials: "include" }),
+        fetch("/api/stock-item-location-prices/all", { credentials: "include" }),
+        fetch("/api/stock-items/cost-dubai", { credentials: "include" }),
+      ]);
+      const allItems: StockItem[] = allRes.ok ? await allRes.json() : [];
+      const locationPrices: { stockItemId: number; locationId: number; locationName: string; sellingPrice: string }[] = pricesRes.ok ? await pricesRes.json() : [];
       const costDubaiData: { stockItemId: number; costDubai: string }[] = costDubaiRes.ok ? await costDubaiRes.json() : [];
       const costDubaiMap = new Map<number, string>();
-      for (const cd of costDubaiData) {
-        costDubaiMap.set(cd.stockItemId, cd.costDubai);
-      }
-
+      for (const cd of costDubaiData) costDubaiMap.set(cd.stockItemId, cd.costDubai);
       const priceMap = new Map<number, Map<string, string>>();
       for (const lp of locationPrices) {
         if (!priceMap.has(lp.stockItemId)) priceMap.set(lp.stockItemId, new Map());
         priceMap.get(lp.stockItemId)!.set(lp.locationName, lp.sellingPrice);
       }
-
       const sortedLocations = locations.map(l => l.name).sort();
-
-      const data = stockItems.map(item => {
+      const data = allItems.map(item => {
         const costDubai = costDubaiMap.get(item.id);
         const defaultPrice = item.sellingPrice || "0";
         const row: Record<string, string> = {
-          Code: item.code,
-          Name: item.name,
-          Barcode: item.barcode || "",
-          UOM: item.uom,
+          Code: item.code, Name: item.name, Barcode: item.barcode || "", UOM: item.uom,
           "Stock Group": getStockGroupName(item.stockGroupId),
           "Default Selling Price": formatAmount(defaultPrice),
           "Cost Dubai": costDubai ? formatAmount(costDubai) : "",
         };
         for (const loc of sortedLocations) {
           const locPrice = priceMap.get(item.id)?.get(loc);
-          // Fall back to default selling price if no location-specific price set
           row[`Price - ${loc}`] = formatAmount(locPrice ?? defaultPrice);
         }
         row["Active"] = item.active ? "Yes" : "No";
@@ -368,26 +331,22 @@ export default function StockItems() {
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Stock Items");
       await writeFile(workbook, "stock-items.xlsx");
-    } catch (error) {
-      toast({
-        title: "Export failed",
-        description: "Could not export stock items",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Export failed", description: "Could not export stock items", variant: "destructive" });
     }
   };
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Stock Items" 
+      <PageHeader
+        title="Stock Items"
         subtitle="Manage all stock items in your company"
       >
         <div className="flex flex-wrap gap-2">
           {selectedIds.length > 0 && (
-            <Button 
-              variant="destructive" 
-              className="gap-2" 
+            <Button
+              variant="destructive"
+              className="gap-2"
               onClick={handleDeleteClick}
               data-testid="button-delete-selected"
             >
@@ -412,7 +371,7 @@ export default function StockItems() {
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Import
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setAdjustDialogOpen(true)} data-testid="menu-adjust-stock">
+              <DropdownMenuItem onClick={handleOpenAdjustDialog} data-testid="menu-adjust-stock">
                 <Edit className="h-4 w-4 mr-2" />
                 Adjust Stock
               </DropdownMenuItem>
@@ -434,7 +393,7 @@ export default function StockItems() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
-              placeholder="Search by name, code, or barcode..."
+              placeholder="Search by name or code..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -457,13 +416,6 @@ export default function StockItems() {
           </select>
         </div>
 
-        {!isLoading && unassignedItems.length > 0 && (
-          <div className="mb-4 flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-50 dark:bg-yellow-950/20 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-300">
-            <span className="font-medium">Warning:</span>
-            <span>{unassignedItems.length} item{unassignedItems.length > 1 ? "s are" : " is"} not assigned to any Stock Group. Please edit {unassignedItems.length > 1 ? "them" : "it"} and assign a group.</span>
-          </div>
-        )}
-
         {isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-12 w-full" />
@@ -478,7 +430,7 @@ export default function StockItems() {
                 <tr className="h-12">
                   <th className="w-12 px-3">
                     <Checkbox
-                      checked={allFilteredSelected}
+                      checked={allPageSelected}
                       onCheckedChange={handleSelectAll}
                       data-testid="checkbox-select-all"
                     />
@@ -490,17 +442,15 @@ export default function StockItems() {
                 </tr>
               </thead>
               <tbody>
-                {filteredStockItems.length === 0 ? (
+                {displayItems.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="text-center py-8 text-muted-foreground">
-                      {searchTerm ? "No items found matching your search" : "No stock items found"}
+                      {debouncedSearch ? "No items found matching your search" : "No stock items found"}
                     </td>
                   </tr>
                 ) : (
-                  filteredStockItems.map((item) => {
-                    const sellingPrice = parseFloat(item.sellingPrice || "0");
+                  displayItems.map((item) => {
                     const isSelected = selectedIds.includes(item.id);
-                    
                     return (
                       <tr
                         key={item.id}
@@ -514,8 +464,8 @@ export default function StockItems() {
                             data-testid={`checkbox-${item.id}`}
                           />
                         </td>
-                        <td 
-                          className="px-3 font-medium cursor-pointer sticky left-0 bg-background z-10" 
+                        <td
+                          className="px-3 font-medium cursor-pointer sticky left-0 bg-background z-10"
                           onClick={() => handleStockItemClick(item.id, item.name)}
                           data-testid={`name-${item.id}`}
                         >
@@ -524,15 +474,15 @@ export default function StockItems() {
                             {item.name}
                           </div>
                         </td>
-                        <td 
-                          className="px-3 text-sm cursor-pointer" 
+                        <td
+                          className="px-3 text-sm cursor-pointer"
                           onClick={() => handleStockItemClick(item.id, item.name)}
                           data-testid={`group-${item.id}`}
                         >
                           {getStockGroupName(item.stockGroupId)}
                         </td>
-                        <td 
-                          className="px-3 cursor-pointer" 
+                        <td
+                          className="px-3 cursor-pointer"
                           onClick={() => handleStockItemClick(item.id, item.name)}
                           data-testid={`status-${item.id}`}
                         >
@@ -564,25 +514,21 @@ export default function StockItems() {
           <div className="md:hidden space-y-3">
             <div className="flex items-center gap-2 pb-2 border-b">
               <Checkbox
-                checked={allFilteredSelected}
+                checked={allPageSelected}
                 onCheckedChange={handleSelectAll}
                 data-testid="checkbox-select-all-mobile"
               />
               <span className="text-sm text-muted-foreground">Select All</span>
             </div>
-            {filteredStockItems.length === 0 ? (
+            {displayItems.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                {searchTerm ? "No items found matching your search" : "No stock items found"}
+                {debouncedSearch ? "No items found matching your search" : "No stock items found"}
               </div>
             ) : (
-              filteredStockItems.map((item) => {
+              displayItems.map((item) => {
                 const isSelected = selectedIds.includes(item.id);
                 return (
-                  <Card
-                    key={item.id}
-                    className="p-3"
-                    data-testid={`card-stock-item-${item.id}`}
-                  >
+                  <Card key={item.id} className="p-3" data-testid={`card-stock-item-${item.id}`}>
                     <div className="flex items-start gap-3">
                       <div className="pt-1" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
@@ -591,33 +537,16 @@ export default function StockItems() {
                           data-testid={`checkbox-mobile-${item.id}`}
                         />
                       </div>
-                      <div
-                        className="flex-1 min-w-0 cursor-pointer"
-                        onClick={() => handleStockItemClick(item.id, item.name)}
-                      >
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleStockItemClick(item.id, item.name)}>
                         <div className="flex items-center gap-2 mb-1">
                           <Package className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="font-medium truncate" data-testid={`name-mobile-${item.id}`}>
-                            {item.name}
-                          </span>
+                          <span className="font-medium truncate" data-testid={`name-mobile-${item.id}`}>{item.name}</span>
                         </div>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm mt-2">
-                          <div>
-                            <span className="text-muted-foreground">Code: </span>
-                            <span>{item.code}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">UOM: </span>
-                            <span>{item.uom}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Group: </span>
-                            <span data-testid={`group-mobile-${item.id}`}>{getStockGroupName(item.stockGroupId)}</span>
-                          </div>
-                          {!hideStockRates && <div>
-                            <span className="text-muted-foreground">Price: </span>
-                            <span>{formatAmount(item.sellingPrice)}</span>
-                          </div>}
+                          <div><span className="text-muted-foreground">Code: </span><span>{item.code}</span></div>
+                          <div><span className="text-muted-foreground">UOM: </span><span>{item.uom}</span></div>
+                          <div><span className="text-muted-foreground">Group: </span><span data-testid={`group-mobile-${item.id}`}>{getStockGroupName(item.stockGroupId)}</span></div>
+                          {!hideStockRates && <div><span className="text-muted-foreground">Price: </span><span>{formatAmount(item.sellingPrice)}</span></div>}
                         </div>
                         <div className="flex items-center justify-between mt-2">
                           <Badge variant={item.active ? "default" : "secondary"} data-testid={`status-mobile-${item.id}`}>
@@ -625,13 +554,7 @@ export default function StockItems() {
                           </Badge>
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => handleEditClick(item.id, e)}
-                        data-testid={`button-edit-mobile-${item.id}`}
-                        className="gap-1 shrink-0"
-                      >
+                      <Button size="sm" variant="ghost" onClick={(e) => handleEditClick(item.id, e)} data-testid={`button-edit-mobile-${item.id}`} className="gap-1 shrink-0">
                         <Edit className="h-4 w-4" />
                         Edit
                       </Button>
@@ -644,9 +567,35 @@ export default function StockItems() {
           </>
         )}
 
-        {!isLoading && filteredStockItems.length > 0 && (
-          <div className="mt-4 text-sm text-muted-foreground">
-            Showing {filteredStockItems.length} of {stockItems.length} items (Use Location Prices tab to set per-location prices)
+        {/* Pagination controls */}
+        {!isLoading && totalItems > 0 && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+            <span>
+              Showing {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, totalItems)} of {totalItems} items
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                data-testid="button-prev-page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="px-3 py-1 text-sm">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                data-testid="button-next-page"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         )}
       </Card>
@@ -681,13 +630,13 @@ export default function StockItems() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete {selectedIds.length} stock {selectedIds.length === 1 ? 'item' : 'items'}? 
+              Are you sure you want to delete {selectedIds.length} stock {selectedIds.length === 1 ? 'item' : 'items'}?
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleConfirmDelete}
               className="bg-destructive hover:bg-destructive/90"
               data-testid="button-confirm-delete"
@@ -714,7 +663,7 @@ export default function StockItems() {
                   <SelectValue placeholder="Select stock item..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {stockItems.map((item) => (
+                  {allStockItems.map((item) => (
                     <SelectItem key={item.id} value={item.id.toString()}>
                       {item.code} - {item.name}
                     </SelectItem>
@@ -776,11 +725,7 @@ export default function StockItems() {
             </div>
           </div>
           <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setAdjustDialogOpen(false)}
-              data-testid="button-adjust-cancel"
-            >
+            <Button variant="outline" onClick={() => setAdjustDialogOpen(false)} data-testid="button-adjust-cancel">
               Cancel
             </Button>
             <Button

@@ -28,11 +28,72 @@ export function registerInventoryRoutes(app: Express) {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
+      const companyId = req.session.currentCompanyId;
+      const { page, pageSize, search, locationId, stockGroupId } = req.query;
 
-      const inventory = await storage.getCompanyInventory(
-        req.session.currentCompanyId,
-      );
-      res.json(inventory);
+      // No page param → flat array (backward-compat for offline sync and cache invalidation)
+      if (!page) {
+        const rows = await storage.getCompanyInventory(companyId);
+        return res.json(rows);
+      }
+
+      // Paginated path
+      const pageNum = Math.max(1, parseInt(page as string) || 1);
+      const pageSizeNum = Math.min(500, Math.max(1, parseInt(pageSize as string) || 50));
+      const offset = (pageNum - 1) * pageSizeNum;
+
+      const conditions: any[] = [
+        eq(inventory.companyId, companyId),
+        isNull(locations.deletedAt),
+      ];
+      if (locationId) {
+        conditions.push(eq(inventory.locationId, parseInt(locationId as string)));
+      }
+      if (stockGroupId && stockGroupId !== "all") {
+        conditions.push(eq(stockItems.stockGroupId, parseInt(stockGroupId as string)));
+      }
+      if (search && typeof search === "string" && search.trim()) {
+        const q = `%${search.trim()}%`;
+        conditions.push(or(ilike(stockItems.name, q), ilike(stockItems.code, q)));
+      }
+      const where = and(...conditions);
+
+      const [{ total }] = await db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(inventory)
+        .leftJoin(stockItems, eq(inventory.stockItemId, stockItems.id))
+        .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+        .innerJoin(locations, eq(inventory.locationId, locations.id))
+        .where(where);
+
+      const data = await db
+        .select({
+          inventoryId: inventory.id,
+          locationId: inventory.locationId,
+          locationName: locations.name,
+          locationCode: locations.code,
+          stockItemId: inventory.stockItemId,
+          quantity: inventory.quantity,
+          averageRate: inventory.averageRate,
+          totalValue: inventory.totalValue,
+          lastUpdated: inventory.lastUpdated,
+          stockItemCode: stockItems.code,
+          stockItemName: stockItems.name,
+          stockItemUom: stockItems.uom,
+          stockGroupId: stockItems.stockGroupId,
+          stockGroupName: sql<string>`COALESCE(${stockGroups.name}, '')`,
+          stockGroupCode: sql<string>`COALESCE(${stockGroups.code}, '')`,
+        })
+        .from(inventory)
+        .leftJoin(stockItems, eq(inventory.stockItemId, stockItems.id))
+        .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+        .innerJoin(locations, eq(inventory.locationId, locations.id))
+        .where(where)
+        .orderBy(asc(stockItems.code), asc(locations.name))
+        .limit(pageSizeNum)
+        .offset(offset);
+
+      return res.json({ data, page: pageNum, pageSize: pageSizeNum, total, totalPages: Math.ceil(total / pageSizeNum) });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

@@ -187,6 +187,8 @@ export const ledgerAccounts = pgTable("ledger_accounts", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   uniqueCompanyCode: uniqueIndex("ledger_accounts_company_code_unique").on(t.companyId, t.code),
+  companyDeletedCodeIdx: index("ledger_accounts_company_deleted_code_idx").on(t.companyId, t.deletedAt, t.code),
+  companyTypeIdx: index("ledger_accounts_company_type_idx").on(t.companyId, t.accountType),
 }));
 
 export const insertLedgerAccountSchema = createInsertSchema(ledgerAccounts).omit({
@@ -382,6 +384,8 @@ export const stockItems = pgTable("stock_items", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   uniqueCompanyCode: uniqueIndex("stock_items_company_code_unique").on(t.companyId, t.code),
+  companyDeletedCodeIdx: index("stock_items_company_deleted_code_idx").on(t.companyId, t.deletedAt, t.code),
+  companyGroupIdx: index("stock_items_company_group_idx").on(t.companyId, t.stockGroupId),
 }));
 
 export const insertStockItemSchema = createInsertSchema(stockItems).omit({
@@ -657,10 +661,9 @@ export const inventory = pgTable("inventory", {
 }, (t) => ({
   companyIdx: index("inventory_company_idx").on(t.companyId),
   uniqueLocationItem: uniqueIndex("inventory_location_item_unique").on(t.locationId, t.stockItemId),
-  // Phase 4+5 (May 2026): standalone location index for "all stock at this
-  // location" scans — the composite unique above is keyed on (location_id,
-  // stock_item_id) so cannot serve location-only filters.
   locationIdx: index("inventory_location_idx").on(t.locationId),
+  stockItemIdx: index("inventory_stock_item_idx").on(t.stockItemId),
+  companyLocationIdx: index("inventory_company_location_idx").on(t.companyId, t.locationId),
 }));
 
 export const insertInventorySchema = createInsertSchema(inventory).omit({

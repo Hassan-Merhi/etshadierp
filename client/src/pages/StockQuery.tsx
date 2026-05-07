@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
-import { getApiRequest } from "@/lib/factoryApi";
 import { useLocation, useSearch } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -29,17 +28,38 @@ interface FactoryBaleProduct {
   active: boolean;
 }
 
+interface PagedStockItems {
+  data: StockItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
 function StockQueryContent() {
   const appMode = useAppMode();
-  const modeApiRequest = getApiRequest(appMode);
   const isFactory = appMode === "factory";
   const search = useSearch();
   const initialQ = new URLSearchParams(search).get("q") || "";
   const [searchTerm, setSearchTerm] = useState(initialQ);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialQ);
   const [_location, navigate] = useLocation();
 
-  const { data: stockItems = [], isLoading: erpLoading } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items"],
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // ERP: use paginated server-side search
+  const { data: pagedStockItems, isLoading: erpLoading } = useQuery<PagedStockItems>({
+    queryKey: ["/api/stock-items", { search: debouncedSearch, pageSize: 200 }],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: "1", pageSize: "200" });
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+      const res = await fetch(`/api/stock-items?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch stock items");
+      return res.json();
+    },
     enabled: !isFactory,
   });
 
@@ -51,13 +71,12 @@ function StockQueryContent() {
   const stockItemsLoading = isFactory ? factoryLoading : erpLoading;
 
   const items = isFactory
-    ? factoryProducts.map(p => ({ id: p.id, code: p.articleCode || p.code, name: p.name, active: p.active }))
-    : stockItems.map(p => ({ id: p.id, code: p.code, name: p.name, active: p.active }));
+    ? factoryProducts
+        .filter(p => !debouncedSearch.trim() || p.name.toLowerCase().includes(debouncedSearch.toLowerCase()) || (p.articleCode || p.code).toLowerCase().includes(debouncedSearch.toLowerCase()))
+        .map(p => ({ id: p.id, code: p.articleCode || p.code, name: p.name, active: p.active }))
+    : (pagedStockItems?.data ?? []).map(p => ({ id: p.id, code: p.code, name: p.name, active: p.active }));
 
-  const filteredItems = items.filter(item =>
-    item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredItems = items;
 
   const handleItemClick = (item: { id: number }) => {
     if (isFactory) {
