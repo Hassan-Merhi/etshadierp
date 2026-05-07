@@ -717,12 +717,14 @@ export function registerPosRoutes(app: Express) {
 
           // Fix 3: Authoritative stock check inside the transaction with row lock.
           // Catches race conditions where two cashiers sell the last unit concurrently.
+          // Use FOR UPDATE OF i (not the whole JOIN) because PostgreSQL rejects
+          // FOR UPDATE on the nullable side of a LEFT JOIN.
           const stockLockResult = await (tx as any).execute(sql`
             SELECT i.quantity, si.name AS item_name
             FROM inventory i
             LEFT JOIN stock_items si ON si.id = i.stock_item_id
             WHERE i.location_id = ${parsedLocationId} AND i.stock_item_id = ${item.stockItemId}
-            FOR UPDATE
+            FOR UPDATE OF i
           `);
           const lockedRow = stockLockResult.rows?.[0] ?? stockLockResult[0];
           const lockedQty = lockedRow ? parseFloat(lockedRow.quantity ?? "0") : 0;
