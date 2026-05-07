@@ -135,13 +135,12 @@ export function registerStockSummaryRoutes(app: Express) {
           sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`
         ));
       
-      // 4. Sales (Outwards)
+      // 4. Sales (Outwards) — use totalSales (selling price) not totalCost (cost price)
       const salesData = await db
         .select({
           month: sql<number>`EXTRACT(MONTH FROM ${vouchers.voucherDate})`,
           quantity: salesItems.quantity,
-          costPrice: salesItems.costPrice,
-          totalCost: salesItems.totalCost,
+          totalSales: salesItems.totalSales,
           optional: vouchers.optional,
         })
         .from(salesItems)
@@ -196,11 +195,11 @@ export function registerStockSummaryRoutes(app: Express) {
         }
       }
       
-      // Process Sales (always outward)
+      // Process Sales (always outward) — value = selling revenue
       for (const row of salesData) {
         const month = Number(row.month);
         monthBuckets[month].outQty += parseFloat(row.quantity);
-        monthBuckets[month].outVal += parseFloat(row.totalCost);
+        monthBuckets[month].outVal += parseFloat(row.totalSales);
       }
       
       // Calculate running closing balance
@@ -837,12 +836,12 @@ export function registerStockSummaryRoutes(app: Express) {
         }
       }
       
-      // 3. Sales at this location (Outwards)
+      // 3. Sales at this location (Outwards) — use totalSales (selling price) not totalCost
       const salesData = await db
         .select({
           month: sql<number>`EXTRACT(MONTH FROM ${vouchers.voucherDate})`,
           quantity: salesItems.quantity,
-          totalCost: salesItems.totalCost,
+          totalSales: salesItems.totalSales,
         })
         .from(salesItems)
         .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
@@ -858,7 +857,7 @@ export function registerStockSummaryRoutes(app: Express) {
       for (const row of salesData) {
         const month = Number(row.month);
         monthBuckets[month].outQty += parseFloat(row.quantity);
-        monthBuckets[month].outVal += parseFloat(row.totalCost || "0");
+        monthBuckets[month].outVal += parseFloat(row.totalSales || "0");
       }
 
       // 4. Credit / Debit Note Items at this location
@@ -1052,6 +1051,146 @@ export function registerStockSummaryRoutes(app: Express) {
     }
   });
   
+  // Per-month drill-down: individual transactions for a stock item at a location
+  // Returns inTransactions and outTransactions arrays for the given year+month.
+  // Out-value for sales uses selling price (totalSales); transfers use totalAmount.
+  app.get("/api/locations/:locationId/stock-items/:stockItemId/monthly-detail", requireAuth, async (req, res) => {
+    try {
+      const locationId  = parseInt(req.params.locationId);
+      const stockItemId = parseInt(req.params.stockItemId);
+      const year  = parseInt(req.query.year  as string);
+      const month = parseInt(req.query.month as string);
+      const companyId = req.session.currentCompanyId;
+      if (!companyId)                     return res.status(400).json({ message: "No company selected" });
+      if (!year || !month || month < 1 || month > 12) return res.status(400).json({ message: "Invalid year/month" });
+
+      const inTx:  any[] = [];
+      const outTx: any[] = [];
+
+      // ── Sales (Outward) ──────────────────────────────────────────────────────
+      const saleRows = await db
+        .select({
+          date:       vouchers.voucherDate,
+          ref:        vouchers.voucherNumber,
+          qty:        salesItems.quantity,
+          totalSales: salesItems.totalSales,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(and(
+          eq(salesItems.stockItemId, stockItemId),
+          eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
+          eq(vouchers.optional, false),
+          eq(vouchers.locationId, locationId),
+          sql`EXTRACT(YEAR  FROM ${vouchers.voucherDate}) = ${year}`,
+          sql`EXTRACT(MONTH FROM ${vouchers.voucherDate}) = ${month}`,
+        ));
+      for (const r of saleRows) {
+        const qty = parseFloat(r.qty);
+        const val = parseFloat(r.totalSales || "0");
+        outTx.push({ type: "Sale", date: r.date, reference: r.ref, qty, rate: qty > 0 ? val / qty : 0, value: val });
+      }
+
+      // ── Stock Transfers (In and Out) ─────────────────────────────────────────
+      const transferRows = await db
+        .select({
+          date:        vouchers.voucherDate,
+          ref:         vouchers.voucherNumber,
+          qty:         stockTransferItems.quantity,
+          totalAmount: stockTransferItems.totalAmount,
+          srcLoc:      stockTransferItems.sourceLocationId,
+          dstLoc:      stockTransferVouchers.destinationLocationId,
+        })
+        .from(stockTransferItems)
+        .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
+        .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
+        .where(and(
+          eq(stockTransferItems.stockItemId, stockItemId),
+          eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
+          eq(vouchers.optional, false),
+          sql`EXTRACT(YEAR  FROM ${vouchers.voucherDate}) = ${year}`,
+          sql`EXTRACT(MONTH FROM ${vouchers.voucherDate}) = ${month}`,
+          or(
+            eq(stockTransferItems.sourceLocationId, locationId),
+            eq(stockTransferVouchers.destinationLocationId, locationId),
+          ),
+        ));
+      for (const r of transferRows) {
+        const qty = parseFloat(r.qty);
+        const val = parseFloat(r.totalAmount);
+        const entry = { date: r.date, reference: r.ref, qty, rate: qty > 0 ? val / qty : 0, value: val };
+        if (r.srcLoc === locationId) outTx.push({ ...entry, type: "Transfer Out" });
+        if (r.dstLoc === locationId) inTx.push({  ...entry, type: "Transfer In"  });
+      }
+
+      // ── Stock Adjustments ────────────────────────────────────────────────────
+      const adjRows = await db
+        .select({
+          date:           vouchers.voucherDate,
+          ref:            vouchers.voucherNumber,
+          qty:            stockAdjustmentItems.quantity,
+          totalAmount:    stockAdjustmentItems.totalAmount,
+          adjustmentType: stockAdjustmentVouchers.adjustmentType,
+        })
+        .from(stockAdjustmentItems)
+        .innerJoin(stockAdjustmentVouchers, eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id))
+        .innerJoin(vouchers, eq(stockAdjustmentVouchers.voucherId, vouchers.id))
+        .where(and(
+          eq(stockAdjustmentItems.stockItemId, stockItemId),
+          eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
+          eq(vouchers.optional, false),
+          eq(stockAdjustmentVouchers.locationId, locationId),
+          sql`EXTRACT(YEAR  FROM ${vouchers.voucherDate}) = ${year}`,
+          sql`EXTRACT(MONTH FROM ${vouchers.voucherDate}) = ${month}`,
+        ));
+      for (const r of adjRows) {
+        const qty = Math.abs(parseFloat(r.qty));
+        const val = Math.abs(parseFloat(r.totalAmount));
+        const entry = { date: r.date, reference: r.ref, qty, rate: qty > 0 ? val / qty : 0, value: val };
+        if (r.adjustmentType === "Production" || parseFloat(r.qty) > 0)
+          inTx.push({  ...entry, type: `Adjustment (${r.adjustmentType})` });
+        else
+          outTx.push({ ...entry, type: `Adjustment (${r.adjustmentType})` });
+      }
+
+      // ── Credit / Debit Notes ─────────────────────────────────────────────────
+      const noteRows = await db
+        .select({
+          date:          vouchers.voucherDate,
+          ref:           vouchers.voucherNumber,
+          qty:           creditNoteItems.quantity,
+          inventoryCost: creditNoteItems.inventoryCost,
+          noteType:      vouchers.voucherType,
+        })
+        .from(creditNoteItems)
+        .innerJoin(vouchers, eq(creditNoteItems.voucherId, vouchers.id))
+        .where(and(
+          eq(creditNoteItems.stockItemId, stockItemId),
+          eq(creditNoteItems.locationId, locationId),
+          eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
+          sql`EXTRACT(YEAR  FROM ${vouchers.voucherDate}) = ${year}`,
+          sql`EXTRACT(MONTH FROM ${vouchers.voucherDate}) = ${month}`,
+        ));
+      for (const r of noteRows) {
+        const qty  = parseFloat(r.qty);
+        const rate = parseFloat(r.inventoryCost || "0");
+        const val  = rate * qty;
+        const entry = { date: r.date, reference: r.ref, qty, rate, value: val };
+        if (r.noteType === "Credit Note") inTx.push({  ...entry, type: "Credit Note"  });
+        else                              outTx.push({ ...entry, type: "Debit Note"   });
+      }
+
+      const byDate = (a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime();
+      res.json({ inTransactions: inTx.sort(byDate), outTransactions: outTx.sort(byDate) });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Location Stock Item Monthly Vouchers - Get detailed transactions for a specific month at a location
   app.get("/api/locations/:locationId/stock-items/:stockItemId/vouchers/:year/:month", requireAuth, async (req, res) => {
     try {

@@ -1841,16 +1841,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       return;
     }
 
-    // Fix 1: POS users must have an open shift before making sales
-    if (!hasOpenShift) {
-      toast({
-        title: "No open shift",
-        description: "Open a cash shift before making sales.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     const invalidRow = rows.find(r => r.itemName?.trim() && !r.stockItemId);
     if (invalidRow) {
       const invalidIdx = rows.indexOf(invalidRow);
@@ -1995,7 +1985,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             <Button
               onClick={handleSaveSale}
               size="sm"
-              disabled={saveMutation.isPending || !hasValidItems || !hasOpenShift}
+              disabled={saveMutation.isPending || !hasValidItems}
               className="gap-1 sm:gap-2"
               data-testid="button-complete-sale"
             >
@@ -2006,17 +1996,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         </div>
       </PageHeader>
 
-      {posUser && activeLocation && !hasOpenShift && (
-        <div
-          className="flex items-center gap-3 rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 px-4 py-3 text-sm"
-          data-testid="banner-no-shift"
-        >
-          <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-          <span className="text-amber-800 dark:text-amber-200">
-            Open a cash shift before making sales.
-          </span>
-        </div>
-      )}
 
       <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4">
         <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
@@ -2779,7 +2758,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         ) : (
           <Button
             onClick={handleSaveSale}
-            disabled={saveMutation.isPending || !hasValidItems || !hasOpenShift}
+            disabled={saveMutation.isPending || !hasValidItems}
             className="shrink-0 h-10 px-5"
             data-testid="button-mobile-sticky-save"
           >

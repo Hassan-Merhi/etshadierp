@@ -3,8 +3,9 @@ import { useParams, useLocation } from "wouter";
 import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
-import { ArrowLeft, MapPin, Globe, Eye } from "lucide-react";
+import { ArrowLeft, MapPin, Globe, Eye, TrendingUp, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PeriodFilter, getDefaultPeriodValue, PeriodFilterValue } from "@/components/ui/period-filter";
@@ -13,6 +14,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useCursorNav } from "@/contexts/CursorNavContext";
 import { PageHeader } from "@/components/PageHeader";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface MonthlyData {
   month: number;

@@ -214,6 +214,13 @@ export default function StockTransferOrder() {
     () => getDefaultPeriodValue("this_year")
   );
 
+  // Drill-down detail dialog state
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailYear, setDetailYear] = useState(new Date().getFullYear());
+  const [detailMonth, setDetailMonth] = useState(0);
+  const [detailMonthName, setDetailMonthName] = useState("");
+  const [detailDirection, setDetailDirection] = useState<"in" | "out">("out");
+
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
   });
@@ -239,6 +246,26 @@ export default function StockTransferOrder() {
       return res.json();
     },
     enabled: historyDialogOpen && !!historyItem && !!historyLocation,
+  });
+
+  const { data: detailData, isLoading: detailLoading } = useQuery<{ inTransactions: any[]; outTransactions: any[] }>({
+    queryKey: [
+      "/api/locations",
+      historyLocation?.id,
+      "stock-items",
+      historyItem?.id,
+      "monthly-detail",
+      { year: detailYear, month: detailMonth },
+    ],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/locations/${historyLocation!.id}/stock-items/${historyItem!.id}/monthly-detail?year=${detailYear}&month=${detailMonth}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) throw new Error("Failed to fetch detail");
+      return res.json();
+    },
+    enabled: detailOpen && !!historyItem && !!historyLocation && detailMonth > 0,
   });
 
   const { data: existingTransfer } = useQuery<any>({
@@ -2100,10 +2127,34 @@ export default function StockTransferOrder() {
                         <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{fmtQty(month.openingQty)}</td>
                         <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{fmtRate(month.openingRate)}</td>
                         <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{fmtVal(month.openingValue)}</td>
-                        <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400 font-medium">{fmtQty(month.inwardQty)}</td>
+                        <td
+                          className={`text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400 font-medium ${month.inwardQty > 0 ? "cursor-pointer underline underline-offset-2 decoration-dotted hover:text-green-900 dark:hover:text-green-200" : ""}`}
+                          onClick={() => {
+                            if (month.inwardQty > 0) {
+                              setDetailYear(parseInt(historyPeriod.fromDate.slice(0, 4)));
+                              setDetailMonth(month.month);
+                              setDetailMonthName(month.monthName);
+                              setDetailDirection("in");
+                              setDetailOpen(true);
+                            }
+                          }}
+                          title={month.inwardQty > 0 ? "Click to see individual transactions" : undefined}
+                        >{fmtQty(month.inwardQty)}</td>
                         <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{fmtRate(month.inwardRate)}</td>
                         <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{fmtVal(month.inwardValue)}</td>
-                        <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400 font-medium">{fmtQty(month.outwardQty)}</td>
+                        <td
+                          className={`text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400 font-medium ${month.outwardQty > 0 ? "cursor-pointer underline underline-offset-2 decoration-dotted hover:text-red-900 dark:hover:text-red-200" : ""}`}
+                          onClick={() => {
+                            if (month.outwardQty > 0) {
+                              setDetailYear(parseInt(historyPeriod.fromDate.slice(0, 4)));
+                              setDetailMonth(month.month);
+                              setDetailMonthName(month.monthName);
+                              setDetailDirection("out");
+                              setDetailOpen(true);
+                            }
+                          }}
+                          title={month.outwardQty > 0 ? "Click to see individual transactions" : undefined}
+                        >{fmtQty(month.outwardQty)}</td>
                         <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{fmtRate(month.outwardRate)}</td>
                         <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{fmtVal(month.outwardValue)}</td>
                         <td className="text-right px-3 py-2 tabular-nums font-semibold text-foreground">{fmtQty(month.closingQty)}</td>
