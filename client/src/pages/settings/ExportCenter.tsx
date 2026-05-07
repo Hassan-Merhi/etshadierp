@@ -52,11 +52,12 @@ interface BackupStatus {
 }
 interface WaSettings {
   instanceId: string; apiToken: string; enabled: boolean;
-  dailyAutoSend: boolean; dailyRecipientId: number | null; hasCredentials: boolean;
+  dailyAutoSend: boolean; dailyRecipientId: number | null;
+  dailyRecipientName: string | null; hasCredentials: boolean;
 }
 interface WaRecipient { id: number; chatId: string; name: string; isGroup: boolean; active: boolean; }
 interface NpSettings {
-  recipientId: number | null; frequency: string; sendHour: number;
+  recipientId: number | null; recipientName: string | null; frequency: string; sendHour: number;
   sendDayOfWeek: number; enabled: boolean; autoSend: boolean; lastSentAt: string | null;
 }
 
@@ -456,6 +457,11 @@ export function ExportCenter() {
   // ── Computed values ──────────────────────────────────────────────────────
 
   const waGroups = waRecipients.filter(r => r.isGroup && r.active);
+  // Use the name returned directly from the server (joined server-side) so it works
+  // regardless of which company the user is currently viewing.
+  const dailyWaGroupName = waSettings?.dailyRecipientName ?? null;
+  const npWaGroupName = npSettings?.recipientName ?? null;
+  // For the dropdown display we still look in the local recipients list
   const dailyWaGroup = waRecipients.find(r => r.id === waSettings?.dailyRecipientId);
   const npWaGroup = waRecipients.find(r => r.id === (npRecipientId !== undefined ? npRecipientId : npSettings?.recipientId));
   const waReady = !!(waSettings?.enabled && waSettings?.dailyRecipientId);
@@ -647,6 +653,7 @@ export function ExportCenter() {
         <TabsList className="w-full sm:w-auto">
           <TabsTrigger value="daily" data-testid="tab-daily-export">Daily Export</TabsTrigger>
           <TabsTrigger value="np" data-testid="tab-np-export">Net Position Export</TabsTrigger>
+          <TabsTrigger value="stock" data-testid="tab-stock-report">Stock Report</TabsTrigger>
         </TabsList>
 
         {/* ══════════════════════════════════════════════════════════════
@@ -679,7 +686,7 @@ export function ExportCenter() {
                     </span>
                     <span className="flex items-center gap-1.5">
                       <MessageSquare className="h-3 w-3 shrink-0" />
-                      WhatsApp: {dailyWaGroup ? dailyWaGroup.name : <span className="text-amber-600">Not configured</span>}
+                      WhatsApp: {dailyWaGroupName ? dailyWaGroupName : <span className="text-amber-600">Not configured</span>}
                     </span>
                     <span className="flex items-center gap-1.5">
                       <Building2 className="h-3 w-3 shrink-0" />
@@ -950,9 +957,6 @@ export function ExportCenter() {
             )}
           </div>
 
-          {/* Stock + Net Position Report for a specific company */}
-          <StockReportSection />
-
         </TabsContent>
 
         {/* ══════════════════════════════════════════════════════════════
@@ -984,7 +988,7 @@ export function ExportCenter() {
                     </span>
                     <span className="flex items-center gap-1.5">
                       <Users className="h-3 w-3 shrink-0" />
-                      WhatsApp group: {npWaGroup ? npWaGroup.name : <span className="text-amber-600">Not selected</span>}
+                      WhatsApp group: {npWaGroupName ? npWaGroupName : <span className="text-amber-600">Not selected</span>}
                     </span>
                   </div>
                 </div>
@@ -1148,6 +1152,14 @@ export function ExportCenter() {
           </Card>
 
         </TabsContent>
+
+        {/* ══════════════════════════════════════════════════════════════
+            STOCK REPORT TAB
+        ══════════════════════════════════════════════════════════════ */}
+        <TabsContent value="stock" className="space-y-4 mt-4">
+          <StockReportSection />
+        </TabsContent>
+
       </Tabs>
 
       {/* ── Recipients (collapsible) ───────────────────────────────────── */}

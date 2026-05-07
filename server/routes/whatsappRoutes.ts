@@ -36,18 +36,27 @@ export function registerWhatsAppRoutes(app: Express) {
 
   app.get("/api/whatsapp/settings", requireAuth, async (_req, res) => {
     try {
-      const s = await getWaSettings();
-      if (!s) {
+      const r = await pool.query(`
+        SELECT ws.instance_id, ws.api_token, ws.enabled, ws.monthly_auto_send,
+               ws.daily_auto_send, ws.daily_recipient_id,
+               wr.name AS daily_recipient_name
+          FROM whatsapp_settings ws
+          LEFT JOIN whatsapp_recipients wr ON wr.id = ws.daily_recipient_id
+         WHERE ws.id = 1
+      `);
+      if (!r.rows.length) {
         return res.json({ instanceId: "", apiToken: "", enabled: false, monthlyAutoSend: false });
       }
+      const s = r.rows[0];
       res.json({
-        instanceId:       s.instanceId,
-        apiToken:         s.apiToken ? "••••••" : "",
-        enabled:          s.enabled,
-        monthlyAutoSend:  s.monthlyAutoSend,
-        dailyAutoSend:    s.dailyAutoSend,
-        dailyRecipientId: s.dailyRecipientId,
-        hasCredentials:   !!(s.instanceId && s.apiToken),
+        instanceId:          s.instance_id,
+        apiToken:            s.api_token ? "••••••" : "",
+        enabled:             s.enabled,
+        monthlyAutoSend:     s.monthly_auto_send,
+        dailyAutoSend:       s.daily_auto_send,
+        dailyRecipientId:    s.daily_recipient_id,
+        dailyRecipientName:  s.daily_recipient_name ?? null,
+        hasCredentials:      !!(s.instance_id && s.api_token),
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -363,19 +372,23 @@ export function registerWhatsAppRoutes(app: Express) {
   app.get("/api/whatsapp/np-settings", requireAuth, async (_req, res) => {
     try {
       const r = await pool.query(
-        `SELECT id, recipient_id, frequency, send_hour, send_day_of_week,
-                enabled, auto_send, last_sent_at
-         FROM net_position_export_settings WHERE id = 1`,
+        `SELECT npe.id, npe.recipient_id, npe.frequency, npe.send_hour, npe.send_day_of_week,
+                npe.enabled, npe.auto_send, npe.last_sent_at,
+                wr.name AS recipient_name
+           FROM net_position_export_settings npe
+           LEFT JOIN whatsapp_recipients wr ON wr.id = npe.recipient_id
+          WHERE npe.id = 1`,
       );
       if (!r.rows.length) {
         return res.json({
-          recipientId: null, frequency: "daily", sendHour: 18,
+          recipientId: null, recipientName: null, frequency: "daily", sendHour: 18,
           sendDayOfWeek: 1, enabled: false, autoSend: false, lastSentAt: null,
         });
       }
       const row = r.rows[0];
       res.json({
         recipientId:   row.recipient_id,
+        recipientName: row.recipient_name ?? null,
         frequency:     row.frequency      ?? "daily",
         sendHour:      row.send_hour      ?? 18,
         sendDayOfWeek: row.send_day_of_week ?? 1,
