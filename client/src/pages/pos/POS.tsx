@@ -1316,7 +1316,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     );
   };
 
-  const selectItem = async (item: InventoryItem & { stockItemId: number }) => {
+  const selectItem = async (item: InventoryItem & { stockItemId: number }, targetRowOverride?: number) => {
     const canSellZeroStock = posUser?.canSellNegativeStock || authUser?.canSellNegativeStock;
     if (item.stock === 0 && !canSellZeroStock) {
       setZeroStockItem(item.name);
@@ -1324,9 +1324,21 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       return;
     }
 
-    // If no row is active (e.g. clicked from sidebar), auto-pick the first empty row
-    let targetRow = activeRow;
-    if (targetRow === null) {
+    // Fix 4: guard against stale out-of-bounds activeRow
+    let resolvedActiveRow = activeRow;
+    if (resolvedActiveRow !== null && resolvedActiveRow >= rows.length) {
+      resolvedActiveRow = null;
+    }
+
+    // Fix 6: honour explicit override (from right-panel Enter), else fall back to activeRow
+    let targetRow = targetRowOverride ?? resolvedActiveRow;
+    if (targetRow === null || targetRow === undefined) {
+      const emptyRowIndex = rows.findIndex(r => !r.itemName);
+      targetRow = emptyRowIndex >= 0 ? emptyRowIndex : rows.length - 1;
+    }
+
+    // Guard: never write past the end of the array
+    if (targetRow >= rows.length) {
       const emptyRowIndex = rows.findIndex(r => !r.itemName);
       targetRow = emptyRowIndex >= 0 ? emptyRowIndex : rows.length - 1;
     }
@@ -1353,25 +1365,22 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       amount: qty * displayRate,
       configuredPrice: item.configuredPrice,
     };
-    
+
+    // Fix 1: use stable unique ID for the new blank row (never array-length-based)
+    if (targetRow === rows.length - 1) {
+      newRows.push({
+        id: `pos-row-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        itemName: "",
+        quantity: 0,
+        rate: 0,
+        rateUSD: 0,
+        amount: 0,
+      });
+    }
+
     setRows(newRows);
     setSearchTerm("");
     setHighlightedIndex(0);
-
-    // Add new row if last row is being edited
-    if (targetRow === rows.length - 1) {
-      setRows([
-        ...newRows,
-        {
-          id: String(rows.length + 1),
-          itemName: "",
-          quantity: 0,
-          rate: 0,
-          rateUSD: 0,
-          amount: 0,
-        },
-      ]);
-    }
 
     // Move to quantity field
     setTimeout(() => {
@@ -1414,11 +1423,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     setRows(newRows);
 
     // Add new row if last row is being edited (only for non-empty numeric values)
+    // Fix 1: use stable unique ID — never base on array length which collides after deletes
     if (index === rows.length - 1 && value !== "" && value !== 0 && field !== "itemName") {
       setRows([
         ...newRows,
         {
-          id: String(rows.length + 1),
+          id: `pos-row-${Date.now()}-${Math.random().toString(36).slice(2)}`,
           itemName: "",
           quantity: 0,
           rate: 0,
@@ -1430,13 +1440,21 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   };
 
   const handleDeleteRow = async (index: number) => {
-    // Don't allow deleting if it's the only row
+    // Fix 2: if this is the only row, reset it to a clean blank instead of blocking
     if (rows.length === 1) {
-      toast({
-        title: "Cannot Delete",
-        description: "At least one row must remain",
-        variant: "destructive",
-      });
+      setRows([{
+        id: `pos-row-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        itemName: "",
+        quantity: 0,
+        rate: 0,
+        rateUSD: 0,
+        amount: 0,
+      }]);
+      // Fix 3: clear all selection/search state
+      setActiveRow(null);
+      setSearchTerm("");
+      setHighlightedIndex(0);
+      setSelectedCell({ row: 0, col: 0 });
       return;
     }
 
@@ -1447,7 +1465,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     const hasBlankRow = newRows.some(row => !row.itemName && row.quantity === 0 && row.rate === 0);
     if (!hasBlankRow) {
       newRows.push({
-        id: String(Date.now()),
+        id: `pos-row-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         itemName: "",
         quantity: 0,
         rate: 0,
@@ -1457,6 +1475,15 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }
     
     setRows(newRows);
+
+    // Fix 3: always reset active/search state after deletion so the right-panel
+    // cannot target a row that no longer exists at the same index
+    setActiveRow(null);
+    setSearchTerm("");
+    setHighlightedIndex(0);
+    if (selectedCell.row >= newRows.length) {
+      setSelectedCell({ row: 0, col: 0 });
+    }
   };
 
   const handleKeyDown = async (e: React.KeyboardEvent, rowIndex: number, colIndex: number) => {
@@ -2412,19 +2439,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                     clearTimeout(clearActiveRowTimerRef.current);
                     clearActiveRowTimerRef.current = null;
                   }
-                  // Clear the search text and unset the confirmed item so the
-                  // user can immediately type a new search (same feel as the
-                  // inline cell when it's empty).
+                  // Clear the search text so the cashier can immediately type a
+                  // new search. Fix 5: do NOT clear stockItemId here — a confirmed
+                  // item should only be invalidated when the cashier actually changes
+                  // the search text (handled in onChange below).
                   setSearchTerm("");
                   setHighlightedIndex(0);
-                  setActiveRow(prev => {
-                    if (prev !== null) {
-                      setRows(rs => rs.map((r, i) =>
-                        i === prev ? { ...r, stockItemId: undefined } : r
-                      ));
-                    }
-                    return prev;
-                  });
                 }}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -2463,13 +2483,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                     const items = getFilteredInventory();
                     if (items.length > 0) {
                       const item = items[highlightedIndex] || items[0];
-                      const targetRow = activeRow ?? selectedCell.row;
-                      if (activeRow === null) {
-                        setActiveRow(targetRow);
-                        setTimeout(() => selectItem(item), 0);
-                      } else {
-                        selectItem(item);
-                      }
+                      // Fix 6: compute the exact target row now and pass it directly
+                      // to selectItem so it never relies on async state update timing.
+                      // Guard against out-of-bounds activeRow before using it.
+                      const safeActiveRow = (activeRow !== null && activeRow < rows.length) ? activeRow : null;
+                      const targetRow = safeActiveRow ?? selectedCell.row;
+                      selectItem(item, targetRow);
                     }
                   } else if (e.key === "ArrowDown") {
                     e.preventDefault();
