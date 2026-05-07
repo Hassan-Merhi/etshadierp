@@ -51,7 +51,56 @@ async function buildNetPositionZip(
   });
 }
 
-async function runDailyExport(): Promise<void> {
+// ── Helpers: check today's scheduled export state (UTC-agnostic: last 10 h) ───
+
+async function hasTodayExportSucceeded(): Promise<boolean> {
+  try {
+    const r = await pool.query(`
+      SELECT id FROM daily_export_runs
+       WHERE run_type = 'scheduled'
+         AND status   IN ('success', 'partial_failed')
+         AND started_at >= NOW() - INTERVAL '10 hours'
+       LIMIT 1
+    `);
+    return (r.rowCount ?? 0) > 0;
+  } catch { return false; }
+}
+
+async function isTodayExportRunning(): Promise<boolean> {
+  try {
+    const r = await pool.query(`
+      SELECT id FROM daily_export_runs
+       WHERE run_type = 'scheduled'
+         AND status   = 'running'
+         AND started_at >= NOW() - INTERVAL '10 hours'
+       LIMIT 1
+    `);
+    return (r.rowCount ?? 0) > 0;
+  } catch { return false; }
+}
+
+/**
+ * Re-runs the daily export if today's scheduled run hasn't succeeded yet.
+ * Called at startup (after server restart) and from recovery crons.
+ */
+export async function checkAndRecoverDailyExport(): Promise<void> {
+  try {
+    if (await hasTodayExportSucceeded()) {
+      console.log("[DailyExport] Recovery check: today's export already succeeded — nothing to do.");
+      return;
+    }
+    if (await isTodayExportRunning()) {
+      console.log("[DailyExport] Recovery check: export is currently running — skipping.");
+      return;
+    }
+    console.log("[DailyExport] Recovery check: re-running today's failed/missed export...");
+    await runDailyExport();
+  } catch (e: any) {
+    console.error("[DailyExport] Recovery check error:", e?.message || e);
+  }
+}
+
+async function runDailyExport(): Promise<boolean> {
   const cronFiredAt = new Date().toISOString();
   console.log(`[DailyExport] 6 PM cron executed at ${cronFiredAt}`);
 
@@ -70,7 +119,7 @@ async function runDailyExport(): Promise<void> {
     console.log("[DailyExport] Email schedule and WhatsApp daily auto-send are both disabled. Nothing to send.");
     const rid = await createExportRun("scheduled");
     await finishExportRun(rid, { status: "skipped", skippedReason: "Email schedule and WhatsApp daily auto-send are both disabled." });
-    return;
+    return true;
   }
 
   const runId = await createExportRun("scheduled");
@@ -81,7 +130,7 @@ async function runDailyExport(): Promise<void> {
     if (!companies || companies.length === 0) {
       console.log("[DailyExport] No companies found — skipping export.");
       await finishExportRun(runId, { status: "failed", skippedReason: "No companies found." });
-      return;
+      return false;
     }
 
     const today = getTodayLabel();
@@ -96,7 +145,7 @@ async function runDailyExport(): Promise<void> {
         companiesCount: companies.length,
         skippedReason: "Export ZIP is empty — no companies exported successfully.",
       });
-      return;
+      return false;
     }
 
     const zipSizeBytes = zip.length;
@@ -198,9 +247,12 @@ async function runDailyExport(): Promise<void> {
       whatsappAttempts: waAttempts,
     });
 
+    return finalStatus !== "failed";
+
   } catch (err: any) {
     console.error(`[DailyExport] Unexpected error in run ${runId}:`, err?.stack || err?.message || err);
     await finishExportRun(runId, { status: "failed", skippedReason: err?.message || "Unexpected error" }).catch(() => {});
+    return false;
   }
 }
 
@@ -661,11 +713,40 @@ export function startScheduler() {
   schedulerStarted = true;
 
   // Run at 6:00 PM EST (America/New_York) every day.
-  // runDailyExport builds the ZIP once, then independently attempts email (if scheduled)
-  // and WhatsApp (if configured) — no double-build, no silent skips.
+  // Retries up to 4× with 15-minute gaps on failure (covers transient errors).
+  // Server-restart failures are handled by the 8 PM / 10 PM recovery crons and startup check.
   cron.schedule("0 18 * * *", async () => {
     console.log(`[DailyExport] 6 PM cron fired at ${new Date().toISOString()}`);
-    await runDailyExport();
+    const MAX_ATTEMPTS = 4;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      const ok = await runDailyExport();
+      if (ok) {
+        if (attempt > 1) console.log(`[DailyExport] Succeeded on retry attempt ${attempt}.`);
+        break;
+      }
+      if (attempt < MAX_ATTEMPTS) {
+        console.log(`[DailyExport] Attempt ${attempt}/${MAX_ATTEMPTS} failed — retrying in 15 minutes...`);
+        await new Promise<void>(res => setTimeout(res, 15 * 60 * 1000));
+      } else {
+        console.error(`[DailyExport] All ${MAX_ATTEMPTS} attempts failed. Recovery crons at 8 PM / 10 PM will retry.`);
+      }
+    }
+  }, {
+    timezone: "America/New_York",
+  });
+
+  // Recovery cron at 8 PM EST — re-run if today's scheduled export hasn't succeeded yet.
+  cron.schedule("0 20 * * *", async () => {
+    console.log("[DailyExport] 8 PM recovery cron — checking if today's export needs a retry...");
+    await checkAndRecoverDailyExport();
+  }, {
+    timezone: "America/New_York",
+  });
+
+  // Final recovery cron at 10 PM EST — last attempt for the day.
+  cron.schedule("0 22 * * *", async () => {
+    console.log("[DailyExport] 10 PM final recovery cron — checking if today's export still needs a retry...");
+    await checkAndRecoverDailyExport();
   }, {
     timezone: "America/New_York",
   });
@@ -693,7 +774,7 @@ export function startScheduler() {
     timezone: "America/New_York",
   });
 
-  console.log("[DailyExport] Scheduler started — will run daily at 6:00 PM EST.");
+  console.log("[DailyExport] Scheduler started — daily at 6 PM EST (up to 4 retries), recovery crons at 8 PM + 10 PM EST.");
   console.log("[WhatsApp] Monthly net-position scheduler started — runs on the 1st of each month at 7:00 AM EST.");
   console.log("[StockReport] Independent scheduler started — checks every hour.");
   console.log("[NetPositionExport] Scheduled export checker started — checks every hour.");

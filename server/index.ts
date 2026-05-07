@@ -8,7 +8,7 @@ import fs from "fs";
 import { randomBytes } from "crypto";
 import { registerRoutes } from "./routes";
 import { setupWS } from "./wsServer";
-import { startScheduler } from "./services/schedulerService";
+import { startScheduler, checkAndRecoverDailyExport } from "./services/schedulerService";
 import { setupVite, log } from "./vite";
 import type { User } from "@shared/schema";
 import { db, pool } from "./db";
@@ -2896,6 +2896,16 @@ let migrationsDone = false;
         setTimeout(cleanupStuckRuns, 3000);
         // Then check every 10 minutes to catch anything that stalls during a run
         setInterval(cleanupStuckRuns, 10 * 60 * 1000);
+
+        // Startup recovery: if today's scheduled export failed mid-run (e.g. server restart),
+        // re-trigger it automatically. We wait 90 s so the pool and crons are fully ready.
+        setTimeout(async () => {
+          try {
+            await checkAndRecoverDailyExport();
+          } catch (e: any) {
+            console.warn("[DailyExport] Startup recovery call failed:", e?.message);
+          }
+        }, 90 * 1000);
       });
     });
   };
