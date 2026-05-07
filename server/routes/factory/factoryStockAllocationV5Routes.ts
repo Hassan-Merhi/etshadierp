@@ -285,15 +285,16 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       ((allProductsRaw as any).rows ?? (allProductsRaw as unknown as any[])).forEach((r: any) => {
         // Skip products in excluded (wiper/garbage) categories
         if (excludedCodes.has(r.code) || excludedCodes.has(r.articleCode)) return;
-        if (r.name) {
-          // Map both the code and the article_code so bales stored under either key get a name
-          if (r.code)        allProductsMap.set(r.code, r.name);
-          if (r.articleCode) allProductsMap.set(r.articleCode, r.name);
+        if (r.name && r.articleCode) {
+          // Use only the canonical articleCode (COALESCE(article_code, code)) as the map key.
+          // Adding the raw `code` separately would create phantom zero-stock rows for products
+          // where code != article_code (e.g. legacy codes vs HMD article codes).
+          // Bales stored under the raw `code` still get names via step 9a bidirectional lookup.
+          allProductsMap.set(r.articleCode, r.name);
         }
         const w = r.weightKg ? parseFloat(r.weightKg) : 0;
-        if (w > 0) {
-          if (r.code)        weightMap.set(r.code, w);
-          if (r.articleCode) weightMap.set(r.articleCode, w);
+        if (w > 0 && r.articleCode) {
+          weightMap.set(r.articleCode, w);
         }
       });
 
