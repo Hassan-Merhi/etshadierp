@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search, Tag, Building2, ClipboardList, KeyRound } from "lucide-react";
-import { FactorySidebar } from "@/components/FactorySidebar";
+import { FactorySidebar, FACTORY_NAV_SECTIONS } from "@/components/FactorySidebar";
 import { PropertiesSidebar } from "@/components/PropertiesSidebar";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { DateJumpDialog } from "@/components/DateJumpDialog";
@@ -508,6 +508,13 @@ function AuthenticatedApp() {
     staleTime: 30000,
   });
 
+  const { data: factorySettings } = useQuery<Record<string, any>>({
+    queryKey: ["/api/factory/settings"],
+    queryFn: async () => { const r = await fetch("/api/factory/settings"); return r.ok ? r.json() : {}; },
+    enabled: !!user && !isPOS,
+    staleTime: 60000,
+  });
+
   const hasErpAccess = !myAccess || myAccess.hasErpAccess;
   const hasFactoryAccess = !myAccess || myAccess.hasFactoryAccess;
   const isAdminOwner = user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer";
@@ -797,6 +804,76 @@ function AuthenticatedApp() {
   if (!isFactoryCompany && !hasErpAccess && hasFactoryAccess && !isFactoryRoute && currentLocation !== "/my-settings") {
     return <Redirect to={factoryDefaultPage} />;
   }
+
+  // ── Route-level access guard ───────────────────────────────────────────────
+  // Mirrors the exact same logic the sidebar uses, so hiding a page in settings
+  // also blocks direct URL access — not just the nav link.
+  if (isFactoryRoute && !isAdminOwner && myAccess !== undefined) {
+    const isRestrictedUser = !myAccess.fullAccess && myAccess.pageKeys.length > 0;
+
+    // Sub-page → parent pageKey for routes that aren't direct nav items
+    const SUBPAGE_PARENT: [prefix: string, parentKey: string][] = [
+      ["/factory/sales/invoices",          "factory/invoicing"],
+      ["/factory/sales/new",               "factory/invoicing"],
+      ["/factory/sales/pending-invoices",  "factory/invoicing"],
+      ["/factory/invoices",                "factory/invoicing"],
+      ["/factory/sales/loading/",          "factory/sales/loadings"],
+      ["/factory/bale-product-history",    "factory/bales-hub"],
+      ["/factory/reprint-labels",          "factory/bales-hub"],
+      ["/factory/bales-history",           "factory/bales-hub"],
+      ["/factory/barcode-lookup",          "factory/bales-hub"],
+      ["/factory/payroll",                 "factory/workers"],
+      ["/factory/worker-payroll",          "factory/workers"],
+      ["/factory/containers/new",          "factory/containers"],
+      ["/factory/net-position-details",    "factory/net-position"],
+      ["/factory/ledger-monthly",          "factory/accounts"],
+      ["/factory/ledger-vouchers",         "factory/accounts"],
+    ];
+
+    // Resolve the pageKey for the current path (nav item match first, then sub-page map)
+    const resolvePageKey = (path: string): string | null => {
+      for (const section of FACTORY_NAV_SECTIONS) {
+        for (const item of section.items) {
+          if (path === item.url || path.startsWith(item.url + "/")) {
+            return item.url.replace(/^\//, "");
+          }
+        }
+      }
+      for (const [prefix, parentKey] of SUBPAGE_PARENT) {
+        if (path === prefix || path.startsWith(prefix + "/") || path.startsWith(prefix)) {
+          return parentKey;
+        }
+      }
+      return null;
+    };
+
+    const requiredKey = resolvePageKey(currentLocation);
+
+    // 1. Per-user pageKeys restriction
+    if (isRestrictedUser && requiredKey) {
+      if (!myAccess.pageKeys.includes(requiredKey)) {
+        return <Redirect to={factoryDefaultPage} />;
+      }
+    }
+
+    // 2. Feature-flag restriction (mirrors sidebar featureFlag checks)
+    if (factorySettings && requiredKey) {
+      for (const section of FACTORY_NAV_SECTIONS) {
+        for (const item of section.items) {
+          const itemKey = item.url.replace(/^\//, "");
+          if (itemKey === requiredKey && (item as any).featureFlag) {
+            const flag = (item as any).featureFlag as string;
+            const defaultOn = !!(item as any).featureFlagDefaultOn;
+            const enabled = defaultOn
+              ? factorySettings[flag] !== false
+              : factorySettings[flag] === true;
+            if (!enabled) return <Redirect to={factoryDefaultPage} />;
+          }
+        }
+      }
+    }
+  }
+  // ── End route-level access guard ───────────────────────────────────────────
 
   if (isFactoryRoute || isFactoryCompany) {
     return (
