@@ -644,7 +644,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
         const rows: any[] = [];
         for (const c of allContainers) {
           if (rem <= 0.001) break;
-          const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+          // Use totalKg (agreed weight) for FX allocation ceiling — same as supplier balance.
+          const kg = parseFloat(c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat(c.freight || "0");
           const val = kg * rate + freight;
@@ -1118,7 +1119,9 @@ export function registerFactorySuppliersRoutes(app: Express) {
       const computeBalance = (sid: number, openingBal: number) => {
         const supplierContainers = allContainers.filter((c: any) => c.supplierId === sid);
         const containerValue = supplierContainers.reduce((sum: number, c: any) => {
-          const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+          // Use totalKg (declared/agreed weight) not actualReceivedKg — weight differences
+          // at offload affect inventory only, not what is owed to the supplier.
+          const kg = parseFloat(c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat(c.freight || "0");
           const fx = parseFloat(c.fxRateToUsd || "1");
@@ -1244,7 +1247,9 @@ export function registerFactorySuppliersRoutes(app: Express) {
         // Sum container value including freight (agreed supplier charge) in USD.
         // Cross-currency freight (e.g. USD freight on AUD containers) is added directly in USD.
         const containerValue = supplierContainers.reduce((sum: number, c: any) => {
-          const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+          // Use totalKg (declared/agreed weight) not actualReceivedKg — weight differences
+          // at offload affect inventory only, not what is owed to the supplier.
+          const kg = parseFloat(c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat(c.freight || "0");
           const fx = parseFloat(c.fxRateToUsd || "1");
@@ -1623,7 +1628,9 @@ export function registerFactorySuppliersRoutes(app: Express) {
       }))];
 
       const statement = containers.map((c: any) => {
-        const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+        // Use totalKg (declared/agreed weight) for the payable value shown to the supplier.
+        // actualReceivedKg only affects inventory — not the agreed purchase amount.
+        const kg = parseFloat(c.totalKg || "0");
         const rate = parseFloat(c.ratePerKg || "0");
         const freight = parseFloat(c.freight || "0");
         const containerCc = c.currencyCode || "USD";
