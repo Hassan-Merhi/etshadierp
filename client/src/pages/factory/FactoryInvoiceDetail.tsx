@@ -418,20 +418,12 @@ export default function FactoryInvoiceDetail() {
 
   const handleExportPdf = () => {
     if (!orderId) return;
-    const a = document.createElement("a");
-    a.href = `/api/factory/customer-orders/${orderId}/export-pdf`;
-    a.download = "";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    window.open(`/api/factory/customer-orders/${orderId}/export-pdf`, "_blank");
   };
 
   const handleExportLoadingStatus = () => {
     if (!orderId) return;
-    const a = document.createElement("a");
-    a.href = `/api/factory/customer-orders/${orderId}/loading-status-export`;
-    a.download = "";
-    a.click();
+    window.open(`/api/factory/customer-orders/${orderId}/loading-status-export`, "_blank");
   };
 
   if (isLoading) {
