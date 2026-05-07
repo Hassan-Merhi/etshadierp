@@ -2,12 +2,13 @@ import { useState, useMemo, Fragment, useCallback, useEffect, useRef } from "rea
 import { useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock, Pencil, X, Link2 } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock, Pencil, X, Link2, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -83,6 +84,12 @@ export default function FactoryStockAllocationV5() {
   const [expandedRows, setExpandedRows]         = useState<Set<string>>(new Set());
   const [hideZero, setHideZero]                 = useState(true);
   const [refreshFlash, setRefreshFlash]         = useState(false);
+
+  /* ── Export dialog state ─────────────────────────────────────────────────── */
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportIncludePositive, setExportIncludePositive] = useState(true);
+  const [exportIncludeNegative, setExportIncludeNegative] = useState(true);
+  const [exportIncludeZero, setExportIncludeZero]         = useState(false);
 
   /* ── Add-Containers dialog state ────────────────────────────────────────── */
   const [addCtDialog, setAddCtDialog] = useState<{
@@ -361,6 +368,104 @@ export default function FactoryStockAllocationV5() {
     });
   }
 
+  /* ── Excel export ────────────────────────────────────────────────────────── */
+  async function handleExportExcel() {
+    const XLSX = (await import("xlsx-js-style")).default;
+
+    const filtered = rows.filter(r => {
+      if (r.freeToPromise > 0)  return exportIncludePositive;
+      if (r.freeToPromise < 0)  return exportIncludeNegative;
+      return exportIncludeZero;
+    });
+
+    // ── colour helpers ──────────────────────────────────────────────────────
+    const headerFill  = { patternType: "solid", fgColor: { rgb: "1E293B" } };
+    const headerFont  = { bold: true, color: { rgb: "F8FAFC" }, sz: 10 };
+    const positiveFill = { patternType: "solid", fgColor: { rgb: "DCFCE7" } };
+    const negativeFill = { patternType: "solid", fgColor: { rgb: "FEE2E2" } };
+    const neutralFill  = { patternType: "solid", fgColor: { rgb: "F1F5F9" } };
+    const monoFont    = { name: "Courier New", sz: 10 };
+    const border      = {
+      top:    { style: "thin", color: { rgb: "CBD5E1" } },
+      bottom: { style: "thin", color: { rgb: "CBD5E1" } },
+      left:   { style: "thin", color: { rgb: "CBD5E1" } },
+      right:  { style: "thin", color: { rgb: "CBD5E1" } },
+    };
+
+    function hCell(v: string) {
+      return { v, t: "s", s: { fill: headerFill, font: headerFont, alignment: { horizontal: "center", vertical: "center" }, border } };
+    }
+    function numCell(v: number, fill?: object, color?: string) {
+      return {
+        v, t: "n",
+        s: {
+          font: { ...monoFont, ...(color ? { color: { rgb: color } } : {}) },
+          fill: fill ?? { patternType: "solid", fgColor: { rgb: "FFFFFF" } },
+          alignment: { horizontal: "right" },
+          border,
+        },
+      };
+    }
+    function txtCell(v: string, bold = false) {
+      return { v, t: "s", s: { font: { sz: 10, bold }, alignment: { horizontal: "left", wrapText: true }, border } };
+    }
+
+    const headerRow = [
+      hCell("Article Code"),
+      hCell("Product Name"),
+      hCell("Stock Available"),
+      hCell("Expected to Load"),
+      hCell("Total Loaded"),
+      hCell("Available Balance"),
+    ];
+
+    const dataRows = filtered.map(r => {
+      const bal = r.freeToPromise;
+      const balFill = bal > 0 ? positiveFill : bal < 0 ? negativeFill : neutralFill;
+      const balColor = bal > 0 ? "15803D" : bal < 0 ? "DC2626" : "64748B";
+      return [
+        txtCell(r.articleCode, true),
+        txtCell(r.productName),
+        numCell(r.stockAvailable, { patternType: "solid", fgColor: { rgb: "FFFFFF" } }, "15803D"),
+        numCell(r.expectedToLoad, { patternType: "solid", fgColor: { rgb: "FFFFFF" } }, "D97706"),
+        numCell(r.totalLoaded, { patternType: "solid", fgColor: { rgb: "FFFFFF" } }, "2563EB"),
+        numCell(bal, balFill, balColor),
+      ];
+    });
+
+    // Totals row
+    const totalsBal = filtered.reduce((s, r) => s + r.freeToPromise, 0);
+    const totalsRow = [
+      { v: "TOTALS", t: "s", s: { font: { bold: true, sz: 10 }, fill: { patternType: "solid", fgColor: { rgb: "E2E8F0" } }, alignment: { horizontal: "left" }, border } },
+      { v: `${filtered.length} products`, t: "s", s: { font: { sz: 10, color: { rgb: "64748B" } }, fill: { patternType: "solid", fgColor: { rgb: "E2E8F0" } }, alignment: { horizontal: "left" }, border } },
+      numCell(filtered.reduce((s, r) => s + r.stockAvailable, 0),  { patternType: "solid", fgColor: { rgb: "E2E8F0" } }, "15803D"),
+      numCell(filtered.reduce((s, r) => s + r.expectedToLoad, 0),  { patternType: "solid", fgColor: { rgb: "E2E8F0" } }, "D97706"),
+      numCell(filtered.reduce((s, r) => s + r.totalLoaded, 0),     { patternType: "solid", fgColor: { rgb: "E2E8F0" } }, "2563EB"),
+      numCell(totalsBal, { patternType: "solid", fgColor: { rgb: "E2E8F0" } }, totalsBal < 0 ? "DC2626" : totalsBal > 0 ? "15803D" : "64748B"),
+    ];
+
+    const wsData = [headerRow, ...dataRows, totalsRow];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    ws["!cols"] = [
+      { wch: 16 }, // Article Code
+      { wch: 36 }, // Product Name
+      { wch: 16 }, // Stock Available
+      { wch: 18 }, // Expected to Load
+      { wch: 14 }, // Total Loaded
+      { wch: 18 }, // Available Balance
+    ];
+    ws["!rows"] = [{ hpt: 22 }, ...dataRows.map(() => ({ hpt: 18 })), { hpt: 22 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Stock Allocation");
+
+    const now = new Date();
+    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+    XLSX.writeFile(wb, `stock_allocation_${stamp}.xlsx`);
+    setExportDialogOpen(false);
+  }
+
   /* ── Article rows for the drawer ──────────────────────────────────────── */
   const drawerRows = useMemo(() => rows.map(r => ({
     articleCode:    r.articleCode,
@@ -394,6 +499,15 @@ export default function FactoryStockAllocationV5() {
             data-testid="button-v5-toggle-zero"
           >
             {hideZero ? "Show Zero Rows" : "Hide Zero Rows"}
+          </Button>
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => setExportDialogOpen(true)}
+            disabled={rows.length === 0}
+            data-testid="button-v5-export-excel"
+          >
+            <FileDown className="h-4 w-4 mr-2" />Export Excel
           </Button>
           <Button size="default" onClick={() => setCreateDrawerOpen(true)} data-testid="button-v5-open-create-proforma">
             <Plus className="h-4 w-4 mr-2" />Create Proforma
@@ -1140,6 +1254,98 @@ export default function FactoryStockAllocationV5() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Export Excel dialog */}
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileDown className="h-4 w-4 text-muted-foreground" />
+              Export Stock Allocation
+            </DialogTitle>
+            <DialogDescription>
+              Choose which rows to include in the Excel export.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4 py-1">
+            <p className="text-xs text-muted-foreground">
+              The export includes Article Code, Product Name, Stock Available, Expected to Load, Total Loaded, and Available Balance — with colour-coded balance cells.
+            </p>
+
+            <div className="rounded-md border divide-y">
+              <label className="flex items-center gap-3 px-4 py-3 cursor-pointer hover-elevate" data-testid="checkbox-export-positive">
+                <Checkbox
+                  checked={exportIncludePositive}
+                  onCheckedChange={v => setExportIncludePositive(!!v)}
+                />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium text-green-700 dark:text-green-400">Positive balance</span>
+                  <span className="text-xs text-muted-foreground">More stock than required</span>
+                </div>
+                <span className="ml-auto text-xs font-mono text-green-700 dark:text-green-400">
+                  {rows.filter(r => r.freeToPromise > 0).length} rows
+                </span>
+              </label>
+
+              <label className="flex items-center gap-3 px-4 py-3 cursor-pointer hover-elevate" data-testid="checkbox-export-negative">
+                <Checkbox
+                  checked={exportIncludeNegative}
+                  onCheckedChange={v => setExportIncludeNegative(!!v)}
+                />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium text-destructive">Negative balance (shortages)</span>
+                  <span className="text-xs text-muted-foreground">Stock is below what is needed</span>
+                </div>
+                <span className="ml-auto text-xs font-mono text-destructive">
+                  {rows.filter(r => r.freeToPromise < 0).length} rows
+                </span>
+              </label>
+
+              <label className="flex items-center gap-3 px-4 py-3 cursor-pointer hover-elevate" data-testid="checkbox-export-zero">
+                <Checkbox
+                  checked={exportIncludeZero}
+                  onCheckedChange={v => setExportIncludeZero(!!v)}
+                />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium text-muted-foreground">Zero balance</span>
+                  <span className="text-xs text-muted-foreground">Exactly meets requirements</span>
+                </div>
+                <span className="ml-auto text-xs font-mono text-muted-foreground">
+                  {rows.filter(r => r.freeToPromise === 0).length} rows
+                </span>
+              </label>
+            </div>
+
+            {/* Preview count */}
+            <div className="text-xs text-center text-muted-foreground">
+              {(() => {
+                const count = rows.filter(r =>
+                  (r.freeToPromise > 0 && exportIncludePositive) ||
+                  (r.freeToPromise < 0 && exportIncludeNegative) ||
+                  (r.freeToPromise === 0 && exportIncludeZero)
+                ).length;
+                return count > 0
+                  ? <span><span className="font-semibold text-foreground">{count}</span> rows will be exported</span>
+                  : <span className="text-destructive font-medium">Select at least one filter above</span>;
+              })()}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setExportDialogOpen(false)} data-testid="button-export-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleExportExcel}
+              disabled={!exportIncludePositive && !exportIncludeNegative && !exportIncludeZero}
+              data-testid="button-export-confirm"
+            >
+              <FileDown className="h-4 w-4 mr-2" />Download Excel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
