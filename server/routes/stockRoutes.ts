@@ -1893,7 +1893,7 @@ export function registerStockRoutes(app: Express) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const userId = (req.session as any).userId;
+      const userId: number = req.user?.id ?? req.session.userId;
 
       const keptId      = parseInt(req.params.id);
       const duplicateId = parseInt(req.body.duplicateId);
@@ -2005,7 +2005,7 @@ export function registerStockRoutes(app: Express) {
           throw new Error(`Value integrity check failed — before: ${totalValueBefore.toFixed(2)}, after: ${totalValueAfter.toFixed(2)}`);
         }
 
-        // Step 6 — audit log
+        // Step 6 — capture post-merge snapshot (used for audit log outside the tx)
         const snapshotAfter: Record<string, unknown> = {};
         for (const r of keptInvAfter) {
           snapshotAfter[`${r.stockItemId}_${r.locationId}`] = {
@@ -2013,20 +2013,29 @@ export function registerStockRoutes(app: Express) {
             quantity: r.quantity, averageRate: r.averageRate, totalValue: r.totalValue,
           };
         }
-        await tx.insert(stockItemMergeLogs).values({
-          companyId,
-          keptItemId:      keptId,
-          keptItemCode:    keptItem.code,
-          keptItemName:    keptItem.name,
-          mergedItemId:    duplicateId,
-          mergedItemCode:  duplicateItem.code,
-          mergedItemName:  duplicateItem.name,
-          snapshotBefore,
-          snapshotAfter,
-          mergedByUserId: userId,
-          notes: notes ?? null,
-        });
+        // Store for use after the transaction commits
+        (req as any)._mergeSnapshotAfter = snapshotAfter;
       });
+
+      // Step 7 — audit log (outside transaction so it never rolls back the merge)
+      try {
+        await db.insert(stockItemMergeLogs).values({
+          companyId,
+          keptItemId:     keptId,
+          keptItemCode:   keptItem.code.slice(0, 50),
+          keptItemName:   keptItem.name,
+          mergedItemId:   duplicateId,
+          mergedItemCode: duplicateItem.code.slice(0, 50),
+          mergedItemName: duplicateItem.name,
+          snapshotBefore,
+          snapshotAfter:  (req as any)._mergeSnapshotAfter ?? {},
+          mergedByUserId: userId,
+          notes:          notes ?? null,
+        });
+      } catch (auditErr: any) {
+        // Audit log failure is non-fatal — merge already committed
+        console.error("[Merge] Audit log insert failed (merge succeeded):", auditErr?.message);
+      }
 
       return res.json({ success: true, keptItemId: keptId, mergedItemId: duplicateId });
     } catch (error: any) {
