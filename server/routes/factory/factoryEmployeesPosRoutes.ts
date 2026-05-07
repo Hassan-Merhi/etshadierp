@@ -2914,26 +2914,9 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         const cIds = (allCustomersForNP as any[]).map((c: any) => c.id);
         const custLedgerIds = [...customerLedgerIds];
 
-        // Sales totals from FINALIZED and VERIFIED orders. CHARGE-* vouchers are still
-        // excluded from voucherNet below because the charge is already in grandTotal for
-        // both statuses. When an order moves VERIFIED → FINALIZED its status changes, so
-        // there is no double-counting.
-        const cSalesRows = await db.select({
-          customerId: customerOrders.customerId,
-          total: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric)), 0)`,
-        })
-          .from(customerOrders)
-          .where(and(
-            inArray(customerOrders.customerId, cIds),
-            eq(customerOrders.companyId, companyId),
-            inArray(customerOrders.status, ["FINALIZED", "VERIFIED"]),
-          ))
-          .groupBy(customerOrders.customerId);
-
-        const cSalesMap = new Map(cSalesRows.map((r: any) => [r.customerId, parseFloat(r.total || "0")]));
-
-        // Non-invoice balance adjustments (manual Dr/Cr adjustments, not order-based).
-        const cNonInvRows = await db.select({
+        // ── Customer balance formula — mirrors GET /api/factory/customers exactly ──
+        // 1. Net of ALL customerBalances rows (includes INVOICE type as stored).
+        const cCbNetRows = await db.select({
           customerId: customerBalances.customerId,
           net: sql<string>`COALESCE(SUM(CAST(${customerBalances.debitAmount} AS numeric) - CAST(${customerBalances.creditAmount} AS numeric)), 0)`,
         })
@@ -2941,13 +2924,33 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           .where(and(
             inArray(customerBalances.customerId, cIds),
             eq(customerBalances.companyId, companyId),
-            sql`${customerBalances.referenceType} IS DISTINCT FROM 'INVOICE'`,
           ))
           .groupBy(customerBalances.customerId);
 
-        const cNonInvMap = new Map(cNonInvRows.map((r: any) => [r.customerId, parseFloat(r.net || "0")]));
+        const cCbNetMap = new Map(cCbNetRows.map((r: any) => [r.customerId, parseFloat(r.net || "0")]));
 
-        // Voucher entries via ledgerAccountId — EXCLUDE CHARGE-* (already in salesTotal).
+        // 2. Correction for INVOICE rows: replace stored debitAmount with live grandTotal
+        //    of FINALIZED orders — identical to the statement correction on the Customers page.
+        const cInvCorrRows = await db.select({
+          customerId: customerBalances.customerId,
+          correction: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric) - CAST(${customerBalances.debitAmount} AS numeric)), 0)`,
+        })
+          .from(customerBalances)
+          .innerJoin(customerOrders, and(
+            eq(customerOrders.id, customerBalances.referenceId as any),
+            eq(customerOrders.companyId, companyId),
+            eq(customerOrders.status, "FINALIZED"),
+          ))
+          .where(and(
+            inArray(customerBalances.customerId, cIds),
+            eq(customerBalances.companyId, companyId),
+            sql`${customerBalances.referenceType} = 'INVOICE'`,
+          ))
+          .groupBy(customerBalances.customerId);
+
+        const cInvCorrMap = new Map(cInvCorrRows.map((r: any) => [r.customerId, parseFloat(r.correction || "0")]));
+
+        // 3. Voucher entries via ledgerAccountId — EXCLUDE CHARGE-* AND INV-* (matches Customers page).
         const cLedgerVoucherRows = custLedgerIds.length > 0
           ? await db.select({
               ledgerAccountId: voucherEntries.ledgerAccountId,
@@ -2958,6 +2961,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
                 eq(voucherEntries.voucherId, vouchers.id),
                 eq(vouchers.companyId, companyId),
                 sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
+                sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`,
               ))
               .where(inArray(voucherEntries.ledgerAccountId as any, custLedgerIds))
               .groupBy(voucherEntries.ledgerAccountId)
@@ -2966,7 +2970,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           (cLedgerVoucherRows as any[]).map((r: any) => [r.ledgerAccountId, parseFloat(r.net || "0")]),
         );
 
-        // Voucher entries directly linked via customerId (no ledgerAccountId) — EXCLUDE CHARGE-*.
+        // 4. Voucher entries directly linked via customerId — EXCLUDE CHARGE-* AND INV-* (matches Customers page).
         const cVoucherRows = await db.select({
           customerId: voucherEntries.customerId,
           net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
@@ -2976,6 +2980,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
             eq(voucherEntries.voucherId, vouchers.id),
             eq(vouchers.companyId, companyId),
             sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
+            sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`,
           ))
           .where(and(
             inArray(voucherEntries.customerId as any, cIds),
@@ -2986,14 +2991,14 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         const cVoucherMap = new Map((cVoucherRows as any[]).map((r: any) => [r.customerId, parseFloat(r.net || "0")]));
 
         for (const c of allCustomersForNP as any[]) {
-          const salesTotal = cSalesMap.get(c.id) ?? 0;
-          const nonInvNet = cNonInvMap.get(c.id) ?? 0;
+          const cbNet      = cCbNetMap.get(c.id) ?? 0;
+          const invCorr    = cInvCorrMap.get(c.id) ?? 0;
           const ledgerVoucherNet = c.ledgerAccountId ? (cLedgerVoucherMap.get(c.ledgerAccountId) ?? 0) : 0;
           const directVoucherNet = cVoucherMap.get(c.id) ?? 0;
           const voucherNet = ledgerVoucherNet + directVoucherNet;
-          const opening = parseFloat(c.openingBalance || "0");
+          const opening    = parseFloat(c.openingBalance || "0");
           const openingSide = c.openingBalanceSide || "Dr";
-          const totalBalance = (openingSide === "Dr" ? opening : -opening) + salesTotal + nonInvNet + voucherNet;
+          const totalBalance = (openingSide === "Dr" ? opening : -opening) + cbNet + invCorr + voucherNet;
           if (Math.abs(totalBalance) > 0.01) {
             customerItems.push({ name: c.legalName || c.name || `Customer #${c.id}`, balanceUsd: round2(totalBalance), ledgerAccountId: c.ledgerAccountId || undefined });
           }
