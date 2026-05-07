@@ -394,7 +394,13 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       });
 
       // 11. Apply frontend filters
-      let filtered = rows;
+      // Always exclude garbage and wiper products — they are not part of stock allocation
+      let filtered = rows.filter(r => {
+        const name = (r.productName || "").toLowerCase();
+        const code = (r.articleCode || "").toLowerCase();
+        return !name.includes("garbage") && !name.includes("wiper") &&
+               !code.includes("garbage") && !code.includes("wiper");
+      });
       if (productFilter) {
         const q = String(productFilter).toLowerCase();
         filtered = filtered.filter(r => r.articleCode.toLowerCase().includes(q) || r.productName.toLowerCase().includes(q));
